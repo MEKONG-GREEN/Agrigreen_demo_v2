@@ -82,3 +82,8 @@ Thứ tự nhóm theo D3 C6: **Điều hành / Nghiệp vụ / Báo cáo / (Dữ
   không cần phòng ban mới.
 - Q-068 (đơn vị nội bộ phòng/trạm/trại) — nếu chọn "mở rộng `department` với loại `tram`/`trai`", mã mới
   không được trùng 5 mã trên và không dùng lại `phong_ban_5/6`.
+- **W11.07 (đã làm):** `MenuItem.Needs` (`manager`, `qtnv_bao_gia`) lọc mục theo ngữ cảnh phiên ở `GET /v1/menu`
+  (không lọc khi không có ngữ cảnh/Admin hỗ trợ; ca vàng web là menu đầy đủ). Đã gắn: CNTS "Duyệt báo cáo" (lãnh
+  đạo), Báo giá "Cấu hình báo giá" (QTNV, mục mới), "Nhân sự của phòng" (nhóm "Dùng chung" Cấp Tỉnh, lãnh đạo — Q-067).
+  Đơn vị nội bộ (Q-068) là danh mục riêng `pf_accounts.internal_unit` trỏ mã phòng ban — không thêm dòng vào
+  `department`.

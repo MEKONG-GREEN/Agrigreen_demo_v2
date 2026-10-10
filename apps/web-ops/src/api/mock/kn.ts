@@ -211,6 +211,10 @@ const soon = (key: string, label: string, route: string, icon: string): Item => 
 
 /** Nhóm "Dùng chung" cuối menu mọi đối tượng (domain.SharedGroup, HCTH FN-13). */
 const SHARED: Group = { key: "dung_chung", label: "Dùng chung", items: [soon("chung.contact", "Contact", "/kn/dung-chung/contact", "phone")] };
+/** W11.07 (Q-067): mục "Dùng chung" thêm theo đối tượng — server chỉ trả cho lãnh đạo (Needs manager); bản giả lập trả đầy đủ như ca vàng. */
+const SHARED_BY_AUDIENCE: Partial<Record<KnRole, Item[]>> = {
+  kn_tinh: [soon("tinh.chung.nhan_su_phong", "Nhân sự của phòng", "/kn/nhan-su/cua-phong", "users")],
+};
 
 /** Nhóm "Nghiệp vụ" theo khuôn × đối tượng (domain.deptBusiness) — mọi mục "Sắp có". */
 const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "admin">, Item[]>>>> = {
@@ -258,6 +262,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       soon("tinh.bao_gia.bien_dong", "Báo cáo biến động giá", "/kn/bao-gia/bien-dong", "layers"),
       soon("tinh.bao_gia.dieu_tra", "Điều tra giá thành", "/kn/bao-gia/dieu-tra", "season"),
       soon("tinh.bao_gia.mat_hang", "Mặt hàng", "/kn/bao-gia/mat-hang", "package"),
+      soon("tinh.bao_gia.cau_hinh", "Cấu hình báo giá", "/kn/bao-gia/cau-hinh", "param"), // W11.07: chỉ QTNV ở server
     ],
     kn_xa: [
       soon("xa.bao_gia.nhap", "Nhập báo giá", "/kn/bao-gia/nhap", "upload"),
@@ -402,7 +407,8 @@ export function knMenu(audience: KnRole, departmentCode: string | null, opts: { 
   }
   const d = KN_DEPARTMENTS.find((x) => x.code === (departmentCode ?? "trong_trot")) ?? KN_DEPARTMENTS[0]!;
   const adHoc = opts.adHoc ?? ADHOC_FORMS[d.code] ?? false;
-  const groups = [...profileGroups(profileOf(d.code), audience), SHARED]
+  const shared: Group = { ...SHARED, items: [...SHARED.items, ...(SHARED_BY_AUDIENCE[audience] ?? [])] };
+  const groups = [...profileGroups(profileOf(d.code), audience), shared]
     .map((g) => ({ key: g.key, label: g.label, items: wire(g.items, true, adHoc) }))
     .filter((g) => g.items.length > 0);
   return { menu_version: MENU_VERSION, audience, org_ref: opts.orgRef ?? null, department: deptWire(d), default_route: DEFAULT_ROUTE[audience], groups };

@@ -19,6 +19,11 @@ type KNContext struct {
 	// MgmtLevel là cấp quản lý của vai trò. Rỗng = không biết (chưa có P1) → mọi Cấp Tỉnh cùng phòng ban,
 	// cùng tỉnh được coi là người duyệt (tạm, chờ khách Q-05).
 	MgmtLevel string
+	// InternalUnit là mã đơn vị nội bộ (phòng/trạm/trại) của người gọi — "UnitRef nội bộ" của W11.07 (D3 H0).
+	// Cấp Xã: đơn vị quản lý (HS-37). Rỗng = chưa khai.
+	InternalUnit string
+	// ReadOnly: ngữ cảnh chỉ xem (Cấp Quốc gia, Lãnh đạo đơn vị xem phòng ban khác, Ban Giám đốc — W11.07).
+	ReadOnly bool
 }
 
 // KNContextResolver (do P1 cung cấp qua gốc lắp ráp) trả ngữ cảnh KN của request hiện tại (X-AG-Context).

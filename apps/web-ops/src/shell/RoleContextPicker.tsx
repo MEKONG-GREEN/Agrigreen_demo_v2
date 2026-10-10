@@ -64,7 +64,7 @@ export function RoleContextPicker({
                   type="button"
                   className="dept-pick"
                   disabled={!open || busy}
-                  aria-label={open ? `${d.name} — Vào hệ thống` : `${d.name} — Chưa mở`}
+                  aria-label={open ? `${d.name} — ${d.read_only ? "Vào xem (chỉ xem)" : "Vào hệ thống"}` : `${d.name} — Chưa mở`}
                   onClick={() => onSelect({ assignment_id: current.assignment_id, department_code: d.code })}
                 >
                   <span className="ic" aria-hidden="true">
@@ -72,7 +72,7 @@ export function RoleContextPicker({
                   </span>
                   <b>{d.name}</b>
                   {d.description ? <span className="d">{d.description}</span> : null}
-                  {open ? <span className="go">Vào hệ thống →</span> : <span className="closed">Chưa mở</span>}
+                  {open ? <span className="go">{d.read_only ? "Chỉ xem →" : "Vào hệ thống →"}</span> : <span className="closed">Chưa mở</span>}
                 </button>
               );
             })}

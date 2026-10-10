@@ -267,7 +267,7 @@ func TestFN_CH_00_01_MultiRoleContextsAndSwitch(t *testing.T) {
 		if m["role"] == port.KNXa {
 			deps := m["departments"].([]any)
 			communes := m["communes"].([]any)
-			if len(deps) != 2 || len(communes) != 2 || m["mgmt_level"] != "Chuyên viên" || m["org_name"] != "Tổ chức thử" {
+			if len(deps) != 2 || len(communes) != 2 || m["mgmt_level"] != "Chuyên viên - Cán bộ" || m["org_name"] != "Tổ chức thử" {
 				t.Fatalf("thẻ Cấp Xã: %v", m)
 			}
 			for _, d := range deps {

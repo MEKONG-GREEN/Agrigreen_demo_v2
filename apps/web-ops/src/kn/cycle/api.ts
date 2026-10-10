@@ -276,6 +276,20 @@ export function createCycleApi(opts: KnHttpOptions) {
 
 export type KnAdminApi = ReturnType<typeof createKnAdminApi>;
 
+// W11.07 — phân quyền trong vai + đơn vị nội bộ (admin.yaml KNAssignmentAttrs, KNDelegation, InternalUnit).
+export type KnAssignmentAttrs = D["KNAssignmentAttrs"];
+export type KnDelegation = D["KNDelegation"];
+export type InternalUnit = D["InternalUnit"];
+export type KnCatalogItem = D["KNCatalogItem"];
+export interface KnAttrsInput {
+  province_group?: string;
+  duties?: string[];
+  internal_unit_code?: string;
+  facility_refs?: string[];
+  household_refs?: string[];
+  reason?: string;
+}
+
 /** Quản trị KN (Admin API, MFA). */
 /** Kết quả POST /v1/accounts/kn-users/import. */
 export interface KnUserImport {
@@ -301,7 +315,26 @@ export function createKnAdminApi(opts: KnHttpOptions) {
     /** W11.02 FN-AD-04.04: tab Phiên đang hoạt động / Lịch sử đăng nhập (Keycloak Admin REST). */
     sessions: (id: string) => call<KnUserSessions>("GET", `/v1/accounts/users/${id}/sessions`, undefined, { limit: 50 }),
     user: (id: string) => call<AccountsUser>("GET", `/v1/accounts/users/${id}`),
-    mgmtLevels: () => call<{ items: { code: string; label: string }[]; provisional: boolean }>("GET", "/v1/accounts/mgmt-levels"),
+    mgmtLevels: () =>
+      call<{
+        items: { code: string; label: string; manager?: boolean; reads_all_departments?: boolean }[];
+        provisional: boolean;
+        province_groups?: KnCatalogItem[];
+        duties?: KnCatalogItem[];
+        powers?: KnCatalogItem[];
+        delegation_max_days?: number;
+      }>("GET", "/v1/accounts/mgmt-levels"),
+    // W11.07: phân quyền trong vai, ủy quyền có hạn, đơn vị nội bộ.
+    setAttrs: (id: string, aid: string, body: KnAttrsInput) =>
+      call<{ assignment_id: string; attributes: KnAssignmentAttrs; seq: number }>("PUT", `/v1/accounts/users/${id}/assignments/${aid}/attributes`, body),
+    delegations: (id: string) => call<{ items: KnDelegation[] }>("GET", `/v1/accounts/users/${id}/delegations`),
+    revokeDelegation: (did: string, reason: string) => call<KnDelegation>("POST", `/v1/accounts/delegations/${did}/revoke`, { reason }),
+    internalUnits: (includeInactive = false) => call<{ org_ref: string; items: InternalUnit[]; kinds: KnCatalogItem[] }>("GET", "/v1/accounts/internal-units", undefined, includeInactive ? { include_inactive: "true" } : {}),
+    createInternalUnit: (body: { org_ref: string; code: string; kind: string; name: string; department_code?: string; sort_order?: number }) =>
+      call<InternalUnit>("POST", "/v1/accounts/internal-units", body),
+    seedInternalUnits: (org_ref: string) => call<{ created: InternalUnit[]; existing: number; status: string }>("POST", "/v1/accounts/internal-units/seed", { org_ref }),
+    setInternalUnitActive: (uid: string, active: boolean, reason?: string) =>
+      call<InternalUnit>("POST", `/v1/accounts/internal-units/${uid}/${active ? "reactivate" : "deactivate"}`, reason ? { reason } : {}),
     createKnUser: (body: { full_name: string; email: string; phone?: string; assignments: KnAssignmentInput[] }) =>
       call<{ user: AccountsUser; assignments: KnAssignment[]; activation_email_sent: boolean; warnings: { code: string; message: string }[] }>("POST", "/v1/accounts/kn-users", body),
     assignments: (id: string) => call<{ items: KnAssignment[] }>("GET", `/v1/accounts/users/${id}/assignments`),

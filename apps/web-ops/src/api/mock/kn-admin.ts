@@ -22,13 +22,89 @@ import { AG_COMMUNES, AG_PROVINCE, AG_REGIONS, communeName, regionName } from ".
 const AG_REF = provinceOrgRef(1);
 const T0 = "2026-08-20T01:30:00Z";
 
+/** Danh mục cấp quản lý (accounts/port.MgmtLevels, accounts.kn-roles/2 — W11.07, Q-059). */
 export const MGMT_LEVELS = [
-  { code: "chuyen_vien", label: "Chuyên viên" },
-  { code: "pho_phong", label: "Phó phòng" },
-  { code: "truong_phong", label: "Trưởng phòng" },
+  { code: "chuyen_vien", label: "Chuyên viên - Cán bộ", manager: false, reads_all_departments: false },
+  { code: "phu_trach", label: "Phụ trách", manager: true, reads_all_departments: false },
+  { code: "pho_truong_phong", label: "Phó trưởng phòng", manager: true, reads_all_departments: false },
+  { code: "truong_phong", label: "Trưởng phòng", manager: true, reads_all_departments: false },
+  { code: "lanh_dao_don_vi", label: "Lãnh đạo đơn vị", manager: true, reads_all_departments: true },
+  { code: "pho_giam_doc", label: "Phó Giám đốc", manager: true, reads_all_departments: false },
+  { code: "giam_doc", label: "Giám đốc", manager: true, reads_all_departments: false },
 ];
-const mgmtLabel = (code: string | null | undefined) => MGMT_LEVELS.find((m) => m.code === code || m.label === code)?.label ?? null;
-const mgmtCode = (label: string | null | undefined) => MGMT_LEVELS.find((m) => m.label === label || m.code === label)?.code ?? null;
+/** W11.07: nhóm Cấp Tỉnh, cờ nhiệm vụ, quyền ủy quyền (cùng danh mục với Go). */
+export const PROVINCE_GROUPS = [
+  { code: "vien_chuc", label: "Viên chức" },
+  { code: "tong_hop", label: "Cán bộ tổng hợp" },
+  { code: "chu_nhiem", label: "Chủ nhiệm chương trình/dự án" },
+  { code: "lanh_dao_phong", label: "Lãnh đạo phòng" },
+  { code: "ban_giam_doc", label: "Ban Giám đốc (chỉ xem)" },
+];
+export const DUTIES = [
+  { code: "qtnv_bao_gia", label: "Quản trị nghiệp vụ báo giá (QTNV)" },
+  { code: "phu_trach_bieu", label: "Người phụ trách biểu" },
+];
+export const POWERS = [
+  { code: "mo_lai_ky", label: "Mở lại kỳ" },
+  { code: "duyet_bao_cao", label: "Duyệt, xác thực báo cáo" },
+];
+// Nhãn cũ "Chuyên viên" (dữ liệu giả lập trước W11.07) ↔ chuyen_vien.
+const LEGACY_LABEL: Record<string, string> = { "Chuyên viên": "chuyen_vien" };
+const mgmtLabel = (code: string | null | undefined) => MGMT_LEVELS.find((m) => m.code === code || m.label === code)?.label ?? (code && LEGACY_LABEL[code] ? code : null);
+const mgmtCode = (label: string | null | undefined) => MGMT_LEVELS.find((m) => m.label === label || m.code === label)?.code ?? (label ? (LEGACY_LABEL[label] ?? null) : null);
+
+// ---------------------------------------------------------------------------
+// W11.07: thuộc tính vai, ủy quyền có hạn, đơn vị nội bộ (giả lập trong bộ nhớ)
+// ---------------------------------------------------------------------------
+interface MockAttrs {
+  province_group: string | null;
+  duties: string[];
+  internal_unit_code: string | null;
+  facility_refs: string[];
+  household_refs: string[];
+}
+const ATTRS = new Map<string, MockAttrs>();
+const emptyAttrs = (): MockAttrs => ({ province_group: null, duties: [], internal_unit_code: null, facility_refs: [], household_refs: [] });
+const attrsWire = (aid: string) => {
+  const a = ATTRS.get(aid) ?? emptyAttrs();
+  return { ...a, province_group_label: PROVINCE_GROUPS.find((g) => g.code === a.province_group)?.label ?? null };
+};
+interface MockUnit {
+  id: string;
+  org_ref: string;
+  code: string;
+  kind: string;
+  kind_label: string;
+  name: string;
+  department_code: string | null;
+  sort_order: number;
+  active: boolean;
+  updated_at: string;
+}
+export const UNIT_KINDS = [
+  { code: "ban_giam_doc", label: "Ban Giám đốc" },
+  { code: "van_phong", label: "Văn phòng" },
+  { code: "phong", label: "Phòng" },
+  { code: "tram", label: "Trạm" },
+  { code: "trai", label: "Trại" },
+  { code: "tang_cuong", label: "Tăng cường" },
+];
+const UNITS: MockUnit[] = [];
+interface MockDelegation {
+  delegation_id: string;
+  grantor_ref: string;
+  grantee_ref: string;
+  department_code: string;
+  power: string;
+  power_label: string;
+  valid_from: string;
+  valid_to: string;
+  revoked: boolean;
+  status: "active" | "scheduled" | "expired" | "revoked";
+  reason: string;
+  created_at: string;
+}
+const DELEGATIONS: MockDelegation[] = [];
 
 interface Profile {
   email: string;
@@ -169,6 +245,7 @@ function assignmentWire(a: MockKnAccount, x: RoleAssignment) {
     created_at: T0,
     updated_by: ADMIN_REF,
     updated_at: T0,
+    attributes: attrsWire(x.assignment_id.length === 36 ? x.assignment_id : stableUuid(x.assignment_id)),
   };
 }
 
@@ -431,7 +508,130 @@ const reasonOk = (b: unknown, min: number) => {
 };
 
 export const knAdminRoutes: Route[] = [
-  { method: "GET", pattern: re("/v1/accounts/mgmt-levels"), handler: (ctx) => (isKnAdmin(ctx) ? json({ items: MGMT_LEVELS, provisional: true }) : deny()) },
+  {
+    method: "GET",
+    pattern: re("/v1/accounts/mgmt-levels"),
+    handler: (ctx) =>
+      isKnAdmin(ctx)
+        ? json({ items: MGMT_LEVELS, provisional: true, version: "accounts.kn-roles/2", province_groups: PROVINCE_GROUPS, duties: DUTIES, powers: POWERS, delegation_max_days: 30 })
+        : deny(),
+  },
+  // W11.07: thuộc tính phân quyền trong vai
+  {
+    method: "PUT",
+    pattern: re("/v1/accounts/users/{id}/assignments/{id}/attributes"),
+    handler: (ctx) =>
+      withAccount(ctx, (a) => {
+        const x = a.assignments.find((y) => wireAid(y) === ctx.params[1]);
+        if (!x) return problem(404, "accounts.assignment_not_found", "Không tìm thấy lần gán vai trò");
+        const b = (ctx.body ?? {}) as Partial<MockAttrs> & { internal_unit_code?: string };
+        const group = b.province_group || null;
+        const duties = [...new Set(b.duties ?? [])].sort();
+        const fac = b.facility_refs ?? [];
+        const hh = b.household_refs ?? [];
+        if (group && !PROVINCE_GROUPS.some((g) => g.code === group)) return errField("province_group", "nhóm Cấp Tỉnh không có trong danh mục");
+        if (duties.some((d) => !DUTIES.some((x2) => x2.code === d))) return errField("duties", "cờ nhiệm vụ không có trong danh mục");
+        if (x.role !== "kn_tinh" && (group || duties.length)) return errField("province_group", "nhóm Cấp Tỉnh và cờ nhiệm vụ chỉ dành cho vai Cấp Tỉnh");
+        if (x.role !== "kn_xa" && (fac.length || hh.length)) return errField("facility_refs", "giới hạn cơ sở/hộ chỉ dành cho vai Cấp Xã");
+        const unit = b.internal_unit_code || null;
+        if (unit && !UNITS.some((u) => u.code === unit && u.active)) return problem(422, "accounts.internal_unit_invalid", "Đơn vị nội bộ không thuộc đơn vị của lần gán hoặc đã ngừng");
+        const aid = wireAid(x);
+        const before = attrsWire(aid);
+        ATTRS.set(aid, { province_group: group, duties, internal_unit_code: unit, facility_refs: fac, household_refs: hh });
+        const after = attrsWire(aid);
+        const changes = (["province_group", "duties", "internal_unit_code"] as const)
+          .map((k) => ({ field: k, old: [before[k]].flat().join(",") || null, new: [after[k]].flat().join(",") || null }))
+          .filter((c) => c.old !== c.new);
+        if (changes.length) log(a, { event: "assignment.attributes_changed", entity_ref: aid, actor_ref: ADMIN_REF, changes, reason: null });
+        return json({ assignment_id: aid, attributes: after, seq: changes.length ? seq : 0 });
+      }),
+  },
+  // W11.07: ủy quyền có hạn (Admin xem, thu hồi)
+  {
+    method: "GET",
+    pattern: re("/v1/accounts/users/{id}/delegations"),
+    handler: (ctx) => withAccount(ctx, (a) => json({ items: DELEGATIONS.filter((d) => d.grantor_ref === userId(a) || d.grantee_ref === userId(a)) })),
+  },
+  {
+    method: "POST",
+    pattern: re("/v1/accounts/delegations/{id}/revoke"),
+    handler: (ctx) => {
+      if (!isKnAdmin(ctx)) return deny();
+      if (!reasonOk(ctx.body, 10)) return errField("reason", "bắt buộc, ít nhất 10 ký tự");
+      const d = DELEGATIONS.find((x) => x.delegation_id === ctx.params[0]);
+      if (!d) return problem(404, "accounts.delegation_not_found", "Không tìm thấy ủy quyền");
+      if (d.revoked || d.status === "expired") return problem(409, "accounts.delegation_state", "Ủy quyền đã thu hồi hoặc đã hết hạn");
+      d.revoked = true;
+      d.status = "revoked";
+      return json(d);
+    },
+  },
+  // W11.07: đơn vị nội bộ (Q-068)
+  {
+    method: "GET",
+    pattern: re("/v1/accounts/internal-units"),
+    handler: (ctx) =>
+      isKnAdmin(ctx)
+        ? json({ org_ref: AG_REF, items: UNITS.filter((u) => ctx.url.searchParams.get("include_inactive") === "true" || u.active), kinds: UNIT_KINDS })
+        : deny(),
+  },
+  {
+    method: "POST",
+    pattern: re("/v1/accounts/internal-units/seed"),
+    handler: (ctx) => {
+      if (!isKnAdmin(ctx)) return deny();
+      const seed: [string, string, string, string | null, number][] = [
+        ["ban_giam_doc", "ban_giam_doc", "Ban Giám đốc", null, 0],
+        ...KN_DEPARTMENTS.map((d, i) => [d.code, "phong", d.name, d.code, (i + 1) * 10] as [string, string, string, string | null, number]),
+      ];
+      const created: MockUnit[] = [];
+      let existing = 0;
+      for (const [code, kind, name, dept, sort] of seed) {
+        if (UNITS.some((u) => u.code === code)) {
+          existing++;
+          continue;
+        }
+        const u: MockUnit = { id: uuidv7(), org_ref: AG_REF, code, kind, kind_label: UNIT_KINDS.find((k) => k.code === kind)!.label, name, department_code: dept, sort_order: sort, active: true, updated_at: now() };
+        UNITS.push(u);
+        created.push(u);
+      }
+      return json({ created, existing, status: "tạm, chờ khách (Q-068)" });
+    },
+  },
+  {
+    method: "POST",
+    pattern: re("/v1/accounts/internal-units"),
+    handler: (ctx) => {
+      if (!isKnAdmin(ctx)) return deny();
+      const b = (ctx.body ?? {}) as { code?: string; kind?: string; name?: string; department_code?: string; sort_order?: number };
+      const code = String(b.code ?? "").trim();
+      if (!/^[a-z][a-z0-9_]{1,39}$/.test(code)) return errField("code", "mã 2–40 ký tự [a-z0-9_]");
+      const kind = UNIT_KINDS.find((k) => k.code === b.kind);
+      if (!kind) return errField("kind", "loại đơn vị nội bộ không có trong danh mục");
+      if (!String(b.name ?? "").trim()) return errField("name", "bắt buộc");
+      if (b.department_code && kind.code !== "phong") return errField("department_code", "chỉ đơn vị loại phòng mới gắn phòng ban");
+      if (UNITS.some((u) => u.code === code)) return problem(409, "accounts.internal_unit_code_taken", "Mã đơn vị nội bộ đã có trong đơn vị");
+      const u: MockUnit = { id: uuidv7(), org_ref: AG_REF, code, kind: kind.code, kind_label: kind.label, name: String(b.name).trim(), department_code: b.department_code || null, sort_order: b.sort_order ?? 0, active: true, updated_at: now() };
+      UNITS.push(u);
+      UNITS.sort((x, y) => x.sort_order - y.sort_order || x.code.localeCompare(y.code));
+      return json(u, 201);
+    },
+  },
+  {
+    method: "POST",
+    pattern: new RegExp(`^/v1/accounts/internal-units/${UUID}/(deactivate|reactivate)$`),
+    handler: (ctx) => {
+      if (!isKnAdmin(ctx)) return deny();
+      const u = UNITS.find((x) => x.id === ctx.params[0]);
+      if (!u) return problem(404, "accounts.internal_unit_not_found", "Không tìm thấy đơn vị nội bộ");
+      const active = ctx.params[1] === "reactivate";
+      if (!active && !reasonOk(ctx.body, 10)) return errField("reason", "lý do ngừng ít nhất 10 ký tự");
+      if (u.active === active) return problem(409, "accounts.internal_unit_state", "Đơn vị nội bộ đã ở trạng thái này");
+      u.active = active;
+      u.updated_at = now();
+      return json(u);
+    },
+  },
   {
     method: "GET",
     pattern: re("/v1/accounts/users"),
@@ -798,6 +998,9 @@ function accountByEmail(email: string): MockKnAccount | undefined {
 /** Cho kiểm thử: xóa nhật ký và hồ sơ giả lập. */
 export function resetKnAdmin(): void {
   MOVED.clear();
+  ATTRS.clear();
+  UNITS.length = 0;
+  DELEGATIONS.length = 0;
   PROFILES.clear();
   LOGS.clear();
   SUPPORT_LOG.length = 0;

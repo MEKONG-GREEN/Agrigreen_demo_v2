@@ -34,6 +34,7 @@ class KnContextChoice {
     this.departmentCode,
     this.departmentName,
     this.communes = const [],
+    this.readOnly = false,
   });
 
   final String assignmentId;
@@ -42,6 +43,10 @@ class KnContextChoice {
   final String? departmentCode;
   final String? departmentName;
   final List<KnCommune> communes;
+
+  /// W11.07: phòng ban ngoài phân công, chọn được ở chế độ chỉ xem (Lãnh đạo
+  /// đơn vị, Ban Giám đốc) — máy chủ chặn mọi thao tác ghi.
+  final bool readOnly;
 
   String get key => '$assignmentId|${departmentCode ?? ''}';
 
@@ -55,6 +60,7 @@ class KnContextChoice {
     'department_code': departmentCode,
     'department_name': departmentName,
     'communes': [for (final c in communes) c.toJson()],
+    'read_only': readOnly,
   };
 
   factory KnContextChoice.fromJson(Map<String, Object?> j) => KnContextChoice(
@@ -64,6 +70,7 @@ class KnContextChoice {
     departmentCode: j['department_code'] as String?,
     departmentName: j['department_name'] as String?,
     communes: KnCommune.listOf(j['communes']),
+    readOnly: j['read_only'] == true,
   );
 
   /// Mở `GET /v1/me/contexts` thành các cặp chọn được: phân công còn hiệu lực
@@ -105,6 +112,7 @@ class KnContextChoice {
             departmentCode: '${d['code']}',
             departmentName: '${d['name'] ?? d['code']}',
             communes: base.communes,
+            readOnly: d['read_only'] == true,
           ),
         );
       }
@@ -126,7 +134,16 @@ class KnSessionContext {
     this.departmentCode,
     this.departmentName,
     this.supportSessionId,
+    this.readOnly = false,
+    this.internalUnitCode,
   });
+
+  /// W11.07: ngữ cảnh chỉ xem (Cấp TW, Lãnh đạo đơn vị ở phòng ban khác, Ban
+  /// Giám đốc) — ẩn thao tác ghi; máy chủ vẫn chặn.
+  final bool readOnly;
+
+  /// W11.07: đơn vị nội bộ (Cấp Xã: đơn vị quản lý HS-37).
+  final String? internalUnitCode;
 
   final String contextId;
   final String? assignmentId;
@@ -163,6 +180,8 @@ class KnSessionContext {
     'default_route': defaultRoute,
     'expires_at': expiresAt?.toUtc().toIso8601String(),
     'support_session_id': supportSessionId,
+    'read_only': readOnly,
+    'internal_unit_code': internalUnitCode,
   };
 
   factory KnSessionContext.fromJson(Map<String, Object?> j) => KnSessionContext(
@@ -176,5 +195,7 @@ class KnSessionContext {
     defaultRoute: '${j['default_route'] ?? ''}',
     expiresAt: DateTime.tryParse('${j['expires_at']}'),
     supportSessionId: j['support_session_id'] as String?,
+    readOnly: j['read_only'] == true,
+    internalUnitCode: j['internal_unit_code'] as String?,
   );
 }

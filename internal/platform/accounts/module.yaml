@@ -17,8 +17,10 @@ provides:
     - Directory
     - FarmerAccounts
     - FarmerHouseholds
+    - InternalUnits
     - KNContextResolver
     - KNDirectory
+    - KNPeople
     - MailDirectory
     - ProfileUpdater
     - RecipientDirectory

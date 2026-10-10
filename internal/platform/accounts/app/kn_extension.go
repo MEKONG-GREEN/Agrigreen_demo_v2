@@ -73,7 +73,8 @@ func (e ExtensionKN) KNContext(ctx context.Context) (port.KNContext, bool, error
 		return port.KNContext{}, false, nil
 	}
 	k := p.KN
-	c := port.KNContext{Role: k.Role, Department: k.Department, Communes: slices.Clone(k.Communes)}
+	c := port.KNContext{Role: k.Role, Department: k.Department, Communes: slices.Clone(k.Communes), MgmtLevel: k.MgmtLevel,
+		InternalUnit: k.InternalUnit, ReadOnly: k.ReadOnly()}
 	unit := k.UnitRef
 	if unit == uuid.Nil {
 		unit = k.OrgRef
@@ -83,7 +84,8 @@ func (e ExtensionKN) KNContext(ctx context.Context) (port.KNContext, bool, error
 		return port.KNContext{}, false, err
 	}
 	// Cấp quản lý của lần gán (Q-05). Ngữ cảnh hỗ trợ không gắn tài khoản (AssignmentID Nil) → không biết.
-	if k.AssignmentID != uuid.Nil && e.Assignments != nil {
+	// ResolveContext (W11.07) đã đặt MgmtLevel; tra lại chỉ khi thiếu (ngữ cảnh dựng tay trong kiểm thử cũ).
+	if c.MgmtLevel == "" && k.AssignmentID != uuid.Nil && e.Assignments != nil {
 		list, err := e.Assignments.ActiveAssignments(ctx, k.Role, k.Department)
 		if err != nil {
 			return port.KNContext{}, false, err

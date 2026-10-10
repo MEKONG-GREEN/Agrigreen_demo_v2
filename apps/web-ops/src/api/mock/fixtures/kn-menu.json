@@ -209,6 +209,17 @@
         "status": "coming_soon",
         "status_label": "Sắp có",
         "children": []
+       },
+       {
+        "key": "tinh.chung.nhan_su_phong",
+        "label": "Nhân sự của phòng",
+        "route": "/kn/nhan-su/cua-phong",
+        "icon": "users",
+        "badge_source": null,
+        "enabled": false,
+        "status": "coming_soon",
+        "status_label": "Sắp có",
+        "children": []
        }
       ]
      }
@@ -500,6 +511,17 @@
         "label": "Contact",
         "route": "/kn/dung-chung/contact",
         "icon": "phone",
+        "badge_source": null,
+        "enabled": false,
+        "status": "coming_soon",
+        "status_label": "Sắp có",
+        "children": []
+       },
+       {
+        "key": "tinh.chung.nhan_su_phong",
+        "label": "Nhân sự của phòng",
+        "route": "/kn/nhan-su/cua-phong",
+        "icon": "users",
         "badge_source": null,
         "enabled": false,
         "status": "coming_soon",
@@ -988,6 +1010,17 @@
         "status": "coming_soon",
         "status_label": "Sắp có",
         "children": []
+       },
+       {
+        "key": "tinh.chung.nhan_su_phong",
+        "label": "Nhân sự của phòng",
+        "route": "/kn/nhan-su/cua-phong",
+        "icon": "users",
+        "badge_source": null,
+        "enabled": false,
+        "status": "coming_soon",
+        "status_label": "Sắp có",
+        "children": []
        }
       ]
      }
@@ -1440,6 +1473,17 @@
         "status": "coming_soon",
         "status_label": "Sắp có",
         "children": []
+       },
+       {
+        "key": "tinh.chung.nhan_su_phong",
+        "label": "Nhân sự của phòng",
+        "route": "/kn/nhan-su/cua-phong",
+        "icon": "users",
+        "badge_source": null,
+        "enabled": false,
+        "status": "coming_soon",
+        "status_label": "Sắp có",
+        "children": []
        }
       ]
      }
@@ -1821,6 +1865,17 @@
         "status": "coming_soon",
         "status_label": "Sắp có",
         "children": []
+       },
+       {
+        "key": "tinh.bao_gia.cau_hinh",
+        "label": "Cấu hình báo giá",
+        "route": "/kn/bao-gia/cau-hinh",
+        "icon": "param",
+        "badge_source": null,
+        "enabled": false,
+        "status": "coming_soon",
+        "status_label": "Sắp có",
+        "children": []
        }
       ]
      },
@@ -1848,6 +1903,17 @@
         "label": "Contact",
         "route": "/kn/dung-chung/contact",
         "icon": "phone",
+        "badge_source": null,
+        "enabled": false,
+        "status": "coming_soon",
+        "status_label": "Sắp có",
+        "children": []
+       },
+       {
+        "key": "tinh.chung.nhan_su_phong",
+        "label": "Nhân sự của phòng",
+        "route": "/kn/nhan-su/cua-phong",
+        "icon": "users",
         "badge_source": null,
         "enabled": false,
         "status": "coming_soon",
@@ -2250,6 +2316,17 @@
         "label": "Contact",
         "route": "/kn/dung-chung/contact",
         "icon": "phone",
+        "badge_source": null,
+        "enabled": false,
+        "status": "coming_soon",
+        "status_label": "Sắp có",
+        "children": []
+       },
+       {
+        "key": "tinh.chung.nhan_su_phong",
+        "label": "Nhân sự của phòng",
+        "route": "/kn/nhan-su/cua-phong",
+        "icon": "users",
         "badge_source": null,
         "enabled": false,
         "status": "coming_soon",

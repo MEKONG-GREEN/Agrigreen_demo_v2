@@ -105,6 +105,12 @@ func (m *Module) ActorNames() partyport.ActorNames { return m.svc }
 // Assignments cho P4/P5: lần gán vai trò còn hiệu lực.
 func (m *Module) Assignments() port.Assignments { return m.svc }
 
+// KNPeople (W11.07) cho pf/hrm, Contact, đánh giá: phạm vi nhân sự của ngữ cảnh phiên (BR-04 HCTH, HS-37).
+func (m *Module) KNPeople() port.KNPeople { return m.svc }
+
+// InternalUnits (W11.07) cho module khác: danh mục đơn vị nội bộ (phòng/trạm/trại/BGĐ — Q-068).
+func (m *Module) InternalUnits() port.InternalUnits { return m.svc }
+
 // OrgStatusHandler xử lý pf.party.org.deactivated/reactivated (consumer
 // port.OrgStatusConsumer, chạy trong inbox.Process trên pool accounts_app).
 func (m *Module) OrgStatusHandler() inbox.Handler {

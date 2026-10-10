@@ -63,7 +63,33 @@ type MenuItem struct {
 	BadgeSource string
 	Requires    *MenuRequirement
 	ComingSoon  bool // module chưa có: hiện mờ "Sắp có" (kn.menu/v3)
-	Children    []MenuItem
+	// Needs (W11.07, phân quyền trong vai): mục chỉ hiện khi ngữ cảnh phiên có thuộc tính này — NeedsManager
+	// (lãnh đạo) hoặc mã cờ nhiệm vụ (vd "qtnv_bao_gia"). Rỗng = mọi người của đối tượng.
+	Needs    string
+	Children []MenuItem
+}
+
+// Điều kiện phân quyền trong vai của mục menu (MenuItem.Needs).
+const (
+	NeedsManager    = "manager"      // lãnh đạo: cấp quản lý ≥ phó phòng/phụ trách hoặc nhóm "Lãnh đạo phòng"
+	NeedsPriceAdmin = "qtnv_bao_gia" // QTNV báo giá (Báo giá v1.3)
+)
+
+// MenuTraits là thuộc tính của ngữ cảnh phiên dùng để lọc mục có Needs.
+type MenuTraits struct {
+	Manager bool
+	Duties  []string
+}
+
+// Has cho biết traits đáp ứng điều kiện needs (rỗng luôn đáp ứng).
+func (t MenuTraits) Has(needs string) bool {
+	switch needs {
+	case "":
+		return true
+	case NeedsManager:
+		return t.Manager
+	}
+	return slices.Contains(t.Duties, needs)
 }
 
 // Trạng thái mục menu "Sắp có" (kn.menu/v3; MenuItemView.Status).
@@ -289,12 +315,48 @@ func DepartmentMenu(profile, audience, department string) []MenuGroup {
 	for _, g := range groups {
 		out = append(out, MenuGroup{Key: g.Key, Label: g.Label, Items: bind(g.Items, department)})
 	}
-	return append(out, SharedMenuGroup())
+	shared := SharedMenuGroup()
+	if extra := sharedByAudience[audience]; len(extra) > 0 {
+		shared.Items = append(shared.Items, bind(extra, department)...)
+	}
+	return append(out, shared)
 }
 
 // SharedMenuGroup trả bản sao nhóm "Dùng chung" (cuối menu mọi đối tượng, kể cả Admin).
 func SharedMenuGroup() MenuGroup {
 	return MenuGroup{Key: SharedGroup.Key, Label: SharedGroup.Label, Items: bind(SharedGroup.Items, "")}
+}
+
+// FilterNeeds bỏ mục có Needs mà traits không đáp ứng (W11.07); mục cha không còn mục con và nhóm rỗng vì
+// lọc cũng bỏ. Bản sao — không sửa đầu vào.
+func FilterNeeds(groups []MenuGroup, t MenuTraits) []MenuGroup {
+	var filter func(items []MenuItem) []MenuItem
+	filter = func(items []MenuItem) []MenuItem {
+		out := make([]MenuItem, 0, len(items))
+		for _, it := range items {
+			if !t.Has(it.Needs) {
+				continue
+			}
+			if len(it.Children) > 0 {
+				it.Children = filter(it.Children)
+				if len(it.Children) == 0 {
+					continue
+				}
+			}
+			out = append(out, it)
+		}
+		return out
+	}
+	out := make([]MenuGroup, 0, len(groups))
+	for _, g := range groups {
+		n := len(g.Items)
+		g.Items = filter(g.Items)
+		if n > 0 && len(g.Items) == 0 {
+			continue
+		}
+		out = append(out, g)
+	}
+	return out
 }
 
 // AdminDepartmentItems trả mục con của một phòng ban trong nhóm "Phòng ban" của Admin: Trồng trọt có bộ

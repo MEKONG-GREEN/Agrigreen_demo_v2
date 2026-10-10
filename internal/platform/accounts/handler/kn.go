@@ -37,6 +37,8 @@ func (h Handler) RegisterKNApp(rg *gin.RouterGroup) {
 	rg.GET("/me/contexts", h.myContexts)
 	rg.POST("/me/context", h.selectContext)
 	rg.GET("/me/context", h.currentContext)
+	h.registerDelegationsApp(rg)   // W11.07
+	h.registerInternalUnitsApp(rg) // W11.07
 }
 
 // RegisterKNAdmin gắn route quản trị KN vào Admin API.
@@ -52,7 +54,9 @@ func (h Handler) RegisterKNAdmin(rg *gin.RouterGroup) {
 	rg.POST("/accounts/support-sessions", h.startSupport)
 	rg.POST("/accounts/support-sessions/:id/end", h.endSupport)
 	rg.GET("/accounts/support-log", h.supportLog)
-	h.registerKNImport(rg) // W11.02: nạp Excel nhiều vai trò, phiên/lịch sử đăng nhập
+	h.registerKNImport(rg)           // W11.02: nạp Excel nhiều vai trò, phiên/lịch sử đăng nhập
+	h.registerAttrsAdmin(rg)         // W11.07
+	h.registerInternalUnitsAdmin(rg) // W11.07
 }
 
 // ---------------------------------------------------------------------------
@@ -65,6 +69,9 @@ var reasonExempt = map[string]bool{
 	"/v1/accounts/support-sessions":         true,
 	"/v1/accounts/support-sessions/:id/end": true,
 }
+
+// Route ghi được trong ngữ cảnh chỉ xem: đổi ngữ cảnh (chọn phòng ban khác).
+var viewOnlyExempt = map[string]bool{"/v1/me/context": true}
 
 func isWrite(m string) bool {
 	return m == http.MethodPost || m == http.MethodPut || m == http.MethodPatch || m == http.MethodDelete
@@ -94,6 +101,12 @@ func (h Handler) Middleware() gin.HandlerFunc {
 		kc, err := h.Svc.ResolveContext(ctx, id)
 		if err != nil {
 			httpx.Fail(c, err)
+			return
+		}
+		// W11.07: ngữ cảnh chỉ xem (Lãnh đạo đơn vị ở phòng ban khác, Ban Giám đốc) không ghi được ở BẤT KỲ route
+		// nào — chặn tập trung, không trông vào từng module (đổi ngữ cảnh vẫn được).
+		if kc.ViewOnly && isWrite(c.Request.Method) && !viewOnlyExempt[c.FullPath()] {
+			httpx.Fail(c, app.ErrContextReadOnly)
 			return
 		}
 		audited := kc.Support != nil && isWrite(c.Request.Method) && !reasonExempt[c.FullPath()]
@@ -143,6 +156,7 @@ type deptRefDTO struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
 	Status      string  `json:"status"`
+	ReadOnly    bool    `json:"read_only"` // W11.07: chọn được ở chế độ chỉ xem
 }
 
 type assignmentDTO struct {
@@ -162,6 +176,7 @@ type assignmentDTO struct {
 	CreatedAt     string       `json:"created_at"`
 	UpdatedBy     string       `json:"updated_by"`
 	UpdatedAt     string       `json:"updated_at"`
+	Attributes    attrsDTO     `json:"attributes"` // W11.07
 }
 
 func rfc(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
@@ -184,8 +199,10 @@ func toAssignmentDTO(v app.AssignmentView) assignmentDTO {
 		d.ValidTo = &s
 	}
 	for _, x := range v.DepartmentRefs {
-		d.Departments = append(d.Departments, deptRefDTO{Code: x.Code, Name: x.Name, Description: strPtr(x.Description), Status: x.Status})
+		d.Departments = append(d.Departments, deptRefDTO{Code: x.Code, Name: x.Name, Description: strPtr(x.Description), Status: x.Status,
+			ReadOnly: x.ReadOnly})
 	}
+	d.Attributes = toAttrsDTO(v.Attrs)
 	return d
 }
 
@@ -202,12 +219,22 @@ type contextDTO struct {
 	ExpiresAt        string       `json:"expires_at"`
 	SupportSessionID *string      `json:"support_session_id"`
 	OnBehalfOf       *string      `json:"on_behalf_of"`
+	// W11.07: phân quyền trong vai của ngữ cảnh (powers chỉ đầy đủ ở GET /v1/me/context).
+	ReadOnly         bool     `json:"read_only"`
+	MgmtLevelCode    *string  `json:"mgmt_level_code"`
+	Manager          bool     `json:"manager"`
+	ProvinceGroup    *string  `json:"province_group"`
+	Duties           []string `json:"duties"`
+	InternalUnitCode *string  `json:"internal_unit_code"`
+	Powers           []string `json:"powers"`
 }
 
 func toContextDTO(v app.ContextView) contextDTO {
 	d := contextDTO{ContextID: v.ContextID.String(), AssignmentID: refPtr(v.AssignmentID), Role: v.Role, OrgRef: refPtr(v.OrgRef),
 		OrgName: v.OrgName, Communes: communesDTO(v.Communes), DefaultRoute: v.DefaultRoute, ExpiresAt: rfc(v.ExpiresAt),
-		SupportSessionID: refPtr(v.SupportID), OnBehalfOf: refPtr(v.OnBehalfOf)}
+		SupportSessionID: refPtr(v.SupportID), OnBehalfOf: refPtr(v.OnBehalfOf), ReadOnly: v.ReadOnly, MgmtLevelCode: strPtr(v.MgmtLevel),
+		Manager: v.Manager, ProvinceGroup: strPtr(v.ProvinceGroup), Duties: nonNilStr(v.Duties), InternalUnitCode: strPtr(v.InternalUnit),
+		Powers: nonNilStr(v.Powers)}
 	if v.Department != nil {
 		d.DepartmentCode, d.DepartmentName = strPtr(v.Department.Code), strPtr(v.Department.Name)
 	}
@@ -298,9 +325,12 @@ func (h Handler) mgmtLevels(c *gin.Context) {
 	}
 	items := make([]gin.H, 0, len(port.MgmtLevels))
 	for _, l := range port.MgmtLevels {
-		items = append(items, gin.H{"code": l.Code, "label": l.Label})
+		items = append(items, gin.H{"code": l.Code, "label": l.Label, "manager": l.Manager, "reads_all_departments": l.ReadsAllDepartments})
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items, "provisional": true})
+	// W11.07: danh mục phân quyền trong vai (Q-059) — cùng phiên bản, cùng trạng thái tạm.
+	c.JSON(http.StatusOK, gin.H{"items": items, "provisional": true, "version": port.MgmtCatalogVersion,
+		"province_groups": catalogDTO(port.ProvinceGroups), "duties": catalogDTO(port.Duties), "powers": catalogDTO(port.Powers),
+		"delegation_max_days": domain.DelegationMaxDays})
 }
 
 type assignmentReq struct {

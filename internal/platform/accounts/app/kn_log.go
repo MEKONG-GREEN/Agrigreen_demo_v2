@@ -101,6 +101,15 @@ func (s *Service) UserLog(ctx context.Context, user uuid.UUID, after int64, limi
 			out = append(out, LogEntry{Event: "assignment." + e.Action, EntityRef: e.A.ID, ActorRef: e.ActorRef, At: e.EventTime,
 				RecordedAt: e.RecordedAt, Changes: domain.Diff(e.Before, e.After), Reason: e.Reason})
 		}
+		// W11.07: thuộc tính phân quyền trong vai (sổ phụ) — cũ → mới như sổ gán vai.
+		attrs, err := store.AttrEventsOfUser(ctx, tx, user)
+		if err != nil {
+			return err
+		}
+		for _, e := range attrs {
+			out = append(out, LogEntry{Event: "assignment.attributes_changed", EntityRef: e.AssignmentID, ActorRef: e.ActorRef, At: e.EventTime,
+				RecordedAt: e.RecordedAt, Changes: domain.Diff(e.Before, e.After), Reason: e.Reason})
+		}
 		pcs, err := store.ProfileChanges(ctx, tx, user)
 		if err != nil {
 			return err

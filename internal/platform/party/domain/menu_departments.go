@@ -28,6 +28,21 @@ var SharedGroup = MenuGroup{Key: GroupDungChung, Label: GroupDungChungLabel, Ite
 	soon("chung.contact", "Contact", "/kn/dung-chung/contact", "phone"),
 }}
 
+// needs gắn điều kiện phân quyền trong vai (W11.07) cho một mục.
+func needs(it MenuItem, n string) MenuItem {
+	it.Needs = n
+	return it
+}
+
+// sharedByAudience: mục thêm vào nhóm "Dùng chung" theo đối tượng (W11.07, Q-067 — đề xuất của dev: lãnh đạo
+// các phòng làm việc nhân sự của phòng mình ngay trong phiên phòng ban của mình, không cần gán thêm phòng ban
+// HCTH). Màn thuộc pf/hrm (W11.22) — "Sắp có".
+var sharedByAudience = map[string][]MenuItem{
+	port.AudienceTinh: {
+		needs(soon("tinh.chung.nhan_su_phong", "Nhân sự của phòng", "/kn/nhan-su/cua-phong", "users"), NeedsManager),
+	},
+}
+
 // deptBusiness: nhóm "Nghiệp vụ" theo khuôn × đối tượng. Đối tượng vắng = không có nhóm này.
 var deptBusiness = map[string]map[string][]MenuItem{
 	// Chăn nuôi - Thủy sản (BRD CNTS v3.7 §VI.3; Cấp TW chỉ xem dự án KNQG).
@@ -37,7 +52,7 @@ var deptBusiness = map[string]map[string][]MenuItem{
 		},
 		port.AudienceTinh: {
 			soon("tinh.cnts.canh_bao", "Cảnh báo", "/kn/cnts/canh-bao", "zap"),
-			soon("tinh.cnts.duyet_bao_cao", "Duyệt báo cáo", "/kn/cnts/duyet-bao-cao", "approve"),
+			needs(soon("tinh.cnts.duyet_bao_cao", "Duyệt báo cáo", "/kn/cnts/duyet-bao-cao", "approve"), NeedsManager),
 			soon("tinh.cnts.bieu_mau", "Biểu mẫu & cấp quyền", "/kn/cnts/bieu-mau", "table"),
 			soon("tinh.cnts.lich", "Lịch trực KSGM & lịch tiêm", "/kn/cnts/lich", "calendar"),
 			soon("tinh.cnts.chien_dich", "Chiến dịch điều tra", "/kn/cnts/chien-dich", "megaphone"),
@@ -81,6 +96,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			soon("tinh.bao_gia.bien_dong", "Báo cáo biến động giá", "/kn/bao-gia/bien-dong", "layers"),
 			soon("tinh.bao_gia.dieu_tra", "Điều tra giá thành", "/kn/bao-gia/dieu-tra", "season"),
 			soon("tinh.bao_gia.mat_hang", "Mặt hàng", "/kn/bao-gia/mat-hang", "package"),
+			// W11.07: cấu hình kỳ báo giá, giờ khóa, nhắc, ngưỡng — chỉ QTNV (Báo giá v1.3 FN-AD-04.04…06).
+			needs(soon("tinh.bao_gia.cau_hinh", "Cấu hình báo giá", "/kn/bao-gia/cau-hinh", "param"), NeedsPriceAdmin),
 		},
 		port.AudienceXa: {
 			soon("xa.bao_gia.nhap", "Nhập báo giá", "/kn/bao-gia/nhap", "upload"),

@@ -368,6 +368,88 @@ paths:
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/KNOrgTreeNode"}}
         "401": {$ref: "#/components/responses/Problem"}
+  /v1/me/delegations:
+    get:
+      summary: "W11.07 Ủy quyền có hạn người gọi đã giao hoặc đã nhận"
+      operationId: knMyDelegations
+      tags: [accounts]
+      responses:
+        "200":
+          description: Mới nhất trước
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDelegationList"}
+    post:
+      summary: "W11.07 Lãnh đạo phòng ủy quyền có hạn (≤ 30 ngày) cho cán bộ Cấp Tỉnh cùng đơn vị, cùng phòng ban của phiên"
+      operationId: knCreateDelegation
+      tags: [accounts]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grantee_ref, power, valid_to, reason]
+              properties:
+                grantee_ref: {type: string, format: uuid}
+                department_code: {type: string, description: "Vắng = phòng ban của ngữ cảnh; khác → 403"}
+                power: {type: string, enum: [mo_lai_ky, duyet_bao_cao]}
+                valid_from: {type: string, format: date-time}
+                valid_to: {type: string, format: date-time}
+                reason: {type: string}
+      responses:
+        "201":
+          description: Đã ủy quyền
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDelegation"}
+        "200":
+          description: Gọi lặp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDelegation"}
+        "403": {description: "accounts.delegation_forbidden, accounts.context_read_only", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed, accounts.delegation_grantee_invalid", $ref: "#/components/responses/Problem"}
+  /v1/me/delegations/{id}/revoke:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: "W11.07 Người giao thu hồi ủy quyền còn hiệu lực (lý do ≥ 10 ký tự)"
+      operationId: knRevokeDelegation
+      tags: [accounts]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [reason], properties: {reason: {type: string}}}
+      responses:
+        "200":
+          description: Đã thu hồi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDelegation"}
+        "404": {description: "accounts.delegation_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.delegation_state", $ref: "#/components/responses/Problem"}
+  /v1/internal-units:
+    get:
+      summary: "W11.07 Đơn vị nội bộ của đơn vị (đọc)"
+      operationId: knListInternalUnits
+      tags: [accounts]
+      parameters:
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Theo thứ tự hiển thị
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnitList"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/departments:
     get:
       summary: "Phòng ban của đơn vị (bước 2 đăng nhập, FN-CH-00.01) — chỉ selectable = true chọn được"
@@ -8923,6 +9005,7 @@ components:
         name: {type: string}
         description: {type: [string, "null"]}
         status: {type: string, enum: [active, not_open, suspended]}
+        read_only: {type: boolean, description: "W11.07: phòng ban ngoài lần gán, chọn được ở chế độ chỉ xem (Lãnh đạo đơn vị, Ban Giám đốc)"}
     KNAssignment:
       type: object
       required: [assignment_id, user_ref, role, org_ref, org_name, mgmt_level, mgmt_level_code, communes, departments, valid_from, valid_to, active,
@@ -8944,6 +9027,7 @@ components:
         created_at: {type: string, format: date-time}
         updated_by: {type: string, format: uuid}
         updated_at: {type: string, format: date-time}
+        attributes: {$ref: "#/components/schemas/KNAssignmentAttrs"}
     KNSessionContext:
       type: object
       required: [context_id, assignment_id, role, department_code, department_name, org_ref, org_name, communes, default_route, expires_at,
@@ -8961,6 +9045,67 @@ components:
         expires_at: {type: string, format: date-time}
         support_session_id: {type: [string, "null"], format: uuid, description: "Khác null: Admin đang hỗ trợ (FN-AD-04.07) — dải cảnh báo vàng"}
         on_behalf_of: {type: [string, "null"], format: uuid}
+        read_only: {type: boolean, description: "W11.07: ngữ cảnh chỉ xem (Cấp TW, Lãnh đạo đơn vị ở phòng ban khác, Ban Giám đốc) — mọi thao tác ghi 403 accounts.context_read_only"}
+        mgmt_level_code: {type: [string, "null"]}
+        manager: {type: boolean, description: "Lãnh đạo (≥ phó phòng/phụ trách/lãnh đạo đơn vị, hoặc nhóm Lãnh đạo phòng)"}
+        province_group: {type: [string, "null"]}
+        duties: {type: array, items: {type: string}}
+        internal_unit_code: {type: [string, "null"]}
+        powers: {type: array, items: {type: string}, description: "Quyền nhận qua ủy quyền có hạn còn hiệu lực (đầy đủ ở GET /v1/me/context)"}
+    # --- W11.07: phân quyền trong vai + đơn vị nội bộ (cùng định nghĩa ở admin.yaml/application.yaml) ---
+    KNAssignmentAttrs:
+      type: object
+      description: "Thuộc tính phân quyền trong vai (sổ phụ pf_accounts.assignment_attr_event, W11.07)"
+      required: [province_group, province_group_label, duties, internal_unit_code, facility_refs, household_refs]
+      properties:
+        province_group: {type: [string, "null"], enum: [vien_chuc, tong_hop, chu_nhiem, lanh_dao_phong, ban_giam_doc, null], description: "Nhóm Cấp Tỉnh (chỉ kn_tinh; tạm Q-059)"}
+        province_group_label: {type: [string, "null"]}
+        duties: {type: array, items: {type: string, enum: [qtnv_bao_gia, phu_trach_bieu]}, description: "Cờ nhiệm vụ (chỉ kn_tinh)"}
+        internal_unit_code: {type: [string, "null"], description: "Đơn vị nội bộ; Cấp Xã: đơn vị quản lý (HS-37)"}
+        facility_refs: {type: array, items: {type: string, format: uuid}, description: "Cấp Xã: giới hạn cơ sở (rỗng = cả xã)"}
+        household_refs: {type: array, items: {type: string, format: uuid}, description: "Cấp Xã: giới hạn hộ (rỗng = cả xã)"}
+    KNDelegation:
+      type: object
+      required: [delegation_id, grantor_ref, grantee_ref, department_code, power, power_label, valid_from, valid_to, revoked, status, reason, created_at]
+      properties:
+        delegation_id: {type: string, format: uuid}
+        grantor_ref: {type: string, format: uuid}
+        grantee_ref: {type: string, format: uuid}
+        department_code: {type: string}
+        power: {type: string, enum: [mo_lai_ky, duyet_bao_cao]}
+        power_label: {type: string}
+        valid_from: {type: string, format: date-time}
+        valid_to: {type: string, format: date-time}
+        revoked: {type: boolean}
+        status: {type: string, enum: [active, scheduled, expired, revoked]}
+        reason: {type: string}
+        created_at: {type: string, format: date-time}
+    KNDelegationList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNDelegation"}}
+    InternalUnit:
+      type: object
+      required: [id, org_ref, code, kind, kind_label, name, department_code, sort_order, active, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid}
+        code: {type: string}
+        kind: {type: string, enum: [ban_giam_doc, van_phong, phong, tram, trai, tang_cuong]}
+        kind_label: {type: string}
+        name: {type: string}
+        department_code: {type: [string, "null"], description: "kind = phong: mã phòng ban P2"}
+        sort_order: {type: integer}
+        active: {type: boolean}
+        updated_at: {type: string, format: date-time}
+    InternalUnitList:
+      type: object
+      required: [org_ref, items, kinds]
+      properties:
+        org_ref: {type: string, format: uuid}
+        items: {type: array, items: {$ref: "#/components/schemas/InternalUnit"}}
+        kinds: {type: array, items: {type: object, required: [code, label], properties: {code: {type: string}, label: {type: string}}}}
     Me:
       type: object
       required: [actor_ref, tenant_id, roles, mfa, org, scope]

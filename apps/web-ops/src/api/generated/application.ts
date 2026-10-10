@@ -291,6 +291,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.07 Ủy quyền có hạn người gọi đã giao hoặc đã nhận */
+        get: operations["knMyDelegations"];
+        put?: never;
+        /** W11.07 Lãnh đạo phòng ủy quyền có hạn (≤ 30 ngày) cho cán bộ Cấp Tỉnh cùng đơn vị, cùng phòng ban của phiên */
+        post: operations["knCreateDelegation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/delegations/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** W11.07 Người giao thu hồi ủy quyền còn hiệu lực (lý do ≥ 10 ký tự) */
+        post: operations["knRevokeDelegation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/internal-units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.07 Đơn vị nội bộ của đơn vị (đọc) */
+        get: operations["knListInternalUnits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/departments": {
         parameters: {
             query?: never;
@@ -6355,6 +6409,8 @@ export interface components {
             description: string | null;
             /** @enum {string} */
             status: "active" | "not_open" | "suspended";
+            /** @description W11.07: phòng ban ngoài lần gán, chọn được ở chế độ chỉ xem (Lãnh đạo đơn vị, Ban Giám đốc) */
+            read_only?: boolean;
         };
         KNAssignment: {
             /** Format: uuid */
@@ -6390,6 +6446,7 @@ export interface components {
             updated_by: string;
             /** Format: date-time */
             updated_at: string;
+            attributes?: components["schemas"]["KNAssignmentAttrs"];
         };
         KNSessionContext: {
             /**
@@ -6422,6 +6479,84 @@ export interface components {
             support_session_id: string | null;
             /** Format: uuid */
             on_behalf_of: string | null;
+            /** @description W11.07: ngữ cảnh chỉ xem (Cấp TW, Lãnh đạo đơn vị ở phòng ban khác, Ban Giám đốc) — mọi thao tác ghi 403 accounts.context_read_only */
+            read_only?: boolean;
+            mgmt_level_code?: string | null;
+            /** @description Lãnh đạo (≥ phó phòng/phụ trách/lãnh đạo đơn vị, hoặc nhóm Lãnh đạo phòng) */
+            manager?: boolean;
+            province_group?: string | null;
+            duties?: string[];
+            internal_unit_code?: string | null;
+            /** @description Quyền nhận qua ủy quyền có hạn còn hiệu lực (đầy đủ ở GET /v1/me/context) */
+            powers?: string[];
+        };
+        /** @description Thuộc tính phân quyền trong vai (sổ phụ pf_accounts.assignment_attr_event, W11.07) */
+        KNAssignmentAttrs: {
+            /**
+             * @description Nhóm Cấp Tỉnh (chỉ kn_tinh; tạm Q-059)
+             * @enum {string|null}
+             */
+            province_group: "vien_chuc" | "tong_hop" | "chu_nhiem" | "lanh_dao_phong" | "ban_giam_doc" | null;
+            province_group_label: string | null;
+            /** @description Cờ nhiệm vụ (chỉ kn_tinh) */
+            duties: ("qtnv_bao_gia" | "phu_trach_bieu")[];
+            /** @description Đơn vị nội bộ; Cấp Xã: đơn vị quản lý (HS-37) */
+            internal_unit_code: string | null;
+            /** @description Cấp Xã: giới hạn cơ sở (rỗng = cả xã) */
+            facility_refs: string[];
+            /** @description Cấp Xã: giới hạn hộ (rỗng = cả xã) */
+            household_refs: string[];
+        };
+        KNDelegation: {
+            /** Format: uuid */
+            delegation_id: string;
+            /** Format: uuid */
+            grantor_ref: string;
+            /** Format: uuid */
+            grantee_ref: string;
+            department_code: string;
+            /** @enum {string} */
+            power: "mo_lai_ky" | "duyet_bao_cao";
+            power_label: string;
+            /** Format: date-time */
+            valid_from: string;
+            /** Format: date-time */
+            valid_to: string;
+            revoked: boolean;
+            /** @enum {string} */
+            status: "active" | "scheduled" | "expired" | "revoked";
+            reason: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        KNDelegationList: {
+            items: components["schemas"]["KNDelegation"][];
+        };
+        InternalUnit: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            org_ref: string;
+            code: string;
+            /** @enum {string} */
+            kind: "ban_giam_doc" | "van_phong" | "phong" | "tram" | "trai" | "tang_cuong";
+            kind_label: string;
+            name: string;
+            /** @description kind = phong: mã phòng ban P2 */
+            department_code: string | null;
+            sort_order: number;
+            active: boolean;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        InternalUnitList: {
+            /** Format: uuid */
+            org_ref: string;
+            items: components["schemas"]["InternalUnit"][];
+            kinds: {
+                code: string;
+                label: string;
+            }[];
         };
         Me: {
             /**
@@ -12226,6 +12361,136 @@ export interface operations {
                 };
             };
             401: components["responses"]["Problem"];
+        };
+    };
+    knMyDelegations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mới nhất trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNDelegationList"];
+                };
+            };
+        };
+    };
+    knCreateDelegation: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    grantee_ref: string;
+                    /** @description Vắng = phòng ban của ngữ cảnh; khác → 403 */
+                    department_code?: string;
+                    /** @enum {string} */
+                    power: "mo_lai_ky" | "duyet_bao_cao";
+                    /** Format: date-time */
+                    valid_from?: string;
+                    /** Format: date-time */
+                    valid_to: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNDelegation"];
+                };
+            };
+            /** @description Đã ủy quyền */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNDelegation"];
+                };
+            };
+            /** @description accounts.delegation_forbidden, accounts.context_read_only */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed, accounts.delegation_grantee_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    knRevokeDelegation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã thu hồi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNDelegation"];
+                };
+            };
+            /** @description accounts.delegation_not_found */
+            404: components["responses"]["Problem"];
+            /** @description accounts.delegation_state */
+            409: components["responses"]["Problem"];
+        };
+    };
+    knListInternalUnits: {
+        parameters: {
+            query?: {
+                org_ref?: string;
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Theo thứ tự hiển thị */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InternalUnitList"];
+                };
+            };
+            422: components["responses"]["Problem"];
         };
     };
     knListDepartments: {

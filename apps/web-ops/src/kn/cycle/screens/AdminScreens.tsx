@@ -16,12 +16,34 @@ import { KN_ROLE_LABEL, type KnRole } from "@/kn/contract";
 import { listForms } from "@/kn/forms/api";
 import { Greeting } from "@/kn/ui";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
-import { RawFile, type AccountsUser, type KnAssignment, type KnAssignmentInput, type KnDepartment, type KnOrgTreeNode, type KnUserImport } from "../api";
+import { RawFile, type AccountsUser, type InternalUnit, type KnAssignment, type KnAssignmentInput, type KnDelegation, type KnDepartment, type KnOrgTreeNode, type KnUserImport } from "../api";
 import { LoadState, dt, useAction, useLoad } from "../common";
 
 const AG_REF_FALLBACK = "";
 // W11.06: 5 mã phòng ban seed (docs/kn/phong-ban-seed.md); mã tạm phong_ban_5/6 đã thay.
 const DEPT_OPTIONS_ALL = ["trong_trot", "chan_nuoi_thuy_san", "ke_hoach_tai_chinh", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"];
+// W11.07 (Q-059): danh mục cấp quản lý, nhóm Cấp Tỉnh, cờ nhiệm vụ — cùng mã với accounts/port (accounts.kn-roles/2).
+const MGMT_OPTIONS = [
+  { code: "chuyen_vien", label: "Chuyên viên - Cán bộ" },
+  { code: "phu_trach", label: "Phụ trách" },
+  { code: "pho_truong_phong", label: "Phó trưởng phòng" },
+  { code: "truong_phong", label: "Trưởng phòng" },
+  { code: "lanh_dao_don_vi", label: "Lãnh đạo đơn vị (xem mọi phòng ban, chỉ đọc)" },
+  { code: "pho_giam_doc", label: "Phó Giám đốc" },
+  { code: "giam_doc", label: "Giám đốc" },
+];
+const PROVINCE_GROUP_OPTIONS = [
+  { code: "vien_chuc", label: "Viên chức" },
+  { code: "tong_hop", label: "Cán bộ tổng hợp" },
+  { code: "chu_nhiem", label: "Chủ nhiệm chương trình/dự án" },
+  { code: "lanh_dao_phong", label: "Lãnh đạo phòng" },
+  { code: "ban_giam_doc", label: "Ban Giám đốc (chỉ xem)" },
+];
+const DUTY_OPTIONS = [
+  { code: "qtnv_bao_gia", label: "Quản trị nghiệp vụ báo giá (QTNV)" },
+  { code: "phu_trach_bieu", label: "Người phụ trách biểu" },
+];
+const DELEG_STATUS: Record<string, string> = { active: "Đang hiệu lực", scheduled: "Chưa tới hạn", expired: "Hết hạn", revoked: "Đã thu hồi" };
 const AG_COMMUNE_OPTIONS = [
   { code: "91301", name: "Mỹ Hòa Hưng" },
   { code: "91302", name: "Bình Đức" },
@@ -156,11 +178,13 @@ function AssignmentEditor({ value, onChange, orgRefs }: { value: AsgDraft; onCha
         ))}
       </fieldset>
       <label className="field">
-        <span>Cấp quản lý (tạm, Q-05)</span>
+        <span>Cấp quản lý (tạm, Q-059)</span>
         <select className="input" aria-label="Cấp quản lý" value={value.mgmt} onChange={(e) => onChange({ ...value, mgmt: e.target.value })}>
-          <option value="chuyen_vien">Chuyên viên</option>
-          <option value="pho_phong">Phó phòng</option>
-          <option value="truong_phong">Trưởng phòng</option>
+          {MGMT_OPTIONS.map((m) => (
+            <option key={m.code} value={m.code}>
+              {m.label}
+            </option>
+          ))}
         </select>
       </label>
       {value.role === "kn_xa" ? (
@@ -173,6 +197,116 @@ function AssignmentEditor({ value, onChange, orgRefs }: { value: AsgDraft; onCha
           ))}
         </fieldset>
       ) : null}
+    </div>
+  );
+}
+
+/** W11.07: thuộc tính phân quyền trong vai (sổ phụ) — nhóm Cấp Tỉnh, cờ nhiệm vụ, đơn vị nội bộ, phạm vi Cấp Xã theo cơ sở/hộ. */
+interface AttrsDraft {
+  aid: string;
+  role: KnRole;
+  province_group: string;
+  duties: string[];
+  internal_unit_code: string;
+  facility_refs: string;
+  household_refs: string;
+  reason: string;
+}
+
+function attrsDraftOf(a: KnAssignment): AttrsDraft {
+  const x = a.attributes;
+  return {
+    aid: a.assignment_id,
+    role: a.role,
+    province_group: x?.province_group ?? "",
+    duties: x?.duties ?? [],
+    internal_unit_code: x?.internal_unit_code ?? "",
+    facility_refs: (x?.facility_refs ?? []).join("\n"),
+    household_refs: (x?.household_refs ?? []).join("\n"),
+    reason: "",
+  };
+}
+
+const refLines = (s: string) =>
+  s
+    .split(/[\s,;]+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+function attrsSummary(a: KnAssignment, units: InternalUnit[]): string {
+  const x = a.attributes;
+  if (!x) return "—";
+  const parts = [
+    x.province_group_label,
+    ...x.duties.map((d) => DUTY_OPTIONS.find((o) => o.code === d)?.label ?? d),
+    x.internal_unit_code ? `Đơn vị: ${units.find((u) => u.code === x.internal_unit_code)?.name ?? x.internal_unit_code}` : null,
+    x.facility_refs.length ? `${x.facility_refs.length} cơ sở` : null,
+    x.household_refs.length ? `${x.household_refs.length} hộ` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "—";
+}
+
+function AttrsEditor({ value, onChange, units }: { value: AttrsDraft; onChange: (v: AttrsDraft) => void; units: InternalUnit[] }) {
+  const tinh = value.role === "kn_tinh";
+  const xa = value.role === "kn_xa";
+  return (
+    <div className="stack" role="group" aria-label="Phân quyền trong vai">
+      {tinh ? (
+        <>
+          <label className="field">
+            <span>Nhóm Cấp Tỉnh (tạm, Q-059)</span>
+            <select className="input" aria-label="Nhóm Cấp Tỉnh" value={value.province_group} onChange={(e) => onChange({ ...value, province_group: e.target.value })}>
+              <option value="">— Không —</option>
+              {PROVINCE_GROUP_OPTIONS.map((g) => (
+                <option key={g.code} value={g.code}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <fieldset style={{ border: 0 }}>
+            <legend className="small">Cờ nhiệm vụ</legend>
+            {DUTY_OPTIONS.map((d) => (
+              <label key={d.code} className="row" style={{ gap: 4 }}>
+                <input
+                  type="checkbox"
+                  aria-label={d.label}
+                  checked={value.duties.includes(d.code)}
+                  onChange={(e) => onChange({ ...value, duties: e.target.checked ? [...value.duties, d.code] : value.duties.filter((x) => x !== d.code) })}
+                />{" "}
+                {d.label}
+              </label>
+            ))}
+          </fieldset>
+        </>
+      ) : null}
+      <label className="field">
+        <span>{xa ? "Đơn vị quản lý (HS-37)" : "Đơn vị nội bộ"}</span>
+        <select className="input" aria-label="Đơn vị nội bộ" value={value.internal_unit_code} onChange={(e) => onChange({ ...value, internal_unit_code: e.target.value })}>
+          <option value="">— Chưa gán —</option>
+          {units.map((u) => (
+            <option key={u.code} value={u.code}>
+              {u.name} ({u.kind_label})
+            </option>
+          ))}
+        </select>
+      </label>
+      {xa ? (
+        <>
+          <label className="field">
+            <span>Giới hạn cơ sở (mã tham chiếu, mỗi dòng một mã; trống = cả xã phụ trách)</span>
+            <textarea className="textarea" aria-label="Giới hạn cơ sở" value={value.facility_refs} onChange={(e) => onChange({ ...value, facility_refs: e.target.value })} />
+          </label>
+          <label className="field">
+            <span>Giới hạn hộ (mã tham chiếu)</span>
+            <textarea className="textarea" aria-label="Giới hạn hộ" value={value.household_refs} onChange={(e) => onChange({ ...value, household_refs: e.target.value })} />
+          </label>
+        </>
+      ) : null}
+      <label className="field">
+        <span>Lý do thay đổi</span>
+        <input className="input" aria-label="Lý do thay đổi phân quyền" value={value.reason} onChange={(e) => onChange({ ...value, reason: e.target.value })} />
+      </label>
     </div>
   );
 }
@@ -333,6 +467,7 @@ const LOG_EVENT: Record<string, string> = {
   "assignment.granted": "Thêm vai trò",
   "assignment.changed": "Sửa vai trò",
   "assignment.revoked": "Xóa vai trò",
+  "assignment.attributes_changed": "Sửa phân quyền trong vai",
 };
 
 /** FN-AD-04.04 Chi tiết tài khoản có Log (Hình 25b). */
@@ -342,19 +477,26 @@ export function UserDetailScreen() {
   const act = useAction();
   const refs = useOrgRefs();
   const s = useLoad(async () => {
-    const [user, asg, log] = await Promise.all([knAdminApi.user(id), knAdminApi.assignments(id), knAdminApi.log(id)]);
-    return { user, asg: asg.items, log: log.items };
+    const [user, asg, log, units, delegs] = await Promise.all([
+      knAdminApi.user(id),
+      knAdminApi.assignments(id),
+      knAdminApi.log(id),
+      knAdminApi.internalUnits().catch(() => ({ items: [] as InternalUnit[] })),
+      knAdminApi.delegations(id).catch(() => ({ items: [] as KnDelegation[] })),
+    ]);
+    return { user, asg: asg.items, log: log.items, units: units.items, delegs: delegs.items };
   }, [id, act.note]);
+  const [attrsDlg, setAttrsDlg] = useState<AttrsDraft | null>(null);
   const [edit, setEdit] = useState<{ full_name: string; email: string; phone: string } | null>(null);
   const [asgDlg, setAsgDlg] = useState<{ aid: string | null; draft: AsgDraft } | null>(null);
-  const [reasonDlg, setReasonDlg] = useState<{ kind: "lock" | "unlock" | "revoke"; aid?: string } | null>(null);
+  const [reasonDlg, setReasonDlg] = useState<{ kind: "lock" | "unlock" | "revoke" | "deleg"; aid?: string } | null>(null);
   const [reason, setReason] = useState("");
   useBreadcrumbTail(s.data ? [{ label: fullName(s.data.user) }] : []);
   return (
     <>
       <BackLink href="/kn/quan-tri/nguoi-dung">Danh sách tài khoản</BackLink>
       <LoadState s={s}>
-        {({ user, asg, log }) => {
+        {({ user, asg, log, units, delegs }) => {
           const f = edit ?? { full_name: fullName(user), email: user.email, phone: user.phone ?? "" };
           return (
             <>
@@ -412,6 +554,7 @@ export function UserDetailScreen() {
                           <th scope="col">Phòng ban</th>
                           <th scope="col">Cấp quản lý</th>
                           <th scope="col">Xã/phường phụ trách</th>
+                          <th scope="col">Phân quyền trong vai</th>
                           <th scope="col">Thao tác</th>
                         </tr>
                       </thead>
@@ -425,9 +568,13 @@ export function UserDetailScreen() {
                             <td>{a.role === "admin" ? "Tất cả" : a.departments.map((x) => x.name.replace(/^Phòng /, "")).join(", ")}</td>
                             <td>{a.mgmt_level ?? "—"}</td>
                             <td>{a.role === "kn_xa" ? a.communes.map((c) => c.name).join(", ") || <StatusPill tone="warn">Chưa gán xã</StatusPill> : "—"}</td>
+                            <td className="small">{a.role === "admin" ? "—" : attrsSummary(a, units)}</td>
                             <td>
                               {a.role === "admin" ? null : (
                                 <span className="row-acts">
+                                  <button type="button" aria-label={`Phân quyền trong vai ${KN_ROLE_LABEL[a.role]}`} onClick={() => setAttrsDlg(attrsDraftOf(a))}>
+                                    <Icon name="shield" size={16} />
+                                  </button>
                                   <button type="button" aria-label={`Sửa vai trò ${KN_ROLE_LABEL[a.role]}`} onClick={() => setAsgDlg({ aid: a.assignment_id, draft: { role: a.role as AsgDraft["role"], departments: a.departments.map((x) => x.code), mgmt: a.mgmt_level_code ?? "chuyen_vien", communes: a.communes.map((c) => c.code) } })}>
                                     <Icon name="edit" size={16} />
                                   </button>
@@ -442,6 +589,45 @@ export function UserDetailScreen() {
                       </tbody>
                     </table>
                     <p className="small mute">Một tài khoản có thể có nhiều vai trò, phòng ban; mỗi xã phụ trách là một tab khi nhập báo cáo.</p>
+                    <h2 style={{ marginTop: 14 }}>Ủy quyền có hạn</h2>
+                    {delegs.length ? (
+                      <table className="dt" aria-label="Ủy quyền có hạn">
+                        <thead>
+                          <tr>
+                            <th scope="col">Quyền</th>
+                            <th scope="col">Chiều</th>
+                            <th scope="col">Phòng ban</th>
+                            <th scope="col">Hiệu lực</th>
+                            <th scope="col">Trạng thái</th>
+                            <th scope="col">Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {delegs.map((d) => (
+                            <tr key={d.delegation_id}>
+                              <td>{d.power_label}</td>
+                              <td>{d.grantor_ref === id ? "Đã giao" : "Được nhận"}</td>
+                              <td>{d.department_code}</td>
+                              <td>
+                                {dt(d.valid_from)} → {dt(d.valid_to)}
+                              </td>
+                              <td>
+                                <StatusPill tone={d.status === "active" ? "ok" : d.status === "scheduled" ? "warn" : "neutral"}>{DELEG_STATUS[d.status] ?? d.status}</StatusPill>
+                              </td>
+                              <td>
+                                {d.status === "active" || d.status === "scheduled" ? (
+                                  <button type="button" className="btn btn-o btn-sm" aria-label={`Thu hồi ủy quyền ${d.power_label}`} onClick={() => (setReason(""), setReasonDlg({ kind: "deleg", aid: d.delegation_id }))}>
+                                    Thu hồi
+                                  </button>
+                                ) : null}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="small mute">Chưa có ủy quyền. Lãnh đạo phòng tự ủy quyền trong phiên làm việc (tối đa 30 ngày); Admin xem và thu hồi ở đây.</p>
+                    )}
                     <RelatedTabs
                       tabs={[
                         {
@@ -478,9 +664,39 @@ export function UserDetailScreen() {
                   <AssignmentEditor value={asgDlg.draft} orgRefs={{}} onChange={(v) => setAsgDlg({ ...asgDlg, draft: v })} />
                 </Dialog>
               ) : null}
+              {attrsDlg ? (
+                <Dialog
+                  title="Phân quyền trong vai"
+                  onClose={() => setAttrsDlg(null)}
+                  actions={
+                    <button
+                      type="button"
+                      className="btn btn-p"
+                      onClick={async () => {
+                        const d = attrsDlg;
+                        const r = await act.run(
+                          () =>
+                            knAdminApi.setAttrs(id, d.aid, {
+                              ...(d.role === "kn_tinh" ? { province_group: d.province_group, duties: d.duties } : {}),
+                              internal_unit_code: d.internal_unit_code,
+                              ...(d.role === "kn_xa" ? { facility_refs: refLines(d.facility_refs), household_refs: refLines(d.household_refs) } : {}),
+                              ...(d.reason.trim() ? { reason: d.reason.trim() } : {}),
+                            }),
+                          "Đã lưu phân quyền trong vai (có hiệu lực ở request kế tiếp).",
+                        );
+                        if (r) setAttrsDlg(null);
+                      }}
+                    >
+                      Lưu
+                    </button>
+                  }
+                >
+                  <AttrsEditor value={attrsDlg} units={units} onChange={setAttrsDlg} />
+                </Dialog>
+              ) : null}
               {reasonDlg ? (
                 <Dialog
-                  title={reasonDlg.kind === "lock" ? "Khóa tài khoản" : reasonDlg.kind === "unlock" ? "Mở khóa tài khoản" : "Xóa vai trò"}
+                  title={reasonDlg.kind === "lock" ? "Khóa tài khoản" : reasonDlg.kind === "unlock" ? "Mở khóa tài khoản" : reasonDlg.kind === "deleg" ? "Thu hồi ủy quyền" : "Xóa vai trò"}
                   onClose={() => setReasonDlg(null)}
                   actions={
                     <button
@@ -488,8 +704,21 @@ export function UserDetailScreen() {
                       className="btn btn-p"
                       onClick={async () => {
                         const r = await act.run(
-                          () => (reasonDlg.kind === "revoke" ? knAdminApi.revoke(id, reasonDlg.aid!, reason) : reasonDlg.kind === "lock" ? knAdminApi.lock(id, reason) : knAdminApi.unlock(id, reason)),
-                          reasonDlg.kind === "lock" ? "Đã khóa tài khoản — mọi phiên bị thu hồi." : reasonDlg.kind === "unlock" ? "Đã mở khóa tài khoản." : "Đã xóa vai trò (dữ liệu đã nhập giữ nguyên).",
+                          () =>
+                            reasonDlg.kind === "revoke"
+                              ? knAdminApi.revoke(id, reasonDlg.aid!, reason)
+                              : reasonDlg.kind === "deleg"
+                                ? knAdminApi.revokeDelegation(reasonDlg.aid!, reason)
+                                : reasonDlg.kind === "lock"
+                                  ? knAdminApi.lock(id, reason)
+                                  : knAdminApi.unlock(id, reason),
+                          reasonDlg.kind === "lock"
+                            ? "Đã khóa tài khoản — mọi phiên bị thu hồi."
+                            : reasonDlg.kind === "unlock"
+                              ? "Đã mở khóa tài khoản."
+                              : reasonDlg.kind === "deleg"
+                                ? "Đã thu hồi ủy quyền."
+                                : "Đã xóa vai trò (dữ liệu đã nhập giữ nguyên).",
                         );
                         if (r !== null) setReasonDlg(null);
                       }}
@@ -499,7 +728,7 @@ export function UserDetailScreen() {
                   }
                 >
                   <label className="field">
-                    <span>Lý do* ({reasonDlg.kind === "revoke" ? "≥ 10" : "≥ 20"} ký tự)</span>
+                    <span>Lý do* ({reasonDlg.kind === "revoke" || reasonDlg.kind === "deleg" ? "≥ 10" : "≥ 20"} ký tự)</span>
                     <textarea className="textarea" value={reason} onChange={(e) => setReason(e.target.value)} />
                   </label>
                 </Dialog>
@@ -901,13 +1130,124 @@ export function DepartmentsScreen() {
                   ),
                 },
               ];
-              return <DataTable caption="Phòng ban của TTKN tỉnh An Giang" columns={columns} rows={d.items.slice((page - 1) * 20, page * 20)} rowKey={(x) => x.id} page={page} pageSize={20} total={d.items.length} onPage={setPage} />;
+              return (
+                <>
+                  <DataTable caption="Phòng ban của TTKN tỉnh An Giang" columns={columns} rows={d.items.slice((page - 1) * 20, page * 20)} rowKey={(x) => x.id} page={page} pageSize={20} total={d.items.length} onPage={setPage} />
+                  <InternalUnitsBlock orgRef={d.org_ref} departments={d.items} />
+                </>
+              );
             }}
           </LoadState>
         }
         log={<LogPanel entries={(log.data?.items ?? []).map((l) => ({ event: l.event === "department.status_changed" ? "Đổi trạng thái" : l.event === "department.created" ? "Khai báo phòng ban" : l.event, actor_display: l.actor_display ?? "—", at: l.at, changes: l.changes, reason: l.reason }))} empty={sel ? "Chưa có thay đổi nào." : "Chọn một phòng ban để xem Log."} />}
       />
     </>
+  );
+}
+
+/** W11.07 (Q-068): danh mục đơn vị nội bộ — Ban Giám đốc, phòng (gắn phòng ban), trạm, trại… nơi chứa người (HS-16, HS-37). */
+function InternalUnitsBlock({ orgRef, departments }: { orgRef: string; departments: KnDepartment[] }) {
+  const { knAdminApi } = useAuth();
+  const act = useAction();
+  const s = useLoad(() => knAdminApi.internalUnits(true), [act.note]);
+  const [form, setForm] = useState({ code: "", kind: "tram", name: "", department_code: "" });
+  return (
+    <section className="lv-block" style={{ marginTop: 16 }} aria-label="Đơn vị nội bộ">
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h2>Đơn vị nội bộ</h2>
+        <button type="button" className="btn btn-o btn-sm" disabled={act.busy} onClick={() => void act.run(() => knAdminApi.seedInternalUnits(orgRef), (r) => `Đã nạp ${r.created.length} đơn vị nội bộ (đã có ${r.existing}).`)}>
+          Nạp mặc định
+        </button>
+      </div>
+      {act.view}
+      <LoadState s={s}>
+        {(u) => (
+          <>
+            <table className="dt" aria-label="Danh mục đơn vị nội bộ">
+              <thead>
+                <tr>
+                  <th scope="col">Mã</th>
+                  <th scope="col">Tên</th>
+                  <th scope="col">Loại</th>
+                  <th scope="col">Phòng ban</th>
+                  <th scope="col">Trạng thái</th>
+                  <th scope="col">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {u.items.map((x) => (
+                  <tr key={x.id}>
+                    <td>{x.code}</td>
+                    <td>{x.name}</td>
+                    <td>{x.kind_label}</td>
+                    <td>{x.department_code ?? "—"}</td>
+                    <td>
+                      <StatusPill tone={x.active ? "ok" : "neutral"}>{x.active ? "Đang dùng" : "Đã ngừng"}</StatusPill>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-o btn-sm"
+                        onClick={() => {
+                          const reason = x.active ? (window.prompt("Lý do ngừng (≥ 10 ký tự):") ?? "") : undefined;
+                          void act.run(() => knAdminApi.setInternalUnitActive(x.id, !x.active, reason), x.active ? `Đã ngừng “${x.name}”.` : `Đã dùng lại “${x.name}”.`);
+                        }}
+                      >
+                        {x.active ? "Ngừng" : "Dùng lại"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {u.items.length === 0 ? <p className="small mute">Chưa có đơn vị nội bộ — bấm “Nạp mặc định” (Ban Giám đốc + 5 phòng), rồi thêm trạm, trại.</p> : null}
+            <div className="grid2" role="group" aria-label="Thêm đơn vị nội bộ">
+              <label className="field">
+                <span>Mã*</span>
+                <input className="input" aria-label="Mã đơn vị nội bộ" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+              </label>
+              <label className="field">
+                <span>Tên*</span>
+                <input className="input" aria-label="Tên đơn vị nội bộ" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </label>
+              <label className="field">
+                <span>Loại*</span>
+                <select className="input" aria-label="Loại đơn vị nội bộ" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value, department_code: e.target.value === "phong" ? form.department_code : "" })}>
+                  {u.kinds.map((k) => (
+                    <option key={k.code} value={k.code}>
+                      {k.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Phòng ban (chỉ loại Phòng)</span>
+                <select className="input" aria-label="Phòng ban của đơn vị" disabled={form.kind !== "phong"} value={form.department_code} onChange={(e) => setForm({ ...form, department_code: e.target.value })}>
+                  <option value="">— Không —</option>
+                  {departments.map((d) => (
+                    <option key={d.code} value={d.code}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <button
+              type="button"
+              className="btn btn-p btn-sm"
+              disabled={act.busy || !form.code || !form.name}
+              onClick={() =>
+                void act
+                  .run(() => knAdminApi.createInternalUnit({ org_ref: orgRef, code: form.code.trim(), kind: form.kind, name: form.name.trim(), ...(form.department_code ? { department_code: form.department_code } : {}) }), (r) => `Đã thêm đơn vị “${r.name}”.`)
+                  .then((r) => (r ? setForm({ code: "", kind: "tram", name: "", department_code: "" }) : undefined))
+              }
+            >
+              + Thêm đơn vị nội bộ
+            </button>
+          </>
+        )}
+      </LoadState>
+    </section>
   );
 }
 

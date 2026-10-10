@@ -483,6 +483,17 @@ KN v7.7 gói P1 — gán vai trò nhiều vai × Nút × phòng ban × xã (FN-A
 | 422 | `accounts.support_reason_required` | thao tác ghi trong chế độ hỗ trợ thiếu header `X-AG-Reason` (≥ 10 ký tự, UTF-8 mã hóa phần trăm) |
 | 404 | `accounts.support_session_not_found` | phiên hỗ trợ không có hoặc của Admin khác |
 | 409 | `accounts.support_session_ended` | thoát phiên hỗ trợ đã kết thúc |
+| 403 | `accounts.context_read_only` | W11.07: thao tác ghi trong ngữ cảnh chỉ xem (Lãnh đạo đơn vị ở phòng ban ngoài lần gán, nhóm Ban Giám đốc) — chặn ở middleware cho mọi route; đổi ngữ cảnh vẫn được |
+| 422 | `accounts.internal_unit_invalid` | W11.07: thuộc tính vai trỏ đơn vị nội bộ không có trong đơn vị của lần gán hoặc đã ngừng |
+| 404 | `accounts.internal_unit_not_found` | W11.07: đơn vị nội bộ không có |
+| 409 | `accounts.internal_unit_code_taken` | W11.07: mã đơn vị nội bộ đã có trong đơn vị (mã không tái sử dụng) |
+| 409 | `accounts.internal_unit_state` | W11.07: ngừng đơn vị đã ngừng / dùng lại đơn vị đang dùng |
+| 422 | `accounts.internal_unit_org_invalid` | W11.07: đơn vị nội bộ chỉ khai cho Nút cấp 1/2 (TTKNQG, TTKN tỉnh) đang hoạt động |
+| 422 | `accounts.internal_unit_department_invalid` | W11.07: phòng ban của đơn vị loại phòng không phải phòng ban (chưa xóa) của cùng đơn vị |
+| 404 | `accounts.delegation_not_found` | W11.07: ủy quyền không có, hoặc người thu hồi không phải người giao (không lộ ủy quyền của người khác) |
+| 403 | `accounts.delegation_forbidden` | W11.07: người ủy quyền không phải lãnh đạo phòng Cấp Tỉnh, ngữ cảnh chỉ xem/hỗ trợ, hoặc phòng ban khác phòng ban của phiên |
+| 422 | `accounts.delegation_grantee_invalid` | W11.07: người nhận không có vai Cấp Tỉnh còn hiệu lực (tới hết hạn ủy quyền) cùng đơn vị, cùng phòng ban |
+| 409 | `accounts.delegation_state` | W11.07: thu hồi ủy quyền đã thu hồi hoặc đã hết hạn |
 
 Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định dạng Email", "Sai định dạng vai trò", "SĐT đã tồn tại", "Tên đăng nhập hoặc Email đã tồn tại", "Trùng với dòng N trong tệp", "Tổ chức ngoài phạm vi phụ trách", "Vai trò vượt quyền cấp của bạn". Thao tác loạt trả `code` của từng tài khoản trong `items[]`.
 

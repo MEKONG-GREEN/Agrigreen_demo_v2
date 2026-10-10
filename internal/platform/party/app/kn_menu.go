@@ -351,7 +351,11 @@ func departmentGroups(ctx context.Context, forms port.FormAvailability, d port.D
 		return out, nil
 	}
 	var out []MenuGroupView
-	for _, g := range domain.DepartmentMenu(d.MenuProfile, audience, d.Code) {
+	groups := domain.DepartmentMenu(d.MenuProfile, audience, d.Code)
+	if t, ok := menuTraits(ctx); ok {
+		groups = domain.FilterNeeds(groups, t)
+	}
+	for _, g := range groups {
 		items, err := conv(g.Items)
 		if err != nil {
 			return nil, err
@@ -361,6 +365,21 @@ func departmentGroups(ctx context.Context, forms port.FormAvailability, d port.D
 		}
 	}
 	return out, nil
+}
+
+// menuTraits trả thuộc tính phân quyền trong vai (W11.07) của ngữ cảnh phiên để lọc mục có Needs. ok = false
+// (không lọc — menu đầy đủ của đối tượng): không có ngữ cảnh phiên (đường cũ theo vai realm, xem trước của
+// quản trị nền tảng, ca vàng web) hoặc Admin đang hỗ trợ (FN-AD-04.07: Admin thấy mọi mục để hỗ trợ).
+func menuTraits(ctx context.Context) (domain.MenuTraits, bool) {
+	p, ok := authz.FromContext(ctx)
+	if !ok || p.KN == nil || p.KN.Support != nil {
+		return domain.MenuTraits{}, false
+	}
+	k := p.KN
+	if k.ReadOnly() {
+		return domain.MenuTraits{Manager: k.Manager}, true // chỉ xem: không mục nhiệm vụ (ghi)
+	}
+	return domain.MenuTraits{Manager: k.Manager, Duties: k.Duties}, true
 }
 
 // itemView chuyển một mục bảng tĩnh; mục ComingSoon luôn Enabled = false, Status "coming_soon" (kn.menu/v3).

@@ -37,6 +37,8 @@ export interface DepartmentRef {
   /** Mô tả ngắn hiện trên thẻ phòng ban (Hình 3b). */
   description: string | null;
   status: DepartmentStatus;
+  /** W11.07: phòng ban ngoài lần gán, chọn được ở chế độ chỉ xem (Lãnh đạo đơn vị, Ban Giám đốc). */
+  read_only?: boolean;
 }
 
 export interface CommuneRef {
@@ -91,6 +93,17 @@ export interface SessionContext {
   support_session_id?: string | null;
   /** Tài khoản được hỗ trợ. */
   on_behalf_of?: string | null;
+  /** W11.07: ngữ cảnh chỉ xem (Cấp TW, Lãnh đạo đơn vị ở phòng ban khác, Ban Giám đốc) — server chặn mọi thao tác ghi. */
+  read_only?: boolean;
+  /** W11.07: lãnh đạo (≥ phó phòng/phụ trách hoặc nhóm Lãnh đạo phòng). */
+  manager?: boolean;
+  mgmt_level_code?: string | null;
+  province_group?: string | null;
+  duties?: string[];
+  /** W11.07: đơn vị nội bộ (Cấp Xã: đơn vị quản lý HS-37). */
+  internal_unit_code?: string | null;
+  /** W11.07: quyền nhận qua ủy quyền có hạn (đầy đủ ở GET /v1/me/context). */
+  powers?: string[];
 }
 
 /** Header mang ngữ cảnh phiên (P1 gap §4.5 phương án A). */
