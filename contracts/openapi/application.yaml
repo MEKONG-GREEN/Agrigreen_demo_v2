@@ -7834,6 +7834,474 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: price.threshold_not_found, $ref: "#/components/responses/Problem"}
         "422": {description: price.default_threshold, $ref: "#/components/responses/Problem"}
+  # --- pf/price W11.73 (pf 000141, BRD Báo giá v1.3 FN-AD-04.03, FN-XA-03.01): mặt hàng theo thời kỳ — mặt hàng có phiên bản +
+  # valid_from, nhóm hàng, gán mặt hàng Địa phương cho xã, đề xuất từ xã, bộ theo vụ, "thay thế cho". Ngày hiệu lực vắng →
+  # ngày báo giá kế tiếp (BR-02). point_code = mã xã báo giá (mặc định mã ĐVHC xã; liên kết lỏng tới xã báo giá W11.72). ---
+  /v1/price/items:
+    get:
+      summary: Danh mục mặt hàng nhìn từ một ngày — mọi trạng thái (Hoạt động / Chờ hiệu lực / Ngưng), sắp theo nhóm, thứ tự, mã
+      operationId: priceListItems
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+        - {name: group, in: query, required: false, schema: {type: string}}
+        - {name: kind, in: query, required: false, schema: {type: string, enum: [basic, local]}}
+        - {name: state, in: query, required: false, schema: {type: string, enum: [active, pending, retired]}}
+        - {name: q, in: query, required: false, description: "Tìm theo mã, tên, giống/phẩm cấp", schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceItemList"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Thêm mặt hàng — mã tự sinh MH#####; Cơ bản áp dụng mọi xã, Địa phương gán cho points; "thay thế cho" ngưng mặt hàng cũ từ ngày hiệu lực
+      operationId: priceCreateItem
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceItemInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "400": {description: bad_request, $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden (chỉ Cấp Tỉnh, vai quản trị), $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found (mặt hàng được thay thế), $ref: "#/components/responses/Problem"}
+        "409": {description: price.item_duplicate | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid | price.item_basic_not_assignable, $ref: "#/components/responses/Problem"}
+  /v1/price/items/{code}:
+    get:
+      summary: Một mặt hàng tại ngày — trạng thái, lịch sử phiên bản (lịch sử thay đổi, tên cũ), mặt hàng thay thế nó
+      operationId: priceGetItem
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceItemCode"
+        - $ref: "#/components/parameters/PriceAt"
+      responses:
+        "200":
+          description: Mặt hàng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceItemDetail"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+  /v1/price/items/{code}/revise:
+    post:
+      summary: Sửa mặt hàng — phiên bản mới từ valid_from; đã có giá thì chỉ sửa tên, nơi bán (BR-04) và chỉ Quản trị nghiệp vụ
+      operationId: priceReviseItem
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceItemCode"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceItemInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.item_locked | price.item_retired | price.item_duplicate, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid, $ref: "#/components/responses/Problem"}
+  /v1/price/items/{code}/retire:
+    post:
+      summary: Ngưng mặt hàng — hiệu lực đến valid_to (vắng → hết ngày trước ngày báo giá kế tiếp), có lý do; không xóa
+      operationId: priceRetireItem
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceItemCode"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                valid_to: {type: string, format: date}
+                reason: {type: string, minLength: 1, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.item_retired, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid, $ref: "#/components/responses/Problem"}
+  /v1/price/items/{code}/move:
+    post:
+      summary: Đổi thứ tự hiển thị trong nhóm (lên / xuống) từ ngày báo giá kế tiếp
+      operationId: priceMoveItem
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceItemCode"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [direction]
+              properties:
+                direction: {type: string, enum: [up, down]}
+      responses:
+        "201":
+          description: Đã ghi (written = 0 khi đã ở đầu/cuối nhóm)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.item_retired, $ref: "#/components/responses/Problem"}
+  /v1/price/groups:
+    get:
+      summary: Nhóm hàng đang hiệu lực tại ngày, kèm số mặt hàng đang hiệu lực
+      operationId: priceListGroups
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+      responses:
+        "200":
+          description: Nhóm hàng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [groups]
+                properties:
+                  groups: {type: array, items: {$ref: "#/components/schemas/PriceGroup"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Thêm nhóm hàng (hiệu lực từ hôm nay; mã vắng → nhom_<n>)
+      operationId: priceCreateGroup
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceGroupInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict (mã đã có), $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/groups/{code}/revise:
+    post:
+      summary: Sửa tên / thứ tự nhóm hàng (hiệu lực từ hôm nay)
+      operationId: priceReviseGroup
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceGroupInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.group_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/groups/{code}/retire:
+    post:
+      summary: Xóa nhóm hàng (phiên bản ngưng) — chặn khi nhóm còn mặt hàng đang hoặc sắp hiệu lực
+      operationId: priceRetireGroup
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.group_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.group_not_empty, $ref: "#/components/responses/Problem"}
+  /v1/price/assignments:
+    get:
+      summary: Gán mặt hàng Địa phương cho xã đang hiệu lực tại ngày (lọc theo xã)
+      operationId: priceListAssignments
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+        - {name: point, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Gán
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assignments]
+                properties:
+                  assignments: {type: array, items: {$ref: "#/components/schemas/PriceAssignment"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Gán mặt hàng Địa phương cho xã từ valid_from (gán đã có bỏ qua); mặt hàng Cơ bản không gán riêng
+      operationId: priceAssignItems
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceAssignInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.item_retired, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid | price.item_basic_not_assignable, $ref: "#/components/responses/Problem"}
+  /v1/price/assignments/remove:
+    post:
+      summary: Bỏ gán mặt hàng khỏi xã từ valid_from; hôm nay xã đã có phiếu → áp dụng từ ngày báo giá kế tiếp
+      operationId: priceUnassignItems
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceAssignInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid | price.item_basic_not_assignable, $ref: "#/components/responses/Problem"}
+  /v1/price/point-items:
+    get:
+      summary: Mặt hàng xã báo giá phải báo giá tại ngày — Cơ bản ∪ Địa phương đã gán, lọc bộ theo vụ, đúng thứ tự (AC-04)
+      operationId: pricePointItems
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+        - {name: point, in: query, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Mặt hàng của xã
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [day, point_code, items]
+                properties:
+                  day: {type: string, format: date}
+                  point_code: {type: string}
+                  items: {type: array, items: {$ref: "#/components/schemas/PriceItem"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/item-sets:
+    get:
+      summary: Bộ mặt hàng theo vụ nhìn từ một ngày (có hiệu lực hoặc sắp hiệu lực)
+      operationId: priceListItemSets
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+      responses:
+        "200":
+          description: Bộ mặt hàng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sets]
+                properties:
+                  sets: {type: array, items: {$ref: "#/components/schemas/PriceItemSet"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo bộ mặt hàng theo vụ — mặt hàng thuộc bộ chỉ xuất hiện ở xã khi có bộ chứa nó đang bật (BR-08)
+      operationId: priceCreateItemSet
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceItemSetInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.item_set_exists, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid, $ref: "#/components/responses/Problem"}
+  /v1/price/item-sets/{code}/revise:
+    post:
+      summary: Sửa bộ (tên, vụ, danh sách, bật/tắt, retire = ngưng bộ) — phiên bản mới từ valid_from
+      operationId: priceReviseItemSet
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceItemSetInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_set_not_found | price.item_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid, $ref: "#/components/responses/Problem"}
+  /v1/price/proposals:
+    get:
+      summary: Đề xuất mặt hàng từ xã (mới nhất trước); Cấp Xã chỉ thấy đề xuất của mình
+      operationId: priceListProposals
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: status, in: query, required: false, schema: {type: string, enum: [pending, approved, rejected]}}
+      responses:
+        "200":
+          description: Đề xuất
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [proposals]
+                properties:
+                  proposals: {type: array, items: {$ref: "#/components/schemas/PriceProposal"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Đề xuất mặt hàng mới (Cấp Xã, Cấp Tỉnh) — chỉ xuất hiện ở màn Nhập báo giá khi được duyệt và gán cho xã
+      operationId: priceCreateProposal
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceProposalInput"}
+      responses:
+        "201":
+          description: Đã ghi (code = mã đề xuất)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/proposals/{id}/approve:
+    post:
+      summary: Duyệt đề xuất — tạo mặt hàng (nội dung gửi kèm, mặc định Địa phương) và gán cho xã đề xuất từ ngày hiệu lực (AC-05)
+      operationId: priceApproveProposal
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceItemInput"}
+      responses:
+        "201":
+          description: Đã ghi (code = mã mặt hàng mới)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.proposal_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.proposal_decided | price.item_duplicate, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid, $ref: "#/components/responses/Problem"}
+  /v1/price/proposals/{id}/reject:
+    post:
+      summary: Từ chối đề xuất kèm lý do
+      operationId: priceRejectProposal
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note: {type: string, minLength: 1, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.proposal_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.proposal_decided, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  # --- hết pf/price W11.73 ---
   # --- hết pf/price ---
 components:
   securitySchemes:
@@ -7860,6 +8328,18 @@ components:
       required: false
       description: Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên.
       schema: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$"}
+    PriceAt:
+      name: at
+      in: query
+      required: false
+      description: Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN)
+      schema: {type: string, format: date}
+    PriceItemCode:
+      name: code
+      in: path
+      required: true
+      description: Mã mặt hàng (MH + 5 chữ số)
+      schema: {type: string, pattern: "^MH[0-9]{5}$"}
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -12505,6 +12985,179 @@ components:
         day: {type: string, format: date}
         units: {type: array, items: {$ref: "#/components/schemas/PriceCatalogEntry"}}
         groups: {type: array, items: {$ref: "#/components/schemas/PriceCatalogEntry"}}
+    # --- pf/price W11.73 (mặt hàng theo thời kỳ) ---
+    PriceWriteResult:
+      type: object
+      required: [code, version, valid_from, written]
+      properties:
+        code: {type: string, description: "Mã mặt hàng / nhóm / bộ / xã; mã đề xuất (uuid) khi tạo hoặc từ chối đề xuất"}
+        version: {type: integer, minimum: 0}
+        valid_from: {type: string, format: date}
+        written: {type: integer, minimum: 0, description: Số dòng sổ đã ghi}
+    PriceItem:
+      type: object
+      required: [code, name, variety, group_code, unit_code, spec, sale_place, kind, sort_order, version, valid_from, valid_to, since, state,
+        replaces_code, note, point_count, has_price, new_price, gated, proposal_id]
+      properties:
+        code: {type: string, pattern: "^MH[0-9]{5}$"}
+        name: {type: string}
+        variety: {type: string, description: Giống / phẩm cấp}
+        group_code: {type: string}
+        unit_code: {type: string}
+        spec: {type: [string, "null"], description: Quy cách}
+        sale_place: {type: [string, "null"], description: Nơi bán}
+        kind: {type: string, enum: [basic, local]}
+        sort_order: {type: integer}
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date, description: Ngày hiệu lực của phiên bản hiển thị}
+        valid_to: {type: [string, "null"], format: date, description: Hiệu lực đến (null = không thời hạn)}
+        since: {type: [string, "null"], format: date, description: Ngày mặt hàng bắt đầu hiệu lực}
+        state: {type: string, enum: [active, pending, retired]}
+        replaces_code: {type: [string, "null"], description: "Thay thế cho"}
+        note: {type: [string, "null"], description: Lý do ngưng}
+        point_count: {type: [integer, "null"], description: "Số xã đang gán (Địa phương); null với mặt hàng Cơ bản (mọi xã)"}
+        has_price: {type: boolean}
+        new_price: {type: boolean, description: Nhãn "Giá mới" — mặt hàng thay thế chưa có giá}
+        gated: {type: boolean, description: Thuộc bộ theo vụ đang tắt tại ngày}
+        proposal_id: {type: [string, "null"], format: uuid}
+    PriceItemList:
+      type: object
+      required: [day, items, pending_proposals, can_edit, can_steward]
+      properties:
+        day: {type: string, format: date}
+        items: {type: array, items: {$ref: "#/components/schemas/PriceItem"}}
+        pending_proposals: {type: integer, minimum: 0}
+        can_edit: {type: boolean, description: Thêm mặt hàng, sửa mặt hàng chưa có giá}
+        can_steward: {type: boolean, description: Quản trị nghiệp vụ — ngưng, thứ tự, nhóm, gán xã, bộ theo vụ, đề xuất}
+    PriceItemVersion:
+      type: object
+      required: [version, status, valid_from, name, variety, group_code, unit_code, spec, sale_place, kind, sort_order, note, event_time,
+        actor_ref, proposal_id]
+      properties:
+        version: {type: integer, minimum: 1}
+        status: {type: string, enum: [active, retired]}
+        valid_from: {type: string, format: date}
+        name: {type: string}
+        variety: {type: string}
+        group_code: {type: string}
+        unit_code: {type: string}
+        spec: {type: [string, "null"]}
+        sale_place: {type: [string, "null"]}
+        kind: {type: string, enum: [basic, local]}
+        sort_order: {type: integer}
+        note: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        proposal_id: {type: [string, "null"], format: uuid}
+    PriceItemDetail:
+      allOf:
+        - $ref: "#/components/schemas/PriceItem"
+        - type: object
+          required: [history, replaced_by]
+          properties:
+            history: {type: array, items: {$ref: "#/components/schemas/PriceItemVersion"}}
+            replaced_by: {type: array, items: {type: string}}
+    PriceItemInput:
+      type: object
+      required: [name, variety, group_code, unit_code]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100, description: Tên loại}
+        variety: {type: string, minLength: 1, maxLength: 100, description: Giống / phẩm cấp (bắt buộc — BR-07)}
+        group_code: {type: string}
+        unit_code: {type: string}
+        spec: {type: string, maxLength: 100}
+        sale_place: {type: string, maxLength: 200}
+        kind: {type: string, enum: [basic, local], description: "Bắt buộc khi thêm; duyệt đề xuất mặc định local"}
+        valid_from: {type: string, format: date, description: Vắng → ngày báo giá kế tiếp}
+        valid_to: {type: string, format: date, description: Chỉ khi thêm}
+        replaces_code: {type: string, description: "Thay thế cho — chỉ khi thêm"}
+        points: {type: array, items: {type: string}, description: "Xã áp dụng mặt hàng Địa phương — chỉ khi thêm/duyệt"}
+    PriceGroup:
+      type: object
+      required: [code, name, sort_order, version, valid_from, items]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        sort_order: {type: integer}
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date}
+        items: {type: integer, minimum: 0}
+    PriceGroupInput:
+      type: object
+      required: [name]
+      properties:
+        code: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$", description: Chỉ khi thêm; vắng → nhom_<n>}
+        name: {type: string, minLength: 1, maxLength: 100}
+        sort_order: {type: integer, minimum: 0, description: 0 → cuối danh sách (thêm) / giữ nguyên (sửa)}
+    PriceAssignment:
+      type: object
+      required: [point_code, item_code, version, valid_from]
+      properties:
+        point_code: {type: string}
+        item_code: {type: string}
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date}
+    PriceAssignInput:
+      type: object
+      required: [point_code, item_codes]
+      properties:
+        point_code: {type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"}
+        item_codes: {type: array, minItems: 1, maxItems: 500, items: {type: string}}
+        valid_from: {type: string, format: date}
+    PriceItemSet:
+      type: object
+      required: [code, name, season, item_codes, enabled, version, valid_from, state]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        season: {type: string}
+        item_codes: {type: array, items: {type: string}}
+        enabled: {type: boolean}
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date}
+        state: {type: string, enum: [active, pending, retired]}
+    PriceItemSetInput:
+      type: object
+      required: [name, season, item_codes, enabled]
+      properties:
+        code: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$", description: Bắt buộc khi tạo}
+        name: {type: string, minLength: 1, maxLength: 100}
+        season: {type: string, minLength: 1, maxLength: 50}
+        item_codes: {type: array, minItems: 1, maxItems: 500, items: {type: string}}
+        enabled: {type: boolean}
+        valid_from: {type: string, format: date}
+        retire: {type: boolean, description: Ngưng bộ (chỉ khi sửa)}
+    PriceProposal:
+      type: object
+      required: [id, version, point_code, name, variety, group_code, unit_code, spec, reason, status, item_code, decision_note, proposer_ref,
+        created_at, decided_at]
+      properties:
+        id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        point_code: {type: string}
+        name: {type: string}
+        variety: {type: string}
+        group_code: {type: string}
+        unit_code: {type: string}
+        spec: {type: [string, "null"]}
+        reason: {type: string}
+        status: {type: string, enum: [pending, approved, rejected]}
+        item_code: {type: [string, "null"]}
+        decision_note: {type: [string, "null"]}
+        proposer_ref: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+        decided_at: {type: [string, "null"], format: date-time}
+    PriceProposalInput:
+      type: object
+      required: [point_code, name, variety, group_code, unit_code, reason]
+      properties:
+        point_code: {type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"}
+        name: {type: string, minLength: 1, maxLength: 100}
+        variety: {type: string, minLength: 1, maxLength: 100}
+        group_code: {type: string}
+        unit_code: {type: string}
+        spec: {type: string, maxLength: 100}
+        reason: {type: string, minLength: 1, maxLength: 500}
     # --- pf/price (W11.74) ---
     PriceSchedule:
       type: object

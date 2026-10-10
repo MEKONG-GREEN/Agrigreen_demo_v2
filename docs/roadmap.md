@@ -341,7 +341,7 @@ Làm lại app Khuyến nông theo các BRD ngày 07/10/2026 (Trồng trọt Fin
 - [ ] W11.07: phân quyền trong vai + đơn vị nội bộ.
 - [ ] W11.71: khung `pf/price`.
 - [ ] W11.72: xã báo giá + phân công.
-- [ ] W11.73: mặt hàng theo thời kỳ.
+- [x] W11.73 (10/10/2026, pf 000141): mặt hàng theo thời kỳ (`cap/price`, BRD Báo giá FN-AD-04.03) — sổ `pf_price.item` (mã MH##### tự sinh, phiên bản + `valid_from`, Cơ bản/Địa phương, "thay thế cho"), `item_assignment` (gán xã — mã xã báo giá lỏng, W11.72 nối), `item_proposal` (đề xuất từ xã → duyệt/từ chối), `item_set` (bộ theo vụ bật/tắt); nhóm hàng thêm/sửa/xóa; `port.Items` (KHTC đọc — Q-082; phiếu W11.75 đọc mặt hàng của xã theo ngày); `ItemHooks` cho W11.72/74/75; 21 route `/v1/price/*`; màn `/kn/bao-gia/mat-hang` (web-ops).
 - [x] W11.74 (10/10/2026): lịch báo giá (T2–T6 mặc định, ngoại lệ), giờ khóa 12:00 ±1 phút (job `price_calendar` mỗi phút ở leader), hạn phản hồi 13:30, nhắc nhập giá qua `pf/notify` (`pf.price.reminder.issued`), ngưỡng cảnh báo có phiên bản theo mặc định/nhóm/mặt hàng; mặc định ở `port.Profile.Schedule`; pf 000139; màn `web-ops` `/kn/phong-ban/thong_tin_truyen_thong/bao-gia-lich`.
 - [ ] W11.75: nhập báo giá + xác minh.
 - [ ] W11.76: duyệt/mở duyệt bảng giá.

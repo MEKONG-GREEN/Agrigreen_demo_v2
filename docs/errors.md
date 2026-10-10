@@ -1020,4 +1020,16 @@ Route `/v1/price/*` (Application API). Lỗi chung: `unauthenticated` (401), `fo
 | 404 | `price.exception_not_found` | W11.74: xóa ngoại lệ của ngày không có ngoại lệ |
 | 422 | `price.default_threshold` | W11.74: xóa ngưỡng mặc định (FN-AD-04.06 AC-04) |
 | 404 | `price.threshold_not_found` | W11.74: xóa ngưỡng nhóm/mặt hàng chưa có hoặc đã xóa |
+| 404 | `price.item_not_found` | W11.73: mã mặt hàng không có (sửa, ngưng, đổi thứ tự, gán xã, "thay thế cho", bộ theo vụ, ngưỡng theo mặt hàng `POST /v1/price/thresholds` scope `item`) |
+| 409 | `price.item_duplicate` | W11.73: trùng tên + giống/phẩm cấp + quy cách trong cùng nhóm hàng (không phân biệt hoa thường, khoảng trắng thừa) với mặt hàng đang hoặc sắp hiệu lực |
+| 409 | `price.item_locked` | W11.73: mặt hàng đã có giá — không sửa giống/phẩm cấp, đơn vị tính, quy cách, nhóm hàng, loại (BR-04); dùng "thay thế cho" |
+| 409 | `price.item_retired` | W11.73: mặt hàng đã ngưng tại ngày hiệu lực của thao tác (sửa, ngưng lại, đổi thứ tự, gán xã) |
+| 422 | `price.item_date_invalid` | W11.73: ngày hiệu lực trong quá khứ, là hôm nay khi đã có phiếu gửi, trước ngày hiệu lực của mặt hàng, hoặc hiệu lực đến trước hiệu lực từ |
+| 422 | `price.item_basic_not_assignable` | W11.73: gán/bỏ gán riêng từng xã cho mặt hàng Cơ bản (BR-03 — Cơ bản áp dụng mọi xã) |
+| 404 | `price.group_not_found` | W11.73: sửa/xóa nhóm hàng không có hoặc đã xóa |
+| 409 | `price.group_not_empty` | W11.73: xóa nhóm hàng còn mặt hàng đang hoặc sắp hiệu lực |
+| 404 | `price.proposal_not_found` | W11.73: đề xuất mặt hàng không có |
+| 409 | `price.proposal_decided` | W11.73: duyệt/từ chối đề xuất đã xử lý |
+| 404 | `price.item_set_not_found` | W11.73: sửa bộ mặt hàng theo vụ không có |
+| 409 | `price.item_set_exists` | W11.73: tạo bộ mặt hàng trùng mã đã có |
 

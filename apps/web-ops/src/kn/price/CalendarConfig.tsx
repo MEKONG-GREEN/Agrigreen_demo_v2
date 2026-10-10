@@ -861,7 +861,7 @@ function ThresholdsTab({
               className="input"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder={scope === "group" ? "rau_mau" : "heo_hoi"}
+              placeholder={scope === "group" ? "rau_mau" : "MH00001"}
             />
           </div>
           <div className="field">

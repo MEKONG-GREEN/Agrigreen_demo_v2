@@ -72,8 +72,8 @@ func (s *Service) ThresholdsView(ctx context.Context, profile string) (Threshold
 	return v, err
 }
 
-// SaveThreshold ghi một phiên bản ngưỡng (default kèm tham số chung; group phải là nhóm hàng đang hiệu lực; item chỉ
-// kiểm dạng mã — danh mục mặt hàng ở W11.73). Vai ManageBy.
+// SaveThreshold ghi một phiên bản ngưỡng (default kèm tham số chung; group phải là nhóm hàng đang hiệu lực; item phải
+// có trong danh mục mặt hàng W11.73). Vai ManageBy.
 func (s *Service) SaveThreshold(ctx context.Context, profile, idem string, t domain.Threshold) (domain.Threshold, error) {
 	prof, c, err := s.resolve(ctx, profile)
 	if err != nil {
@@ -87,6 +87,15 @@ func (s *Service) SaveThreshold(ctx context.Context, profile, idem string, t dom
 	}
 	now := s.Clock.Now()
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
+		if t.Scope == domain.ThresholdScopeItem { // W11.73: mặt hàng phải có trong danh mục (mọi trạng thái)
+			ok, err := store.ItemExists(ctx, tx, t.Code)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return port.ErrItemNotFound.WithDetail("mặt hàng " + t.Code)
+			}
+		}
 		if t.Scope == domain.ThresholdScopeGroup {
 			gs, err := groups(ctx, tx, domain.BusinessDay(now))
 			if err != nil {

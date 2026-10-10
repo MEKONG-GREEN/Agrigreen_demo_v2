@@ -49,5 +49,10 @@ func PriceProfiles() []priceport.Profile { return []priceport.Profile{KNPricePro
 
 // wirePrice dựng pf/price trên pool đơn vị.
 func wirePrice(p *pgxpool.Pool, clk clock.Clock) (*price.Module, error) {
-	return price.New(p, clk, PriceProfiles())
+	m, err := price.New(p, clk, PriceProfiles())
+	if err != nil {
+		return nil, err
+	}
+	m.WireItemCalendar() // W11.73: mặt hàng áp dụng từ ngày báo giá kế tiếp theo lịch W11.74
+	return m, nil
 }

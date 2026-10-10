@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -176,18 +177,35 @@ func TestPriceCalendarHTTP_W1174(t *testing.T) {
 	}
 	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"group","code":"rau_mau","pct":"40"}`, http.StatusUnprocessableEntity) // chưa có nhóm
 	call("admin", http.MethodPost, "/v1/price/catalog/defaults", "", http.StatusCreated)
+	// W11.73: ngưng theo mặt hàng tham chiếu danh mục mặt hàng (mã MH#####, phải có trong sổ pf_price.item).
+	if _, err := app.NewItemService(svc).CreateItem(authz.WithPrincipal(context.Background(), who["admin"]), "", app.ItemInput{Name: "Heo hơi",
+		Variety: "loại 1", GroupCode: "chan_nuoi", UnitCode: "kg", Kind: "basic"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"item","code":"MH00009","pct":"25.5"}`, http.StatusNotFound)
+	// W11.73: "ngày báo giá kế tiếp" của danh mục mặt hàng theo lịch — 14/10 (T4) → bỏ ngày nghỉ 15/10 → 16/10 (T6).
+	if err := db.WithModuleTenantTx(context.Background(), pool, app.DBModule, tid, func(tx pgx.Tx) error {
+		d, err := svc.NextQuoteDay(context.Background(), tx, time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC))
+		if err == nil && d.Format(time.DateOnly) != "2026-10-16" {
+			err = fmt.Errorf("NextQuoteDay = %s", d.Format(time.DateOnly))
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"item","code":"heo_hoi","pct":"25.5"}`, http.StatusUnprocessableEntity)
 	call("tinh", http.MethodPost, "/v1/price/thresholds", `{"scope":"group","code":"rau_mau","pct":"40"}`, http.StatusForbidden)
 	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"group","code":"rau_mau","pct":40}`, http.StatusUnprocessableEntity) // số phải là chuỗi
 	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"group","code":"rau_mau","pct":"0"}`, http.StatusUnprocessableEntity)
 	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"group","code":"rau_mau","pct":"100.5"}`, http.StatusUnprocessableEntity)
 	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"group","code":"rau_mau","pct":"40"}`, http.StatusCreated)
-	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"item","code":"heo_hoi","pct":"25.5"}`, http.StatusCreated)
+	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"item","code":"MH00001","pct":"25.5"}`, http.StatusCreated)
 	call("admin", http.MethodPost, "/v1/price/thresholds",
 		`{"scope":"default","code":"","pct":"35","lookback_days":10,"flat_pct":"0.5","survey_pct":"40"}`, http.StatusCreated)
 	if p := call("admin", http.MethodPost, "/v1/price/thresholds/default/x/retire", "", http.StatusUnprocessableEntity); code(p) != "price.default_threshold" {
 		t.Fatalf("AC-04 xóa mặc định: %v", p)
 	}
-	call("admin", http.MethodPost, "/v1/price/thresholds/item/heo_hoi/retire", "", http.StatusNoContent)
+	call("admin", http.MethodPost, "/v1/price/thresholds/item/MH00001/retire", "", http.StatusNoContent)
 	th = call("tinh", http.MethodGet, "/v1/price/thresholds", "", http.StatusOK)
 	if th["default"].(map[string]any)["pct"] != "35.00" || th["default_stored"] != true || len(th["items"].([]any)) != 1 || len(th["history"].([]any)) != 4 {
 		t.Fatalf("ngưỡng sau ghi: %v", th)
@@ -195,7 +213,7 @@ func TestPriceCalendarHTTP_W1174(t *testing.T) {
 	if pct, scope, err := svc.Threshold(ctx, "", "rau_mau", "cai_xanh"); err != nil || pct.String() != "40" || scope != "group" {
 		t.Fatalf("Threshold nhóm: %s %s %v", pct, scope, err)
 	}
-	if pct, scope, err := svc.Threshold(ctx, "", "chan_nuoi", "heo_hoi"); err != nil || pct.String() != "35" || scope != "default" {
+	if pct, scope, err := svc.Threshold(ctx, "", "chan_nuoi", "MH00001"); err != nil || pct.String() != "35" || scope != "default" {
 		t.Fatalf("Threshold mặc định (mặt hàng đã xóa): %s %s %v", pct, scope, err)
 	}
 	if n, flat, survey, err := svc.AlertParams(ctx, ""); err != nil || n != 10 || flat.String() != "0.5" || survey.String() != "40" {

@@ -20,8 +20,8 @@ const (
 
 var (
 	pctHundred = decimal.NewFromInt(100)
-	// reThresholdItem: mã mặt hàng (W11.73 sở hữu danh mục; ở đây chỉ kiểm dạng — CHECK pf 000139).
-	reThresholdItem = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,39}$`)
+	// reThresholdItem: mã mặt hàng — dạng mã của danh mục W11.73 (MH#####, pf 000141); app kiểm mã có trong sổ pf_price.item.
+	reThresholdItem = regexp.MustCompile(`^MH[0-9]{5}$`)
 )
 
 // AlertParams là tham số chung đi cùng ngưỡng mặc định (FN-AD-04.06 B3).

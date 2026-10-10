@@ -5537,6 +5537,283 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/price/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh mục mặt hàng nhìn từ một ngày — mọi trạng thái (Hoạt động / Chờ hiệu lực / Ngưng), sắp theo nhóm, thứ tự, mã */
+        get: operations["priceListItems"];
+        put?: never;
+        /** Thêm mặt hàng — mã tự sinh MH#####; Cơ bản áp dụng mọi xã, Địa phương gán cho points; "thay thế cho" ngưng mặt hàng cũ từ ngày hiệu lực */
+        post: operations["priceCreateItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/items/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một mặt hàng tại ngày — trạng thái, lịch sử phiên bản (lịch sử thay đổi, tên cũ), mặt hàng thay thế nó */
+        get: operations["priceGetItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/items/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa mặt hàng — phiên bản mới từ valid_from; đã có giá thì chỉ sửa tên, nơi bán (BR-04) và chỉ Quản trị nghiệp vụ */
+        post: operations["priceReviseItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/items/{code}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngưng mặt hàng — hiệu lực đến valid_to (vắng → hết ngày trước ngày báo giá kế tiếp), có lý do; không xóa */
+        post: operations["priceRetireItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/items/{code}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đổi thứ tự hiển thị trong nhóm (lên / xuống) từ ngày báo giá kế tiếp */
+        post: operations["priceMoveItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhóm hàng đang hiệu lực tại ngày, kèm số mặt hàng đang hiệu lực */
+        get: operations["priceListGroups"];
+        put?: never;
+        /** Thêm nhóm hàng (hiệu lực từ hôm nay; mã vắng → nhom_<n>) */
+        post: operations["priceCreateGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/groups/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa tên / thứ tự nhóm hàng (hiệu lực từ hôm nay) */
+        post: operations["priceReviseGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/groups/{code}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xóa nhóm hàng (phiên bản ngưng) — chặn khi nhóm còn mặt hàng đang hoặc sắp hiệu lực */
+        post: operations["priceRetireGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gán mặt hàng Địa phương cho xã đang hiệu lực tại ngày (lọc theo xã) */
+        get: operations["priceListAssignments"];
+        put?: never;
+        /** Gán mặt hàng Địa phương cho xã từ valid_from (gán đã có bỏ qua); mặt hàng Cơ bản không gán riêng */
+        post: operations["priceAssignItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/assignments/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bỏ gán mặt hàng khỏi xã từ valid_from; hôm nay xã đã có phiếu → áp dụng từ ngày báo giá kế tiếp */
+        post: operations["priceUnassignItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/point-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mặt hàng xã báo giá phải báo giá tại ngày — Cơ bản ∪ Địa phương đã gán, lọc bộ theo vụ, đúng thứ tự (AC-04) */
+        get: operations["pricePointItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/item-sets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bộ mặt hàng theo vụ nhìn từ một ngày (có hiệu lực hoặc sắp hiệu lực) */
+        get: operations["priceListItemSets"];
+        put?: never;
+        /** Tạo bộ mặt hàng theo vụ — mặt hàng thuộc bộ chỉ xuất hiện ở xã khi có bộ chứa nó đang bật (BR-08) */
+        post: operations["priceCreateItemSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/item-sets/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa bộ (tên, vụ, danh sách, bật/tắt, retire = ngưng bộ) — phiên bản mới từ valid_from */
+        post: operations["priceReviseItemSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đề xuất mặt hàng từ xã (mới nhất trước); Cấp Xã chỉ thấy đề xuất của mình */
+        get: operations["priceListProposals"];
+        put?: never;
+        /** Đề xuất mặt hàng mới (Cấp Xã, Cấp Tỉnh) — chỉ xuất hiện ở màn Nhập báo giá khi được duyệt và gán cho xã */
+        post: operations["priceCreateProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/proposals/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt đề xuất — tạo mặt hàng (nội dung gửi kèm, mặc định Địa phương) và gán cho xã đề xuất từ ngày hiệu lực (AC-05) */
+        post: operations["priceApproveProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/proposals/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Từ chối đề xuất kèm lý do */
+        post: operations["priceRejectProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -10984,6 +11261,211 @@ export interface components {
             units: components["schemas"]["PriceCatalogEntry"][];
             groups: components["schemas"]["PriceCatalogEntry"][];
         };
+        PriceWriteResult: {
+            /** @description Mã mặt hàng / nhóm / bộ / xã; mã đề xuất (uuid) khi tạo hoặc từ chối đề xuất */
+            code: string;
+            version: number;
+            /** Format: date */
+            valid_from: string;
+            /** @description Số dòng sổ đã ghi */
+            written: number;
+        };
+        PriceItem: {
+            code: string;
+            name: string;
+            /** @description Giống / phẩm cấp */
+            variety: string;
+            group_code: string;
+            unit_code: string;
+            /** @description Quy cách */
+            spec: string | null;
+            /** @description Nơi bán */
+            sale_place: string | null;
+            /** @enum {string} */
+            kind: "basic" | "local";
+            sort_order: number;
+            version: number;
+            /**
+             * Format: date
+             * @description Ngày hiệu lực của phiên bản hiển thị
+             */
+            valid_from: string;
+            /**
+             * Format: date
+             * @description Hiệu lực đến (null = không thời hạn)
+             */
+            valid_to: string | null;
+            /**
+             * Format: date
+             * @description Ngày mặt hàng bắt đầu hiệu lực
+             */
+            since: string | null;
+            /** @enum {string} */
+            state: "active" | "pending" | "retired";
+            /** @description Thay thế cho */
+            replaces_code: string | null;
+            /** @description Lý do ngưng */
+            note: string | null;
+            /** @description Số xã đang gán (Địa phương); null với mặt hàng Cơ bản (mọi xã) */
+            point_count: number | null;
+            has_price: boolean;
+            /** @description Nhãn "Giá mới" — mặt hàng thay thế chưa có giá */
+            new_price: boolean;
+            /** @description Thuộc bộ theo vụ đang tắt tại ngày */
+            gated: boolean;
+            /** Format: uuid */
+            proposal_id: string | null;
+        };
+        PriceItemList: {
+            /** Format: date */
+            day: string;
+            items: components["schemas"]["PriceItem"][];
+            pending_proposals: number;
+            /** @description Thêm mặt hàng */
+            can_edit: boolean;
+            /** @description Quản trị nghiệp vụ — ngưng */
+            can_steward: boolean;
+        };
+        PriceItemVersion: {
+            version: number;
+            /** @enum {string} */
+            status: "active" | "retired";
+            /** Format: date */
+            valid_from: string;
+            name: string;
+            variety: string;
+            group_code: string;
+            unit_code: string;
+            spec: string | null;
+            sale_place: string | null;
+            /** @enum {string} */
+            kind: "basic" | "local";
+            sort_order: number;
+            note: string | null;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: uuid */
+            proposal_id: string | null;
+        };
+        PriceItemDetail: components["schemas"]["PriceItem"] & {
+            history: components["schemas"]["PriceItemVersion"][];
+            replaced_by: string[];
+        };
+        PriceItemInput: {
+            /** @description Tên loại */
+            name: string;
+            /** @description Giống / phẩm cấp (bắt buộc — BR-07) */
+            variety: string;
+            group_code: string;
+            unit_code: string;
+            spec?: string;
+            sale_place?: string;
+            /**
+             * @description Bắt buộc khi thêm; duyệt đề xuất mặc định local
+             * @enum {string}
+             */
+            kind?: "basic" | "local";
+            /**
+             * Format: date
+             * @description Vắng → ngày báo giá kế tiếp
+             */
+            valid_from?: string;
+            /**
+             * Format: date
+             * @description Chỉ khi thêm
+             */
+            valid_to?: string;
+            /** @description Thay thế cho — chỉ khi thêm */
+            replaces_code?: string;
+            /** @description Xã áp dụng mặt hàng Địa phương — chỉ khi thêm/duyệt */
+            points?: string[];
+        };
+        PriceGroup: {
+            code: string;
+            name: string;
+            sort_order: number;
+            version: number;
+            /** Format: date */
+            valid_from: string;
+            items: number;
+        };
+        PriceGroupInput: {
+            /** @description Chỉ khi thêm; vắng → nhom_<n> */
+            code?: string;
+            name: string;
+            /** @description 0 → cuối danh sách (thêm) / giữ nguyên (sửa) */
+            sort_order?: number;
+        };
+        PriceAssignment: {
+            point_code: string;
+            item_code: string;
+            version: number;
+            /** Format: date */
+            valid_from: string;
+        };
+        PriceAssignInput: {
+            point_code: string;
+            item_codes: string[];
+            /** Format: date */
+            valid_from?: string;
+        };
+        PriceItemSet: {
+            code: string;
+            name: string;
+            season: string;
+            item_codes: string[];
+            enabled: boolean;
+            version: number;
+            /** Format: date */
+            valid_from: string;
+            /** @enum {string} */
+            state: "active" | "pending" | "retired";
+        };
+        PriceItemSetInput: {
+            /** @description Bắt buộc khi tạo */
+            code?: string;
+            name: string;
+            season: string;
+            item_codes: string[];
+            enabled: boolean;
+            /** Format: date */
+            valid_from?: string;
+            /** @description Ngưng bộ (chỉ khi sửa) */
+            retire?: boolean;
+        };
+        PriceProposal: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            point_code: string;
+            name: string;
+            variety: string;
+            group_code: string;
+            unit_code: string;
+            spec: string | null;
+            reason: string;
+            /** @enum {string} */
+            status: "pending" | "approved" | "rejected";
+            item_code: string | null;
+            decision_note: string | null;
+            /** Format: uuid */
+            proposer_ref: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            decided_at: string | null;
+        };
+        PriceProposalInput: {
+            point_code: string;
+            name: string;
+            variety: string;
+            group_code: string;
+            unit_code: string;
+            spec?: string;
+            reason: string;
+        };
         PriceSchedule: {
             weekdays: ("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")[];
             /** @description Giờ khóa nhập (giờ VN), mặc định 12:00 */
@@ -11220,6 +11702,10 @@ export interface components {
         FormsProfile: string;
         /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
         PriceProfile: string;
+        /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+        PriceAt: string;
+        /** @description Mã mặt hàng (MH + 5 chữ số) */
+        PriceItemCode: string;
         IdempotencyKey: string;
         /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
         At: string;
@@ -22321,6 +22807,753 @@ export interface operations {
             /** @description price.threshold_not_found */
             404: components["responses"]["Problem"];
             /** @description price.default_threshold */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListItems: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+                group?: string;
+                kind?: "basic" | "local";
+                state?: "active" | "pending" | "retired";
+                /** @description Tìm theo mã, tên, giống/phẩm cấp */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceItemList"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.profile_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceCreateItem: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceItemInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description bad_request */
+            400: components["responses"]["Problem"];
+            /** @description forbidden (chỉ Cấp Tỉnh */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found (mặt hàng được thay thế) */
+            404: components["responses"]["Problem"];
+            /** @description price.item_duplicate | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid | price.item_basic_not_assignable */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceGetItem: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+            };
+            header?: never;
+            path: {
+                /** @description Mã mặt hàng (MH + 5 chữ số) */
+                code: components["parameters"]["PriceItemCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mặt hàng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceItemDetail"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceReviseItem: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Mã mặt hàng (MH + 5 chữ số) */
+                code: components["parameters"]["PriceItemCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceItemInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.item_locked | price.item_retired | price.item_duplicate */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRetireItem: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Mã mặt hàng (MH + 5 chữ số) */
+                code: components["parameters"]["PriceItemCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    valid_to?: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.item_retired */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceMoveItem: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Mã mặt hàng (MH + 5 chữ số) */
+                code: components["parameters"]["PriceItemCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    direction: "up" | "down";
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi (written = 0 khi đã ở đầu/cuối nhóm) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.item_retired */
+            409: components["responses"]["Problem"];
+        };
+    };
+    priceListGroups: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhóm hàng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        groups: components["schemas"]["PriceGroup"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceCreateGroup: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceGroupInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description conflict (mã đã có) */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReviseGroup: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceGroupInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.group_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRetireGroup: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.group_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.group_not_empty */
+            409: components["responses"]["Problem"];
+        };
+    };
+    priceListAssignments: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+                point?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gán */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        assignments: components["schemas"]["PriceAssignment"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceAssignItems: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceAssignInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.item_retired */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid | price.item_basic_not_assignable */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceUnassignItems: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceAssignInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid | price.item_basic_not_assignable */
+            422: components["responses"]["Problem"];
+        };
+    };
+    pricePointItems: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+                point: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mặt hàng của xã */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        day: string;
+                        point_code: string;
+                        items: components["schemas"]["PriceItem"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListItemSets: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bộ mặt hàng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sets: components["schemas"]["PriceItemSet"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceCreateItemSet: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceItemSetInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.item_set_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReviseItemSet: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceItemSetInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_set_not_found | price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListProposals: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                status?: "pending" | "approved" | "rejected";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đề xuất */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        proposals: components["schemas"]["PriceProposal"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceCreateProposal: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceProposalInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi (code = mã đề xuất) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceApproveProposal: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceItemInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi (code = mã mặt hàng mới) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.proposal_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.proposal_decided | price.item_duplicate */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRejectProposal: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    note: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.proposal_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.proposal_decided */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
             422: components["responses"]["Problem"];
         };
     };

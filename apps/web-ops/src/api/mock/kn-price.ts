@@ -372,7 +372,7 @@ export function createPriceConfigStore(now: () => number = Date.now) {
           !validPct(b.survey_pct ?? "")
         )
           return fail(422, "validation_failed", "Tham số chung không hợp lệ");
-      } else if (!/^[a-z0-9][a-z0-9_.-]{0,39}$/.test(b.code ?? ""))
+      } else if (!(b.scope === "item" ? /^MH[0-9]{5}$/ : /^[a-z][a-z0-9_]{0,39}$/).test(b.code ?? ""))
         return fail(
           422,
           "validation_failed",

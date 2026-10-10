@@ -156,9 +156,9 @@ func TestThresholds_W1174(t *testing.T) {
 	set := ThresholdSet{
 		Default: Threshold{Scope: ThresholdScopeDefault, Pct: d("30"), Params: &AlertParams{LookbackDays: 7, FlatPct: d("1"), SurveyPct: d("40")}},
 		Groups:  map[string]Threshold{"rau_mau": {Scope: ThresholdScopeGroup, Code: "rau_mau", Pct: d("40")}},
-		Items:   map[string]Threshold{"heo_hoi": {Scope: ThresholdScopeItem, Code: "heo_hoi", Pct: d("25")}},
+		Items:   map[string]Threshold{"MH00006": {Scope: ThresholdScopeItem, Code: "MH00006", Pct: d("25")}},
 	}
-	for _, err := range []error{ValidateThreshold(set.Default), ValidateThreshold(set.Groups["rau_mau"]), ValidateThreshold(set.Items["heo_hoi"])} {
+	for _, err := range []error{ValidateThreshold(set.Default), ValidateThreshold(set.Groups["rau_mau"]), ValidateThreshold(set.Items["MH00006"])} {
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -169,7 +169,7 @@ func TestThresholds_W1174(t *testing.T) {
 	if got := Classify(d("-34.5"), set.For("chan_nuoi", "ga_ta").Pct); got != AlertLow {
 		t.Fatalf("Chăn nuôi −34,5 %% phải Thấp: %q", got)
 	}
-	if got := set.For("chan_nuoi", "heo_hoi"); got.Scope != ThresholdScopeItem || !got.Pct.Equal(d("25")) {
+	if got := set.For("chan_nuoi", "MH00006"); got.Scope != ThresholdScopeItem || !got.Pct.Equal(d("25")) {
 		t.Fatalf("ưu tiên mặt hàng: %+v", got)
 	}
 	if Classify(d("30.0"), d("30")) != AlertHigh || Classify(d("29.9"), d("30")) != AlertNone {
