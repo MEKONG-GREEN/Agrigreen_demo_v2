@@ -23,6 +23,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/price/status", h.status)
 	rg.GET("/price/catalog", h.catalog)
 	rg.POST("/price/catalog/defaults", h.defaults)
+	h.registerCalendar(rg) // W11.74: lịch báo giá, giờ khóa, nhắc, ngưỡng (calendar.go)
 }
 
 type statusDTO struct {

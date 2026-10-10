@@ -16,6 +16,7 @@
 //	mechanization_area_feed_check  mỗi giờ: dữ liệu diện tích vụ App HTX quá ngưỡng độ tươi → báo Admin CGH (CGH FN-07)
 //	metrics_snapshot      00:45 hằng ngày (sau anchor): ghi sổ chỉ số của hôm qua + ảnh chụp lớp GIS (pf/metrics, G3)
 //	mrv_review_escalation mỗi 15 phút: hồ sơ MRV chờ duyệt quá hạn → báo người duyệt, rồi quản trị TTKN tỉnh (KN US-MRV-06)
+//	price_calendar        mỗi phút: mốc khóa nhập giá 12:00 (±1 phút) + nhắc nhập giá lần 1/2 (pf/price, Báo giá FN-AD-04.04, FN-XA-03.04)
 //
 // Khi có lịch, worker đăng ký các gauge (gauges.go) — ADR-0006: ag.sync.conflict.overdue
 // (xung đột đồng bộ quá SLA, theo tenant), ag.db.standby_replication_lag (chỉ khi có
@@ -126,6 +127,8 @@ import (
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/price"
+	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/price/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -637,12 +640,28 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		js = append(js, wjs...)
 	}
+	if selected(jobs, priceport.JobCalendar) {
+		// W11.74 (BRD Báo giá FN-AD-04.04 AC-01, FN-XA-03.04): mỗi phút ghi mốc khóa 12:00 (±1 phút) và nhắc nhập giá;
+		// tìm tenant bằng ag_ops_jobs (cột tenant_id của pf_price, pf 000146), ghi bằng r_price; nhắc → outbox → pf/notify.
+		pricePool, err := openPF(ctx, direct, &closeFn)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		pm, err := price.New(pricePool, clk, assembly.PriceProfiles())
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		js = append(js, pm.CalendarJobs(price.CalendarTenants(out.pools[migrations.PF]), log)...)
+	}
 	if len(js) == 0 {
 		closeFn()
 		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " + extension.JobWorkSchedule + ", " +
 			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot +
 			", " + mrvport.JobReviewEscalator + ", " + extension.JobReportCycle +
-			", " + apiclientport.JobKeyExpiry + ", " + apiclientport.JobFeedBuild + ", " + apiclientport.JobFeedRetention + ", " + apiclientport.JobWebhookDispatch + ")")
+			", " + apiclientport.JobKeyExpiry + ", " + apiclientport.JobFeedBuild + ", " + apiclientport.JobFeedRetention + ", " + apiclientport.JobWebhookDispatch +
+			", " + priceport.JobCalendar + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil

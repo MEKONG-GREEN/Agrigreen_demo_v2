@@ -31,6 +31,9 @@ type Module struct{ svc *app.Service }
 
 // New tạo module trên pool b — vai đăng nhập của đơn vị (app_platform), là thành viên r_price. Cấu hình bên dùng sai → lỗi.
 func New(b tenant.Beginner, clk clock.Clock, profiles []port.Profile) (*Module, error) {
+	if err := app.ValidateProfiles(profiles); err != nil { // W11.74: lịch/ngưỡng mặc định của Profile
+		return nil, err
+	}
 	svc, err := app.NewService(db.ForModule(b, DBModule), clk, profiles)
 	if err != nil {
 		return nil, err

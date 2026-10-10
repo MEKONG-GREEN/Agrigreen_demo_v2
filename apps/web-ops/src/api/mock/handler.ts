@@ -48,6 +48,7 @@ import { collectionRoutes } from "./collection";
 import { contextProblem, knAppRoutes, personaForContext } from "./kn";
 import { formsAdminRoutes, formsAppRoutes } from "./forms/routes";
 import { workScheduleAppRoutes } from "./kn-schedules";
+import { priceConfigRoutes } from "./kn-price";
 import { reportCycleAppRoutes } from "./kn-reports/routes";
 import { knAdminRoutes, supportGuard, supportRecord } from "./kn-admin";
 import { knCollectRoutes } from "./kn-collect";
@@ -122,6 +123,8 @@ const appRoutes: Route[] = [
   ...formsAppRoutes,
   // --- KN v7.7 P5: lịch công tác tuần (/v1/extension/work-schedules*) ---
   ...workScheduleAppRoutes,
+  // --- Báo giá W11.74: lịch báo giá, giờ khóa, nhắc, ngưỡng (/v1/price/calendar*, /v1/price/thresholds*) ---
+  ...priceConfigRoutes,
   // --- KN v7.7 P4: vòng đời báo cáo (phát hành, công việc, nộp, rà soát, kỳ, tổng hợp, dashboard, Chi cục) ---
   ...reportCycleAppRoutes,
   // --- KN v7.7 P7: thu thập dữ liệu Cấp Xã (/v1/kn/cooperatives*, machine-counts*, plots, materials*) ---

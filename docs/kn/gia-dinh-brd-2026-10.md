@@ -84,3 +84,18 @@ Chưa làm trong gói này: lưu `Key`/`WeekYear` của kỳ vào DB (không có
 | X-12 dữ liệu cũ không phòng ban | Thửa `department_code IS NULL` (có trước v7.7) đọc qua KN là **Phòng Trồng trọt** (`store.LegacyKNDepartment`), không còn hiện ở mọi phòng ban; không UPDATE dữ liệu. Các bảng KN khác đều `NOT NULL` nên không có dữ liệu cũ | `cooperative/plot/store/kn.go` |
 | X-02 PII ở ô tự do | Chỉ **cảnh báo** (không chặn) khi ô ghi chú/lý do/nội dung chứa SĐT, email, số CCCD/CMND — nhận dạng bằng mẫu ở web (`src/kn/pii.tsx`) và mobile (`lib/domain/pii_hint.dart`); máy chủ không quét nội dung | hai tệp trên |
 | Di chuyển Nút xã (FN-AD-04.02 B3) | Dùng Admin API có sẵn `POST /v1/orgs/{ref}/move` (lý do ≥ 10 ký tự, giữ lịch sử, bỏ gán khu vực cũ). Xã sang tỉnh khác mà mã ĐVHC không thuộc tỉnh mới → nhập "Mã ĐVHC mới" (máy chủ kiểm ĐVHC trong địa bàn cha) | `OrgStructureScreen` |
+
+## W11.74 — Lịch báo giá, giờ khóa, nhắc, ngưỡng (pf 000146)
+
+| Câu hỏi | Lựa chọn đã dùng | Ở đâu | Đổi thế nào |
+|---|---|---|---|
+| Q-086 / Q-052 — lịch báo giá mặc định, ngày nghỉ, ngày bổ sung | T2–T6 (mẫu BRD FN-AD-04.04 BR-04, chưa xác nhận); không seed ngày nghỉ — Cấp Tỉnh/Admin thêm ở "Lịch ngoại lệ" | `KNPriceProfile.Schedule.Weekdays` (`cmd/api-platform/assembly/price.go`) | Tenant ghi phiên bản lịch mới (`POST /v1/price/calendar/schedule`), không sửa mã; đổi mặc định ở Profile |
+| Giờ nhắc lần 1, lần 2 (BRD không nêu) | 07:30 và 11:00 giờ VN; cả hai kênh (trong ứng dụng, email); mẫu "Nhắc nhập giá ngày {ngày} cho {xã}: vui lòng gửi báo giá trước {giờ khóa}." | `KNPriceProfile.Schedule`, `price/domain.DefaultReminderTemplate` | Như trên |
+| Ai cấu hình lịch/ngưỡng | Vai `ManageBy` của Profile (Admin KN). Cờ "Quản trị nghiệp vụ báo giá" của Cấp Tỉnh chưa có (W11.72) | `app/calendar.go`, `app/threshold.go` | W11.72 mở rộng kiểm quyền ghi |
+| Người nhận nhắc | Chưa có xã báo giá/phân công (W11.72) và phiếu (W11.75): một thông báo chủ đề tới mọi cán bộ xã (`kn_officer`) của tenant; lần 2 không lọc được "xã đã gửi" | `port.ReminderTargets` (nil) | W11.72/W11.75 cài `ReminderTargets` và gọi `Module.UseReminderTargets` |
+| Kênh email của nhắc | Cờ email ghi ở cấu hình và sự kiện; `pf/notify` CHƯA gửi email theo từng người nhận (chỉ email tóm tắt chỉ đạo) | `notify/domain/price.go` | Gói sau thêm kênh email theo người nhận ở `pf/notify` |
+| Loại thông báo | Dùng lại `report_task_due` (CHECK `kind` của `pf_notify` chỉ migration của `pf/notify` sửa được; gói có một số migration) | `notifyport.KindPriceReminder` | Người tích hợp cấp số migration `pf_notify` thêm `price_reminder`, đổi hằng |
+| Thêm ngày nghỉ cho ngày đã có phiếu gửi (BRD chặn) | Chỉ thêm/xóa ngoại lệ từ ngày mai (chưa có phiếu ở W11.74) | `app.AddException` | W11.75 cho phép hôm nay nếu chưa có phiếu |
+| Đổi lịch trong ngày báo giá | Ngày áp dụng sớm nhất = ngày mai nếu hôm nay là ngày báo giá, hôm nay nếu không (422 `price.valid_from`) | `domain.EarliestValidFrom` | — |
+| Ngưỡng mặc định | 30 %, N = 7, đi ngang 1 %, phiếu điều tra 40 % (BRD CT-02…CT-06); ngưỡng mặt hàng chỉ kiểm dạng mã (danh mục ở W11.73) | `KNPriceProfile.Schedule`, `app.SaveThreshold` | Tenant ghi phiên bản ngưỡng; W11.73 kiểm mã mặt hàng có thật |
+| "Mốc duyệt bảng giá dự kiến" (FN-AD-04.04 BR-03: hạn phản hồi trước mốc duyệt) | Chưa có tham số mốc duyệt — chỉ kiểm hạn phản hồi sau giờ khóa | `domain.ValidateSchedule` | W11.76 (duyệt/công bố) thêm mốc duyệt vào lịch |

@@ -1007,4 +1007,13 @@ Route `/v1/price/*` (Application API). Lỗi chung: `unauthenticated` (401), `fo
 | HTTP | Mã | Khi nào |
 |---|---|---|
 | 404 | `price.profile_not_found` | Tham số `profile` không có trong cấu hình của gốc lắp ráp (KN = `kn`) |
+| 422 | `price.respond_before_lock` | W11.74 `POST /v1/price/calendar/schedule`: hạn phản hồi xác minh không sau giờ khóa (FN-AD-04.04 AC-05) |
+| 422 | `price.remind_order` | W11.74: giờ nhắc lần 1 không trước lần 2, hoặc lần 2 không trước giờ khóa (FN-AD-04.05 AC-01) |
+| 422 | `price.template_var` | W11.74: nội dung mẫu nhắc có biến ngoài `{ngày}`, `{xã}`, `{giờ khóa}` — chi tiết nêu biến lỗi |
+| 422 | `price.valid_from` | W11.74: ngày áp dụng lịch trong quá khứ, hoặc hôm nay là ngày báo giá (chỉ áp dụng từ ngày mai); thêm/xóa ngoại lệ cho hôm nay hoặc ngày đã qua |
+| 422 | `price.exception_mismatch` | W11.74: ngày nghỉ rơi vào ngày vốn không báo giá, hoặc ngày bổ sung rơi vào ngày vốn đã báo giá |
+| 409 | `price.exception_exists` | W11.74: ngày đã có ngoại lệ đang hiệu lực — xóa ngoại lệ cũ trước |
+| 404 | `price.exception_not_found` | W11.74: xóa ngoại lệ của ngày không có ngoại lệ |
+| 422 | `price.default_threshold` | W11.74: xóa ngưỡng mặc định (FN-AD-04.06 AC-04) |
+| 404 | `price.threshold_not_found` | W11.74: xóa ngưỡng nhóm/mặt hàng chưa có hoặc đã xóa |
 

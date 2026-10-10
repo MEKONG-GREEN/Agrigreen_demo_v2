@@ -33,6 +33,8 @@ type Service struct {
 	Clock    clock.Clock
 	profiles map[string]port.Profile
 	order    []string
+	// Reminders: người nhận nhắc nhập giá (W11.74; W11.72/W11.75 nối). nil → thông báo chủ đề tới cán bộ xã.
+	Reminders port.ReminderTargets
 }
 
 var _ port.Catalog = (*Service)(nil)

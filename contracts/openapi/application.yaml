@@ -7628,6 +7628,183 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
         "409": {description: conflict, $ref: "#/components/responses/Problem"}
+  # W11.74 — lịch báo giá, giờ khóa, hạn phản hồi, nhắc nhập giá, ngưỡng cảnh báo (BRD FN-AD-04.04…06, FN-XA-03.04). Đọc: mọi cấp
+  # của Profile; ghi: vai quản trị (ManageBy; QTNV báo giá ở W11.72). Số % là chuỗi Decimal. Mọi bản ghi là phiên bản (sổ chỉ ghi thêm).
+  /v1/price/calendar:
+    get:
+      summary: Lịch báo giá đang hiệu lực, phiên bản đã lên lịch, lịch khóa nhập các ngày tới (mặc định 30), ngoại lệ, lịch sử thay đổi
+      operationId: priceCalendar
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+      responses:
+        "200":
+          description: Lịch
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceCalendar"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
+  /v1/price/calendar/schedule:
+    post:
+      summary: Ghi phiên bản lịch mới (ngày báo giá trong tuần, giờ khóa, hạn phản hồi, giờ nhắc, kênh, nội dung mẫu) có hiệu lực từ valid_from
+      description: |
+        valid_from không trong quá khứ; hôm nay là ngày báo giá → sớm nhất ngày mai (422 price.valid_from). Nhắc 1 < nhắc 2 < giờ khóa
+        (422 price.remind_order) < hạn phản hồi (422 price.respond_before_lock). Biến mẫu chỉ {ngày}, {xã}, {giờ khóa} (422 price.template_var).
+      operationId: priceSaveSchedule
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceScheduleInput"}
+      responses:
+        "201":
+          description: Phiên bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSchedule"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | price.valid_from | price.remind_order | price.respond_before_lock | price.template_var", $ref: "#/components/responses/Problem"}
+  /v1/price/calendar/exceptions:
+    post:
+      summary: Thêm ngày nghỉ (holiday — ngày báo giá theo lịch) hoặc ngày báo giá bổ sung (extra — ngày ngoài lịch) kèm lý do; chỉ ngày từ ngày mai
+      operationId: priceAddException
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [day, kind, reason]
+              properties:
+                day: {type: string, format: date}
+                kind: {type: string, enum: [holiday, extra]}
+                reason: {type: string, minLength: 1, maxLength: 300}
+      responses:
+        "201":
+          description: Ngoại lệ đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceCalendarException"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: price.exception_exists, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | price.valid_from | price.exception_mismatch", $ref: "#/components/responses/Problem"}
+  /v1/price/calendar/exceptions/{day}/retire:
+    post:
+      summary: Xóa ngoại lệ của một ngày (ghi phiên bản retired); chỉ ngày từ ngày mai
+      operationId: priceRetireException
+      tags: [price]
+      parameters:
+        - {name: day, in: path, required: true, schema: {type: string, format: date}}
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204": {description: Đã xóa}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.exception_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: price.valid_from, $ref: "#/components/responses/Problem"}
+  /v1/price/calendar/runs:
+    get:
+      summary: Nhật ký job price_calendar — mốc khóa thực tế (độ trễ so với giờ khóa) và lịch sử gửi nhắc lần 1/2
+      operationId: priceCalendarRuns
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: from, in: query, required: false, description: "Vắng → 30 ngày trước", schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, description: "Vắng → hôm nay (giờ VN); tối đa 92 ngày", schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Nhật ký
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [from, to, items]
+                properties:
+                  from: {type: string, format: date}
+                  to: {type: string, format: date}
+                  items: {type: array, items: {$ref: "#/components/schemas/PriceCalendarRun"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/calendar/reminder-test:
+    post:
+      summary: Gửi thử nhắc nhập giá (mẫu của lịch hiện hành) tới tài khoản đang đăng nhập — FN-AD-04.05 AC-02
+      operationId: priceReminderTest
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: Đã xếp hàng thông báo (pf/notify)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [body]
+                properties:
+                  body: {type: string, description: Nội dung đã thay biến}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+  /v1/price/thresholds:
+    get:
+      summary: Ngưỡng cảnh báo giá cao / thấp bất thường đang hiệu lực (mặc định + tham số chung, nhóm hàng, mặt hàng) và lịch sử thay đổi
+      operationId: priceThresholds
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+      responses:
+        "200":
+          description: Ngưỡng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceThresholds"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Ghi ngưỡng (phiên bản mới) — default kèm lookback_days, flat_pct, survey_pct; group/item chỉ pct. 0 < % ≤ 100
+      operationId: priceSaveThreshold
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceThresholdInput"}
+      responses:
+        "201":
+          description: Phiên bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceThreshold"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/thresholds/{scope}/{code}/retire:
+    post:
+      summary: Xóa ngưỡng nhóm hàng / mặt hàng (phiên bản retired); ngưỡng mặc định không xóa được
+      operationId: priceRetireThreshold
+      tags: [price]
+      parameters:
+        - {name: scope, in: path, required: true, schema: {type: string, enum: [default, group, item]}}
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204": {description: Đã xóa}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.threshold_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: price.default_threshold, $ref: "#/components/responses/Problem"}
   # --- hết pf/price ---
 components:
   securitySchemes:
@@ -12244,3 +12421,119 @@ components:
         day: {type: string, format: date}
         units: {type: array, items: {$ref: "#/components/schemas/PriceCatalogEntry"}}
         groups: {type: array, items: {$ref: "#/components/schemas/PriceCatalogEntry"}}
+    # --- pf/price (W11.74) ---
+    PriceSchedule:
+      type: object
+      required: [weekdays, lock_at, respond_by, remind1_at, remind2_at, channels, template, valid_from, version]
+      properties:
+        weekdays: {type: array, items: {type: string, enum: [mon, tue, wed, thu, fri, sat, sun]}}
+        lock_at: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", description: "Giờ khóa nhập (giờ VN), mặc định 12:00"}
+        respond_by: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", description: "Hạn phản hồi xác minh, mặc định 13:30"}
+        remind1_at: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        remind2_at: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        channels: {type: array, items: {type: string, enum: [in_app, email]}}
+        template: {type: string}
+        valid_from: {type: ["string", "null"], format: date, description: "null = mặc định của bên dùng (chưa có phiên bản)"}
+        version: {type: integer, minimum: 0}
+    PriceScheduleInput:
+      type: object
+      required: [weekdays, lock_at, respond_by, remind1_at, remind2_at, channels, template, valid_from]
+      properties:
+        weekdays: {type: array, minItems: 1, items: {type: string, enum: [mon, tue, wed, thu, fri, sat, sun]}}
+        lock_at: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        respond_by: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        remind1_at: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        remind2_at: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        channels: {type: array, minItems: 1, items: {type: string, enum: [in_app, email]}}
+        template: {type: string, minLength: 1, maxLength: 500, description: "Biến {ngày}, {xã}, {giờ khóa}"}
+        valid_from: {type: string, format: date}
+    PriceCalendarDay:
+      type: object
+      required: [day, weekday, kind, quote, reason, lock_at, respond_by, remind1_at, remind2_at]
+      properties:
+        day: {type: string, format: date}
+        weekday: {type: string, enum: [mon, tue, wed, thu, fri, sat, sun]}
+        kind: {type: string, enum: [regular, extra, holiday, off]}
+        quote: {type: boolean, description: "Là kỳ báo giá"}
+        reason: {type: string}
+        lock_at: {type: ["string", "null"], format: date-time}
+        respond_by: {type: ["string", "null"], format: date-time}
+        remind1_at: {type: ["string", "null"], format: date-time}
+        remind2_at: {type: ["string", "null"], format: date-time}
+    PriceCalendarException:
+      type: object
+      required: [day, kind, reason, version]
+      properties:
+        day: {type: string, format: date}
+        kind: {type: string, enum: [holiday, extra]}
+        reason: {type: string}
+        version: {type: integer, minimum: 1}
+    PriceScheduleHistory:
+      allOf:
+        - $ref: "#/components/schemas/PriceSchedule"
+        - type: object
+          required: [actor_ref, recorded_at]
+          properties:
+            actor_ref: {type: string, format: uuid}
+            recorded_at: {type: string, format: date-time}
+    PriceCalendar:
+      type: object
+      required: [profile, now, can_manage, today, locked, current, upcoming, earliest_valid_from, days, exceptions, history]
+      properties:
+        profile: {type: string}
+        now: {type: string, format: date-time}
+        can_manage: {type: boolean}
+        today: {$ref: "#/components/schemas/PriceCalendarDay"}
+        locked: {type: boolean, description: "Kỳ hôm nay đã khóa (Xã chỉ xem)"}
+        current: {$ref: "#/components/schemas/PriceSchedule"}
+        upcoming: {type: array, items: {$ref: "#/components/schemas/PriceSchedule"}}
+        earliest_valid_from: {type: string, format: date}
+        days: {type: array, items: {$ref: "#/components/schemas/PriceCalendarDay"}}
+        exceptions: {type: array, items: {$ref: "#/components/schemas/PriceCalendarException"}}
+        history: {type: array, items: {$ref: "#/components/schemas/PriceScheduleHistory"}}
+    PriceCalendarRun:
+      type: object
+      required: [day, kind, scheduled_at, ran_at, lag_seconds, recipients, targets, note]
+      properties:
+        day: {type: string, format: date}
+        kind: {type: string, enum: [lock, remind1, remind2]}
+        scheduled_at: {type: string, format: date-time}
+        ran_at: {type: string, format: date-time}
+        lag_seconds: {type: integer}
+        recipients: {type: integer, minimum: 0}
+        targets: {type: integer, minimum: 0, description: "Số xã (0 = thông báo chủ đề toàn tenant)"}
+        note: {type: string}
+    PriceThreshold:
+      type: object
+      required: [scope, code, pct, version]
+      properties:
+        scope: {type: string, enum: [default, group, item]}
+        code: {type: string}
+        pct: {$ref: "#/components/schemas/Decimal"}
+        lookback_days: {type: integer, minimum: 1, maximum: 60}
+        flat_pct: {$ref: "#/components/schemas/Decimal"}
+        survey_pct: {$ref: "#/components/schemas/Decimal"}
+        version: {type: integer, minimum: 0}
+        status: {type: string, enum: [active, retired]}
+        actor_ref: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+    PriceThresholdInput:
+      type: object
+      required: [scope, code, pct]
+      properties:
+        scope: {type: string, enum: [default, group, item]}
+        code: {type: string, description: "Rỗng với default; mã nhóm hàng / mặt hàng"}
+        pct: {$ref: "#/components/schemas/Decimal"}
+        lookback_days: {type: integer, minimum: 1, maximum: 60}
+        flat_pct: {$ref: "#/components/schemas/Decimal"}
+        survey_pct: {$ref: "#/components/schemas/Decimal"}
+    PriceThresholds:
+      type: object
+      required: [profile, can_manage, default, default_stored, items, history]
+      properties:
+        profile: {type: string}
+        can_manage: {type: boolean}
+        default: {$ref: "#/components/schemas/PriceThreshold"}
+        default_stored: {type: boolean, description: "false = mặc định của bên dùng (chưa ghi phiên bản)"}
+        items: {type: array, items: {$ref: "#/components/schemas/PriceThreshold"}}
+        history: {type: array, items: {$ref: "#/components/schemas/PriceThreshold"}}

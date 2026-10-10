@@ -5379,6 +5379,147 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/price/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch báo giá đang hiệu lực, phiên bản đã lên lịch, lịch khóa nhập các ngày tới (mặc định 30), ngoại lệ, lịch sử thay đổi */
+        get: operations["priceCalendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/calendar/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ghi phiên bản lịch mới (ngày báo giá trong tuần, giờ khóa, hạn phản hồi, giờ nhắc, kênh, nội dung mẫu) có hiệu lực từ valid_from
+         * @description valid_from không trong quá khứ; hôm nay là ngày báo giá → sớm nhất ngày mai (422 price.valid_from). Nhắc 1 < nhắc 2 < giờ khóa
+         *     (422 price.remind_order) < hạn phản hồi (422 price.respond_before_lock). Biến mẫu chỉ {ngày}, {xã}, {giờ khóa} (422 price.template_var).
+         */
+        post: operations["priceSaveSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/calendar/exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thêm ngày nghỉ (holiday — ngày báo giá theo lịch) hoặc ngày báo giá bổ sung (extra — ngày ngoài lịch) kèm lý do; chỉ ngày từ ngày mai */
+        post: operations["priceAddException"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/calendar/exceptions/{day}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xóa ngoại lệ của một ngày (ghi phiên bản retired); chỉ ngày từ ngày mai */
+        post: operations["priceRetireException"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/calendar/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký job price_calendar — mốc khóa thực tế (độ trễ so với giờ khóa) và lịch sử gửi nhắc lần 1/2 */
+        get: operations["priceCalendarRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/calendar/reminder-test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gửi thử nhắc nhập giá (mẫu của lịch hiện hành) tới tài khoản đang đăng nhập — FN-AD-04.05 AC-02 */
+        post: operations["priceReminderTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ngưỡng cảnh báo giá cao / thấp bất thường đang hiệu lực (mặc định + tham số chung, nhóm hàng, mặt hàng) và lịch sử thay đổi */
+        get: operations["priceThresholds"];
+        put?: never;
+        /** Ghi ngưỡng (phiên bản mới) — default kèm lookback_days, flat_pct, survey_pct; group/item chỉ pct. 0 < % ≤ 100 */
+        post: operations["priceSaveThreshold"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/thresholds/{scope}/{code}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xóa ngưỡng nhóm hàng / mặt hàng (phiên bản retired); ngưỡng mặc định không xóa được */
+        post: operations["priceRetireThreshold"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -10748,6 +10889,134 @@ export interface components {
             day: string;
             units: components["schemas"]["PriceCatalogEntry"][];
             groups: components["schemas"]["PriceCatalogEntry"][];
+        };
+        PriceSchedule: {
+            weekdays: ("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")[];
+            /** @description Giờ khóa nhập (giờ VN), mặc định 12:00 */
+            lock_at: string;
+            /** @description Hạn phản hồi xác minh, mặc định 13:30 */
+            respond_by: string;
+            remind1_at: string;
+            remind2_at: string;
+            channels: ("in_app" | "email")[];
+            template: string;
+            /**
+             * Format: date
+             * @description null = mặc định của bên dùng (chưa có phiên bản)
+             */
+            valid_from: string | null;
+            version: number;
+        };
+        PriceScheduleInput: {
+            weekdays: ("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")[];
+            lock_at: string;
+            respond_by: string;
+            remind1_at: string;
+            remind2_at: string;
+            channels: ("in_app" | "email")[];
+            /** @description Biến {ngày}, {xã}, {giờ khóa} */
+            template: string;
+            /** Format: date */
+            valid_from: string;
+        };
+        PriceCalendarDay: {
+            /** Format: date */
+            day: string;
+            /** @enum {string} */
+            weekday: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+            /** @enum {string} */
+            kind: "regular" | "extra" | "holiday" | "off";
+            /** @description Là kỳ báo giá */
+            quote: boolean;
+            reason: string;
+            /** Format: date-time */
+            lock_at: string | null;
+            /** Format: date-time */
+            respond_by: string | null;
+            /** Format: date-time */
+            remind1_at: string | null;
+            /** Format: date-time */
+            remind2_at: string | null;
+        };
+        PriceCalendarException: {
+            /** Format: date */
+            day: string;
+            /** @enum {string} */
+            kind: "holiday" | "extra";
+            reason: string;
+            version: number;
+        };
+        PriceScheduleHistory: components["schemas"]["PriceSchedule"] & {
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        PriceCalendar: {
+            profile: string;
+            /** Format: date-time */
+            now: string;
+            can_manage: boolean;
+            today: components["schemas"]["PriceCalendarDay"];
+            /** @description Kỳ hôm nay đã khóa (Xã chỉ xem) */
+            locked: boolean;
+            current: components["schemas"]["PriceSchedule"];
+            upcoming: components["schemas"]["PriceSchedule"][];
+            /** Format: date */
+            earliest_valid_from: string;
+            days: components["schemas"]["PriceCalendarDay"][];
+            exceptions: components["schemas"]["PriceCalendarException"][];
+            history: components["schemas"]["PriceScheduleHistory"][];
+        };
+        PriceCalendarRun: {
+            /** Format: date */
+            day: string;
+            /** @enum {string} */
+            kind: "lock" | "remind1" | "remind2";
+            /** Format: date-time */
+            scheduled_at: string;
+            /** Format: date-time */
+            ran_at: string;
+            lag_seconds: number;
+            recipients: number;
+            /** @description Số xã (0 = thông báo chủ đề toàn tenant) */
+            targets: number;
+            note: string;
+        };
+        PriceThreshold: {
+            /** @enum {string} */
+            scope: "default" | "group" | "item";
+            code: string;
+            pct: components["schemas"]["Decimal"];
+            lookback_days?: number;
+            flat_pct?: components["schemas"]["Decimal"];
+            survey_pct?: components["schemas"]["Decimal"];
+            version: number;
+            /** @enum {string} */
+            status?: "active" | "retired";
+            /** Format: uuid */
+            actor_ref?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+        };
+        PriceThresholdInput: {
+            /** @enum {string} */
+            scope: "default" | "group" | "item";
+            /** @description Rỗng với default; mã nhóm hàng / mặt hàng */
+            code: string;
+            pct: components["schemas"]["Decimal"];
+            lookback_days?: number;
+            flat_pct?: components["schemas"]["Decimal"];
+            survey_pct?: components["schemas"]["Decimal"];
+        };
+        PriceThresholds: {
+            profile: string;
+            can_manage: boolean;
+            default: components["schemas"]["PriceThreshold"];
+            /** @description false = mặc định của bên dùng (chưa ghi phiên bản) */
+            default_stored: boolean;
+            items: components["schemas"]["PriceThreshold"][];
+            history: components["schemas"]["PriceThreshold"][];
         };
     };
     responses: {
@@ -21616,6 +21885,301 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description conflict */
             409: components["responses"]["Problem"];
+        };
+    };
+    priceCalendar: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceCalendar"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.profile_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceSaveSchedule: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceScheduleInput"];
+            };
+        };
+        responses: {
+            /** @description Phiên bản đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSchedule"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.profile_not_found */
+            404: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.valid_from | price.remind_order | price.respond_before_lock | price.template_var */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceAddException: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    day: string;
+                    /** @enum {string} */
+                    kind: "holiday" | "extra";
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Ngoại lệ đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceCalendarException"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.exception_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.valid_from | price.exception_mismatch */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRetireException: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã xóa */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.exception_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.valid_from */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceCalendarRuns: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Vắng → 30 ngày trước */
+                from?: string;
+                /** @description Vắng → hôm nay (giờ VN); tối đa 92 ngày */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhật ký */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        from: string;
+                        /** Format: date */
+                        to: string;
+                        items: components["schemas"]["PriceCalendarRun"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReminderTest: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã xếp hàng thông báo (pf/notify) */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Nội dung đã thay biến */
+                        body: string;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceThresholds: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ngưỡng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceThresholds"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceSaveThreshold: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceThresholdInput"];
+            };
+        };
+        responses: {
+            /** @description Phiên bản đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceThreshold"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRetireThreshold: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                scope: "default" | "group" | "item";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã xóa */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.threshold_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.default_threshold */
+            422: components["responses"]["Problem"];
         };
     };
 }

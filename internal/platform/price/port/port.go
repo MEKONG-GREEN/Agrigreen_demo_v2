@@ -3,7 +3,7 @@
 //
 // Điểm mở rộng cho các gói sau (ADR-0049 mục 4):
 //   - Profile: cấu hình theo bên dùng (vai → cấp, vai quản trị danh mục, phòng ban chủ) ở gốc lắp ráp — không so tên ứng
-//     dụng (R-MOD-04). W11.72 thêm cờ Quản trị nghiệp vụ, W11.74 thêm giờ khóa/hạn phản hồi vào Profile.
+//     dụng (R-MOD-04). W11.72 thêm cờ Quản trị nghiệp vụ, W11.74 thêm Profile.Schedule (giờ khóa, hạn phản hồi, nhắc, ngưỡng mặc định).
 //   - Catalog: danh mục nền (đơn vị tính, nhóm hàng) có hiệu lực theo ngày — W11.73 (mặt hàng) và KHTC (Q-082) đọc qua đây.
 //   - Series, Publish (v4.1 §26) và sự kiện price.published: W11.76 khai ở gói này khi có bảng giá ngày.
 //   - PubSchema: schema view công bố; view đầu tiên v1_board_daily (W11.76) khai bằng chỉ thị //ag:pubview.
@@ -31,6 +31,8 @@ type Profile struct {
 	Roles map[string]string
 	// ManageBy: vai được ghi danh mục nền (đơn vị tính, nhóm hàng). W11.72 thêm cờ Quản trị nghiệp vụ báo giá.
 	ManageBy []string
+	// Schedule: lịch báo giá, giờ khóa, hạn phản hồi, nhắc, ngưỡng MẶC ĐỊNH (W11.74, port/calendar.go).
+	Schedule ScheduleDefaults
 }
 
 // Unit là một đơn vị tính đang hiệu lực (phiên bản mới nhất có valid_from ≤ ngày hỏi).
