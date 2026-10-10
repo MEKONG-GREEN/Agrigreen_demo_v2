@@ -348,6 +348,11 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "apiclient.job_not_found": "Không tìm thấy việc xuất dữ liệu.",
   "apiclient.job_not_ready": "Việc xuất dữ liệu chưa hoàn tất — chưa tải được tệp.",
   "apiclient.export_not_supported": "Sản phẩm dữ liệu này chưa hỗ trợ xuất tệp.",
+  "apiclient.sandbox_key_refused": "Khóa thử chỉ dùng cho môi trường thử và khóa thật chỉ dùng cho môi trường thật — khóa này bị từ chối.",
+  "apiclient.too_many_webhooks": "Khách hàng đã có tối đa 5 webhook đang hoạt động. Tắt một webhook trước khi thêm mới.",
+  "apiclient.webhook_feed_not_subscribed": "Feed chưa có hợp đồng tích hợp hoặc khách hàng chưa được duyệt quyền đọc feed này.",
+  "apiclient.webhook_not_found": "Không tìm thấy webhook này của khách hàng.",
+  "apiclient.webhook_url_rejected": "Địa chỉ webhook không hợp lệ: phải là https tới tên miền công khai đầy đủ, cổng 443/8443, không trỏ vào mạng nội bộ.",
   "apiclient.export_conflict": "Đã có tệp xuất khác nội dung dưới cùng khóa — việc xuất bị dừng.",
   // pf/metering (G5, ADR-0023 / ADR-0024)
   "metering.unavailable": "Không ghi được sổ sử dụng — hệ thống không trả dữ liệu. Vui lòng thử lại sau.",
