@@ -1,6 +1,6 @@
 // Package domain là quy tắc thuần của pf/forms (`cap/forms`, không I/O, không time.Now — R-12, không float — R-10):
 // cấu hình bên dùng, định nghĩa trường biểu, kiểm số liệu nộp, máy trạng thái kỳ và bài nộp, nội dung ảnh chụp
-// đóng băng. Cùng bất biến được DB kiểm lại (pf 000121: trg_transition, trg_bind_period, review_four_eyes; pf 000142:
+// đóng băng. Cùng bất biến được DB kiểm lại (pf 000121: trg_transition, trg_bind_period, review_four_eyes; pf 000140:
 // trg_bind_spec, trg_submission_limit, trg_bind_held, hủy kỳ trong trg_transition).
 package domain
 
@@ -83,7 +83,7 @@ func ValidateProfile(p port.Profile) error {
 	return nil
 }
 
-// SupportedUnitKinds là loại đơn vị lá đã hỗ trợ (khớp CHECK pf_forms.period_spec.unit_kind, pf 000142).
+// SupportedUnitKinds là loại đơn vị lá đã hỗ trợ (khớp CHECK pf_forms.period_spec.unit_kind, pf 000140).
 // port.UnitPerson (HCTH) chưa có.
 var SupportedUnitKinds = []string{port.UnitCommune, port.UnitFacility, port.UnitHousehold, port.UnitDepartment}
 

@@ -49,7 +49,7 @@ type Profile struct {
 }
 
 // Loại đơn vị lá (W11.05). Đơn vị = người và luồng nhiều bước (HCTH, D3 §2.5) CHỪA CHỖ: hằng số có, cấu hình và
-// sổ (pf 000142 CHECK unit_kind, review_flow) chưa nhận — thêm khi HCTH chọn phương án (a) "mở rộng cap/forms".
+// sổ (pf 000140 CHECK unit_kind, review_flow) chưa nhận — thêm khi HCTH chọn phương án (a) "mở rộng cap/forms".
 const (
 	UnitCommune    = "commune"    // xã (KN Trồng trọt, CNTS phần lớn biểu)
 	UnitFacility   = "facility"   // cơ sở giết mổ (CNTS BM-01) — cha = mã xã

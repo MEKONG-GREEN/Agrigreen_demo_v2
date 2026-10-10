@@ -368,7 +368,7 @@ func uuidStrings(xs []uuid.UUID) []string {
 }
 
 // ---------------------------------------------------------------------------
-// W11.05 (pf 000142): đặc tả kỳ, bài giữ "Chờ mở kỳ"
+// W11.05 (pf 000140): đặc tả kỳ, bài giữ "Chờ mở kỳ"
 // ---------------------------------------------------------------------------
 
 // InsertSpec ghi đặc tả kỳ native CÙNG GIAO DỊCH phát hành (trigger kiểm, chép profile).

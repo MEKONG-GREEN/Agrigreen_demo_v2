@@ -100,6 +100,7 @@ Chưa làm trong gói này: lưu `Key`/`WeekYear` của kỳ vào DB (không có
 | Ngưỡng mặc định | 30 %, N = 7, đi ngang 1 %, phiếu điều tra 40 % (BRD CT-02…CT-06); ngưỡng mặt hàng chỉ kiểm dạng mã (danh mục ở W11.73) | `KNPriceProfile.Schedule`, `app.SaveThreshold` | Tenant ghi phiên bản ngưỡng; W11.73 kiểm mã mặt hàng có thật |
 | "Mốc duyệt bảng giá dự kiến" (FN-AD-04.04 BR-03: hạn phản hồi trước mốc duyệt) | Chưa có tham số mốc duyệt — chỉ kiểm hạn phản hồi sau giờ khóa | `domain.ValidateSchedule` | W11.76 (duyệt/công bố) thêm mốc duyệt vào lịch |
 ## W11.05 — `cap/forms` tổng quát đơn vị lá (pf 000142)
+## W11.05 — `cap/forms` tổng quát đơn vị lá (pf 000140)
 
 | Câu hỏi | Phương án đã chọn | Đổi ở đâu |
 |---|---|---|
@@ -116,5 +117,5 @@ Chưa làm trong gói này: lưu `Key`/`WeekYear` của kỳ vào DB (không có
 
 Chưa làm trong gói này: mở loại kỳ ngày/quý/KSGM ở "Phát hành biểu" và lưu `period_key`/`week_year` vào
 `pf_extension.report_period` — cần một migration của module `pf/extension` (archlint cấm migration `pf_forms` sửa schema
-`pf_extension`; gói chỉ được cấp pf 000142). Ảnh chụp ghi song song KN đã mang `period_key` tính lại từ quy tắc lưu ở
+`pf_extension`; gói chỉ được cấp pf 000140). Ảnh chụp ghi song song KN đã mang `period_key` tính lại từ quy tắc lưu ở
 đợt. "Chờ mở kỳ" của vòng đời KN v1 (đồng bộ offline sau chốt) để W11.42 (CN2).
