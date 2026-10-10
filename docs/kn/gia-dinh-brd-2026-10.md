@@ -18,11 +18,6 @@ Mặc định chung của đợt (theo hướng dẫn đợt W11):
 | QĐ-6 (lịch tuần) — chỉ phần tài liệu | Danh sách lỗi ghi CNTS v3.7 (tuần Thứ Ba – Thứ Hai) là văn bản chưa cập nhật theo KHTC (Thứ Tư – Thứ Ba) | `docs/kn/loi-van-ban-brd.md` CN-1 | Nếu PO chọn Thứ Ba – Thứ Hai: chuyển CN-1 sang KHTC. Mã kỳ thuộc W11.03 |
 | D3 T0 (menu mobile "đã có?") | Xác minh trong mã thay vì chờ: `kn_menu_service.dart` gọi `GET /v1/menu`, `kn_context_picker_screen.dart` chọn ngữ cảnh, có kiểm thử Flutter. UR-CH-01, UR-KT-02, FN-CH-00.01 chuyển sang **đạt** | `docs/uat/kn-v7.7-acceptance.md` | Nếu kiểm trên máy thật thấy thiếu: đưa về **một phần** và ghi phần thiếu |
 | "Báo cáo đột xuất" | Thêm dòng `TT-FN-AD-04.06-DX` (**một phần**): menu và mobile Cấp Xã đã có, web thiếu trang `/kn/bao-cao/dot-xuat`. Màn hình thuộc W11.02 | `docs/uat/kn-v7.7-acceptance.md` mục 7 | — |
-# Giả định khi chưa có trả lời của khách — BRD KN 10/2026
-
-Mỗi gói W11.x ghi các câu hỏi (§2 QĐ, §4 Q-0xx của tài liệu đối chiếu v4.3/MKG v1.4/BRD KN) mà gói đã
-làm theo phương án đề xuất. Khi khách trả lời khác, sửa ở chỗ được nêu.
-
 ## W11.06 — Mở phòng ban + menu kn.menu/v3
 
 | Câu hỏi | Phương án đã chọn | Đổi ở đâu nếu khách chọn khác |
@@ -35,11 +30,6 @@ làm theo phương án đề xuất. Khi khách trả lời khác, sửa ở ch�
 | Module chưa có trong menu | Hiện mờ "Sắp có" (không ẩn sau cờ) | `domain.MenuItem.ComingSoon`; gói module bỏ cờ khi màn sẵn sàng |
 | Nhóm "Dùng chung" | Cuối menu mọi đối tượng (kể cả Admin), hiện có Contact (HCTH FN-13) "Sắp có" | `domain.SharedGroup` |
 | Khuôn của phòng ban mới | Khung báo cáo theo kỳ chung (giữ màn đang chạy và trang mặc định của vai) + nhóm "Nghiệp vụ" theo §VI.3 từng BRD | `domain/menu_departments.go`; gói module có thể thay khung chung bằng menu riêng của phòng |
-# Giả định khi hiện thực BRD Khuyến nông 10/2026 (chủ sản phẩm chưa trả lời)
-
-Nguồn: đối chiếu v4.3 / MKG v1.4 / BRD KN (09/10/2026) — §2 quyết định QĐ-1…10, §4 câu hỏi Q-0xx. Mỗi gói ghi lựa chọn mặc định đã
-dùng ("Đề xuất của dev"); đổi khi chủ sản phẩm trả lời. Mỗi gói một mục.
-
 ## W11.71 — Khung `pf/price` (ADR-0049, pf 000138)
 
 | Câu hỏi | Lựa chọn đã dùng | Ở đâu | Đổi thế nào |
@@ -51,11 +41,6 @@ dùng ("Đề xuất của dev"); đổi khi chủ sản phẩm trả lời. M�
 | Đơn vị tính mặc định (BRD không liệt kê) | kg, tạ, tấn, lít, con, trái, bao, chai | `price/domain.DefaultUnits` | Chủ danh mục thêm/ngưng mã (phiên bản mới `retired`); seed chỉ ghi mã chưa có |
 | 5 nhóm hàng mặc định | Theo BRD FN-AD-04.03: `lua_gao`, `rau_mau`, `chan_nuoi`, `thuy_hai_san`, `vat_tu_nong_nghiep` | `price/domain.DefaultGroups` | Như trên |
 | Ngày hiệu lực danh mục | `valid_from` = ngày báo giá theo giờ VN (BR-02: áp dụng từ ngày báo giá kế tiếp); seed mặc định hiệu lực từ hôm nay | pf 000138, `price/domain.BusinessDay` | Lịch báo giá thật (ngày nghỉ, Q-086) ở W11.74 |
-# Giả định khi chưa có trả lời của PO — đợt BRD KN 10/2026
-
-Mỗi gói W11.x ghi các câu hỏi đang chặn/chờ và phương án dev đã chọn làm mặc định (theo §2, §4 của tài liệu đối
-chiếu v4.3 / BRD KN). Đổi phương án = đổi tham số/seed, không sửa mã, trừ khi ghi khác.
-
 ## W11.03 — Lịch kỳ hệ thống dùng chung
 
 | Câu hỏi | Phương án đã chọn | Đổi ở đâu |
@@ -99,7 +84,6 @@ Chưa làm trong gói này: lưu `Key`/`WeekYear` của kỳ vào DB (không có
 | Đổi lịch trong ngày báo giá | Ngày áp dụng sớm nhất = ngày mai nếu hôm nay là ngày báo giá, hôm nay nếu không (422 `price.valid_from`) | `domain.EarliestValidFrom` | — |
 | Ngưỡng mặc định | 30 %, N = 7, đi ngang 1 %, phiếu điều tra 40 % (BRD CT-02…CT-06); ngưỡng mặt hàng chỉ kiểm dạng mã (danh mục ở W11.73) | `KNPriceProfile.Schedule`, `app.SaveThreshold` | Tenant ghi phiên bản ngưỡng; W11.73 kiểm mã mặt hàng có thật |
 | "Mốc duyệt bảng giá dự kiến" (FN-AD-04.04 BR-03: hạn phản hồi trước mốc duyệt) | Chưa có tham số mốc duyệt — chỉ kiểm hạn phản hồi sau giờ khóa | `domain.ValidateSchedule` | W11.76 (duyệt/công bố) thêm mốc duyệt vào lịch |
-## W11.05 — `cap/forms` tổng quát đơn vị lá (pf 000142)
 ## W11.05 — `cap/forms` tổng quát đơn vị lá (pf 000140)
 
 | Câu hỏi | Phương án đã chọn | Đổi ở đâu |
