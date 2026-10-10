@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -76,16 +77,16 @@ func TestPriceFrameHTTP_W1171(t *testing.T) {
 	call("tw", http.MethodGet, "/v1/price/status", http.StatusForbidden) // profile thử không có kn_tw
 	call("tinh", http.MethodGet, "/v1/price/status?profile=htx", http.StatusNotFound)
 	st := call("tinh", http.MethodGet, "/v1/price/status", http.StatusOK)
-	if st["profile"] != "kn" || st["level"] != "TINH" || st["can_manage"] != false || st["units"] != 0.0 || st["day"] != "2026-10-12" ||
+	if st["profile"] != "kn" || st["level"] != "TINH" || st["can_manage"] != false || fmt.Sprint(st["units"]) != "0" || st["day"] != "2026-10-12" ||
 		st["rule_version"] != "price.v1" || st["department"] != "thong_tin_truyen_thong" {
 		t.Fatalf("status: %v", st)
 	}
 
 	call("tinh", http.MethodPost, "/v1/price/catalog/defaults", http.StatusForbidden)
-	if n := call("admin", http.MethodPost, "/v1/price/catalog/defaults", http.StatusCreated)["written"]; n != 13.0 {
+	if n := call("admin", http.MethodPost, "/v1/price/catalog/defaults", http.StatusCreated)["written"]; fmt.Sprint(n) != "13" {
 		t.Fatalf("ghi mặc định: %v", n)
 	}
-	if n := call("admin", http.MethodPost, "/v1/price/catalog/defaults", http.StatusCreated)["written"]; n != 0.0 {
+	if n := call("admin", http.MethodPost, "/v1/price/catalog/defaults", http.StatusCreated)["written"]; fmt.Sprint(n) != "0" {
 		t.Fatalf("ghi lại mặc định phải không ghi gì: %v", n)
 	}
 
@@ -94,7 +95,7 @@ func TestPriceFrameHTTP_W1171(t *testing.T) {
 	if len(gs) != 5 || len(us) != 8 || cat["day"] != "2026-10-12" {
 		t.Fatalf("danh mục: %v", cat)
 	}
-	if g := gs[0].(map[string]any); g["code"] != "lua_gao" || g["name"] != "Lúa gạo" || g["version"] != 1.0 || g["valid_from"] != "2026-10-12" {
+	if g := gs[0].(map[string]any); g["code"] != "lua_gao" || g["name"] != "Lúa gạo" || fmt.Sprint(g["version"]) != "1" || g["valid_from"] != "2026-10-12" {
 		t.Fatalf("nhóm đầu: %v", g)
 	}
 	// Trước ngày hiệu lực: rỗng (BR-02 — áp dụng từ ngày báo giá ghi trong valid_from).
