@@ -1,6 +1,7 @@
 // Package seeddata nhúng dữ liệu nền KN v7.7 của pf/party (go:embed), TẠM — chờ khách xác nhận:
 //
-//   - departments_an_giang.json: 6 phòng ban của TTKN An Giang, Phòng Trồng trọt "Đang áp dụng" (Q-02).
+//   - departments_an_giang.json: 5 phòng ban của TTKN An Giang, Phòng Trồng trọt "Đang áp dụng" (W11.06,
+//     Q-051; mã: docs/kn/phong-ban-seed.md).
 //   - regions_an_giang.json: Khu vực (huyện cũ) của tỉnh An Giang (mã 91, sau sắp xếp 2025) và xã
 //     thuộc từng Khu vực, suy từ bảng kế thừa ĐVHC (Q-04).
 //

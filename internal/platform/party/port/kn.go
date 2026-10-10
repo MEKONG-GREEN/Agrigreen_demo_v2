@@ -15,11 +15,38 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// Mã phòng ban đã biết (seed TTKN An Giang, tạm — chờ khách Q-02). Mã là chuỗi [a-z][a-z0-9_]{1,39};
-// mọi bản ghi nghiệp vụ KN mới mang department_code là một trong các mã của đơn vị.
+// Mã phòng ban đã biết (seed TTKN An Giang — W11.06, docs/kn/phong-ban-seed.md; tên chờ khách Q-051).
+// Mã là chuỗi [a-z][a-z0-9_]{1,39}; mọi bản ghi nghiệp vụ KN mới mang department_code là một trong các
+// mã của đơn vị. Mã là định danh ổn định — đổi TÊN hiển thị không đổi mã.
 const (
-	DeptTrongTrot = "trong_trot" // Phòng Trồng trọt — "Đang áp dụng" (FN-AD-04.03)
+	DeptTrongTrot           = "trong_trot"             // Phòng Trồng trọt — "Đang áp dụng" (FN-AD-04.03)
+	DeptChanNuoiThuySan     = "chan_nuoi_thuy_san"     // Phòng Chăn nuôi - Thủy sản (BRD CNTS v3.7)
+	DeptKeHoachTaiChinh     = "ke_hoach_tai_chinh"     // Phòng Kế hoạch - Tài chính (BRD KHTC v2.2)
+	DeptThongTinTruyenThong = "thong_tin_truyen_thong" // Phòng Thông tin Tuyên truyền (BRD Báo giá v1.3; mã giữ từ v7.7)
+	DeptHanhChinhTongHop    = "hanh_chinh_tong_hop"    // Phòng Hành chính - Tổng hợp (BRD HCTH v3.0)
 )
+
+// Mã tạm cũ (seed v7.7, Q-02) — W11.06 thay bằng mã thật. Tham chiếu cũ (gán vai, ngữ cảnh, URL) vẫn
+// chạy qua CanonicalDepartmentCode.
+const (
+	DeptLegacyPhongBan5 = "phong_ban_5"
+	DeptLegacyPhongBan6 = "phong_ban_6"
+)
+
+// legacyDeptAliases: mã tạm → mã thật kế nhiệm ("" = bỏ, không có kế nhiệm — Q-051: BRD chỉ nêu tên 5
+// phòng ban).
+var legacyDeptAliases = map[string]string{
+	DeptLegacyPhongBan5: DeptHanhChinhTongHop,
+	DeptLegacyPhongBan6: "",
+}
+
+// CanonicalDepartmentCode trả mã kế nhiệm của một mã tạm cũ (ok = true khi code là mã tạm). Mã kế nhiệm
+// rỗng: mã tạm đã bỏ, không có phòng ban thay thế. Người tra cứu dùng mã gốc TRƯỚC (đơn vị chưa nâng cấp
+// seed vẫn có dòng phong_ban_5), chỉ dùng mã kế nhiệm khi mã gốc không còn (đã xóa hoặc chưa từng có).
+func CanonicalDepartmentCode(code string) (string, bool) {
+	to, ok := legacyDeptAliases[code]
+	return to, ok
+}
 
 // Trạng thái phòng ban (FN-AD-04.03).
 const (
@@ -32,6 +59,12 @@ const (
 const (
 	MenuProfileTrongTrot = "trong_trot"
 	MenuProfileGeneric   = "generic" // phòng ban mới bật bằng cấu hình (UR-KT-02)
+	// kn.menu/v3 (W11.06): khuôn riêng theo phòng ban = khung báo cáo theo kỳ dùng chung + nhóm
+	// "Nghiệp vụ" của phòng (mục chưa có module hiện "Sắp có", không bấm được).
+	MenuProfileChanNuoiThuySan     = "chan_nuoi_thuy_san"
+	MenuProfileKeHoachTaiChinh     = "ke_hoach_tai_chinh"
+	MenuProfileThongTinTuyenTruyen = "thong_tin_truyen_thong"
+	MenuProfileHanhChinhTongHop    = "hanh_chinh_tong_hop"
 )
 
 // Đối tượng (vai KN v7.7) của menu. KHÔNG phải vai Keycloak: vai KN nằm ở ngữ cảnh phiên (P1,

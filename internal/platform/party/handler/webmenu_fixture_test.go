@@ -1,7 +1,7 @@
 package handler
 
 // Ca vàng hợp đồng menu Go ↔ web-ops (KN-fix, UR-KT-02): menu do bảng tĩnh Go dựng (cùng hàm của
-// GET /v1/menu, cùng thân JSON KNMenu) cho 6 phòng ban mặc định An Giang được ghi ra
+// GET /v1/menu, cùng thân JSON KNMenu) cho 5 phòng ban mặc định An Giang (W11.06) được ghi ra
 // apps/web-ops/src/api/mock/fixtures/kn-menu.json; Vitest (src/api/mock/kn-menu.contract.test.ts) kiểm
 // bản giả lập web trả ĐÚNG như vậy, và accounts/domain (P1 default_route) kiểm cùng tệp.
 // Sinh lại sau khi đổi domain/menu.go:
@@ -74,6 +74,17 @@ func TestWebMenuFixture(t *testing.T) {
 				name += "+dot_xuat"
 			}
 			cases = append(cases, webMenuCase{Name: name, Audience: aud, Department: depts[0].Code, AdHoc: adHoc, Menu: menuBody(v)})
+		}
+	}
+	// kn.menu/v3 (W11.06): khuôn riêng của từng phòng ban còn lại (bảng menu không phụ thuộc trạng thái —
+	// trạng thái chỉ chặn chọn phòng ban ở ngữ cảnh phiên).
+	for _, d := range depts[1:] {
+		for _, aud := range []string{port.AudienceTW, port.AudienceTinh, port.AudienceXa} {
+			v, err := app.DepartmentMenu(ctx, nil, d, aud)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cases = append(cases, webMenuCase{Name: aud + "/" + d.Code, Audience: aud, Department: d.Code, Menu: menuBody(v)})
 		}
 	}
 	cases = append(cases, webMenuCase{Name: "admin", Audience: port.AudienceAdmin, Menu: menuBody(app.AdminMenu(uuid.Nil, depts))})

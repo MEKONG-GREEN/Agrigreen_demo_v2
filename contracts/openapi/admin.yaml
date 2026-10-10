@@ -4844,7 +4844,7 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
   /v1/orgs/{ref}/departments/seed:
     post:
-      summary: "Nạp 6 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng) — TẠM, chờ khách Q-02; chạy lặp an toàn"
+      summary: "Nạp 5 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng; W11.06, chờ khách Q-051); xóa mã tạm phong_ban_5/6 chưa dùng; chạy lặp an toàn"
       operationId: knSeedDepartments
       tags: [party]
       parameters:
@@ -4857,11 +4857,13 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [created, existing, status]
+                required: [created, existing, status, legacy_retired, legacy_kept]
                 properties:
                   created: {type: array, items: {$ref: "#/components/schemas/KNDepartment"}}
                   existing: {type: integer}
                   status: {type: string}
+                  legacy_retired: {type: array, items: {type: string}, description: "Mã tạm (phong_ban_5/6) đã xóa trong lần nạp này — chưa mở, không có tài khoản/dữ liệu"}
+                  legacy_kept: {type: array, items: {type: string}, description: "Mã tạm còn giữ (đang áp dụng, có tài khoản/dữ liệu hoặc chưa nối nguồn đếm) — Admin xử lý; tra cứu mã cũ vẫn trả dòng này"}
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   /v1/regions:
@@ -7349,7 +7351,7 @@ components:
         sort_order: {type: integer}
         status: {type: string, enum: [active, not_open, suspended], description: "Đang áp dụng / Chưa mở / Ngưng hoạt động"}
         status_label: {type: string}
-        menu_profile: {type: string, enum: [trong_trot, generic], description: "Bộ menu dựng sẵn trong mã (kn.menu/v2)"}
+        menu_profile: {type: string, enum: [trong_trot, generic, chan_nuoi_thuy_san, ke_hoach_tai_chinh, thong_tin_truyen_thong, hanh_chinh_tong_hop], description: "Bộ menu dựng sẵn trong mã (kn.menu/v3); generic + mã có khuôn riêng → khuôn riêng"}
         retired: {type: boolean, description: "Đã xóa (sự kiện retired) — mã không tái sử dụng"}
         selectable: {type: boolean, description: "Chọn được ở bước 2 đăng nhập (Đang áp dụng, chưa xóa)"}
         account_count: {type: [integer, "null"], description: "null = chưa nối nguồn đếm (P1) hoặc Application API"}

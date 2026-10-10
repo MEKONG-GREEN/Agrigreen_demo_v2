@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { KnMenu, KnRole } from "@/kn/contract";
 import { createKnApi } from "@/kn/client";
 import { fromKnMenu } from "@/kn/menuAdapter";
+import { menuLinks } from "@/shell/menu";
 import fixture from "./fixtures/kn-menu.json";
 import { mockFetchNoDelay } from "./handler";
 import { DEFAULT_ROUTE, knMenu, MENU_VERSION } from "./kn";
@@ -23,7 +24,7 @@ const cases = fixture.cases as unknown as FixtureCase[];
 const shape = (m: KnMenu) => ({ ...m, org_ref: null });
 
 describe("menu giả lập = bảng menu Go (kn-menu.json)", () => {
-  it("phiên bản, trang mặc định (P1 default_route = P2), 6 phòng ban nền", () => {
+  it("phiên bản, trang mặc định (P1 default_route = P2), 5 phòng ban nền (W11.06)", () => {
     expect(MENU_VERSION).toBe(fixture.menu_version);
     expect(DEFAULT_ROUTE).toEqual(fixture.default_routes);
     expect(KN_DEPARTMENTS.map((d) => ({ code: d.code, name: d.name, status: d.status, menu_profile: KN_MENU_PROFILE[d.code] ?? "generic" }))).toEqual(
@@ -77,9 +78,37 @@ describe("fromKnMenu — trình bày Hình 3c", () => {
       ["Phòng Trồng trọt", "active", 7],
       ["Chăn nuôi - TS", "not_open", 0],
       ["Kế hoạch - TC", "not_open", 0],
-      ["3 phòng khác", "not_open", 0],
+      ["2 phòng khác", "not_open", 0],
     ]);
+    // kn.menu/v3: nhóm "Dùng chung" cuối; Contact "Sắp có" không thành liên kết.
+    const tree = fromKnMenu(admin);
+    expect(tree.groups.at(-1)).toMatchObject({ key: "dung_chung", label: "Dùng chung", items: [{ key: "chung.contact", status: "coming_soon" }] });
     const odd: KnMenu = { ...admin, groups: [{ key: "x", label: "X", items: [{ ...admin.groups[0]!.items[0]!, icon: "khong-co" }] }] };
     expect(fromKnMenu(odd).groups[0]!.items[0]!.icon).toBe("file");
+  });
+});
+
+describe("kn.menu/v3 (W11.06): khuôn theo phòng ban + Dùng chung", () => {
+  it("phòng ban khác Trồng trọt: Điều hành / Nghiệp vụ (Sắp có) / Báo cáo / Dùng chung; mục Sắp có không bấm được", () => {
+    for (const code of ["chan_nuoi_thuy_san", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) {
+      const m = cases.find((c) => c.name === `kn_tinh/${code}`)!.menu;
+      expect(m.groups.map((g) => g.key)).toEqual(["dieu_hanh", "nghiep_vu", "bao_cao", "dung_chung"]);
+      const tree = fromKnMenu(m);
+      const biz = tree.groups.find((g) => g.key === "nghiep_vu")!;
+      expect(biz.items.every((i) => i.status === "coming_soon")).toBe(true);
+      const links = menuLinks(tree).map((l) => l.node.key);
+      expect(links).toContain("tinh.dashboard"); // khung chung vẫn chạy
+      expect(links.some((k) => biz.items.some((i) => i.key === k))).toBe(false);
+    }
+    // KHTC: Cấp Xã không có menu KHTC.
+    expect(cases.find((c) => c.name === "kn_xa/ke_hoach_tai_chinh")!.menu.groups.map((g) => g.key)).toEqual(["dieu_hanh", "bao_cao", "dung_chung"]);
+  });
+
+  it("mã tạm phong_ban_5 → Phòng Hành chính - Tổng hợp (Admin, /modules)", async () => {
+    const res = await mockFetchNoDelay(
+      new Request("http://x/v1/departments/phong_ban_5/modules?audience=admin", { headers: { Authorization: `Bearer ${mockToken("kn-admin")}` } }),
+    );
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as KnMenu).department?.code).toBe("hanh_chinh_tong_hop");
   });
 });

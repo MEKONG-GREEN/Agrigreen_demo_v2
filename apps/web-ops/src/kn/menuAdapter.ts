@@ -22,7 +22,8 @@ export const SHORT_DEPT_NAME: Readonly<Record<string, string>> = {
   trong_trot: "Trồng trọt",
   chan_nuoi_thuy_san: "Chăn nuôi - TS",
   ke_hoach_tai_chinh: "Kế hoạch - TC",
-  thong_tin_truyen_thong: "Thông tin - TT",
+  thong_tin_truyen_thong: "Thông tin TT",
+  hanh_chinh_tong_hop: "Hành chính - TH",
 };
 
 /** Khóa nhóm và tiền tố khóa mục phòng ban của menu Admin (domain.AdminDepartmentGroupKey). */
@@ -32,7 +33,8 @@ function node(it: KnMenuItem): MenuNode {
   const n: MenuNode = { key: it.key, label: it.label, icon: toNavIcon(it.icon) };
   if (it.route) n.href = it.route;
   if (it.badge_source) n.badge_source = it.badge_source;
-  if (!it.enabled) n.status = "not_open";
+  if (it.status === "coming_soon") n.status = "coming_soon";
+  else if (!it.enabled) n.status = "not_open";
   if (it.children.length) n.children = it.children.map(node);
   return n;
 }

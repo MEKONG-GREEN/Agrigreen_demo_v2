@@ -214,10 +214,12 @@ class KnHomeScreen extends ConsumerWidget {
                   enabled: e.enabled,
                   leading: Icon(_iconFor(e.key)),
                   title: Text(e.label),
-                  trailing: (badges[e.badgeSource] ?? 0) > 0
+                  trailing: e.comingSoon
+                      ? const KnChip('Sắp có', AgColors.mute)
+                      : (badges[e.badgeSource] ?? 0) > 0
                       ? KnChip('${badges[e.badgeSource]}', AgColors.red)
                       : null,
-                  onTap: () => open(e),
+                  onTap: e.comingSoon ? null : () => open(e),
                 ),
             ],
           ],

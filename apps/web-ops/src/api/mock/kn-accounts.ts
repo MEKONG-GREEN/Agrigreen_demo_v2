@@ -13,21 +13,36 @@ export const MOCK_KN_PASSWORD = "KhuyenNong@2026";
 const TENANT = "01927b3e-0000-7000-8000-00000000a001";
 
 /**
- * 6 phòng ban của TTKN An Giang (FN-AD-04.03) = dữ liệu nền Go internal/platform/party/seeddata/departments_an_giang.json
- * (kiểm bởi src/api/mock/kn-menu.contract.test.ts qua ca vàng kn-menu.json). Q-02: mới biết 4 tên trên wireframe —
- * 2 phòng còn lại là tên TẠM, chờ khách. Chỉ Phòng Trồng trọt "Đang áp dụng".
+ * 5 phòng ban của TTKN An Giang (FN-AD-04.03, W11.06) = dữ liệu nền Go internal/platform/party/seeddata/departments_an_giang.json
+ * (kiểm bởi src/api/mock/kn-menu.contract.test.ts qua ca vàng kn-menu.json). Q-051 (chờ khách): tên "Thông tin Tuyên truyền"
+ * theo BRD Báo giá/KHTC, mã giữ từ v7.7; mã tạm phong_ban_5 → hanh_chinh_tong_hop, phong_ban_6 bỏ (LEGACY_DEPT_ALIAS).
+ * Chỉ Phòng Trồng trọt "Đang áp dụng". Mã: docs/kn/phong-ban-seed.md.
  */
 export const KN_DEPARTMENTS: readonly DepartmentRef[] = [
   { code: "trong_trot", name: "Phòng Trồng trọt", description: "Báo cáo tuần/tháng/vụ cây trồng; thu thập HTX, máy móc, thửa ruộng, vật tư", status: "active" },
-  { code: "chan_nuoi_thuy_san", name: "Phòng Chăn nuôi - Thủy sản", description: "Báo cáo Chăn nuôi, Nuôi trồng & Đánh bắt Thủy sản", status: "not_open" },
-  { code: "ke_hoach_tai_chinh", name: "Phòng Kế hoạch - Tài chính", description: "Tổng hợp báo cáo liên phòng; Dự án khuyến nông", status: "not_open" },
-  { code: "thong_tin_truyen_thong", name: "Phòng Thông tin - Truyền thông", description: "Thư viện kỹ thuật & tin tức; Quản trị đào tạo; Giá cả thị trường", status: "not_open" },
-  { code: "phong_ban_5", name: "Phòng ban 5 (tạm, chờ khách Q-02)", description: "Tên chưa có trong BRD v7.7", status: "not_open" },
-  { code: "phong_ban_6", name: "Phòng ban 6 (tạm, chờ khách Q-02)", description: "Tên chưa có trong BRD v7.7", status: "not_open" },
+  { code: "chan_nuoi_thuy_san", name: "Phòng Chăn nuôi - Thủy sản", description: "Báo cáo Chăn nuôi, Nuôi trồng & Đánh bắt Thủy sản; KSGM, dịch bệnh, dự án KNQG", status: "not_open" },
+  { code: "ke_hoach_tai_chinh", name: "Phòng Kế hoạch - Tài chính", description: "Kế hoạch năm, tổng hợp báo cáo liên phòng; dự án khuyến nông", status: "not_open" },
+  { code: "thong_tin_truyen_thong", name: "Phòng Thông tin Tuyên truyền", description: "Báo giá nông sản; thư viện kỹ thuật & tin tức; quản trị đào tạo", status: "not_open" },
+  { code: "hanh_chinh_tong_hop", name: "Phòng Hành chính - Tổng hợp", description: "Hồ sơ nhân sự, đánh giá xếp loại, kho tài liệu nhân sự; Contact dùng chung", status: "not_open" },
 ];
 
-/** Bộ menu của phòng ban (P2 menu_profile): chỉ Trồng trọt có bộ riêng. */
-export const KN_MENU_PROFILE: Readonly<Record<string, "trong_trot" | "generic">> = { trong_trot: "trong_trot" };
+/** Bộ menu của phòng ban (P2 menu_profile, kn.menu/v3): mỗi phòng ban seed có khuôn riêng; phòng ban khác "generic". */
+export type KnMenuProfile = "trong_trot" | "generic" | "chan_nuoi_thuy_san" | "ke_hoach_tai_chinh" | "thong_tin_truyen_thong" | "hanh_chinh_tong_hop";
+export const KN_MENU_PROFILE: Readonly<Record<string, KnMenuProfile>> = {
+  trong_trot: "trong_trot",
+  chan_nuoi_thuy_san: "chan_nuoi_thuy_san",
+  ke_hoach_tai_chinh: "ke_hoach_tai_chinh",
+  thong_tin_truyen_thong: "thong_tin_truyen_thong",
+  hanh_chinh_tong_hop: "hanh_chinh_tong_hop",
+};
+
+/** Mã tạm cũ → mã kế nhiệm (Go port.CanonicalDepartmentCode); "" = bỏ. */
+export const LEGACY_DEPT_ALIAS: Readonly<Record<string, string>> = { phong_ban_5: "hanh_chinh_tong_hop", phong_ban_6: "" };
+
+/** Phòng ban theo mã; mã tạm cũ không còn → phòng ban kế nhiệm. */
+export function findKnDepartment(code: string): DepartmentRef | undefined {
+  return KN_DEPARTMENTS.find((d) => d.code === code) ?? KN_DEPARTMENTS.find((d) => d.code === LEGACY_DEPT_ALIAS[code]);
+}
 
 /** Tên ngắn (Hình 3c) — định nghĩa ở src/kn/menuAdapter.ts, giữ tên xuất cũ. */
 export { SHORT_DEPT_NAME } from "@/kn/menuAdapter";

@@ -13,7 +13,7 @@ import (
 // UR-KT-02 / BRD v7.7 §6: mọi bộ menu × đối tượng có trang mặc định, khóa mục duy nhất, đường dẫn đã thay
 // mã phòng ban; Cấp Xã không có Dashboard (chốt v7.4); bộ generic không có mục riêng của Trồng trọt.
 func TestUR_KT_02_MenuTableConsistent(t *testing.T) {
-	for _, profile := range []string{port.MenuProfileTrongTrot, port.MenuProfileGeneric} {
+	for _, profile := range domain.MenuProfiles {
 		for _, aud := range []string{port.AudienceTW, port.AudienceTinh, port.AudienceXa} {
 			groups := domain.DepartmentMenu(profile, aud, "chan_nuoi")
 			if len(groups) == 0 {
@@ -37,7 +37,7 @@ func TestUR_KT_02_MenuTableConsistent(t *testing.T) {
 					if aud == port.AudienceXa && strings.Contains(it.Key, "dashboard") {
 						t.Fatalf("Cấp Xã không có Dashboard: %s", it.Key)
 					}
-					if profile == port.MenuProfileGeneric && (strings.Contains(it.Key, "thu_thap") || strings.Contains(it.Key, "chi_cuc")) {
+					if profile != port.MenuProfileTrongTrot && (strings.Contains(it.Key, "thu_thap") || strings.Contains(it.Key, "chi_cuc")) {
 						t.Fatalf("bộ generic có mục riêng Trồng trọt: %s", it.Key)
 					}
 					walk(it.Children)
@@ -109,5 +109,64 @@ func TestFN_AD_04_03_NormalizeDepartment(t *testing.T) {
 		if _, err := domain.NormalizeDepartment(bad); err == nil {
 			t.Fatalf("phải lỗi: %+v", bad)
 		}
+	}
+}
+
+// W11.06 (kn.menu/v3, D3 C6, D4 X2): khuôn theo phòng ban — nhóm "Nghiệp vụ" sau "Điều hành", nhóm
+// "Dùng chung" (Contact) cuối mọi đối tượng; mục module chưa có là "Sắp có"; bộ Trồng trọt giữ nguyên các
+// nhóm cũ; phòng ban seed cũ (menu_profile generic) nhận khuôn riêng theo mã.
+func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
+	if domain.MenuVersion != "kn.menu/v3" {
+		t.Fatal(domain.MenuVersion)
+	}
+	keys := func(gs []domain.MenuGroup) []string {
+		out := []string{}
+		for _, g := range gs {
+			out = append(out, g.Key)
+		}
+		return out
+	}
+	tt := keys(domain.DepartmentMenu(port.MenuProfileTrongTrot, port.AudienceXa, port.DeptTrongTrot))
+	if strings.Join(tt, ",") != "dieu_hanh,bao_cao,du_lieu,dung_chung" {
+		t.Fatalf("Trồng trọt Cấp Xã: %v", tt)
+	}
+	for _, code := range []string{port.DeptChanNuoiThuySan, port.DeptKeHoachTaiChinh, port.DeptThongTinTruyenThong, port.DeptHanhChinhTongHop} {
+		if p := domain.EffectiveMenuProfile(port.MenuProfileGeneric, code); p != code || !domain.KnownMenuProfile(p) {
+			t.Fatalf("EffectiveMenuProfile(generic, %s) = %s", code, p)
+		}
+		gs := domain.DepartmentMenu(port.MenuProfileGeneric, port.AudienceTinh, code)
+		if k := keys(gs); strings.Join(k, ",") != "dieu_hanh,nghiep_vu,bao_cao,dung_chung" {
+			t.Fatalf("%s Cấp Tỉnh: %v", code, k)
+		}
+		for _, it := range gs[1].Items {
+			if !it.ComingSoon {
+				t.Fatalf("%s: mục nghiệp vụ chưa có module phải Sắp có: %s", code, it.Key)
+			}
+		}
+		admin := domain.AdminDepartmentItems(port.MenuProfileGeneric, code)
+		if last := admin[len(admin)-1]; !last.ComingSoon || !strings.HasPrefix(last.Route, "/kn/phong-ban/"+code+"/") {
+			t.Fatalf("%s: mục Admin Sắp có: %+v", code, last)
+		}
+	}
+	if p := domain.EffectiveMenuProfile(port.MenuProfileTrongTrot, port.DeptChanNuoiThuySan); p != port.MenuProfileTrongTrot {
+		t.Fatal("bộ menu khác generic giữ nguyên")
+	}
+	// KHTC: Cấp Xã không có menu KHTC (BRD KHTC v2.2 §VI.3).
+	if k := keys(domain.DepartmentMenu(port.MenuProfileKeHoachTaiChinh, port.AudienceXa, port.DeptKeHoachTaiChinh)); strings.Join(k, ",") != "dieu_hanh,bao_cao,dung_chung" {
+		t.Fatalf("KHTC Cấp Xã: %v", k)
+	}
+	sh := domain.SharedMenuGroup()
+	if sh.Key != domain.GroupDungChung || len(sh.Items) == 0 || !sh.Items[0].ComingSoon {
+		t.Fatalf("Dùng chung: %+v", sh)
+	}
+	// Mã tạm cũ (Q-051).
+	if to, ok := port.CanonicalDepartmentCode(port.DeptLegacyPhongBan5); !ok || to != port.DeptHanhChinhTongHop {
+		t.Fatal("phong_ban_5 → hanh_chinh_tong_hop")
+	}
+	if to, ok := port.CanonicalDepartmentCode(port.DeptLegacyPhongBan6); !ok || to != "" {
+		t.Fatal("phong_ban_6 bỏ, không kế nhiệm")
+	}
+	if _, ok := port.CanonicalDepartmentCode(port.DeptTrongTrot); ok {
+		t.Fatal("mã thật không phải mã tạm")
 	}
 }

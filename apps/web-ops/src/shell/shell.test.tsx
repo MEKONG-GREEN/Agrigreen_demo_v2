@@ -23,11 +23,11 @@ const admin = knMenuFor("admin", null);
 const labels = (t: MenuTree) => menuLinks(t).map((l) => l.node.label);
 
 describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
-  it("nhóm Điều hành / Báo cáo / Dữ liệu; Admin: Điều hành / Phòng ban / Quản trị hệ thống", () => {
-    expect(xa.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dữ liệu"]);
-    expect(tinh.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo"]);
-    expect(tw.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo"]);
-    expect(admin.groups.map((g) => g.label)).toEqual(["Điều hành", "Phòng ban", "Quản trị hệ thống"]);
+  it("nhóm Điều hành / Báo cáo / Dữ liệu + Dùng chung (kn.menu/v3); Admin: Điều hành / Phòng ban / Quản trị hệ thống / Dùng chung", () => {
+    expect(xa.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dữ liệu", "Dùng chung"]);
+    expect(tinh.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dùng chung"]);
+    expect(tw.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dùng chung"]);
+    expect(admin.groups.map((g) => g.label)).toEqual(["Điều hành", "Phòng ban", "Quản trị hệ thống", "Dùng chung"]);
   });
 
   it("Cấp Xã không có Dashboard (chốt v7.4); Cấp Quốc gia có Báo cáo năm, không có Nhiệm vụ", () => {
@@ -50,7 +50,7 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
       ["Phòng Trồng trọt", "active"],
       ["Chăn nuôi - TS", "not_open"],
       ["Kế hoạch - TC", "not_open"],
-      ["3 phòng khác", "not_open"],
+      ["2 phòng khác", "not_open"],
     ]);
     const hrefs = menuLinks(admin).map((l) => l.node.href);
     expect(hrefs).toEqual(expect.arrayContaining(["/kn/tong-quan", "/kn/quan-tri/co-cau-to-chuc", "/kn/quan-tri/nguoi-dung", "/quan-tri/to-chuc", "/quan-tri/tai-khoan", "/kn/phong-ban/trong_trot/danh-muc", "/quan-tri/mau-bao-cao"]));

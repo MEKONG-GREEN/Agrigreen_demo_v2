@@ -14,7 +14,7 @@ import { uuidv7 } from "../idempotency";
 import type { DepartmentRef, KnRole, RoleAssignment, SessionContext } from "@/kn/contract";
 import { NATIONAL_REF, provinceOrgRef } from "./data";
 import { hasRole, json, problem, type Ctx, type Route } from "./http";
-import { findKnAccount, KN_ACCOUNTS, KN_DEPARTMENTS, type MockKnAccount } from "./kn-accounts";
+import { findKnAccount, KN_ACCOUNTS, KN_DEPARTMENTS, KN_MENU_PROFILE, type MockKnAccount } from "./kn-accounts";
 import { dropSupportContexts, knStoredContext, registerKnContext, DEFAULT_ROUTE } from "./kn";
 import { stableUuid } from "./kn-schedules";
 import { AG_COMMUNES, AG_PROVINCE, AG_REGIONS, communeName, regionName } from "./kn-reports/store";
@@ -334,7 +334,7 @@ function deptWire(d: DepartmentRef, i: number) {
     sort_order: i + 1,
     status: d.status,
     status_label: STATUS_LABEL[d.status],
-    menu_profile: d.code === "trong_trot" ? "trong_trot" : "generic",
+    menu_profile: KN_MENU_PROFILE[d.code] ?? "generic",
     retired: false,
     selectable: d.status === "active",
     account_count: accounts,

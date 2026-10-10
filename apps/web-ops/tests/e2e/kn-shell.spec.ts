@@ -46,7 +46,7 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
 
     await expect(page).toHaveURL(/\/kn\/nhiem-vu\/cong-viec$/);
     await expect(page.getByRole("heading", { level: 1, name: "Công việc cần làm" })).toBeVisible();
-    await expect(groupLabels(page)).toHaveText(["Điều hành", "Báo cáo", "Dữ liệu"]);
+    await expect(groupLabels(page)).toHaveText(["Điều hành", "Báo cáo", "Dữ liệu", "Dùng chung"]);
     const active = menuNav(page).locator('[aria-current="page"]');
     await expect(active).toHaveCount(1);
     await expect(active).toContainText("Công việc cần làm");
@@ -62,7 +62,7 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await loginKn(page, "0912345603");
     await expect(page).toHaveURL(/\/kn\/dashboard$/);
     await expect(page.getByRole("heading", { level: 1, name: /Xin chào, Lê Minh Quân/ })).toBeVisible();
-    await expect(groupLabels(page)).toHaveText(["Điều hành", "Báo cáo"]);
+    await expect(groupLabels(page)).toHaveText(["Điều hành", "Báo cáo", "Dùng chung"]);
     for (const label of ["Dashboard", "Báo cáo tuần", "Báo cáo tháng", "Báo cáo hàng vụ", "Báo cáo năm"]) {
       await expect(menuNav(page).getByRole("link", { name: label })).toBeVisible();
     }
@@ -100,7 +100,7 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await page.getByRole("menuitem", { name: "Cấp Xã · Phòng Trồng trọt" }).click();
     await expect(page).toHaveURL(/\/kn\/nhiem-vu\/cong-viec$/);
     await expect(accountMenu(page)).toContainText("Cấp Xã · Trồng trọt");
-    await expect(groupLabels(page)).toHaveText(["Điều hành", "Báo cáo", "Dữ liệu"]);
+    await expect(groupLabels(page)).toHaveText(["Điều hành", "Báo cáo", "Dữ liệu", "Dùng chung"]);
     await expect(menuNav(page).getByRole("link", { name: "Phát hành biểu mẫu" })).toHaveCount(0);
     // Trang của vai trò cũ không còn trong menu → không có quyền.
     await page.goto("/kn/nhiem-vu/phat-hanh");
@@ -113,7 +113,10 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await loginKn(page, "admin.mekong@mekonggreen.vn");
     await expect(page).toHaveURL(/\/kn\/tong-quan$/);
     await expect(page.getByRole("heading", { level: 1, name: /Xin chào, admin\.mekong/ })).toBeVisible();
-    await expect(groupLabels(page)).toHaveText(["Điều hành", "Phòng ban", "Quản trị hệ thống"]);
+    await expect(groupLabels(page)).toHaveText(["Điều hành", "Phòng ban", "Quản trị hệ thống", "Dùng chung"]);
+    // kn.menu/v3 (W11.06): Contact (module dùng chung chưa có) hiện mờ "Sắp có", không phải liên kết.
+    await expect(menuNav(page).locator(".nav-item.is-disabled", { hasText: "Contact" })).toContainText("Sắp có");
+    await expect(menuNav(page).getByRole("link", { name: /Contact/ })).toHaveCount(0);
     const closed = menuNav(page).locator(".nav-item.is-disabled", { hasText: "Chăn nuôi - TS" });
     await expect(closed).toContainText("Chưa mở");
     await expect(menuNav(page).getByRole("link", { name: /Chăn nuôi/ })).toHaveCount(0);
@@ -147,7 +150,7 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(accountMenu(page)).toContainText("Cấp Xã · Trồng trọt");
     await sidebar(page).getByRole("button", { name: "Mở rộng menu" }).click();
     await expect(sidebar(page)).not.toHaveAttribute("data-collapsed", "true");
-    await expect(groupLabels(page)).toHaveText(["Điều hành", "Báo cáo", "Dữ liệu"]);
+    await expect(groupLabels(page)).toHaveText(["Điều hành", "Báo cáo", "Dữ liệu", "Dùng chung"]);
   });
 
   test("mẫu List → Detail: STT, nhãn trạng thái, xem/sửa/xóa, phân trang; Detail có quay lại, Log, breadcrumb", async ({ page }) => {

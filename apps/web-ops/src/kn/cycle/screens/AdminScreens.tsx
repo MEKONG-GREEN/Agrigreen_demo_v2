@@ -20,7 +20,8 @@ import type { AccountsUser, KnAssignment, KnAssignmentInput, KnDepartment, KnOrg
 import { LoadState, dt, useAction, useLoad } from "../common";
 
 const AG_REF_FALLBACK = "";
-const DEPT_OPTIONS_ALL = ["trong_trot", "chan_nuoi_thuy_san", "ke_hoach_tai_chinh", "thong_tin_truyen_thong", "phong_ban_5", "phong_ban_6"];
+// W11.06: 5 mã phòng ban seed (docs/kn/phong-ban-seed.md); mã tạm phong_ban_5/6 đã thay.
+const DEPT_OPTIONS_ALL = ["trong_trot", "chan_nuoi_thuy_san", "ke_hoach_tai_chinh", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"];
 const AG_COMMUNE_OPTIONS = [
   { code: "91301", name: "Mỹ Hòa Hưng" },
   { code: "91302", name: "Bình Đức" },

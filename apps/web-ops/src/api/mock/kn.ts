@@ -14,13 +14,13 @@ import { uuidv7 } from "../idempotency";
 import type { DepartmentRef, KnMenu, KnMenuGroup, KnMenuItem, KnRole, MenuTree, RoleAssignment, SessionContext } from "@/kn/contract";
 import { fromKnMenu } from "@/kn/menuAdapter";
 import { json, problem, type Route } from "./http";
-import { findKnAccount, findKnAccountByIdentifier, KN_DEPARTMENTS, KN_MENU_PROFILE, knPersona, MOCK_KN_PASSWORD, type MockKnAccount } from "./kn-accounts";
+import { findKnAccount, findKnAccountByIdentifier, findKnDepartment, KN_DEPARTMENTS, KN_MENU_PROFILE, knPersona, MOCK_KN_PASSWORD, type KnMenuProfile, type MockKnAccount } from "./kn-accounts";
 import type { MockPersona } from "./personas";
 import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v2";
+export const MENU_VERSION = "kn.menu/v3";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -56,6 +56,8 @@ interface Item {
   badge?: string;
   /** Chỉ hiện khi có mẫu "đột xuất" (MenuRequirement). */
   adHoc?: boolean;
+  /** Module chưa có: hiện mờ "Sắp có" (domain.MenuItem.ComingSoon, kn.menu/v3). */
+  soon?: boolean;
   children?: Item[];
 }
 interface Group {
@@ -150,8 +152,151 @@ const TRONG_TROT: Record<Exclude<KnRole, "admin">, Group[]> = {
   ],
 };
 
-/** Mục con của phòng ban trong nhóm "Phòng ban" của Admin (domain.adminDeptItems). */
-function adminDeptItems(code: string, profile: "trong_trot" | "generic"): Item[] {
+/** Bộ menu chung cho phòng ban mở bằng cấu hình (domain.genericMenus). */
+const GENERIC: Record<Exclude<KnRole, "admin">, Group[]> = {
+  kn_tw: TRONG_TROT.kn_tw,
+  kn_tinh: [
+    {
+      key: "dieu_hanh",
+      label: "Điều hành",
+      items: [
+        { key: "tinh.dashboard", label: "Dashboard", route: "/kn/dashboard", icon: "dashboard" },
+        {
+          key: "tinh.nhiem_vu",
+          label: "Nhiệm vụ",
+          icon: "task",
+          children: [
+            { key: "tinh.nhiem_vu.phat_hanh", label: "Phát hành biểu mẫu", route: "/kn/nhiem-vu/phat-hanh", icon: "send" },
+            { key: "tinh.nhiem_vu.trang_thai_nop", label: "Trạng thái nộp", route: "/kn/nhiem-vu/trang-thai-nop", icon: "bell", badge: B.notSubmitted },
+            { key: "tinh.nhiem_vu.ra_soat", label: "Rà soát & chốt kỳ", route: "/kn/nhiem-vu/ra-soat", icon: "check", badge: B.reviewPending },
+          ],
+        },
+      ],
+    },
+    {
+      key: "bao_cao",
+      label: "Báo cáo",
+      items: [
+        { key: "tinh.bao_cao.tong_hop", label: "Báo cáo tổng hợp các xã", route: "/kn/bao-cao/tong-hop", icon: "layers" },
+        { key: "tinh.bao_cao.dot_xuat", label: "Báo cáo đột xuất", route: "/kn/bao-cao/dot-xuat", icon: "zap", badge: B.adHocStatus, adHoc: true },
+      ],
+    },
+  ],
+  kn_xa: [
+    {
+      key: "dieu_hanh",
+      label: "Điều hành",
+      items: [
+        {
+          key: "xa.nhiem_vu",
+          label: "Nhiệm vụ",
+          icon: "task",
+          children: [{ key: "xa.nhiem_vu.cong_viec", label: "Công việc cần làm", route: "/kn/nhiem-vu/cong-viec", icon: "bell", badge: B.tasksTodo }],
+        },
+      ],
+    },
+    {
+      key: "bao_cao",
+      label: "Báo cáo",
+      items: [
+        ...BC_KY("xa"),
+        { key: "xa.bao_cao.cua_xa", label: "Báo cáo của xã", route: "/kn/bao-cao/cua-xa", icon: "chart" },
+        { key: "xa.bao_cao.dot_xuat", label: "Báo cáo đột xuất", route: "/kn/bao-cao/dot-xuat", icon: "zap", badge: B.adHocTodo, adHoc: true },
+      ],
+    },
+  ],
+};
+
+const soon = (key: string, label: string, route: string, icon: string): Item => ({ key, label, route, icon, soon: true });
+
+/** Nhóm "Dùng chung" cuối menu mọi đối tượng (domain.SharedGroup, HCTH FN-13). */
+const SHARED: Group = { key: "dung_chung", label: "Dùng chung", items: [soon("chung.contact", "Contact", "/kn/dung-chung/contact", "phone")] };
+
+/** Nhóm "Nghiệp vụ" theo khuôn × đối tượng (domain.deptBusiness) — mọi mục "Sắp có". */
+const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "admin">, Item[]>>>> = {
+  chan_nuoi_thuy_san: {
+    kn_tw: [soon("tw.cnts.du_an_knqg", "Dự án KNQG", "/kn/cnts/du-an-knqg", "report")],
+    kn_tinh: [
+      soon("tinh.cnts.canh_bao", "Cảnh báo", "/kn/cnts/canh-bao", "zap"),
+      soon("tinh.cnts.duyet_bao_cao", "Duyệt báo cáo", "/kn/cnts/duyet-bao-cao", "approve"),
+      soon("tinh.cnts.bieu_mau", "Biểu mẫu & cấp quyền", "/kn/cnts/bieu-mau", "table"),
+      soon("tinh.cnts.lich", "Lịch trực KSGM & lịch tiêm", "/kn/cnts/lich", "calendar"),
+      soon("tinh.cnts.chien_dich", "Chiến dịch điều tra", "/kn/cnts/chien-dich", "megaphone"),
+      soon("tinh.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
+      soon("tinh.cnts.du_an_knqg", "Dự án KNQG / Điểm trình diễn", "/kn/cnts/du-an-knqg", "report"),
+      soon("tinh.cnts.quy_trinh", "Quy trình, văn bản", "/kn/cnts/quy-trinh", "sop"),
+    ],
+    kn_xa: [
+      soon("xa.cnts.lich", "Lịch trực của tôi", "/kn/cnts/lich", "calendar"),
+      soon("xa.cnts.nhat_ky", "Hộ mô hình & nhật ký", "/kn/cnts/nhat-ky", "journal"),
+      soon("xa.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
+      soon("xa.cnts.diem_trinh_dien", "Điểm trình diễn", "/kn/cnts/du-an-knqg", "report"),
+      soon("xa.cnts.quy_trinh", "Quy trình, văn bản", "/kn/cnts/quy-trinh", "sop"),
+    ],
+  },
+  ke_hoach_tai_chinh: {
+    kn_tw: [soon("tw.khtc.bao_cao_tinh", "Báo cáo Tỉnh (KHTC)", "/kn/khtc/bao-cao-da-xuat", "report")],
+    kn_tinh: [
+      soon("tinh.khtc.ky_bao_cao", "Kỳ báo cáo & phiếu các phòng", "/kn/khtc/ky-bao-cao", "task"),
+      soon("tinh.khtc.ke_hoach_nam", "Kế hoạch năm", "/kn/khtc/ke-hoach-nam", "calendar"),
+      soon("tinh.khtc.so_lieu_ngoai", "Số liệu nguồn ngoài", "/kn/khtc/so-lieu-ngoai", "database"),
+      soon("tinh.khtc.mau_bao_cao", "Mẫu báo cáo KHTC", "/kn/khtc/mau-bao-cao", "table"),
+      soon("tinh.khtc.tien_do", "Tiến độ các chương trình", "/kn/khtc/tien-do", "chart"),
+      soon("tinh.khtc.da_xuat", "Báo cáo đã xuất", "/kn/khtc/bao-cao-da-xuat", "report"),
+    ],
+  },
+  thong_tin_truyen_thong: {
+    kn_tw: [
+      soon("tw.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
+      soon("tw.bao_gia.bien_dong", "Báo cáo biến động giá", "/kn/bao-gia/bien-dong", "layers"),
+      soon("tw.bao_gia.gia_thanh", "Giá thành sản xuất", "/kn/bao-gia/gia-thanh", "report"),
+    ],
+    kn_tinh: [
+      soon("tinh.bao_gia.tien_do", "Tiến độ nhập giá", "/kn/bao-gia/tien-do", "bell"),
+      soon("tinh.bao_gia.kiem_duyet", "Kiểm duyệt & công bố", "/kn/bao-gia/kiem-duyet", "approve"),
+      soon("tinh.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
+      soon("tinh.bao_gia.bien_dong", "Báo cáo biến động giá", "/kn/bao-gia/bien-dong", "layers"),
+      soon("tinh.bao_gia.dieu_tra", "Điều tra giá thành", "/kn/bao-gia/dieu-tra", "season"),
+      soon("tinh.bao_gia.mat_hang", "Mặt hàng", "/kn/bao-gia/mat-hang", "package"),
+    ],
+    kn_xa: [
+      soon("xa.bao_gia.nhap", "Nhập báo giá", "/kn/bao-gia/nhap", "upload"),
+      soon("xa.bao_gia.xac_minh", "Yêu cầu xác minh", "/kn/bao-gia/xac-minh", "check"),
+      soon("xa.bao_gia.lich_su", "Lịch sử báo giá", "/kn/bao-gia/lich-su", "journal"),
+      soon("xa.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
+    ],
+  },
+  hanh_chinh_tong_hop: {
+    kn_tinh: [
+      soon("tinh.hcth.ho_so", "Hồ sơ nhân sự", "/kn/nhan-su/ho-so", "users"),
+      soon("tinh.hcth.kho_tai_lieu", "Hồ sơ dữ liệu", "/kn/nhan-su/kho-tai-lieu", "library"),
+      soon("tinh.hcth.danh_gia", "Đánh giá", "/kn/nhan-su/danh-gia", "approve"),
+      soon("tinh.hcth.danh_muc", "Danh mục nhân sự", "/kn/nhan-su/danh-muc", "catalog"),
+    ],
+    kn_xa: [soon("xa.hcth.danh_gia", "Đánh giá của tôi", "/kn/nhan-su/danh-gia-cua-toi", "approve")],
+  },
+};
+
+/** Mục "Sắp có" thêm vào mục con phòng ban của Admin (domain.adminDeptBusiness). */
+const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, (base: string) => Item[]>> = {
+  chan_nuoi_thuy_san: (b) => [soon("admin.pb.cnts_danh_muc", "Danh mục CNTS", `${b}/danh-muc-cnts`, "catalog")],
+  ke_hoach_tai_chinh: (b) => [soon("admin.pb.khtc_ke_hoach", "Kế hoạch năm", `${b}/ke-hoach-nam`, "calendar")],
+  thong_tin_truyen_thong: (b) => [soon("admin.pb.bao_gia_cau_hinh", "Xã báo giá & mặt hàng", `${b}/bao-gia-cau-hinh`, "param")],
+  hanh_chinh_tong_hop: (b) => [
+    soon("admin.pb.hcth_phan_quyen", "Phân quyền hồ sơ", `${b}/phan-quyen-ho-so`, "shield"),
+    soon("admin.pb.hcth_thu_muc", "Thư mục tài liệu", `${b}/thu-muc-tai-lieu`, "library"),
+  ],
+};
+
+/** Nhóm của khuôn × đối tượng (domain.DepartmentMenu): Trồng trọt; khuôn riêng = chung + "Nghiệp vụ" sau "Điều hành". */
+function profileGroups(profile: KnMenuProfile, audience: Exclude<KnRole, "admin">): Group[] {
+  if (profile === "trong_trot") return TRONG_TROT[audience];
+  const biz = BUSINESS[profile]?.[audience] ?? [];
+  return GENERIC[audience].flatMap((g) => (g.key === "dieu_hanh" && biz.length ? [g, { key: "nghiep_vu", label: "Nghiệp vụ", items: biz }] : [g]));
+}
+
+/** Mục con của phòng ban trong nhóm "Phòng ban" của Admin (domain.adminDeptItems + adminDeptBusiness). */
+function adminDeptItems(code: string, profile: KnMenuProfile): Item[] {
   const base = `/kn/phong-ban/${code}`;
   return [
     { key: "admin.pb.theo_doi_nop", label: "Theo dõi nộp báo cáo", route: `${base}/theo-doi-nop`, icon: "bell" },
@@ -167,6 +312,7 @@ function adminDeptItems(code: string, profile: "trong_trot" | "generic"): Item[]
     { key: "admin.pb.danh_muc", label: "Danh mục nông nghiệp", route: `${base}/danh-muc`, icon: "package" },
     // P3b: trình thiết kế mẫu báo cáo dạng lưới Excel (FN-AD-04.06, Hình 27).
     { key: "admin.pb.mau_bao_cao", label: "Mẫu báo cáo", route: `${base}/mau-bao-cao`, icon: "table" },
+    ...(ADMIN_BUSINESS[profile]?.(base) ?? []),
   ];
 }
 
@@ -216,12 +362,13 @@ function wire(items: readonly Item[], enabled: boolean, adHoc: boolean): KnMenuI
     if (it.adHoc && !adHoc) continue;
     const children = wire(it.children ?? [], enabled, adHoc);
     if (it.children?.length && !children.length) continue;
-    out.push({ key: it.key, label: it.label, route: it.route ?? null, icon: it.icon, badge_source: it.badge ?? null, enabled, children });
+    const base: KnMenuItem = { key: it.key, label: it.label, route: it.route ?? null, icon: it.icon, badge_source: it.badge ?? null, enabled, children };
+    out.push(it.soon ? { ...base, enabled: false, status: "coming_soon", status_label: "Sắp có" } : base);
   }
   return out;
 }
 
-const profileOf = (code: string) => KN_MENU_PROFILE[code] ?? "generic";
+const profileOf = (code: string): KnMenuProfile => KN_MENU_PROFILE[code] ?? "generic";
 const deptWire = (d: DepartmentRef): NonNullable<KnMenu["department"]> => ({ code: d.code, name: d.name, status: d.status, menu_profile: profileOf(d.code) });
 
 function adminDeptItem(d: DepartmentRef): KnMenuItem {
@@ -241,7 +388,7 @@ function adminDeptItem(d: DepartmentRef): KnMenuItem {
 
 /**
  * KNMenu trên dây (= Go app.DepartmentMenu / app.AdminMenu). Admin: Điều hành / Phòng ban (mọi phòng ban, chưa mở
- * enabled = false) / Quản trị hệ thống. Chỉ bộ Trồng trọt có ở giả lập (phòng ban khác chưa mở → 409 ở handler).
+ * enabled = false) / Quản trị hệ thống / Dùng chung (kn.menu/v3). Phòng ban chưa mở → 409 ở handler.
  */
 export function knMenu(audience: KnRole, departmentCode: string | null, opts: { adHoc?: boolean; orgRef?: string | null } = {}): KnMenu {
   if (audience === "admin") {
@@ -249,12 +396,13 @@ export function knMenu(audience: KnRole, departmentCode: string | null, opts: { 
       { key: ADMIN_OVERVIEW.key, label: ADMIN_OVERVIEW.label, items: wire(ADMIN_OVERVIEW.items, true, false) },
       { key: "phong_ban", label: "Phòng ban", items: KN_DEPARTMENTS.map(adminDeptItem) },
       { key: ADMIN_SYSTEM.key, label: ADMIN_SYSTEM.label, items: wire(ADMIN_SYSTEM.items, true, false) },
+      { key: SHARED.key, label: SHARED.label, items: wire(SHARED.items, true, false) },
     ];
     return { menu_version: MENU_VERSION, audience, org_ref: opts.orgRef ?? null, department: null, default_route: DEFAULT_ROUTE.admin, groups };
   }
   const d = KN_DEPARTMENTS.find((x) => x.code === (departmentCode ?? "trong_trot")) ?? KN_DEPARTMENTS[0]!;
   const adHoc = opts.adHoc ?? ADHOC_FORMS[d.code] ?? false;
-  const groups = TRONG_TROT[audience]
+  const groups = [...profileGroups(profileOf(d.code), audience), SHARED]
     .map((g) => ({ key: g.key, label: g.label, items: wire(g.items, true, adHoc) }))
     .filter((g) => g.items.length > 0);
   return { menu_version: MENU_VERSION, audience, org_ref: opts.orgRef ?? null, department: deptWire(d), default_route: DEFAULT_ROUTE[audience], groups };
@@ -421,7 +569,7 @@ export const knAppRoutes: Route[] = [
       const q = menuQuery(request, url);
       if (q instanceof Response) return q;
       if (q.audience === "admin") return json(knMenu("admin", null, { orgRef: q.orgRef }), 200, NO_STORE);
-      const d = q.department ? KN_DEPARTMENTS.find((x) => x.code === q.department) : KN_DEPARTMENTS.find((x) => x.status === "active");
+      const d = q.department ? findKnDepartment(q.department) : KN_DEPARTMENTS.find((x) => x.status === "active");
       if (!d) return problem(404, "party.department_not_found", "Department not found");
       if (d.status !== "active") return problem(409, "party.department_not_open", "Department not open");
       return json(knMenu(q.audience, d.code, { orgRef: q.orgRef }), 200, NO_STORE);
@@ -433,14 +581,14 @@ export const knAppRoutes: Route[] = [
     handler: ({ params, request, url }) => {
       const q = menuQuery(request, url, params[0] ?? "");
       if (q instanceof Response) return q;
-      const code = params[0] ?? "";
-      const d = KN_DEPARTMENTS.find((x) => x.code === code);
+      const d = findKnDepartment(params[0] ?? "");
       if (!d) return problem(404, "party.department_not_found", "Department not found");
+      const code = d.code;
       if (q.audience === "admin") {
         // Admin: nhóm của MỘT phòng ban (kể cả chưa mở — mục con enabled = false), như app.DepartmentModules.
         const item = knMenu("admin", null).groups.find((g) => g.key === "phong_ban")!.items.find((i) => i.key === `phong_ban.${code}`)!;
         return json(
-          { menu_version: MENU_VERSION, audience: "admin", org_ref: q.orgRef, department: { code: d.code, name: d.name, status: d.status, menu_profile: KN_MENU_PROFILE[d.code] ?? "generic" },
+          { menu_version: MENU_VERSION, audience: "admin", org_ref: q.orgRef, department: { code: d.code, name: d.name, status: d.status, menu_profile: profileOf(d.code) },
             default_route: DEFAULT_ROUTE.admin, groups: [{ key: item.key, label: d.name, items: item.children }] } satisfies KnMenu,
           200,
           NO_STORE,

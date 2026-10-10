@@ -204,7 +204,7 @@ Map<String, Object?> assignment(
 };
 
 Map<String, Object?> menuJson() => {
-  'menu_version': 'kn.menu/v2',
+  'menu_version': 'kn.menu/v3',
   'audience': 'kn_xa',
   'org_ref': null,
   'department': null,
@@ -264,6 +264,24 @@ Map<String, Object?> menuJson() => {
           'icon': 'x',
           'badge_source': null,
           'enabled': true,
+          'children': <Object?>[],
+        },
+      ],
+    },
+    // kn.menu/v3 (W11.06): nhóm "Dùng chung" — Contact "Sắp có".
+    {
+      'key': 'dung_chung',
+      'label': 'Dùng chung',
+      'items': [
+        {
+          'key': 'chung.contact',
+          'label': 'Contact',
+          'route': '/kn/dung-chung/contact',
+          'icon': 'phone',
+          'badge_source': null,
+          'enabled': false,
+          'status': 'coming_soon',
+          'status_label': 'Sắp có',
           'children': <Object?>[],
         },
       ],

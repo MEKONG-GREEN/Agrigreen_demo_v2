@@ -170,7 +170,14 @@ void main() {
         KnMenuKey.congViec,
         KnMenuKey.lichCongTac,
         KnMenuKey.htx,
+        'chung.contact',
       ]);
+      // kn.menu/v3: mục "Sắp có" (nhóm Dùng chung) giữ lại, không bấm được.
+      final contact = online.entries.last;
+      expect(contact.group, 'Dùng chung');
+      expect(contact.comingSoon, isTrue);
+      expect(contact.enabled, isFalse);
+      expect(online.version, 'kn.menu/v3');
       expect((await menu.badges())[knBadgeTasksTodo], 3);
       kn.offline = true;
       final cached = await menu.load();

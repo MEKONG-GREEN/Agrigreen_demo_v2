@@ -317,7 +317,7 @@ export interface paths {
         };
         /**
          * UR-KT-02: cây module (menu) của một phòng ban cho vai KN — bật phòng ban không cần phát hành lại web/app
-         * @description Dựng từ bảng menu tĩnh có phiên bản (kn.menu/v2) và trạng thái phòng ban hiện hành ở MỖI request (Cache-Control: no-store).
+         * @description Dựng từ bảng menu tĩnh có phiên bản (kn.menu/v3: khuôn theo phòng ban + nhóm "Dùng chung" cuối mọi menu; mục module chưa có hiện "Sắp có", enabled = false, status coming_soon) và trạng thái phòng ban hiện hành ở MỖI request (Cache-Control: no-store).
          *     audience vắng: theo ngữ cảnh phiên (P1) hoặc vai duy nhất của người gọi. platform_admin xem được mọi cấp (FN-AD-04.07).
          *     audience = admin: mục con của phòng ban trong nhóm "Phòng ban" (enabled = false khi chưa mở).
          */
@@ -3068,7 +3068,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Số đếm menu việc cần xử lý của ngữ cảnh (badge_source của menu kn.menu/v2) */
+        /** Số đếm menu việc cần xử lý của ngữ cảnh (badge_source của menu kn.menu/v3) */
         get: operations["rcBadges"];
         put?: never;
         post?: never;
@@ -5709,10 +5709,10 @@ export interface components {
             status: "active" | "not_open" | "suspended";
             status_label: string;
             /**
-             * @description Bộ menu dựng sẵn trong mã (kn.menu/v2)
+             * @description Bộ menu dựng sẵn trong mã (kn.menu/v3); generic + mã có khuôn riêng → khuôn riêng
              * @enum {string}
              */
-            menu_profile: "trong_trot" | "generic";
+            menu_profile: "trong_trot" | "generic" | "chan_nuoi_thuy_san" | "ke_hoach_tai_chinh" | "thong_tin_truyen_thong" | "hanh_chinh_tong_hop";
             /** @description Đã xóa (sự kiện retired) — mã không tái sử dụng */
             retired: boolean;
             /** @description Chọn được ở bước 2 đăng nhập (Đang áp dụng, chưa xóa) */
@@ -5784,18 +5784,18 @@ export interface components {
             icon: string;
             /** @description Khóa số đếm việc cần xử lý (ẩn khi 0) — client lấy số từ module sở hữu */
             badge_source: string | null;
-            /** @description false: hiện mờ (phòng ban chưa mở trong menu Admin) */
+            /** @description false: hiện mờ, không bấm được (phòng ban chưa mở trong menu Admin; mục "Sắp có") */
             enabled: boolean;
             /**
-             * @description Chỉ mục phòng ban của menu Admin
+             * @description Mục phòng ban của menu Admin (active/not_open/suspended); coming_soon: mục của module chưa có — nhãn "Sắp có" (kn.menu/v3)
              * @enum {string}
              */
-            status?: "active" | "not_open" | "suspended";
+            status?: "active" | "not_open" | "suspended" | "coming_soon";
             status_label?: string;
             children: components["schemas"]["KNMenuItem"][];
         };
         KNMenuGroup: {
-            /** @description dieu_hanh | bao_cao | du_lieu; Admin: dieu_hanh | phong_ban | quan_tri */
+            /** @description dieu_hanh | nghiep_vu | bao_cao | du_lieu | dung_chung; Admin: dieu_hanh | phong_ban | quan_tri | dung_chung */
             key: string;
             label: string;
             items: components["schemas"]["KNMenuItem"][];
@@ -5816,7 +5816,7 @@ export interface components {
             updated_at: string | null;
         };
         KNMenu: {
-            /** @description Phiên bản bảng menu tĩnh (kn.menu/v2) */
+            /** @description Phiên bản bảng menu tĩnh (kn.menu/v3) */
             menu_version: string;
             /** @enum {string} */
             audience: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";

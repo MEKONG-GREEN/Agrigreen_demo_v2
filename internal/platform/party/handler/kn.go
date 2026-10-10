@@ -329,7 +329,8 @@ func (h KN) seedDepartments(c *gin.Context) {
 	for _, d := range res.Created {
 		items = append(items, toDepartmentDTO(d, nil))
 	}
-	c.JSON(http.StatusOK, gin.H{"created": items, "existing": res.Existing, "status": res.Status})
+	c.JSON(http.StatusOK, gin.H{"created": items, "existing": res.Existing, "status": res.Status,
+		"legacy_retired": res.LegacyRetired, "legacy_kept": res.LegacyKept})
 }
 
 // ---------------------------------------------------------------------------

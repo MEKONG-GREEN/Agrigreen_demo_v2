@@ -3277,7 +3277,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Nạp 6 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng) — TẠM, chờ khách Q-02; chạy lặp an toàn */
+        /** Nạp 5 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng; W11.06, chờ khách Q-051); xóa mã tạm phong_ban_5/6 chưa dùng; chạy lặp an toàn */
         post: operations["knSeedDepartments"];
         delete?: never;
         options?: never;
@@ -5543,10 +5543,10 @@ export interface components {
             status: "active" | "not_open" | "suspended";
             status_label: string;
             /**
-             * @description Bộ menu dựng sẵn trong mã (kn.menu/v2)
+             * @description Bộ menu dựng sẵn trong mã (kn.menu/v3); generic + mã có khuôn riêng → khuôn riêng
              * @enum {string}
              */
-            menu_profile: "trong_trot" | "generic";
+            menu_profile: "trong_trot" | "generic" | "chan_nuoi_thuy_san" | "ke_hoach_tai_chinh" | "thong_tin_truyen_thong" | "hanh_chinh_tong_hop";
             /** @description Đã xóa (sự kiện retired) — mã không tái sử dụng */
             retired: boolean;
             /** @description Chọn được ở bước 2 đăng nhập (Đang áp dụng, chưa xóa) */
@@ -12854,6 +12854,10 @@ export interface operations {
                         created: components["schemas"]["KNDepartment"][];
                         existing: number;
                         status: string;
+                        /** @description Mã tạm (phong_ban_5/6) đã xóa trong lần nạp này — chưa mở, không có tài khoản/dữ liệu */
+                        legacy_retired: string[];
+                        /** @description Mã tạm còn giữ (đang áp dụng, có tài khoản/dữ liệu hoặc chưa nối nguồn đếm) — Admin xử lý; tra cứu mã cũ vẫn trả dòng này */
+                        legacy_kept: string[];
                     };
                 };
             };

@@ -11,11 +11,13 @@ import { rowKeyOf } from "@/kn/grid/model";
 import type { FormDefinition, FormLogEntry, FormVersion } from "./types";
 import { REPORT_TYPE_LABEL, VERSION_STATUS_LABEL, type FormReportType } from "./types";
 
-/** Tên phòng ban hiển thị (tạm theo mã P2; Q-02 chờ khách). */
+/** Tên phòng ban hiển thị (theo mã seed P2, W11.06; Q-051 chờ khách). */
 const DEPT_NAMES: Record<string, string> = {
   trong_trot: "Phòng Trồng trọt",
   chan_nuoi_thuy_san: "Phòng Chăn nuôi - Thủy sản",
   ke_hoach_tai_chinh: "Phòng Kế hoạch - Tài chính",
+  thong_tin_truyen_thong: "Phòng Thông tin Tuyên truyền",
+  hanh_chinh_tong_hop: "Phòng Hành chính - Tổng hợp",
 };
 
 export function deptName(code: string): string {

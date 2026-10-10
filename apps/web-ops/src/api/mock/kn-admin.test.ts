@@ -119,7 +119,7 @@ describe("quản trị KN giả lập", () => {
     const adminCtx = await contextOf("kn-admin", "asg-admin", null);
     const adm = createKnAdminApi(opts("kn-admin", () => adminCtx, true));
     const depts = (await adm.departments()).items;
-    expect(depts).toHaveLength(6);
+    expect(depts).toHaveLength(5); // W11.06: 5 phòng ban seed
     const cn = depts.find((d) => d.code === "chan_nuoi_thuy_san")!;
     expect(await code(adm.departmentStatus(cn.id, "suspended"))).toBe("422 validation_failed");
     const r = await adm.departmentStatus(cn.id, "active");

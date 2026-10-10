@@ -5,8 +5,14 @@ package domain
 // lại — bật một phòng ban ("Đang áp dụng") hiện menu ngay, không phát hành lại ứng dụng.
 //
 //   - Mỗi phòng ban chọn một bộ menu (menu_profile): "trong_trot" (Phòng Trồng trọt, đủ 25 FN của
-//     module) hoặc "generic" (phòng ban mới mở bằng cấu hình danh mục + mẫu báo cáo — chỉ khung chung
-//     Phát hành/Nộp/Rà soát/Tổng hợp/Báo cáo theo loại kỳ).
+//     module), "generic" (phòng ban mới mở bằng cấu hình danh mục + mẫu báo cáo — chỉ khung chung
+//     Phát hành/Nộp/Rà soát/Tổng hợp/Báo cáo theo loại kỳ), hoặc từ kn.menu/v3 (W11.06) một khuôn riêng
+//     của phòng ban: chan_nuoi_thuy_san, ke_hoach_tai_chinh, thong_tin_truyen_thong, hanh_chinh_tong_hop
+//     = khung chung + nhóm "Nghiệp vụ" của phòng (BRD CNTS v3.7, KHTC v2.2, Báo giá v1.3, HCTH v3.0 §VI.3).
+//     Phòng ban cũ còn menu_profile "generic" mà mã có khuôn riêng → dùng khuôn riêng (EffectiveMenuProfile).
+//   - kn.menu/v3: mục có ComingSoon (module chưa có) hiện mờ nhãn "Sắp có", không bấm được (W11.06 chọn
+//     "hiện Sắp có" thay vì ẩn sau cờ — người dùng thấy lộ trình, không cần bật cờ khi module tới; gói của
+//     module bỏ ComingSoon khi màn sẵn sàng). Mọi đối tượng có nhóm cuối "Dùng chung" (Contact, HCTH FN-13).
 //   - HỢP ĐỒNG ĐƯỜNG DẪN (KN-fix — một hợp đồng chung Go ↔ web-ops ↔ bản giả lập): đường dẫn là trang
 //     của web-ops. Vai + phòng ban của vai KN nằm trong NGỮ CẢNH PHIÊN (P1, header X-AG-Context), KHÔNG
 //     nằm trong URL: "/kn/<màn>" (vd /kn/nhiem-vu/lich-cong-tac cho cả Cấp Tỉnh và Cấp Xã — màn đọc vai
@@ -31,7 +37,7 @@ import (
 )
 
 // MenuVersion là phiên bản của bảng menu tĩnh.
-const MenuVersion = "kn.menu/v2"
+const MenuVersion = "kn.menu/v3"
 
 // Mã loại báo cáo của danh mục report_type (pf/masterdata) mà menu tham chiếu.
 const ReportTypeAdHoc = "dot_xuat"
@@ -56,8 +62,15 @@ type MenuItem struct {
 	Icon        string
 	BadgeSource string
 	Requires    *MenuRequirement
+	ComingSoon  bool // module chưa có: hiện mờ "Sắp có" (kn.menu/v3)
 	Children    []MenuItem
 }
+
+// Trạng thái mục menu "Sắp có" (kn.menu/v3; MenuItemView.Status).
+const (
+	ItemComingSoon      = "coming_soon"
+	ItemComingSoonLabel = "Sắp có"
+)
 
 // MenuGroup là một nhóm sidebar (Điều hành / Báo cáo / Dữ liệu; Admin: Điều hành / Phòng ban /
 // Quản trị hệ thống).
@@ -249,9 +262,17 @@ var defaultRoutes = map[string]string{
 }
 
 var profiles = map[string]map[string][]MenuGroup{
-	port.MenuProfileTrongTrot: trongTrotMenus,
-	port.MenuProfileGeneric:   genericMenus,
+	port.MenuProfileTrongTrot:           trongTrotMenus,
+	port.MenuProfileGeneric:             genericMenus,
+	port.MenuProfileChanNuoiThuySan:     withBusiness(port.MenuProfileChanNuoiThuySan),
+	port.MenuProfileKeHoachTaiChinh:     withBusiness(port.MenuProfileKeHoachTaiChinh),
+	port.MenuProfileThongTinTuyenTruyen: withBusiness(port.MenuProfileThongTinTuyenTruyen),
+	port.MenuProfileHanhChinhTongHop:    withBusiness(port.MenuProfileHanhChinhTongHop),
 }
+
+// MenuProfiles là mọi bộ menu có trong mã (thứ tự cố định — OpenAPI enum menu_profile).
+var MenuProfiles = []string{port.MenuProfileTrongTrot, port.MenuProfileGeneric, port.MenuProfileChanNuoiThuySan,
+	port.MenuProfileKeHoachTaiChinh, port.MenuProfileThongTinTuyenTruyen, port.MenuProfileHanhChinhTongHop}
 
 // KnownMenuProfile cho biết p là bộ menu có trong mã.
 func KnownMenuProfile(p string) bool { _, ok := profiles[p]; return ok }
@@ -260,21 +281,29 @@ func KnownMenuProfile(p string) bool { _, ok := profiles[p]; return ok }
 func KnownAudience(a string) bool { return slices.Contains(port.Audiences, a) }
 
 // DepartmentMenu trả nhóm menu của đối tượng (kn_tw/kn_tinh/kn_xa) cho phòng ban dùng bộ profile
-// ("{department}" nếu có thì thay bằng mã). Bản sao sâu — người gọi được lọc/sửa.
+// ("{department}" nếu có thì thay bằng mã), kết thúc bằng nhóm "Dùng chung" (kn.menu/v3). Bản sao sâu —
+// người gọi được lọc/sửa.
 func DepartmentMenu(profile, audience, department string) []MenuGroup {
-	groups := profiles[profile][audience]
-	out := make([]MenuGroup, 0, len(groups))
+	groups := profiles[EffectiveMenuProfile(profile, department)][audience]
+	out := make([]MenuGroup, 0, len(groups)+1)
 	for _, g := range groups {
 		out = append(out, MenuGroup{Key: g.Key, Label: g.Label, Items: bind(g.Items, department)})
 	}
-	return out
+	return append(out, SharedMenuGroup())
 }
 
-// AdminDepartmentItems trả mục con của một phòng ban trong nhóm "Phòng ban" của Admin.
+// SharedMenuGroup trả bản sao nhóm "Dùng chung" (cuối menu mọi đối tượng, kể cả Admin).
+func SharedMenuGroup() MenuGroup {
+	return MenuGroup{Key: SharedGroup.Key, Label: SharedGroup.Label, Items: bind(SharedGroup.Items, "")}
+}
+
+// AdminDepartmentItems trả mục con của một phòng ban trong nhóm "Phòng ban" của Admin: Trồng trọt có bộ
+// riêng; phòng ban khác dùng bộ chung + mục "Sắp có" của khuôn riêng (kn.menu/v3).
 func AdminDepartmentItems(profile, department string) []MenuItem {
+	profile = EffectiveMenuProfile(profile, department)
 	items, ok := adminDeptItems[profile]
 	if !ok {
-		items = adminDeptItems[port.MenuProfileGeneric]
+		items = append(slices.Clone(adminDeptItems[port.MenuProfileGeneric]), adminDeptBusiness[profile]...)
 	}
 	return bind(items, department)
 }

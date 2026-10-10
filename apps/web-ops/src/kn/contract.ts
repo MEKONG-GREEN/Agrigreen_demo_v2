@@ -112,8 +112,11 @@ export interface MenuNode {
   children?: MenuNode[];
   /** Khóa nguồn số đếm (vd "extension.report_tasks.todo"); chỉ đặt cho việc cần xử lý. */
   badge_source?: string;
-  /** "not_open": phòng ban chưa mở — hiện mờ, nhãn "Chưa mở", không bấm được. */
-  status?: "active" | "not_open";
+  /**
+   * "not_open": phòng ban chưa mở — hiện mờ, nhãn "Chưa mở", không bấm được.
+   * "coming_soon": mục của module chưa có (kn.menu/v3) — hiện mờ, nhãn "Sắp có", không bấm được.
+   */
+  status?: "active" | "not_open" | "coming_soon";
 }
 
 export interface MenuGroup {

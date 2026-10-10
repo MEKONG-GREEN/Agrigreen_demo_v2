@@ -22,14 +22,17 @@ export interface MenuLink {
   group: MenuGroup;
 }
 
+/** Lá bấm được: có href, không "Chưa mở" / "Sắp có" (kn.menu/v3). */
+const usable = (n: MenuNode): boolean => !!n.href && n.status !== "not_open" && n.status !== "coming_soon";
+
 /** Mọi liên kết (lá có href) theo thứ tự hiển thị. */
 export function menuLinks(tree: MenuTree): MenuLink[] {
   const out: MenuLink[] = [];
   for (const group of tree.groups) {
     for (const item of group.items) {
       if (item.children?.length) {
-        for (const c of item.children) if (c.href && c.status !== "not_open") out.push({ node: c, parent: item, group });
-      } else if (item.href && item.status !== "not_open") out.push({ node: item, parent: null, group });
+        for (const c of item.children) if (usable(c)) out.push({ node: c, parent: item, group });
+      } else if (usable(item)) out.push({ node: item, parent: null, group });
     }
   }
   return out;

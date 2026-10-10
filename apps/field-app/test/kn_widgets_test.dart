@@ -204,6 +204,13 @@ void main() {
       expect(find.text('Mục lạ'), findsNothing);
       expect(find.text('Lịch công tác'), findsOneWidget);
       expect(find.text('3'), findsOneWidget);
+      // kn.menu/v3: nhóm "Dùng chung", Contact "Sắp có" (không bấm được).
+      expect(find.text('Dùng chung'), findsOneWidget);
+      expect(find.text('Sắp có'), findsOneWidget);
+      final contact = tester.widget<ListTile>(
+        find.byKey(const ValueKey('kn-menu-chung.contact')),
+      );
+      expect(contact.enabled, isFalse);
       await _finish(tester, env);
     },
   );
