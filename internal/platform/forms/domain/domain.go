@@ -1,6 +1,7 @@
 // Package domain là quy tắc thuần của pf/forms (`cap/forms`, không I/O, không time.Now — R-12, không float — R-10):
 // cấu hình bên dùng, định nghĩa trường biểu, kiểm số liệu nộp, máy trạng thái kỳ và bài nộp, nội dung ảnh chụp
-// đóng băng. Cùng bất biến được DB kiểm lại (pf 000121: trg_transition, trg_bind_period, review_four_eyes).
+// đóng băng. Cùng bất biến được DB kiểm lại (pf 000121: trg_transition, trg_bind_period, review_four_eyes; pf 000142:
+// trg_bind_spec, trg_submission_limit, trg_bind_held, hủy kỳ trong trg_transition).
 package domain
 
 import (
@@ -17,8 +18,10 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 )
 
-// RuleVersion là phiên bản quy tắc ghi vào sổ (rule_version) và vào ảnh chụp.
-const RuleVersion = "forms-2026.10"
+// RuleVersion là phiên bản quy tắc ghi vào sổ (rule_version) và vào ảnh chụp. forms-2026.11 (W11.05): đặc tả kỳ
+// (loại đơn vị lá, giới hạn lần gửi), hủy kỳ, bài giữ "Chờ mở kỳ"; ảnh chụp ghi trạng thái lúc chốt (Không nộp, Đã
+// chốt – chưa điều chỉnh — trường closed_status, status giữ trạng thái bài nộp như W6.2). Dòng cũ giữ forms-2026.10.
+const RuleVersion = "forms-2026.11"
 
 // SnapshotSchema là định dạng nội dung ảnh chụp native.
 const SnapshotSchema = "pf.forms.snapshot/v1"
@@ -64,7 +67,110 @@ func ValidateProfile(p port.Profile) error {
 	if len(p.DefineBy) == 0 {
 		return fmt.Errorf("profile %s: define_by bắt buộc", p.Name)
 	}
+	for i, k := range p.UnitKinds {
+		if !slices.Contains(SupportedUnitKinds, k) || slices.Contains(p.UnitKinds[:i], k) {
+			return fmt.Errorf("profile %s: loại đơn vị %q không hỗ trợ hoặc trùng (%s)", p.Name, k, strings.Join(SupportedUnitKinds, " | "))
+		}
+	}
+	if p.MaxSubmissions < 0 || p.MaxSubmissions > MaxSubmissionsCap {
+		return fmt.Errorf("profile %s: max_submissions 0–%d", p.Name, MaxSubmissionsCap)
+	}
+	for i, d := range p.Departments {
+		if !reKey.MatchString(d) || slices.Contains(p.Departments[:i], d) {
+			return fmt.Errorf("profile %s: phòng ban %q không hợp lệ hoặc trùng", p.Name, d)
+		}
+	}
 	return nil
+}
+
+// SupportedUnitKinds là loại đơn vị lá đã hỗ trợ (khớp CHECK pf_forms.period_spec.unit_kind, pf 000142).
+// port.UnitPerson (HCTH) chưa có.
+var SupportedUnitKinds = []string{port.UnitCommune, port.UnitFacility, port.UnitHousehold, port.UnitDepartment}
+
+// MaxSubmissionsCap là trần của giới hạn số lần gửi (khớp CHECK max_submissions BETWEEN 1 AND 20).
+const MaxSubmissionsCap = 20
+
+// Spec là đặc tả kỳ native (sổ phụ pf_forms.period_spec). Kỳ không có dòng đặc tả (phát hành trước W11.05) dùng
+// DefaultSpec.
+type Spec struct {
+	UnitKind       string
+	UnitParents    []string // song song với danh sách đơn vị (cơ sở/hộ → mã xã); rỗng với xã/phòng ban
+	MaxSubmissions int      // 0 = không giới hạn
+	ReviewFlow     string   // port.ReviewFlowSingle
+	// Khóa kỳ theo lịch kỳ hệ thống (W11.03 Span/Period): loại kỳ, khóa ("2026-W41", "2026-10-K2", "2026-Q4"…),
+	// khoảng ngày, thẻ quy tắc chia kỳ. Rỗng = kỳ không gắn lịch.
+	PeriodKind, PeriodKey string
+	From, To              *time.Time
+	PeriodRule            string
+}
+
+// DefaultSpec là đặc tả của kỳ không có dòng period_spec: xã, không giới hạn, một bước rà soát.
+func DefaultSpec() Spec { return Spec{UnitKind: port.UnitCommune, ReviewFlow: port.ReviewFlowSingle} }
+
+// PeriodKinds là loại kỳ của lịch kỳ hệ thống (khớp extension/reportcycle/domain và CHECK period_kind).
+var PeriodKinds = []string{"day", "week", "ksgm_week", "month", "quarter", "season", "year", "adhoc"}
+
+var rePeriodKey = regexp.MustCompile(`^[0-9A-Za-z-]{1,20}$`)
+
+// ValidateSpec kiểm đặc tả kỳ khi phát hành: loại đơn vị thuộc profile; đơn vị cha song song với đơn vị (bắt buộc
+// với cơ sở/hộ, cấm với xã/phòng ban); phòng ban đúng dạng mã; giới hạn 0–20; khóa kỳ cần loại kỳ.
+func ValidateSpec(kinds, units []string, s Spec) error {
+	if !slices.Contains(kinds, s.UnitKind) {
+		return ErrTemplate{"unit_kind", strings.Join(kinds, " | ")}
+	}
+	switch s.UnitKind {
+	case port.UnitFacility, port.UnitHousehold:
+		if len(s.UnitParents) != len(units) {
+			return ErrTemplate{"unit_parents", "cần mã xã cha cho từng đơn vị"}
+		}
+		for _, p := range s.UnitParents {
+			if !reUnit.MatchString(p) {
+				return ErrTemplate{"unit_parents", "mã xã cha không hợp lệ: " + p}
+			}
+		}
+	default:
+		if len(s.UnitParents) != 0 {
+			return ErrTemplate{"unit_parents", "chỉ dùng với cơ sở/hộ"}
+		}
+	}
+	if s.UnitKind == port.UnitDepartment {
+		for _, u := range units {
+			if !reKey.MatchString(u) {
+				return ErrTemplate{"units", "mã phòng ban dạng [a-z][a-z0-9_]*: " + u}
+			}
+		}
+	}
+	if s.MaxSubmissions < 0 || s.MaxSubmissions > MaxSubmissionsCap {
+		return ErrTemplate{"max_submissions", fmt.Sprintf("0–%d (0 = không giới hạn)", MaxSubmissionsCap)}
+	}
+	if s.PeriodKind != "" && !slices.Contains(PeriodKinds, s.PeriodKind) {
+		return ErrTemplate{"period.kind", strings.Join(PeriodKinds, " | ")}
+	}
+	if s.PeriodKey != "" && (s.PeriodKind == "" || !rePeriodKey.MatchString(s.PeriodKey)) {
+		return ErrTemplate{"period.key", "cần loại kỳ; dạng [0-9A-Za-z-]{1,20}"}
+	}
+	if (s.From == nil) != (s.To == nil) || (s.From != nil && s.To.Before(*s.From)) {
+		return ErrTemplate{"period.to", "from/to đi cùng nhau, to ≥ from"}
+	}
+	if n := utf8.RuneCountInString(s.PeriodRule); n > 200 {
+		return ErrTemplate{"period.rule", "tối đa 200 ký tự"}
+	}
+	return nil
+}
+
+// Parent trả đơn vị dùng để lọc phạm vi của đơn vị u thuộc danh sách units: cơ sở/hộ → mã xã cha; khác → chính u.
+func (s Spec) Parent(units []string, u string) string {
+	if len(s.UnitParents) == len(units) && len(units) > 0 {
+		if i := slices.Index(units, u); i >= 0 {
+			return s.UnitParents[i]
+		}
+	}
+	return u
+}
+
+// LimitReached cho biết đơn vị đã gửi đủ số lần tối đa (versions = số phiên bản đã gửi).
+func (s Spec) LimitReached(versions int64) bool {
+	return s.MaxSubmissions > 0 && versions >= int64(s.MaxSubmissions)
 }
 
 // Kiểu trường biểu.
@@ -197,16 +303,17 @@ func Reason(s string) (string, bool) {
 
 // Trạng thái kỳ (phép chiếu sự kiện cuối).
 const (
-	PeriodOpen     = "open"
-	PeriodClosed   = "closed"
-	PeriodReopened = "reopened"
+	PeriodOpen      = "open"
+	PeriodClosed    = "closed"
+	PeriodReopened  = "reopened"
+	PeriodCancelled = "cancelled" // Đã hủy (KHTC BR-DL-18) — trạng thái cuối
 )
 
 // Event là một sự kiện kỳ đã ghi.
 type Event struct {
 	ID     uuid.UUID
 	Seq    int64
-	Action string // published | closed | reopened
+	Action string // published | closed | reopened | cancelled
 	Mode   string
 	Units  []string
 	Reason string
@@ -216,10 +323,11 @@ type Event struct {
 
 // PeriodState là trạng thái kỳ suy từ sổ sự kiện (đã sắp theo seq).
 type PeriodState struct {
-	Status      string   // open | closed | reopened
+	Status      string   // open | closed | reopened | cancelled
 	ReopenUnits []string // reopened: phạm vi (rỗng = cả kỳ)
 	ReopenedAt  *time.Time
-	Closes      int // số lần chốt
+	ClosedAt    *time.Time // lần chốt cuối
+	Closes      int        // số lần chốt
 }
 
 // StateOf chiếu trạng thái kỳ từ các sự kiện.
@@ -230,8 +338,11 @@ func StateOf(evs []Event) PeriodState {
 		case "published":
 			s.Status = PeriodOpen
 		case "closed":
-			s.Status, s.ReopenUnits = PeriodClosed, nil
+			at := e.At
+			s.Status, s.ReopenUnits, s.ClosedAt = PeriodClosed, nil, &at
 			s.Closes++
+		case "cancelled":
+			s.Status, s.ReopenUnits = PeriodCancelled, nil
 		case "reopened":
 			at := e.At
 			s.Status, s.ReopenUnits, s.ReopenedAt = PeriodReopened, e.Units, &at
@@ -258,6 +369,43 @@ const (
 	SubAccepted  = "accepted"
 	SubReturned  = "returned"
 )
+
+// Trạng thái hiển thị khi kỳ đã chốt với đơn vị (W11.05, CNTS III.3.0 dòng 10, 11, 13; KHTC "Không gửi") — phép
+// chiếu lúc đọc và nội dung ảnh chụp, không ghi sổ.
+const (
+	SubMissed           = "missed"            // Không nộp: chốt khi chưa gửi lần nào (tính 0)
+	SubClosedUnadjusted = "closed_unadjusted" // Đã chốt – chưa điều chỉnh: chốt khi đang bị trả lại (giữ số đã nộp)
+	SubAwaitingReopen   = "awaiting_reopen"   // Chờ mở kỳ: có bài đến sau lần chốt cuối (bản offline)
+)
+
+// ClosedFor cho biết kỳ đã chốt với đơn vị u (chốt, hoặc mở lại một phần không gồm u). Kỳ hủy không tính.
+func (s PeriodState) ClosedFor(u string) bool {
+	return (s.Status == PeriodClosed || s.Status == PeriodReopened) && !s.AcceptsUnit(u)
+}
+
+// UnitStatus là trạng thái hiển thị của đơn vị u: base (SubmissionStatus) khi kỳ còn nhận bài của u; khi kỳ đã chốt
+// với u — Chờ mở kỳ nếu có bài giữ sau lần chốt cuối (heldAt), Không nộp nếu chưa gửi, Đã chốt – chưa điều chỉnh nếu
+// đang bị trả lại, còn lại giữ base.
+func UnitStatus(base string, st PeriodState, u string, heldAt *time.Time) string {
+	if !st.ClosedFor(u) {
+		return base
+	}
+	if heldAt != nil && (st.ClosedAt == nil || heldAt.After(*st.ClosedAt)) {
+		return SubAwaitingReopen
+	}
+	return ClosedStatus(base)
+}
+
+// ClosedStatus đổi trạng thái bài nộp lúc chốt: chưa gửi → Không nộp; trả lại → Đã chốt – chưa điều chỉnh.
+func ClosedStatus(base string) string {
+	switch base {
+	case SubNone:
+		return SubMissed
+	case SubReturned:
+		return SubClosedUnadjusted
+	}
+	return base
+}
 
 // Review là kết quả rà soát một phiên bản.
 type Review struct {
@@ -292,6 +440,7 @@ func CanResubmit(status string, acceptedAt *time.Time, st PeriodState) bool {
 type UnitSnapshot struct {
 	Unit         string            `json:"unit"`
 	Status       string            `json:"status"`
+	ClosedStatus string            `json:"closed_status"` // W11.05: trạng thái lúc chốt (Không nộp, Đã chốt – chưa điều chỉnh…)
 	SubmissionID *string           `json:"submission_id"`
 	Version      int64             `json:"version"`
 	Values       map[string]string `json:"values"`

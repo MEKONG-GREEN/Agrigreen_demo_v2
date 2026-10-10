@@ -134,3 +134,31 @@ func TestFN_TI_02_01_ExtractMetrics(t *testing.T) {
 		t.Fatal("tỷ lệ, năng suất")
 	}
 }
+
+// W11.05: vòng đời mở rộng (CNTS) — kỳ chốt: chưa gửi → Không nộp, đang yêu cầu điều chỉnh → Đã chốt – chưa điều
+// chỉnh; Trồng trọt giữ "Đã chốt".
+func TestExtendedLifecycle_W1105(t *testing.T) {
+	now := time.Date(2026, 10, 10, 5, 0, 0, 0, time.UTC)
+	if ExtendedLifecycle("trong_trot") || !ExtendedLifecycle("chan_nuoi_thuy_san") {
+		t.Fatal("ExtendedLifecycle")
+	}
+	for _, c := range []struct {
+		status   string
+		extended bool
+		want     string
+	}{
+		{TaskNotStarted, false, TaskClosed},
+		{TaskDraft, false, TaskClosed},
+		{TaskAdjustmentRequested, false, TaskClosed},
+		{TaskNotStarted, true, TaskMissed},
+		{TaskDraft, true, TaskMissed},
+		{TaskAdjustmentRequested, true, TaskClosedUnadjusted},
+		{TaskSubmitted, true, TaskClosed},
+		{TaskConfirmed, true, TaskClosed},
+	} {
+		st := TaskState{Status: c.status, DueAt: now.Add(-time.Hour), PeriodClosed: true, Extended: c.extended}
+		if got := st.Display(now); got != c.want || StatusLabel[got] == "" {
+			t.Errorf("%s extended=%v: %s, muốn %s", c.status, c.extended, got, c.want)
+		}
+	}
+}

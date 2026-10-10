@@ -2,9 +2,12 @@
  "_note": "SINH TỰ ĐỘNG bởi TestWebReportCycleFixture (internal/platform/extension/reportcycle/domain) — không sửa tay.",
  "status_labels": {
   "adjustment_requested": "Yêu cầu điều chỉnh",
+  "awaiting_reopen": "Chờ mở kỳ",
   "closed": "Đã chốt",
+  "closed_unadjusted": "Đã chốt – chưa điều chỉnh",
   "confirmed": "Đã xác nhận",
   "draft": "Lưu nháp",
+  "missed": "Không nộp",
   "not_started": "Chưa nhập",
   "overdue": "Trễ hạn",
   "submitted": "Đã nộp"

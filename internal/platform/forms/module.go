@@ -11,6 +11,10 @@
 //   - Freezer: lối ghi song song chốt/mở lại kỳ + ảnh chụp cho bên dùng có vòng đời riêng (KN extension/reportcycle,
 //     route v1 cũ giữ nguyên — nguyên tắc 3), trong giao dịch của bên dùng (hàm pf_forms.mirror).
 //   - HTTP: /v1/forms/* (Application API).
+//   - W11.05 (pf 000142): đơn vị lá tổng quát — loại đơn vị (xã, cơ sở GM, hộ/điểm, phòng ban; người và luồng nhiều
+//     bước của HCTH CHỪA CHỖ), giới hạn số lần gửi, khóa kỳ theo lịch kỳ hệ thống (sổ phụ period_spec); hủy kỳ
+//     (sự kiện cancelled); trạng thái lúc chốt Không nộp / Đã chốt – chưa điều chỉnh / Chờ mở kỳ (bài offline đến sau
+//     chốt giữ ở held_submission). Profile KN: kn, kn_cnts, kn_khtc (cmd/api-platform/assembly/forms.go).
 //
 // 14 biểu thật của KN (câu hỏi Q-01) chưa có: chỉ có biểu mẫu thử (fixture); profile production không phát hành
 // được kỳ trên biểu fixture — bật production chờ Q-01.

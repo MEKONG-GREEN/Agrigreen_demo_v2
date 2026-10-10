@@ -616,6 +616,9 @@ func (s *Service) WithdrawBatch(ctx context.Context, id uuid.UUID, reason, idem 
 		if err := store.WithdrawTasks(ctx, tx, id, now); err != nil {
 			return err
 		}
+		if err := s.mirrorWithdrawn(ctx, tx, id, why, a.p.ActorRef, ev.IdemKey, now); err != nil { // W11.05: hủy kỳ ở cap/forms
+			return err
+		}
 		nb, err := store.BatchByID(ctx, tx, id, false)
 		if err == nil && nb != nil {
 			out = *nb

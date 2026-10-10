@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 )
 
 // Lock khóa kỳ đến hết giao dịch (nộp bài, chốt, mở lại xếp hàng — ảnh chụp không lỡ bài nộp chen giữa).
@@ -364,4 +365,123 @@ func uuidStrings(xs []uuid.UUID) []string {
 		out[i] = x.String()
 	}
 	return out
+}
+
+// ---------------------------------------------------------------------------
+// W11.05 (pf 000142): đặc tả kỳ, bài giữ "Chờ mở kỳ"
+// ---------------------------------------------------------------------------
+
+// InsertSpec ghi đặc tả kỳ native CÙNG GIAO DỊCH phát hành (trigger kiểm, chép profile).
+func InsertSpec(ctx context.Context, tx pgx.Tx, tid, periodID uuid.UUID, s domain.Spec, actor uuid.UUID, at time.Time, idem string) error {
+	parents := s.UnitParents
+	if parents == nil {
+		parents = []string{}
+	}
+	var maxSub *int
+	if s.MaxSubmissions > 0 {
+		maxSub = &s.MaxSubmissions
+	}
+	_, err := tx.Exec(ctx, `INSERT INTO pf_forms.period_spec (id, tenant_id, stream_key, period_id, profile, unit_kind, unit_parents, max_submissions,
+	    review_flow, period_kind, period_key, period_from, period_to, period_rule, event_time, actor_ref, idem_key, rule_version)
+	  VALUES ($1, $2, 'spec:' || $3::uuid::text, $3::uuid, '', $4, $5, $6, $7, $8, $9, $10::date, $11::date, $12, $13, $14, $15, $16)`,
+		ids.New(), tid, periodID, s.UnitKind, parents, maxSub, s.ReviewFlow, nilIfEmpty(s.PeriodKind), nilIfEmpty(s.PeriodKey), dateOrNil(s.From),
+		dateOrNil(s.To), nilIfEmpty(s.PeriodRule), at.UTC(), actor, idem, domain.RuleVersion)
+	return err
+}
+
+// SpecOf đọc đặc tả kỳ; kỳ không có dòng (trước W11.05) → domain.DefaultSpec.
+func SpecOf(ctx context.Context, tx pgx.Tx, periodID uuid.UUID) (domain.Spec, error) {
+	s := domain.DefaultSpec()
+	var maxSub *int
+	var kind, key, rule *string
+	var from, to *time.Time
+	err := tx.QueryRow(ctx, `SELECT unit_kind, unit_parents, max_submissions, review_flow, period_kind, period_key, period_from, period_to, period_rule
+	    FROM pf_forms.period_spec WHERE period_id = $1`, periodID).
+		Scan(&s.UnitKind, &s.UnitParents, &maxSub, &s.ReviewFlow, &kind, &key, &from, &to, &rule)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.DefaultSpec(), nil
+	}
+	if err != nil {
+		return s, err
+	}
+	if maxSub != nil {
+		s.MaxSubmissions = *maxSub
+	}
+	s.PeriodKind, s.PeriodKey, s.PeriodRule = deref(kind), deref(key), deref(rule)
+	s.From, s.To = from, to
+	if len(s.UnitParents) == 0 {
+		s.UnitParents = nil
+	}
+	return s, nil
+}
+
+// Held là một bài giữ "Chờ mở kỳ" (đến sau khi kỳ đã chốt với đơn vị).
+type Held struct {
+	ID         uuid.UUID
+	PeriodID   uuid.UUID
+	Unit       string
+	Seq        int64
+	Values     map[string]string
+	Submitter  uuid.UUID
+	CapturedAt time.Time
+	EventTime  time.Time
+}
+
+// InsertHeld ghi bài giữ (trigger kiểm kỳ đã chốt với đơn vị — sai → AGF02).
+func InsertHeld(ctx context.Context, tx pgx.Tx, tid uuid.UUID, h *Held, idem string) error {
+	vals, err := json.Marshal(h.Values)
+	if err != nil {
+		return err
+	}
+	return tx.QueryRow(ctx, `INSERT INTO pf_forms.held_submission (id, tenant_id, stream_key, period_id, unit_code, profile, template_id, "values",
+	    submitter_ref, captured_at, event_time, actor_ref, idem_key, rule_version)
+	  VALUES ($1, $2, 'held:' || $3::uuid::text || ':' || $4::text, $3::uuid, $4::text, '', $3::uuid, $5::jsonb, $6, $7, $8, $6, $9, $10) RETURNING seq`,
+		h.ID, tid, h.PeriodID, h.Unit, string(vals), h.Submitter, h.CapturedAt.UTC(), h.EventTime.UTC(), idem, domain.RuleVersion).Scan(&h.Seq)
+}
+
+// LatestHeld trả bài giữ cuối của từng đơn vị trong kỳ.
+func LatestHeld(ctx context.Context, tx pgx.Tx, periodID uuid.UUID) (map[string]Held, error) {
+	rows, err := tx.Query(ctx, `SELECT DISTINCT ON (unit_code) id, period_id, unit_code, seq, "values"::text, submitter_ref, captured_at, event_time
+	    FROM pf_forms.held_submission WHERE period_id = $1 ORDER BY unit_code, seq DESC`, periodID)
+	if err != nil {
+		return nil, err
+	}
+	hs, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Held, error) {
+		var h Held
+		var vals string
+		if err := r.Scan(&h.ID, &h.PeriodID, &h.Unit, &h.Seq, &vals, &h.Submitter, &h.CapturedAt, &h.EventTime); err != nil {
+			return h, err
+		}
+		return h, json.Unmarshal([]byte(vals), &h.Values)
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]Held, len(hs))
+	for _, h := range hs {
+		out[h.Unit] = h
+	}
+	return out, nil
+}
+
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func dateOrNil(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	d := t.UTC().Format(time.DateOnly)
+	return &d
 }

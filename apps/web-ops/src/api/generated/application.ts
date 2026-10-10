@@ -5277,6 +5277,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/forms/periods/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy kỳ đang mở (cấp close_by của Nút phát hành; lý do bắt buộc) — trạng thái cuối, không nộp/chốt/mở lại sau hủy (W11.05, KHTC BR-DL-18) */
+        post: operations["formsCancelPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/forms/periods/{id}/snapshots": {
         parameters: {
             query?: never;
@@ -10702,6 +10719,12 @@ export interface components {
             review_by: string;
             allow_fixtures: boolean;
             require_reviewed_before_close: boolean;
+            /** @description Loại đơn vị lá (phần tử đầu = mặc định) — W11.05 */
+            unit_kinds?: ("commune" | "facility" | "household" | "department")[];
+            /** @description Phòng ban KN được dùng profile (rỗng = mọi phòng ban) */
+            departments?: string[];
+            /** @description Số lần gửi tối đa mặc định (0 = không giới hạn) */
+            max_submissions?: number;
         };
         FormsField: {
             key: string;
@@ -10742,6 +10765,65 @@ export interface components {
             /** Format: date-time */
             due_at: string;
             units: string[];
+            /**
+             * @description Rỗng = loại mặc định của profile (W11.05)
+             * @enum {string}
+             */
+            unit_kind?: "commune" | "facility" | "household" | "department";
+            /** @description Mã xã cha song song với units — bắt buộc với facility/household, cấm với loại khác */
+            unit_parents?: string[];
+            /** @description Vắng = mặc định của profile; 0 = không giới hạn */
+            max_submissions?: number;
+            period?: components["schemas"]["FormsPeriodKey"];
+        };
+        /** @description Khóa kỳ theo lịch kỳ hệ thống (W11.03 — reportcycle/domain Span.Key, thẻ quy tắc chia kỳ) — lưu ở pf_forms.period_spec */
+        FormsPeriodKey: {
+            /** @enum {string} */
+            kind?: "day" | "week" | "ksgm_week" | "month" | "quarter" | "season" | "year" | "adhoc";
+            /** @description Vd 2026-W41, 2026-10-K2, 2026-Q4 */
+            key?: string;
+            /** Format: date */
+            from?: string;
+            /** Format: date */
+            to?: string;
+            rule?: string;
+        };
+        FormsPeriodSpec: {
+            /** @enum {string} */
+            unit_kind: "commune" | "facility" | "household" | "department";
+            unit_parents: string[];
+            /** @description 0 = không giới hạn */
+            max_submissions: number;
+            /**
+             * @description Chỉ một bước rà soát bốn mắt; nhiều bước (HCTH) chưa hỗ trợ
+             * @enum {string}
+             */
+            review_flow: "single";
+            period_kind: string | null;
+            period_key: string | null;
+            /** Format: date */
+            period_from: string | null;
+            /** Format: date */
+            period_to: string | null;
+            period_rule: string | null;
+        };
+        FormsCancelInput: {
+            reason: string;
+        };
+        /** @description Bài đến sau khi kỳ đã chốt với đơn vị (Chờ mở kỳ) — không vào số liệu kỳ */
+        FormsHeld: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            values: {
+                [key: string]: string;
+            };
+            /** Format: uuid */
+            submitter_ref: string;
+            /** Format: date-time */
+            captured_at: string;
+            /** Format: date-time */
+            event_time: string;
         };
         FormsPeriod: {
             /** Format: uuid */
@@ -10768,7 +10850,7 @@ export interface components {
             id: string;
             seq: number;
             /** @enum {string} */
-            action: "published" | "closed" | "reopened";
+            action: "published" | "closed" | "reopened" | "cancelled";
             /** @enum {string} */
             mode: "manual" | "auto";
             units: string[];
@@ -10795,6 +10877,11 @@ export interface components {
             values: {
                 [key: string]: string;
             };
+            /**
+             * Format: date-time
+             * @description Bản offline: lúc ghi trên thiết bị — kỳ đã chốt với đơn vị thì bài được giữ (202, Chờ mở kỳ)
+             */
+            captured_at?: string;
         };
         FormsSubmission: {
             /** Format: uuid */
@@ -10811,7 +10898,7 @@ export interface components {
             /** Format: date-time */
             event_time: string;
             /** @enum {string} */
-            status: "submitted" | "accepted" | "returned";
+            status: "submitted" | "accepted" | "returned" | "awaiting_reopen";
             review: null | components["schemas"]["FormsReview"];
         };
         FormsReviewInput: {
@@ -10850,14 +10937,21 @@ export interface components {
         };
         FormsUnit: {
             unit: string;
-            /** @enum {string} */
-            status: "not_submitted" | "submitted" | "accepted" | "returned";
+            /** @description Đơn vị lọc phạm vi: mã xã cha (cơ sở/hộ), chính unit với loại khác */
+            parent: string;
+            /**
+             * @description Khi kỳ đã chốt với đơn vị: missed = Không nộp, closed_unadjusted = Đã chốt – chưa điều chỉnh, awaiting_reopen = Chờ mở kỳ (W11.05)
+             * @enum {string}
+             */
+            status: "not_submitted" | "submitted" | "accepted" | "returned" | "missed" | "closed_unadjusted" | "awaiting_reopen";
             submission: null | components["schemas"]["FormsSubmission"];
+            held: null | components["schemas"]["FormsHeld"];
         };
         FormsPeriodView: {
             period: components["schemas"]["FormsPeriod"];
+            spec: components["schemas"]["FormsPeriodSpec"];
             /** @enum {string} */
-            status: "open" | "closed" | "reopened";
+            status: "open" | "closed" | "reopened" | "cancelled";
             reopen_units: string[];
             events: components["schemas"]["FormsPeriodEvent"][];
             units: components["schemas"]["FormsUnit"][];
@@ -21616,11 +21710,20 @@ export interface operations {
                     "application/json": components["schemas"]["FormsSubmission"];
                 };
             };
+            /** @description Bản offline (captured_at) đến sau khi kỳ đã chốt với đơn vị — giữ ở trạng thái Chờ mở kỳ (status = awaiting_reopen), không vào số liệu kỳ (W11.05) */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsSubmission"];
+                };
+            };
             /** @description forbidden */
             403: components["responses"]["Problem"];
             /** @description forms.period_not_found */
             404: components["responses"]["Problem"];
-            /** @description forms.period_closed | forms.submission_accepted */
+            /** @description forms.period_closed | forms.submission_accepted | forms.submission_limit | forms.period_cancelled */
             409: components["responses"]["Problem"];
             /** @description forms.values_invalid | forms.unit_not_in_period */
             422: components["responses"]["Problem"];
@@ -21655,7 +21758,7 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description forms.period_not_found */
             404: components["responses"]["Problem"];
-            /** @description forms.period_closed | forms.pending_review */
+            /** @description forms.period_closed | forms.pending_review | forms.period_cancelled */
             409: components["responses"]["Problem"];
         };
     };
@@ -21692,9 +21795,48 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description forms.period_not_found */
             404: components["responses"]["Problem"];
-            /** @description forms.period_not_closed */
+            /** @description forms.period_not_closed | forms.period_cancelled */
             409: components["responses"]["Problem"];
             /** @description validation_failed | forms.unit_not_in_period */
+            422: components["responses"]["Problem"];
+        };
+    };
+    formsCancelPeriod: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormsCancelInput"];
+            };
+        };
+        responses: {
+            /** @description Kỳ sau hủy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsPeriodView"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description forms.period_closed | forms.period_cancelled */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
             422: components["responses"]["Problem"];
         };
     };
@@ -21762,7 +21904,7 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description forms.submission_not_found */
             404: components["responses"]["Problem"];
-            /** @description forms.period_closed | forms.submission_superseded | forms.already_reviewed */
+            /** @description forms.period_closed | forms.submission_superseded | forms.already_reviewed | forms.submission_limit | forms.period_cancelled */
             409: components["responses"]["Problem"];
             /** @description validation_failed */
             422: components["responses"]["Problem"];

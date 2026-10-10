@@ -31,7 +31,8 @@ type TaskView struct {
 }
 
 func viewOf(t store.Task, p store.Period, b *store.Batch, now time.Time) TaskView {
-	st := domain.TaskState{Status: t.Status, DueAt: t.DueAt, PeriodClosed: p.Status == "closed", ReopenedUntil: t.ReopenedUntil}
+	st := domain.TaskState{Status: t.Status, DueAt: t.DueAt, PeriodClosed: p.Status == "closed", ReopenedUntil: t.ReopenedUntil,
+		Extended: domain.ExtendedLifecycle(t.DepartmentCode)}
 	return TaskView{Task: t, Period: p, Batch: b, Display: st.Display(now), Open: st.Open(now)}
 }
 

@@ -77,6 +77,8 @@ func (s *Service) Profiles() []port.Profile {
 type actor struct {
 	ref, tenant uuid.UUID
 	role, level string
+	dept        string // phòng ban của ngữ cảnh KN (rỗng: vai realm, Admin)
+	leaf        bool   // cấp của người gọi là cấp lá (cấp nộp bài)
 	scope       authz.Scope
 	node        uuid.UUID
 	define      bool
@@ -95,9 +97,12 @@ func (s *Service) resolve(ctx context.Context, name string) (port.Profile, actor
 	}
 	a := actor{ref: p.ActorRef, tenant: p.TenantID, node: p.OrgRef}
 	if p.KN != nil {
-		a.role, a.scope, a.node = p.KN.Role, p.KN.Scope, p.KN.OrgRef
-		a.level = prof.Roles[a.role]
+		a.role, a.scope, a.node, a.dept = p.KN.Role, p.KN.Scope, p.KN.OrgRef, p.KN.Department
+		a.level = prof.LevelOf(a.role, a.dept)
 		a.define = slices.Contains(prof.DefineBy, a.role)
+		if len(prof.Departments) > 0 && a.role != authz.KNAdmin && !slices.Contains(prof.Departments, a.dept) {
+			return prof, a, problem.Forbidden.WithDetail("cấu hình biểu " + name + " không dành cho phòng ban của phiên")
+		}
 	} else {
 		for _, r := range p.Roles {
 			if l, ok := prof.Roles[r]; ok && a.level == "" {
@@ -114,7 +119,18 @@ func (s *Service) resolve(ctx context.Context, name string) (port.Profile, actor
 	if a.level == "" && !a.define {
 		return prof, a, problem.Forbidden.WithDetail("vai của người gọi không thuộc cấu hình biểu " + name)
 	}
+	a.leaf = a.level != "" && a.level == prof.Leaf()
 	return prof, a, nil
+}
+
+// allowsUnit: người gọi được thao tác/thấy đơn vị u (thuộc danh sách units của kỳ có đặc tả spec) — W11.05:
+//   - xã: phạm vi phiên chứa mã xã; cơ sở/hộ: phạm vi phiên chứa mã xã CHA của đơn vị;
+//   - phòng ban: cấp lá chỉ phòng ban của phiên; cấp trên (phát hành, rà soát, chốt) mọi phòng ban của tenant.
+func (a actor) allowsUnit(spec domain.Spec, units []string, u string) bool {
+	if spec.UnitKind == port.UnitDepartment {
+		return a.scope.All || (a.leaf && a.dept == u) || (!a.leaf && a.level != "")
+	}
+	return a.scope.Allows(spec.Parent(units, u))
 }
 
 func (a actor) need(level, what string) error {
@@ -149,6 +165,8 @@ func classify(err error) error {
 		return problem.Conflict.WithDetail("trạng thái kỳ đã đổi").WithCause(err)
 	case pg.Code == "AGF02":
 		return port.ErrPeriodClosed.WithCause(err)
+	case pg.Code == "AGF03":
+		return port.ErrSubmissionLimit.WithCause(err)
 	case pg.Code == "23514" && pg.ConstraintName == "review_four_eyes":
 		return problem.SelfApproval.WithCause(err)
 	case pg.Code == "23505":

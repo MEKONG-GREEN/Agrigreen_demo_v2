@@ -985,11 +985,15 @@ Route `/v1/forms/*` (Application API). Route v1 cũ của KN (`/v1/extension/rep
 | 409 | `forms.submission_superseded` | Rà soát phiên bản không còn là bản cuối |
 | 409 | `forms.already_reviewed` | Phiên bản đã được rà soát |
 | 409 | `forms.pending_review` | Chốt khi còn bài chờ rà soát và bên dùng bật `require_reviewed_before_close` |
+| 409 | `forms.period_cancelled` | W11.05: nộp, rà soát, chốt, mở lại hoặc hủy lại kỳ đã hủy (`POST /v1/forms/periods/{id}/cancel`); kỳ đã hủy là trạng thái cuối |
+| 409 | `forms.submission_limit` | W11.05: đơn vị đã gửi đủ `max_submissions` lần của kỳ (KHTC: 3, Q-081) — nộp thêm, hoặc trả lại phiên bản cuối cho phép; DB từ chối phiên bản vượt giới hạn (SQLSTATE AGF03, `trg_submission_limit`, pf 000142) |
 | 409 | `conflict` | Trạng thái kỳ đổi giữa chừng (máy trạng thái ở DB, SQLSTATE AGF01); ghi song song vào mã kỳ native |
 | 422 | `forms.template_invalid` | Định nghĩa biểu sai (mã, tiêu đề, trường: khóa, kiểu `text`/`integer`/`decimal`/`date`/`choice`, lựa chọn) — `field` chỉ chỗ sai |
 | 422 | `forms.values_invalid` | Số liệu không khớp biểu: khóa lạ, thiếu trường bắt buộc, sai kiểu (thập phân là chuỗi, tối đa 6 chữ số lẻ) |
 | 422 | `forms.unit_not_in_period` | Đơn vị không thuộc kỳ, hoặc ngoài phạm vi mở lại của kỳ mở lại một phần |
-| 422 | `validation_failed` | Thiếu nhãn/hạn nộp/đơn vị khi phát hành; trả lại không ghi chú; lý do mở lại ngoài 10–500 ký tự |
+| 422 | `validation_failed` | Thiếu nhãn/hạn nộp/đơn vị khi phát hành; trả lại không ghi chú; lý do mở lại/hủy ngoài 10–500 ký tự; W11.05: `unit_kind` ngoài cấu hình bên dùng, `unit_parents` thiếu/thừa (bắt buộc với `facility`/`household`), mã phòng ban sai dạng, `max_submissions` ngoài 0–20, khóa kỳ (`period.*`) sai; `captured_at` không phải RFC 3339 |
+
+Bản offline (`captured_at`) nộp vào kỳ đã chốt với đơn vị KHÔNG lỗi: trả `202` với `status = awaiting_reopen` (Chờ mở kỳ, sổ `pf_forms.held_submission`). Phiên chọn phòng ban không thuộc `departments` của bên dùng (vd `kn_cnts` chỉ Phòng CNTS) → `forbidden`.
 
 ### pf/evidence (`cap/evidence` — tệp minh chứng, R-DB-07, W6.5)
 

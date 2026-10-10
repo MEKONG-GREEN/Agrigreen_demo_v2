@@ -99,3 +99,22 @@ Chưa làm trong gói này: lưu `Key`/`WeekYear` của kỳ vào DB (không có
 | Đổi lịch trong ngày báo giá | Ngày áp dụng sớm nhất = ngày mai nếu hôm nay là ngày báo giá, hôm nay nếu không (422 `price.valid_from`) | `domain.EarliestValidFrom` | — |
 | Ngưỡng mặc định | 30 %, N = 7, đi ngang 1 %, phiếu điều tra 40 % (BRD CT-02…CT-06); ngưỡng mặt hàng chỉ kiểm dạng mã (danh mục ở W11.73) | `KNPriceProfile.Schedule`, `app.SaveThreshold` | Tenant ghi phiên bản ngưỡng; W11.73 kiểm mã mặt hàng có thật |
 | "Mốc duyệt bảng giá dự kiến" (FN-AD-04.04 BR-03: hạn phản hồi trước mốc duyệt) | Chưa có tham số mốc duyệt — chỉ kiểm hạn phản hồi sau giờ khóa | `domain.ValidateSchedule` | W11.76 (duyệt/công bố) thêm mốc duyệt vào lịch |
+## W11.05 — `cap/forms` tổng quát đơn vị lá (pf 000142)
+
+| Câu hỏi | Phương án đã chọn | Đổi ở đâu |
+|---|---|---|
+| Q-081 — số lần gửi phiếu KHTC | Tối đa **3**, lần 3 tự khóa: không "yêu cầu bổ sung" được nữa, chỉ xác nhận (FN-TI-02.03/02.04) | `KNKHTCProfile.MaxSubmissions` (gốc lắp ráp); kỳ đặt riêng `max_submissions` khi mở kỳ (0 = không giới hạn) |
+| Q-047 — sửa số kỳ cũ | `cap/forms` không đổi số đã chốt: ảnh chụp đóng băng giữ nguyên, sửa = mở lại kỳ (CNTS) hoặc ghi điều chỉnh ở phiếu kỳ sau (KHTC, W11.63). Lũy kế đọc từ nguồn (đề xuất "lũy kế của nguồn") — chưa làm ở gói này | W11.63, W11.10 |
+| Q-045 — lịch kỳ của kỳ `cap/forms` | Kỳ native mang khóa kỳ theo lịch kỳ hệ thống W11.03 (`period.kind/key/from/to/rule`), lưu ở `pf_forms.period_spec`; bên gọi tự tính khóa bằng `reportcycle/domain` | Bên gọi (W11.42, W11.62) |
+| Q-056 — ai định nghĩa biểu | Admin KN + `reports_admin` cho cả `kn_cnts`, `kn_khtc` (như `kn`) | `DefineBy` của Profile |
+| Vòng đời CNTS III.3.0 (Không nộp, Đã chốt – chưa điều chỉnh, Chờ mở kỳ) | Áp cho `cap/forms` (mọi profile — phép chiếu khi kỳ đã chốt với đơn vị) và cho vòng đời KN v1 chỉ ở phòng `chan_nuoi_thuy_san` (`reportcycle/domain.ExtendedLifecycle`); Trồng trọt giữ "Đã chốt" | `extendedLifecycle` (mã) |
+| "Chờ mở kỳ" | Bản offline (`captured_at`) đến sau chốt được GIỮ (sổ `held_submission`, HTTP 202), không vào số liệu kỳ; Cấp Tỉnh mở lại kỳ rồi đơn vị nộp lại (không tự áp bản giữ) | `app.SubmitOffline` |
+| Hủy kỳ (KHTC BR-DL-18) | Chỉ hủy kỳ đang mở (published/reopened); kỳ đã chốt không hủy (KHTC: "Đã đóng" là cuối); kỳ hủy không mở lại. Thu hồi đợt KN v1 ghi `cancelled` (mirror) cho mọi kỳ của đợt | `pf_forms.fn_transition` |
+| Phạm vi đơn vị lá | Cơ sở GM / hộ-điểm: lọc theo mã xã cha (`unit_parents`); phòng ban: cấp lá chỉ phòng của phiên, cấp trên (Phòng KHTC) mọi phòng | `app.actor.allowsUnit` |
+| Phòng ban được dùng Profile | `kn_cnts`: chỉ `chan_nuoi_thuy_san`; `kn_khtc`: mọi phòng (KHTC mở kỳ bằng khóa vai `kn_tinh@ke_hoach_tai_chinh`, phòng khác nộp) | `Departments`, `Roles` của Profile |
+| Đơn vị = người, nhiều bước (HCTH, D3 §2.5) | **Chưa làm** — chừa chỗ: hằng `port.UnitPerson`, `port.ReviewFlowSteps`, cột `review_flow` (CHECK chỉ `single`). Theo đề xuất (b) của D3 §2.5, `pf/hrm` tự giữ máy trạng thái đợt; (a) thêm `person` + `steps` khi có bên dùng thứ hai | Migration mới + `domain.SupportedUnitKinds` |
+
+Chưa làm trong gói này: mở loại kỳ ngày/quý/KSGM ở "Phát hành biểu" và lưu `period_key`/`week_year` vào
+`pf_extension.report_period` — cần một migration của module `pf/extension` (archlint cấm migration `pf_forms` sửa schema
+`pf_extension`; gói chỉ được cấp pf 000142). Ảnh chụp ghi song song KN đã mang `period_key` tính lại từ quy tắc lưu ở
+đợt. "Chờ mở kỳ" của vòng đời KN v1 (đồng bộ offline sau chốt) để W11.42 (CN2).

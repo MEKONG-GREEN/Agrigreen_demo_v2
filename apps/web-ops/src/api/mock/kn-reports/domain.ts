@@ -267,7 +267,10 @@ export function split(pt: string, fromS: string, toS: string, season: string, ru
 export type StoredStatus = "not_started" | "draft" | "submitted" | "adjustment_requested" | "confirmed";
 export type DisplayStatus = StoredStatus | "overdue" | "closed";
 
-export const STATUS_LABEL: Record<DisplayStatus, string> = {
+// Vòng đời mở rộng (W11.05, CNTS v3.7 III.3.0) — chỉ phòng ban có ExtendedLifecycle (Go); Trồng trọt không dùng.
+export type ExtendedStatus = "closed_unadjusted" | "missed" | "awaiting_reopen";
+
+export const STATUS_LABEL: Record<DisplayStatus | ExtendedStatus, string> = {
   not_started: "Chưa nhập",
   draft: "Lưu nháp",
   submitted: "Đã nộp",
@@ -275,6 +278,9 @@ export const STATUS_LABEL: Record<DisplayStatus, string> = {
   adjustment_requested: "Yêu cầu điều chỉnh",
   confirmed: "Đã xác nhận",
   closed: "Đã chốt",
+  closed_unadjusted: "Đã chốt – chưa điều chỉnh",
+  missed: "Không nộp",
+  awaiting_reopen: "Chờ mở kỳ",
 };
 
 export const DISPLAY_STATUSES: DisplayStatus[] = ["not_started", "draft", "submitted", "overdue", "adjustment_requested", "confirmed", "closed"];
