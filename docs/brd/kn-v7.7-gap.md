@@ -3,6 +3,13 @@
 > Đầu vào: [kn-trong-trot-v7.7.md](kn-trong-trot-v7.7.md) (tóm tắt BRD v7.7), mã ở nhánh `kn-0` (= `sub/kn-v77` = main @ 0819839). Mã hiện tại xây theo BRD App Khuyến nông v1.0 (FR-01…FR-32), Backlog US v1.0 và prototype `App_Khuyen_Nong_v5.0.html` (nghiệm thu: `docs/uat/g1-acceptance.md`, `g2-acceptance.md`).
 > Kế hoạch thực hiện: [kn-v7.7-plan.md](kn-v7.7-plan.md).
 
+> **Cập nhật W11.01 (10/10/2026).** Cột "Mã hiện tại" của ma trận dưới đây là ảnh chụp trước P1–P8 và giữ nguyên làm lịch sử. Từ đó mã đã đổi chỗ như sau (trạng thái nghiệm thu hiện hành ở [kn-v7.7-acceptance.md](../uat/kn-v7.7-acceptance.md), đối chiếu đầy đủ ở [doi-chieu-brd-kn-2026-10.md](../kn/doi-chieu-brd-kn-2026-10.md) Phụ lục C):
+> - **W3.3 (pf 000131–000133):** HTX, nông hộ, thửa, vụ, nhật ký canh tác chuyển từ `party` (cooperative/household), `geo` (plot), `cropcycle` sang module `pf/cooperative` (`internal/platform/cooperative/{member,plot,season}`, schema `pf_coop`). Dòng UR-XA-16, UR-XA-18, UR-KT-01 và mục 3 (HTX, bản đồ) đọc theo vị trí mới. `/v1/kn/cooperatives*`, `/v1/kn/households*` vẫn ở `party/handler/kn_collect.go` (qua `cooperativeport`); `/v1/kn/plots*` ở `cooperative/plot/handler/kn.go`.
+> - **W6.2 (pf 000121–000122):** chốt/mở lại kỳ KN ghi song song vào `pf/forms` (`cap/forms`); vòng đời báo cáo KN vẫn chạy trên `extension/reportcycle` đến W11.04.
+> - **Menu mobile** từ `GET /v1/menu` và chọn ngữ cảnh trên mobile đã có (P7, `apps/field-app/lib/application/kn_menu_service.dart`, `ui/kn/kn_context_picker_screen.dart`).
+> - **Còn thiếu, bản đầu không ghi:** trang web "Báo cáo đột xuất" (`/kn/bao-cao/dot-xuat` có trong menu nhưng rơi vào `ComingSoon`), làm ở gói W11.02.
+> - Mã FN/UR trùng giữa các BRD KN: ma trận nghiệm thu dùng tiền tố module (`TT-`, `HC-`, `CN-`, `KH-`, `BG-`); mã không tiền tố trong tài liệu này là `TT-`.
+
 **Trạng thái:** **Đáp ứng** = dùng được gần như nguyên trạng · **Cần sửa** = đã có nền nhưng phải đổi hành vi, mô hình hoặc giao diện · **Mới** = chưa có gì đáng kể · **Bỏ khỏi phạm vi module** = v7.7 chuyển sang module/hệ thống khác.
 
 ## 1. Tóm tắt khác biệt lớn nhất

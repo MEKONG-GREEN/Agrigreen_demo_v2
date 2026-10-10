@@ -328,6 +328,24 @@ Nhận xét:
 
 - [x] FB (09/10/2026): tra cứu sổ theo `idem_key` chọn dòng mới nhất sau hạn 30 ngày của `shared.ledger_idem` — `ledger.NewestFirst`/`NewestByIdem` (`ORDER BY recorded_at DESC, id DESC`) trên 98 truy vấn store mkg/pf (gồm 3 truy vấn trước đây lấy dòng cũ nhất), chặng theo tiền tố lấy bộ mới nhất, lô khóa mỗi khóa một dòng; `pgtest.Env.ExpireLedgerIdem` + 4 kiểm thử tích hợp; không migration — 8 sổ thiếu chỉ mục `idem_key` ghi lại để làm sau ([ADR-0012](adr/0012-duy-nhat-tren-bang-so-phan-vung.md#hiện-thực--tra-cứu-theo-idem_key-chọn-dòng-mới-nhất-fb-09102026)).
 
+## BRD KN 10/2026
+
+Làm lại app Khuyến nông theo các BRD ngày 07/10/2026 (Trồng trọt Final, HCTH v3.0, CNTS v3.7, KHTC v2.2, Báo giá v1.3). Kế hoạch và danh sách gói: [đối chiếu BRD KN 10/2026](kn/doi-chieu-brd-kn-2026-10.md) §3.2. PO chưa trả lời §2/§4; các gói làm theo đề xuất của dev, giả định ghi ở [gia-dinh-brd-2026-10.md](kn/gia-dinh-brd-2026-10.md).
+
+Đợt W11 (đang làm, 10/10/2026):
+- [x] W11.01 (10/10/2026): tài liệu KN — đưa bản đối chiếu vào `docs/kn/` (sửa: sổ song phương ở pf 000135, mkg 000038 chỉ có bảng gửi/feed); UAT/gap sau W3.3/W6.2 (đường dẫn `pf/cooperative`, menu và ngữ cảnh mobile đã có → UR-CH-01, UR-KT-02, FN-CH-00.01 **đạt**); thêm dòng "Báo cáo đột xuất"; tiền tố `TT-` cho mã FN/UR trong ma trận nghiệm thu; [lỗi văn bản BRD gửi BA](kn/loi-van-ban-brd.md).
+- [ ] W11.02: đóng khoảng trống Trồng trọt (Báo cáo đột xuất, vẽ thửa web, nạp Tỉnh giao, di chuyển Nút xã, nạp Excel tài khoản…).
+- [ ] W11.03: lịch kỳ hệ thống dùng chung (tuần Thứ Tư → Thứ Ba theo QĐ-6, kỳ ngày, KSGM 4 tuần/tháng).
+- [ ] W11.05: `cap/forms` tổng quát đơn vị lá.
+- [ ] W11.06: mở phòng ban + menu kn.menu/v3.
+- [ ] W11.07: phân quyền trong vai + đơn vị nội bộ.
+- [ ] W11.71: khung `pf/price`.
+- [ ] W11.72: xã báo giá + phân công.
+- [ ] W11.73: mặt hàng theo thời kỳ.
+- [ ] W11.74: lịch báo giá, giờ khóa, nhắc, ngưỡng.
+- [ ] W11.75: nhập báo giá + xác minh.
+- [ ] W11.76: duyệt/mở duyệt bảng giá.
+
 ## G6
 Theo Phụ lục A của tài liệu kiến trúc:
 - **G6 (Q1/2029):** cấu hình Phase 1, không sửa mã. Cơ chế giống Phase K: một lớp giá trị mới (ADR-0025).
