@@ -29,6 +29,7 @@ var catalog = []CatalogEntry{
 	{Name: "pf/mrv", Kind: "domain", Enable: "per_tenant", Permissions: []string{"mrv_collector", "mrv_exporter", "mrv_reviewer", "mrv_viewer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_mrv"}, Shares: []string{}},
 	{Name: "pf/notify", Kind: "capability", Enable: "per_tenant", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_notify"}, Shares: []string{}},
 	{Name: "pf/party", Kind: "kernel", Enable: "always", Permissions: []string{"cgh_viewer", "consent_reader", "consent_writer", "coop_manager", "kn_national_admin", "kn_officer", "kn_province_admin", "mkg_sync", "registry_admin"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_party"}, Shares: []string{}},
+	{Name: "pf/price", Kind: "capability", Enable: "per_tenant", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_price", "pf_price_pub"}, Shares: []string{}},
 	{Name: "pf/reports", Kind: "capability", Enable: "per_tenant", Permissions: []string{"reports_admin"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_reports"}, Shares: []string{}},
 	{Name: "pf/simulation", Kind: "domain", Enable: "per_tenant", Permissions: []string{"simulation_analyst"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_simulation"}, Shares: []string{}},
 	{Name: "pf/sync", Kind: "capability", Enable: "per_tenant", Permissions: []string{"device_admin", "sync_conflict_resolver"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_sync"}, Shares: []string{}},

@@ -346,6 +346,7 @@ Làm lại app Khuyến nông theo các BRD ngày 07/10/2026 (Trồng trọt Fin
 - [ ] W11.75: nhập báo giá + xác minh.
 - [ ] W11.76: duyệt/mở duyệt bảng giá.
 - [x] W11.06 (10/10/2026): mở phòng ban + menu `kn.menu/v3` — seed 5 phòng ban (`trong_trot`, `chan_nuoi_thuy_san`, `ke_hoach_tai_chinh`, `thong_tin_truyen_thong` tên "Thông tin Tuyên truyền", `hanh_chinh_tong_hop`), mã tạm `phong_ban_5` → `hanh_chinh_tong_hop`, `phong_ban_6` bỏ (bí danh `port.CanonicalDepartmentCode`, nạp lại seed xóa mã tạm chưa dùng); khuôn menu theo phòng ban (nhóm "Nghiệp vụ", mục module chưa có "Sắp có") + nhóm "Dùng chung" (Contact) cho mọi vai; web-ops + app di động vẽ "Sắp có"; không migration ([mã phòng ban](kn/phong-ban-seed.md), [giả định](kn/gia-dinh-brd-2026-10.md#w1106--mở-phòng-ban--menu-knmenuv3)).
+- [x] W11.71 (10/10/2026, pf 000138): khung `cap/price` = module `pf/price` (ADR-0049) — schema `pf_price` + `pf_price_pub`, vai `r_price`/`r_price_pub`, sổ danh mục nền có hiệu lực theo ngày (đơn vị tính, nhóm hàng), `port.Profile`/`port.Catalog`, `/v1/price/status|catalog|catalog/defaults`, agnofloat cả module, thêm vào `app/KN`; nghiệp vụ Báo giá ở W11.72–W11.76.
 
 ## G6
 Theo Phụ lục A của tài liệu kiến trúc:

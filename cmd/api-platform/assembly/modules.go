@@ -28,6 +28,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/price"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation"
 	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
@@ -91,6 +92,7 @@ type Modules struct {
 	Metering      *metering.Module  // G5 (ADR-0023/0024): sổ sử dụng Public API, điểm kiểm soát xuất, bảng kê
 	APIClient     *apiclient.Module // G5 (ADR-0022): khách hàng Public API, khóa, đăng ký, gói hạn mức — Admin API
 	Forms         *forms.Module     // W6.2 cap/forms: biểu theo kỳ, chốt kỳ kèm ảnh chụp đóng băng
+	Price         *price.Module     // W11.71 cap/price: khung giá — danh mục nền, /v1/price/* (ADR-0049)
 }
 
 // Named trả module kèm tên repo (module.yaml) theo thứ tự gắn route.
@@ -101,6 +103,7 @@ func (m Modules) Named() []NamedModule {
 		{"pf/notify", m.Notify}, {"pf/accounts", m.Accounts}, {"pf/reports", m.Reports}, {"pf/waterway", m.Waterway},
 		{"pf/simulation", m.Simulation}, {"pf/cropcycle", m.CropCycle}, {"pf/cooperative", m.Cooperative}, {"pf/metrics", m.Metrics},
 		{"pf/extdata", m.ExtData}, {"pf/metering", m.Metering}, {"pf/apiclient", m.APIClient}, {"pf/forms", m.Forms},
+		{"pf/price", m.Price},
 	}
 }
 
@@ -265,6 +268,10 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
+	pr, err := wirePrice(unit, clk) // W11.71: cap/price (/v1/price/*), khung giá — ADR-0049
+	if err != nil {
+		return Modules{}, pools, err
+	}
 	pty.UseOrgImpact(kn.OpenPeriodsImpact())
 	pty.UseDepartmentUsage(kn.ReportUsage())
 	pty.UseFormAvailability(rep.FormAvailability())
@@ -364,7 +371,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
 		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Cooperative: coop, Metrics: met, ExtData: ed, Metering: meter, APIClient: apic,
-		Forms: fm}, pools, nil
+		Forms: fm, Price: pr}, pools, nil
 }
 
 // EgressModeFromEnv đọc AG_EGRESS_MODE (ADR-0024 mục 2): rỗng → observe; giá trị lạ → lỗi khởi động.

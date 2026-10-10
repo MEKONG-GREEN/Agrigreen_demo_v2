@@ -7501,6 +7501,64 @@ paths:
               schema: {$ref: "#/components/schemas/FormsSnapshot"}
         "404": {description: forms.snapshot_not_found, $ref: "#/components/responses/Problem"}
   # --- hết pf/forms ---
+  # --- pf/price (cap/price, W11.71 — ADR-0049): khung module giá của Báo giá nông sản (BRD v1.3). Trạng thái module và danh mục
+  # nền (đơn vị tính, nhóm hàng) có hiệu lực theo ngày; route nghiệp vụ (xã báo giá, mặt hàng, lịch, phiếu, bảng giá) thêm ở
+  # W11.72–W11.76. Bên dùng chọn bằng query `profile` (vắng → profile đầu tiên; KN = kn). Ngữ cảnh KN: header X-AG-Context. ---
+  /v1/price/status:
+    get:
+      summary: Trạng thái khung cap/price của tenant người gọi — cấu hình bên dùng, cấp của người gọi, số mục danh mục đang hiệu lực
+      operationId: priceStatus
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+      responses:
+        "200":
+          description: Trạng thái
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceStatus"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
+  /v1/price/catalog:
+    get:
+      summary: Danh mục nền đang hiệu lực tại một ngày (đơn vị tính, nhóm hàng) — phiên bản mới nhất có valid_from ≤ ngày, bỏ mã đã ngưng
+      operationId: priceCatalog
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: at, in: query, required: false, description: "Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN)", schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Danh mục
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceCatalog"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/catalog/defaults:
+    post:
+      summary: Ghi danh mục mặc định (5 nhóm hàng BRD, đơn vị tính thường gặp) hiệu lực từ hôm nay — chỉ mã chưa có; vai quản trị danh mục
+      operationId: priceInstallDefaults
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Số phiên bản đã ghi (0 khi mọi mã đã có)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [written]
+                properties:
+                  written: {type: integer, minimum: 0}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict, $ref: "#/components/responses/Problem"}
+  # --- hết pf/price ---
 components:
   securitySchemes:
     oidc:
@@ -7519,6 +7577,12 @@ components:
       in: query
       required: true
       description: Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn)
+      schema: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$"}
+    PriceProfile:
+      name: profile
+      in: query
+      required: false
+      description: Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên.
       schema: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$"}
     IdempotencyKey:
       name: Idempotency-Key
@@ -12081,3 +12145,32 @@ components:
         events: {type: array, items: {$ref: "#/components/schemas/FormsPeriodEvent"}}
         units: {type: array, items: {$ref: "#/components/schemas/FormsUnit"}}
         snapshots: {type: array, items: {$ref: "#/components/schemas/FormsSnapshot"}}
+    # --- pf/price (W11.71) ---
+    PriceStatus:
+      type: object
+      required: [profile, department, level, can_manage, rule_version, day, units, groups]
+      properties:
+        profile: {type: string}
+        department: {type: string, description: "Mã phòng ban chủ dữ liệu giá của bên dùng (KN: Phòng TTTT)"}
+        level: {type: string, description: "Cấp của người gọi trong bên dùng (TW | TINH | XA); rỗng nếu chỉ có vai quản trị"}
+        can_manage: {type: boolean}
+        rule_version: {type: string}
+        day: {type: string, format: date}
+        units: {type: integer, minimum: 0}
+        groups: {type: integer, minimum: 0}
+    PriceCatalogEntry:
+      type: object
+      required: [code, name, sort_order, version, valid_from]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        sort_order: {type: integer}
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date}
+    PriceCatalog:
+      type: object
+      required: [day, units, groups]
+      properties:
+        day: {type: string, format: date}
+        units: {type: array, items: {$ref: "#/components/schemas/PriceCatalogEntry"}}
+        groups: {type: array, items: {$ref: "#/components/schemas/PriceCatalogEntry"}}

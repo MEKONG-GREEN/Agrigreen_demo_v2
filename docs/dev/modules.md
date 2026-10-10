@@ -333,6 +333,19 @@ Kiến trúc v4.1 §26, §7.2. Module năng lực `pf/forms` (`internal/platform
 
 **Chưa làm:** chuyển kỳ KN sang kỳ native và web-ops sang `/v1/forms`; báo cáo Chi cục đọc ảnh chụp; gộp engine mẫu dạng lưới của `pf/reports` (bố cục, công thức) làm kiểu trường của `cap/forms` (điểm mở rộng `forms.field_types`); `publications` cho `cap/analytics`.
 
+## Khung giá `cap/price` (W11.71)
+
+[ADR-0049](../adr/0049-cap-price-pf-price.md); kiến trúc v4.1 §26. Module năng lực `pf/price` (`internal/platform/price`, `cap/price`, `enable: per_tenant`) sở hữu `pf_price` và `pf_price_pub` (pf 000138); vai `r_price` (không vai cũ, `app_platform` là thành viên), `r_price_pub` (đọc view công bố — chưa có view, `v1_board_daily` ở W11.76). Toàn module cấm float (agnofloat `floatFreeZones`, R-CODE-01): giá, % là decimal/`numeric`.
+
+| Thành phần | Khung W11.71 | Gói mở rộng |
+|---|---|---|
+| `port.Profile` | tên, phòng ban chủ, vai → cấp (TW/TINH/XA), `ManageBy`; KN ở `cmd/api-platform/assembly/price.go` | W11.72 cờ QTNV; W11.74 giờ khóa, hạn phản hồi |
+| `port.Catalog` | `Units`, `Groups` có hiệu lực tại ngày (tenant từ ctx) | W11.73 mặt hàng; KHTC đọc (Q-082) |
+| Sổ `pf_price.unit`, `pf_price.commodity_group` | mỗi dòng một phiên bản của một mã (`seq`), `valid_from` (date giờ VN), `status` `active`/`retired` | W11.73 tham chiếu `code` |
+| HTTP | `GET /v1/price/status`, `GET /v1/price/catalog?at=`, `POST /v1/price/catalog/defaults` (5 nhóm BRD + 8 ĐVT, chỉ mã chưa có) | W11.72–W11.76 thêm route |
+
+Bảng mới của các gói sau: migration riêng tên `<số>_pf_price_<việc>.up.sql`, sổ `shared.apply_ledger`, `GRANT SELECT, INSERT … TO r_price`; view công bố mới khai `//ag:pubview pf_price_pub.<tên> v1` trong `price/port` rồi `GRANT SELECT … TO r_price_pub` (kiểm thử `TestPubViewsDeclaredAndPrivileges_W63` đếm số view).
+
 ## Cấp phép chia sẻ v2 (W4.1)
 
 ADR-0030 mục 3, kiến trúc v4.1 §17.1, R-SEC-04. pf 000120. Mã ở `internal/platform/party/{app,store,handler}/sharing.go`.

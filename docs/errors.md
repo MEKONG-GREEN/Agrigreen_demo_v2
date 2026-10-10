@@ -998,3 +998,12 @@ Route `/v1/forms/*` (Application API). Route v1 cũ của KN (`/v1/extension/rep
 |---|---|---|
 | 422 | `evidence.subject_unresolved` | `POST /v1/files` có bộ ba `subject_module`/`subject_type`/`subject_id` mà module chủ không phân giải được: module chưa nối `Resolver`, thực thể không có (hoặc ngoài tenant), loại không cho tham chiếu |
 | 403 | `evidence.subject_forbidden` | `GET /v1/files/{ref}[/content]`: tệp có chủ thể mà người gọi không thấy (mã xã của chủ thể ngoài phạm vi, không qua cấp phép chia sẻ) hoặc chủ thể không còn phân giải được. Quyết định vẫn ghi sổ `pf_files.access_log` |
+
+### pf/price (`cap/price` — khung giá, W11.71, ADR-0049)
+
+Route `/v1/price/*` (Application API). Lỗi chung: `unauthenticated` (401), `forbidden` (403 — vai không thuộc cấu hình giá, hoặc ghi danh mục mà không có vai quản trị), `node_scope_required` (403 — Cấp Xã không có Nút), `validation_failed` (422 — `at` không phải ngày), `conflict` (409 — ghi danh mục đồng thời trùng khóa), `module_not_enabled` (403 — module tắt cho tenant).
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 404 | `price.profile_not_found` | Tham số `profile` không có trong cấu hình của gốc lắp ráp (KN = `kn`) |
+

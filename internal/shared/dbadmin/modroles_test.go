@@ -24,7 +24,7 @@ func pubRoles() []string {
 // W6.3 (§14, ADR-0031 §2, R-DB-10): r_<module>_pub NOLOGIN cho đúng các module sở hữu schema _pub, tạo trước
 // vai phân tích; chỉ r_metrics (cap/analytics) là thành viên; không thuộc ag_shared_user, không vượt RLS.
 func TestPubRoles_W63(t *testing.T) {
-	want := []string{"r_cropcycle_pub", "r_extension_pub", "r_geo_pub", "r_mechanization_pub"}
+	want := []string{"r_cropcycle_pub", "r_extension_pub", "r_geo_pub", "r_mechanization_pub", "r_price_pub"}
 	if got := pubRoles(); !slices.Equal(got, want) {
 		t.Fatalf("vai _pub: %v, muốn %v", got, want)
 	}
@@ -100,10 +100,10 @@ func roleByName(t *testing.T, name string) (Role, int) {
 // thứ tự tạo nhóm trước.
 func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	groups := ModuleGroups()
-	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + pf/evidence + pf/cooperative (W3.3) + 7 mkg có vai cũ
-	// + mkg/engine (W8.2, không vai cũ) + vault/identity; pf/extdata không schema.
-	if len(groups) != 31 || len(legacyGroups()) != 25 {
-		t.Errorf("số vai nhóm: %d (muốn 31, 25 có vai cũ): %v", len(groups), groups)
+	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + pf/evidence + pf/cooperative (W3.3) + pf/price (W11.71)
+	// + 7 mkg có vai cũ + mkg/engine (W8.2, không vai cũ) + vault/identity; pf/extdata không schema.
+	if len(groups) != 32 || len(legacyGroups()) != 25 {
+		t.Errorf("số vai nhóm: %d (muốn 32, 25 có vai cũ): %v", len(groups), groups)
 	}
 	if slices.ContainsFunc(groups, func(g ModuleGroup) bool { return g.Module == "pf/extdata" }) {
 		t.Error("pf/extdata không có schema — không có vai nhóm")
@@ -123,7 +123,7 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 			t.Errorf("%s: %+v", g.Role, r)
 		}
 		if g.Legacy == "" {
-			// Module không có vai cũ (W2.5: pf/kref, W6.1: pf/workflow, W6.2: pf/forms, W6.5: pf/evidence, W3.3: pf/cooperative) — không vai đăng nhập nào ngoài app_* là thành viên.
+			// Module không có vai cũ (W2.5: pf/kref, W6.1: pf/workflow, W6.2: pf/forms, W6.5: pf/evidence, W3.3: pf/cooperative, W11.71: pf/price) — không vai đăng nhập nào ngoài app_* là thành viên.
 			for _, o := range Roles {
 				if slices.Contains(o.MemberOf, g.Role) && !slices.Contains(LoginRoles(), o.Name) {
 					t.Errorf("%s không được là thành viên %s", o.Name, g.Role)
@@ -199,6 +199,10 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	// W6.2: api-platform ghép pf/forms — app_platform là thành viên r_forms.
 	if !slices.Contains(plat.MemberOf, "r_forms") {
 		t.Errorf("r_forms: app_platform %v", plat.MemberOf)
+	}
+	// W11.71: api-platform ghép pf/price (ADR-0049) — app_platform là thành viên r_price.
+	if !slices.Contains(plat.MemberOf, "r_price") {
+		t.Errorf("r_price: app_platform %v", plat.MemberOf)
 	}
 	// W8.2: api-internal ghép mkg/engine (job engine_observation_feed) — app_internal là thành viên r_engine (chỉ cụm mkg).
 	if in, _ := roleByName(t, AppInternal); !slices.Contains(in.MemberOf, "r_engine") {
@@ -409,6 +413,7 @@ var laterGroups = map[string]string{
 	"pf/forms":       "pf/000122_pf_forms_grants.up.sql",
 	"pf/evidence":    "pf/000123_pf_evidence.up.sql",
 	"pf/cooperative": "pf/000131_pf_cooperative_schema.up.sql", // W3.3: vai r_cooperative sinh khi module có owns_schema
+	"pf/price":       "pf/000138_pf_price.up.sql",              // W11.71 (ADR-0049): khung cap/price
 }
 
 // pf 000092 (W2.5) cấp SELECT k_ref.* cho MỌI r_* của module pf lúc đó (R-DB-05) — danh sách ghi tay khớp

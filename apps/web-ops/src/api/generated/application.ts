@@ -5300,6 +5300,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/price/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái khung cap/price của tenant người gọi — cấu hình bên dùng, cấp của người gọi, số mục danh mục đang hiệu lực */
+        get: operations["priceStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh mục nền đang hiệu lực tại một ngày (đơn vị tính, nhóm hàng) — phiên bản mới nhất có valid_from ≤ ngày, bỏ mã đã ngưng */
+        get: operations["priceCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/catalog/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi danh mục mặc định (5 nhóm hàng BRD, đơn vị tính thường gặp) hiệu lực từ hôm nay — chỉ mã chưa có; vai quản trị danh mục */
+        post: operations["priceInstallDefaults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -10641,6 +10692,33 @@ export interface components {
             units: components["schemas"]["FormsUnit"][];
             snapshots: components["schemas"]["FormsSnapshot"][];
         };
+        PriceStatus: {
+            profile: string;
+            /** @description Mã phòng ban chủ dữ liệu giá của bên dùng (KN: Phòng TTTT) */
+            department: string;
+            /** @description Cấp của người gọi trong bên dùng (TW | TINH | XA); rỗng nếu chỉ có vai quản trị */
+            level: string;
+            can_manage: boolean;
+            rule_version: string;
+            /** Format: date */
+            day: string;
+            units: number;
+            groups: number;
+        };
+        PriceCatalogEntry: {
+            code: string;
+            name: string;
+            sort_order: number;
+            version: number;
+            /** Format: date */
+            valid_from: string;
+        };
+        PriceCatalog: {
+            /** Format: date */
+            day: string;
+            units: components["schemas"]["PriceCatalogEntry"][];
+            groups: components["schemas"]["PriceCatalogEntry"][];
+        };
     };
     responses: {
         /** @description RFC 9457 */
@@ -10747,6 +10825,8 @@ export interface components {
         PartnerGrantor: string;
         /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
         FormsProfile: string;
+        /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+        PriceProfile: string;
         IdempotencyKey: string;
         /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
         At: string;
@@ -21344,6 +21424,98 @@ export interface operations {
             };
             /** @description forms.snapshot_not_found */
             404: components["responses"]["Problem"];
+        };
+    };
+    priceStatus: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trạng thái */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceStatus"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.profile_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceCatalog: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceCatalog"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.profile_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceInstallDefaults: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số phiên bản đã ghi (0 khi mọi mã đã có) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        written: number;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.profile_not_found */
+            404: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
         };
     };
 }
