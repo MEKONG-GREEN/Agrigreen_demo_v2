@@ -98,6 +98,9 @@ var ParamRegistry = []ParamSpec{
 	{Key: "mrv.co2.transport_waterway_kg_per_tkm", Name: "Hệ số phát thải vận chuyển đường thủy (tạm)", Unit: "kgCO2e/t·km", Kind: ParamKindDecimal, Min: "0", Max: "10"},
 	{Key: "mrv.anomaly_no_record_days", Name: "Số ngày không có bản ghi mới → cảnh báo bất thường", Unit: "ngày", Kind: ParamKindDecimal, Min: "1", Max: "120"},
 	{Key: "mrv.compare_window_days", Name: "Cửa sổ ghép nhật ký HTX ↔ minh chứng cán bộ", Unit: "ngày", Kind: ParamKindDecimal, Min: "0", Max: "30"},
+	// W11.03 lịch kỳ hệ thống dùng chung (extension/port.ParamPeriodRule, ParamKSGMWeekStarts).
+	{Key: "extension.report_period_rule", Name: "Quy tắc chia kỳ báo cáo (lịch kỳ hệ thống)", Kind: ParamKindText},
+	{Key: "extension.ksgm_week_starts", Name: "Ranh giới 4 tuần KSGM của tháng (vd 1,8,15,22)", Kind: ParamKindText, Dimensional: true},
 }
 
 var stageNames = map[string]string{

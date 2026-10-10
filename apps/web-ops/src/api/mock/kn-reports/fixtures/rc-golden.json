@@ -31,6 +31,40 @@
    "time": "17:00"
   }
  },
+ "default_deadlines_v2": {
+  "adhoc": {
+   "offset_days": 7,
+   "time": "17:00"
+  },
+  "day": {
+   "offset_days": 1,
+   "time": "09:00"
+  },
+  "ksgm_week": {
+   "offset_days": 1,
+   "time": "12:00"
+  },
+  "month": {
+   "offset_days": 1,
+   "time": "10:00"
+  },
+  "quarter": {
+   "offset_days": 1,
+   "time": "10:00"
+  },
+  "season": {
+   "offset_days": 7,
+   "time": "17:00"
+  },
+  "week": {
+   "offset_days": 1,
+   "time": "12:00"
+  },
+  "year": {
+   "offset_days": 1,
+   "time": "10:00"
+  }
+ },
  "default_close_after_days": 3,
  "max_periods": 60,
  "split": [
@@ -40,7 +74,7 @@
    "from_date": "2026-09-02",
    "to_date": "2026-09-20",
    "season_label": "Thu Đông 2026",
-   "week_numbering": "season",
+   "rule": "kn.period_rule/v1-tam;week=season",
    "deadline": {
     "offset_days": 2,
     "time": "17:00"
@@ -49,9 +83,11 @@
    "periods": [
     {
      "slot": 1,
+     "key": "2026-W36",
      "label": "Tuần 1",
      "range_label": "02/09–06/09/2026",
      "iso_week": 36,
+     "week_year": 2026,
      "from_date": "2026-09-02",
      "to_date": "2026-09-06",
      "due_at": "2026-09-08T10:00:00Z",
@@ -59,9 +95,11 @@
     },
     {
      "slot": 2,
+     "key": "2026-W37",
      "label": "Tuần 2",
      "range_label": "07/09–13/09/2026",
      "iso_week": 37,
+     "week_year": 2026,
      "from_date": "2026-09-07",
      "to_date": "2026-09-13",
      "due_at": "2026-09-15T10:00:00Z",
@@ -69,9 +107,11 @@
     },
     {
      "slot": 3,
+     "key": "2026-W38",
      "label": "Tuần 3",
      "range_label": "14/09–20/09/2026",
      "iso_week": 38,
+     "week_year": 2026,
      "from_date": "2026-09-14",
      "to_date": "2026-09-20",
      "due_at": "2026-09-22T10:00:00Z",
@@ -87,7 +127,7 @@
    "from_date": "2026-09-07",
    "to_date": "2026-09-27",
    "season_label": "",
-   "week_numbering": "iso",
+   "rule": "kn.period_rule/v1-tam;week=iso",
    "deadline": {
     "offset_days": 2,
     "time": "17:00"
@@ -96,9 +136,11 @@
    "periods": [
     {
      "slot": 1,
+     "key": "2026-W37",
      "label": "Tuần 37",
      "range_label": "07/09–13/09/2026",
      "iso_week": 37,
+     "week_year": 2026,
      "from_date": "2026-09-07",
      "to_date": "2026-09-13",
      "due_at": "2026-09-15T10:00:00Z",
@@ -106,9 +148,11 @@
     },
     {
      "slot": 2,
+     "key": "2026-W38",
      "label": "Tuần 38",
      "range_label": "14/09–20/09/2026",
      "iso_week": 38,
+     "week_year": 2026,
      "from_date": "2026-09-14",
      "to_date": "2026-09-20",
      "due_at": "2026-09-22T10:00:00Z",
@@ -116,9 +160,11 @@
     },
     {
      "slot": 3,
+     "key": "2026-W39",
      "label": "Tuần 39",
      "range_label": "21/09–27/09/2026",
      "iso_week": 39,
+     "week_year": 2026,
      "from_date": "2026-09-21",
      "to_date": "2026-09-27",
      "due_at": "2026-09-29T10:00:00Z",
@@ -134,7 +180,7 @@
    "from_date": "2026-12-21",
    "to_date": "2027-01-10",
    "season_label": "Đông Xuân 2026-2027",
-   "week_numbering": "season",
+   "rule": "kn.period_rule/v1-tam;week=season",
    "deadline": {
     "offset_days": 1,
     "time": "08:30"
@@ -143,9 +189,11 @@
    "periods": [
     {
      "slot": 1,
+     "key": "2026-W52",
      "label": "Tuần 1",
      "range_label": "21/12–27/12/2026",
      "iso_week": 52,
+     "week_year": 2026,
      "from_date": "2026-12-21",
      "to_date": "2026-12-27",
      "due_at": "2026-12-28T01:30:00Z",
@@ -153,9 +201,11 @@
     },
     {
      "slot": 2,
+     "key": "2026-W53",
      "label": "Tuần 2",
      "range_label": "28/12/2026–03/01/2027",
      "iso_week": 53,
+     "week_year": 2026,
      "from_date": "2026-12-28",
      "to_date": "2027-01-03",
      "due_at": "2027-01-04T01:30:00Z",
@@ -163,9 +213,11 @@
     },
     {
      "slot": 3,
+     "key": "2027-W01",
      "label": "Tuần 3",
      "range_label": "04/01–10/01/2027",
      "iso_week": 1,
+     "week_year": 2027,
      "from_date": "2027-01-04",
      "to_date": "2027-01-10",
      "due_at": "2027-01-11T01:30:00Z",
@@ -181,7 +233,7 @@
    "from_date": "2026-07-15",
    "to_date": "2026-09-30",
    "season_label": "",
-   "week_numbering": "season",
+   "rule": "kn.period_rule/v1-tam;week=season",
    "deadline": {
     "offset_days": 10,
     "time": "17:00"
@@ -190,9 +242,11 @@
    "periods": [
     {
      "slot": 1,
+     "key": "2026-07",
      "label": "Tháng 7/2026",
      "range_label": "15/07–31/07/2026",
      "iso_week": 0,
+     "week_year": 0,
      "from_date": "2026-07-15",
      "to_date": "2026-07-31",
      "due_at": "2026-08-10T10:00:00Z",
@@ -200,9 +254,11 @@
     },
     {
      "slot": 2,
+     "key": "2026-08",
      "label": "Tháng 8/2026",
      "range_label": "01/08–31/08/2026",
      "iso_week": 0,
+     "week_year": 0,
      "from_date": "2026-08-01",
      "to_date": "2026-08-31",
      "due_at": "2026-09-10T10:00:00Z",
@@ -210,9 +266,11 @@
     },
     {
      "slot": 3,
+     "key": "2026-09",
      "label": "Tháng 9/2026",
      "range_label": "01/09–30/09/2026",
      "iso_week": 0,
+     "week_year": 0,
      "from_date": "2026-09-01",
      "to_date": "2026-09-30",
      "due_at": "2026-10-10T10:00:00Z",
@@ -228,7 +286,7 @@
    "from_date": "2026-09-01",
    "to_date": "2026-12-31",
    "season_label": "Thu Đông 2026",
-   "week_numbering": "season",
+   "rule": "kn.period_rule/v1-tam;week=season",
    "deadline": {
     "offset_days": 7,
     "time": "17:00"
@@ -237,9 +295,11 @@
    "periods": [
     {
      "slot": 1,
+     "key": "",
      "label": "Thu Đông 2026",
      "range_label": "01/09–31/12/2026",
      "iso_week": 0,
+     "week_year": 0,
      "from_date": "2026-09-01",
      "to_date": "2026-12-31",
      "due_at": "2027-01-07T10:00:00Z",
@@ -255,7 +315,7 @@
    "from_date": "2026-01-01",
    "to_date": "2026-12-31",
    "season_label": "",
-   "week_numbering": "season",
+   "rule": "kn.period_rule/v1-tam;week=season",
    "deadline": {
     "offset_days": 7,
     "time": "17:00"
@@ -264,9 +324,11 @@
    "periods": [
     {
      "slot": 1,
+     "key": "",
      "label": "Năm 2026",
      "range_label": "01/01–31/12/2026",
      "iso_week": 0,
+     "week_year": 0,
      "from_date": "2026-01-01",
      "to_date": "2026-12-31",
      "due_at": "2027-01-07T10:00:00Z",
@@ -282,7 +344,7 @@
    "from_date": "2026-10-01",
    "to_date": "2026-10-03",
    "season_label": "Rà soát sau lũ",
-   "week_numbering": "season",
+   "rule": "kn.period_rule/v1-tam;week=season",
    "deadline": {
     "offset_days": 7,
     "time": "17:00"
@@ -291,9 +353,11 @@
    "periods": [
     {
      "slot": 1,
+     "key": "",
      "label": "Rà soát sau lũ",
      "range_label": "01/10–03/10/2026",
      "iso_week": 0,
+     "week_year": 0,
      "from_date": "2026-10-01",
      "to_date": "2026-10-03",
      "due_at": "2026-10-10T10:00:00Z",
@@ -309,7 +373,7 @@
    "from_date": "2026-09-07",
    "to_date": "2026-09-01",
    "season_label": "",
-   "week_numbering": "season",
+   "rule": "kn.period_rule/v1-tam;week=season",
    "deadline": {
     "offset_days": 2,
     "time": "17:00"
@@ -328,7 +392,7 @@
    "from_date": "2025-01-01",
    "to_date": "2026-12-31",
    "season_label": "",
-   "week_numbering": "season",
+   "rule": "kn.period_rule/v1-tam;week=season",
    "deadline": {
     "offset_days": 2,
     "time": "17:00"
@@ -347,7 +411,7 @@
    "from_date": "2026-09-07",
    "to_date": "2026-09-13",
    "season_label": "",
-   "week_numbering": "season",
+   "rule": "kn.period_rule/v1-tam;week=season",
    "deadline": {
     "offset_days": 2,
     "time": "25:00"
@@ -366,7 +430,7 @@
    "from_date": "2026-09-07",
    "to_date": "2026-09-13",
    "season_label": "",
-   "week_numbering": "season",
+   "rule": "kn.period_rule/v1-tam;week=season",
    "deadline": {
     "offset_days": 2,
     "time": "17:00"
@@ -385,7 +449,7 @@
    "from_date": "2026-09-07",
    "to_date": "2026-09-13",
    "season_label": "",
-   "week_numbering": "season",
+   "rule": "kn.period_rule/v1-tam;week=season",
    "deadline": {
     "offset_days": 2,
     "time": "17:00"
@@ -397,6 +461,745 @@
     "Msg": "week | month | season | year | adhoc"
    },
    "rule_tag": "kn.period_rule/v1-tam;week=season"
+  },
+  {
+   "name": "v2 tuần Thứ Tư–Thứ Ba",
+   "period_type": "week",
+   "from_date": "2026-09-02",
+   "to_date": "2026-09-22",
+   "season_label": "Thu Đông 2026",
+   "rule": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+   "deadline": {
+    "offset_days": 1,
+    "time": "12:00"
+   },
+   "close_after_days": 3,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "2026-W36",
+     "label": "Tuần 36/2026",
+     "range_label": "02/09–08/09/2026",
+     "iso_week": 36,
+     "week_year": 2026,
+     "from_date": "2026-09-02",
+     "to_date": "2026-09-08",
+     "due_at": "2026-09-09T05:00:00Z",
+     "auto_close_at": "2026-09-12T05:00:00Z"
+    },
+    {
+     "slot": 2,
+     "key": "2026-W37",
+     "label": "Tuần 37/2026",
+     "range_label": "09/09–15/09/2026",
+     "iso_week": 37,
+     "week_year": 2026,
+     "from_date": "2026-09-09",
+     "to_date": "2026-09-15",
+     "due_at": "2026-09-16T05:00:00Z",
+     "auto_close_at": "2026-09-19T05:00:00Z"
+    },
+    {
+     "slot": 3,
+     "key": "2026-W38",
+     "label": "Tuần 38/2026",
+     "range_label": "16/09–22/09/2026",
+     "iso_week": 38,
+     "week_year": 2026,
+     "from_date": "2026-09-16",
+     "to_date": "2026-09-22",
+     "due_at": "2026-09-23T05:00:00Z",
+     "auto_close_at": "2026-09-26T05:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+  },
+  {
+   "name": "v2 tuần cắt đầu/cuối, qua năm",
+   "period_type": "week",
+   "from_date": "2026-12-28",
+   "to_date": "2027-01-08",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+   "deadline": {
+    "offset_days": 1,
+    "time": "12:00"
+   },
+   "close_after_days": 0,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "2026-W52",
+     "label": "Tuần 52/2026",
+     "range_label": "28/12–29/12/2026",
+     "iso_week": 52,
+     "week_year": 2026,
+     "from_date": "2026-12-28",
+     "to_date": "2026-12-29",
+     "due_at": "2026-12-30T05:00:00Z",
+     "auto_close_at": "2026-12-30T05:00:00Z"
+    },
+    {
+     "slot": 2,
+     "key": "2027-W01",
+     "label": "Tuần 1/2027",
+     "range_label": "30/12/2026–05/01/2027",
+     "iso_week": 1,
+     "week_year": 2027,
+     "from_date": "2026-12-30",
+     "to_date": "2027-01-05",
+     "due_at": "2027-01-06T05:00:00Z",
+     "auto_close_at": "2027-01-06T05:00:00Z"
+    },
+    {
+     "slot": 3,
+     "key": "2027-W02",
+     "label": "Tuần 2/2027",
+     "range_label": "06/01–08/01/2027",
+     "iso_week": 2,
+     "week_year": 2027,
+     "from_date": "2027-01-06",
+     "to_date": "2027-01-08",
+     "due_at": "2027-01-09T05:00:00Z",
+     "auto_close_at": "2027-01-09T05:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+  },
+  {
+   "name": "v2 tuần 53 (2030)",
+   "period_type": "week",
+   "from_date": "2030-12-25",
+   "to_date": "2031-01-07",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+   "deadline": {
+    "offset_days": 1,
+    "time": "12:00"
+   },
+   "close_after_days": 0,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "2030-W53",
+     "label": "Tuần 53/2030",
+     "range_label": "25/12–31/12/2030",
+     "iso_week": 53,
+     "week_year": 2030,
+     "from_date": "2030-12-25",
+     "to_date": "2030-12-31",
+     "due_at": "2031-01-01T05:00:00Z",
+     "auto_close_at": "2031-01-01T05:00:00Z"
+    },
+    {
+     "slot": 2,
+     "key": "2031-W01",
+     "label": "Tuần 1/2031",
+     "range_label": "01/01–07/01/2031",
+     "iso_week": 1,
+     "week_year": 2031,
+     "from_date": "2031-01-01",
+     "to_date": "2031-01-07",
+     "due_at": "2031-01-08T05:00:00Z",
+     "auto_close_at": "2031-01-08T05:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+  },
+  {
+   "name": "v2 tuần n của đợt",
+   "period_type": "week",
+   "from_date": "2026-09-02",
+   "to_date": "2026-09-15",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;week=season",
+   "deadline": {
+    "offset_days": 1,
+    "time": "12:00"
+   },
+   "close_after_days": 1,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "2026-W36",
+     "label": "Tuần 1",
+     "range_label": "02/09–08/09/2026",
+     "iso_week": 36,
+     "week_year": 2026,
+     "from_date": "2026-09-02",
+     "to_date": "2026-09-08",
+     "due_at": "2026-09-09T05:00:00Z",
+     "auto_close_at": "2026-09-10T05:00:00Z"
+    },
+    {
+     "slot": 2,
+     "key": "2026-W37",
+     "label": "Tuần 2",
+     "range_label": "09/09–15/09/2026",
+     "iso_week": 37,
+     "week_year": 2026,
+     "from_date": "2026-09-09",
+     "to_date": "2026-09-15",
+     "due_at": "2026-09-16T05:00:00Z",
+     "auto_close_at": "2026-09-17T05:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=season;month=week_end"
+  },
+  {
+   "name": "v2 tuần ISO thứ Hai (53/2026)",
+   "period_type": "week",
+   "from_date": "2026-12-21",
+   "to_date": "2027-01-10",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;week_start=mon;week=iso;month=calendar",
+   "deadline": {
+    "offset_days": 1,
+    "time": "12:00"
+   },
+   "close_after_days": 0,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "2026-W52",
+     "label": "Tuần 52/2026",
+     "range_label": "21/12–27/12/2026",
+     "iso_week": 52,
+     "week_year": 2026,
+     "from_date": "2026-12-21",
+     "to_date": "2026-12-27",
+     "due_at": "2026-12-28T05:00:00Z",
+     "auto_close_at": "2026-12-28T05:00:00Z"
+    },
+    {
+     "slot": 2,
+     "key": "2026-W53",
+     "label": "Tuần 53/2026",
+     "range_label": "28/12/2026–03/01/2027",
+     "iso_week": 53,
+     "week_year": 2026,
+     "from_date": "2026-12-28",
+     "to_date": "2027-01-03",
+     "due_at": "2027-01-04T05:00:00Z",
+     "auto_close_at": "2027-01-04T05:00:00Z"
+    },
+    {
+     "slot": 3,
+     "key": "2027-W01",
+     "label": "Tuần 1/2027",
+     "range_label": "04/01–10/01/2027",
+     "iso_week": 1,
+     "week_year": 2027,
+     "from_date": "2027-01-04",
+     "to_date": "2027-01-10",
+     "due_at": "2027-01-11T05:00:00Z",
+     "auto_close_at": "2027-01-11T05:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=mon;week=iso;month=calendar"
+  },
+  {
+   "name": "v2 tuần thứ Ba–thứ Hai (CNTS)",
+   "period_type": "week",
+   "from_date": "2026-09-22",
+   "to_date": "2026-10-05",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;week_start=tue",
+   "deadline": {
+    "offset_days": 1,
+    "time": "12:00"
+   },
+   "close_after_days": 0,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "2026-W39",
+     "label": "Tuần 39/2026",
+     "range_label": "22/09–28/09/2026",
+     "iso_week": 39,
+     "week_year": 2026,
+     "from_date": "2026-09-22",
+     "to_date": "2026-09-28",
+     "due_at": "2026-09-29T05:00:00Z",
+     "auto_close_at": "2026-09-29T05:00:00Z"
+    },
+    {
+     "slot": 2,
+     "key": "2026-W40",
+     "label": "Tuần 40/2026",
+     "range_label": "29/09–05/10/2026",
+     "iso_week": 40,
+     "week_year": 2026,
+     "from_date": "2026-09-29",
+     "to_date": "2026-10-05",
+     "due_at": "2026-10-06T05:00:00Z",
+     "auto_close_at": "2026-10-06T05:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=tue;week=year;month=week_end"
+  },
+  {
+   "name": "v2 tháng theo Thứ Ba cuối",
+   "period_type": "month",
+   "from_date": "2026-07-15",
+   "to_date": "2026-09-30",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+   "deadline": {
+    "offset_days": 1,
+    "time": "10:00"
+   },
+   "close_after_days": 3,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "2026-07",
+     "label": "Tháng 7/2026",
+     "range_label": "15/07–28/07/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-07-15",
+     "to_date": "2026-07-28",
+     "due_at": "2026-07-29T03:00:00Z",
+     "auto_close_at": "2026-08-01T03:00:00Z"
+    },
+    {
+     "slot": 2,
+     "key": "2026-08",
+     "label": "Tháng 8/2026",
+     "range_label": "29/07–25/08/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-07-29",
+     "to_date": "2026-08-25",
+     "due_at": "2026-08-26T03:00:00Z",
+     "auto_close_at": "2026-08-29T03:00:00Z"
+    },
+    {
+     "slot": 3,
+     "key": "2026-09",
+     "label": "Tháng 9/2026",
+     "range_label": "26/08–29/09/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-08-26",
+     "to_date": "2026-09-29",
+     "due_at": "2026-09-30T03:00:00Z",
+     "auto_close_at": "2026-10-03T03:00:00Z"
+    },
+    {
+     "slot": 4,
+     "key": "2026-10",
+     "label": "Tháng 10/2026",
+     "range_label": "30/09–30/09/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-09-30",
+     "to_date": "2026-09-30",
+     "due_at": "2026-10-01T03:00:00Z",
+     "auto_close_at": "2026-10-04T03:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+  },
+  {
+   "name": "v2 tháng dương lịch",
+   "period_type": "month",
+   "from_date": "2026-07-15",
+   "to_date": "2026-09-30",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;month=calendar",
+   "deadline": {
+    "offset_days": 1,
+    "time": "10:00"
+   },
+   "close_after_days": 3,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "2026-07",
+     "label": "Tháng 7/2026",
+     "range_label": "15/07–31/07/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-07-15",
+     "to_date": "2026-07-31",
+     "due_at": "2026-08-01T03:00:00Z",
+     "auto_close_at": "2026-08-04T03:00:00Z"
+    },
+    {
+     "slot": 2,
+     "key": "2026-08",
+     "label": "Tháng 8/2026",
+     "range_label": "01/08–31/08/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-08-01",
+     "to_date": "2026-08-31",
+     "due_at": "2026-09-01T03:00:00Z",
+     "auto_close_at": "2026-09-04T03:00:00Z"
+    },
+    {
+     "slot": 3,
+     "key": "2026-09",
+     "label": "Tháng 9/2026",
+     "range_label": "01/09–30/09/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-09-01",
+     "to_date": "2026-09-30",
+     "due_at": "2026-10-01T03:00:00Z",
+     "auto_close_at": "2026-10-04T03:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=year;month=calendar"
+  },
+  {
+   "name": "v2 quý",
+   "period_type": "quarter",
+   "from_date": "2026-01-01",
+   "to_date": "2026-12-31",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+   "deadline": {
+    "offset_days": 1,
+    "time": "10:00"
+   },
+   "close_after_days": 3,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "2026-Q1",
+     "label": "Quý I/2026",
+     "range_label": "01/01–31/03/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-01-01",
+     "to_date": "2026-03-31",
+     "due_at": "2026-04-01T03:00:00Z",
+     "auto_close_at": "2026-04-04T03:00:00Z"
+    },
+    {
+     "slot": 2,
+     "key": "2026-Q2",
+     "label": "Quý II/2026",
+     "range_label": "01/04–30/06/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-04-01",
+     "to_date": "2026-06-30",
+     "due_at": "2026-07-01T03:00:00Z",
+     "auto_close_at": "2026-07-04T03:00:00Z"
+    },
+    {
+     "slot": 3,
+     "key": "2026-Q3",
+     "label": "Quý III/2026",
+     "range_label": "01/07–29/09/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-07-01",
+     "to_date": "2026-09-29",
+     "due_at": "2026-09-30T03:00:00Z",
+     "auto_close_at": "2026-10-03T03:00:00Z"
+    },
+    {
+     "slot": 4,
+     "key": "2026-Q4",
+     "label": "Quý IV/2026",
+     "range_label": "30/09–29/12/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-09-30",
+     "to_date": "2026-12-29",
+     "due_at": "2026-12-30T03:00:00Z",
+     "auto_close_at": "2027-01-02T03:00:00Z"
+    },
+    {
+     "slot": 5,
+     "key": "2027-Q1",
+     "label": "Quý I/2027",
+     "range_label": "30/12–31/12/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-12-30",
+     "to_date": "2026-12-31",
+     "due_at": "2027-01-01T03:00:00Z",
+     "auto_close_at": "2027-01-04T03:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+  },
+  {
+   "name": "v2 năm",
+   "period_type": "year",
+   "from_date": "2025-12-31",
+   "to_date": "2027-01-05",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+   "deadline": {
+    "offset_days": 1,
+    "time": "10:00"
+   },
+   "close_after_days": 3,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "2026",
+     "label": "Năm 2026",
+     "range_label": "31/12/2025–29/12/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2025-12-31",
+     "to_date": "2026-12-29",
+     "due_at": "2026-12-30T03:00:00Z",
+     "auto_close_at": "2027-01-02T03:00:00Z"
+    },
+    {
+     "slot": 2,
+     "key": "2027",
+     "label": "Năm 2027",
+     "range_label": "30/12/2026–05/01/2027",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-12-30",
+     "to_date": "2027-01-05",
+     "due_at": "2027-01-06T03:00:00Z",
+     "auto_close_at": "2027-01-09T03:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+  },
+  {
+   "name": "v2 ngày",
+   "period_type": "day",
+   "from_date": "2026-02-27",
+   "to_date": "2026-03-02",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+   "deadline": {
+    "offset_days": 1,
+    "time": "09:00"
+   },
+   "close_after_days": 0,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "2026-02-27",
+     "label": "Ngày 27/02/2026",
+     "range_label": "27/02–27/02/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-02-27",
+     "to_date": "2026-02-27",
+     "due_at": "2026-02-28T02:00:00Z",
+     "auto_close_at": "2026-02-28T02:00:00Z"
+    },
+    {
+     "slot": 2,
+     "key": "2026-02-28",
+     "label": "Ngày 28/02/2026",
+     "range_label": "28/02–28/02/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-02-28",
+     "to_date": "2026-02-28",
+     "due_at": "2026-03-01T02:00:00Z",
+     "auto_close_at": "2026-03-01T02:00:00Z"
+    },
+    {
+     "slot": 3,
+     "key": "2026-03-01",
+     "label": "Ngày 01/03/2026",
+     "range_label": "01/03–01/03/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-03-01",
+     "to_date": "2026-03-01",
+     "due_at": "2026-03-02T02:00:00Z",
+     "auto_close_at": "2026-03-02T02:00:00Z"
+    },
+    {
+     "slot": 4,
+     "key": "2026-03-02",
+     "label": "Ngày 02/03/2026",
+     "range_label": "02/03–02/03/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-03-02",
+     "to_date": "2026-03-02",
+     "due_at": "2026-03-03T02:00:00Z",
+     "auto_close_at": "2026-03-03T02:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+  },
+  {
+   "name": "v2 tuần KSGM",
+   "period_type": "ksgm_week",
+   "from_date": "2026-02-01",
+   "to_date": "2026-03-10",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+   "deadline": {
+    "offset_days": 1,
+    "time": "12:00"
+   },
+   "close_after_days": 0,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "2026-02-K1",
+     "label": "Tuần KSGM 1 tháng 2/2026",
+     "range_label": "01/02–07/02/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-02-01",
+     "to_date": "2026-02-07",
+     "due_at": "2026-02-08T05:00:00Z",
+     "auto_close_at": "2026-02-08T05:00:00Z"
+    },
+    {
+     "slot": 2,
+     "key": "2026-02-K2",
+     "label": "Tuần KSGM 2 tháng 2/2026",
+     "range_label": "08/02–14/02/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-02-08",
+     "to_date": "2026-02-14",
+     "due_at": "2026-02-15T05:00:00Z",
+     "auto_close_at": "2026-02-15T05:00:00Z"
+    },
+    {
+     "slot": 3,
+     "key": "2026-02-K3",
+     "label": "Tuần KSGM 3 tháng 2/2026",
+     "range_label": "15/02–21/02/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-02-15",
+     "to_date": "2026-02-21",
+     "due_at": "2026-02-22T05:00:00Z",
+     "auto_close_at": "2026-02-22T05:00:00Z"
+    },
+    {
+     "slot": 4,
+     "key": "2026-02-K4",
+     "label": "Tuần KSGM 4 tháng 2/2026",
+     "range_label": "22/02–28/02/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-02-22",
+     "to_date": "2026-02-28",
+     "due_at": "2026-03-01T05:00:00Z",
+     "auto_close_at": "2026-03-01T05:00:00Z"
+    },
+    {
+     "slot": 5,
+     "key": "2026-03-K1",
+     "label": "Tuần KSGM 1 tháng 3/2026",
+     "range_label": "01/03–07/03/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-03-01",
+     "to_date": "2026-03-07",
+     "due_at": "2026-03-08T05:00:00Z",
+     "auto_close_at": "2026-03-08T05:00:00Z"
+    },
+    {
+     "slot": 6,
+     "key": "2026-03-K2",
+     "label": "Tuần KSGM 2 tháng 3/2026",
+     "range_label": "08/03–10/03/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-03-08",
+     "to_date": "2026-03-10",
+     "due_at": "2026-03-11T05:00:00Z",
+     "auto_close_at": "2026-03-11T05:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+  },
+  {
+   "name": "v2 vụ",
+   "period_type": "season",
+   "from_date": "2026-09-01",
+   "to_date": "2026-12-31",
+   "season_label": "Thu Đông 2026",
+   "rule": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+   "deadline": {
+    "offset_days": 7,
+    "time": "17:00"
+   },
+   "close_after_days": 3,
+   "periods": [
+    {
+     "slot": 1,
+     "key": "",
+     "label": "Thu Đông 2026",
+     "range_label": "01/09–31/12/2026",
+     "iso_week": 0,
+     "week_year": 0,
+     "from_date": "2026-09-01",
+     "to_date": "2026-12-31",
+     "due_at": "2027-01-07T10:00:00Z",
+     "auto_close_at": "2027-01-10T10:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+  },
+  {
+   "name": "v2 quá số kỳ ngày",
+   "period_type": "day",
+   "from_date": "2026-01-01",
+   "to_date": "2027-01-02",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+   "deadline": {
+    "offset_days": 1,
+    "time": "09:00"
+   },
+   "close_after_days": 0,
+   "periods": [],
+   "error": {
+    "Field": "to_date",
+    "Msg": "tối đa 366 kỳ mỗi đợt"
+   },
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+  },
+  {
+   "name": "v2 loại kỳ lạ",
+   "period_type": "fortnight",
+   "from_date": "2026-09-07",
+   "to_date": "2026-09-13",
+   "season_label": "",
+   "rule": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+   "deadline": {
+    "offset_days": 1,
+    "time": "12:00"
+   },
+   "close_after_days": 3,
+   "periods": [],
+   "error": {
+    "Field": "period_type",
+    "Msg": "day | week | ksgm_week | month | quarter | season | year | adhoc"
+   },
+   "rule_tag": "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
   }
  ],
  "status": [

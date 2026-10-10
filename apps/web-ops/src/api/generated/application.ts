@@ -2597,8 +2597,12 @@ export interface paths {
         put?: never;
         /**
          * Xem trước đợt phát hành: kỳ đã chia, số công việc = biểu × xã × kỳ, xã chưa có cán bộ
-         * @description Không ghi gì. Quy tắc chia kỳ Q-17 TẠM (tuần thứ Hai–Chủ nhật, nhãn "Tuần n của đợt" hoặc ISO theo tham số
-         *     extension.report_period_week_numbering); hạn mặc định tuần = Thứ Ba tuần sau 17:00, tháng = ngày 10 tháng sau.
+         * @description Không ghi gì. Lịch kỳ hệ thống v2 (W11.03, QĐ-6 đề xuất, chờ Q-045): quy tắc lấy từ tham số
+         *     extension.report_period_rule có hiệu lực tại from_date (nạp sẵn "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+         *     từ 04/11/2026; trước đó/chưa có phiên bản → v1):
+         *     tuần báo cáo Thứ Tư–Thứ Ba, nhãn "Tuần 41/2026" (tuần chứa 01/01 là tuần 1), tháng/quý/năm = các tuần có Thứ Ba
+         *     thuộc kỳ. Hạn mặc định v2: tuần = 12:00 ngày sau ngày cuối kỳ, tháng = 10:00 Thứ Tư sau Thứ Ba cuối tháng.
+         *     Đợt đã phát hành giữ period_rule đã ghi (v1 "kn.period_rule/v1-tam;week=season": tuần thứ Hai–Chủ nhật).
          */
         post: operations["rcPreviewBatch"];
         delete?: never;
@@ -9679,6 +9683,7 @@ export interface components {
             slot: number;
             label: string;
             range_label: string;
+            /** @description Số tuần của năm theo period_rule của đợt (v1: ISO 8601; v2: tuần chứa 01/01 là tuần 1); null nếu không phải kỳ tuần */
             iso_week: number | null;
             /** Format: date */
             from_date: string;

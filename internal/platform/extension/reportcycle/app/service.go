@@ -16,6 +16,7 @@ import (
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/store"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -197,15 +198,37 @@ func (s *Service) paramInt(ctx context.Context, key string, def int) int {
 	return int(v.Value.IntPart())
 }
 
-func (s *Service) paramText(ctx context.Context, key, def string) string {
+// periodRule trả quy tắc chia kỳ (port.ParamPeriodRule) có hiệu lực lúc 00:00 giờ VN của ngày đầu đợt from — quy
+// tắc mới chỉ áp dụng cho đợt bắt đầu từ ngày hiệu lực của phiên bản tham số; đợt đã phát hành giữ period_rule đã
+// ghi. Chưa có phiên bản hiệu lực → domain.LegacyRule (W11.03).
+func (s *Service) periodRule(ctx context.Context, from time.Time) domain.PeriodRule {
 	if s.Params == nil {
-		return def
+		return domain.LegacyRule
 	}
-	v, err := s.Params.At(ctx, key, s.now())
-	if err != nil || v.Text == "" {
-		return def
+	v, err := s.Params.At(ctx, port.ParamPeriodRule, time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, clock.Zone()))
+	if err != nil {
+		return domain.LegacyRule
 	}
-	return v.Text
+	return domain.EffectiveRule(v.Text)
+}
+
+// ksgmStarts đọc ranh giới tuần KSGM từng tháng (port.ParamKSGMWeekStarts:YYYY-MM) có hiệu lực tại ngày 1 của tháng.
+func (s *Service) ksgmStarts(ctx context.Context) domain.KSGMStarts {
+	if s.Params == nil {
+		return nil
+	}
+	return func(y int, m time.Month) []int {
+		first := domain.Date(y, m, 1)
+		v, err := s.Params.At(ctx, port.ParamKSGMWeekStarts+":"+first.Format("2006-01"), time.Date(y, m, 1, 0, 0, 0, 0, clock.Zone()))
+		if err != nil || v.Text == "" {
+			return nil
+		}
+		st, err := domain.ParseKSGMStarts(v.Text)
+		if err != nil {
+			return nil
+		}
+		return st
+	}
 }
 
 func idemOr(key, suffix string) string {

@@ -65,6 +65,7 @@
     {"key": "mrv.urgent.min_area_ha", "value": "5", "unit": "ha", "effective_from": "2026-01-01", "source_doc": "KN US-MRV-04 — diện tích ảnh hưởng từ đó bật Cảnh báo khẩn (TẠM, chờ khách)"},
     {"key": "mrv.awd.activity_codes", "text": "tuoi_nuoc", "unit": "", "effective_from": "2026-01-01", "source_doc": "KN FR-08 — mã hoạt động nhật ký HTX coi là ghi AWD (TẠM, chờ danh mục htx_farm_log chốt C-1)"},
     {"key": "mrv.review_sla_hours", "value": "72", "unit": "giờ", "effective_from": "2026-01-01", "source_doc": "KN US-MRV-06 — thời hạn xử lý hồ sơ MRV chờ duyệt; quá hạn báo người duyệt (TẠM, BRD chưa có số)"},
-    {"key": "mrv.review_escalate_hours", "value": "120", "unit": "giờ", "effective_from": "2026-01-01", "source_doc": "KN US-MRV-06 — quá hạn này leo thang lên quản trị TTKN tỉnh (TẠM, BRD chưa có số)"}
+    {"key": "mrv.review_escalate_hours", "value": "120", "unit": "giờ", "effective_from": "2026-01-01", "source_doc": "KN US-MRV-06 — quá hạn này leo thang lên quản trị TTKN tỉnh (TẠM, BRD chưa có số)"},
+    {"key": "extension.report_period_rule", "text": "kn.period_rule/v2;week_start=wed;week=year;month=week_end", "unit": "", "effective_from": "2026-11-04", "source_doc": "W11.03 lịch kỳ hệ thống — QĐ-6 đề xuất: tuần báo cáo Thứ Tư–Thứ Ba, tháng/quý/năm theo Thứ Ba cuối (KHTC v2.2 GD-05, BR-DL-01) (TẠM, chờ PO chốt Q-045)"}
   ]
 }

@@ -26,9 +26,11 @@ type fxDeadline struct {
 
 type fxPeriod struct {
 	Slot        int    `json:"slot"`
+	Key         string `json:"key"`
 	Label       string `json:"label"`
 	RangeLabel  string `json:"range_label"`
 	ISOWeek     int    `json:"iso_week"`
+	WeekYear    int    `json:"week_year"`
 	From        string `json:"from_date"`
 	To          string `json:"to_date"`
 	DueAt       string `json:"due_at"`
@@ -41,7 +43,7 @@ type fxSplit struct {
 	From           string      `json:"from_date"`
 	To             string      `json:"to_date"`
 	Season         string      `json:"season_label"`
-	WeekNumbering  string      `json:"week_numbering"`
+	Rule           string      `json:"rule"`
 	Deadline       fxDeadline  `json:"deadline"`
 	CloseAfterDays int         `json:"close_after_days"`
 	Periods        []fxPeriod  `json:"periods"`
@@ -99,6 +101,7 @@ type webFixture struct {
 	Note       string                `json:"_note"`
 	Statuses   map[string]string     `json:"status_labels"`
 	Defaults   map[string]fxDeadline `json:"default_deadlines"`
+	DefaultsV2 map[string]fxDeadline `json:"default_deadlines_v2"`
 	CloseAfter int                   `json:"default_close_after_days"`
 	MaxPeriods int                   `json:"max_periods"`
 	Split      []fxSplit             `json:"split"`
@@ -119,6 +122,7 @@ func TestWebReportCycleFixture(t *testing.T) {
 		Note:       "SINH TỰ ĐỘNG bởi TestWebReportCycleFixture (internal/platform/extension/reportcycle/domain) — không sửa tay.",
 		Statuses:   StatusLabel,
 		Defaults:   map[string]fxDeadline{},
+		DefaultsV2: map[string]fxDeadline{},
 		CloseAfter: DefaultCloseAfterDays,
 		MaxPeriods: MaxPeriods,
 	}
@@ -126,31 +130,55 @@ func TestWebReportCycleFixture(t *testing.T) {
 		d := DefaultDeadline(pt)
 		fx.Defaults[pt] = fxDeadline(d)
 	}
-	type sc struct {
-		name, pt, from, to, season, numbering string
-		d                                     Deadline
-		closeAfter                            int
+	for _, pt := range []string{PeriodDay, PeriodWeek, PeriodKSGMWeek, PeriodMonth, PeriodQuarter, PeriodSeason, PeriodYear, PeriodAdhoc} {
+		fx.DefaultsV2[pt] = fxDeadline(DefaultRule.DefaultDeadline(pt))
 	}
+	type sc struct {
+		name, pt, from, to, season, rule string
+		d                                Deadline
+		closeAfter                       int
+	}
+	v2 := DefaultRule.Tag()
+	v2d := DefaultRule.DefaultDeadline
 	cases := []sc{
-		{"tuần từ thứ Tư, 3 kỳ", PeriodWeek, "2026-09-02", "2026-09-20", "Thu Đông 2026", WeekNumberingSeason, DefaultDeadline(PeriodWeek), 3},
-		{"tuần ISO", PeriodWeek, "2026-09-07", "2026-09-27", "", WeekNumberingISO, DefaultDeadline(PeriodWeek), 1},
-		{"tuần qua năm", PeriodWeek, "2026-12-21", "2027-01-10", "Đông Xuân 2026-2027", WeekNumberingSeason, Deadline{OffsetDays: 1, Time: "08:30"}, 0},
-		{"tháng", PeriodMonth, "2026-07-15", "2026-09-30", "", WeekNumberingSeason, DefaultDeadline(PeriodMonth), 3},
-		{"vụ", PeriodSeason, "2026-09-01", "2026-12-31", "Thu Đông 2026", WeekNumberingSeason, DefaultDeadline(PeriodSeason), 3},
-		{"năm không tên", PeriodYear, "2026-01-01", "2026-12-31", "", WeekNumberingSeason, DefaultDeadline(PeriodYear), 5},
-		{"đột xuất", PeriodAdhoc, "2026-10-01", "2026-10-03", "Rà soát sau lũ", WeekNumberingSeason, DefaultDeadline(PeriodAdhoc), 2},
-		{"đến ngày trước từ ngày", PeriodWeek, "2026-09-07", "2026-09-01", "", WeekNumberingSeason, DefaultDeadline(PeriodWeek), 3},
-		{"quá số kỳ", PeriodWeek, "2025-01-01", "2026-12-31", "", WeekNumberingSeason, DefaultDeadline(PeriodWeek), 3},
-		{"giờ sai", PeriodWeek, "2026-09-07", "2026-09-13", "", WeekNumberingSeason, Deadline{OffsetDays: 2, Time: "25:00"}, 3},
-		{"chốt sau hạn quá 60", PeriodWeek, "2026-09-07", "2026-09-13", "", WeekNumberingSeason, DefaultDeadline(PeriodWeek), 61},
-		{"loại kỳ lạ", "quarter", "2026-09-07", "2026-09-13", "", WeekNumberingSeason, DefaultDeadline(PeriodWeek), 3},
+		{"tuần từ thứ Tư, 3 kỳ", PeriodWeek, "2026-09-02", "2026-09-20", "Thu Đông 2026", "kn.period_rule/v1-tam;week=season", DefaultDeadline(PeriodWeek), 3},
+		{"tuần ISO", PeriodWeek, "2026-09-07", "2026-09-27", "", "kn.period_rule/v1-tam;week=iso", DefaultDeadline(PeriodWeek), 1},
+		{"tuần qua năm", PeriodWeek, "2026-12-21", "2027-01-10", "Đông Xuân 2026-2027", "kn.period_rule/v1-tam;week=season", Deadline{OffsetDays: 1, Time: "08:30"}, 0},
+		{"tháng", PeriodMonth, "2026-07-15", "2026-09-30", "", "kn.period_rule/v1-tam;week=season", DefaultDeadline(PeriodMonth), 3},
+		{"vụ", PeriodSeason, "2026-09-01", "2026-12-31", "Thu Đông 2026", "kn.period_rule/v1-tam;week=season", DefaultDeadline(PeriodSeason), 3},
+		{"năm không tên", PeriodYear, "2026-01-01", "2026-12-31", "", "kn.period_rule/v1-tam;week=season", DefaultDeadline(PeriodYear), 5},
+		{"đột xuất", PeriodAdhoc, "2026-10-01", "2026-10-03", "Rà soát sau lũ", "kn.period_rule/v1-tam;week=season", DefaultDeadline(PeriodAdhoc), 2},
+		{"đến ngày trước từ ngày", PeriodWeek, "2026-09-07", "2026-09-01", "", "kn.period_rule/v1-tam;week=season", DefaultDeadline(PeriodWeek), 3},
+		{"quá số kỳ", PeriodWeek, "2025-01-01", "2026-12-31", "", "kn.period_rule/v1-tam;week=season", DefaultDeadline(PeriodWeek), 3},
+		{"giờ sai", PeriodWeek, "2026-09-07", "2026-09-13", "", "kn.period_rule/v1-tam;week=season", Deadline{OffsetDays: 2, Time: "25:00"}, 3},
+		{"chốt sau hạn quá 60", PeriodWeek, "2026-09-07", "2026-09-13", "", "kn.period_rule/v1-tam;week=season", DefaultDeadline(PeriodWeek), 61},
+		{"loại kỳ lạ", "quarter", "2026-09-07", "2026-09-13", "", "kn.period_rule/v1-tam;week=season", DefaultDeadline(PeriodWeek), 3},
+		// Quy tắc v2 (W11.03, QĐ-6): tuần Thứ Tư–Thứ Ba, số tuần theo năm, tháng/quý/năm theo Thứ Ba cuối.
+		{"v2 tuần Thứ Tư–Thứ Ba", PeriodWeek, "2026-09-02", "2026-09-22", "Thu Đông 2026", v2, v2d(PeriodWeek), 3},
+		{"v2 tuần cắt đầu/cuối, qua năm", PeriodWeek, "2026-12-28", "2027-01-08", "", v2, v2d(PeriodWeek), 0},
+		{"v2 tuần 53 (2030)", PeriodWeek, "2030-12-25", "2031-01-07", "", v2, v2d(PeriodWeek), 0},
+		{"v2 tuần n của đợt", PeriodWeek, "2026-09-02", "2026-09-15", "", "kn.period_rule/v2;week=season", v2d(PeriodWeek), 1},
+		{"v2 tuần ISO thứ Hai (53/2026)", PeriodWeek, "2026-12-21", "2027-01-10", "", "kn.period_rule/v2;week_start=mon;week=iso;month=calendar", v2d(PeriodWeek), 0},
+		{"v2 tuần thứ Ba–thứ Hai (CNTS)", PeriodWeek, "2026-09-22", "2026-10-05", "", "kn.period_rule/v2;week_start=tue", v2d(PeriodWeek), 0},
+		{"v2 tháng theo Thứ Ba cuối", PeriodMonth, "2026-07-15", "2026-09-30", "", v2, v2d(PeriodMonth), 3},
+		{"v2 tháng dương lịch", PeriodMonth, "2026-07-15", "2026-09-30", "", "kn.period_rule/v2;month=calendar", DefaultRule.DefaultDeadline(PeriodMonth), 3},
+		{"v2 quý", PeriodQuarter, "2026-01-01", "2026-12-31", "", v2, v2d(PeriodQuarter), 3},
+		{"v2 năm", PeriodYear, "2025-12-31", "2027-01-05", "", v2, v2d(PeriodYear), 3},
+		{"v2 ngày", PeriodDay, "2026-02-27", "2026-03-02", "", v2, v2d(PeriodDay), 0},
+		{"v2 tuần KSGM", PeriodKSGMWeek, "2026-02-01", "2026-03-10", "", v2, v2d(PeriodKSGMWeek), 0},
+		{"v2 vụ", PeriodSeason, "2026-09-01", "2026-12-31", "Thu Đông 2026", v2, v2d(PeriodSeason), 3},
+		{"v2 quá số kỳ ngày", PeriodDay, "2026-01-01", "2027-01-02", "", v2, v2d(PeriodDay), 0},
+		{"v2 loại kỳ lạ", "fortnight", "2026-09-07", "2026-09-13", "", v2, v2d(PeriodWeek), 3},
 	}
 	for _, c := range cases {
 		from, _ := ParseDate(c.from)
 		to, _ := ParseDate(c.to)
-		rule := PeriodRule{Version: RuleVersion, WeekNumbering: c.numbering}
-		ps, err := Split(c.pt, from, to, c.season, rule, c.d, c.closeAfter, loc)
-		out := fxSplit{Name: c.name, PeriodType: c.pt, From: c.from, To: c.to, Season: c.season, WeekNumbering: c.numbering,
+		rule, err := ParseRule(c.rule)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		ps, err := Split(SplitInput{PeriodType: c.pt, From: from, To: to, SeasonLabel: c.season, Rule: rule, Deadline: c.d, CloseAfterDays: c.closeAfter, Loc: loc})
+		out := fxSplit{Name: c.name, PeriodType: c.pt, From: c.from, To: c.to, Season: c.season, Rule: c.rule,
 			Deadline: fxDeadline{c.d.OffsetDays, c.d.Time}, CloseAfterDays: c.closeAfter, Periods: []fxPeriod{}, RuleTag: rule.Tag()}
 		if err != nil {
 			var e ErrPeriod
@@ -160,7 +188,7 @@ func TestWebReportCycleFixture(t *testing.T) {
 			out.Error = &e
 		}
 		for _, p := range ps {
-			out.Periods = append(out.Periods, fxPeriod{p.Slot, p.Label, p.RangeLabel, p.ISOWeek, p.From.Format(time.DateOnly), p.To.Format(time.DateOnly), fxTime(p.DueAt), fxTime(p.AutoCloseAt)})
+			out.Periods = append(out.Periods, fxPeriod{p.Slot, p.Key, p.Label, p.RangeLabel, p.ISOWeek, p.WeekYear, p.From.Format(time.DateOnly), p.To.Format(time.DateOnly), fxTime(p.DueAt), fxTime(p.AutoCloseAt)})
 		}
 		fx.Split = append(fx.Split, out)
 	}

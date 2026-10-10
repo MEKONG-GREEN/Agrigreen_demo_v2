@@ -184,9 +184,22 @@ export function ReadOnlyNotice({ children }: { children?: ReactNode }) {
 export function ymdLocal(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
-export function mondayLocal(d = new Date()): Date {
+/**
+ * Lịch kỳ hệ thống (W11.03): tham số extension.report_period_rule nạp sẵn tuần báo cáo Thứ Tư–Thứ Ba hiệu lực từ
+ * 04/11/2026; trước đó tuần thứ Hai–Chủ nhật (v1). Chỉ dùng để GỢI Ý ngày mặc định — kỳ thật do máy chủ chia
+ * (Xem trước trả period_rule).
+ */
+export const REPORT_RULE_V2_FROM = "2026-11-04";
+
+/** Thứ đầu tuần báo cáo (0 = Chủ nhật … 6 = thứ Bảy) của tuần chứa ngày d theo lịch kỳ đang hiệu lực. */
+export function reportWeekStart(d = new Date()): number {
+  return ymdLocal(d) >= REPORT_RULE_V2_FROM ? 3 : 1;
+}
+
+/** Ngày đầu tuần (weekStart: 0 = Chủ nhật … 6 = thứ Bảy) chứa d, theo giờ địa phương. */
+export function weekStartLocal(d = new Date(), weekStart = reportWeekStart(d)): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  x.setDate(x.getDate() - ((x.getDay() - weekStart + 7) % 7));
   return x;
 }
 

@@ -14,30 +14,32 @@ import type { FormDefinition } from "@/kn/forms/types";
 import { FormGrid, communeRows } from "@/kn/grid";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
 import type { RcBatchInput, RcFormItem, RcPreview, RcStatusItem, RcTask } from "../api";
-import { LoadState, TaskPill, dt, mondayLocal, toLog, useAction, useCommuneNames, useCycleReadOnly, useLoad, ymdLocal } from "../common";
+import { LoadState, TaskPill, dt, toLog, useAction, useCommuneNames, useCycleReadOnly, useLoad, weekStartLocal, ymdLocal } from "../common";
 
 
+// Hạn tính từ ngày cuối kỳ; "" = hạn mặc định của lịch kỳ máy chủ (v2: tuần → 12:00 Thứ Tư sau kỳ; W11.03).
 const DEADLINES = [
-  { value: "2|17:00", label: "Thứ Ba tuần sau, 17:00" },
-  { value: "1|17:00", label: "Thứ Hai tuần sau, 17:00" },
-  { value: "0|17:00", label: "Chủ nhật cuối kỳ, 17:00" },
-  { value: "3|11:00", label: "Thứ Tư tuần sau, 11:00" },
+  { value: "", label: "Mặc định theo lịch kỳ" },
+  { value: "1|12:00", label: "1 ngày sau ngày cuối kỳ, 12:00" },
+  { value: "1|17:00", label: "1 ngày sau ngày cuối kỳ, 17:00" },
+  { value: "0|17:00", label: "Ngày cuối kỳ, 17:00" },
+  { value: "2|11:00", label: "2 ngày sau ngày cuối kỳ, 11:00" },
 ];
 
 /** FN-TI-02.02 Phát hành biểu mẫu báo cáo (Hình 7). */
 export function PublishScreen() {
   const { cycleApi } = useAuth();
   const router = useRouter();
-  const mon = mondayLocal();
+  const ws = weekStartLocal();
   const [rt, setRt] = useState<"weekly" | "monthly" | "seasonal">("weekly");
   const [picked, setPicked] = useState<string[]>([]);
   const [mode, setMode] = useState<"province" | "regions" | "communes">("province");
   const [regions, setRegions] = useState<string[]>([]);
   const [communes, setCommunes] = useState<string[]>([]);
-  const [from, setFrom] = useState(ymdLocal(mon));
-  const [to, setTo] = useState(ymdLocal(new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 27)));
+  const [from, setFrom] = useState(ymdLocal(ws));
+  const [to, setTo] = useState(ymdLocal(new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 27)));
   const [season, setSeason] = useState("Thu Đông 2026");
-  const [deadline, setDeadline] = useState("2|17:00");
+  const [deadline, setDeadline] = useState("");
   const [closeAfter, setCloseAfter] = useState(1);
   const [note, setNote] = useState("");
   const [pv, setPv] = useState<Record<string, Record<string, Record<string, string>>>>({});
@@ -55,7 +57,7 @@ export function PublishScreen() {
       from_date: from,
       to_date: to,
       season_label: season,
-      deadline: { offset_days: Number(offset), time: time! },
+      ...(deadline ? { deadline: { offset_days: Number(offset), time: time! } } : {}),
       close_after_days: closeAfter,
       ...(note ? { note } : {}),
       provincial_values: pv,

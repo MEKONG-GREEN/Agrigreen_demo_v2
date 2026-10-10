@@ -36,14 +36,20 @@ const (
 	ReminderAutoOverdue = "auto_overdue" // tự nhắc khi trễ hạn
 )
 
-// Khóa tham số (pf/masterdata) — TẠM, chờ khách (Q-15, Q-17).
+// Khóa tham số (pf/masterdata) — TẠM, chờ khách (Q-15, Q-045).
 const (
 	// ParamReminderBeforeHours: tự nhắc khi còn ≤ n giờ tới hạn mà chưa gửi. Mặc định 24; 0 = tắt.
 	ParamReminderBeforeHours = "extension.report_reminder_before_hours"
 	// ParamReminderOverdueEveryHours: khi trễ hạn, nhắc lại mỗi n giờ tới khi chốt kỳ. Mặc định 24; 0 = tắt.
 	ParamReminderOverdueEveryHours = "extension.report_reminder_overdue_every_hours"
-	// ParamPeriodWeekNumbering: "season" (Tuần n của đợt, mặc định) hoặc "iso" (Tuần ISO, vd Tuần 36) — Q-17.
-	ParamPeriodWeekNumbering = "extension.report_period_week_numbering"
+	// ParamPeriodRule: quy tắc chia kỳ (lịch kỳ hệ thống, W11.03) — Text = reportcycle/domain.PeriodRule.Tag(), vd
+	// "kn.period_rule/v2;week_start=wed;week=year;month=week_end". Tra lúc 00:00 giờ VN ngày đầu đợt/kỳ; chưa có
+	// phiên bản hiệu lực → LegacyRule (v1). Dữ liệu nền nạp DefaultRule (QĐ-6 đề xuất) hiệu lực 2026-11-04.
+	// Thay khóa tạm Q-17 "extension.report_period_week_numbering" (đã bỏ).
+	ParamPeriodRule = "extension.report_period_rule"
+	// ParamKSGMWeekStarts: ranh giới 4 tuần KSGM của một tháng, khóa có chiều ":YYYY-MM", Text "1,10,16,23";
+	// vắng → 1,8,15,22 (CNTS H04).
+	ParamKSGMWeekStarts = "extension.ksgm_week_starts"
 	// ParamAttachmentLimitMB (pf/reports): giới hạn tổng dung lượng đính kèm email Chi cục. Mặc định 10.
 	ParamAttachmentLimitMB = "reports.dispatch_attachment_limit_mb"
 )

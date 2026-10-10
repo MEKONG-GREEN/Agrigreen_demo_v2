@@ -161,7 +161,8 @@ func (s *Service) preview(ctx context.Context, a actor, in BatchInput, strict bo
 	if n := len([]rune(in.SeasonLabel)); n < 1 || n > 120 {
 		return pv, problem.Validation.WithField("season_label", "bắt buộc, tối đa 120 ký tự (vd Thu Đông 2026)")
 	}
-	pv.Deadline = domain.DefaultDeadline(pt)
+	pv.Rule = s.periodRule(ctx, from)
+	pv.Deadline = pv.Rule.DefaultDeadline(pt)
 	if in.Deadline != nil {
 		pv.Deadline = *in.Deadline
 	}
@@ -169,11 +170,8 @@ func (s *Service) preview(ctx context.Context, a actor, in BatchInput, strict bo
 	if in.CloseAfterDays != nil {
 		pv.CloseAfterDays = *in.CloseAfterDays
 	}
-	pv.Rule = domain.DefaultRule
-	if v := s.paramText(ctx, port.ParamPeriodWeekNumbering, ""); v == domain.WeekNumberingISO || v == domain.WeekNumberingSeason {
-		pv.Rule.WeekNumbering = v
-	}
-	pv.Periods, err = domain.Split(pt, from, to, in.SeasonLabel, pv.Rule, pv.Deadline, pv.CloseAfterDays, clock.Zone())
+	pv.Periods, err = domain.Split(domain.SplitInput{PeriodType: pt, From: from, To: to, SeasonLabel: in.SeasonLabel, Rule: pv.Rule,
+		Deadline: pv.Deadline, CloseAfterDays: pv.CloseAfterDays, Loc: clock.Zone(), KSGM: s.ksgmStarts(ctx)})
 	if err != nil {
 		var pe domain.ErrPeriod
 		if errors.As(err, &pe) {

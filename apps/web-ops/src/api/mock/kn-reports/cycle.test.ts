@@ -79,6 +79,14 @@ describe("vòng đời báo cáo giả lập (P4)", () => {
     expect([pv.form_count, pv.commune_count, pv.period_count, pv.task_count]).toEqual([1, 3, 3, 9]);
     expect(pv.communes_without_officer).toEqual(["91307"]);
     expect(pv.periods[0]).toMatchObject({ label: "Tuần 1", range_label: "28/09–04/10/2026", due_at: "2026-10-06T10:00:00Z" });
+    expect(pv.period_rule).toBe("kn.period_rule/v1-tam;week=season");
+    // W11.03: đợt bắt đầu từ ngày hiệu lực tham số lịch kỳ v2 (04/11/2026) chia theo tuần báo cáo Thứ Tư–Thứ Ba.
+    const v2 = await tinh.preview({ ...input, from_date: "2026-11-04", to_date: "2026-11-17" });
+    expect(v2.period_rule).toBe("kn.period_rule/v2;week_start=wed;week=year;month=week_end");
+    expect(v2.periods.map((p) => [p.label, p.range_label, p.due_at])).toEqual([
+      ["Tuần 45/2026", "04/11–10/11/2026", "2026-11-11T05:00:00Z"],
+      ["Tuần 46/2026", "11/11–17/11/2026", "2026-11-18T05:00:00Z"],
+    ]);
     const { batch, periods } = await tinh.issue(input);
     // Cấp Quốc gia chỉ xem.
     const tw = await clientFor("kn-quan", "asg-quan-tw");

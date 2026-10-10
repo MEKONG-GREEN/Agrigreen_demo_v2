@@ -12,10 +12,17 @@ import (
 
 var vn = time.FixedZone("ICT", 7*3600)
 
-// FN-TI-02.02 "hệ thống tự chia các kỳ" (Q-17 tạm): tuần thứ Hai–Chủ nhật, kỳ đầu/cuối cắt theo khoảng ngày; nhãn
-// "Tuần n của đợt" hoặc tuần ISO; hạn = cuối kỳ + n ngày lúc HH:MM giờ Việt Nam; giờ chốt = hạn + số ngày chốt.
+func splitV1(pt string, from, to time.Time, season string, numbering string, d Deadline, closeAfter int) ([]Period, error) {
+	r := LegacyRule
+	r.WeekNumbering = numbering
+	return Split(SplitInput{PeriodType: pt, From: from, To: to, SeasonLabel: season, Rule: r, Deadline: d, CloseAfterDays: closeAfter, Loc: vn})
+}
+
+// FN-TI-02.02 "hệ thống tự chia các kỳ" — quy tắc v1 (Q-17 cũ, giữ để tái tạo đợt đã phát hành): tuần thứ
+// Hai–Chủ nhật, kỳ đầu/cuối cắt theo khoảng ngày; nhãn "Tuần n của đợt" hoặc tuần ISO; hạn = cuối kỳ + n ngày lúc
+// HH:MM giờ Việt Nam; giờ chốt = hạn + số ngày chốt. Quy tắc v2: period_test.go.
 func TestFN_TI_02_02_SplitWeeks(t *testing.T) {
-	ps, err := Split(PeriodWeek, Date(2026, 9, 2), Date(2026, 9, 20), "Thu Đông 2026", DefaultRule, DefaultDeadline(PeriodWeek), 3, vn)
+	ps, err := splitV1(PeriodWeek, Date(2026, 9, 2), Date(2026, 9, 20), "Thu Đông 2026", WeekNumberingSeason, DefaultDeadline(PeriodWeek), 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,25 +35,28 @@ func TestFN_TI_02_02_SplitWeeks(t *testing.T) {
 	if ps[1].DueAt != time.Date(2026, 9, 15, 10, 0, 0, 0, time.UTC) || ps[1].AutoCloseAt != time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC) {
 		t.Fatalf("hạn Thứ Ba tuần sau 17:00, chốt +3 ngày: %v %v", ps[1].DueAt, ps[1].AutoCloseAt)
 	}
-	iso, _ := Split(PeriodWeek, Date(2026, 9, 7), Date(2026, 9, 13), "", PeriodRule{Version: RuleVersion, WeekNumbering: WeekNumberingISO}, DefaultDeadline(PeriodWeek), 0, vn)
+	iso, _ := splitV1(PeriodWeek, Date(2026, 9, 7), Date(2026, 9, 13), "", WeekNumberingISO, DefaultDeadline(PeriodWeek), 0)
 	if iso[0].Label != "Tuần 37" {
 		t.Fatalf("tuần ISO: %s", iso[0].Label)
 	}
-	ms, _ := Split(PeriodMonth, Date(2026, 7, 15), Date(2026, 9, 30), "", DefaultRule, DefaultDeadline(PeriodMonth), 3, vn)
+	ms, _ := splitV1(PeriodMonth, Date(2026, 7, 15), Date(2026, 9, 30), "", WeekNumberingSeason, DefaultDeadline(PeriodMonth), 3)
 	if len(ms) != 3 || ms[0].Label != "Tháng 7/2026" || ms[0].From != Date(2026, 7, 15) || ms[0].DueAt != time.Date(2026, 8, 10, 10, 0, 0, 0, time.UTC) {
 		t.Fatalf("tháng (nộp ngày 10 tháng sau): %+v", ms[0])
 	}
-	if s, _ := Split(PeriodSeason, Date(2026, 9, 1), Date(2026, 12, 31), "Thu Đông 2026", DefaultRule, DefaultDeadline(PeriodSeason), 3, vn); len(s) != 1 || s[0].Label != "Thu Đông 2026" {
+	if s, _ := splitV1(PeriodSeason, Date(2026, 9, 1), Date(2026, 12, 31), "Thu Đông 2026", WeekNumberingSeason, DefaultDeadline(PeriodSeason), 3); len(s) != 1 || s[0].Label != "Thu Đông 2026" {
 		t.Fatalf("vụ = một kỳ: %+v", s)
 	}
-	if _, err := Split(PeriodWeek, Date(2026, 9, 7), Date(2026, 9, 1), "", DefaultRule, DefaultDeadline(PeriodWeek), 3, vn); err == nil {
+	if _, err := splitV1(PeriodWeek, Date(2026, 9, 7), Date(2026, 9, 1), "", WeekNumberingSeason, DefaultDeadline(PeriodWeek), 3); err == nil {
 		t.Fatal("đến ngày trước từ ngày")
 	}
-	if _, err := Split(PeriodWeek, Date(2025, 1, 1), Date(2026, 12, 31), "", DefaultRule, DefaultDeadline(PeriodWeek), 3, vn); err == nil {
+	if _, err := splitV1(PeriodWeek, Date(2025, 1, 1), Date(2026, 12, 31), "", WeekNumberingSeason, DefaultDeadline(PeriodWeek), 3); err == nil {
 		t.Fatal("quá số kỳ tối đa")
 	}
-	if _, err := Split(PeriodWeek, Date(2026, 9, 7), Date(2026, 9, 13), "", DefaultRule, Deadline{OffsetDays: 2, Time: "25:00"}, 3, vn); err == nil {
+	if _, err := splitV1(PeriodWeek, Date(2026, 9, 7), Date(2026, 9, 13), "", WeekNumberingSeason, Deadline{OffsetDays: 2, Time: "25:00"}, 3); err == nil {
 		t.Fatal("giờ sai")
+	}
+	if _, err := splitV1(PeriodQuarter, Date(2026, 7, 1), Date(2026, 9, 30), "", WeekNumberingSeason, DefaultDeadline(PeriodMonth), 3); err == nil {
+		t.Fatal("v1 không có kỳ quý")
 	}
 }
 

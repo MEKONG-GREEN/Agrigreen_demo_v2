@@ -21,6 +21,7 @@ import { Decimal } from "@/kn/grid/decimal";
 import {
   DAY_MS,
   DEFAULT_CLOSE_AFTER_DAYS,
+  LEGACY_RULE,
   PeriodError,
   REPORT_PERIOD_TYPE,
   STATUS_LABEL,
@@ -31,6 +32,7 @@ import {
   ratio,
   reason as checkReason,
   rfc3339,
+  ruleAt,
   ruleTag,
   split,
   taskDisplay,
@@ -42,6 +44,7 @@ import {
   type ChangeKind,
   type Deadline,
   type DisplayStatus,
+  type PeriodRule,
   type ReportType,
   type Row,
   type Source,
@@ -595,6 +598,7 @@ export const runWire = (r: Run) => ({ ...r, actor_display: actorDisplay(r.actor_
 // ---------------------------------------------------------------------------
 export interface BatchPlan {
   report_type: ReportType;
+  rule: PeriodRule;
   period_type: string;
   season_label: string;
   from_date: string;
@@ -614,8 +618,10 @@ export interface BatchPlan {
 
 const REPORT_TYPES: ReportType[] = ["weekly", "monthly", "seasonal", "annual", "adhoc"];
 
-export function planBatch(c: Caller, body: unknown): Result<BatchPlan> {
+/** rule: quy tắc chia kỳ; mặc định = tham số extension.report_period_rule tại from_date (W11.03, ruleAt). */
+export function planBatch(c: Caller, body: unknown, ruleIn?: PeriodRule): Result<BatchPlan> {
   const b = (body ?? {}) as Record<string, unknown>;
+  const rule = ruleIn ?? ruleAt(String(b.from_date ?? ""));
   const rt = b.report_type as ReportType;
   if (!REPORT_TYPES.includes(rt)) return fieldErr("report_type", "weekly | monthly | seasonal | annual | adhoc");
   const pt = REPORT_PERIOD_TYPE[rt];
@@ -633,12 +639,12 @@ export function planBatch(c: Caller, body: unknown): Result<BatchPlan> {
   const note = typeof b.note === "string" && b.note.trim() ? b.note.trim() : null;
   if (note && [...note].length > 2000) return fieldErr("note", "tối đa 2000 ký tự");
   const dl = (b.deadline ?? {}) as Partial<Deadline>;
-  const def = defaultDeadline(pt);
+  const def = defaultDeadline(pt, rule);
   const deadline: Deadline = { offset_days: typeof dl.offset_days === "number" ? dl.offset_days : def.offset_days, time: typeof dl.time === "string" ? dl.time : def.time };
   const closeAfter = typeof b.close_after_days === "number" ? b.close_after_days : DEFAULT_CLOSE_AFTER_DAYS;
   let periods: SplitPeriod[];
   try {
-    periods = split(pt, String(b.from_date ?? ""), String(b.to_date ?? ""), season, "season", deadline, closeAfter);
+    periods = split(pt, String(b.from_date ?? ""), String(b.to_date ?? ""), season, rule, deadline, closeAfter);
   } catch (e) {
     if (e instanceof PeriodError) return fieldErr(e.field, e.msg);
     throw e;
@@ -704,6 +710,7 @@ export function planBatch(c: Caller, body: unknown): Result<BatchPlan> {
   }
   return {
     report_type: rt,
+    rule,
     period_type: pt,
     season_label: season,
     from_date: String(b.from_date),
@@ -726,7 +733,7 @@ export function previewWire(p: BatchPlan) {
   return {
     report_type: p.report_type,
     period_type: p.period_type,
-    period_rule: ruleTag("season"),
+    period_rule: ruleTag(p.rule),
     deadline: p.deadline,
     close_after_days: p.close_after_days,
     forms: p.forms.map((f) => ({
@@ -768,7 +775,7 @@ export function issueBatch(c: Caller, plan: BatchPlan, at = nowMs()): Result<{ b
     season_label: plan.season_label,
     from_date: plan.from_date,
     to_date: plan.to_date,
-    period_rule: ruleTag("season"),
+    period_rule: ruleTag(plan.rule),
     deadline_offset_days: plan.deadline.offset_days,
     deadline_time: plan.deadline.time,
     close_after_days: plan.close_after_days,
@@ -1916,7 +1923,7 @@ export function seed(now = Date.now()): void {
     season_label: "Thu Đông 2026",
     note: "Nộp đủ biểu tuần",
     provincial_values: pv,
-  });
+  }, LEGACY_RULE); // đợt phát hành trước lịch kỳ v2 — giữ quy tắc đã ghi (period_rule v1), không chia/đánh số lại
   if (isErr(plan)) return;
   const issueAt = start - DAY_MS + 7 * 3_600_000;
   const issued = issueBatch(binh, plan, issueAt);
