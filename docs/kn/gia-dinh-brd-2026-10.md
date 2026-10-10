@@ -69,3 +69,18 @@ chiếu v4.3 / BRD KN). Đổi phương án = đổi tham số/seed, không sử
 
 Chưa làm trong gói này: lưu `Key`/`WeekYear` của kỳ vào DB (không có migration); loại báo cáo ngày/quý/KSGM ở
 "Phát hành biểu" Trồng trọt (chờ W11.05/W11.42).
+
+## W11.02 — Đóng khoảng trống Trồng trọt (D3 T1)
+
+| Câu hỏi / mục | Giả định đã lấy | Đổi ở đâu |
+|---|---|---|
+| Q-064 (Q-TT-3) vẽ thửa trên Web | **Hoãn**: chấp nhận "Web xem, Mobile vẽ" (đề xuất của dev). `PlotsScreen` web giữ danh sách + `GapNotice`; vẽ ở app di động (`boundary_screen.dart`) | Làm khi khách bắt buộc: màn vẽ web dùng `/v1/kn/plots` (máy chủ đã đủ: chồng lấn, tối thiểu 3 điểm, KML/GeoJSON) |
+| Q-060 (Q-TT-2) lệch A1–A5 | Giữ nguyên các lệch nội bộ (khóa hẳn sau 3 lần khóa tạm, liên kết kích hoạt, liên kết tải 7 ngày, vẽ tối thiểu 3 điểm) | — |
+| "Báo cáo đột xuất" | Một trang `/kn/bao-cao/dot-xuat` theo vai: Cấp Xã = công việc kỳ `adhoc`; Cấp Tỉnh/Admin = tổng hợp đợt `adhoc`; Cấp Quốc gia = chỉ xem. Màn phát hành thêm loại kỳ "Đột xuất" (một kỳ). Menu vẫn chỉ hiện khi phòng ban có mẫu loại `dot_xuat` | `apps/web-ops/src/app/kn/bao-cao/dot-xuat/page.tsx` |
+| Nạp Tỉnh giao từ Excel (UR-TI-02) | Tệp "rộng": một dòng một xã, cột "Mã xã" + mỗi cột Tỉnh giao tiêu đề "<Mã biểu> <Chữ cột>" (một biểu thì chỉ chữ cột). Máy chủ chỉ đọc tệp (shared/tabular, ô công thức bị từ chối), trả giá trị cho Bước 4; phát hành gửi `provincial_source = excel`. Tệp mẫu CSV UTF-8 dựng ở trình duyệt từ danh sách xã của "Xem trước". Tối đa 500 dòng, 2 MB | `reportcycle/app/provincial_import.go` |
+| Nạp Excel tài khoản nhiều vai trò (UR-AD-04) | Mỗi dòng = một lần gán vai trò; các dòng cùng Email = một tài khoản. Vai trò nhận mã hoặc nhãn ("Cấp Xã"…); vai Admin không nạp qua tệp. "Mã Nút" = mã tổ chức hoặc UUID. Phòng ban/xã phân tách ";". Một dòng lỗi → loại cả tài khoản (không tạo tài khoản thiếu vai). Tối đa 300 dòng | `accounts/app/kn_import.go` |
+| Tab Phiên / Lịch sử đăng nhập | Đọc trực tiếp Keycloak Admin REST, không lưu ở pf. Realm bật lưu sự kiện `LOGIN`, `LOGIN_ERROR`, `LOGOUT`, `CODE_TO_TOKEN_ERROR`, giữ **1 năm** (theo N-13 "nhật ký truy cập ≥ 1 năm"); tài khoản dịch vụ thêm `view-events`. Realm production đã nhập phải áp tay (Realm settings › Events) | `deploy/compose/keycloak/agrigreen-realm.json`, `docs/brd/kn-p1-realm-patch.md` |
+| Đếm theo phòng ban (FN-AD-04.03) | `record_count` = tổng bản ghi mang `department_code` trong tenant (mã phòng ban duy nhất trong tenant, không tách theo đơn vị): công việc báo cáo, lịch công tác, ghi nhận vật tư, mẫu báo cáo, lần gửi Chi cục, dòng máy móc HTX, thửa | `pty.UseDepartmentUsage(...)` ở `cmd/api-platform/assembly/modules.go` |
+| X-12 dữ liệu cũ không phòng ban | Thửa `department_code IS NULL` (có trước v7.7) đọc qua KN là **Phòng Trồng trọt** (`store.LegacyKNDepartment`), không còn hiện ở mọi phòng ban; không UPDATE dữ liệu. Các bảng KN khác đều `NOT NULL` nên không có dữ liệu cũ | `cooperative/plot/store/kn.go` |
+| X-02 PII ở ô tự do | Chỉ **cảnh báo** (không chặn) khi ô ghi chú/lý do/nội dung chứa SĐT, email, số CCCD/CMND — nhận dạng bằng mẫu ở web (`src/kn/pii.tsx`) và mobile (`lib/domain/pii_hint.dart`); máy chủ không quét nội dung | hai tệp trên |
+| Di chuyển Nút xã (FN-AD-04.02 B3) | Dùng Admin API có sẵn `POST /v1/orgs/{ref}/move` (lý do ≥ 10 ký tự, giữ lịch sử, bỏ gán khu vực cũ). Xã sang tỉnh khác mà mã ĐVHC không thuộc tỉnh mới → nhập "Mã ĐVHC mới" (máy chủ kiểm ĐVHC trong địa bàn cha) | `OrgStructureScreen` |

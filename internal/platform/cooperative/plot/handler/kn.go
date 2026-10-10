@@ -31,6 +31,9 @@ func (h Handler) registerKN(rg *gin.RouterGroup) {
 }
 
 func knPlotDTO(p store.Plot, labels map[uuid.UUID]string, withGeom bool) gin.H {
+	if p.Department == "" {
+		p.Department = store.LegacyKNDepartment // X-12: thửa có trước v7.7 đọc qua KN là Phòng Trồng trọt
+	}
 	m := gin.H{
 		"ref": p.Ref.String(), "code": p.Code, "lot_name": strOrNil(p.LotName), "commune_code": p.CommuneCode,
 		"cooperative_ref": refOrNil(p.CooperativeRef), "farmer": nil, "note": strOrNil(p.Note), "area_ha": p.AreaHa.StringFixed(4),

@@ -13,7 +13,7 @@
 import { uuidv7 } from "../idempotency";
 import type { DepartmentRef, KnRole, RoleAssignment, SessionContext } from "@/kn/contract";
 import { NATIONAL_REF, provinceOrgRef } from "./data";
-import { hasRole, json, problem, type Ctx, type Route } from "./http";
+import { hasRole, json, problem, problemOf, type Ctx, type Route } from "./http";
 import { findKnAccount, KN_ACCOUNTS, KN_DEPARTMENTS, KN_MENU_PROFILE, type MockKnAccount } from "./kn-accounts";
 import { dropSupportContexts, knStoredContext, registerKnContext, DEFAULT_ROUTE } from "./kn";
 import { stableUuid } from "./kn-schedules";
@@ -349,9 +349,13 @@ function deptWire(d: DepartmentRef, i: number) {
 // ---------------------------------------------------------------------------
 const communeRef = (code: string) => stableUuid(`org-${code}`);
 
+/** Giả lập FN-AD-04.02 B3: Nút xã đã chuyển sang TTKN tỉnh thứ hai (chỉ để màn cây thể hiện; dữ liệu khác giữ nguyên). */
+const OTHER_PROVINCE_REF = provinceOrgRef(2);
+const MOVED = new Set<string>();
+
 function orgTree() {
   const regionNode = (r: { code: string; name: string } | null) => {
-    const members = AG_COMMUNES.filter((c) => (r ? c.region === r.code : !c.region));
+    const members = AG_COMMUNES.filter((c) => !MOVED.has(c.code) && (r ? c.region === r.code : !c.region));
     return {
       ref: null,
       kind: r ? "region" : "region_unassigned",
@@ -389,7 +393,21 @@ function orgTree() {
         active: true,
         region: null,
         commune_count: AG_COMMUNES.length,
-        children: [{ ref: AG_REF, kind: "ttkn_province", code: "TTKN-AG", name: "TTKN tỉnh An Giang", admin_unit_code: AG_PROVINCE, level: 2, active: true, region: null, commune_count: AG_COMMUNES.length, children: groups }],
+        children: [
+          { ref: AG_REF, kind: "ttkn_province", code: "TTKN-AG", name: "TTKN tỉnh An Giang", admin_unit_code: AG_PROVINCE, level: 2, active: true, region: null, commune_count: AG_COMMUNES.length - MOVED.size, children: groups },
+          {
+            ref: OTHER_PROVINCE_REF,
+            kind: "ttkn_province",
+            code: "TTKN-CT",
+            name: "TTKN tỉnh Cần Thơ",
+            admin_unit_code: "92",
+            level: 2,
+            active: true,
+            region: null,
+            commune_count: MOVED.size,
+            children: AG_COMMUNES.filter((c) => MOVED.has(c.code)).map((c) => ({ ref: communeRef(c.code), kind: "extension_team", code: `AG-${c.code}`, name: c.name, admin_unit_code: c.code, level: 3, active: true, region: null, commune_count: 0, children: [] })),
+          },
+        ],
       },
     ],
   };
@@ -451,6 +469,28 @@ export const knAdminRoutes: Route[] = [
       log(acct, { event: "account.activation_sent", entity_ref: null, actor_ref: ADMIN_REF, changes: [], reason: null });
       return json({ user: userWire(acct), assignments: built.map((x) => assignmentWire(acct, x)), activation_email_sent: true, warnings: built.flatMap(warningsOf) }, 201);
     },
+  },
+  {
+    method: "POST",
+    pattern: re("/v1/accounts/kn-users/import"),
+    handler: (ctx) => importKnUsers(ctx),
+  },
+  {
+    method: "GET",
+    pattern: re("/v1/accounts/users/{id}/sessions"),
+    handler: (ctx) =>
+      withAccount(ctx, (a) => {
+        const p = profileOf(a);
+        const at = p.last_login ?? T0;
+        return json({
+          available: true,
+          active: p.enabled ? [{ id: `s-${a.id}`, ip_address: "10.20.0.15", started_at: at, last_access_at: at, clients: ["agrigreen-web-ops"] }] : [],
+          history: [
+            { at, type: "LOGIN", ip_address: "10.20.0.15", client: "agrigreen-web-ops", error: null },
+            { at: T0, type: "LOGIN_ERROR", ip_address: "10.20.0.15", client: "agrigreen-web-ops", error: "invalid_user_credentials" },
+          ],
+        });
+      }),
   },
   {
     method: "GET",
@@ -663,6 +703,23 @@ export const knAdminRoutes: Route[] = [
     },
   },
   {
+    method: "POST",
+    pattern: re("/v1/orgs/{id}/move"),
+    handler: (ctx) => {
+      if (!isKnAdmin(ctx)) return deny();
+      const c = AG_COMMUNES.find((x) => communeRef(x.code) === ctx.params[0]);
+      if (!c) return problem(422, "party.invalid_hierarchy", "Không di chuyển Nút cấp 1, cấp 2");
+      const b = (ctx.body ?? {}) as { new_parent_ref?: string; reason?: string };
+      if ([...String(b.reason ?? "").trim()].length < 10) return errField("reason", "bắt buộc, ≥ 10 ký tự");
+      if (b.new_parent_ref !== AG_REF && b.new_parent_ref !== OTHER_PROVINCE_REF) return errField("new_parent_ref", "Nút cha phải là TTKN tỉnh");
+      const moved = b.new_parent_ref === OTHER_PROVINCE_REF;
+      if (moved === MOVED.has(c.code)) return problem(409, "party.org_state_conflict", "Nút xã đã thuộc Nút tỉnh này");
+      if (moved) MOVED.add(c.code);
+      else MOVED.delete(c.code);
+      return json({ org: { ref: ctx.params[0], kind: "extension_team", name: c.name, parent_ref: b.new_parent_ref, admin_unit_code: c.code } });
+    },
+  },
+  {
     method: "GET",
     pattern: re("/v1/orgs/{id}/impact"),
     handler: (ctx) => {
@@ -688,8 +745,59 @@ export const knAdminRoutes: Route[] = [
   },
 ];
 
+/** Giả lập POST /v1/accounts/kn-users/import (W11.02): CSV, mỗi dòng một vai trò, cùng Email = một tài khoản (gọi lại route tạo tài khoản). */
+const MOCK_ROLE: Record<string, string> = { kn_tw: "kn_tw", "cấp quốc gia": "kn_tw", kn_tinh: "kn_tinh", "cấp tỉnh": "kn_tinh", kn_xa: "kn_xa", "cấp xã": "kn_xa" };
+function importKnUsers(ctx: Ctx): Response {
+  if (!isKnAdmin(ctx)) return deny();
+  if (typeof ctx.body !== "string") return problem(422, "accounts.import_invalid", "Tệp nhập không đúng mẫu quy định", { detail: "Giả lập chỉ đọc CSV UTF-8" });
+  const lines = ctx.body.replace(/^\ufeff/, "").split(/\r?\n/).filter((l) => l.trim());
+  const head = (lines[0] ?? "").split(",").map((h) => h.trim().toLowerCase());
+  const col = (names: string[]) => head.findIndex((h) => names.includes(h));
+  const ci = { name: col(["họ tên", "ho_ten"]), email: col(["email"]), phone: col(["sđt", "so_dien_thoai"]), role: col(["vai trò", "vai_tro"]), org: col(["mã nút", "ma_nut"]), dept: col(["phòng ban", "phong_ban"]), mgmt: col(["cấp quản lý", "cap_quan_ly"]), communes: col(["xã phụ trách", "xa_phu_trach"]) };
+  if (ci.name < 0 || ci.email < 0 || ci.role < 0 || ci.org < 0) return problem(422, "accounts.import_invalid", "Tệp nhập không đúng mẫu quy định", { detail: "Tệp thiếu cột bắt buộc: Họ tên, Email, Vai trò, Mã Nút" });
+  const create = knAdminRoutes.find((r) => r.method === "POST" && r.pattern.source === re("/v1/accounts/kn-users").source)!;
+  const groups = new Map<string, { lines: number[]; body: { full_name: string; email: string; phone?: string; assignments: Record<string, unknown>[] }; bad?: string }>();
+  lines.slice(1).forEach((l, i) => {
+    const c = l.split(",").map((x) => x.trim());
+    const email = (c[ci.email] ?? "").toLowerCase();
+    const key = email || `#${i}`;
+    const g = groups.get(key) ?? { lines: [], body: { full_name: c[ci.name] ?? "", email, ...(c[ci.phone] ? { phone: c[ci.phone] } : {}), assignments: [] } };
+    groups.set(key, g);
+    g.lines.push(i + 2);
+    const role = MOCK_ROLE[(c[ci.role] ?? "").toLowerCase()];
+    if (!email) g.bad = "Thiếu email";
+    else if (!role) g.bad = "Vai trò không hợp lệ (Cấp Quốc gia, Cấp Tỉnh, Cấp Xã)";
+    const org = c[ci.org] === "TTKNQG" ? NATIONAL_REF : c[ci.org] === "TTKN-AG" ? AG_REF : c[ci.org];
+    const list = (v?: string) => (v ?? "").split(";").map((x) => x.trim()).filter(Boolean);
+    g.body.assignments.push({ role, org_ref: org, department_codes: list(c[ci.dept]), commune_codes: list(c[ci.communes]), mgmt_level: c[ci.mgmt] ? "chuyen_vien" : null });
+  });
+  const rows: { row: number; status: "created" | "rejected"; reason: string | null; user_id: string | null; activation_email_sent: boolean }[] = [];
+  let accounts = 0;
+  for (const g of groups.values()) {
+    let reason = g.bad ?? null;
+    let uid: string | null = null;
+    if (!reason) {
+      const r = create.handler({ ...ctx, body: g.body });
+      if (r.status === 201) {
+        accounts++;
+        const acct = accountByEmail(g.body.email);
+        uid = acct ? userId(acct) : null;
+      } else reason = problemOf(r)?.title ?? "Không tạo được tài khoản";
+    }
+    for (const row of g.lines) rows.push(reason ? { row, status: "rejected", reason, user_id: null, activation_email_sent: false } : { row, status: "created", reason: null, user_id: uid, activation_email_sent: true });
+  }
+  rows.sort((x, y) => x.row - y.row);
+  const created = rows.filter((r) => r.status === "created").length;
+  return json({ accounts_created: accounts, created, rejected: rows.length - created, rows });
+}
+
+function accountByEmail(email: string): MockKnAccount | undefined {
+  return KN_ACCOUNTS.find((a) => a.identifiers.includes(email));
+}
+
 /** Cho kiểm thử: xóa nhật ký và hồ sơ giả lập. */
 export function resetKnAdmin(): void {
+  MOVED.clear();
   PROFILES.clear();
   LOGS.clear();
   SUPPORT_LOG.length = 0;

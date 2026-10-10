@@ -6,6 +6,9 @@
   "resetPasswordAllowed": false,
   "loginWithEmailAllowed": true,
   "loginTheme": "agrigreen",
+  "eventsEnabled": true,
+  "eventsExpiration": 31536000,
+  "enabledEventTypes": ["LOGIN", "LOGIN_ERROR", "LOGOUT", "CODE_TO_TOKEN_ERROR"],
   "duplicateEmailsAllowed": false,
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
@@ -131,7 +134,7 @@
       "username": "service-account-agrigreen-accounts",
       "enabled": true,
       "serviceAccountClientId": "agrigreen-accounts",
-      "clientRoles": { "realm-management": ["manage-users", "view-users", "query-users"] }
+      "clientRoles": { "realm-management": ["manage-users", "view-users", "query-users", "view-events"] }
     },
     {
       "username": "service-account-agrigreen-tms",
@@ -242,7 +245,7 @@
   "clients": [
     {
       "clientId": "agrigreen-accounts",
-      "name": "Tài khoản dịch vụ pf/accounts — Keycloak Admin REST (manage-users, view-users, query-users)",
+      "name": "Tài khoản dịch vụ pf/accounts — Keycloak Admin REST (manage-users, view-users, query-users, view-events)",
       "description": "Bí mật lấy từ biến môi trường AG_KC_CLIENT_SECRET lúc nhập realm (scripts/gen-dev-secrets). Không đăng nhập người dùng.",
       "enabled": true,
       "publicClient": false,

@@ -2987,6 +2987,100 @@ paths:
                   next_cursor: {type: [integer, "null"]}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/kn-users/import:
+    post:
+      summary: "Nạp Excel tài khoản KN nhiều vai trò (FN-AD-04.04 \"Nạp Excel\", UR-AD-04, W11.02) — kết quả theo từng dòng"
+      description: |
+        Thân request là tệp CSV UTF-8/.xlsx (shared/tabular; ô công thức → từ chối cả tệp). Mỗi dòng là MỘT lần gán vai trò; các dòng
+        cùng Email gộp thành một tài khoản nhiều vai (vd Cấp Xã 2 xã + Cấp Quốc gia). Cột: Họ tên, Email (bắt buộc), SĐT, Vai trò
+        (kn_tw | kn_tinh | kn_xa hoặc "Cấp Quốc gia" / "Cấp Tỉnh" / "Cấp Xã"; vai Admin không nạp qua tệp), Mã Nút (mã tổ chức hoặc
+        UUID), Phòng ban (mã, phân tách ";"), Cấp quản lý (mã hoặc nhãn), Xã phụ trách (mã, phân tách ";"). Mỗi tài khoản tạo như
+        POST /v1/accounts/kn-users (tiên quyết Nút + phòng ban, liên kết kích hoạt, không mật khẩu tạm). Tài khoản có dòng lỗi bị
+        loại cả nhóm; tài khoản khác vẫn tạo. Khóa idem của tài khoản = Idempotency-Key + ":acc:" + dòng đầu (gửi lại cùng khóa phát
+        lại). Lý do không chứa dữ liệu nhập. Tối đa 300 dòng, 2 MB.
+      operationId: accountsImportKNUsers
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          text/csv: {schema: {type: string, format: binary}}
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Kết quả từng dòng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accounts_created, created, rejected, rows]
+                properties:
+                  accounts_created: {type: integer, description: "Số tài khoản đã tạo"}
+                  created: {type: integer, description: "Số dòng (lần gán) đã ghi"}
+                  rejected: {type: integer}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [row, status, reason, user_id, activation_email_sent]
+                      properties:
+                        row: {type: integer}
+                        status: {type: string, enum: [created, rejected]}
+                        reason: {type: [string, "null"]}
+                        user_id: {type: [string, "null"], format: uuid}
+                        activation_email_sent: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/{id}/sessions:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: "Tab \"Phiên đang hoạt động\" và \"Lịch sử đăng nhập\" của màn Detail tài khoản (FN-AD-04.04, W11.02) — đọc Keycloak Admin REST"
+      description: |
+        Phiên: GET /users/{id}/sessions; lịch sử: GET /events?user=…&type=LOGIN|LOGIN_ERROR|LOGOUT|CODE_TO_TOKEN_ERROR (realm phải bật
+        eventsEnabled; tài khoản dịch vụ cần view-events). Không ghi gì, không lưu IP ở pf. available = false khi bản cài không đọc
+        được phiên. Cùng phạm vi như khung Log.
+      operationId: accountsUserSessions
+      tags: [accounts]
+      parameters:
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Phiên đang hoạt động (mới truy cập trước) và lịch sử đăng nhập (mới nhất trước)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [available, active, history]
+                properties:
+                  available: {type: boolean}
+                  active:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, ip_address, started_at, last_access_at, clients]
+                      properties:
+                        id: {type: string}
+                        ip_address: {type: string}
+                        started_at: {type: [string, "null"], format: date-time}
+                        last_access_at: {type: [string, "null"], format: date-time}
+                        clients: {type: array, items: {type: string}}
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      required: [at, type, ip_address, client, error]
+                      properties:
+                        at: {type: [string, "null"], format: date-time}
+                        type: {type: string}
+                        ip_address: {type: string}
+                        client: {type: string}
+                        error: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/accounts/support-sessions:
     post:
       summary: "FN-AD-04.07 Menu các cấp: Admin (platform_admin, MFA) vào menu Cấp Quốc gia/Tỉnh/Xã để hỗ trợ — trả ngữ cảnh phiên (gửi qua X-AG-Context, dải cảnh báo vàng theo support_session_id)"

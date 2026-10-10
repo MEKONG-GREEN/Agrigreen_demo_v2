@@ -2611,6 +2611,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/report-batches/provincial-import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nạp giá trị cột Tỉnh giao từ tệp CSV UTF-8/.xlsx (FN-TI-02.02 Bước 4, UR-TI-02) — chỉ đọc tệp, không ghi
+         * @description Thân request là tệp (không multipart), đọc bằng shared/tabular (ô công thức → cả tệp bị từ chối). Một dòng một xã:
+         *     cột "Mã xã" bắt buộc; mỗi cột Tỉnh giao có tiêu đề "<Mã biểu> <Chữ cột>" (vd "T01 E", "T01_E Diện tích giao");
+         *     chỉ chọn một biểu thì "E"/"Cột E" cũng nhận. Cột không nhận ra → ignored_columns. Dòng lỗi (thiếu/trùng mã xã,
+         *     số âm/không phải số) bị loại kèm lý do không chứa giá trị nhập; dòng khác vẫn nhận. Kết quả đưa vào provincial_values
+         *     của POST /v1/extension/report-batches với provincial_source = excel (máy chủ kiểm lại phạm vi xã). Tối đa 500 dòng, 2 MB.
+         */
+        post: operations["rcImportProvincialValues"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/report-batches": {
         parameters: {
             query?: never;
@@ -10467,6 +10491,7 @@ export interface components {
             area_deviation_pct: string | null;
             /** @enum {string|null} */
             shape?: "polygon" | "circle" | "square" | null;
+            /** @description Thửa có trước v7.7 (không mang phòng ban) đọc là trong_trot — X-12, W11.02 */
             department_code?: string | null;
             /** @enum {string} */
             status: "draft" | "active" | "retired";
@@ -15869,6 +15894,76 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcImportProvincialValues: {
+        parameters: {
+            query: {
+                report_type: "weekly" | "monthly" | "seasonal" | "annual" | "adhoc";
+                /** @description Ngày bắt đầu đợt (chọn phiên bản mẫu áp dụng) */
+                from_date?: string;
+                /** @description template_id các biểu đã chọn, phân tách dấu phẩy */
+                template_ids: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Giá trị đọc được và kết quả từng dòng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        provincial_source: "excel";
+                        /** @description template_id → mã xã → chữ cột → giá trị (như RcBatchInput.provincial_values) */
+                        provincial_values: {
+                            [key: string]: {
+                                [key: string]: {
+                                    [key: string]: string;
+                                };
+                            };
+                        };
+                        columns: {
+                            header: string;
+                            /** Format: uuid */
+                            template_id: string;
+                            form_code: string;
+                            letter: string;
+                        }[];
+                        ignored_columns: string[];
+                        accepted: number;
+                        rejected: number;
+                        rows: {
+                            /** @description Số dòng trong tệp (tiêu đề = 1) */
+                            row: number;
+                            commune_code: string;
+                            /** @enum {string} */
+                            status: "accepted" | "rejected";
+                            /** @description Không chứa giá trị nhập */
+                            reason: string | null;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
     };

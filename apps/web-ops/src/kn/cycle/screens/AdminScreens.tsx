@@ -16,7 +16,7 @@ import { KN_ROLE_LABEL, type KnRole } from "@/kn/contract";
 import { listForms } from "@/kn/forms/api";
 import { Greeting } from "@/kn/ui";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
-import type { AccountsUser, KnAssignment, KnAssignmentInput, KnDepartment, KnOrgTreeNode } from "../api";
+import { RawFile, type AccountsUser, type KnAssignment, type KnAssignmentInput, type KnDepartment, type KnOrgTreeNode, type KnUserImport } from "../api";
 import { LoadState, dt, useAction, useLoad } from "../common";
 
 const AG_REF_FALLBACK = "";
@@ -207,17 +207,32 @@ export function UsersScreen() {
   }, [act.note]);
   const [form, setForm] = useState({ full_name: "", email: "", phone: "" });
   const [drafts, setDrafts] = useState<AsgDraft[]>([emptyDraft()]);
+  const [imported, setImported] = useState<KnUserImport | null>(null);
   return (
     <>
       <PageHeader
         title="Người dùng"
         actions={
-          <button type="button" className="btn btn-p" disabled={!refs.province} title={!refs.province ? "Cần khai báo cơ cấu tổ chức và phòng ban trước" : undefined} onClick={() => setCreating(true)}>
-            <Icon name="user" size={15} /> Tạo tài khoản
-          </button>
+          <>
+            <ImportUsersButton onDone={(r) => (setImported(r), act.setNote(`Đã tạo ${r.accounts_created} tài khoản (${r.created} vai trò), ${r.rejected} dòng lỗi.`))} disabled={!refs.province} />
+            <button type="button" className="btn btn-p" disabled={!refs.province} title={!refs.province ? "Cần khai báo cơ cấu tổ chức và phòng ban trước" : undefined} onClick={() => setCreating(true)}>
+              <Icon name="user" size={15} /> Tạo tài khoản
+            </button>
+          </>
         }
       />
       {act.view}
+      {imported?.rejected ? (
+        <div className="alert alert-warn" role="status" aria-label="Dòng lỗi khi nạp tài khoản">
+          <Icon name="alert" />
+          <span>
+            {imported.rows
+              .filter((r) => r.status === "rejected")
+              .map((r) => `Dòng ${r.row}: ${r.reason ?? "lỗi"}`)
+              .join(" · ")}
+          </span>
+        </div>
+      ) : null}
       <FilterBar onReset={() => (setQ(""), setStatus(""), setRole(""))}>
         <FilterChip label="Vai trò" value={role} onChange={setRole} options={[{ value: "", label: "Tất cả" }, ...Object.entries(KN_ROLE_LABEL).map(([value, label]) => ({ value, label }))]} />
         <FilterChip
@@ -434,8 +449,8 @@ export function UserDetailScreen() {
                           label: "Thông tin hệ thống",
                           content: <LabelValueBlock items={[{ label: "Tạo bởi", value: "admin.mekong" }, { label: "Thời điểm tạo", value: dt(user.created_at) }, { label: "Tên đăng nhập", value: user.username }, { label: "Kích hoạt", value: user.required_actions.length ? "Chưa kích hoạt" : "Đã kích hoạt" }]} />,
                         },
-                        { id: "sess", label: "Phiên đang hoạt động", content: <p className="mute">Đọc từ Keycloak Admin REST (sessions) — bản giả lập chưa có (P1, mục còn mở).</p> },
-                        { id: "hist", label: "Lịch sử đăng nhập", content: <p className="mute">Đọc từ Keycloak events — bản giả lập chưa có (P1, mục còn mở).</p> },
+                        { id: "sess", label: "Phiên đang hoạt động", content: <SessionsTab userId={user.id} view="active" /> },
+                        { id: "hist", label: "Lịch sử đăng nhập", content: <SessionsTab userId={user.id} view="history" /> },
                       ]}
                     />
                   </>
@@ -590,6 +605,117 @@ export function MenuLevelsScreen() {
   );
 }
 
+const IMPORT_HEADER = ["Họ tên", "Email", "SĐT", "Vai trò", "Mã Nút", "Phòng ban", "Cấp quản lý", "Xã phụ trách"];
+const IMPORT_SAMPLE = [
+  ["Nguyễn Văn An", "an.nv@vi-du.vn", "0912345001", "Cấp Xã", "TTKN-AG", "trong_trot", "Chuyên viên", "30292;30301"],
+  ["Nguyễn Văn An", "an.nv@vi-du.vn", "", "Cấp Quốc gia", "TTKNQG", "trong_trot", "", ""],
+];
+
+/** W11.02 UR-AD-04 "Nạp Excel": tải tệp mẫu CSV, nạp CSV UTF-8/.xlsx; mỗi dòng một vai trò, cùng Email = một tài khoản. */
+function ImportUsersButton({ onDone, disabled }: { onDone: (r: KnUserImport) => void; disabled?: boolean }) {
+  const { knAdminApi } = useAuth();
+  const act = useAction();
+  const sample = () => {
+    const csv = [IMPORT_HEADER, ...IMPORT_SAMPLE].map((l) => l.join(",")).join("\r\n") + "\r\n";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([String.fromCharCode(0xfeff) + csv], { type: "text/csv;charset=utf-8" }));
+    a.download = "mau-tai-khoan-kn.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  return (
+    <>
+      <button type="button" className="btn btn-o" onClick={sample}>
+        <Icon name="download" size={15} /> Tệp mẫu
+      </button>
+      <label className={`btn btn-o${disabled || act.busy ? " disabled" : ""}`}>
+        <Icon name="upload" size={15} /> Nạp Excel
+        <input
+          type="file"
+          accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          aria-label="Tệp tài khoản"
+          style={{ display: "none" }}
+          disabled={disabled || act.busy}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            const type = /[.]xlsx$/i.test(file.name) ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv; charset=utf-8";
+            const r = await act.run(async () => knAdminApi.importKnUsers(new RawFile(await file.arrayBuffer(), type)));
+            if (r) onDone(r);
+          }}
+        />
+      </label>
+      {act.problem ? act.view : null}
+    </>
+  );
+}
+
+/** W11.02 FN-AD-04.04: tab "Phiên đang hoạt động" / "Lịch sử đăng nhập" (Keycloak Admin REST, không lưu ở pf). */
+function SessionsTab({ userId, view }: { userId: string; view: "active" | "history" }) {
+  const { knAdminApi } = useAuth();
+  const s = useLoad(() => knAdminApi.sessions(userId), [userId]);
+  return (
+    <LoadState s={s}>
+      {(d) =>
+        !d.available ? (
+          <p className="mute">Máy chủ chưa nối đọc phiên Keycloak.</p>
+        ) : view === "active" ? (
+          d.active.length ? (
+            <table className="dt">
+              <thead>
+                <tr>
+                  <th scope="col">Bắt đầu</th>
+                  <th scope="col">Truy cập gần nhất</th>
+                  <th scope="col">Địa chỉ IP</th>
+                  <th scope="col">Ứng dụng</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.active.map((x) => (
+                  <tr key={x.id}>
+                    <td>{x.started_at ? dt(x.started_at) : "—"}</td>
+                    <td>{x.last_access_at ? dt(x.last_access_at) : "—"}</td>
+                    <td>{x.ip_address || "—"}</td>
+                    <td>{x.clients.join(", ") || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="mute">Không có phiên đang hoạt động.</p>
+          )
+        ) : d.history.length ? (
+          <table className="dt">
+            <thead>
+              <tr>
+                <th scope="col">Thời điểm</th>
+                <th scope="col">Sự kiện</th>
+                <th scope="col">Địa chỉ IP</th>
+                <th scope="col">Ứng dụng</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.history.map((x, i) => (
+                <tr key={`${x.at}-${i}`}>
+                  <td>{x.at ? dt(x.at) : "—"}</td>
+                  <td>{LOGIN_EVENT_LABEL[x.type] ?? x.type}{x.error ? ` (${x.error})` : ""}</td>
+                  <td>{x.ip_address || "—"}</td>
+                  <td>{x.client || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="mute">Chưa có lịch sử đăng nhập (realm cần bật lưu sự kiện).</p>
+        )
+      }
+    </LoadState>
+  );
+}
+
+const LOGIN_EVENT_LABEL: Record<string, string> = { LOGIN: "Đăng nhập", LOGIN_ERROR: "Đăng nhập sai", LOGOUT: "Đăng xuất", CODE_TO_TOKEN_ERROR: "Lỗi cấp phiên" };
+
 /** FN-AD-04.02 Cơ cấu tổ chức 3 cấp (Hình 23): cây TTKNQG › TTKN tỉnh › Khu vực › Xã, gán Khu vực, bảng Ảnh hưởng. */
 export function OrgStructureScreen() {
   const { knAdminApi } = useAuth();
@@ -599,6 +725,35 @@ export function OrgStructureScreen() {
   const impact = useLoad(sel?.ref ? () => knAdminApi.impact(sel.ref!) : null, [sel?.ref]);
   const [region, setRegion] = useState("");
   const [reason, setReason] = useState("");
+  const [target, setTarget] = useState("");
+  const [moveUnit, setMoveUnit] = useState("");
+  const [moveReason, setMoveReason] = useState("");
+  // Nút cấp 2 (TTKN tỉnh) và Nút tỉnh đang chứa Nút xã đã chọn — đích "Di chuyển sang tỉnh khác" (FN-AD-04.02 B3).
+  const { provinces, parentOf } = useMemo(() => {
+    const provinces: KnOrgTreeNode[] = [];
+    const parentOf = new Map<string, string>();
+    const walk = (n: KnOrgTreeNode, prov: string | null) => {
+      const here = n.level === 2 && n.ref ? n.ref : prov;
+      if (n.level === 2 && n.ref) provinces.push(n);
+      if (n.ref && n.level === 3 && here) parentOf.set(n.ref, here);
+      n.children.forEach((c) => walk(c, here));
+    };
+    (tree.data?.items ?? []).forEach((n) => walk(n, null));
+    return { provinces, parentOf };
+  }, [tree.data]);
+  const doMove = async () => {
+    if (!sel?.ref || !target) return;
+    const im = impact.data;
+    const counts = (im?.rows ?? []).map((r) => `${r.label}: ${r.count ?? "chưa nối nguồn"}`).join(", ");
+    const warn = im?.warnings.length ? `\n${im.warnings.join("\n")}` : "";
+    if (!window.confirm(`Di chuyển “${sel.name}” sang ${provinces.find((p) => p.ref === target)?.name ?? "tỉnh khác"}?\nẢnh hưởng — ${counts}${warn}`)) return;
+    const r = await act.run(() => knAdminApi.moveOrg(sel.ref!, target, moveReason, moveUnit.trim() || undefined), `Đã di chuyển “${sel.name}”. Phạm vi dữ liệu của tài khoản liên quan cập nhật ngay.`);
+    if (r !== null) {
+      setTarget("");
+      setMoveReason("");
+      setMoveUnit("");
+    }
+  };
   const render = (n: KnOrgTreeNode, depth: number) => (
     <li key={`${n.kind}-${n.code}`} style={{ marginLeft: depth * 14 }}>
       {n.ref ? (
@@ -647,6 +802,31 @@ export function OrgStructureScreen() {
                     </label>
                     <button type="button" className="btn btn-p btn-sm" onClick={() => void act.run(() => knAdminApi.assignRegion(sel.ref!, region || null, reason), "Đã gán khu vực.")}>
                       Lưu khu vực
+                    </button>
+                    <h3 style={{ marginTop: 12 }}>Di chuyển sang tỉnh khác</h3>
+                    <label className="field">
+                      <span>Nút tỉnh đích</span>
+                      <select className="input" value={target} onChange={(e) => setTarget(e.target.value)}>
+                        <option value="">— Chọn TTKN tỉnh —</option>
+                        {provinces
+                          .filter((p) => p.ref !== parentOf.get(sel.ref!))
+                          .map((p) => (
+                            <option key={p.ref!} value={p.ref!}>
+                              {p.name}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Mã ĐVHC mới (bỏ trống = giữ {sel.admin_unit_code ?? "—"})</span>
+                      <input className="input" value={moveUnit} onChange={(e) => setMoveUnit(e.target.value)} />
+                    </label>
+                    <label className="field">
+                      <span>Lý do di chuyển (≥ 10 ký tự)</span>
+                      <input className="input" value={moveReason} onChange={(e) => setMoveReason(e.target.value)} />
+                    </label>
+                    <button type="button" className="btn btn-o btn-sm" disabled={!target || act.busy || impact.data?.movable === false} onClick={() => void doMove()}>
+                      Di chuyển sang tỉnh khác
                     </button>
                   </>
                 ) : (

@@ -4,6 +4,7 @@ package handler
 
 import (
 	"encoding/base64"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -28,6 +29,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g := rg.Group("/extension")
 	g.GET("/report-forms", h.reportForms)
 	g.POST("/report-batches/preview", h.preview)
+	httpx.AllowBody(g, http.MethodPost, "/report-batches/provincial-import", app.MaxProvincialImportBytes+1024)
+	g.POST("/report-batches/provincial-import", h.provincialImport)
 	g.POST("/report-batches", h.issue)
 	g.GET("/report-batches", h.listBatches)
 	g.GET("/report-batches/:id", h.getBatch)
@@ -246,6 +249,46 @@ func previewDTO(pv app.Preview) gin.H {
 		"deadline": gin.H{"offset_days": pv.Deadline.OffsetDays, "time": pv.Deadline.Time}, "close_after_days": pv.CloseAfterDays,
 		"forms": forms, "periods": periods, "communes": communes, "communes_without_officer": noOff, "provincial_columns": cols,
 		"form_count": len(pv.Forms), "commune_count": len(pv.Communes), "period_count": len(pv.Periods), "task_count": pv.TaskCount, "warnings": warn}
+}
+
+// provincialImport: thân request là tệp CSV UTF-8/.xlsx (không multipart); query report_type, from_date,
+// template_ids (phân tách dấu phẩy). Chỉ đọc tệp — không ghi gì (FN-TI-02.02 Bước 4, W11.02).
+func (h Handler) provincialImport(c *gin.Context) {
+	var ids []string
+	for _, s := range strings.Split(c.Query("template_ids"), ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			ids = append(ids, s)
+		}
+	}
+	tpls, p := uuids(ids, "template_ids")
+	if p != nil {
+		httpx.Fail(c, p)
+		return
+	}
+	res, err := h.Svc.ImportProvincial(c.Request.Context(), c.Query("report_type"), c.Query("from_date"), tpls,
+		io.LimitReader(c.Request.Body, app.MaxProvincialImportBytes+1))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	values := map[string]map[string]map[string]string{}
+	for t, m := range res.Values {
+		values[t.String()] = m
+	}
+	cols := make([]gin.H, 0, len(res.Columns))
+	for _, x := range res.Columns {
+		cols = append(cols, gin.H{"header": x.Header, "template_id": x.TemplateID.String(), "form_code": x.FormCode, "letter": x.Letter})
+	}
+	rows := make([]gin.H, 0, len(res.Rows))
+	for _, r := range res.Rows {
+		var reason *string
+		if r.Reason != "" {
+			reason = &r.Reason
+		}
+		rows = append(rows, gin.H{"row": r.Line, "commune_code": r.Commune, "status": r.Status, "reason": reason})
+	}
+	c.JSON(http.StatusOK, gin.H{"provincial_source": app.PVExcel, "provincial_values": values, "columns": cols,
+		"ignored_columns": res.Ignored, "accepted": res.Accepted, "rejected": res.Rejected, "rows": rows})
 }
 
 func (h Handler) preview(c *gin.Context) {

@@ -208,6 +208,7 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `extension.form_not_assigned` | pf/extension: mẫu chưa gán cho loại báo cáo của phòng ban (FN-AD-04.06) hoặc chưa có phiên bản phát hành áp dụng tại kỳ đầu |
 | 422 | `extension.form_no_structure` | pf/extension: mẫu chưa có cột nhập liệu — chặn phát hành (FN-TI-02.02) |
 | 422 | `extension.period_slots_exceeded` | pf/extension: số kỳ của đợt vượt số khe kỳ trên một dòng của mẫu nhiều kỳ (PL 01, 01B, 02, 07; tạm theo seed, chờ khách Q-01) |
+| 422 | `extension.provincial_import_invalid` | pf/extension: tệp nạp Tỉnh giao (`POST /v1/extension/report-batches/provincial-import`, W11.02) không đọc được (không phải CSV UTF-8/.xlsx, ô công thức, quá 500 dòng/2 MB), thiếu cột "Mã xã", không nhận ra cột Tỉnh giao nào hoặc hai cột trùng một cột Tỉnh giao — từ chối cả tệp; dòng lỗi riêng lẻ trả trong `rows` |
 | 422 | `extension.no_communes` | pf/extension: chưa chọn xã nhận, hoặc mã xã không phải Nút xã đang hoạt động của tỉnh |
 | 409 | `extension.batch_has_submissions` | pf/extension: thu hồi đợt khi đã có xã gửi báo cáo |
 | 409 | `extension.batch_withdrawn` | pf/extension: đợt đã thu hồi |
@@ -446,7 +447,7 @@ Tài khoản cán bộ quản lý trong Keycloak qua Admin REST (KN US-ADM-01..0
 | 409 | `accounts.state_conflict` | pf/accounts: khóa tài khoản đã khóa, mở tài khoản đang hoạt động, gửi liên kết cho tài khoản đang khóa |
 | 409 | `accounts.org_inactive` | pf/accounts: gán tài khoản vào tổ chức đã vô hiệu hóa, hoặc mở khóa khi tổ chức của tài khoản đang vô hiệu hóa (kích hoạt lại tổ chức sẽ tự mở) |
 | 422 | `accounts.org_invalid` | pf/accounts: không có tổ chức với `org_ref` trong tenant |
-| 422 | `accounts.import_invalid` | pf/accounts: tệp nhập không phải CSV/XLSX đọc được, thiếu cột bắt buộc (`email`, `org_ref`, `roles`, `full_name` hoặc `first_name`/`last_name`), không có dòng dữ liệu hoặc quá 200 dòng — từ chối cả tệp |
+| 422 | `accounts.import_invalid` | pf/accounts: tệp nhập không phải CSV/XLSX đọc được, thiếu cột bắt buộc (`email`, `org_ref`, `roles`, `full_name` hoặc `first_name`/`last_name`), không có dòng dữ liệu hoặc quá 200 dòng — từ chối cả tệp. Cũng dùng cho nạp tài khoản KN nhiều vai trò (`POST /v1/accounts/kn-users/import`, W11.02): thiếu cột Họ tên/Email/Vai trò/Mã Nút, ô công thức, quá 300 dòng |
 | 422 | `accounts.household_invalid` | pf/accounts: tài khoản nông dân — nông hộ không có, đã ngừng, chưa là thành viên HTX đang hoạt động, hoặc SĐT không khớp nông hộ nào |
 | 422 | `accounts.phone_household_mismatch` | pf/accounts: SĐT không phải SĐT chủ hộ của `household_ref` đã chọn (tra chỉ mục mù kho định danh) |
 | 409 | `accounts.farmer_exists` | pf/accounts: nông hộ đã có tài khoản nông dân đang dùng |

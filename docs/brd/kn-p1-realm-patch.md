@@ -12,6 +12,7 @@
 | Lần đầu đăng nhập | — | không đổi: required action `UPDATE_PASSWORD` qua liên kết kích hoạt (`execute-actions-email`), không gửi mật khẩu tạm; thông điệp `updatePasswordTitle` | FN-CH-00.01 B2, X-04 |
 | Vai realm | — | `kn_user` (cổng vào bề mặt KN; vai nghiệp vụ ở sổ gán vai trò pf/accounts) | gap §4.5 |
 | Thông điệp `vi`/`en` | khóa = "liên hệ Admin" | `accountTemporarilyDisabledMessage` "… tạm khóa 15 phút …", `invalidUserMessage` "Sai tài khoản hoặc mật khẩu. Sau 5 lần sai, tài khoản bị khóa tạm 15 phút; bị khóa tạm 3 lần trong 24 giờ thì khóa hẳn (liên hệ Admin).", `usernameOrEmail` "Email hoặc số điện thoại" | Hình 3a |
+| Lưu sự kiện đăng nhập (W11.02) | tắt | `eventsEnabled: true`, `eventsExpiration: 31536000` (1 năm, N-13), `enabledEventTypes` = `LOGIN`, `LOGIN_ERROR`, `LOGOUT`, `CODE_TO_TOKEN_ERROR`; tài khoản dịch vụ `agrigreen-accounts` thêm `realm-management/view-events` — tab "Lịch sử đăng nhập" (`GET /v1/accounts/users/{id}/sessions`) | FN-AD-04.04, UR-AD-04 |
 
 GIS US-LOG-01 AC-3 (khóa vĩnh viễn) bị thay bởi BRD v7.7 (mới hơn, gap §4.6); chủ sản phẩm chốt Q-21 ngày 03/10/2026 (A3, `docs/cau-hoi-ton-dong.md`): khóa tạm, khóa hẳn sau 3 lần khóa tạm trong 24 giờ.
 
@@ -25,4 +26,5 @@ GIS US-LOG-01 AC-3 (khóa vĩnh viễn) bị thay bởi BRD v7.7 (mới hơn, ga
 ## Việc còn lại
 
 1. **"Còn n lần thử"**: template FreeMarker của Keycloak không có số lần sai còn lại; cần SPI authenticator (đọc `BruteForceProtector`) — chưa làm, banner ghi quy tắc "sau 5 lần sai khóa tạm 15 phút" (phương án dự phòng của gap §4.6).
-2. **Production đã chạy**: `--import-realm` chỉ nhập khi realm chưa có — realm đã nhập cần áp các thuộc tính trên (kể cả `loginTheme` và bộ chống dò A3: `bruteForceStrategy`, `maxDeltaTimeSeconds`, `permanentLockout`, `maxTemporaryLockouts`) bằng Admin Console/REST (Realm settings › Themes › Login theme = `agrigreen`).
+2. **Sự kiện đăng nhập** (W11.02): realm đã nhập cần bật Events (Realm settings › Events › User events: lưu, hạn 1 năm, 4 loại sự kiện trên) và gán `view-events` cho tài khoản dịch vụ `agrigreen-accounts`; thiếu thì tab "Lịch sử đăng nhập" rỗng/503.
+3. **Production đã chạy**: `--import-realm` chỉ nhập khi realm chưa có — realm đã nhập cần áp các thuộc tính trên (kể cả `loginTheme` và bộ chống dò A3: `bruteForceStrategy`, `maxDeltaTimeSeconds`, `permanentLockout`, `maxTemporaryLockouts`) bằng Admin Console/REST (Realm settings › Themes › Login theme = `agrigreen`).

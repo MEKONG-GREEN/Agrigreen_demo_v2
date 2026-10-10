@@ -2051,6 +2051,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/kn-users/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nạp Excel tài khoản KN nhiều vai trò (FN-AD-04.04 "Nạp Excel", UR-AD-04, W11.02) — kết quả theo từng dòng
+         * @description Thân request là tệp CSV UTF-8/.xlsx (shared/tabular; ô công thức → từ chối cả tệp). Mỗi dòng là MỘT lần gán vai trò; các dòng
+         *     cùng Email gộp thành một tài khoản nhiều vai (vd Cấp Xã 2 xã + Cấp Quốc gia). Cột: Họ tên, Email (bắt buộc), SĐT, Vai trò
+         *     (kn_tw | kn_tinh | kn_xa hoặc "Cấp Quốc gia" / "Cấp Tỉnh" / "Cấp Xã"; vai Admin không nạp qua tệp), Mã Nút (mã tổ chức hoặc
+         *     UUID), Phòng ban (mã, phân tách ";"), Cấp quản lý (mã hoặc nhãn), Xã phụ trách (mã, phân tách ";"). Mỗi tài khoản tạo như
+         *     POST /v1/accounts/kn-users (tiên quyết Nút + phòng ban, liên kết kích hoạt, không mật khẩu tạm). Tài khoản có dòng lỗi bị
+         *     loại cả nhóm; tài khoản khác vẫn tạo. Khóa idem của tài khoản = Idempotency-Key + ":acc:" + dòng đầu (gửi lại cùng khóa phát
+         *     lại). Lý do không chứa dữ liệu nhập. Tối đa 300 dòng, 2 MB.
+         */
+        post: operations["accountsImportKNUsers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Tab "Phiên đang hoạt động" và "Lịch sử đăng nhập" của màn Detail tài khoản (FN-AD-04.04, W11.02) — đọc Keycloak Admin REST
+         * @description Phiên: GET /users/{id}/sessions; lịch sử: GET /events?user=…&type=LOGIN|LOGIN_ERROR|LOGOUT|CODE_TO_TOKEN_ERROR (realm phải bật
+         *     eventsEnabled; tài khoản dịch vụ cần view-events). Không ghi gì, không lưu IP ở pf. available = false khi bản cài không đọc
+         *     được phiên. Cùng phạm vi như khung Log.
+         */
+        get: operations["accountsUserSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/accounts/support-sessions": {
         parameters: {
             query?: never;
@@ -10272,6 +10322,97 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    accountsImportKNUsers: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Kết quả từng dòng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Số tài khoản đã tạo */
+                        accounts_created: number;
+                        /** @description Số dòng (lần gán) đã ghi */
+                        created: number;
+                        rejected: number;
+                        rows: {
+                            row: number;
+                            /** @enum {string} */
+                            status: "created" | "rejected";
+                            reason: string | null;
+                            /** Format: uuid */
+                            user_id: string | null;
+                            activation_email_sent: boolean;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    accountsUserSessions: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên đang hoạt động (mới truy cập trước) và lịch sử đăng nhập (mới nhất trước) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        available: boolean;
+                        active: {
+                            id: string;
+                            ip_address: string;
+                            /** Format: date-time */
+                            started_at: string | null;
+                            /** Format: date-time */
+                            last_access_at: string | null;
+                            clients: string[];
+                        }[];
+                        history: {
+                            /** Format: date-time */
+                            at: string | null;
+                            type: string;
+                            ip_address: string;
+                            client: string;
+                            error: string | null;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
     accountsStartSupport: {

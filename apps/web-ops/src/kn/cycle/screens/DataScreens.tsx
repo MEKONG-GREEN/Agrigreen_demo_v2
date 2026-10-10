@@ -13,6 +13,7 @@ import { DataTable, FilterBar, FilterChip, PageHeader, RowActions, SearchBox, St
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
 import type { KnCooperative, KnPlot, MaterialRecord } from "../api";
 import { LoadState, dt, num, useAction, useCommuneNames, useCycleReadOnly, useLoad, ymdLocal } from "../common";
+import { PiiHint } from "@/kn/pii";
 
 /** Ghi chú phần còn ở nơi khác (nạp Excel, vẽ bản đồ ngoại tuyến…). */
 export function GapNotice({ what }: { what: string }) {
@@ -243,6 +244,7 @@ export function CoopDetailScreen() {
                 <label className="field">
                   <span>Lý do* (≥ 20 ký tự)</span>
                   <textarea className="textarea" value={reason} onChange={(e) => setReason(e.target.value)} />
+                  <PiiHint text={reason} />
                 </label>
               </Dialog>
             ) : null}
@@ -445,6 +447,7 @@ export function MaterialsScreen() {
           <label className="field">
             <span>Ghi chú</span>
             <input className="input" value={line.note} onChange={(e) => setLine({ ...line, note: e.target.value })} />
+            <PiiHint text={line.note} />
           </label>
           <button
             type="button"

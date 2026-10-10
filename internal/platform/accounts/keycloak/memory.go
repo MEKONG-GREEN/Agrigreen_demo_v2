@@ -26,7 +26,10 @@ type Memory struct {
 	links   []IssuedLink
 	logout  map[uuid.UUID]int
 	failFor map[string]error // tên thao tác → lỗi giả
-	now     func() time.Time
+	// sessions, events: phiên và sự kiện đăng nhập giả lập (RecordLogin, sessions.go).
+	sessions map[uuid.UUID][]port.Session
+	events   map[uuid.UUID][]port.LoginEvent
+	now      func() time.Time
 }
 
 type memUser struct {
@@ -445,6 +448,7 @@ func (m *Memory) Logout(_ context.Context, id uuid.UUID) error {
 		return err
 	}
 	m.logout[id]++
+	delete(m.sessions, id)
 	return nil
 }
 

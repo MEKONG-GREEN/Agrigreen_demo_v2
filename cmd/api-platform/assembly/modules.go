@@ -274,6 +274,11 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	pty.UseOrgImpact(kn.OpenPeriodsImpact())
 	pty.UseDepartmentUsage(kn.ReportUsage())
+	// W11.02 (FN-AD-04.03): đếm bản ghi theo phòng ban ở mọi module mang department_code — mẫu/gửi Chi cục, máy móc HTX,
+	// thửa (thửa cũ không phòng ban → Trồng trọt, X-12).
+	pty.UseDepartmentUsage(rep.DepartmentUsage())
+	pty.UseDepartmentUsage(mech.DepartmentUsage())
+	pty.UseDepartmentUsage(coop.DepartmentUsage())
 	pty.UseFormAvailability(rep.FormAvailability())
 	md.UseFormUsage(rep.FormUsage())
 	kn.UseTablePDF(rep.TablePDF()) // KN v7.7 P5: "Xuất PDF" lịch công tác

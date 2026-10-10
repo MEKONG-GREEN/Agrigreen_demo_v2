@@ -286,6 +286,16 @@ func (k markers) MarkersInBBox(ctx context.Context, minLon, minLat, maxLon, maxL
 }
 
 // plotStats đổi DTO thống kê thửa sang partyport.PlotStat.
+// DepartmentUsage cho pf/party (W11.02, FN-AD-04.03): số thửa theo phòng ban (thửa cũ không phòng ban → Trồng trọt, X-12).
+func (m *Module) DepartmentUsage() partyport.DepartmentUsage { return plotDepartments{m.plot} }
+
+type plotDepartments struct{ plot *plotapp.Service }
+
+func (p plotDepartments) DepartmentUsage(ctx context.Context, _ uuid.UUID, code string) (partyport.Usage, error) {
+	n, err := p.plot.DepartmentPlots(ctx, code)
+	return partyport.Usage{Records: n}, err
+}
+
 type plotStats struct{ plot *plotapp.Service }
 
 func (p plotStats) DigitizedByCommune(ctx context.Context, communes []string) ([]partyport.PlotStat, error) {

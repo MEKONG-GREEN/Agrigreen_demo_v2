@@ -411,9 +411,13 @@ func OpenPeriodsForCommunes(ctx context.Context, tx pgx.Tx, communes []string) (
 	return n, err
 }
 
-// DepartmentRecords đếm công việc báo cáo của phòng ban (cột "dữ liệu" khi "xóa" phòng ban, FN-AD-04.03).
+// DepartmentRecords đếm bản ghi nghiệp vụ của phòng ban trong pf_extension (cột "dữ liệu" khi "xóa" phòng ban,
+// FN-AD-04.03): công việc báo cáo (P4), lịch công tác (P5), ghi nhận vật tư (P7) — W11.02.
 func DepartmentRecords(ctx context.Context, tx pgx.Tx, dept string) (int, error) {
 	var n int
-	err := tx.QueryRow(ctx, `SELECT count(*) FROM pf_extension.report_task WHERE department_code = $1`, dept).Scan(&n)
+	err := tx.QueryRow(ctx, `SELECT
+	    (SELECT count(*) FROM pf_extension.report_task WHERE department_code = $1)
+	  + (SELECT count(*) FROM pf_extension.work_schedule_current WHERE department_code = $1)
+	  + (SELECT count(*) FROM pf_extension.material_record WHERE department_code = $1)`, dept).Scan(&n)
 	return n, err
 }

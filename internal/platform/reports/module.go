@@ -119,6 +119,9 @@ func (m *Module) FormAvailability() partyport.FormAvailability {
 // FormUsage cho pf/masterdata (P2): cột "biểu đang dùng" của danh mục nông nghiệp.
 func (m *Module) FormUsage() mdport.FormUsage { return app.FormUsage{Svc: m.svc} }
 
+// DepartmentUsage cho pf/party (W11.02): số mẫu báo cáo và lần gửi Chi cục theo phòng ban (FN-AD-04.03).
+func (m *Module) DepartmentUsage() partyport.DepartmentUsage { return app.DepartmentUsage{Svc: m.svc} }
+
 // UseEgress (G5, ADR-0024 mục 3) nối điểm kiểm soát xuất dùng chung (pf/metering, kênh
 // report_export) sau điểm kiểm soát cục bộ ở ba lối (yêu cầu, lịch, tải). cp nil → hành vi cũ.
 func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode) {

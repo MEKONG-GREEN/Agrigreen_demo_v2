@@ -28,6 +28,7 @@ import {
 } from "./model";
 import { ScheduleLog, ScheduleTags, SessionGrid, useCommuneNames, useCoops, usePreloadCoops, WeekPicker, type CardItem } from "./parts";
 import { dayColumnLabel, nextWeekStart, vnDeadlineLabel, weekDays } from "./week";
+import { PiiHint } from "@/kn/pii";
 
 export interface CommuneOption {
   code: string;
@@ -523,6 +524,7 @@ function ItemForm({
           Nội dung công việc
         </label>
         <input id="ws-content" className="input" maxLength={500} value={form.content} onChange={(e) => set({ content: e.target.value })} />
+        <PiiHint text={form.content} />
       </div>
       <div className="field">
         <label htmlFor="ws-commune">Địa điểm: xã/phường</label>
@@ -560,6 +562,7 @@ function ItemForm({
       <div className="field">
         <label htmlFor="ws-note">Ghi chú</label>
         <textarea id="ws-note" className="textarea" rows={2} maxLength={1000} value={form.note} onChange={(e) => set({ note: e.target.value })} />
+        <PiiHint text={form.note} />
       </div>
       {error || pii ? (
         <p className="err" role="alert">

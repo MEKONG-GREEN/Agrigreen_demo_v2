@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/kn_collection_service.dart';
 import 'kn_common.dart';
 import 'kn_providers.dart';
+import '../../domain/pii_hint.dart';
 
 /// Máy móc HTX (FN-XA-03.04): tổng theo loại của xã = Σ các HTX; mở HTX để
 /// khai báo số lượng từng loại máy.
@@ -325,8 +326,11 @@ class _EditorState extends ConsumerState<KnMachineEditor> {
                       Expanded(
                         child: TextField(
                           controller: _lines[i].note,
-                          decoration: const InputDecoration(
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
                             labelText: 'Ghi chú',
+                            helperText: piiWarning(_lines[i].note.text), // X-02
+                            helperMaxLines: 3,
                           ),
                         ),
                       ),

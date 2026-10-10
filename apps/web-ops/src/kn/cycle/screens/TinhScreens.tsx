@@ -13,8 +13,9 @@ import { formLayout } from "@/kn/forms/api";
 import type { FormDefinition } from "@/kn/forms/types";
 import { FormGrid, communeRows } from "@/kn/grid";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
-import type { RcBatchInput, RcFormItem, RcPreview, RcStatusItem, RcTask } from "../api";
+import { RawFile, type RcBatchInput, type RcFormItem, type RcPreview, type RcProvincialImport, type RcStatusItem, type RcTask } from "../api";
 import { LoadState, TaskPill, dt, toLog, useAction, useCommuneNames, useCycleReadOnly, useLoad, weekStartLocal, ymdLocal } from "../common";
+import { PiiHint } from "@/kn/pii";
 
 
 // Hạn tính từ ngày cuối kỳ; "" = hạn mặc định của lịch kỳ máy chủ (v2: tuần → 12:00 Thứ Tư sau kỳ; W11.03).
@@ -31,7 +32,7 @@ export function PublishScreen() {
   const { cycleApi } = useAuth();
   const router = useRouter();
   const ws = weekStartLocal();
-  const [rt, setRt] = useState<"weekly" | "monthly" | "seasonal">("weekly");
+  const [rt, setRt] = useState<"weekly" | "monthly" | "seasonal" | "adhoc">("weekly");
   const [picked, setPicked] = useState<string[]>([]);
   const [mode, setMode] = useState<"province" | "regions" | "communes">("province");
   const [regions, setRegions] = useState<string[]>([]);
@@ -43,6 +44,8 @@ export function PublishScreen() {
   const [closeAfter, setCloseAfter] = useState(1);
   const [note, setNote] = useState("");
   const [pv, setPv] = useState<Record<string, Record<string, Record<string, string>>>>({});
+  const [pvSource, setPvSource] = useState<"manual" | "excel">("manual");
+  const [pvImport, setPvImport] = useState<RcProvincialImport | null>(null);
   const [preview, setPreview] = useState<RcPreview | null>(null);
   const [showBatches, setShowBatches] = useState(false);
   const act = useAction();
@@ -61,6 +64,7 @@ export function PublishScreen() {
       close_after_days: closeAfter,
       ...(note ? { note } : {}),
       provincial_values: pv,
+      provincial_source: pvSource,
     };
   };
   const doPreview = async () => {
@@ -72,6 +76,36 @@ export function PublishScreen() {
   const provCols = (forms.data?.items ?? []).filter((f) => picked.includes(f.template_id)).flatMap((f) => f.provincial_columns.map((c) => ({ f, c })));
   const previewCommunes = preview?.communes ?? [];
   const name = useCommuneNames(previewCommunes.map((c) => c.commune_code));
+  /** UR-TI-02: tệp mẫu CSV UTF-8 (BOM) — cột Mã xã, Tên xã và mỗi cột Tỉnh giao "<Mã biểu> <Chữ cột>". */
+  const downloadPvTemplate = () => {
+    const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const head = ["Mã xã", "Tên xã", ...provCols.map(({ f, c }) => `${f.code} ${c.letter} ${c.title}${c.unit ? ` (${c.unit})` : ""}`)];
+    const lines = [head, ...previewCommunes.map((cm) => [cm.commune_code, name(cm.commune_code), ...provCols.map(({ f, c }) => pv[f.template_id]?.[cm.commune_code]?.[c.letter] ?? "")])];
+    const blob = new Blob([String.fromCharCode(0xfeff) + lines.map((l) => l.map(esc).join(",")).join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `tinh-giao-${rt}-${from}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  const importPv = async (file: File) => {
+    const xlsx = /\.xlsx$/i.test(file.name);
+    const type = xlsx ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv; charset=utf-8";
+    const r = await act.run(
+      async () => cycleApi.provincialImport({ report_type: rt, from_date: from, template_ids: picked }, new RawFile(await file.arrayBuffer(), type)),
+      (x) => `Đã đọc ${x.accepted} dòng từ “${file.name}”${x.rejected ? `, ${x.rejected} dòng lỗi` : ""}.`,
+    );
+    if (!r) return;
+    setPvImport(r);
+    setPvSource("excel");
+    setPv((cur) => {
+      const next = { ...cur };
+      for (const [tpl, byCommune] of Object.entries(r.provincial_values)) next[tpl] = { ...(next[tpl] ?? {}), ...byCommune };
+      return next;
+    });
+  };
+  const inPreview = new Set(previewCommunes.map((c) => c.commune_code));
+  const outsideImport = pvImport ? pvImport.rows.filter((x) => x.status === "accepted" && previewCommunes.length > 0 && !inPreview.has(x.commune_code)) : [];
   return (
     <>
       <PageHeader
@@ -232,8 +266,48 @@ export function PublishScreen() {
                   </tbody>
                 </table>
               ) : null}
+              <div className="row" style={{ gap: 8, marginTop: 10 }} aria-label="Nạp Tỉnh giao từ Excel">
+                <button type="button" className="btn btn-o btn-sm" disabled={!previewCommunes.length} onClick={downloadPvTemplate}>
+                  <Icon name="download" size={14} /> Tải tệp mẫu
+                </button>
+                <label className="btn btn-o btn-sm">
+                  <Icon name="upload" size={14} /> Nạp từ Excel/CSV
+                  <input
+                    type="file"
+                    accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    aria-label="Tệp Tỉnh giao"
+                    style={{ display: "none" }}
+                    disabled={act.busy || !picked.length}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void importPv(file);
+                    }}
+                  />
+                </label>
+                {pvSource === "excel" ? <StatusPill tone="info">Nguồn: Excel</StatusPill> : null}
+              </div>
+              {pvImport ? (
+                <div className="small" role="status" aria-label="Kết quả nạp Tỉnh giao" style={{ marginTop: 8 }}>
+                  <div>
+                    Cột nhận: {pvImport.columns.map((c) => `${c.form_code} ${c.letter}`).join(", ")}
+                    {pvImport.ignored_columns.length ? ` · bỏ qua: ${pvImport.ignored_columns.join(", ")}` : ""}
+                  </div>
+                  {pvImport.rows
+                    .filter((x) => x.status === "rejected")
+                    .map((x) => (
+                      <div key={x.row} style={{ color: "var(--danger)" }}>
+                        Dòng {x.row}
+                        {x.commune_code ? ` (${x.commune_code})` : ""}: {x.reason}
+                      </div>
+                    ))}
+                  {outsideImport.length ? (
+                    <div style={{ color: "var(--warn, #b45309)" }}>Xã không nhận đợt này (sẽ bị từ chối khi phát hành): {outsideImport.map((x) => x.commune_code).join(", ")}</div>
+                  ) : null}
+                </div>
+              ) : null}
               <p className="small mute" style={{ marginTop: 8 }}>
-                Nhập Excel / Lấy từ đợt trước: máy chủ nhận <code>provincial_source: excel</code> và <code>copy_provincial_from_previous</code>. Cấp Xã thấy giá trị này ở dạng chỉ đọc.
+                Tệp một dòng một xã: cột “Mã xã” và mỗi cột Tỉnh giao có tiêu đề “&lt;Mã biểu&gt; &lt;Chữ cột&gt;” (vd “T01 E”). Ô công thức bị từ chối — dán giá trị. Cấp Xã thấy giá trị này ở dạng chỉ đọc.
               </p>
             </section>
           ) : null}
@@ -247,6 +321,7 @@ export function PublishScreen() {
                 <option value="weekly">Tuần</option>
                 <option value="monthly">Tháng</option>
                 <option value="seasonal">Vụ</option>
+                <option value="adhoc">Đột xuất</option>
               </select>
             </label>
             <label className="field">
@@ -278,6 +353,7 @@ export function PublishScreen() {
             <label className="field">
               <span>Ghi chú giao việc</span>
               <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+              <PiiHint text={note} />
             </label>
           </section>
           <section className="card sec" aria-label="Xem trước">
@@ -447,6 +523,7 @@ export function StatusScreen() {
                 <label className="field" style={{ flex: "1 1 320px" }}>
                   <span>Nội dung nhắc</span>
                   <input className="input" value={message} onChange={(e) => setMessage(e.target.value)} />
+                  <PiiHint text={message} />
                 </label>
                 <button type="button" className="btn btn-p btn-sm" disabled={!sel.length || act.busy} onClick={() => void act.run(() => cycleApi.remind(bp.active!, { period_id: bp.period!.id, template_id: form || null, communes: sel, message }), (r) => `Đã nhắc ${r.reminder.communes.length} xã (${r.reminder.recipient_count} cán bộ).`).then(() => setSel([]))}>
                   Gửi nhắc nhở xã đã chọn
@@ -621,6 +698,7 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
                       <label className="field" style={{ marginTop: 10 }}>
                         <span>Lý do yêu cầu điều chỉnh*</span>
                         <textarea className="textarea" value={reason} onChange={(e) => setReason(e.target.value)} />
+                        <PiiHint text={reason} />
                       </label>
                     )}
                   </>
@@ -674,6 +752,7 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
                   <label className="field">
                     <span>Lý do mở lại*</span>
                     <textarea className="textarea" value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} />
+                    <PiiHint text={reopenReason} />
                   </label>
                   <label className="field">
                     <span>Mở đến ngày* (17:00)</span>

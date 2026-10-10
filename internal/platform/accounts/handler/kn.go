@@ -52,6 +52,7 @@ func (h Handler) RegisterKNAdmin(rg *gin.RouterGroup) {
 	rg.POST("/accounts/support-sessions", h.startSupport)
 	rg.POST("/accounts/support-sessions/:id/end", h.endSupport)
 	rg.GET("/accounts/support-log", h.supportLog)
+	h.registerKNImport(rg) // W11.02: nạp Excel nhiều vai trò, phiên/lịch sử đăng nhập
 }
 
 // ---------------------------------------------------------------------------

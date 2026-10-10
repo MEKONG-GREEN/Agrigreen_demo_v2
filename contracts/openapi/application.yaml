@@ -3666,6 +3666,72 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-batches/provincial-import:
+    post:
+      summary: "Nạp giá trị cột Tỉnh giao từ tệp CSV UTF-8/.xlsx (FN-TI-02.02 Bước 4, UR-TI-02) — chỉ đọc tệp, không ghi"
+      description: |
+        Thân request là tệp (không multipart), đọc bằng shared/tabular (ô công thức → cả tệp bị từ chối). Một dòng một xã:
+        cột "Mã xã" bắt buộc; mỗi cột Tỉnh giao có tiêu đề "<Mã biểu> <Chữ cột>" (vd "T01 E", "T01_E Diện tích giao");
+        chỉ chọn một biểu thì "E"/"Cột E" cũng nhận. Cột không nhận ra → ignored_columns. Dòng lỗi (thiếu/trùng mã xã,
+        số âm/không phải số) bị loại kèm lý do không chứa giá trị nhập; dòng khác vẫn nhận. Kết quả đưa vào provincial_values
+        của POST /v1/extension/report-batches với provincial_source = excel (máy chủ kiểm lại phạm vi xã). Tối đa 500 dòng, 2 MB.
+      operationId: rcImportProvincialValues
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: report_type, in: query, required: true, schema: {type: string, enum: [weekly, monthly, seasonal, annual, adhoc]}}
+        - {name: from_date, in: query, required: false, description: "Ngày bắt đầu đợt (chọn phiên bản mẫu áp dụng)", schema: {type: string, format: date}}
+        - {name: template_ids, in: query, required: true, description: "template_id các biểu đã chọn, phân tách dấu phẩy", schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          text/csv: {schema: {type: string, format: binary}}
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Giá trị đọc được và kết quả từng dòng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [provincial_source, provincial_values, columns, ignored_columns, accepted, rejected, rows]
+                properties:
+                  provincial_source: {type: string, enum: [excel]}
+                  provincial_values:
+                    type: object
+                    description: "template_id → mã xã → chữ cột → giá trị (như RcBatchInput.provincial_values)"
+                    additionalProperties:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        additionalProperties: {type: string}
+                  columns:
+                    type: array
+                    items:
+                      type: object
+                      required: [header, template_id, form_code, letter]
+                      properties:
+                        header: {type: string}
+                        template_id: {type: string, format: uuid}
+                        form_code: {type: string}
+                        letter: {type: string}
+                  ignored_columns: {type: array, items: {type: string}}
+                  accepted: {type: integer}
+                  rejected: {type: integer}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [row, commune_code, status, reason]
+                      properties:
+                        row: {type: integer, description: "Số dòng trong tệp (tiêu đề = 1)"}
+                        commune_code: {type: string}
+                        status: {type: string, enum: [accepted, rejected]}
+                        reason: {type: [string, "null"], description: "Không chứa giá trị nhập"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/extension/report-batches:
     post:
       summary: "Phát hành biểu: sinh công việc xã × biểu × kỳ, giá trị Tỉnh giao, thông báo (FN-TI-02.02)"
@@ -11925,7 +11991,7 @@ components:
         declared_area_ha: {type: [string, "null"]}
         area_deviation_pct: {type: [string, "null"]}
         shape: {type: [string, "null"], enum: [polygon, circle, square, null]}
-        department_code: {type: [string, "null"]}
+        department_code: {type: [string, "null"], description: "Thửa có trước v7.7 (không mang phòng ban) đọc là trong_trot — X-12, W11.02"}
         status: {type: string, enum: [draft, active, retired]}
         needs_review: {type: boolean}
         version: {type: integer}

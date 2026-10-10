@@ -334,7 +334,7 @@ Làm lại app Khuyến nông theo các BRD ngày 07/10/2026 (Trồng trọt Fin
 
 Đợt W11 (đang làm, 10/10/2026):
 - [x] W11.01 (10/10/2026): tài liệu KN — đưa bản đối chiếu vào `docs/kn/` (sửa: sổ song phương ở pf 000135, mkg 000038 chỉ có bảng gửi/feed); UAT/gap sau W3.3/W6.2 (đường dẫn `pf/cooperative`, menu và ngữ cảnh mobile đã có → UR-CH-01, UR-KT-02, FN-CH-00.01 **đạt**); thêm dòng "Báo cáo đột xuất"; tiền tố `TT-` cho mã FN/UR trong ma trận nghiệm thu; [lỗi văn bản BRD gửi BA](kn/loi-van-ban-brd.md).
-- [ ] W11.02: đóng khoảng trống Trồng trọt (Báo cáo đột xuất, vẽ thửa web, nạp Tỉnh giao, di chuyển Nút xã, nạp Excel tài khoản…).
+- [x] W11.02 (10/10/2026): đóng khoảng trống Trồng trọt (BRD Final = v7.7) — trang "Báo cáo đột xuất", nạp Tỉnh giao từ CSV/.xlsx (`shared/tabular`), di chuyển Nút xã sang tỉnh khác, nạp Excel tài khoản KN nhiều vai trò, tab Phiên/Lịch sử đăng nhập (Keycloak Admin REST, realm bật Events 1 năm + `view-events`), đếm bản ghi theo phòng ban ở 7 nguồn, X-12 (thửa cũ không phòng ban → Trồng trọt), X-02 (cảnh báo PII ô tự do web + mobile); không migration; vẽ thửa trên Web hoãn (Q-064) ([giả định](kn/gia-dinh-brd-2026-10.md#w1102--đóng-khoảng-trống-trồng-trọt-d3-t1)).
 - [ ] W11.03: lịch kỳ hệ thống dùng chung (tuần Thứ Tư → Thứ Ba theo QĐ-6, kỳ ngày, KSGM 4 tuần/tháng).
 - [ ] W11.05: `cap/forms` tổng quát đơn vị lá.
 - [ ] W11.06: mở phòng ban + menu kn.menu/v3.

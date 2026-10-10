@@ -36,6 +36,17 @@ export type DispRecipient = A["DispRecipient"];
 export type DispView = A["DispView"];
 export type Dispatch = A["Dispatch"];
 
+/** Kết quả nạp Tỉnh giao từ tệp (POST /v1/extension/report-batches/provincial-import). */
+export interface RcProvincialImport {
+  provincial_source: "excel";
+  provincial_values: Record<string, Record<string, Record<string, string>>>;
+  columns: { header: string; template_id: string; form_code: string; letter: string }[];
+  ignored_columns: string[];
+  accepted: number;
+  rejected: number;
+  rows: { row: number; commune_code: string; status: "accepted" | "rejected"; reason: string | null }[];
+}
+
 /** RcPreview với các phần tử đã khai (Go handler/dto.go). */
 export interface RcPreview {
   report_type: string;
@@ -167,6 +178,14 @@ function qs(q?: Q): string {
   return s ? `?${s}` : "";
 }
 
+/** Thân request là tệp nguyên văn (CSV/.xlsx) thay cho JSON — các đường nạp tệp (shared/tabular). */
+export class RawFile {
+  constructor(
+    readonly data: Blob | ArrayBuffer | Uint8Array | string,
+    readonly contentType: string,
+  ) {}
+}
+
 export function knHttp(opts: KnHttpOptions) {
   const base = opts.baseUrl.replace(/\/+$/, "");
   const doFetch = opts.fetch ?? ((r: Request) => fetch(r));
@@ -177,12 +196,12 @@ export function knHttp(opts: KnHttpOptions) {
     const ctx = opts.getContextId();
     if (ctx) headers.set(CONTEXT_HEADER, ctx);
     if (method !== "GET") {
-      headers.set("Content-Type", "application/json");
+      headers.set("Content-Type", body instanceof RawFile ? body.contentType : "application/json");
       headers.set("Idempotency-Key", idem ?? uuidv7());
       const r = supportReason?.trim();
       if (r) headers.set(REASON_HEADER, encodeURIComponent(r));
     }
-    const req = new Request(`${base}${path}${qs(query)}`, { method, headers, body: method === "GET" ? undefined : JSON.stringify(body ?? {}) });
+    const req = new Request(`${base}${path}${qs(query)}`, { method, headers, body: method === "GET" ? undefined : body instanceof RawFile ? (body.data as BodyInit) : JSON.stringify(body ?? {}) });
     let res: Response;
     try {
       res = await doFetch(req);
@@ -209,6 +228,9 @@ export function createCycleApi(opts: KnHttpOptions) {
   return {
     reportForms: (report_type: string, from_date?: string) => call<{ items: RcFormItem[] }>("GET", `${X}/report-forms`, undefined, { report_type, from_date }),
     preview: (b: RcBatchInput) => call<RcPreview>("POST", `${X}/report-batches/preview`, b),
+    /** UR-TI-02: đọc tệp Tỉnh giao (CSV UTF-8/.xlsx) — không ghi; kết quả đưa vào provincial_values khi phát hành. */
+    provincialImport: (q: { report_type: string; from_date?: string; template_ids: string[] }, file: RawFile) =>
+      call<RcProvincialImport>("POST", `${X}/report-batches/provincial-import`, file, { report_type: q.report_type, from_date: q.from_date, template_ids: q.template_ids.join(",") }),
     issue: (b: RcBatchInput, idem?: string) => call<{ batch: RcBatch; periods: RcPeriod[]; warnings: string[]; communes_without_officer: string[] }>("POST", `${X}/report-batches`, b, undefined, idem),
     batches: (q: { report_type?: string; province?: string } = {}) => call<{ items: RcBatch[]; next_cursor: string | null }>("GET", `${X}/report-batches`, undefined, q),
     batch: (id: string) => call<{ batch: RcBatch; periods: RcPeriod[] }>("GET", `${X}/report-batches/${id}`),
@@ -255,10 +277,29 @@ export function createCycleApi(opts: KnHttpOptions) {
 export type KnAdminApi = ReturnType<typeof createKnAdminApi>;
 
 /** Quản trị KN (Admin API, MFA). */
+/** Kết quả POST /v1/accounts/kn-users/import. */
+export interface KnUserImport {
+  accounts_created: number;
+  created: number;
+  rejected: number;
+  rows: { row: number; status: "created" | "rejected"; reason: string | null; user_id: string | null; activation_email_sent: boolean }[];
+}
+
+/** GET /v1/accounts/users/{id}/sessions. */
+export interface KnUserSessions {
+  available: boolean;
+  active: { id: string; ip_address: string; started_at: string | null; last_access_at: string | null; clients: string[] }[];
+  history: { at: string | null; type: string; ip_address: string; client: string; error: string | null }[];
+}
+
 export function createKnAdminApi(opts: KnHttpOptions) {
   const call = knHttp(opts);
   return {
     users: () => call<{ items: AccountsUser[]; next_cursor: string | null }>("GET", "/v1/accounts/users", undefined, { limit: 100 }),
+    /** W11.02 UR-AD-04: nạp Excel tài khoản nhiều vai trò (mỗi dòng một lần gán, cùng Email = một tài khoản). */
+    importKnUsers: (file: RawFile, idem?: string) => call<KnUserImport>("POST", "/v1/accounts/kn-users/import", file, undefined, idem),
+    /** W11.02 FN-AD-04.04: tab Phiên đang hoạt động / Lịch sử đăng nhập (Keycloak Admin REST). */
+    sessions: (id: string) => call<KnUserSessions>("GET", `/v1/accounts/users/${id}/sessions`, undefined, { limit: 50 }),
     user: (id: string) => call<AccountsUser>("GET", `/v1/accounts/users/${id}`),
     mgmtLevels: () => call<{ items: { code: string; label: string }[]; provisional: boolean }>("GET", "/v1/accounts/mgmt-levels"),
     createKnUser: (body: { full_name: string; email: string; phone?: string; assignments: KnAssignmentInput[] }) =>
@@ -283,6 +324,9 @@ export function createKnAdminApi(opts: KnHttpOptions) {
     regions: (province_code: string) => call<{ province_code: string; items: KnRegion[]; assigned_communes: number }>("GET", "/v1/regions", undefined, { province_code }),
     orgTree: () => call<{ items: KnOrgTreeNode[] }>("GET", "/v1/orgs/tree"),
     assignRegion: (ref: string, region_code: string | null, reason?: string) => call<unknown>("POST", `/v1/orgs/${ref}/region`, { region_code, ...(reason ? { reason } : {}) }),
+    /** FN-AD-04.02 B3: di chuyển Nút xã sang Nút tỉnh khác (Admin API /v1/orgs/{ref}/move, lý do bắt buộc, giữ lịch sử). */
+    moveOrg: (ref: string, new_parent_ref: string, reason: string, new_admin_unit_code?: string) =>
+      call<unknown>("POST", `/v1/orgs/${ref}/move`, { new_parent_ref, reason, ...(new_admin_unit_code ? { new_admin_unit_code } : {}) }),
     impact: (ref: string) => call<{ org: { name: string }; communes: string[]; rows: { key?: string; label?: string; count?: number }[]; warnings: string[]; movable: boolean }>("GET", `/v1/orgs/${ref}/impact`),
   };
 }

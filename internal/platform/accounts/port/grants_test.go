@@ -116,10 +116,11 @@ func TestRolesExistInRealm(t *testing.T) {
 		if u.ServiceAccountClientID == "agrigreen-accounts" {
 			got := slices.Clone(u.ClientRoles["realm-management"])
 			slices.Sort(got)
-			ok = slices.Equal(got, []string{"manage-users", "query-users", "view-users"})
+			// view-events (W11.02): tab "Lịch sử đăng nhập" đọc GET /events của realm (FN-AD-04.04).
+			ok = slices.Equal(got, []string{"manage-users", "query-users", "view-events", "view-users"})
 		}
 	}
 	if !ok {
-		t.Fatal("tài khoản dịch vụ agrigreen-accounts phải có đúng manage-users, view-users, query-users")
+		t.Fatal("tài khoản dịch vụ agrigreen-accounts phải có đúng manage-users, view-users, query-users, view-events")
 	}
 }

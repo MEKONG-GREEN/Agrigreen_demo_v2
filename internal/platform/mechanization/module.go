@@ -26,6 +26,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/store"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
@@ -61,6 +62,9 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 // MachineCounts (cooperativeport, W3.2) cho cảnh báo vô hiệu hóa HTX qua gốc lắp ráp — hôm nay pf/party
 // nhận (partyport.CoopMachineCounts cùng chữ ký), W3.3 pf/cooperative (KN v7.7 FN-XA-03.03/03.04).
 func (m *Module) MachineCounts() coopport.MachineCounts { return app.MachineCounts{Svc: m.svc} }
+
+// DepartmentUsage cho pf/party (W11.02): số dòng máy móc HTX theo phòng ban (FN-AD-04.03).
+func (m *Module) DepartmentUsage() partyport.DepartmentUsage { return app.DepartmentUsage{Svc: m.svc} }
 
 // ReportData cho pf/reports: 3 tab FN-10 đọc từ kết quả cân đối đã lưu.
 func (m *Module) ReportData() mechanizationsrc.ReportData { return app.ReportData{Svc: m.svc} }
