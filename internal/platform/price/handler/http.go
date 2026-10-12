@@ -31,6 +31,7 @@ type statusDTO struct {
 	Department  string `json:"department"`
 	Level       string `json:"level"`
 	CanManage   bool   `json:"can_manage"`
+	CanSteward  bool   `json:"can_steward"` // W11.72: Quản trị nghiệp vụ báo giá
 	RuleVersion string `json:"rule_version"`
 	Day         string `json:"day"`
 	Units       int    `json:"units"`
@@ -46,9 +47,10 @@ type entryDTO struct {
 }
 
 type catalogDTO struct {
-	Day    string     `json:"day"`
-	Units  []entryDTO `json:"units"`
-	Groups []entryDTO `json:"groups"`
+	Day     string     `json:"day"`
+	Units   []entryDTO `json:"units"`
+	Groups  []entryDTO `json:"groups"`
+	Regions []entryDTO `json:"regions"` // W11.72 nhóm vùng
 }
 
 func (h Handler) status(c *gin.Context) {
@@ -58,7 +60,7 @@ func (h Handler) status(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, statusDTO{Profile: st.Profile.Name, Department: st.Profile.Department, Level: st.Level, CanManage: st.CanManage,
-		RuleVersion: st.RuleVersion, Day: st.Day.Format(time.DateOnly), Units: st.Units, Groups: st.Groups})
+		CanSteward: st.CanSteward, RuleVersion: st.RuleVersion, Day: st.Day.Format(time.DateOnly), Units: st.Units, Groups: st.Groups})
 }
 
 func (h Handler) catalog(c *gin.Context) {
@@ -76,7 +78,8 @@ func (h Handler) catalog(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	out := catalogDTO{Day: v.Day.Format(time.DateOnly), Units: make([]entryDTO, 0, len(v.Units)), Groups: make([]entryDTO, 0, len(v.Groups))}
+	out := catalogDTO{Day: v.Day.Format(time.DateOnly), Units: make([]entryDTO, 0, len(v.Units)), Groups: make([]entryDTO, 0, len(v.Groups)),
+		Regions: make([]entryDTO, 0, len(v.Regions))}
 	for _, u := range v.Units {
 		out.Units = append(out.Units, entryDTO{Code: u.Code, Name: u.Name, SortOrder: u.SortOrder, Version: u.Version,
 			ValidFrom: u.ValidFrom.Format(time.DateOnly)})
@@ -84,6 +87,10 @@ func (h Handler) catalog(c *gin.Context) {
 	for _, g := range v.Groups {
 		out.Groups = append(out.Groups, entryDTO{Code: g.Code, Name: g.Name, SortOrder: g.SortOrder, Version: g.Version,
 			ValidFrom: g.ValidFrom.Format(time.DateOnly)})
+	}
+	for _, r := range v.Regions {
+		out.Regions = append(out.Regions, entryDTO{Code: r.Code, Name: r.Name, SortOrder: r.SortOrder, Version: r.Version,
+			ValidFrom: r.ValidFrom.Format(time.DateOnly)})
 	}
 	c.JSON(http.StatusOK, out)
 }

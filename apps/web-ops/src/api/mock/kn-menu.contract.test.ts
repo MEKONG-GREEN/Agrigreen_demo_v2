@@ -95,10 +95,12 @@ describe("kn.menu/v3 (W11.06): khuôn theo phòng ban + Dùng chung", () => {
       expect(m.groups.map((g) => g.key)).toEqual(["dieu_hanh", "nghiep_vu", "bao_cao", "dung_chung"]);
       const tree = fromKnMenu(m);
       const biz = tree.groups.find((g) => g.key === "nghiep_vu")!;
-      expect(biz.items.every((i) => i.status === "coming_soon")).toBe(true);
+      // W11.72: "Cấu hình báo giá" (QTNV) đã mở; mục khác vẫn "Sắp có".
+      const open = new Set(["tinh.bao_gia.cau_hinh"]);
+      expect(biz.items.filter((i) => !open.has(i.key)).every((i) => i.status === "coming_soon")).toBe(true);
       const links = menuLinks(tree).map((l) => l.node.key);
       expect(links).toContain("tinh.dashboard"); // khung chung vẫn chạy
-      expect(links.some((k) => biz.items.some((i) => i.key === k))).toBe(false);
+      expect(links.filter((k) => biz.items.some((i) => i.key === k))).toEqual(code === "thong_tin_truyen_thong" ? ["tinh.bao_gia.cau_hinh"] : []);
     }
     // KHTC: Cấp Xã không có menu KHTC.
     expect(cases.find((c) => c.name === "kn_xa/ke_hoach_tai_chinh")!.menu.groups.map((g) => g.key)).toEqual(["dieu_hanh", "bao_cao", "dung_chung"]);

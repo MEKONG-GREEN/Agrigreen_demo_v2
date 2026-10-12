@@ -1017,7 +1017,7 @@ Bản offline (`captured_at`) nộp vào kỳ đã chốt với đơn vị KHÔN
 
 ### pf/price (`cap/price` — khung giá, W11.71, ADR-0049)
 
-Route `/v1/price/*` (Application API). Lỗi chung: `unauthenticated` (401), `forbidden` (403 — vai không thuộc cấu hình giá, hoặc ghi danh mục mà không có vai quản trị), `node_scope_required` (403 — Cấp Xã không có Nút), `validation_failed` (422 — `at` không phải ngày), `conflict` (409 — ghi danh mục đồng thời trùng khóa), `module_not_enabled` (403 — module tắt cho tenant).
+Route `/v1/price/*` (Application API). Lỗi chung: `unauthenticated` (401), `forbidden` (403 — vai không thuộc cấu hình giá, ghi danh mục/xã báo giá/phân công mà không có vai quản trị, hoặc cấu hình lịch/ngưỡng/mặt hàng mà không là Quản trị nghiệp vụ báo giá — W11.72), `node_scope_required` (403 — Cấp Xã không có Nút), `validation_failed` (422 — `at` không phải ngày), `conflict` (409 — ghi danh mục đồng thời trùng khóa), `module_not_enabled` (403 — module tắt cho tenant).
 
 | HTTP | Mã | Khi nào |
 |---|---|---|
@@ -1025,7 +1025,7 @@ Route `/v1/price/*` (Application API). Lỗi chung: `unauthenticated` (401), `fo
 | 422 | `price.respond_before_lock` | W11.74 `POST /v1/price/calendar/schedule`: hạn phản hồi xác minh không sau giờ khóa (FN-AD-04.04 AC-05) |
 | 422 | `price.remind_order` | W11.74: giờ nhắc lần 1 không trước lần 2, hoặc lần 2 không trước giờ khóa (FN-AD-04.05 AC-01) |
 | 422 | `price.template_var` | W11.74: nội dung mẫu nhắc có biến ngoài `{ngày}`, `{xã}`, `{giờ khóa}` — chi tiết nêu biến lỗi |
-| 422 | `price.valid_from` | W11.74: ngày áp dụng lịch trong quá khứ, hoặc hôm nay là ngày báo giá (chỉ áp dụng từ ngày mai); thêm/xóa ngoại lệ cho hôm nay hoặc ngày đã qua |
+| 422 | `price.valid_from` | W11.74: ngày áp dụng lịch trong quá khứ, hoặc hôm nay là ngày báo giá (chỉ áp dụng từ ngày mai); thêm/xóa ngoại lệ cho hôm nay hoặc ngày đã qua. W11.72: ngày hiệu lực của thay đổi xã báo giá/phân công đã qua |
 | 422 | `price.exception_mismatch` | W11.74: ngày nghỉ rơi vào ngày vốn không báo giá, hoặc ngày bổ sung rơi vào ngày vốn đã báo giá |
 | 409 | `price.exception_exists` | W11.74: ngày đã có ngoại lệ đang hiệu lực — xóa ngoại lệ cũ trước |
 | 404 | `price.exception_not_found` | W11.74: xóa ngoại lệ của ngày không có ngoại lệ |
@@ -1043,4 +1043,12 @@ Route `/v1/price/*` (Application API). Lỗi chung: `unauthenticated` (401), `fo
 | 409 | `price.proposal_decided` | W11.73: duyệt/từ chối đề xuất đã xử lý |
 | 404 | `price.item_set_not_found` | W11.73: sửa bộ mặt hàng theo vụ không có |
 | 409 | `price.item_set_exists` | W11.73: tạo bộ mặt hàng trùng mã đã có |
+| 404 | `price.point_not_found` | W11.72: mã xã báo giá không có — sửa/ngưng/phân công xã; W11.73 gán mặt hàng, "Thêm mặt hàng" có xã áp dụng, đề xuất (Cấp Tỉnh), danh sách mặt hàng của xã (`point_code` nay phải là xã báo giá có thật) |
+| 422 | `price.point_inactive` | W11.72: xã báo giá chưa hoạt động hoặc đã ngưng tại ngày hiệu lực của thao tác (gán mặt hàng, phân công, sửa xã) |
+| 422 | `price.admin_unit_invalid` | W11.72: mã ĐVHC không phải xã hoặc không có hiệu lực tại ngày hiệu lực (ADR-0032 — "ĐVHC hết hiệu lực không chọn được") |
+| 409 | `price.admin_unit_taken` | W11.72: mã ĐVHC đã gắn với xã báo giá khác đang hoặc sắp hoạt động (FN-AD-04.02 AC-02) |
+| 422 | `price.region_not_found` | W11.72: nhóm vùng không có hiệu lực tại ngày hiệu lực (thêm/sửa xã, sửa/ngưng nhóm vùng) |
+| 409 | `price.region_in_use` | W11.72: ngưng nhóm vùng còn xã báo giá đang hoặc sắp hoạt động |
+| 422 | `price.officer_invalid` | W11.72: người được phân công không phải cán bộ đúng cấp (Cấp Xã cho vai `xa`, Cấp Tỉnh cho vai `tinh`) của phòng ban báo giá (danh bạ pf/accounts) |
+| 403 | `price.point_not_assigned` | W11.72: Cấp Xã đề xuất mặt hàng cho xã báo giá mình không phụ trách chính hôm nay |
 

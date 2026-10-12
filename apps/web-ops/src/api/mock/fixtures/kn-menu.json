@@ -1872,9 +1872,7 @@
         "route": "/kn/bao-gia/cau-hinh",
         "icon": "param",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -2757,10 +2755,28 @@
           "children": []
          },
          {
-          "key": "admin.pb.bao_gia_cau_hinh",
-          "label": "Xã báo giá \u0026 mặt hàng",
-          "route": "/kn/phong-ban/thong_tin_truyen_thong/bao-gia-cau-hinh",
-          "icon": "param",
+          "key": "admin.pb.bao_gia_xa",
+          "label": "Xã báo giá",
+          "route": "/kn/bao-gia/xa-bao-gia",
+          "icon": "map",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
+         },
+         {
+          "key": "admin.pb.bao_gia_lich",
+          "label": "Kỳ báo giá \u0026 giờ khóa",
+          "route": "/kn/phong-ban/thong_tin_truyen_thong/bao-gia-lich",
+          "icon": "calendar",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
+         },
+         {
+          "key": "admin.pb.bao_gia_mat_hang",
+          "label": "Mặt hàng",
+          "route": "/kn/bao-gia/mat-hang",
+          "icon": "package",
           "badge_source": null,
           "enabled": false,
           "status": "coming_soon",

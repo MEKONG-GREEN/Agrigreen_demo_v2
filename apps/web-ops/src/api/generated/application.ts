@@ -5445,7 +5445,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ghi danh mục mặc định (5 nhóm hàng BRD, đơn vị tính thường gặp) hiệu lực từ hôm nay — chỉ mã chưa có; vai quản trị danh mục */
+        /** Ghi danh mục mặc định (5 nhóm hàng BRD, đơn vị tính thường gặp, 2 nhóm vùng An Giang / Kiên Giang) hiệu lực từ hôm nay — chỉ mã chưa có; vai quản trị danh mục */
         post: operations["priceInstallDefaults"];
         delete?: never;
         options?: never;
@@ -5865,6 +5865,178 @@ export interface paths {
         put?: never;
         /** Từ chối đề xuất kèm lý do */
         post: operations["priceRejectProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhóm vùng tại ngày (mọi trạng thái), kèm số xã báo giá đang hoạt động */
+        get: operations["priceListRegions"];
+        put?: never;
+        /** Thêm nhóm vùng (hiệu lực từ hôm nay; mã vắng → vung_<n>) — vai quản trị */
+        post: operations["priceCreateRegion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/regions/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa tên / thứ tự nhóm vùng (hiệu lực từ hôm nay) */
+        post: operations["priceReviseRegion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/regions/{code}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngưng nhóm vùng từ hôm nay — chặn khi còn xã báo giá đang hoặc sắp hoạt động thuộc nhóm */
+        post: operations["priceRetireRegion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh mục xã báo giá tại ngày (B1) — mã, tên, mã ĐVHC, nhóm vùng, cán bộ Xã phụ trách, cán bộ Tỉnh, số mặt hàng, trạng thái */
+        get: operations["priceListPoints"];
+        put?: never;
+        /** Thêm xã báo giá (B2) — ĐVHC cấp xã có hiệu lực (tên theo ĐVHC), nhóm vùng, ngày bắt đầu báo giá; mã XBG#### hệ thống sinh */
+        post: operations["priceCreatePoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/points/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một xã báo giá tại ngày kèm lịch sử thay đổi và lịch sử phân công (AC-02) */
+        get: operations["priceGetPoint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/points/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa xã báo giá từ ngày hiệu lực — đổi nhóm vùng, chuyển sang mã ĐVHC mới khi sắp xếp ĐVHC (giữ mã xã, lịch sử) */
+        post: operations["priceRevisePoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/points/{code}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngưng xã báo giá từ ngày hiệu lực, lý do bắt buộc (B3); hôm nay xã đã gửi phiếu → áp dụng từ ngày báo giá kế tiếp */
+        post: operations["priceRetirePoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/points/{code}/officers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phân công người phụ trách xã từ ngày hiệu lực — role xa (cán bộ Xã phụ trách chính, thay người cũ) | tinh (cán bộ Cấp Tỉnh); officer_ref null = bỏ phân công */
+        post: operations["priceAssignPointOfficer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/admin-units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ĐVHC cấp xã có hiệu lực tại ngày (danh mục ĐVHC dùng chung, ADR-0032) để chọn khi thêm/sửa xã báo giá, kèm xã báo giá đang gắn */
+        get: operations["priceListAdminUnits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/officers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh bạ cán bộ để phân công (cán bộ Cấp Xã / Cấp Tỉnh của phòng ban báo giá) — vai quản trị, Cấp Tỉnh */
+        get: operations["priceListOfficers"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -11386,7 +11558,10 @@ export interface components {
             department: string;
             /** @description Cấp của người gọi trong bên dùng (TW | TINH | XA); rỗng nếu chỉ có vai quản trị */
             level: string;
+            /** @description Vai quản trị (Admin): danh mục nền, xã báo giá, phân công */
             can_manage: boolean;
+            /** @description W11.72: Quản trị nghiệp vụ báo giá — vai quản trị hoặc Cấp Tỉnh có cờ qtnv_bao_gia (lịch, ngưỡng, mặt hàng) */
+            can_steward: boolean;
             rule_version: string;
             /** Format: date */
             day: string;
@@ -11406,6 +11581,8 @@ export interface components {
             day: string;
             units: components["schemas"]["PriceCatalogEntry"][];
             groups: components["schemas"]["PriceCatalogEntry"][];
+            /** @description W11.72 nhóm vùng */
+            regions: components["schemas"]["PriceCatalogEntry"][];
         };
         PriceWriteResult: {
             /** @description Mã mặt hàng / nhóm / bộ / xã; mã đề xuất (uuid) khi tạo hoặc từ chối đề xuất */
@@ -11604,13 +11781,150 @@ export interface components {
             decided_at: string | null;
         };
         PriceProposalInput: {
-            point_code: string;
+            /** @description Mã xã báo giá (W11.72). Cấp Xã: xã mình phụ trách chính hôm nay — vắng khi phụ trách đúng một xã; Cấp Tỉnh: bắt buộc */
+            point_code?: string;
             name: string;
             variety: string;
             group_code: string;
             unit_code: string;
             spec?: string;
             reason: string;
+        };
+        PriceRegion: {
+            code: string;
+            name: string;
+            sort_order: number;
+            version: number;
+            /** Format: date */
+            valid_from: string;
+            /** @enum {string} */
+            status: "active" | "retired";
+            /** @description Số xã báo giá đang hoạt động thuộc nhóm tại ngày */
+            points: number;
+        };
+        PriceRegionInput: {
+            /** @description Chỉ khi thêm; vắng → vung_<n> */
+            code?: string;
+            name: string;
+            sort_order?: number;
+        };
+        PricePoint: {
+            code: string;
+            /** @description Tên xã theo ĐVHC tại ngày hiệu lực của phiên bản */
+            name: string;
+            admin_unit_code: string;
+            admin_unit_name: string;
+            /** @description ĐVHC còn hiệu lực tại ngày — false: cần chuyển sang mã ĐVHC kế thừa */
+            admin_unit_valid: boolean;
+            successor_codes: string[];
+            region_code: string;
+            region_name: string;
+            /** @enum {string} */
+            state: "active" | "pending" | "retired";
+            version: number;
+            /** Format: date */
+            valid_from: string;
+            /**
+             * Format: date
+             * @description Ngày bắt đầu báo giá
+             */
+            since: string | null;
+            /** Format: date */
+            valid_to: string | null;
+            note: string | null;
+            /**
+             * Format: uuid
+             * @description Cán bộ Xã phụ trách chính tại ngày (null = Chưa có cán bộ Xã)
+             */
+            officer_ref: string | null;
+            /** @description Chỉ vai quản trị và Cấp Tỉnh */
+            officer_name: string | null;
+            /** Format: date */
+            officer_since: string | null;
+            /**
+             * Format: uuid
+             * @description Cán bộ Cấp Tỉnh được phân công (null = Chưa phân công)
+             */
+            owner_ref: string | null;
+            owner_name: string | null;
+            /** Format: date */
+            owner_since: string | null;
+            item_count: number;
+        };
+        PricePointVersion: {
+            version: number;
+            /** Format: date */
+            valid_from: string;
+            /** @enum {string} */
+            status: "active" | "retired";
+            admin_unit_code: string;
+            name: string;
+            region_code: string;
+            note: string | null;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        PricePointOfficerVersion: {
+            /** @enum {string} */
+            role: "xa" | "tinh";
+            /** Format: uuid */
+            officer_ref: string | null;
+            name: string | null;
+            /** Format: date */
+            valid_from: string;
+            version: number;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        PricePointDetail: {
+            point: components["schemas"]["PricePoint"];
+            versions: components["schemas"]["PricePointVersion"][];
+            officers: components["schemas"]["PricePointOfficerVersion"][];
+        };
+        PricePointInput: {
+            /** @description Thêm: bắt buộc; sửa: vắng = giữ */
+            admin_unit_code?: string;
+            /** @description Thêm: bắt buộc; sửa: vắng = giữ */
+            region_code?: string;
+            /**
+             * Format: date
+             * @description Vắng → ngày báo giá kế tiếp
+             */
+            valid_from?: string;
+            note?: string;
+            /** @description Ngưng: lý do (bắt buộc — hoặc gửi trong note) */
+            reason?: string;
+        };
+        PriceOfficerInput: {
+            /** @enum {string} */
+            role: "xa" | "tinh";
+            /** Format: uuid */
+            officer_ref?: string | null;
+            /** Format: date */
+            valid_from?: string;
+        };
+        PriceAdminUnit: {
+            code: string;
+            name: string;
+            parent_code: string | null;
+            /** Format: date */
+            valid_from: string;
+            /** Format: date */
+            valid_to: string | null;
+            /** @description Mã xã báo giá đang gắn ĐVHC tại ngày */
+            taken_by: string | null;
+        };
+        PriceOfficer: {
+            /** Format: uuid */
+            ref: string;
+            name: string;
+            /** @enum {string} */
+            level: "XA" | "TINH";
+            communes: string[];
         };
         PriceSchedule: {
             weekdays: ("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")[];
@@ -23829,6 +24143,412 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description price.proposal_decided */
             409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListRegions: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhóm vùng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        regions: components["schemas"]["PriceRegion"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceCreateRegion: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceRegionInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description conflict (mã đã có) */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReviseRegion: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceRegionInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | price.region_not_found */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRetireRegion: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.region_in_use */
+            409: components["responses"]["Problem"];
+            /** @description price.region_not_found */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListPoints: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+                region?: string;
+                state?: "active" | "pending" | "retired";
+                /** @description true: Cấp Xã — xã mình phụ trách chính; Cấp Tỉnh — xã được phân công cho mình */
+                mine?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Xã báo giá (sắp theo nhóm vùng, mã) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        points: components["schemas"]["PricePoint"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceCreatePoint: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PricePointInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.admin_unit_taken */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.admin_unit_invalid | price.region_not_found | price.valid_from */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceGetPoint: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Xã báo giá */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PricePointDetail"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.point_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceRevisePoint: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PricePointInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.point_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.admin_unit_taken */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.admin_unit_invalid | price.region_not_found | price.point_inactive | price.valid_from */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRetirePoint: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PricePointInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.point_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | price.point_inactive | price.valid_from */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceAssignPointOfficer: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceOfficerInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.point_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | price.officer_invalid | price.point_inactive | price.valid_from */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListAdminUnits: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ĐVHC */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        admin_units: components["schemas"]["PriceAdminUnit"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceListOfficers: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                level: "XA" | "TINH";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cán bộ (directory = false khi gốc lắp ráp chưa nối danh bạ) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        officers: components["schemas"]["PriceOfficer"][];
+                        directory: boolean;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
             /** @description validation_failed */
             422: components["responses"]["Problem"];
         };

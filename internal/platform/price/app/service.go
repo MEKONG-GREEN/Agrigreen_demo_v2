@@ -33,8 +33,11 @@ type Service struct {
 	Clock    clock.Clock
 	profiles map[string]port.Profile
 	order    []string
-	// Reminders: người nhận nhắc nhập giá (W11.74; W11.72/W11.75 nối). nil → thông báo chủ đề tới cán bộ xã.
+	// Reminders: người nhận nhắc nhập giá (W11.74). Module.New nối PointReminders (W11.72 — cán bộ Xã phụ trách từng xã
+	// báo giá); nil → thông báo chủ đề tới cán bộ xã của tenant.
 	Reminders port.ReminderTargets
+	// Points: điểm nối của xã báo giá + phân công (W11.72): danh bạ cán bộ, "xã đã gửi phiếu" (W11.75).
+	Points PointHooks
 }
 
 var _ port.Catalog = (*Service)(nil)
@@ -74,6 +77,9 @@ type caller struct {
 	ref, tenant uuid.UUID
 	level       string // TW | TINH | XA; rỗng nếu chỉ có vai quản trị
 	manage      bool
+	// steward: Quản trị nghiệp vụ báo giá (W11.72) — vai quản trị (ManageBy) hoặc Cấp Tỉnh có cờ nhiệm vụ
+	// Profile.StewardDuty trên lần gán (KNContext.HasDuty — W11.07; ngữ cảnh chỉ xem không mang cờ).
+	steward bool
 }
 
 // resolve tìm profile (rỗng → profile đầu tiên) và vai của người gọi trong đó: vai ngữ cảnh KN nếu có, không thì vai realm.
@@ -102,6 +108,7 @@ func (s *Service) resolve(ctx context.Context, name string) (port.Profile, calle
 			c.manage = true
 		}
 	}
+	c.steward = c.manage || (c.level == "TINH" && prof.StewardDuty != "" && p.KN != nil && p.KN.HasDuty(prof.StewardDuty))
 	if c.level == "" && !c.manage {
 		return prof, c, problem.Forbidden.WithDetail("vai của người gọi không thuộc cấu hình giá " + name)
 	}
@@ -120,6 +127,7 @@ type Status struct {
 	Profile     port.Profile
 	Level       string
 	CanManage   bool
+	CanSteward  bool // W11.72: Quản trị nghiệp vụ báo giá (cấu hình lịch, ngưỡng, mặt hàng)
 	RuleVersion string
 	Day         time.Time
 	Units       int
@@ -132,7 +140,7 @@ func (s *Service) Status(ctx context.Context, profile string) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
-	st := Status{Profile: prof, Level: c.level, CanManage: c.manage, RuleVersion: domain.RuleVersion, Day: domain.BusinessDay(s.Clock.Now())}
+	st := Status{Profile: prof, Level: c.level, CanManage: c.manage, CanSteward: c.steward, RuleVersion: domain.RuleVersion, Day: domain.BusinessDay(s.Clock.Now())}
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
 		var e error
 		if st.Units, e = store.Count(ctx, tx, domain.KindUnit, st.Day); e != nil {
@@ -146,9 +154,10 @@ func (s *Service) Status(ctx context.Context, profile string) (Status, error) {
 
 // CatalogView là danh mục nền đang hiệu lực tại một ngày.
 type CatalogView struct {
-	Day    time.Time
-	Units  []port.Unit
-	Groups []port.Group
+	Day     time.Time
+	Units   []port.Unit
+	Groups  []port.Group
+	Regions []port.Region // W11.72 nhóm vùng
 }
 
 // CatalogAt đọc danh mục nền tại ngày at (zero → hôm nay, giờ VN) cho người gọi thuộc profile.
@@ -167,7 +176,10 @@ func (s *Service) CatalogAt(ctx context.Context, profile string, at time.Time) (
 		if v.Units, e = units(ctx, tx, day); e != nil {
 			return e
 		}
-		v.Groups, e = groups(ctx, tx, day)
+		if v.Groups, e = groups(ctx, tx, day); e != nil {
+			return e
+		}
+		v.Regions, e = regions(ctx, tx, day)
 		return e
 	})
 	return v, err
@@ -238,11 +250,11 @@ func (s *Service) InstallDefaults(ctx context.Context, profile, idem string) (in
 	}
 	now := s.Clock.Now()
 	day := domain.BusinessDay(now)
-	entries := append(domain.DefaultUnits(day), domain.DefaultGroups(day)...)
+	entries := append(append(domain.DefaultUnits(day), domain.DefaultGroups(day)...), domain.DefaultRegions(day)...) // W11.72 nhóm vùng
 	written := 0
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
 		have := map[domain.Kind]map[string]bool{}
-		for _, k := range []domain.Kind{domain.KindUnit, domain.KindGroup} {
+		for _, k := range []domain.Kind{domain.KindUnit, domain.KindGroup, domain.KindRegion} {
 			codes, e := store.Codes(ctx, tx, k)
 			if e != nil {
 				return e

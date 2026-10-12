@@ -233,7 +233,7 @@ func (s *Service) SendTestReminder(ctx context.Context, profile string) (string,
 	if err != nil {
 		return "", err
 	}
-	if !c.manage {
+	if !c.steward {
 		return "", problem.Forbidden.WithDetail("chỉ vai quản trị nghiệp vụ báo giá gửi thử được")
 	}
 	now := s.Clock.Now()

@@ -12,6 +12,9 @@
 // W11.73 (pf 000141): mặt hàng theo thời kỳ — app.ItemService (port.Items), nhóm hàng, gán xã, đề xuất, bộ theo vụ,
 // "thay thế cho"; điểm nối app.ItemHooks (SetItemHooks) cho W11.72/W11.74/W11.75.
 //
+// W11.72 (pf 000144): xã báo giá ↔ ĐVHC có hiệu lực, nhóm vùng, phân công cán bộ Xã / Cấp Tỉnh theo ngày (port.Points);
+// cờ Quản trị nghiệp vụ (Profile.StewardDuty); nhắc nhập giá tới cán bộ Xã phụ trách (app.PointReminders).
+//
 // Module khác chỉ import price/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
 package price
 
@@ -44,8 +47,19 @@ func New(b tenant.Beginner, clk clock.Clock, profiles []port.Profile) (*Module, 
 	if err != nil {
 		return nil, err
 	}
+	svc.Reminders = app.PointReminders{S: svc} // W11.72: nhắc cán bộ Xã phụ trách từng xã báo giá
 	return &Module{svc: svc, items: app.NewItemService(svc)}, nil
 }
+
+// Points cho module khác (W11.75 phiếu, W11.77 tiến độ): xã báo giá đang hoạt động, người phụ trách theo ngày (W11.72).
+func (m *Module) Points() port.Points { return m.svc }
+
+// UseOfficers nối danh bạ cán bộ KN (gốc lắp ráp — pf/accounts) cho phân công xã báo giá (W11.72): kiểm người được phân
+// công đúng cấp, tên ở danh sách xã. Không nối → không kiểm, không tên.
+func (m *Module) UseOfficers(o port.Officers) { m.svc.Points.Officers = o }
+
+// SetPointHooks thay toàn bộ điểm nối của xã báo giá (W11.75 nối Submitted — "xã đã gửi phiếu").
+func (m *Module) SetPointHooks(h app.PointHooks) { m.svc.Points = h }
 
 // Catalog cho module khác: danh mục nền (đơn vị tính, nhóm hàng) có hiệu lực theo ngày.
 func (m *Module) Catalog() port.Catalog { return m.svc }
@@ -65,6 +79,7 @@ func (m *Module) WireItemCalendar() { m.items.Hooks.NextDay = m.svc.NextQuoteDay
 func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Handler{Svc: m.svc}.RegisterApp(rg)
 	handler.ItemHandler{Svc: m.items}.RegisterApp(rg) // W11.73
+	handler.PointHandler{Svc: m.svc}.RegisterApp(rg)  // W11.72
 }
 
 // RegisterAdmin: không có route Admin API.

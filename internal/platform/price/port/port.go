@@ -3,7 +3,7 @@
 //
 // Điểm mở rộng cho các gói sau (ADR-0049 mục 4):
 //   - Profile: cấu hình theo bên dùng (vai → cấp, vai quản trị danh mục, phòng ban chủ) ở gốc lắp ráp — không so tên ứng
-//     dụng (R-MOD-04). W11.72 thêm cờ Quản trị nghiệp vụ, W11.74 thêm Profile.Schedule (giờ khóa, hạn phản hồi, nhắc, ngưỡng mặc định).
+//     dụng (R-MOD-04). W11.72 thêm Profile.StewardDuty (cờ Quản trị nghiệp vụ), W11.74 thêm Profile.Schedule (giờ khóa, hạn phản hồi, nhắc, ngưỡng mặc định).
 //   - Catalog: danh mục nền (đơn vị tính, nhóm hàng) có hiệu lực theo ngày — W11.73 (mặt hàng) và KHTC (Q-082) đọc qua đây.
 //   - Series, Publish (v4.1 §26) và sự kiện price.published: W11.76 khai ở gói này khi có bảng giá ngày.
 //   - PubSchema: schema view công bố; view đầu tiên v1_board_daily (W11.76) khai bằng chỉ thị //ag:pubview.
@@ -29,8 +29,13 @@ type Profile struct {
 	Department string
 	// Roles: vai ngữ cảnh (KN: authz.KN*) hoặc vai realm → cấp (TW, TINH, XA). Vai không có ở đây không đọc được.
 	Roles map[string]string
-	// ManageBy: vai được ghi danh mục nền (đơn vị tính, nhóm hàng). W11.72 thêm cờ Quản trị nghiệp vụ báo giá.
+	// ManageBy: vai quản trị (Admin) — ghi danh mục nền (đơn vị tính, nhóm hàng, nhóm vùng), xã báo giá, phân công;
+	// cũng có mọi quyền của Quản trị nghiệp vụ.
 	ManageBy []string
+	// StewardDuty (W11.72): cờ nhiệm vụ trên lần gán Cấp Tỉnh cho quyền Quản trị nghiệp vụ báo giá — cấu hình lịch, giờ
+	// khóa, nhắc, ngưỡng (W11.74), mặt hàng theo thời kỳ (W11.73). KN: authz.DutyPriceAdmin ("qtnv_bao_gia", đọc bằng
+	// KNContext.HasDuty — W11.07). Rỗng = chỉ vai ManageBy.
+	StewardDuty string
 	// Schedule: lịch báo giá, giờ khóa, hạn phản hồi, nhắc, ngưỡng MẶC ĐỊNH (W11.74, port/calendar.go).
 	Schedule ScheduleDefaults
 }
@@ -42,6 +47,15 @@ type Unit struct {
 	SortOrder int
 	Version   int64
 	ValidFrom time.Time // ngày (00:00 UTC của ngày giờ VN)
+}
+
+// Region là một nhóm vùng đang hiệu lực (W11.72 — An Giang, Kiên Giang).
+type Region struct {
+	Code      string
+	Name      string
+	SortOrder int
+	Version   int64
+	ValidFrom time.Time
 }
 
 // Group là một nhóm hàng đang hiệu lực.

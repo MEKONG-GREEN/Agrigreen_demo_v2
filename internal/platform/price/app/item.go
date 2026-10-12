@@ -9,7 +9,7 @@ package app
 //   - đọc: mọi cấp của profile (TW chỉ xem) và vai quản trị;
 //   - thêm mặt hàng, sửa mặt hàng CHƯA có giá: Cấp Tỉnh, vai quản trị (Admin hỗ trợ — được ghi vết bằng actor_ref);
 //   - sửa mặt hàng đã có giá, ngưng, đổi thứ tự, nhóm hàng, gán xã, bộ theo vụ, duyệt/từ chối đề xuất: Quản trị nghiệp vụ
-//     (Cấp Tỉnh có cờ QTNV — mặc định mọi Cấp Tỉnh khi chưa nối Steward) và vai quản trị;
+//     (Cấp Tỉnh có cờ QTNV Profile.StewardDuty — W11.72) và vai quản trị;
 //   - đề xuất mặt hàng: Cấp Xã, Cấp Tỉnh.
 
 import (
@@ -37,7 +37,9 @@ type ItemHooks struct {
 	HasSheets func(ctx context.Context, tx pgx.Tx, day time.Time, point string) (bool, error)
 	// NextDay: ngày báo giá kế tiếp sau today theo lịch báo giá (W11.74). nil → ngày hôm sau.
 	NextDay func(ctx context.Context, tx pgx.Tx, today time.Time) (time.Time, error)
-	// Steward: người gọi Cấp Tỉnh có quyền Quản trị nghiệp vụ báo giá (W11.72). nil → mọi Cấp Tỉnh (giả định).
+	// Steward: người gọi Cấp Tỉnh có quyền Quản trị nghiệp vụ báo giá. nil (mặc định, W11.72) → cờ nhiệm vụ
+	// Profile.StewardDuty trên lần gán Cấp Tỉnh (KNContext.HasDuty(authz.DutyPriceAdmin) ở KN); Profile không khai cờ →
+	// chỉ vai quản trị. Hook chỉ để bên dùng khác thay nguồn cờ.
 	Steward func(ctx context.Context) bool
 }
 
@@ -53,7 +55,13 @@ var _ port.Items = (*ItemService)(nil)
 func NewItemService(s *Service) *ItemService { return &ItemService{Service: s} }
 
 func (s *ItemService) steward(ctx context.Context, c caller) bool {
-	return c.manage || (c.level == "TINH" && (s.Hooks.Steward == nil || s.Hooks.Steward(ctx)))
+	if c.manage {
+		return true
+	}
+	if s.Hooks.Steward != nil {
+		return c.level == "TINH" && s.Hooks.Steward(ctx)
+	}
+	return c.steward
 }
 
 func editor(c caller) bool { return c.manage || c.level == "TINH" }
@@ -440,6 +448,10 @@ func (s *ItemService) createItemTx(ctx context.Context, tx pgx.Tx, c caller, in 
 	if in.Kind == domain.ItemBasic && len(in.Points) > 0 {
 		return WriteResult{}, port.ErrItemBasicAssign
 	}
+	ps, err := requirePoints(ctx, tx, in.Points, from) // W11.72: xã báo giá có thật, hoạt động từ ngày hiệu lực
+	if err != nil {
+		return WriteResult{}, err
+	}
 	now := s.Clock.Now()
 	points := in.Points
 	if in.ReplacesCode != "" {
@@ -455,8 +467,10 @@ func (s *ItemService) createItemTx(ctx context.Context, tx pgx.Tx, c caller, in 
 			}
 		}
 		if in.Kind == domain.ItemLocal && len(points) == 0 {
+			active := ps.states(from)
 			for _, a := range domain.EffectiveAt(sn.assigns, from) {
-				if a.Status == domain.StatusActive && a.V.ItemCode == in.ReplacesCode {
+				// xã đã ngưng tại ngày hiệu lực không nhận mặt hàng mới (W11.72)
+				if a.Status == domain.StatusActive && a.V.ItemCode == in.ReplacesCode && active[a.V.PointCode].State == domain.PointStateActive {
 					points = append(points, a.V.PointCode)
 				}
 			}
@@ -720,6 +734,7 @@ func (s *ItemService) ItemsAt(ctx context.Context, at time.Time) ([]port.Item, e
 }
 
 // PointItems (port.Items) đọc mặt hàng xã point báo giá tại ngày at cho tenant của ctx.
+// Xã không có hoặc không hoạt động tại ngày (W11.72) → danh sách rỗng.
 func (s *ItemService) PointItems(ctx context.Context, point string, at time.Time) ([]port.Item, error) {
 	day := domain.BusinessDay(at)
 	var out []port.Item
@@ -731,7 +746,16 @@ func (s *ItemService) PointItems(ctx context.Context, point string, at time.Time
 	return out, err
 }
 
+// pointItems trả mặt hàng của xã point tại ngày; xã không hoạt động tại ngày → rỗng (BR-03: Cơ bản áp dụng mọi xã
+// ĐANG HOẠT ĐỘNG — W11.72).
 func pointItems(ctx context.Context, tx pgx.Tx, point string, day time.Time) ([]domain.ItemState, error) {
+	ps, err := loadPointSnap(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	if st, ok := ps.states(day)[point]; !ok || st.State != domain.PointStateActive {
+		return nil, nil
+	}
 	sn, err := loadSnap(ctx, tx)
 	if err != nil {
 		return nil, err

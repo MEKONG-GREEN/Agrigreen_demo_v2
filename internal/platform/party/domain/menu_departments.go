@@ -96,8 +96,10 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			soon("tinh.bao_gia.bien_dong", "Báo cáo biến động giá", "/kn/bao-gia/bien-dong", "layers"),
 			soon("tinh.bao_gia.dieu_tra", "Điều tra giá thành", "/kn/bao-gia/dieu-tra", "season"),
 			soon("tinh.bao_gia.mat_hang", "Mặt hàng", "/kn/bao-gia/mat-hang", "package"),
-			// W11.07: cấu hình kỳ báo giá, giờ khóa, nhắc, ngưỡng — chỉ QTNV (Báo giá v1.3 FN-AD-04.04…06).
-			needs(soon("tinh.bao_gia.cau_hinh", "Cấu hình báo giá", "/kn/bao-gia/cau-hinh", "param"), NeedsPriceAdmin),
+			// W11.07: cấu hình kỳ báo giá, giờ khóa, nhắc, ngưỡng — chỉ QTNV (Báo giá v1.3 FN-AD-04.04…06). W11.72: màn
+			// lịch báo giá của W11.74 (cùng màn Admin /kn/phong-ban/{department}/bao-gia-lich) — đã mở.
+			needs(MenuItem{Key: "tinh.bao_gia.cau_hinh", Label: "Cấu hình báo giá", Route: "/kn/bao-gia/cau-hinh", Icon: "param"},
+				NeedsPriceAdmin),
 		},
 		port.AudienceXa: {
 			soon("xa.bao_gia.nhap", "Nhập báo giá", "/kn/bao-gia/nhap", "upload"),
@@ -120,7 +122,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 	},
 }
 
-// adminDeptBusiness: mục "Sắp có" thêm vào mục con của phòng ban trong nhóm "Phòng ban" của Admin.
+// adminDeptBusiness: mục nghiệp vụ ("Sắp có" cho tới khi module có màn) thêm vào mục con của phòng ban trong nhóm
+// "Phòng ban" của Admin.
 var adminDeptBusiness = map[string][]MenuItem{
 	port.MenuProfileChanNuoiThuySan: {
 		soon("admin.pb.cnts_danh_muc", "Danh mục CNTS", adminDeptRoute("/danh-muc-cnts"), "catalog"),
@@ -128,8 +131,11 @@ var adminDeptBusiness = map[string][]MenuItem{
 	port.MenuProfileKeHoachTaiChinh: {
 		soon("admin.pb.khtc_ke_hoach", "Kế hoạch năm", adminDeptRoute("/ke-hoach-nam"), "calendar"),
 	},
+	// W11.72: Xã báo giá (FN-AD-04.02, phân công FN-AD-04.01) và Kỳ báo giá & giờ khóa (W11.74 FN-AD-04.04…06) đã mở.
 	port.MenuProfileThongTinTuyenTruyen: {
-		soon("admin.pb.bao_gia_cau_hinh", "Xã báo giá & mặt hàng", adminDeptRoute("/bao-gia-cau-hinh"), "param"),
+		{Key: "admin.pb.bao_gia_xa", Label: "Xã báo giá", Route: "/kn/bao-gia/xa-bao-gia", Icon: "map"},
+		{Key: "admin.pb.bao_gia_lich", Label: "Kỳ báo giá & giờ khóa", Route: adminDeptRoute("/bao-gia-lich"), Icon: "calendar"},
+		soon("admin.pb.bao_gia_mat_hang", "Mặt hàng", "/kn/bao-gia/mat-hang", "package"),
 	},
 	port.MenuProfileHanhChinhTongHop: {
 		soon("admin.pb.hcth_phan_quyen", "Phân quyền hồ sơ", adminDeptRoute("/phan-quyen-ho-so"), "shield"),

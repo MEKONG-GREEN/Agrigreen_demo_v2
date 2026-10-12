@@ -268,7 +268,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	pr, err := wirePrice(unit, clk) // W11.71: cap/price (/v1/price/*), khung giá — ADR-0049
+	// W11.71: cap/price (/v1/price/*), khung giá — ADR-0049; W11.72: danh bạ cán bộ phân công xã báo giá.
+	pr, err := wirePrice(unit, clk, PriceOfficers{Assignments: acc.Assignments(), Names: acc.ActorNames()})
 	if err != nil {
 		return Modules{}, pools, err
 	}

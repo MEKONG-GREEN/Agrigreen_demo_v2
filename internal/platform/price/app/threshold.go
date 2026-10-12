@@ -60,7 +60,7 @@ func (s *Service) ThresholdsView(ctx context.Context, profile string) (Threshold
 	if err != nil {
 		return ThresholdView{}, err
 	}
-	v := ThresholdView{Profile: prof.Name, CanManage: c.manage}
+	v := ThresholdView{Profile: prof.Name, CanManage: c.steward}
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
 		var e error
 		if v.Set, v.Rows, v.DefaultSet, e = s.thresholdSet(ctx, tx, prof); e != nil {
@@ -79,7 +79,7 @@ func (s *Service) SaveThreshold(ctx context.Context, profile, idem string, t dom
 	if err != nil {
 		return t, err
 	}
-	if !c.manage {
+	if !c.steward {
 		return t, problem.Forbidden.WithDetail("chỉ vai quản trị nghiệp vụ báo giá cấu hình được ngưỡng")
 	}
 	if err := domain.ValidateThreshold(t); err != nil {
@@ -126,7 +126,7 @@ func (s *Service) RemoveThreshold(ctx context.Context, profile, idem, scope, cod
 	if err != nil {
 		return err
 	}
-	if !c.manage {
+	if !c.steward {
 		return problem.Forbidden.WithDetail("chỉ vai quản trị nghiệp vụ báo giá cấu hình được ngưỡng")
 	}
 	if scope == domain.ThresholdScopeDefault {

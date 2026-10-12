@@ -270,6 +270,13 @@ func (s *ItemService) assignment(ctx context.Context, profile, point string, ite
 		if err != nil {
 			return err
 		}
+		if status == domain.StatusActive { // W11.72: gán cho xã báo giá có thật, đang hoạt động từ ngày hiệu lực
+			if _, err := requirePoints(ctx, tx, []string{point}, from); err != nil {
+				return err
+			}
+		} else if err := knownPoint(ctx, tx, point); err != nil {
+			return err
+		}
 		sn, err := loadSnap(ctx, tx)
 		if err != nil {
 			return err
@@ -322,6 +329,9 @@ func (s *ItemService) ListPointItems(ctx context.Context, profile, point string,
 	}
 	out := PointItemList{Day: s.dayOr(at), Point: point}
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
+		if err := knownPoint(ctx, tx, point); err != nil { // W11.72
+			return err
+		}
 		var e error
 		out.Items, e = pointItems(ctx, tx, point, out.Day)
 		return e
@@ -515,7 +525,8 @@ type ProposalInput struct {
 }
 
 // CreateProposal ghi đề xuất (Cấp Xã, Cấp Tỉnh). Mặt hàng chỉ xuất hiện ở màn Nhập báo giá khi được duyệt và gán cho xã.
-// Xã của người gọi chưa đối chiếu được với phân công (W11.72) — point_code do client gửi.
+// W11.72: Cấp Xã chỉ đề xuất cho xã báo giá mình phụ trách chính hôm nay (point_code vắng + phụ trách đúng một xã → xã
+// đó); Cấp Tỉnh đề xuất cho xã báo giá đang hoạt động.
 func (s *ItemService) CreateProposal(ctx context.Context, profile string, in ProposalInput, idem string) (WriteResult, error) {
 	_, c, err := s.resolve(ctx, profile)
 	if err != nil {
@@ -527,7 +538,7 @@ func (s *ItemService) CreateProposal(ctx context.Context, profile string, in Pro
 	p := domain.Proposal{PointCode: in.PointCode, Name: strings.TrimSpace(in.Name), Variety: strings.TrimSpace(in.Variety),
 		GroupCode: in.GroupCode, UnitCode: in.UnitCode, Spec: strings.TrimSpace(in.Spec), Reason: strings.TrimSpace(in.Reason),
 		Status: domain.ProposalPending}
-	if !domain.ValidPointCode(p.PointCode) {
+	if p.PointCode != "" && !domain.ValidPointCode(p.PointCode) {
 		return WriteResult{}, problem.Validation.WithDetail("mã xã báo giá không hợp lệ")
 	}
 	probe := domain.Item{Name: p.Name, Variety: p.Variety, GroupCode: p.GroupCode, UnitCode: p.UnitCode, Spec: p.Spec, Kind: domain.ItemLocal,
@@ -541,6 +552,9 @@ func (s *ItemService) CreateProposal(ctx context.Context, profile string, in Pro
 	id := ids.New()
 	var res WriteResult
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
+		if err := s.proposalPoint(ctx, tx, c, &p); err != nil {
+			return err
+		}
 		seq, err := store.InsertProposal(ctx, tx, ids.New(), c.tenant, id, p, c.ref, s.Clock.Now(), c.ref, idemKey(idem, "proposal"))
 		if err != nil {
 			return classify(err)
@@ -666,4 +680,42 @@ func containsStr(xs []string, x string) bool {
 		}
 	}
 	return false
+}
+
+// proposalPoint đặt/kiểm xã của đề xuất theo phân công (W11.72).
+func (s *ItemService) proposalPoint(ctx context.Context, tx pgx.Tx, c caller, p *domain.Proposal) error {
+	today := s.today()
+	if c.level == "XA" {
+		ps, err := loadPointSnap(ctx, tx)
+		if err != nil {
+			return err
+		}
+		mine := callerPoints(ps, c.ref, today)
+		if p.PointCode == "" && len(mine) == 1 {
+			p.PointCode = mine[0]
+		}
+		if p.PointCode == "" || !containsStr(mine, p.PointCode) {
+			return port.ErrPointNotAssigned.WithDetail("xã báo giá được phân công: " + strings.Join(mine, ", "))
+		}
+		return nil
+	}
+	if p.PointCode == "" {
+		return problem.Validation.WithDetail("chọn xã báo giá đề xuất")
+	}
+	_, err := requirePoints(ctx, tx, []string{p.PointCode}, today)
+	return err
+}
+
+// knownPoint kiểm mã là xã báo giá có trong sổ (mọi trạng thái).
+func knownPoint(ctx context.Context, tx pgx.Tx, code string) error {
+	vs, err := store.LoadPoints(ctx, tx)
+	if err != nil {
+		return err
+	}
+	for _, v := range vs {
+		if v.Key == code {
+			return nil
+		}
+	}
+	return port.ErrPointNotFound.WithDetail("xã báo giá " + code)
 }

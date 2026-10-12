@@ -53,6 +53,7 @@ import { reportCycleAppRoutes } from "./kn-reports/routes";
 import { knAdminRoutes, supportGuard, supportRecord } from "./kn-admin";
 import { knCollectRoutes } from "./kn-collect";
 import { priceItemRoutes } from "./kn-price-items";
+import { pricePointRoutes } from "./kn-price-points";
 import { apiClientAdminRoutes, meteringAdminRoutes } from "./g5";
 
 function sleep(ms: number) {
@@ -132,6 +133,7 @@ const appRoutes: Route[] = [
   ...knCollectRoutes,
   // --- cap/price W11.73: mặt hàng theo thời kỳ (/v1/price/items*, groups*, assignments*, point-items, item-sets*, proposals*) ---
   ...priceItemRoutes,
+  ...pricePointRoutes, // W11.72 xã báo giá + phân công
 
   // --- pf/extension ---
   {

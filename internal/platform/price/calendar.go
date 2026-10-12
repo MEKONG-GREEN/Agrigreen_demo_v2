@@ -20,8 +20,8 @@ func (m *Module) Calendar() port.Calendar { return m.svc }
 // Thresholds cho W11.75: ngưỡng cảnh báo đang hiệu lực, tham số chung.
 func (m *Module) Thresholds() port.Thresholds { return m.svc }
 
-// UseReminderTargets nối bộ chọn người nhận nhắc nhập giá (W11.72 xã + phân công, W11.75 phiếu đã gửi). Không nối →
-// thông báo chủ đề tới cán bộ xã của tenant.
+// UseReminderTargets thay bộ chọn người nhận nhắc nhập giá. Mặc định (New, W11.72): cán bộ Xã phụ trách từng xã báo
+// giá; lần 2 bỏ xã đã gửi khi W11.75 nối PointHooks.Submitted. nil → thông báo chủ đề tới cán bộ xã của tenant.
 func (m *Module) UseReminderTargets(t port.ReminderTargets) { m.svc.Reminders = t }
 
 // CalendarTenants dựng bộ tìm tenant cho job lịch từ pool vai ag_ops_jobs (worker, nối thẳng).

@@ -83,7 +83,7 @@ func TestPriceFrameHTTP_W1171(t *testing.T) {
 	}
 
 	call("tinh", http.MethodPost, "/v1/price/catalog/defaults", http.StatusForbidden)
-	if n := call("admin", http.MethodPost, "/v1/price/catalog/defaults", http.StatusCreated)["written"]; fmt.Sprint(n) != "13" {
+	if n := call("admin", http.MethodPost, "/v1/price/catalog/defaults", http.StatusCreated)["written"]; fmt.Sprint(n) != "15" { // 8 ĐVT + 5 nhóm hàng + 2 nhóm vùng (W11.72)
 		t.Fatalf("ghi mặc định: %v", n)
 	}
 	if n := call("admin", http.MethodPost, "/v1/price/catalog/defaults", http.StatusCreated)["written"]; fmt.Sprint(n) != "0" {

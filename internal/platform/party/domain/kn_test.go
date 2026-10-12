@@ -139,11 +139,17 @@ func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
 			t.Fatalf("%s Cấp Tỉnh: %v", code, k)
 		}
 		for _, it := range gs[1].Items {
-			if !it.ComingSoon {
+			if !it.ComingSoon && it.Key != "tinh.bao_gia.cau_hinh" { // W11.72: cấu hình báo giá (QTNV) đã có màn
 				t.Fatalf("%s: mục nghiệp vụ chưa có module phải Sắp có: %s", code, it.Key)
 			}
 		}
 		admin := domain.AdminDepartmentItems(port.MenuProfileGeneric, code)
+		if code == port.DeptThongTinTruyenThong { // W11.72: Xã báo giá, Kỳ báo giá & giờ khóa đã mở; Mặt hàng Sắp có
+			if n := len(admin); admin[n-3].ComingSoon || admin[n-2].Route != "/kn/phong-ban/"+code+"/bao-gia-lich" || !admin[n-1].ComingSoon {
+				t.Fatalf("%s: mục Admin Báo giá: %+v", code, admin[n-3:])
+			}
+			continue
+		}
 		if last := admin[len(admin)-1]; !last.ComingSoon || !strings.HasPrefix(last.Route, "/kn/phong-ban/"+code+"/") {
 			t.Fatalf("%s: mục Admin Sắp có: %+v", code, last)
 		}

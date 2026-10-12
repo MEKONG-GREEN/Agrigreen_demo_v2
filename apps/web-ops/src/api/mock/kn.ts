@@ -262,7 +262,8 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       soon("tinh.bao_gia.bien_dong", "Báo cáo biến động giá", "/kn/bao-gia/bien-dong", "layers"),
       soon("tinh.bao_gia.dieu_tra", "Điều tra giá thành", "/kn/bao-gia/dieu-tra", "season"),
       soon("tinh.bao_gia.mat_hang", "Mặt hàng", "/kn/bao-gia/mat-hang", "package"),
-      soon("tinh.bao_gia.cau_hinh", "Cấu hình báo giá", "/kn/bao-gia/cau-hinh", "param"), // W11.07: chỉ QTNV ở server
+      // W11.07: chỉ QTNV ở server; W11.72: đã mở (màn lịch báo giá W11.74).
+      { key: "tinh.bao_gia.cau_hinh", label: "Cấu hình báo giá", route: "/kn/bao-gia/cau-hinh", icon: "param" },
     ],
     kn_xa: [
       soon("xa.bao_gia.nhap", "Nhập báo giá", "/kn/bao-gia/nhap", "upload"),
@@ -286,7 +287,12 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
 const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, (base: string) => Item[]>> = {
   chan_nuoi_thuy_san: (b) => [soon("admin.pb.cnts_danh_muc", "Danh mục CNTS", `${b}/danh-muc-cnts`, "catalog")],
   ke_hoach_tai_chinh: (b) => [soon("admin.pb.khtc_ke_hoach", "Kế hoạch năm", `${b}/ke-hoach-nam`, "calendar")],
-  thong_tin_truyen_thong: (b) => [soon("admin.pb.bao_gia_cau_hinh", "Xã báo giá & mặt hàng", `${b}/bao-gia-cau-hinh`, "param")],
+  // W11.72: Xã báo giá + Kỳ báo giá & giờ khóa đã mở.
+  thong_tin_truyen_thong: (b) => [
+    { key: "admin.pb.bao_gia_xa", label: "Xã báo giá", route: "/kn/bao-gia/xa-bao-gia", icon: "map" },
+    { key: "admin.pb.bao_gia_lich", label: "Kỳ báo giá & giờ khóa", route: `${b}/bao-gia-lich`, icon: "calendar" },
+    soon("admin.pb.bao_gia_mat_hang", "Mặt hàng", "/kn/bao-gia/mat-hang", "package"),
+  ],
   hanh_chinh_tong_hop: (b) => [
     soon("admin.pb.hcth_phan_quyen", "Phân quyền hồ sơ", `${b}/phan-quyen-ho-so`, "shield"),
     soon("admin.pb.hcth_thu_muc", "Thư mục tài liệu", `${b}/thu-muc-tai-lieu`, "library"),

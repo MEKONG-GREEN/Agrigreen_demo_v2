@@ -34,7 +34,7 @@ func TestPriceItemsHTTP_W1173(t *testing.T) {
 	env := pgtest.Get(t)
 	now := time.Date(2026, 10, 12, 3, 0, 0, 0, time.UTC) // 10:00 giờ VN, thứ Hai 12/10/2026
 	prof := port.Profile{Name: "kn", Department: "thong_tin_truyen_thong", Roles: map[string]string{"kn_tinh": "TINH", "kn_xa": "XA", "kn_tw": "TW"},
-		ManageBy: []string{"admin"}}
+		ManageBy: []string{"admin"}, StewardDuty: authz.DutyPriceAdmin}
 	svc, err := app.NewService(db.ForModule(env.Pool(t, migrations.PF, dbadmin.AppPlatform), app.DBModule), clock.NewFixed(now),
 		[]port.Profile{prof})
 	if err != nil {
@@ -49,7 +49,8 @@ func TestPriceItemsHTTP_W1173(t *testing.T) {
 	tid, other := ids.New(), ids.New()
 	who := map[string]authz.Principal{
 		"admin": {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "admin", Scope: authz.Scope{All: true}}},
-		"tinh":  {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "kn_tinh", Department: "thong_tin_truyen_thong"}},
+		"tinh": {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "kn_tinh", Department: "thong_tin_truyen_thong",
+			Duties: []string{authz.DutyPriceAdmin}}}, // W11.72: QTNV báo giá
 		"xa":    {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "kn_xa", OrgRef: ids.New()}},
 		"xa2":   {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "kn_xa", OrgRef: ids.New()}},
 		"tw":    {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "kn_tw"}},
@@ -62,6 +63,7 @@ func TestPriceItemsHTTP_W1173(t *testing.T) {
 	})
 	Handler{Svc: svc}.RegisterApp(r.Group("/v1"))
 	ItemHandler{Svc: items}.RegisterApp(r.Group("/v1"))
+	PointHandler{Svc: svc}.RegisterApp(r.Group("/v1")) // W11.72: xã báo giá có thật
 	call := func(as, method, path string, body any, want int) map[string]any {
 		t.Helper()
 		var buf []byte
@@ -108,6 +110,18 @@ func TestPriceItemsHTTP_W1173(t *testing.T) {
 	}
 
 	call("admin", http.MethodPost, "/v1/price/catalog/defaults", nil, http.StatusCreated)
+	// W11.72: point_code phải là xã báo giá có thật — 3 xã XBG0001…3 từ hôm nay; xa phụ trách XBG0002, xa2 phụ trách XBG0003.
+	seedCommunes(t, tid, "2026-01-01", "", "A1", "A2", "A3")
+	for _, au := range []string{"A1", "A2", "A3"} {
+		call("admin", http.MethodPost, "/v1/price/points", map[string]any{"admin_unit_code": au, "region_code": "an_giang",
+			"valid_from": "2026-10-12"}, http.StatusCreated)
+	}
+	for as, pt := range map[string]string{"xa": "XBG0002", "xa2": "XBG0003"} {
+		call("admin", http.MethodPost, "/v1/price/points/"+pt+"/officers", map[string]any{"role": "xa",
+			"officer_ref": who[as].ActorRef.String(), "valid_from": "2026-10-12"}, http.StatusCreated)
+	}
+	call("tinh", http.MethodPost, "/v1/price/assignments", map[string]any{"point_code": "X9", "item_codes": []string{"MH00001"}},
+		http.StatusNotFound) // mã xã không có
 
 	// Thêm mặt hàng (B2): mã tự sinh, hiệu lực từ ngày báo giá kế tiếp (13/10).
 	xoai := map[string]any{"name": "Xoài", "variety": "cát Hòa Lộc loại 1", "group_code": "rau_mau", "unit_code": "kg", "kind": "basic"}
@@ -125,13 +139,13 @@ func TestPriceItemsHTTP_W1173(t *testing.T) {
 	call("tinh", http.MethodPost, "/v1/price/items", map[string]any{"name": "xoài", "variety": "Cát Hòa Lộc  loại 1", "group_code": "rau_mau",
 		"unit_code": "kg", "kind": "local"}, http.StatusConflict) // trùng trong nhóm
 	lua := map[string]any{"name": "Lúa", "variety": "Jasmine 85 (tươi)", "group_code": "lua_gao", "unit_code": "kg", "kind": "local",
-		"points": []string{"X1"}, "valid_from": "2026-10-12"}
+		"points": []string{"XBG0001"}, "valid_from": "2026-10-12"}
 	if code(call("admin", http.MethodPost, "/v1/price/items", lua, http.StatusCreated)) != "MH00002" {
 		t.Fatal("mã thứ hai")
 	}
-	eq(pointCodes("X1", "2026-10-12"), "MH00002")
-	eq(pointCodes("X1", "2026-10-13"), "MH00002", "MH00001") // lua_gao trước rau_mau (AC-03, AC-04)
-	eq(pointCodes("X2", "2026-10-13"), "MH00001")
+	eq(pointCodes("XBG0001", "2026-10-12"), "MH00002")
+	eq(pointCodes("XBG0001", "2026-10-13"), "MH00002", "MH00001") // lua_gao trước rau_mau (AC-03, AC-04)
+	eq(pointCodes("XBG0002", "2026-10-13"), "MH00001")
 
 	l := call("tw", http.MethodGet, "/v1/price/items?at=2026-10-12", nil, http.StatusOK)
 	if its := l["items"].([]any); len(its) != 2 || its[1].(map[string]any)["state"] != "pending" || l["can_edit"] != false {
@@ -159,8 +173,8 @@ func TestPriceItemsHTTP_W1173(t *testing.T) {
 	if code(w) != "MH00003" {
 		t.Fatalf("thay thế: %v", w)
 	}
-	eq(pointCodes("X2", "2026-10-13"), "MH00001")
-	eq(pointCodes("X2", "2026-10-14"), "MH00003")
+	eq(pointCodes("XBG0002", "2026-10-13"), "MH00001")
+	eq(pointCodes("XBG0002", "2026-10-14"), "MH00003")
 	det = call("tinh", http.MethodGet, "/v1/price/items/MH00003?at=2026-10-14", nil, http.StatusOK)
 	if det["new_price"] != true || det["replaces_code"] != "MH00001" {
 		t.Fatalf("giá mới: %v", det)
@@ -175,14 +189,14 @@ func TestPriceItemsHTTP_W1173(t *testing.T) {
 		http.StatusUnprocessableEntity)
 	call("tinh", http.MethodPost, "/v1/price/items/MH00002/retire", map[string]any{"valid_to": "2026-10-20", "reason": ""}, http.StatusUnprocessableEntity)
 	call("tinh", http.MethodPost, "/v1/price/items/MH00002/retire", map[string]any{"valid_to": "2026-10-20", "reason": "Hết vụ"}, http.StatusCreated)
-	eq(pointCodes("X1", "2026-10-20"), "MH00002", "MH00003")
-	eq(pointCodes("X1", "2026-10-21"), "MH00003")
+	eq(pointCodes("XBG0001", "2026-10-20"), "MH00002", "MH00003")
+	eq(pointCodes("XBG0001", "2026-10-21"), "MH00003")
 
 	// Đổi thứ tự trong nhóm.
 	call("tinh", http.MethodPost, "/v1/price/items", map[string]any{"name": "Dưa leo", "variety": "loại 1", "group_code": "rau_mau",
 		"unit_code": "kg", "kind": "basic"}, http.StatusCreated) // MH00004
 	call("tinh", http.MethodPost, "/v1/price/items/MH00004/move", map[string]any{"direction": "up"}, http.StatusCreated)
-	eq(pointCodes("X2", "2026-10-14"), "MH00004", "MH00003")
+	eq(pointCodes("XBG0002", "2026-10-14"), "MH00004", "MH00003")
 
 	// Nhóm hàng (B6).
 	g := call("tinh", http.MethodPost, "/v1/price/groups", map[string]any{"name": "Cây ăn trái"}, http.StatusCreated)
@@ -197,25 +211,27 @@ func TestPriceItemsHTTP_W1173(t *testing.T) {
 	}
 
 	// Gán cho xã (B5): mặt hàng Cơ bản không gán riêng.
-	call("tinh", http.MethodPost, "/v1/price/assignments", map[string]any{"point_code": "X2", "item_codes": []string{"MH00003"}},
+	call("tinh", http.MethodPost, "/v1/price/assignments", map[string]any{"point_code": "XBG0002", "item_codes": []string{"MH00003"}},
 		http.StatusUnprocessableEntity)
-	call("tinh", http.MethodPost, "/v1/price/assignments", map[string]any{"point_code": "X2", "item_codes": []string{"MH00002"}}, http.StatusCreated)
-	eq(pointCodes("X2", "2026-10-14"), "MH00002", "MH00004", "MH00003")
-	call("tinh", http.MethodPost, "/v1/price/assignments/remove", map[string]any{"point_code": "X2", "item_codes": []string{"MH00002"},
+	call("tinh", http.MethodPost, "/v1/price/assignments", map[string]any{"point_code": "XBG0002", "item_codes": []string{"MH00002"}}, http.StatusCreated)
+	eq(pointCodes("XBG0002", "2026-10-14"), "MH00002", "MH00004", "MH00003")
+	call("tinh", http.MethodPost, "/v1/price/assignments/remove", map[string]any{"point_code": "XBG0002", "item_codes": []string{"MH00002"},
 		"valid_from": "2026-10-15"}, http.StatusCreated)
-	eq(pointCodes("X2", "2026-10-15"), "MH00004", "MH00003")
+	eq(pointCodes("XBG0002", "2026-10-15"), "MH00004", "MH00003")
 	if as := list("tinh", "/v1/price/assignments?at=2026-10-14"); len(as) != 2 {
 		t.Fatalf("gán: %v", as)
 	}
 
 	// Đề xuất từ xã → duyệt (AC-05) / từ chối.
-	prop := map[string]any{"point_code": "X2", "name": "Sầu riêng", "variety": "Ri6", "group_code": "rau_mau", "unit_code": "kg", "reason": "Vùng mới"}
+	prop := map[string]any{"point_code": "XBG0002", "name": "Sầu riêng", "variety": "Ri6", "group_code": "rau_mau", "unit_code": "kg", "reason": "Vùng mới"}
 	call("tw", http.MethodPost, "/v1/price/proposals", prop, http.StatusForbidden)
 	p1 := code(call("xa", http.MethodPost, "/v1/price/proposals", prop, http.StatusCreated))
 	prop["name"] = "Bưởi"
 	p2 := code(call("xa", http.MethodPost, "/v1/price/proposals", prop, http.StatusCreated))
-	call("xa2", http.MethodPost, "/v1/price/proposals", map[string]any{"point_code": "X3", "name": "Mít", "variety": "Thái", "group_code": "rau_mau",
-		"unit_code": "kg", "reason": "Có bán"}, http.StatusCreated)
+	call("xa2", http.MethodPost, "/v1/price/proposals", map[string]any{"point_code": "XBG0002", "name": "Mít", "variety": "Thái",
+		"group_code": "rau_mau", "unit_code": "kg", "reason": "Có bán"}, http.StatusForbidden) // W11.72: không phụ trách XBG0002
+	call("xa2", http.MethodPost, "/v1/price/proposals", map[string]any{"name": "Mít", "variety": "Thái", "group_code": "rau_mau",
+		"unit_code": "kg", "reason": "Có bán"}, http.StatusCreated) // xã lấy từ phân công
 	if ps := list("xa", "/v1/price/proposals"); len(ps) != 2 {
 		t.Fatalf("Cấp Xã chỉ thấy đề xuất của mình: %v", ps)
 	}
@@ -233,8 +249,8 @@ func TestPriceItemsHTTP_W1173(t *testing.T) {
 	call("tinh", http.MethodPost, "/v1/price/proposals/"+p2+"/reject", map[string]any{"note": ""}, http.StatusUnprocessableEntity)
 	call("tinh", http.MethodPost, "/v1/price/proposals/"+p2+"/reject", map[string]any{"note": "Đã có mặt hàng tương tự"}, http.StatusCreated)
 	call("tinh", http.MethodPost, "/v1/price/proposals/"+ids.New().String()+"/reject", map[string]any{"note": "x"}, http.StatusNotFound)
-	eq(pointCodes("X2", "2026-10-13"), "MH00002", "MH00004", "MH00001", "MH00005") // từ ngày báo giá kế tiếp
-	eq(pointCodes("X1", "2026-10-13"), "MH00002", "MH00004", "MH00001")
+	eq(pointCodes("XBG0002", "2026-10-13"), "MH00002", "MH00004", "MH00001", "MH00005") // từ ngày báo giá kế tiếp
+	eq(pointCodes("XBG0001", "2026-10-13"), "MH00002", "MH00004", "MH00001")
 	if ps := list("xa", "/v1/price/proposals?status=rejected"); len(ps) != 1 || ps[0].(map[string]any)["decision_note"] != "Đã có mặt hàng tương tự" {
 		t.Fatalf("từ chối: %v", ps)
 	}
@@ -243,10 +259,10 @@ func TestPriceItemsHTTP_W1173(t *testing.T) {
 	set := map[string]any{"code": "he_thu", "name": "Bộ Hè Thu", "season": "Hè Thu 2026", "item_codes": []string{"MH00005"}, "enabled": false}
 	call("tinh", http.MethodPost, "/v1/price/item-sets", set, http.StatusCreated)
 	call("tinh", http.MethodPost, "/v1/price/item-sets", set, http.StatusConflict)
-	eq(pointCodes("X2", "2026-10-13"), "MH00002", "MH00004", "MH00001")
+	eq(pointCodes("XBG0002", "2026-10-13"), "MH00002", "MH00004", "MH00001")
 	set["enabled"], set["valid_from"] = true, "2026-10-20"
 	call("tinh", http.MethodPost, "/v1/price/item-sets/he_thu/revise", set, http.StatusCreated)
-	eq(pointCodes("X2", "2026-10-20"), "MH00004", "MH00003", "MH00005")
+	eq(pointCodes("XBG0002", "2026-10-20"), "MH00004", "MH00003", "MH00005")
 	if ss := list("tinh", "/v1/price/item-sets?at=2026-10-13"); len(ss) != 1 || ss[0].(map[string]any)["enabled"] != false {
 		t.Fatalf("bộ: %v", ss)
 	}
@@ -256,7 +272,7 @@ func TestPriceItemsHTTP_W1173(t *testing.T) {
 	if its := list("other", "/v1/price/items"); len(its) != 0 {
 		t.Fatalf("tenant khác: %v", its)
 	}
-	pi, err := items.PointItems(tenant.WithID(context.Background(), tid), "X2", time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC))
+	pi, err := items.PointItems(tenant.WithID(context.Background(), tid), "XBG0002", time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC))
 	if err != nil || len(pi) != 3 || pi[2].Code != "MH00005" || pi[2].Kind != "local" {
 		t.Fatalf("PointItems: %v %v", pi, err)
 	}

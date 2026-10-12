@@ -237,7 +237,7 @@ func (s *Service) Calendar(ctx context.Context, profile string) (CalendarView, e
 	}
 	now := s.Clock.Now()
 	today := domain.BusinessDay(now)
-	v := CalendarView{Profile: prof.Name, Now: now, CanManage: c.manage}
+	v := CalendarView{Profile: prof.Name, Now: now, CanManage: c.steward}
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
 		st, err := s.calendarState(ctx, tx, prof)
 		if err != nil {
@@ -270,7 +270,7 @@ func (s *Service) SaveSchedule(ctx context.Context, profile, idem string, in dom
 	if err != nil {
 		return domain.Schedule{}, err
 	}
-	if !c.manage {
+	if !c.steward {
 		return domain.Schedule{}, problem.Forbidden.WithDetail("chỉ vai quản trị nghiệp vụ báo giá cấu hình được lịch")
 	}
 	if err := domain.ValidateSchedule(in); err != nil {
@@ -315,7 +315,7 @@ func (s *Service) AddException(ctx context.Context, profile, idem string, e doma
 	if err != nil {
 		return e, err
 	}
-	if !c.manage {
+	if !c.steward {
 		return e, problem.Forbidden.WithDetail("chỉ vai quản trị nghiệp vụ báo giá cấu hình được lịch ngoại lệ")
 	}
 	if err := domain.ValidateException(e); err != nil {
@@ -356,7 +356,7 @@ func (s *Service) RemoveException(ctx context.Context, profile, idem string, day
 	if err != nil {
 		return err
 	}
-	if !c.manage {
+	if !c.steward {
 		return problem.Forbidden.WithDetail("chỉ vai quản trị nghiệp vụ báo giá cấu hình được lịch ngoại lệ")
 	}
 	now := s.Clock.Now()

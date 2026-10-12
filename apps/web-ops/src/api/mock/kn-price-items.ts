@@ -519,7 +519,25 @@ function itemRoutes(): Route[] {
           version: 1,
           valid_from: from,
         }));
-        return json({ day: at, units, groups } satisfies S["PriceCatalog"]);
+        // W11.72: nhóm vùng mặc định (An Giang, Kiên Giang).
+        const regions = (
+          [
+            ["an_giang", "An Giang"],
+            ["kien_giang", "Kiên Giang"],
+          ] as const
+        ).map(([code, name], i) => ({
+          code,
+          name,
+          sort_order: (i + 1) * 10,
+          version: 1,
+          valid_from: from,
+        }));
+        return json({
+          day: at,
+          units,
+          groups,
+          regions,
+        } satisfies S["PriceCatalog"]);
       },
     },
     {
