@@ -1,0 +1,280 @@
+# ============================================================================
+#  TRIEN KHAI DEMO - MOT NUT BAM
+#
+#  Dat file nay vao:  .github/workflows/trien-khai-demo.yml
+#  (file MOI, khong dong vao ci.yml)
+#
+#  Cach chay:
+#    Tab Actions > "Trien khai demo" o cot trai > nut "Run workflow" >
+#    "Run workflow" lan nua. De trong o commit = lay dau nhanh main.
+#
+#    Hoac bang the, cho ai thich dong lenh:
+#      git tag demo-20261015 && git push --tags
+#
+#  Vi sao tach khoi ci.yml:
+#    - ci.yml lo viec XAY ANH, chay tu dong moi lan push vao main. Khong ai
+#      phai bam gi.
+#    - File nay lo viec DUA LEN MAY CHU, chi chay khi co nguoi quyet dinh.
+#    Tach ra thi tab Actions co mot muc rieng ten "Trien khai demo", lich su
+#    trien khai doc duoc ngay, va khong bao gio co chuyen mot lan push lam
+#    khoi dong lai demo giua luc dang trinh dien.
+#
+#  Dieu kien:
+#    - Repository variable  AG_DEMO_DOMAIN = demo.mekonggreen.vn
+#    - Repository secrets   SERVER_HOST / SERVER_USER / SERVER_SSH_KEY
+#    - Tren may chu: docker-compose.mkg.yml da chuyen sang ghcr va .env co
+#      dong AG_TAG=  (chay 06-chuyen-sang-ghcr.sh mot lan)
+# ============================================================================
+
+name: Trien khai demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Ma commit 40 ky tu. De TRONG = dau nhanh main."
+        required: false
+        type: string
+  push:
+    tags: ["demo-*"]
+
+permissions:
+  contents: read
+  packages: read
+
+# Khong bao gio huy mot lan trien khai dang chay. Bi cat giua
+# "docker compose up" la trang thai te nhat: migration co the da chay xong
+# ma container thi chua len. Lan bam thu hai se XEP HANG, khong de len nhau.
+concurrency:
+  group: trien-khai-demo
+  cancel-in-progress: false
+
+jobs:
+
+  # -------------------------------------------------------------------------
+  chon-ban:
+    name: Chon ban va kiem du anh
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.chon.outputs.sha }}
+      mota: ${{ steps.chon.outputs.mota }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # can lich su day du de kiem to tien cua main
+
+      - name: Chon ma commit
+        id: chon
+        run: |
+          set -euo pipefail
+          vao="${{ inputs.commit }}"
+          if [ -z "$vao" ]; then
+            # Bam nut tu nhanh main -> github.sha la dau main.
+            # Day the demo-*   -> github.sha la commit duoc gan the.
+            sha="${{ github.sha }}"
+            echo "Khong nhap commit - dung ${{ github.ref_name }}"
+          else
+            sha="$vao"
+          fi
+
+          if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::'$sha' khong phai ma commit 40 ky tu chu thuong"
+            exit 1
+          fi
+          if ! git cat-file -e "${sha}^{commit}" 2>/dev/null; then
+            echo "::error::Khong thay commit $sha trong repo"
+            exit 1
+          fi
+
+          # Chi cho trien khai thu da nam tren main. Khong co buoc nay thi mot
+          # nhanh thu nghiem bat ky cung len duoc may chu demo.
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::$sha khong phai to tien cua origin/main - tu choi trien khai"
+            exit 1
+          fi
+
+          mota=$(git log -1 --format='%ad  %an  %s' --date=short "$sha" | cut -c1-100)
+          echo "sha=$sha"   >> "$GITHUB_OUTPUT"
+          echo "mota=$mota" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Ban se trien khai"
+            echo ""
+            echo "- commit: \`$sha\`"
+            echo "- $mota"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dang nhap ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Kiem TRUOC khi dung toi may chu. Thieu mot anh ma van di tiep thi
+      # "compose up" se dung giua chung: vai container da doi sang ban moi,
+      # vai container chua - va migration thi co the da chay.
+      - name: Kiem du 13 anh tren ghcr
+        run: |
+          set -uo pipefail
+          OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          SHA='${{ steps.chon.outputs.sha }}'
+          thieu=0
+          for n in api-platform api-internal identity-vault ingest worker \
+                   worker-internal outbox-publisher migrate optimizer \
+                   api-public integration-gateway postgres web-ops-demo; do
+            img="ghcr.io/$OWNER/agrigreen-$n:$SHA"
+            if docker manifest inspect "$img" > /dev/null 2>&1; then
+              echo "  [ CO  ] $n"
+            else
+              echo "  [THIEU] $n   <-- $img"
+              thieu=$((thieu+1))
+            fi
+          done
+          if [ "$thieu" -gt 0 ]; then
+            echo "::error::Thieu $thieu anh cho commit $SHA. Thuong la vi CI cua commit do chua chay xong, hoac bi huy giua chung. Mo tab Actions, tim lan chay cua commit do va bam 'Re-run all jobs'."
+            exit 1
+          fi
+          echo "Du 13 anh."
+
+  # -------------------------------------------------------------------------
+  trien-khai:
+    name: Dua len may chu
+    needs: chon-ban
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: SSH vao may chu, keo anh va khoi dong lai
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SERVER_SSH_KEY }}
+          script_stop: true
+          command_timeout: 25m
+          script: |
+            set -euo pipefail
+            cd /opt/stacks/agrigreen
+
+            SHA='${{ needs.chon-ban.outputs.sha }}'
+            C="-f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.vps.yml -f deploy/compose/docker-compose.mkg.yml"
+            E=deploy/compose/.env
+
+            # Dong bo ma nguon: file compose va migration doi theo commit.
+            # Dung "checkout -B main <sha>" chu khong "pull" de khong vap xung
+            # dot neu may chu tung bi sua tay. docker-compose.mkg.yml la file
+            # KHONG theo doi boi Git nen checkout khong dung toi no.
+            git fetch --quiet origin main
+            git checkout -q -B main "$SHA"
+            git log -1 --format='Dang o: %H  %s' | cut -c1-100
+
+            # Ghi lai phien ban cu de con duong quay lui
+            grep '^AG_TAG=' "$E" > deploy/compose/.env.previous 2>/dev/null || true
+
+            if grep -q '^AG_TAG=' "$E"; then
+              sed -i "s|^AG_TAG=.*|AG_TAG=$SHA|" "$E"
+            else
+              echo "AG_TAG=$SHA" >> "$E"
+            fi
+            grep '^AG_TAG=' "$E"
+
+            docker compose $C config --quiet
+
+            # Kho goi cua repo rieng tu nen phai dang nhap moi keo duoc anh.
+            # Dung GITHUB_TOKEN cua chinh lan chay nay: no het han khi job ket
+            # thuc, nen may chu khong phai giu mot bi mat lau dai nao.
+            echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+            trap 'docker logout ghcr.io > /dev/null 2>&1 || true' EXIT
+
+            docker compose $C pull --quiet
+            docker compose $C up -d --wait --wait-timeout 1200
+
+            # Khong co buoc nay thi mot lan "pull" that bai am tham van cho ra
+            # job mau xanh - da tung xay ra voi HRM.
+            running=$(docker compose $C ps --status running -q | wc -l)
+            echo "So container dang chay: $running"
+            if [ "$running" -lt 16 ]; then
+              docker compose $C ps -a
+              echo "::error::Thieu container"
+              exit 1
+            fi
+
+            # Nam dich vu chay mot lan phai thoat 0. migrate-up quan trong
+            # nhat: migration cua du an chi tien, khong co file .down.sql nao.
+            for s in kc-db-init migrate-bootstrap migrate-up rabbitmq-init s3-init; do
+              cid=$(docker compose $C ps -aq "$s" | head -1)
+              [ -n "$cid" ] || { echo "::error::khong thay container $s"; exit 1; }
+              code=$(docker inspect -f '{{.State.ExitCode}}' "$cid")
+              echo "  $s -> ma thoat $code"
+              if [ "$code" != 0 ]; then
+                docker compose $C logs --no-color --tail 60 "$s"
+                echo "::error::$s thoat voi ma $code"
+                exit 1
+              fi
+            done
+
+            echo "--- 20 dong cuoi cua migrate-up ---"
+            docker compose $C logs --no-color --tail 20 migrate-up || true
+
+            # -a: don ca anh con nhan nhung khong container nao dung.
+            # "until=168h" giu lai mot tuan -> van quay lui duoc vai ban truoc.
+            docker image prune -af --filter "until=168h"
+
+  # -------------------------------------------------------------------------
+  kiem-tra:
+    name: Kiem tra tu ben ngoai
+    needs: [chon-ban, trien-khai]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Goi thu cac diem cuoi cong khai
+        run: |
+          set -eu
+          D="${{ vars.AG_DEMO_DOMAIN }}"
+          check() {
+            for i in 1 2 3 4 5; do
+              code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$1" || echo 000)
+              echo "  $1 -> $code (lan $i)"
+              [ "$code" = "$2" ] && return 0
+              sleep 10
+            done
+            echo "::error::$1 khong tra ve $2"
+            return 1
+          }
+          check "https://api.$D/readyz" 200
+          check "https://app.$D/login"  200
+          check "https://auth.$D/realms/agrigreen/.well-known/openid-configuration" 200
+
+      - name: issuer phai la https va dung ten mien
+        run: |
+          set -eu
+          D="${{ vars.AG_DEMO_DOMAIN }}"
+          iss=$(curl -fsS "https://auth.$D/realms/agrigreen/.well-known/openid-configuration" | jq -r .issuer)
+          echo "issuer = $iss"
+          if [ "$iss" != "https://auth.$D/realms/agrigreen" ]; then
+            echo "::error::issuer sai - Nginx co the da mat X-Forwarded-Proto"
+            exit 1
+          fi
+
+      - name: Hai site kia khong bi anh huong
+        run: |
+          set -eu
+          for u in https://mekonggreen.vn https://hrm.mekonggreen.vn; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 12 "$u" || echo 000)
+            echo "  $u -> $code"
+            # hrm tra 401 vi con lop mat khau demo; chi can KHONG phai 000/5xx.
+            case "$code" in 000|5*) echo "::error::$u tra $code"; exit 1 ;; esac
+          done
+
+      - name: Ghi tom tat
+        if: always()
+        run: |
+          {
+            echo "### Ket qua"
+            echo ""
+            echo "- commit da trien khai: \`${{ needs.chon-ban.outputs.sha }}\`"
+            echo "- ${{ needs.chon-ban.outputs.mota }}"
+            echo ""
+            echo "Viec cuoi phai lam bang mat: mo https://app.${{ vars.AG_DEMO_DOMAIN }} va dang nhap thu."
+          } >> "$GITHUB_STEP_SUMMARY"
