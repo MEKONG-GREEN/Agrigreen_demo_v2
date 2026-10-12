@@ -2,12 +2,32 @@
 # (go-licenses RB-4, govulncheck, Trivy). Action GitHub đã ghim SHA — Dependabot cập nhật cả SHA lẫn
 # chú thích phiên bản. Phiên bản công cụ ghim trong lệnh (govulncheck, go-licenses, gitleaks, cosign
 # kèm SHA-256) phải nâng tay trong .github/workflows/ci.yml.
+#
+# ---------------------------------------------------------------------------
+# TẠM DỪNG 12/10/2026 — open-pull-requests-limit: 0 ở TẤT CẢ các hệ.
+#
+# Lý do: Actions bị tắt khoảng 2 tuần. Khi bật lại, Dependabot rebase cùng lúc
+# 10 PR đang mở, mỗi PR kích hoạt một lượt CI đầy đủ (hơn 25 job: ba app
+# Flutter, emulator Android, hai bộ Playwright, 11 ảnh, compose-smoke 45
+# phút). GitHub tính TỔNG phút của mọi job, nên 10 lượt như vậy có thể ngốn
+# gần hết hạn mức 2.000 phút/tháng của gói Free trong một buổi.
+#
+# Theo tài liệu GitHub, đặt open-pull-requests-limit: 0 là cách tạm dừng
+# version updates cho từng hệ mà không phải xoá file này.
+#
+# ĐỂ BẬT LẠI: đổi các số 0 dưới đây về giá trị mong muốn. Đề xuất khi bật lại,
+# thay vì trả về 10 như cũ:
+#   - open-pull-requests-limit: 2        (3 PR cùng lúc là đủ để theo kịp)
+#   - schedule.interval: monthly         (hằng tuần là quá dày với bộ CI này)
+#   - và thêm bộ lọc paths cho các job app di động trong ci.yml, để sửa một
+#     thư viện npm không kéo theo cả emulator Android chạy 20 phút.
+# ---------------------------------------------------------------------------
 version: 2
 updates:
   - package-ecosystem: gomod
     directory: /
     schedule: { interval: weekly, day: monday, timezone: Asia/Ho_Chi_Minh }
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0   # tạm dừng (cũ: 10)
     groups:
       go-minor-patch:
         update-types: [minor, patch]
@@ -15,7 +35,7 @@ updates:
   - package-ecosystem: npm
     directory: /apps/web-ops
     schedule: { interval: weekly, day: monday, timezone: Asia/Ho_Chi_Minh }
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0   # tạm dừng (cũ: 10)
     groups:
       web-ops-minor-patch:
         update-types: [minor, patch]
@@ -23,7 +43,7 @@ updates:
   - package-ecosystem: npm
     directory: /apps/web-internal
     schedule: { interval: weekly, day: monday, timezone: Asia/Ho_Chi_Minh }
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0   # tạm dừng (cũ: 10)
     groups:
       web-internal-minor-patch:
         update-types: [minor, patch]
@@ -31,11 +51,12 @@ updates:
   - package-ecosystem: pip
     directory: /optimizer
     schedule: { interval: weekly, day: monday, timezone: Asia/Ho_Chi_Minh }
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0   # tạm dừng (cũ: 5)
 
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday, timezone: Asia/Ho_Chi_Minh }
+    open-pull-requests-limit: 0   # tạm dừng (trước đây không khai, mặc định 5)
     groups:
       actions:
         patterns: ["*"]
