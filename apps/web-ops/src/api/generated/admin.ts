@@ -218,6 +218,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/masterdata/catalogs/{catalog}/items/{code}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalog: components["parameters"]["Catalog"];
+                code: components["parameters"]["ItemCode"];
+            };
+            cookie?: never;
+        };
+        /** W11.41 (BRD CNTS FN-06 BR-03): các giá trị có hiệu lực từ ngày của một mục danh mục cnts_* (sổ catalog_effective) */
+        get: operations["catalogItemVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/masterdata/params/versions": {
         parameters: {
             query?: never;
@@ -4343,10 +4363,21 @@ export interface components {
             /**
              * @description Theo danh mục — rice_variety: growth_days, expected_yield_t_per_ha (decimal); farm_stage: pilot (true|false, cờ thí điểm CGH), description;
              *     machine_type: farm_stage (mã khâu đang dùng); season: start_month, end_month; pest: kind (sau_hai|benh_hai|dong_vat_hai|co_dai).
+             *     W11.41 CNTS — cnts_species: group, unit, herd_column, order; cnts_breed: species; cnts_disease: species (danh sách), notifiable;
+             *     cnts_vaccine: species (loài so sánh, bắt buộc), diseases, report_group (heo|bo|cum_gia_cam|dai|khac), order; cnts_chemical: unit, target;
+             *     cnts_slaughter_facility: commune_code, facility_kind (tap_trung|nho_le), stamp_codes_gs, stamp_codes_gc (nhiều mã, ngăn cách dấu phẩy),
+             *     species, address — facility_ref do hệ thống cấp và giữ cố định (giá trị gửi lên bị bỏ qua); cnts_aquaculture_object: scale_unit (ha|long|veo|m3);
+             *     cnts_fishing_group: unit, order; cnts_indicator: unit, value_type (decimal|integer|percent); cnts_model_type: sector (chan_nuoi|thuy_san), species;
+             *     cnts_vaccination_schedule: model_type và/hoặc breed, doses ("<vaccine>/<lần>@<ngày tuổi>" ngăn cách dấu phẩy).
              */
             attrs?: {
                 [key: string]: string;
             };
+            /**
+             * Format: date
+             * @description W11.41 — chỉ danh mục cnts_*: ngày áp dụng giá trị mới (FN-06 BR-03); trống = hôm nay
+             */
+            valid_from?: string;
         };
         CatalogItem: {
             catalog: string;
@@ -4362,6 +4393,30 @@ export interface components {
             updated_at: string;
             /** @description KN v7.7 FN-AD-04.05: số mẫu báo cáo đang dùng mục (vắng khi chưa nối P3) */
             forms_in_use?: number;
+            /**
+             * Format: date
+             * @description W11.41 (danh mục cnts_*): ngày bắt đầu hiệu lực của giá trị trả về (đọc theo at hoặc vừa ghi)
+             */
+            valid_from?: string;
+        };
+        CatalogEffectiveVersion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            valid_from: string;
+            /** Format: date */
+            valid_to: string | null;
+            after: components["schemas"]["CatalogSnapshot"];
+            /**
+             * Format: uuid
+             * @description Dòng sổ catalog_change cùng giao dịch
+             */
+            change_id: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: uuid */
+            actor_ref: string;
+            seq: number;
         };
         ReasonInput: {
             reason?: string;
@@ -6811,7 +6866,7 @@ export interface components {
     };
     parameters: {
         IdempotencyKey: string;
-        Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest" | "vessel_class" | "crop" | "material" | "production_model" | "report_type";
+        Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest" | "vessel_class" | "crop" | "material" | "production_model" | "report_type" | "cnts_species" | "cnts_breed" | "cnts_vaccine" | "cnts_vaccination_schedule" | "cnts_disease" | "cnts_chemical" | "cnts_slaughter_facility" | "cnts_aquaculture_object" | "cnts_fishing_group" | "cnts_indicator" | "cnts_model_type" | "cnts_document_type";
         ItemCode: string;
         VersionID: string;
         Cursor: string;
@@ -7045,6 +7100,8 @@ export interface operations {
         parameters: {
             query?: {
                 include_inactive?: boolean;
+                /** @description W11.41 — chỉ danh mục cnts_*: giá trị có hiệu lực tại ngày (YYYY-MM-DD hoặc RFC 3339, giờ Việt Nam); có at thì không phân trang (next_cursor null) */
+                at?: string;
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["Limit"];
             };
@@ -7101,9 +7158,9 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description masterdata.catalog_not_found */
             404: components["responses"]["Problem"];
-            /** @description masterdata.catalog_item_exists */
+            /** @description masterdata.catalog_item_exists | masterdata.catalog_item_name_taken | masterdata.cnts_stamp_taken */
             409: components["responses"]["Problem"];
-            /** @description validation_failed | masterdata.farm_stage_invalid */
+            /** @description validation_failed | masterdata.farm_stage_invalid | masterdata.catalog_ref_invalid | masterdata.cnts_commune_invalid */
             422: components["responses"]["Problem"];
         };
     };
@@ -7134,6 +7191,8 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            /** @description masterdata.catalog_item_name_taken | masterdata.cnts_stamp_taken */
+            409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
     };
@@ -7225,6 +7284,33 @@ export interface operations {
                     "application/json": {
                         items: components["schemas"]["CatalogChange"][];
                         next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    catalogItemVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalog: components["parameters"]["Catalog"];
+                code: components["parameters"]["ItemCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Theo valid_from tăng dần; valid_to = valid_from của giá trị kế tiếp (null = đang hiệu lực / mới nhất) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CatalogEffectiveVersion"][];
                     };
                 };
             };
@@ -10568,7 +10654,7 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description accounts.assignment_state */
             409: components["responses"]["Problem"];
-            /** @description validation_failed, accounts.internal_unit_invalid */
+            /** @description validation_failed, accounts.internal_unit_invalid, accounts.facility_invalid (W11.41) */
             422: components["responses"]["Problem"];
         };
     };

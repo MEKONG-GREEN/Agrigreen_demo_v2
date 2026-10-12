@@ -74,6 +74,8 @@ type itemDTO struct {
 	UpdatedAt          string            `json:"updated_at"`
 	// FormsInUse: số mẫu báo cáo đang dùng mục (KN v7.7 FN-AD-04.05 "biểu đang dùng"); vắng khi chưa nối P3.
 	FormsInUse *int `json:"forms_in_use,omitempty"`
+	// ValidFrom (W11.41, danh mục CNTS): ngày bắt đầu hiệu lực của giá trị trả về (đọc theo ?at= hoặc vừa ghi).
+	ValidFrom *string `json:"valid_from,omitempty"`
 }
 
 func toItemDTO(it domain.Item) itemDTO {
@@ -85,6 +87,31 @@ func toItemDTO(it domain.Item) itemDTO {
 	if it.DeactivationReason != "" {
 		r := it.DeactivationReason
 		d.DeactivationReason = &r
+	}
+	if !it.ValidFrom.IsZero() {
+		v := it.ValidFrom.Format(time.DateOnly)
+		d.ValidFrom = &v
+	}
+	return d
+}
+
+type effectiveDTO struct {
+	ID        string          `json:"id"`
+	ValidFrom string          `json:"valid_from"`
+	ValidTo   *string         `json:"valid_to"`
+	After     domain.Snapshot `json:"after"`
+	ChangeID  string          `json:"change_id"`
+	EventTime string          `json:"event_time"`
+	ActorRef  string          `json:"actor_ref"`
+	Seq       int64           `json:"seq"`
+}
+
+func toEffectiveDTO(v domain.Version) effectiveDTO {
+	d := effectiveDTO{ID: v.ID.String(), ValidFrom: v.ValidFrom.Format(time.DateOnly), After: v.After, ChangeID: v.ChangeID.String(),
+		EventTime: v.EventTime.UTC().Format(time.RFC3339Nano), ActorRef: v.ActorRef.String(), Seq: v.Seq}
+	if v.ValidTo != nil {
+		t := v.ValidTo.Format(time.DateOnly)
+		d.ValidTo = &t
 	}
 	return d
 }

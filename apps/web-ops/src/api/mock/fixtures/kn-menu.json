@@ -978,6 +978,15 @@
         "status": "coming_soon",
         "status_label": "Sắp có",
         "children": []
+       },
+       {
+        "key": "tinh.cnts.danh_muc",
+        "label": "Danh mục CNTS",
+        "route": "/kn/cnts/danh-muc",
+        "icon": "catalog",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      },
@@ -2625,8 +2634,6 @@
           "icon": "catalog",
           "badge_source": null,
           "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
           "children": []
          }
         ]

@@ -236,6 +236,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Modules: pty.ModuleEnablement()}) // W1.4: vai của module đã tắt không cấp được
 	// KN v7.7 P1 ↔ P2: menu theo ngữ cảnh phiên, số tài khoản theo phòng ban (mở khóa "xóa" phòng ban),
 	// dòng tài khoản của bảng Ảnh hưởng, tên người thao tác trong Log (Keycloak, dự phòng danh bạ cán bộ).
+	acc.UseFacilityCatalog(md.CNTSCatalogs()) // W11.41: phạm vi Cấp Xã theo cơ sở giết mổ của danh mục CNTS
 	pty.UseSessionContext(acc.SessionContext())
 	pty.UseDepartmentUsage(acc.DepartmentUsage())
 	pty.UseOrgImpact(acc.OrgImpact())

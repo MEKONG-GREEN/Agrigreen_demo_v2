@@ -90,6 +90,10 @@ func (m *Module) Middleware() gin.HandlerFunc { return handler.Handler{Svc: m.sv
 // UseDepartments nối phòng ban của pf/party sau khi dựng (gốc lắp ráp).
 func (m *Module) UseDepartments(d partyport.Departments) { m.svc.Departments = d }
 
+// UseFacilityCatalog (W11.41) nối danh mục cơ sở giết mổ CNTS (pf/masterdata): facility_refs của phạm vi Cấp Xã
+// phải là cơ sở đang dùng. Không nối → chỉ kiểm dạng UUID.
+func (m *Module) UseFacilityCatalog(f app.FacilityCatalog) { m.svc.Facilities = f }
+
 // SessionContext cho pf/party: menu theo ngữ cảnh phiên (P2 UseSessionContext).
 func (m *Module) SessionContext() partyport.SessionContext { return app.SessionContext{} }
 

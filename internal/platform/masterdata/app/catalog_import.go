@@ -66,6 +66,8 @@ var catalogImportAliases = map[string]string{
 	"catalog": "catalog", "danh_muc": "catalog",
 	"code": "code", "ma": "code", "ma_muc": "code",
 	"name": "name", "ten": "name", "ten_muc": "name",
+	// W11.41: ngày áp dụng của danh mục CNTS (YYYY-MM-DD; trống = hôm nay).
+	"valid_from": "valid_from", "hieu_luc_tu": "valid_from", "ngay_hieu_luc": "valid_from",
 }
 
 // ImportCatalogs nạp nhiều mục danh mục từ CSV/XLSX (HTX US-CAT-02). Tệp sai mẫu →
@@ -127,12 +129,25 @@ func (s *Service) ImportCatalogs(ctx context.Context, body io.Reader, key string
 				}
 			}
 			row.Catalog, row.Code = it.Catalog, strings.TrimSpace(it.Code)
-			norm, err := it.Normalize()
+			if vf := strings.TrimSpace(rec.Get(col, "valid_from")); vf != "" {
+				d, err := domain.ParseDay(vf)
+				if err == nil {
+					err = domain.ValidateValidFrom(d)
+				}
+				if err != nil || !domain.EffectiveDated(it.Catalog) {
+					row.Reason = "valid_from: YYYY-MM-DD, chỉ danh mục Chăn nuôi – Thủy sản"
+					res.add(row)
+					continue
+				}
+				it.ValidFrom = d
+			}
+			norm, err := prepareFacilityRef(it).Normalize()
 			if err != nil {
 				row.Reason = importReason(err)
 				res.add(row)
 				continue
 			}
+			norm.ValidFrom = s.effectiveFrom(norm)
 			row.Code = norm.Code
 			k := norm.Catalog + "/" + norm.Code
 			if prev, dup := seen[k]; dup {
@@ -146,6 +161,7 @@ func (s *Service) ImportCatalogs(ctx context.Context, body io.Reader, key string
 				return err
 			}
 			if cur != nil {
+				norm = keepFacilityRef(norm, *cur)
 				if cur.SameContent(norm) {
 					row.Status = ImportRowSkipped
 				} else {
@@ -154,7 +170,7 @@ func (s *Service) ImportCatalogs(ctx context.Context, body io.Reader, key string
 				res.add(row)
 				continue
 			}
-			if err := checkRefs(ctx, tx, norm); err != nil {
+			if err := checkRefs(ctx, tx, norm, norm.ValidFrom); err != nil {
 				if pr := problem.From(err); pr.Status == http.StatusUnprocessableEntity {
 					row.Reason = pr.Title
 					res.add(row)

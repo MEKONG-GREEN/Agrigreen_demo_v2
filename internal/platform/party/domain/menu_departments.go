@@ -2,7 +2,7 @@ package domain
 
 // kn.menu/v3 (W11.06, D3 C6/H0, D4 X2): khuôn menu riêng của các phòng ban ngoài Trồng trọt và nhóm
 // "Dùng chung". Nguồn: bảng "Menu theo vai trò" của BRD CNTS v3.7 §VI.3, KHTC v2.2 §VI.3, Báo giá v1.3
-// §VI.3, HCTH v3.0 §VI.3. Mọi mục ở đây là ComingSoon (module chưa có — W11.2x, W11.4x, W11.6x, W11.7x);
+// §VI.3, HCTH v3.0 §VI.3. Mục ở đây là ComingSoon (module chưa có — W11.2x, W11.4x, W11.6x, W11.7x) trừ mục đã có màn;
 // gói của module bỏ ComingSoon (và thêm ánh xạ menuModules nếu là module per_tenant) khi màn sẵn sàng.
 // Khuôn riêng = khung báo cáo theo kỳ chung (genericMenus, giữ nguyên màn đang chạy và trang mặc định của
 // đối tượng) + nhóm "Nghiệp vụ" ngay sau "Điều hành" (thứ tự C6: Điều hành / Nghiệp vụ / Báo cáo).
@@ -59,6 +59,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			soon("tinh.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
 			soon("tinh.cnts.du_an_knqg", "Dự án KNQG / Điểm trình diễn", "/kn/cnts/du-an-knqg", "report"),
 			soon("tinh.cnts.quy_trinh", "Quy trình, văn bản", "/kn/cnts/quy-trinh", "sop"),
+			// W11.41: Cấp Tỉnh xem danh mục CNTS (FN-06: Admin CRUD, Cấp Tỉnh R).
+			{Key: "tinh.cnts.danh_muc", Label: "Danh mục CNTS", Route: "/kn/cnts/danh-muc", Icon: "catalog"},
 		},
 		port.AudienceXa: {
 			soon("xa.cnts.lich", "Lịch trực của tôi", "/kn/cnts/lich", "calendar"),
@@ -126,7 +128,7 @@ var deptBusiness = map[string]map[string][]MenuItem{
 // "Phòng ban" của Admin.
 var adminDeptBusiness = map[string][]MenuItem{
 	port.MenuProfileChanNuoiThuySan: {
-		soon("admin.pb.cnts_danh_muc", "Danh mục CNTS", adminDeptRoute("/danh-muc-cnts"), "catalog"),
+		{Key: "admin.pb.cnts_danh_muc", Label: "Danh mục CNTS", Route: adminDeptRoute("/danh-muc-cnts"), Icon: "catalog"}, // W11.41
 	},
 	port.MenuProfileKeHoachTaiChinh: {
 		soon("admin.pb.khtc_ke_hoach", "Kế hoạch năm", adminDeptRoute("/ke-hoach-nam"), "calendar"),

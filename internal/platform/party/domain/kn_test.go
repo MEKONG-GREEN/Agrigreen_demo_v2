@@ -112,6 +112,11 @@ func TestFN_AD_04_03_NormalizeDepartment(t *testing.T) {
 	}
 }
 
+// implementedMenu: mục nghiệp vụ của khuôn phòng ban đã có màn (gói đã bỏ ComingSoon).
+var implementedMenu = map[string]bool{
+	"tinh.cnts.danh_muc": true, "admin.pb.cnts_danh_muc": true, // W11.41
+}
+
 // W11.06 (kn.menu/v3, D3 C6, D4 X2): khuôn theo phòng ban — nhóm "Nghiệp vụ" sau "Điều hành", nhóm
 // "Dùng chung" (Contact) cuối mọi đối tượng; mục module chưa có là "Sắp có"; bộ Trồng trọt giữ nguyên các
 // nhóm cũ; phòng ban seed cũ (menu_profile generic) nhận khuôn riêng theo mã.
@@ -139,7 +144,7 @@ func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
 			t.Fatalf("%s Cấp Tỉnh: %v", code, k)
 		}
 		for _, it := range gs[1].Items {
-			if !it.ComingSoon && it.Key != "tinh.bao_gia.cau_hinh" { // W11.72: cấu hình báo giá (QTNV) đã có màn
+			if !it.ComingSoon && it.Key != "tinh.bao_gia.cau_hinh" && !implementedMenu[it.Key] { // W11.72 cấu hình báo giá, W11.41
 				t.Fatalf("%s: mục nghiệp vụ chưa có module phải Sắp có: %s", code, it.Key)
 			}
 		}
@@ -150,7 +155,7 @@ func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
 			}
 			continue
 		}
-		if last := admin[len(admin)-1]; !last.ComingSoon || !strings.HasPrefix(last.Route, "/kn/phong-ban/"+code+"/") {
+		if last := admin[len(admin)-1]; (!last.ComingSoon && !implementedMenu[last.Key]) || !strings.HasPrefix(last.Route, "/kn/phong-ban/"+code+"/") {
 			t.Fatalf("%s: mục Admin Sắp có: %+v", code, last)
 		}
 	}

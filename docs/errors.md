@@ -55,6 +55,8 @@ Mã lỗi của module có dạng `<module>.<lỗi>`.
 | 422 | `masterdata.farm_stage_invalid` | pf/masterdata: loại máy gắn khâu sản xuất không có hoặc đã ngừng dùng |
 | 409 | `masterdata.catalog_item_name_taken` | pf/masterdata (KN v7.7 FN-AD-04.05): danh mục đã có mục khác cùng tên (không phân biệt hoa/thường tiếng Việt) |
 | 422 | `masterdata.catalog_ref_invalid` | pf/masterdata (KN v7.7 FN-AD-04.05): cây trồng gắn nhóm không phải nhóm cấp 1 đang dùng (hoặc chính nó); sâu bệnh gắn cây trồng bị ảnh hưởng không có/đã ngừng dùng |
+| 409 | `masterdata.cnts_stamp_taken` | pf/masterdata (W11.41, BRD CNTS FN-06): mã số khắc mộc dấu GS/GC đã thuộc cơ sở giết mổ khác (kể cả cơ sở đã ngừng dùng — mã là định danh, không tái dùng); `field` chỉ mã → cơ sở đang giữ |
+| 422 | `masterdata.cnts_commune_invalid` | pf/masterdata (W11.41, FN-06 BR-02): cơ sở giết mổ trỏ mã không phải xã/phường/đặc khu có hiệu lực tại ngày áp dụng (`valid_from`) |
 | 404 | `masterdata.param_not_found` | pf/masterdata: không có phiên bản tham số ĐÃ PHÊ DUYỆT có hiệu lực tại thời điểm tra |
 | 404 | `masterdata.param_version_not_found` | pf/masterdata: không có phiên bản tham số |
 | 409 | `masterdata.param_invalid_transition` | pf/masterdata: trạng thái không cho phép (gửi duyệt khi không phải nháp; duyệt/từ chối khi chưa gửi hoặc đã quyết định) |
@@ -485,6 +487,7 @@ KN v7.7 gói P1 — gán vai trò nhiều vai × Nút × phòng ban × xã (FN-A
 | 409 | `accounts.support_session_ended` | thoát phiên hỗ trợ đã kết thúc |
 | 403 | `accounts.context_read_only` | W11.07: thao tác ghi trong ngữ cảnh chỉ xem (Lãnh đạo đơn vị ở phòng ban ngoài lần gán, nhóm Ban Giám đốc) — chặn ở middleware cho mọi route; đổi ngữ cảnh vẫn được |
 | 422 | `accounts.internal_unit_invalid` | W11.07: thuộc tính vai trỏ đơn vị nội bộ không có trong đơn vị của lần gán hoặc đã ngừng |
+| 422 | `accounts.facility_invalid` | W11.41: `facility_refs` của phạm vi Cấp Xã trỏ ref không phải cơ sở giết mổ đang dùng của danh mục CNTS (pf/masterdata) |
 | 404 | `accounts.internal_unit_not_found` | W11.07: đơn vị nội bộ không có |
 | 409 | `accounts.internal_unit_code_taken` | W11.07: mã đơn vị nội bộ đã có trong đơn vị (mã không tái sử dụng) |
 | 409 | `accounts.internal_unit_state` | W11.07: ngừng đơn vị đã ngừng / dùng lại đơn vị đang dùng |

@@ -54,6 +54,7 @@ import { knAdminRoutes, supportGuard, supportRecord } from "./kn-admin";
 import { knCollectRoutes } from "./kn-collect";
 import { priceItemRoutes } from "./kn-price-items";
 import { pricePointRoutes } from "./kn-price-points";
+import { cntsCatalogAdminRoutes, cntsCatalogAppRoutes } from "./kn-cnts-catalogs";
 import { apiClientAdminRoutes, meteringAdminRoutes } from "./g5";
 
 function sleep(ms: number) {
@@ -134,6 +135,8 @@ const appRoutes: Route[] = [
   // --- cap/price W11.73: mặt hàng theo thời kỳ (/v1/price/items*, groups*, assignments*, point-items, item-sets*, proposals*) ---
   ...priceItemRoutes,
   ...pricePointRoutes, // W11.72 xã báo giá + phân công
+  // --- W11.41: danh mục CNTS (/v1/masterdata/catalogs/cnts_*, đọc theo ngày ?at=) — trước route danh mục chung ---
+  ...cntsCatalogAppRoutes,
 
   // --- pf/extension ---
   {
@@ -426,6 +429,8 @@ const adminRoutes: Route[] = [
   // để GET /v1/accounts/users trong ngữ cảnh Admin KN trả tài khoản KN.
   ...knAdminRoutes,
   ...htxGapAdminRoutes,
+  // W11.41: danh mục CNTS — thêm/sửa/ngừng có ngày áp dụng, phiên bản hiệu lực.
+  ...cntsCatalogAdminRoutes,
   // --- KN v7.7 P3: trình thiết kế mẫu báo cáo (FN-AD-04.06) ---
   ...formsAdminRoutes,
   {

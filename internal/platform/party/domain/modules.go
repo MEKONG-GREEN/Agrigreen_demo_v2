@@ -21,6 +21,7 @@ var menuModules = map[string]string{
 	"/kn/du-lieu/vat-tu":             "pf/extension",
 	"/kn/quan-tri/don-vi-hanh-chinh": "pf/masterdata",
 	"/kn/bao-gia":                    "pf/price", // Báo giá nông sản (W11.72)
+	"/kn/cnts/danh-muc":              "pf/masterdata", // W11.41
 	"/quan-tri/tham-so":              "pf/masterdata",
 	"/quan-tri/mau-bao-cao":          "pf/reports",
 	"/quan-tri/xung-dot":             "pf/sync",
@@ -38,6 +39,7 @@ var menuDeptModules = map[string]string{
 	"/du-lieu-bao-cao": "pf/extension",
 	"/thu-thap":        "pf/extension",
 	"/danh-muc":        "pf/masterdata",
+	"/danh-muc-cnts":   "pf/masterdata", // W11.41
 	"/mau-bao-cao":     "pf/reports",
 	"/bao-gia-lich":    "pf/price", // W11.74 lịch báo giá (W11.72 mở menu)
 }

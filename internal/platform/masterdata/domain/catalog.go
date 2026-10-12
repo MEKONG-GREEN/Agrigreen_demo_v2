@@ -23,9 +23,12 @@ const CatalogRuleVersion = "pf.masterdata.catalog/v1"
 // CatalogFormat là định dạng tệp danh mục nhúng.
 const CatalogFormat = "agrigreen.catalogs/v1"
 
-// Catalogs là các danh mục module quản lý.
-var Catalogs = []string{port.CatalogRiceVariety, port.CatalogFarmStage, port.CatalogMachineType, port.CatalogSeason, port.CatalogPest, port.CatalogVesselClass,
+// baseCatalogs là danh mục dùng chung / Trồng trọt (trước W11.41).
+var baseCatalogs = []string{port.CatalogRiceVariety, port.CatalogFarmStage, port.CatalogMachineType, port.CatalogSeason, port.CatalogPest, port.CatalogVesselClass,
 	port.CatalogCrop, port.CatalogMaterial, port.CatalogProductionModel, port.CatalogReportType}
+
+// Catalogs là các danh mục module quản lý: dùng chung / Trồng trọt rồi CNTS (W11.41).
+var Catalogs = slices.Concat(baseCatalogs, CNTSCatalogs)
 
 // Hành động ghi vào sổ lịch sử danh mục.
 const (
@@ -42,7 +45,7 @@ var itemCodeRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$`)
 
 // Lỗi kiểm dữ liệu danh mục.
 var (
-	ErrCatalogUnknown = errors.New("danh mục không tồn tại; dùng rice_variety, farm_stage, machine_type, season, pest, vessel_class, crop, material, production_model hoặc report_type")
+	ErrCatalogUnknown = errors.New("danh mục không tồn tại (xem GET /v1/masterdata/catalogs)")
 	ErrItemCode       = errors.New("mã mục 1–40 ký tự [A-Za-z0-9_.-]")
 	ErrItemName       = errors.New("tên bắt buộc, tối đa 200 ký tự")
 	ErrReason         = fmt.Errorf("lý do bắt buộc, %d–500 ký tự", MinReasonLen)
@@ -62,6 +65,9 @@ type Item struct {
 	Revision           int
 	UpdatedBy          uuid.UUID
 	UpdatedAt          time.Time
+	// ValidFrom (chỉ danh mục CNTS, W11.41): ngày bắt đầu hiệu lực của giá trị — khi ghi là ngày áp dụng (zero =
+	// hôm nay), khi đọc theo ngày là valid_from của phiên bản có hiệu lực. Không lưu ở bảng hiện trạng.
+	ValidFrom time.Time
 }
 
 // Snapshot là trạng thái của mục ghi vào sổ lịch sử (trước → sau).
@@ -323,6 +329,9 @@ func (it Item) Normalize() (Item, error) {
 		if _, ok := out[k]; s.required && !ok {
 			return it, FieldError{"attrs." + k, errors.New("bắt buộc")}
 		}
+	}
+	if err := normalizeCNTS(Item{Catalog: it.Catalog, Attrs: out}); err != nil {
+		return it, err
 	}
 	if it.Catalog == port.CatalogSeason {
 		_, a := out["start_month"]

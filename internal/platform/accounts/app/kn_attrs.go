@@ -34,6 +34,9 @@ import (
 var (
 	ErrInternalUnitInvalid = problem.New(http.StatusUnprocessableEntity, "accounts.internal_unit_invalid",
 		"Đơn vị nội bộ không thuộc đơn vị của lần gán hoặc đã ngừng")
+	// ErrFacilityInvalid (W11.41): facility_refs phải là cơ sở giết mổ đang dùng của danh mục CNTS (pf/masterdata).
+	ErrFacilityInvalid = problem.New(http.StatusUnprocessableEntity, "accounts.facility_invalid",
+		"Cơ sở không có trong danh mục cơ sở giết mổ đang dùng")
 	ErrContextReadOnly = problem.New(http.StatusForbidden, "accounts.context_read_only",
 		"Ngữ cảnh chỉ xem (Lãnh đạo đơn vị xem phòng ban khác, Ban Giám đốc) — không thao tác ghi được")
 	ErrDelegationNotFound  = problem.New(http.StatusNotFound, "accounts.delegation_not_found", "Không tìm thấy ủy quyền")
@@ -82,6 +85,15 @@ func (s *Service) SetAssignmentAttrs(ctx context.Context, user, id uuid.UUID, in
 	}
 	if in, err = domain.NormalizeAttrs(asg.Role, in); err != nil {
 		return AttrsResult{}, fieldProblem(err)
+	}
+	if s.Facilities != nil && len(in.Facilities) > 0 {
+		unknown, err := s.Facilities.UnknownFacilities(ctx, in.Facilities)
+		if err != nil {
+			return AttrsResult{}, err
+		}
+		if len(unknown) > 0 {
+			return AttrsResult{}, ErrFacilityInvalid.With("facility_refs", unknown[0].String())
+		}
 	}
 	if in.InternalUnit != "" {
 		u, err := s.InternalUnitByCode(ctx, asg.UnitRef, in.InternalUnit)

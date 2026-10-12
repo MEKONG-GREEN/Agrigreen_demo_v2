@@ -13,7 +13,7 @@ depends:
   pf/sync: ">=1.0 <2"
   pf/workflow: ">=1.0 <2"
 provides:
-  ports: [AdminUnitHistory, Catalogs, FormUsage, StaffNames]
+  ports: [AdminUnitHistory, CNTSCatalogs, Catalogs, FormUsage, StaffNames]
   events: [pf.masterdata.admin_unit.changed/v1, pf.masterdata.param.approved/v1]
   internal_events: []
   publications: []

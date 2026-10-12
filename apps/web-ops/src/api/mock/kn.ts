@@ -229,6 +229,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       soon("tinh.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
       soon("tinh.cnts.du_an_knqg", "Dự án KNQG / Điểm trình diễn", "/kn/cnts/du-an-knqg", "report"),
       soon("tinh.cnts.quy_trinh", "Quy trình, văn bản", "/kn/cnts/quy-trinh", "sop"),
+      { key: "tinh.cnts.danh_muc", label: "Danh mục CNTS", route: "/kn/cnts/danh-muc", icon: "catalog" }, // W11.41
     ],
     kn_xa: [
       soon("xa.cnts.lich", "Lịch trực của tôi", "/kn/cnts/lich", "calendar"),
@@ -285,7 +286,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
 
 /** Mục "Sắp có" thêm vào mục con phòng ban của Admin (domain.adminDeptBusiness). */
 const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, (base: string) => Item[]>> = {
-  chan_nuoi_thuy_san: (b) => [soon("admin.pb.cnts_danh_muc", "Danh mục CNTS", `${b}/danh-muc-cnts`, "catalog")],
+  chan_nuoi_thuy_san: (b) => [{ key: "admin.pb.cnts_danh_muc", label: "Danh mục CNTS", route: `${b}/danh-muc-cnts`, icon: "catalog" }], // W11.41
   ke_hoach_tai_chinh: (b) => [soon("admin.pb.khtc_ke_hoach", "Kế hoạch năm", `${b}/ke-hoach-nam`, "calendar")],
   // W11.72: Xã báo giá + Kỳ báo giá & giờ khóa đã mở.
   thong_tin_truyen_thong: (b) => [

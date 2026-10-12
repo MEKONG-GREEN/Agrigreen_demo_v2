@@ -113,7 +113,10 @@ func (s *Service) Seed(ctx context.Context, tid uuid.UUID) (SeedResult, error) {
 			} else if cur != nil {
 				continue
 			}
-			if e := checkRefs(ctx, tx, it); e != nil {
+			if domain.EffectiveDated(it.Catalog) {
+				it.ValidFrom = SeedValidFrom
+			}
+			if e := checkRefs(ctx, tx, it, domain.DayOf(now)); e != nil {
 				return e
 			}
 			it.Active, it.Revision, it.UpdatedBy, it.UpdatedAt = true, 1, SeedSetterRef, now

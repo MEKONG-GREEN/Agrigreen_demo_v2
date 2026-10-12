@@ -92,3 +92,7 @@ Database dựng mới từ đầu không gặp lỗi, vì lúc thêm cột sổ 
 - `TestLegsByIdemPrefixReturnsNewestSetAfterExpiry` (`internal/mkg/logistics/handler`): nhiều dòng theo tiền tố.
 - `TestMaterialByIdemKeysReturnsNewestPerKeyAfterExpiry` (`internal/platform/extension/material/handler`): lô khóa.
 - `TestNewestByIdem` (`internal/shared/ledger`): chuỗi SQL của helper.
+
+## Hiện thực — sổ phụ hiệu lực của danh mục CNTS (W11.41, pf 000146, 12/10/2026)
+
+Giá trị có hiệu lực từ ngày của danh mục `cnts_*` (BRD CNTS FN-06 BR-03) không thêm cột `valid_from` vào `pf_masterdata.catalog_change` (sổ đã có dòng) mà ghi sổ phụ `pf_masterdata.catalog_effective` (`shared.apply_ledger`, cùng `stream_key`, `change_id` trỏ dòng `catalog_change` cùng giao dịch). Tra theo ngày: `valid_from <= ngày` lớn nhất, cùng ngày lấy `seq` lớn nhất; `idem_key` của dòng sổ phụ = khóa của dòng `catalog_change` tương ứng.

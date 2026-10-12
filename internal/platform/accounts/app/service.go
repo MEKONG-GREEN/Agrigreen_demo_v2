@@ -80,6 +80,15 @@ type Service struct {
 	Names       partyport.ActorNames
 	// W1.4 (R-MOD-08): trạng thái bật module theo đơn vị (pf/party) — chặn cấp vai của module đã tắt.
 	Modules partyport.ModuleEnablement
+	// Facilities (tùy chọn, W11.41): danh mục cơ sở giết mổ CNTS (pf/masterdata CNTSCatalogs) — kiểm phạm vi Cấp
+	// Xã theo cơ sở (facility_refs). Nil → chỉ kiểm dạng UUID như W11.07.
+	Facilities FacilityCatalog
+}
+
+// FacilityCatalog là phần cổng danh mục CNTS pf/accounts cần (masterdata/port.CNTSCatalogs thỏa mãn): ref không
+// phải cơ sở giết mổ đang dùng.
+type FacilityCatalog interface {
+	UnknownFacilities(ctx context.Context, refs []uuid.UUID) ([]uuid.UUID, error)
 }
 
 // KNModule là module sở hữu nghiệp vụ của vai trò KN (kn_tw, kn_tinh, kn_xa).

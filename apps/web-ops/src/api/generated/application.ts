@@ -6291,6 +6291,11 @@ export interface components {
             updated_at: string;
             /** @description KN v7.7 FN-AD-04.05: số mẫu báo cáo đang dùng mục (vắng khi chưa nối P3) */
             forms_in_use?: number;
+            /**
+             * Format: date
+             * @description W11.41 (danh mục cnts_*): ngày bắt đầu hiệu lực của giá trị trả về (đọc theo at hoặc vừa ghi)
+             */
+            valid_from?: string;
         };
         DisplayValue: {
             /** @example gis.stage_color:chin_ro */
@@ -12170,7 +12175,7 @@ export interface components {
         /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
         At: string;
         UnitCode: string;
-        Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest" | "vessel_class" | "crop" | "material" | "production_model" | "report_type";
+        Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest" | "vessel_class" | "crop" | "material" | "production_model" | "report_type" | "cnts_species" | "cnts_breed" | "cnts_vaccine" | "cnts_vaccination_schedule" | "cnts_disease" | "cnts_chemical" | "cnts_slaughter_facility" | "cnts_aquaculture_object" | "cnts_fishing_group" | "cnts_indicator" | "cnts_model_type" | "cnts_document_type";
         /** @description Mã thiết bị đã đăng ký bởi chính người gọi (pf/sync) */
         DeviceID: string;
         /** @description Mục đích xử lý dữ liệu cá nhân (R-42) */
@@ -12384,6 +12389,8 @@ export interface operations {
         parameters: {
             query?: {
                 include_inactive?: boolean;
+                /** @description W11.41 — chỉ danh mục cnts_*: giá trị có hiệu lực tại ngày (YYYY-MM-DD hoặc RFC 3339, giờ Việt Nam); có at thì không phân trang (next_cursor null) */
+                at?: string;
                 cursor?: string;
                 limit?: number;
             };
@@ -12413,7 +12420,10 @@ export interface operations {
     };
     getCatalogItem: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description W11.41 — chỉ danh mục cnts_*: giá trị có hiệu lực tại ngày (YYYY-MM-DD hoặc RFC 3339, giờ Việt Nam); có at thì không phân trang (next_cursor null) */
+                at?: string;
+            };
             header?: never;
             path: {
                 catalog: components["parameters"]["Catalog"];
