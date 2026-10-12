@@ -7687,6 +7687,244 @@ paths:
               schema: {$ref: "#/components/schemas/FormsSnapshot"}
         "404": {description: forms.snapshot_not_found, $ref: "#/components/responses/Problem"}
   # --- hết pf/forms ---
+  # --- pf/hrm (dom/hrm, W11.21 — ADR-0050): danh mục nhân sự Phòng HCTH (BRD HCTH v3.0 FN-19, UR-ADM-08). Đọc: Admin và Cấp Tỉnh
+  # của Phòng Hành chính – Tổng hợp (port.Access ở gốc lắp ráp); ghi: Admin. Mọi bản ghi là phiên bản (sổ chỉ ghi thêm); ngừng sử
+  # dụng = phiên bản active=false (BR-01). Số thập phân (hệ số, PCCV, %) là chuỗi. Không dữ liệu cá nhân.
+  /v1/hrm/status:
+    get:
+      summary: Tình trạng danh mục nhân sự — số mục đang dùng theo loại, bảng hệ số và tham số có hiệu lực hôm nay, số mục còn là dữ liệu mẫu (Q-070)
+      operationId: hrmStatus
+      tags: [hrm]
+      responses:
+        "200":
+          description: Tình trạng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmStatus"}
+        "401": {description: unauthenticated, $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+  /v1/hrm/defaults:
+    post:
+      summary: Cài danh mục, bảng hệ số và tham số mặc định (BRD + dữ liệu mẫu đánh dấu placeholder) — chỉ mã/ngạch/khóa chưa có; Admin
+      operationId: hrmInstallDefaults
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Số phiên bản đã ghi (0 khi mọi mục đã có)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, scales, rules]
+                properties:
+                  items: {type: integer, minimum: 0}
+                  scales: {type: integer, minimum: 0}
+                  rules: {type: integer, minimum: 0}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict, $ref: "#/components/responses/Problem"}
+  /v1/hrm/catalogs/{kind}:
+    parameters:
+      - $ref: "#/components/parameters/HrmKind"
+    get:
+      summary: Mục hiện hành (phiên bản mới nhất) của một danh mục nhân sự, sắp theo thứ tự rồi mã
+      operationId: hrmCatalogList
+      tags: [hrm]
+      parameters:
+        - {name: include_retired, in: query, required: false, description: "true → cả mục đã ngừng sử dụng", schema: {type: boolean}}
+      responses:
+        "200":
+          description: Danh mục
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kind, items]
+                properties:
+                  kind: {type: string}
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmCatalogItem"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.kind_unknown, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Thêm mục (mã được chuẩn hóa — bỏ khoảng trắng, xuống dòng; AC-03); mã đã có → chặn; Admin
+      operationId: hrmCatalogCreate
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmCatalogItemInput"}
+      responses:
+        "201":
+          description: Đã ghi phiên bản 1
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.kind_unknown, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.item_exists, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | hrm.item_reference, $ref: "#/components/responses/Problem"}
+  /v1/hrm/catalogs/{kind}/{code}/history:
+    parameters:
+      - $ref: "#/components/parameters/HrmKind"
+      - {name: code, in: path, required: true, schema: {type: string}}
+    get:
+      summary: Mọi phiên bản của một mục (cũ trước)
+      operationId: hrmCatalogHistory
+      tags: [hrm]
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [versions]
+                properties:
+                  versions: {type: array, items: {$ref: "#/components/schemas/HrmCatalogItem"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.kind_unknown | hrm.item_not_found, $ref: "#/components/responses/Problem"}
+  /v1/hrm/catalogs/{kind}/{code}/revise:
+    parameters:
+      - $ref: "#/components/parameters/HrmKind"
+      - {name: code, in: path, required: true, schema: {type: string}}
+    post:
+      summary: Ghi phiên bản mới của mục (sửa tên, thứ tự, thuộc tính; active=false → ngừng sử dụng, true → dùng lại); không đổi mã; Admin
+      operationId: hrmCatalogRevise
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmCatalogItemInput"}
+      responses:
+        "201":
+          description: Đã ghi phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.kind_unknown | hrm.item_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | hrm.item_reference, $ref: "#/components/responses/Problem"}
+  /v1/hrm/grade-scales:
+    get:
+      summary: Ngạch/CDNN đang dùng kèm bảng hệ số có hiệu lực tại một ngày (valid_from lớn nhất ≤ ngày; cùng ngày lấy bản ghi sau)
+      operationId: hrmGradeScales
+      tags: [hrm]
+      parameters:
+        - {name: at, in: query, required: false, description: "Ngày YYYY-MM-DD (vắng → hôm nay, giờ VN)", schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Bảng hệ số
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [day, grades]
+                properties:
+                  day: {type: string, format: date}
+                  grades:
+                    type: array
+                    items:
+                      type: object
+                      required: [grade, scale]
+                      properties:
+                        grade: {$ref: "#/components/schemas/HrmCatalogItem"}
+                        scale:
+                          description: null nếu ngạch chưa có bảng hệ số hiệu lực tại ngày hỏi
+                          oneOf:
+                            - {$ref: "#/components/schemas/HrmGradeScale"}
+                            - {type: "null"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/hrm/grade-scales/{grade}:
+    parameters:
+      - {name: grade, in: path, required: true, description: "Mã ngạch/CDNN (vd 01.003, V.05.02.07)", schema: {type: string}}
+    post:
+      summary: Ghi phiên bản bảng hệ số của ngạch từ ngày hiệu lực (BR-02, AC-02 — bảng cũ giữ nguyên cho ngày trước đó); ngạch phải đang dùng; Admin
+      operationId: hrmGradeScaleAdd
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmGradeScaleInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | hrm.item_reference, $ref: "#/components/responses/Problem"}
+  /v1/hrm/grade-scales/{grade}/history:
+    parameters:
+      - {name: grade, in: path, required: true, schema: {type: string}}
+    get:
+      summary: Mọi phiên bản bảng hệ số của ngạch theo ngày hiệu lực
+      operationId: hrmGradeScaleHistory
+      tags: [hrm]
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [versions]
+                properties:
+                  versions: {type: array, items: {$ref: "#/components/schemas/HrmGradeScale"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.item_not_found, $ref: "#/components/responses/Problem"}
+  /v1/hrm/rules/{key}:
+    parameters:
+      - $ref: "#/components/parameters/HrmRuleKey"
+    get:
+      summary: Tham số có hiệu lực tại một ngày và mọi phiên bản (quy tắc nâng bậc, bảng quy đổi thành tích)
+      operationId: hrmRule
+      tags: [hrm]
+      parameters:
+        - {name: at, in: query, required: false, description: "Ngày YYYY-MM-DD (vắng → hôm nay, giờ VN)", schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Tham số
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmRuleView"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.rule_unknown, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Ghi phiên bản tham số từ ngày hiệu lực (payload kiểm chặt theo khóa; mã kỷ luật/khen thưởng phải đang dùng); Admin
+      operationId: hrmRuleAdd
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmRuleInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.rule_unknown, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | hrm.item_reference, $ref: "#/components/responses/Problem"}
+  # --- hết pf/hrm ---
   # --- pf/price (cap/price, W11.71 — ADR-0049): khung module giá của Báo giá nông sản (BRD v1.3). Trạng thái module và danh mục
   # nền (đơn vị tính, nhóm hàng) có hiệu lực theo ngày; route nghiệp vụ (xã báo giá, mặt hàng, lịch, phiếu, bảng giá) thêm ở
   # W11.72–W11.76. Bên dùng chọn bằng query `profile` (vắng → profile đầu tiên; KN = kn). Ngữ cảnh KN: header X-AG-Context. ---
@@ -8663,6 +8901,21 @@ components:
       required: true
       description: Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn)
       schema: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$"}
+    HrmKind:
+      name: kind
+      in: path
+      required: true
+      description: Loại danh mục nhân sự (pf/hrm, FN-19)
+      schema:
+        type: string
+        enum: [position, grade, education_level, major, major_group, ethnicity, religion, political_theory, state_mgmt,
+          foreign_language, language_level, it_level, award_form, discipline_form, change_type, leave_reason]
+    HrmRuleKey:
+      name: key
+      in: path
+      required: true
+      description: Khóa tham số có phiên bản (pf/hrm) — promotion (quy tắc nâng bậc), achievement_conversion (quy đổi thành tích)
+      schema: {type: string, enum: [promotion, achievement_conversion]}
     PriceProfile:
       name: profile
       in: query
@@ -13363,6 +13616,165 @@ components:
         events: {type: array, items: {$ref: "#/components/schemas/FormsPeriodEvent"}}
         units: {type: array, items: {$ref: "#/components/schemas/FormsUnit"}}
         snapshots: {type: array, items: {$ref: "#/components/schemas/FormsSnapshot"}}
+    # --- pf/hrm (W11.21) ---
+    HrmStatus:
+      type: object
+      required: [can_manage, rule_version, day, counts, placeholders, scales, rules]
+      properties:
+        can_manage: {type: boolean, description: "true = Admin (ghi được)"}
+        rule_version: {type: string}
+        day: {type: string, format: date}
+        counts: {type: object, additionalProperties: {type: integer, minimum: 0}, description: "Loại danh mục → số mục đang dùng"}
+        placeholders: {type: integer, minimum: 0, description: "Số mục/bảng hệ số/tham số hiện hành còn là dữ liệu mẫu (chờ Q-070)"}
+        scales: {type: integer, minimum: 0, description: "Số ngạch có bảng hệ số hiệu lực hôm nay"}
+        rules: {type: integer, minimum: 0}
+    HrmCatalogAttrs:
+      type: object
+      additionalProperties: false
+      description: >-
+        Thuộc tính riêng theo loại; trường không thuộc loại phải vắng. position: leader, allowance (hệ số PCCV, chuỗi 2 chữ số
+        thập phân, chỉ khi leader), mgmt_level. grade: equiv_group, grade_type, salary_class. education_level: rank.
+        major_group: level. major: groups (mã trình độ → mã nhóm chuyên ngành của trình độ đó). ethnicity: minority.
+        religion: no_religion.
+      properties:
+        leader: {type: boolean}
+        allowance: {type: string, pattern: "^\\d+(\\.\\d{1,2})?$"}
+        mgmt_level: {type: string}
+        equiv_group: {type: string, enum: [CVCC, CVC, CV, CS, CON_LAI]}
+        grade_type: {type: string, enum: [cong_chuc, vien_chuc]}
+        salary_class: {type: string, maxLength: 20}
+        rank: {type: integer, minimum: 1, maximum: 100}
+        level: {type: string}
+        groups: {type: object, additionalProperties: {type: string}}
+        minority: {type: boolean}
+        no_religion: {type: boolean}
+    HrmCatalogItem:
+      type: object
+      required: [kind, code, name, sort_order, active, placeholder, version, attrs, recorded_at]
+      properties:
+        kind: {type: string}
+        code: {type: string}
+        name: {type: string}
+        sort_order: {type: integer}
+        active: {type: boolean, description: "false = đã ngừng sử dụng (không xóa — BR-01)"}
+        placeholder: {type: boolean, description: "Dữ liệu mẫu chưa được Phòng HCTH xác nhận (Q-070)"}
+        version: {type: integer, minimum: 1}
+        attrs: {$ref: "#/components/schemas/HrmCatalogAttrs"}
+        recorded_at: {type: string, format: date-time}
+    HrmCatalogItemInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        code: {type: string, description: "Bắt buộc khi thêm; vắng khi sửa (mã ở đường dẫn). Khoảng trắng, xuống dòng bị loại bỏ"}
+        name: {type: string, minLength: 1, maxLength: 200}
+        sort_order: {type: integer, minimum: 0, maximum: 100000}
+        active: {type: boolean, description: "Vắng → true. Sửa với false = ngừng sử dụng"}
+        attrs: {$ref: "#/components/schemas/HrmCatalogAttrs"}
+    HrmWriteResult:
+      type: object
+      required: [code, version]
+      properties:
+        code: {type: string, description: "Mã đã chuẩn hóa (mục, ngạch hoặc khóa tham số)"}
+        version: {type: integer, minimum: 1}
+    HrmGradeScale:
+      type: object
+      required: [grade_code, valid_from, steps, coefficients, hold_months, note, placeholder, version, recorded_at]
+      properties:
+        grade_code: {type: string}
+        valid_from: {type: string, format: date}
+        steps: {type: integer, minimum: 1, maximum: 20}
+        coefficients: {type: array, items: {type: string}, description: "Hệ số bậc 1..n, chuỗi thập phân 2 chữ số"}
+        hold_months: {type: integer, minimum: 1, maximum: 120, description: "Thời gian giữ bậc (tháng) — NLTX"}
+        note: {type: string}
+        placeholder: {type: boolean}
+        version: {type: integer, minimum: 1}
+        recorded_at: {type: string, format: date-time}
+    HrmGradeScaleInput:
+      type: object
+      additionalProperties: false
+      required: [valid_from, coefficients, hold_months]
+      properties:
+        valid_from: {type: string, format: date}
+        coefficients:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: "Hệ số bậc 1..n tăng dần, 0 < hệ số ≤ 99,99, tối đa 2 chữ số thập phân"
+          items: {type: string, pattern: "^\\d+(\\.\\d{1,2})?$"}
+        hold_months: {type: integer, minimum: 1, maximum: 120}
+        note: {type: string, maxLength: 500}
+    HrmRule:
+      type: object
+      required: [key, valid_from, payload, note, placeholder, version, recorded_at]
+      properties:
+        key: {type: string}
+        valid_from: {type: string, format: date}
+        payload: {type: object, description: "promotion: HrmPromotionRules; achievement_conversion: HrmAchievementConversion"}
+        note: {type: string}
+        placeholder: {type: boolean}
+        version: {type: integer, minimum: 1}
+        recorded_at: {type: string, format: date-time}
+    HrmRuleView:
+      type: object
+      required: [key, day, current, versions]
+      properties:
+        key: {type: string}
+        day: {type: string, format: date}
+        current:
+          oneOf:
+            - {$ref: "#/components/schemas/HrmRule"}
+            - {type: "null"}
+        versions: {type: array, items: {$ref: "#/components/schemas/HrmRule"}}
+    HrmRuleInput:
+      type: object
+      additionalProperties: false
+      required: [valid_from, payload]
+      properties:
+        valid_from: {type: string, format: date}
+        payload:
+          oneOf:
+            - {$ref: "#/components/schemas/HrmPromotionRules"}
+            - {$ref: "#/components/schemas/HrmAchievementConversion"}
+        note: {type: string, maxLength: 500}
+    HrmPromotionRules:
+      type: object
+      additionalProperties: false
+      description: Quy tắc nâng bậc (FN-09 BR-02, BR-03) — mặc định là mẫu chờ Q-070. Phần trăm là chuỗi thập phân.
+      required: [min_rating, rating_years, achievement_years, discipline_extension_months, nlth_quota_pct, nlth_retirement_months,
+        nlth_retirement_within_months, tnvk_start_pct, tnvk_step_pct, tnvk_cycle_months, tnvk_first_months, remind_months,
+        retirement_age_male_months, retirement_age_female_months]
+      properties:
+        min_rating: {type: string, enum: [HTXSNV, HTTNV, HTNV, KHTNV]}
+        rating_years: {type: integer, minimum: 1, maximum: 10}
+        achievement_years: {type: integer, minimum: 1, maximum: 10}
+        discipline_extension_months: {type: object, additionalProperties: {type: integer, minimum: 0, maximum: 60}}
+        nlth_quota_pct: {type: string}
+        nlth_retirement_months: {type: integer, minimum: 0, maximum: 36}
+        nlth_retirement_within_months: {type: integer, minimum: 0, maximum: 36}
+        tnvk_start_pct: {type: string}
+        tnvk_step_pct: {type: string}
+        tnvk_cycle_months: {type: integer, minimum: 1, maximum: 60}
+        tnvk_first_months: {type: integer, minimum: 1, maximum: 120}
+        remind_months: {type: array, items: {type: integer, minimum: 1, maximum: 24}, minItems: 1, maxItems: 6}
+        retirement_age_male_months: {type: integer, minimum: 600, maximum: 840}
+        retirement_age_female_months: {type: integer, minimum: 600, maximum: 840}
+    HrmAchievementConversion:
+      type: object
+      additionalProperties: false
+      required: [rules]
+      properties:
+        rules:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [award_code, months]
+            properties:
+              award_code: {type: string, description: "Mã hình thức khen thưởng (award_form) đang dùng"}
+              months: {type: integer, minimum: 1, maximum: 36}
     # --- pf/price (W11.71) ---
     PriceStatus:
       type: object

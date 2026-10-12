@@ -5402,6 +5402,180 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/hrm/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tình trạng danh mục nhân sự — số mục đang dùng theo loại, bảng hệ số và tham số có hiệu lực hôm nay, số mục còn là dữ liệu mẫu (Q-070) */
+        get: operations["hrmStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cài danh mục, bảng hệ số và tham số mặc định (BRD + dữ liệu mẫu đánh dấu placeholder) — chỉ mã/ngạch/khóa chưa có; Admin */
+        post: operations["hrmInstallDefaults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/catalogs/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+            };
+            cookie?: never;
+        };
+        /** Mục hiện hành (phiên bản mới nhất) của một danh mục nhân sự, sắp theo thứ tự rồi mã */
+        get: operations["hrmCatalogList"];
+        put?: never;
+        /** Thêm mục (mã được chuẩn hóa — bỏ khoảng trắng, xuống dòng; AC-03); mã đã có → chặn; Admin */
+        post: operations["hrmCatalogCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/catalogs/{kind}/{code}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        /** Mọi phiên bản của một mục (cũ trước) */
+        get: operations["hrmCatalogHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/catalogs/{kind}/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi phiên bản mới của mục (sửa tên, thứ tự, thuộc tính; active=false → ngừng sử dụng, true → dùng lại); không đổi mã; Admin */
+        post: operations["hrmCatalogRevise"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/grade-scales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ngạch/CDNN đang dùng kèm bảng hệ số có hiệu lực tại một ngày (valid_from lớn nhất ≤ ngày; cùng ngày lấy bản ghi sau) */
+        get: operations["hrmGradeScales"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/grade-scales/{grade}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mã ngạch/CDNN (vd 01.003, V.05.02.07) */
+                grade: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi phiên bản bảng hệ số của ngạch từ ngày hiệu lực (BR-02, AC-02 — bảng cũ giữ nguyên cho ngày trước đó); ngạch phải đang dùng; Admin */
+        post: operations["hrmGradeScaleAdd"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/grade-scales/{grade}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grade: string;
+            };
+            cookie?: never;
+        };
+        /** Mọi phiên bản bảng hệ số của ngạch theo ngày hiệu lực */
+        get: operations["hrmGradeScaleHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/rules/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Khóa tham số có phiên bản (pf/hrm) — promotion (quy tắc nâng bậc), achievement_conversion (quy đổi thành tích) */
+                key: components["parameters"]["HrmRuleKey"];
+            };
+            cookie?: never;
+        };
+        /** Tham số có hiệu lực tại một ngày và mọi phiên bản (quy tắc nâng bậc, bảng quy đổi thành tích) */
+        get: operations["hrmRule"];
+        put?: never;
+        /** Ghi phiên bản tham số từ ngày hiệu lực (payload kiểm chặt theo khóa; mã kỷ luật/khen thưởng phải đang dùng); Admin */
+        post: operations["hrmRuleAdd"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/price/status": {
         parameters: {
             query?: never;
@@ -11557,6 +11731,143 @@ export interface components {
             units: components["schemas"]["FormsUnit"][];
             snapshots: components["schemas"]["FormsSnapshot"][];
         };
+        HrmStatus: {
+            /** @description true = Admin (ghi được) */
+            can_manage: boolean;
+            rule_version: string;
+            /** Format: date */
+            day: string;
+            /** @description Loại danh mục → số mục đang dùng */
+            counts: {
+                [key: string]: number;
+            };
+            /** @description Số mục/bảng hệ số/tham số hiện hành còn là dữ liệu mẫu (chờ Q-070) */
+            placeholders: number;
+            /** @description Số ngạch có bảng hệ số hiệu lực hôm nay */
+            scales: number;
+            rules: number;
+        };
+        /** @description Thuộc tính riêng theo loại; trường không thuộc loại phải vắng. position: leader, allowance (hệ số PCCV, chuỗi 2 chữ số thập phân, chỉ khi leader), mgmt_level. grade: equiv_group, grade_type, salary_class. education_level: rank. major_group: level. major: groups (mã trình độ → mã nhóm chuyên ngành của trình độ đó). ethnicity: minority. religion: no_religion. */
+        HrmCatalogAttrs: {
+            leader?: boolean;
+            allowance?: string;
+            mgmt_level?: string;
+            /** @enum {string} */
+            equiv_group?: "CVCC" | "CVC" | "CV" | "CS" | "CON_LAI";
+            /** @enum {string} */
+            grade_type?: "cong_chuc" | "vien_chuc";
+            salary_class?: string;
+            rank?: number;
+            level?: string;
+            groups?: {
+                [key: string]: string;
+            };
+            minority?: boolean;
+            no_religion?: boolean;
+        };
+        HrmCatalogItem: {
+            kind: string;
+            code: string;
+            name: string;
+            sort_order: number;
+            /** @description false = đã ngừng sử dụng (không xóa — BR-01) */
+            active: boolean;
+            /** @description Dữ liệu mẫu chưa được Phòng HCTH xác nhận (Q-070) */
+            placeholder: boolean;
+            version: number;
+            attrs: components["schemas"]["HrmCatalogAttrs"];
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmCatalogItemInput: {
+            /** @description Bắt buộc khi thêm; vắng khi sửa (mã ở đường dẫn). Khoảng trắng, xuống dòng bị loại bỏ */
+            code?: string;
+            name: string;
+            sort_order?: number;
+            /** @description Vắng → true. Sửa với false = ngừng sử dụng */
+            active?: boolean;
+            attrs?: components["schemas"]["HrmCatalogAttrs"];
+        };
+        HrmWriteResult: {
+            /** @description Mã đã chuẩn hóa (mục, ngạch hoặc khóa tham số) */
+            code: string;
+            version: number;
+        };
+        HrmGradeScale: {
+            grade_code: string;
+            /** Format: date */
+            valid_from: string;
+            steps: number;
+            /** @description Hệ số bậc 1..n, chuỗi thập phân 2 chữ số */
+            coefficients: string[];
+            /** @description Thời gian giữ bậc (tháng) — NLTX */
+            hold_months: number;
+            note: string;
+            placeholder: boolean;
+            version: number;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmGradeScaleInput: {
+            /** Format: date */
+            valid_from: string;
+            /** @description Hệ số bậc 1..n tăng dần, 0 < hệ số ≤ 99,99, tối đa 2 chữ số thập phân */
+            coefficients: string[];
+            hold_months: number;
+            note?: string;
+        };
+        HrmRule: {
+            key: string;
+            /** Format: date */
+            valid_from: string;
+            /** @description promotion: HrmPromotionRules; achievement_conversion: HrmAchievementConversion */
+            payload: Record<string, never>;
+            note: string;
+            placeholder: boolean;
+            version: number;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmRuleView: {
+            key: string;
+            /** Format: date */
+            day: string;
+            current: components["schemas"]["HrmRule"] | null;
+            versions: components["schemas"]["HrmRule"][];
+        };
+        HrmRuleInput: {
+            /** Format: date */
+            valid_from: string;
+            payload: components["schemas"]["HrmPromotionRules"] | components["schemas"]["HrmAchievementConversion"];
+            note?: string;
+        };
+        /** @description Quy tắc nâng bậc (FN-09 BR-02, BR-03) — mặc định là mẫu chờ Q-070. Phần trăm là chuỗi thập phân. */
+        HrmPromotionRules: {
+            /** @enum {string} */
+            min_rating: "HTXSNV" | "HTTNV" | "HTNV" | "KHTNV";
+            rating_years: number;
+            achievement_years: number;
+            discipline_extension_months: {
+                [key: string]: number;
+            };
+            nlth_quota_pct: string;
+            nlth_retirement_months: number;
+            nlth_retirement_within_months: number;
+            tnvk_start_pct: string;
+            tnvk_step_pct: string;
+            tnvk_cycle_months: number;
+            tnvk_first_months: number;
+            remind_months: number[];
+            retirement_age_male_months: number;
+            retirement_age_female_months: number;
+        };
+        HrmAchievementConversion: {
+            rules: {
+                /** @description Mã hình thức khen thưởng (award_form) đang dùng */
+                award_code: string;
+                months: number;
+            }[];
+        };
         PriceStatus: {
             profile: string;
             /** @description Mã phòng ban chủ dữ liệu giá của bên dùng (KN: Phòng TTTT) */
@@ -12165,6 +12476,10 @@ export interface components {
         PartnerGrantor: string;
         /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
         FormsProfile: string;
+        /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+        HrmKind: "position" | "grade" | "education_level" | "major" | "major_group" | "ethnicity" | "religion" | "political_theory" | "state_mgmt" | "foreign_language" | "language_level" | "it_level" | "award_form" | "discipline_form" | "change_type" | "leave_reason";
+        /** @description Khóa tham số có phiên bản (pf/hrm) — promotion (quy tắc nâng bậc), achievement_conversion (quy đổi thành tích) */
+        HrmRuleKey: "promotion" | "achievement_conversion";
         /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
         PriceProfile: string;
         /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
@@ -23021,6 +23336,365 @@ export interface operations {
             };
             /** @description forms.snapshot_not_found */
             404: components["responses"]["Problem"];
+        };
+    };
+    hrmStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tình trạng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmStatus"];
+                };
+            };
+            /** @description unauthenticated */
+            401: components["responses"]["Problem"];
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmInstallDefaults: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số phiên bản đã ghi (0 khi mọi mục đã có) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: number;
+                        scales: number;
+                        rules: number;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+        };
+    };
+    hrmCatalogList: {
+        parameters: {
+            query?: {
+                /** @description true → cả mục đã ngừng sử dụng */
+                include_retired?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        kind: string;
+                        items: components["schemas"]["HrmCatalogItem"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.kind_unknown */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmCatalogCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmCatalogItemInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi phiên bản 1 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.kind_unknown */
+            404: components["responses"]["Problem"];
+            /** @description hrm.item_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmCatalogHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        versions: components["schemas"]["HrmCatalogItem"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.kind_unknown | hrm.item_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmCatalogRevise: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmCatalogItemInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.kind_unknown | hrm.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmGradeScales: {
+        parameters: {
+            query?: {
+                /** @description Ngày YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng hệ số */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        day: string;
+                        grades: {
+                            grade: components["schemas"]["HrmCatalogItem"];
+                            /** @description null nếu ngạch chưa có bảng hệ số hiệu lực tại ngày hỏi */
+                            scale: components["schemas"]["HrmGradeScale"] | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmGradeScaleAdd: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Mã ngạch/CDNN (vd 01.003, V.05.02.07) */
+                grade: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmGradeScaleInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmGradeScaleHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grade: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        versions: components["schemas"]["HrmGradeScale"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.item_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmRule: {
+        parameters: {
+            query?: {
+                /** @description Ngày YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Khóa tham số có phiên bản (pf/hrm) — promotion (quy tắc nâng bậc), achievement_conversion (quy đổi thành tích) */
+                key: components["parameters"]["HrmRuleKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tham số */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmRuleView"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.rule_unknown */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmRuleAdd: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Khóa tham số có phiên bản (pf/hrm) — promotion (quy tắc nâng bậc), achievement_conversion (quy đổi thành tích) */
+                key: components["parameters"]["HrmRuleKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.rule_unknown */
+            404: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference */
+            422: components["responses"]["Problem"];
         };
     };
     priceStatus: {

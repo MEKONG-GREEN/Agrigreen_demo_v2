@@ -216,7 +216,7 @@ const SHARED_BY_AUDIENCE: Partial<Record<KnRole, Item[]>> = {
   kn_tinh: [soon("tinh.chung.nhan_su_phong", "Nhân sự của phòng", "/kn/nhan-su/cua-phong", "users")],
 };
 
-/** Nhóm "Nghiệp vụ" theo khuôn × đối tượng (domain.deptBusiness) — mọi mục "Sắp có". */
+/** Nhóm "Nghiệp vụ" theo khuôn × đối tượng (domain.deptBusiness) — mục "Sắp có" trừ mục gói đã làm (W11.21). */
 const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "admin">, Item[]>>>> = {
   chan_nuoi_thuy_san: {
     kn_tw: [soon("tw.cnts.du_an_knqg", "Dự án KNQG", "/kn/cnts/du-an-knqg", "report")],
@@ -278,7 +278,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       soon("tinh.hcth.ho_so", "Hồ sơ nhân sự", "/kn/nhan-su/ho-so", "users"),
       soon("tinh.hcth.kho_tai_lieu", "Hồ sơ dữ liệu", "/kn/nhan-su/kho-tai-lieu", "library"),
       soon("tinh.hcth.danh_gia", "Đánh giá", "/kn/nhan-su/danh-gia", "approve"),
-      soon("tinh.hcth.danh_muc", "Danh mục nhân sự", "/kn/nhan-su/danh-muc", "catalog"),
+      { key: "tinh.hcth.danh_muc", label: "Danh mục nhân sự", route: "/kn/nhan-su/danh-muc", icon: "catalog" }, // W11.21 (pf/hrm)
     ],
     kn_xa: [soon("xa.hcth.danh_gia", "Đánh giá của tôi", "/kn/nhan-su/danh-gia-cua-toi", "approve")],
   },
@@ -295,6 +295,7 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, (base: string) => Item[]>> =
     soon("admin.pb.bao_gia_mat_hang", "Mặt hàng", "/kn/bao-gia/mat-hang", "package"),
   ],
   hanh_chinh_tong_hop: (b) => [
+    { key: "admin.pb.hcth_danh_muc", label: "Danh mục nhân sự", route: `${b}/danh-muc-nhan-su`, icon: "catalog" }, // W11.21 (pf/hrm)
     soon("admin.pb.hcth_phan_quyen", "Phân quyền hồ sơ", `${b}/phan-quyen-ho-so`, "shield"),
     soon("admin.pb.hcth_thu_muc", "Thư mục tài liệu", `${b}/thu-muc-tai-lieu`, "library"),
   ],

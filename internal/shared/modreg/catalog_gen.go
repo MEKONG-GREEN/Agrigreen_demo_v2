@@ -21,6 +21,7 @@ var catalog = []CatalogEntry{
 	{Name: "pf/extension", Kind: "domain", Enable: "per_tenant", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_extension", "pf_extension_pub"}, Shares: []string{}},
 	{Name: "pf/forms", Kind: "capability", Enable: "per_tenant", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_forms"}, Shares: []string{}},
 	{Name: "pf/geo", Kind: "capability", Enable: "per_tenant", Permissions: []string{"coop_manager", "farmer", "geo_admin", "map_consumer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_geo", "pf_geo_pub"}, Shares: []string{}},
+	{Name: "pf/hrm", Kind: "domain", Enable: "per_tenant", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_hrm"}, Shares: []string{}},
 	{Name: "pf/kref", Kind: "kernel", Enable: "always", Permissions: []string{}, Zones: []string{"pf", "mkg"}, OwnsSchema: []string{"k_ref"}, Shares: []string{}},
 	{Name: "pf/masterdata", Kind: "capability", Enable: "per_tenant", Permissions: []string{"masterdata_admin"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_masterdata"}, Shares: []string{}},
 	{Name: "pf/mechanization", Kind: "domain", Enable: "per_tenant", Permissions: []string{"cgh_admin", "cgh_sync", "cgh_viewer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_mechanization", "pf_mechanization_pub"}, Shares: []string{"machine"}},

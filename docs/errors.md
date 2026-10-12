@@ -1018,6 +1018,18 @@ Bản offline (`captured_at`) nộp vào kỳ đã chốt với đơn vị KHÔN
 | 422 | `evidence.subject_unresolved` | `POST /v1/files` có bộ ba `subject_module`/`subject_type`/`subject_id` mà module chủ không phân giải được: module chưa nối `Resolver`, thực thể không có (hoặc ngoài tenant), loại không cho tham chiếu |
 | 403 | `evidence.subject_forbidden` | `GET /v1/files/{ref}[/content]`: tệp có chủ thể mà người gọi không thấy (mã xã của chủ thể ngoài phạm vi, không qua cấp phép chia sẻ) hoặc chủ thể không còn phân giải được. Quyết định vẫn ghi sổ `pf_files.access_log` |
 
+### pf/hrm (`dom/hrm` — danh mục nhân sự Phòng HCTH, W11.21, ADR-0050)
+
+Route `/v1/hrm/*` (Application API). Lỗi chung: `unauthenticated` (401), `forbidden` (403 — không phải Admin hoặc Cấp Tỉnh của Phòng Hành chính – Tổng hợp; ghi mà không phải Admin; ngữ cảnh chỉ xem), `validation_failed` (422 — mã sai dạng, tên rỗng, thuộc tính không thuộc loại, hệ số không tăng dần hoặc quá 2 chữ số thập phân, tham số sai, `at`/`valid_from` không phải ngày), `conflict` (409 — ghi đồng thời trùng khóa), `module_not_enabled` (403 — module tắt cho tenant).
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 404 | `hrm.kind_unknown` | Loại danh mục ở đường dẫn không thuộc danh sách FN-19 |
+| 404 | `hrm.item_not_found` | Sửa/xem lịch sử mục (hoặc bảng hệ số của ngạch) chưa có |
+| 409 | `hrm.item_exists` | Thêm mục có mã (đã chuẩn hóa) đã có trong danh mục, kể cả mục đã ngừng sử dụng (FN-19: trùng mã → chặn) |
+| 422 | `hrm.item_reference` | Tham chiếu tới mục không có hoặc đã ngừng: nhóm chuyên ngành → trình độ, chuyên ngành → nhóm của đúng trình độ, bảng hệ số → ngạch, tham số → mã kỷ luật/khen thưởng |
+| 404 | `hrm.rule_unknown` | Khóa tham số không phải `promotion` hoặc `achievement_conversion` |
+
 ### pf/price (`cap/price` — khung giá, W11.71, ADR-0049)
 
 Route `/v1/price/*` (Application API). Lỗi chung: `unauthenticated` (401), `forbidden` (403 — vai không thuộc cấu hình giá, ghi danh mục/xã báo giá/phân công mà không có vai quản trị, hoặc cấu hình lịch/ngưỡng/mặt hàng mà không là Quản trị nghiệp vụ báo giá — W11.72), `node_scope_required` (403 — Cấp Xã không có Nút), `validation_failed` (422 — `at` không phải ngày), `conflict` (409 — ghi danh mục đồng thời trùng khóa), `module_not_enabled` (403 — module tắt cho tenant).

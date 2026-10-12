@@ -2292,9 +2292,7 @@
         "route": "/kn/nhan-su/danh-muc",
         "icon": "catalog",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -2843,6 +2841,15 @@
           "label": "Mẫu báo cáo",
           "route": "/kn/phong-ban/hanh_chinh_tong_hop/mau-bao-cao",
           "icon": "table",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
+         },
+         {
+          "key": "admin.pb.hcth_danh_muc",
+          "label": "Danh mục nhân sự",
+          "route": "/kn/phong-ban/hanh_chinh_tong_hop/danh-muc-nhan-su",
+          "icon": "catalog",
           "badge_source": null,
           "enabled": false,
           "children": []

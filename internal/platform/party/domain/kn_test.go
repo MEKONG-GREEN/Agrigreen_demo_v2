@@ -115,6 +115,7 @@ func TestFN_AD_04_03_NormalizeDepartment(t *testing.T) {
 // implementedMenu: mục nghiệp vụ của khuôn phòng ban đã có màn (gói đã bỏ ComingSoon).
 var implementedMenu = map[string]bool{
 	"tinh.cnts.danh_muc": true, "admin.pb.cnts_danh_muc": true, // W11.41
+	"tinh.hcth.danh_muc": true, "admin.pb.hcth_danh_muc": true, // W11.21
 }
 
 // W11.06 (kn.menu/v3, D3 C6, D4 X2): khuôn theo phòng ban — nhóm "Nghiệp vụ" sau "Điều hành", nhóm

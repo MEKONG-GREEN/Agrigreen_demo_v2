@@ -27,10 +27,11 @@ var NoFloat = &analysis.Analyzer{
 // KN v7.7 P4: vòng đời báo cáo (diện tích, sản lượng, chỉ số dashboard — decimal) và quy tắc báo cáo Chi cục.
 // W8.2: mkg/engine — giá trị và cận bất định của quan sát (diện tích, tỷ lệ) đều decimal.
 // W11.71: pf/price (cap/price, R-CODE-01 nêu đích danh) — giá, ngưỡng %, giá thành đều decimal, cả trong kiểm thử.
+// W11.21: pf/hrm (dom/hrm) — hệ số bậc, hệ số phụ cấp, % TNVK, tỷ lệ chỉ tiêu đều decimal, cả trong kiểm thử.
 var floatFreeZones = []string{"/internal/mkg/hub", "/internal/mkg/logistics", "/internal/mkg/engine",
 	"/internal/platform/reports/formula", "/internal/platform/reports/form", "/internal/platform/reports/formimport",
 	"/internal/platform/extension/reportcycle", "/internal/platform/reports/dispatch",
-	"/internal/platform/price"}
+	"/internal/platform/price", "/internal/platform/hrm"}
 
 // floatFreeProdZones là module cấm float trong mã không phải kiểm thử: mkg/fieldops (số cuộn, diện tích
 // hiện trường, ngày công) và pf/mechanization (diện tích, giờ máy, số máy). Kiểm thử HTTP của hai module

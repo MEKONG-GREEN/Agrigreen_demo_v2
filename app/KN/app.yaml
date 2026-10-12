@@ -12,6 +12,7 @@ modules:
   pf/extension: ">=1.0 <2"     # nhiệm vụ, chỉ đạo, phòng ban (dom/extension)
   pf/forms: ">=1.0 <2"         # cap/forms: phát hành/nộp/rà soát/chốt kỳ + ảnh chụp (W6.2; KN v1 ghi song song)
   pf/geo: ">=2.0 <3"           # bản đồ khuyến nông, /v1/kn/* của geo
+  pf/hrm: ">=1.0 <2"           # dom/hrm: nhân sự Phòng HCTH — danh mục nhân sự FN-19, /v1/hrm/* (W11.21, ADR-0050)
   pf/masterdata: ">=1.0 <2"
   pf/mrv: ">=1.0 <2"           # đối chiếu HTX ↔ KN (KN US-MRV-02), thu thập MRV ở app hiện trường
   pf/notify: ">=1.0 <2"

@@ -193,3 +193,18 @@ Chưa làm: app di động (`field-app`) chưa hiển thị `period_key`; lọc 
 | Quyền | FN-06: Admin (`masterdata_admin`) thêm/sửa/ngừng/nạp Excel qua Admin API; Cấp Tỉnh (và mọi người dùng đã xác thực) chỉ đọc qua Application API — mục menu mới `tinh.cnts.danh_muc` (Cấp Tỉnh) và `admin.pb.cnts_danh_muc` bỏ "Sắp có" | `party/domain/menu_departments.go` |
 | Phạm vi Cấp Xã theo cơ sở (W11.07) | `facility_refs` phải là cơ sở giết mổ **đang dùng hôm nay** (`accounts.facility_invalid`); chưa kiểm cơ sở thuộc xã của lần gán (Nút xã không mang mã ĐVHC ở pf/accounts) | `accounts.UseFacilityCatalog`; gói W11.42 kiểm thêm theo xã |
 | Đồng bộ thiết bị | Danh mục CNTS **chưa** đồng bộ xuống app (entity `catalog_item` giữ 10 danh mục cũ) — mobile CNTS là W11.42 | `domain.SyncCatalogs` |
+
+## W11.21 — Danh mục nhân sự (pf 000147)
+
+| Câu hỏi / mục | Phương án đã chọn | Đổi ở đâu |
+|---|---|---|
+| Danh mục FN-19 ở `cap/masterdata` (bản đối chiếu H1) hay module của chủ | **Module mới `pf/hrm` (`dom/hrm`) dựng ngay ở W11.21**, schema `pf_hrm` — một bên dùng, thuộc tính và tham chiếu chéo riêng ([ADR-0050](../adr/0050-dom-hrm-pf-hrm.md)) | ADR-0050 |
+| Q-070 bảng hệ số, thời gian giữ bậc, quy chế NLTH, % TNVK, tuổi nghỉ hưu, số ngày nhắc | Chưa có dữ liệu → cài **mẫu** `placeholder = true` (nhãn "Mẫu" trên màn): bảng hệ số theo NĐ 204/2004 (A2.1 4,40 + 0,34 × 8 bậc; A1 2,34 + 0,33 × 9 bậc; B 1,86 + 0,20 × 12 bậc; giữ bậc A 36 / B 24 tháng; hiệu lực 01/10/2004); quy tắc nâng bậc: xếp loại tối thiểu HTNV, 3 năm xếp loại, 5 năm thành tích, kéo dài giữ bậc khiển trách/cảnh cáo 6, cách chức 12 tháng, chỉ tiêu NLTH 10 %, NLTH nghỉ hưu ≤ 12 tháng trong 12 tháng, TNVK 5 % + 1 %/12 tháng sau 36 tháng ở bậc cuối, nhắc 1/3/6 tháng, tuổi nghỉ hưu 2026 nam 61 tuổi 6 tháng (738 tháng), nữ 57 tuổi (684 tháng) — mỗi năm lộ trình một phiên bản; quy đổi thành tích: Bằng khen Bộ/UBND tỉnh, CSTĐ cấp tỉnh 12 tháng, CSTĐ cơ sở, Giấy khen Sở 9 tháng | Admin ghi phiên bản mới (`POST /v1/hrm/grade-scales/{grade}`, `/v1/hrm/rules/{key}`) — mẫu bị thay, không xóa |
+| Danh sách BRD không liệt kê (chức vụ, chuyên ngành, dân tộc/tôn giáo khác Kinh/"Không", khen thưởng, kỷ luật, biến động, lý do nghỉ) | Cài mẫu ngắn (`placeholder`); hệ số PCCV của chức vụ để trống (không đoán) | Admin sửa trên màn; `domain/defaults.go` |
+| Tên ngạch 06.031 và V.03.09.27 (BRD chỉ ghi mã) | "Kế toán viên" (CV), "Kỹ thuật viên khuyến nông hạng IV" (CS, loại B — khớp hệ số chênh lệch 0,20 của AC-02 FN-09), cả hai `placeholder` | Admin sửa tên |
+| Chuẩn hóa mã (AC-03) | Mã ngạch: bỏ MỌI khoảng trắng, xuống dòng (kể cả giữa mã), giữ chữ hoa; mã danh mục khác: bỏ khoảng trắng, về chữ thường, `[a-z][a-z0-9_]*` | `domain.NormalizeCode` |
+| Quyền | Admin thêm/sửa/ngừng; Cấp Tỉnh có ngữ cảnh ở phòng `hanh_chinh_tong_hop` chỉ xem (BRD §VI.4 "Master data: Admin Có, Cấp Tỉnh – HCTH Xem"); vai khác 403. Không duyệt bốn mắt (BRD: HCTH không có luồng phê duyệt) | `assembly.KNHRMAccess` |
+| BR-05 quan hệ ngạch ↔ chức vụ | Chưa mô hình (chờ HCTH xác nhận); chức vụ có `mgmt_level` tùy chọn nối với cấp quản lý tài khoản (W11.07) | — |
+| Bảng hệ số sửa ngày quá khứ | Cho phép (chuyển đổi dữ liệu cần bảng cũ); cùng ngày hiệu lực thì bản ghi sau thắng. Quyết định nâng bậc (W11.25) phải chụp hệ số lúc ban hành để BR-02 đúng cả khi sửa lùi | W11.25 |
+| Đơn vị công tác (HS-16, NS05) | Không ở danh mục này — dùng danh mục đơn vị nội bộ W11.07 (`pf_accounts.internal_unit`) | — |
+| Nạp danh mục/bảng hệ số từ Excel (luồng phụ FN-19) | Chưa làm (chờ dữ liệu Q-070; `cap/import`/`shared/tabular` ở W11.30) | W11.30 |

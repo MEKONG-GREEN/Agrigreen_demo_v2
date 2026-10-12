@@ -335,6 +335,20 @@ Kiến trúc v4.1 §26, §7.2. Module năng lực `pf/forms` (`internal/platform
 
 **Chưa làm:** chuyển kỳ KN sang kỳ native và web-ops sang `/v1/forms`; báo cáo Chi cục đọc ảnh chụp; gộp engine mẫu dạng lưới của `pf/reports` (bố cục, công thức) làm kiểu trường của `cap/forms` (điểm mở rộng `forms.field_types`); `publications` cho `cap/analytics`.
 
+## Module nhân sự `dom/hrm` (W11.21)
+
+[ADR-0050](../adr/0050-dom-hrm-pf-hrm.md). Module nghiệp vụ `pf/hrm` (`internal/platform/hrm`, `dom/hrm`, `kind: domain`, `enable: per_tenant`) sở hữu `pf_hrm` (pf 000147); vai `r_hrm` (không vai cũ, `app_platform` là thành viên). Toàn module cấm float (agnofloat): hệ số, PCCV, % là decimal/`numeric`.
+
+| Thành phần | W11.21 | Gói mở rộng |
+|---|---|---|
+| `port.Access` | phòng ban chủ, vai ghi (`ManageBy`), vai xem trong phòng ban (`ReadBy`); KN ở `cmd/api-platform/assembly/hrm.go` | W11.22 ma trận quyền hồ sơ (FN-20) |
+| `port.Catalog` | `Items(kind)`, `ScaleAt(grade, at)`, `RuleAt(key, at)` (tenant từ ctx) | W11.23 Contact đọc chức vụ |
+| Sổ `pf_hrm.catalog_item` | 16 loại danh mục FN-19, phiên bản theo `(kind, code)`, `attrs` kiểm ở domain, `placeholder` | W11.22 hồ sơ tham chiếu `code` |
+| Sổ `pf_hrm.grade_scale`, `rule_param` | bảng hệ số `numeric(5,2)[]` + giữ bậc, tham số `promotion`/`achievement_conversion`, `valid_from` | W11.25 tra as-of ngày hưởng, chụp hệ số vào quyết định |
+| HTTP | `/v1/hrm/status`, `/defaults`, `/catalogs/{kind}[/{code}/history|revise]`, `/grade-scales[/{grade}[/history]]`, `/rules/{key}` | W11.22–W11.28 thêm route |
+
+Bảng mới của các gói sau: migration riêng tên `<số>_pf_hrm_<việc>.up.sql`, sổ `shared.apply_ledger`, `GRANT SELECT, INSERT … TO r_hrm`. PII (hồ sơ) chỉ qua `vault/identity` (RB-3).
+
 ## Khung giá `cap/price` (W11.71)
 
 [ADR-0049](../adr/0049-cap-price-pf-price.md); kiến trúc v4.1 §26. Module năng lực `pf/price` (`internal/platform/price`, `cap/price`, `enable: per_tenant`) sở hữu `pf_price` và `pf_price_pub` (pf 000138); vai `r_price` (không vai cũ, `app_platform` là thành viên), `r_price_pub` (đọc view công bố — chưa có view, `v1_board_daily` ở W11.76). Toàn module cấm float (agnofloat `floatFreeZones`, R-CODE-01): giá, % là decimal/`numeric`.

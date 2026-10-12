@@ -19,6 +19,7 @@ var menuModules = map[string]string{
 	"/kn/du-lieu/may-moc":            "pf/mechanization",
 	"/kn/du-lieu/ve-thua":            "pf/geo",
 	"/kn/du-lieu/vat-tu":             "pf/extension",
+	"/kn/nhan-su":                    "pf/hrm", // W11.21: màn nhân sự Phòng HCTH (dom/hrm)
 	"/kn/quan-tri/don-vi-hanh-chinh": "pf/masterdata",
 	"/kn/bao-gia":                    "pf/price",      // Báo giá nông sản (W11.72)
 	"/kn/cnts/danh-muc":              "pf/masterdata", // W11.41
@@ -34,14 +35,15 @@ var menuModules = map[string]string{
 
 // menuDeptModules: màn Admin theo phòng ban (/kn/phong-ban/{department}/<màn>) → module.
 var menuDeptModules = map[string]string{
-	"/theo-doi-nop":    "pf/extension",
-	"/tong-hop":        "pf/extension",
-	"/du-lieu-bao-cao": "pf/extension",
-	"/thu-thap":        "pf/extension",
-	"/danh-muc":        "pf/masterdata",
-	"/danh-muc-cnts":   "pf/masterdata", // W11.41
-	"/mau-bao-cao":     "pf/reports",
-	"/bao-gia-lich":    "pf/price", // W11.74 lịch báo giá (W11.72 mở menu)
+	"/theo-doi-nop":     "pf/extension",
+	"/tong-hop":         "pf/extension",
+	"/du-lieu-bao-cao":  "pf/extension",
+	"/thu-thap":         "pf/extension",
+	"/danh-muc":         "pf/masterdata",
+	"/danh-muc-cnts":    "pf/masterdata", // W11.41
+	"/mau-bao-cao":      "pf/reports",
+	"/bao-gia-lich":     "pf/price", // W11.74 lịch báo giá (W11.72 mở menu)
+	"/danh-muc-nhan-su": "pf/hrm",   // W11.21: danh mục nhân sự (FN-19)
 }
 
 // MenuModule trả module per_tenant sở hữu màn route ("" = lõi, luôn hiện).

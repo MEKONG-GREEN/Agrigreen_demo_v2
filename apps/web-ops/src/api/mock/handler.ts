@@ -55,6 +55,7 @@ import { knCollectRoutes } from "./kn-collect";
 import { priceItemRoutes } from "./kn-price-items";
 import { pricePointRoutes } from "./kn-price-points";
 import { cntsCatalogAdminRoutes, cntsCatalogAppRoutes } from "./kn-cnts-catalogs";
+import { hrmRoutes } from "./kn-hrm";
 import { apiClientAdminRoutes, meteringAdminRoutes } from "./g5";
 
 function sleep(ms: number) {
@@ -137,6 +138,8 @@ const appRoutes: Route[] = [
   ...pricePointRoutes, // W11.72 xã báo giá + phân công
   // --- W11.41: danh mục CNTS (/v1/masterdata/catalogs/cnts_*, đọc theo ngày ?at=) — trước route danh mục chung ---
   ...cntsCatalogAppRoutes,
+  // --- dom/hrm W11.21: danh mục nhân sự HCTH (/v1/hrm/*) ---
+  ...hrmRoutes,
 
   // --- pf/extension ---
   {
