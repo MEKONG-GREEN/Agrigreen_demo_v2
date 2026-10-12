@@ -193,4 +193,3 @@ Chưa làm: app di động (`field-app`) chưa hiển thị `period_key`; lọc 
 | Quyền | FN-06: Admin (`masterdata_admin`) thêm/sửa/ngừng/nạp Excel qua Admin API; Cấp Tỉnh (và mọi người dùng đã xác thực) chỉ đọc qua Application API — mục menu mới `tinh.cnts.danh_muc` (Cấp Tỉnh) và `admin.pb.cnts_danh_muc` bỏ "Sắp có" | `party/domain/menu_departments.go` |
 | Phạm vi Cấp Xã theo cơ sở (W11.07) | `facility_refs` phải là cơ sở giết mổ **đang dùng hôm nay** (`accounts.facility_invalid`); chưa kiểm cơ sở thuộc xã của lần gán (Nút xã không mang mã ĐVHC ở pf/accounts) | `accounts.UseFacilityCatalog`; gói W11.42 kiểm thêm theo xã |
 | Đồng bộ thiết bị | Danh mục CNTS **chưa** đồng bộ xuống app (entity `catalog_item` giữ 10 danh mục cũ) — mobile CNTS là W11.42 | `domain.SyncCatalogs` |
-
