@@ -20,7 +20,7 @@ var menuModules = map[string]string{
 	"/kn/du-lieu/ve-thua":            "pf/geo",
 	"/kn/du-lieu/vat-tu":             "pf/extension",
 	"/kn/quan-tri/don-vi-hanh-chinh": "pf/masterdata",
-	"/kn/bao-gia":                    "pf/price", // Báo giá nông sản (W11.72)
+	"/kn/bao-gia":                    "pf/price",      // Báo giá nông sản (W11.72)
 	"/kn/cnts/danh-muc":              "pf/masterdata", // W11.41
 	"/quan-tri/tham-so":              "pf/masterdata",
 	"/quan-tri/mau-bao-cao":          "pf/reports",
