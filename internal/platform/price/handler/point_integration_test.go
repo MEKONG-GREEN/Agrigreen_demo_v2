@@ -58,7 +58,7 @@ func (f fakeOfficers) Officers(_ context.Context, _ port.Profile, level string) 
 	return f[level], nil
 }
 
-// Xã báo giá + phân công W11.72 (pf 000144, BRD Báo giá FN-AD-04.02, FN-AD-04.01) qua HTTP: nhóm vùng mặc định + thêm,
+// Xã báo giá + phân công W11.72 (pf 000145, BRD Báo giá FN-AD-04.02, FN-AD-04.01) qua HTTP: nhóm vùng mặc định + thêm,
 // ĐVHC có hiệu lực (ADR-0032), thêm xã (mã tự sinh, ĐVHC hết hiệu lực/trùng bị chặn — AC-02), phân công cán bộ Xã theo
 // ngày hiệu lực (AC-02 FN-AD-04.01) và cán bộ Cấp Tỉnh, chuyển mã ĐVHC khi sắp xếp ĐVHC, ngưng xã, cờ QTNV
 // (Profile.StewardDuty), port.Points, PointReminders (nhắc cán bộ Xã phụ trách, lần 2 bỏ xã đã gửi).

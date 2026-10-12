@@ -29,7 +29,7 @@ func table(k domain.Kind) (string, error) {
 		return "pf_price.unit", nil
 	case domain.KindGroup:
 		return "pf_price.commodity_group", nil
-	case domain.KindRegion: // W11.72 nhóm vùng (pf 000144)
+	case domain.KindRegion: // W11.72 nhóm vùng (pf 000145)
 		return "pf_price.region_group", nil
 	}
 	return "", fmt.Errorf("price: loại danh mục %q", k)

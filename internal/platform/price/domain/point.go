@@ -1,6 +1,6 @@
 package domain
 
-// Xã báo giá + phân công (W11.72, pf 000144; BRD Báo giá v1.3 FN-AD-04.02 Danh mục xã báo giá, FN-AD-04.01 phân công
+// Xã báo giá + phân công (W11.72, pf 000145; BRD Báo giá v1.3 FN-AD-04.02 Danh mục xã báo giá, FN-AD-04.01 phân công
 // cán bộ Xã / cán bộ Cấp Tỉnh theo ngày hiệu lực): quy tắc thuần — mã xã tự sinh, kiểm dữ liệu, phép chiếu "xã có hiệu
 // lực tại ngày", người phụ trách tại ngày. Không I/O, không đồng hồ.
 
@@ -60,7 +60,7 @@ type Point struct {
 	Note          string // lý do ngưng / chuyển ĐVHC
 }
 
-// ValidatePoint kiểm nội dung xã báo giá (cùng ràng buộc CHECK của pf 000144).
+// ValidatePoint kiểm nội dung xã báo giá (cùng ràng buộc CHECK của pf 000145).
 func ValidatePoint(p Point) error {
 	switch {
 	case !ValidAutoPointCode(p.Code):

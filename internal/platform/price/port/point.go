@@ -1,6 +1,6 @@
 package port
 
-// Xã báo giá + phân công (W11.72, pf 000144; BRD Báo giá v1.3 FN-AD-04.02, FN-AD-04.01): xã báo giá liên kết mã ĐVHC có
+// Xã báo giá + phân công (W11.72, pf 000145; BRD Báo giá v1.3 FN-AD-04.02, FN-AD-04.01): xã báo giá liên kết mã ĐVHC có
 // hiệu lực (ADR-0032), nhóm vùng, cán bộ Xã phụ trách chính và cán bộ Cấp Tỉnh được phân công theo ngày hiệu lực.
 // Phiếu báo giá (W11.75), tiến độ (W11.77) đọc qua Points.
 

@@ -1,6 +1,6 @@
 package store
 
-// SQL của xã báo giá + phân công (W11.72, pf 000144): sổ pf_price.region_group, collection_point, point_officer; đọc
+// SQL của xã báo giá + phân công (W11.72, pf 000145): sổ pf_price.region_group, collection_point, point_officer; đọc
 // bảng chiếu ĐVHC k_ref.admin_unit (ADR-0029, ADR-0032 — r_price SELECT từ pf 000138). Đọc cả sổ của tenant rồi chiếu ở
 // domain (BRD: 26 xã × vài phiên bản).
 

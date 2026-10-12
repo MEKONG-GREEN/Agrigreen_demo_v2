@@ -12,7 +12,7 @@
 // W11.73 (pf 000141): mặt hàng theo thời kỳ — app.ItemService (port.Items), nhóm hàng, gán xã, đề xuất, bộ theo vụ,
 // "thay thế cho"; điểm nối app.ItemHooks (SetItemHooks) cho W11.72/W11.74/W11.75.
 //
-// W11.72 (pf 000144): xã báo giá ↔ ĐVHC có hiệu lực, nhóm vùng, phân công cán bộ Xã / Cấp Tỉnh theo ngày (port.Points);
+// W11.72 (pf 000145): xã báo giá ↔ ĐVHC có hiệu lực, nhóm vùng, phân công cán bộ Xã / Cấp Tỉnh theo ngày (port.Points);
 // cờ Quản trị nghiệp vụ (Profile.StewardDuty); nhắc nhập giá tới cán bộ Xã phụ trách (app.PointReminders).
 //
 // Module khác chỉ import price/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.

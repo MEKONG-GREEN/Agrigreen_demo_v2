@@ -85,7 +85,7 @@ Bảng giá xã là giá thị trường, không phải dữ liệu hộ → kh�
 - Xã báo giá: `point_code` là mã xã báo giá (mặc định mã ĐVHC xã), KHÔNG khóa ngoại — W11.72 dựng `collection_point` và kiểm mã khi nối.
 - Chưa làm: nhập danh mục từ Excel (chờ `cap/import`), thông báo cho Cấp Xã khi đề xuất được xử lý (chờ nối `notify`), đối chiếu xã của Cấp Xã với phân công (W11.72).
 
-### W11.72 xã báo giá + phân công (12/10/2026, pf 000144)
+### W11.72 xã báo giá + phân công (12/10/2026, pf 000145)
 
 - Sổ `pf_price.region_group` (nhóm vùng — cùng cột với `commodity_group`, chuỗi `region:<code>`; mặc định An Giang, Kiên Giang ghi cùng `POST /v1/price/catalog/defaults`), `collection_point` (xã báo giá, chuỗi `point:<code>`, mã `XBG####` hệ thống sinh dưới khóa cố vấn theo tenant; `admin_unit_code` + tên xã chụp theo ĐVHC tại ngày hiệu lực; `region_code`; ngưng = `retired` kèm lý do), `point_officer` (chuỗi `<role>:<point>`; `xa` = cán bộ Xã phụ trách chính, `tinh` = cán bộ Cấp Tỉnh; `officer_ref` NULL = bỏ phân công).
 - ĐVHC có hiệu lực (ADR-0032): đọc bảng chiếu `k_ref.admin_unit` (`valid_to` không bao gồm) — chỉ ĐVHC cấp xã có hiệu lực tại ngày hiệu lực; một ĐVHC chỉ gắn một xã báo giá đang/sắp hoạt động (`domain.AdminUnitClash`); sắp xếp ĐVHC = `POST /v1/price/points/{code}/revise` với mã ĐVHC mới (giữ mã xã, lịch sử); danh sách báo `admin_unit_valid = false` + mã kế thừa khi ĐVHC đã hết hiệu lực.

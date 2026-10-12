@@ -50,7 +50,7 @@ func Validate(e Entry) error {
 		re, maxName = reUnitCode, 50
 	case KindGroup:
 		re, maxName = reGroupCode, 100
-	case KindRegion: // W11.72 nhóm vùng (pf 000144)
+	case KindRegion: // W11.72 nhóm vùng (pf 000145)
 		re, maxName = reRegionCode, 100
 	default:
 		return fmt.Errorf("%w: loại %q", ErrInvalid, e.Kind)

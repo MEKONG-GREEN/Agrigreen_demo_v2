@@ -1,6 +1,6 @@
 package app
 
-// Xã báo giá + phân công (W11.72, pf 000144; BRD Báo giá nông sản v1.3 FN-AD-04.02 Danh mục xã báo giá, FN-AD-04.01
+// Xã báo giá + phân công (W11.72, pf 000145; BRD Báo giá nông sản v1.3 FN-AD-04.02 Danh mục xã báo giá, FN-AD-04.01
 // gán cán bộ Xã vào xã / phân công xã cho cán bộ Cấp Tỉnh theo ngày hiệu lực; mục II "Nhóm vùng").
 //
 // Quyền:
