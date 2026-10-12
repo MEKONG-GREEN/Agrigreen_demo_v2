@@ -4,7 +4,7 @@
   "owner": "pf/extension",
   "status": "published",
   "package": "W11.10",
-  "migration": "pf 000146",
+  "migration": "pf 000144",
   "consumers": ["KHTC — bộ đọc nguồn module (W11.64, pf/extension department_code = ke_hoach_tai_chinh)", "r_metrics, r_agg (thành viên r_extension_pub)"],
   "purpose": "Số liệu ĐÃ CHỐT theo kỳ báo cáo của các phòng KN chạy vòng đời báo cáo pf/extension (Trồng trọt: Báo cáo tổng hợp các xã; CNTS sau, cùng view) kèm cờ chốt của kỳ nguồn — nguồn duy nhất KHTC đọc (BRD KHTC BR-DL-02…04, QĐ-6: nguồn sửa được tới khi chốt, KHTC đọc lũy kế của nguồn).",
   "grain": "kỳ × biểu (một dòng mỗi biểu của mỗi kỳ có khóa kỳ đã lưu, đợt chưa thu hồi)",

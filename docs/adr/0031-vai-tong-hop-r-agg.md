@@ -86,7 +86,7 @@ Ngưỡng k là mục `[KÝ]` của v4.1 (K-8, Phụ lục C C-4, câu hỏi Q5-
 | W6.3 | Schema `_pub`, view có phiên bản, vai `r_<module>_pub` (thành viên: `r_metrics`), `pf/metrics` chỉ đọc `_pub`, bản sao chỉ đọc `AG_DB_REPLICA_URL` — xong 09/10/2026 ([modules.md](../dev/modules.md#view-công-bố-_pub-w63)) | pf 000124 |
 | W6.4 | `r_agg`, danh mục job, nhật ký chạy, cổng CI danh mục BYPASSRLS — mã xong 09/10/2026, bật production chờ C-4 (ghi chú dưới) | pf 000129 (000109 cũ bỏ) |
 | FC | Vai đăng nhập riêng `app_agg`, `worker -agg-run`, EXECUTE `k_ref.ctx_*` cho `r_agg` (ghi chú dưới) | pf 000137 |
-| W11.10 | Nguồn module cho KHTC: `pf_extension_pub.v1_consolidation_closed` (số liệu đã chốt theo khóa kỳ + cờ chốt), hợp đồng cột `contracts/pubview` (kể cả hai view giá `planned` cho W11.76); view có bên đọc ngoài `pf/metrics` được miễn "pf/metrics phải đọc" khi có hợp đồng `published` | pf 000146 |
+| W11.10 | Nguồn module cho KHTC: `pf_extension_pub.v1_consolidation_closed` (số liệu đã chốt theo khóa kỳ + cờ chốt), hợp đồng cột `contracts/pubview` (kể cả hai view giá `planned` cho W11.76); view có bên đọc ngoài `pf/metrics` được miễn "pf/metrics phải đọc" khi có hợp đồng `published` | pf 000144 |
 | W5.3 | Tập dữ liệu dựng sẵn cho cổng tích hợp qua ngưỡng k | pf 000126–000127 (000100–000101 cũ bỏ) |
 
 Bản đối chiếu ghi gói `r_agg` là "W6.5" ở vài chỗ; số đúng theo kế hoạch là **W6.4**.

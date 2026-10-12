@@ -12,7 +12,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// TestW11_10_ClosedSourcePubView: view nguồn module cho KHTC pf_extension_pub.v1_consolidation_closed (pf 000146) —
+// TestW11_10_ClosedSourcePubView: view nguồn module cho KHTC pf_extension_pub.v1_consolidation_closed (pf 000144) —
 // một dòng mỗi kỳ × biểu có khóa kỳ đã lưu; số liệu = lần tổng hợp mới nhất ghi không muộn hơn lần chốt gần nhất chạm
 // biểu (QĐ-6 mặc định: ảnh chụp đã chốt); lần "Cập nhật" tay sau khi mở lại không lọt vào cho tới khi chốt lại; cờ chốt
 // biểu/kỳ/khóa kỳ (Q-048: mọi biểu nguồn của tuần đã chốt).

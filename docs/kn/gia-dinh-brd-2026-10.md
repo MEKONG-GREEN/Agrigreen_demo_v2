@@ -150,7 +150,7 @@ Chưa làm trong gói này: mở loại kỳ ngày/quý/KSGM ở "Phát hành bi
 
 Chưa làm: app di động (`field-app`) chưa hiển thị `period_key`; lọc công việc theo `period_type` mới ở màn Cấp Xã (`TasksScreen`) chưa thêm lựa chọn.
 
-## W11.10 — Hợp đồng nguồn module `_pub` (pf 000146)
+## W11.10 — Hợp đồng nguồn module `_pub` (pf 000144)
 
 | Câu hỏi / mục | Phương án đã chọn | Đổi ở đâu |
 |---|---|---|

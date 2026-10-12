@@ -65,7 +65,7 @@ func TestPubViewsDeclaredAndPrivileges_W63(t *testing.T) {
 	if len(views) != 4 {
 		t.Fatalf("module công bố view _pub: %v", views)
 	}
-	// W6.3: 11 view (pf 000124); W11.10: + pf_extension_pub.v1_consolidation_closed (pf 000146).
+	// W6.3: 11 view (pf 000124); W11.10: + pf_extension_pub.v1_consolidation_closed (pf 000144).
 	if n := countViews(views); n != 12 {
 		t.Fatalf("số view _pub đã khai: %d", n)
 	}

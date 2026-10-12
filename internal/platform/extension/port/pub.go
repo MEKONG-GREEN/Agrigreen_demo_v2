@@ -4,7 +4,7 @@ package port
 // (pf 000124). Mỗi view là HỢP ĐỒNG có phiên bản như port: đổi bảng nội bộ không được làm vỡ view đã công bố;
 // đổi cột/ý nghĩa = view v<N+1>_<tên> mới. Chỉ vai r_extension_pub (thành viên: r_metrics) đọc được.
 //
-// W11.10 (pf 000146): nguồn module cho KHTC — số liệu đã chốt (lần tổng hợp các xã lúc chốt) theo phòng × tỉnh ×
+// W11.10 (pf 000144): nguồn module cho KHTC — số liệu đã chốt (lần tổng hợp các xã lúc chốt) theo phòng × tỉnh ×
 // khóa kỳ, kèm cờ chốt của kỳ nguồn. Hợp đồng cột: contracts/pubview/pf_extension_pub.consolidation_closed.v1.json.
 //
 //ag:pubview pf_extension_pub.field_report v1

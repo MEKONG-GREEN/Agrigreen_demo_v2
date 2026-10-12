@@ -6,7 +6,7 @@ View công bố `pf_<module>_pub.v<N>_<tên>` (R-DB-10, W6.3 — [modules.md](..
 
 | View | Chủ | Trạng thái | Hạt | Ghi chú |
 |---|---|---|---|---|
-| [`pf_extension_pub.v1_consolidation_closed`](pf_extension_pub.consolidation_closed.v1.json) | `pf/extension` | **published** (pf 000146) | kỳ × biểu | Số liệu đã chốt (lần tổng hợp các xã lúc chốt) theo phòng × tỉnh × khóa kỳ + cờ chốt biểu/kỳ/khóa kỳ. Trồng trọt bây giờ; CNTS vào cùng view (`department_code = chan_nuoi_thuy_san`) |
+| [`pf_extension_pub.v1_consolidation_closed`](pf_extension_pub.consolidation_closed.v1.json) | `pf/extension` | **published** (pf 000144) | kỳ × biểu | Số liệu đã chốt (lần tổng hợp các xã lúc chốt) theo phòng × tỉnh × khóa kỳ + cờ chốt biểu/kỳ/khóa kỳ. Trồng trọt bây giờ; CNTS vào cùng view (`department_code = chan_nuoi_thuy_san`) |
 | [`pf_price_pub.v1_board_daily`](pf_price_pub.board_daily.v1.json) | `pf/price` | **planned** — dựng ở W11.76 | ngày × mặt hàng | Bảng giá đã duyệt theo ngày, min/max toàn tỉnh (Q-084) |
 | [`pf_price_pub.v1_ticket_week`](pf_price_pub.ticket_week.v1.json) | `pf/price` | **planned** — dựng ở W11.76 | tuần báo cáo × xã báo giá | Số phiếu giá đã thu thập theo tuần báo cáo + cờ tuần đã chốt |
 
