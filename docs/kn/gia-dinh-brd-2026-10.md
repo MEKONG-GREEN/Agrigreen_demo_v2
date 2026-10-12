@@ -149,3 +149,15 @@ Chưa làm trong gói này: mở loại kỳ ngày/quý/KSGM ở "Phát hành bi
 | Số khe kỳ của biểu | Không đổi: đợt nhiều kỳ hơn số khe kỳ của mẫu bị từ chối khi phát hành (cảnh báo khi xem trước) — kỳ ngày dài cần mẫu không có khối kỳ hoặc đợt ngắn | Q-01 |
 
 Chưa làm: app di động (`field-app`) chưa hiển thị `period_key`; lọc công việc theo `period_type` mới ở màn Cấp Xã (`TasksScreen`) chưa thêm lựa chọn.
+
+## W11.10 — Hợp đồng nguồn module `_pub` (pf 000146)
+
+| Câu hỏi / mục | Phương án đã chọn | Đổi ở đâu |
+|---|---|---|
+| QĐ-6 — "nguồn đã chốt" là gì | Ảnh chụp đã chốt: lần tổng hợp các xã (bất biến) mới nhất của kỳ × biểu ghi không muộn hơn lần chốt gần nhất chạm biểu (chốt, tự chốt, chốt lại). Số tạm khi đang mở lại không lọt ra; nguồn sửa được tới khi chốt | View `pf_extension_pub.v1_consolidation_closed` (đổi ý nghĩa = `v2`) |
+| Q-048 — "nguồn đã chốt cho tuần X" | Đề xuất dev: **mọi** biểu của **mọi** kỳ cùng (phòng, tỉnh, loại kỳ, khóa kỳ) đã chốt và không xã × biểu nào đang mở lại (`key_closed`). Có thêm cờ theo biểu (`form_closed`) và theo kỳ (`period_closed`) nếu PO chọn mức mịn hơn | Bên đọc W11.64 chọn cột cờ — không cần migration |
+| Khóa tra cứu | `period_key` ĐÃ LƯU lúc phát hành (W11.05b). Kỳ không có khóa (vụ, đột xuất, phát hành trước pf 000143) không có dòng — không tính lại bằng SQL | Nạp ngược khóa kỳ cũ nếu KHTC cần kỳ trước 04/11/2026 |
+| Q-047 — lũy kế nào là chuẩn | Lũy kế của nguồn: cột lũy kế nằm trong `rows/totals.cells` của ảnh chụp (KHTC không tự cộng) | — |
+| Phạm vi CNTS | Cùng view, `department_code = chan_nuoi_thuy_san`: nếu CNTS dùng vòng đời `extension/reportcycle` thì có dòng ngay; nếu dùng kỳ native `cap/forms` thì thêm nhánh `UNION ALL` (giữ cột) bằng `CREATE OR REPLACE VIEW` — schema `pf_forms` thuộc module khác nên cần thêm view `pf_forms_pub` hoặc port đọc, quyết ở gói CNTS | W11.42/W11.44 |
+| Giá (BG10 dữ liệu) | Chỉ hợp đồng (`planned`): bảng giá đã duyệt theo ngày min/max **toàn tỉnh**, ngày chưa duyệt không có dòng → bên đọc lấy ngày đã duyệt gần nhất ≤ ngày chốt (Q-084 đề xuất); số phiếu theo tuần báo cáo × xã, chỉ đếm phiếu của bảng giá đã duyệt, cờ tuần đã chốt = mọi ngày báo giá theo lịch đã duyệt | W11.76 dựng theo `contracts/pubview/README.md` |
+| Bên đọc KHTC | KHTC nằm trong `pf/extension` (`ke_hoach_tai_chinh`); vai đọc là `r_extension_pub` (view) — W11.64 quyết cấp thành viên `r_extension_pub`/`r_price_pub` cho đường đọc của nó hay đọc qua port | W11.64 |

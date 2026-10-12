@@ -56,6 +56,10 @@ Bảng giá xã là giá thị trường, không phải dữ liệu hộ → kh�
 
 ## Hiện thực
 
+### W11.10 hợp đồng view giá (12/10/2026, không migration `pf_price`)
+
+- Cột của `pf_price_pub.v1_board_daily` (bảng giá đã duyệt theo ngày, min/max toàn tỉnh — Q-084) và `pf_price_pub.v1_ticket_week` (số phiếu theo tuần báo cáo + cờ tuần đã chốt) chốt ở `contracts/pubview/*.json`, trạng thái `planned`; W11.76 dựng view đúng cột, khai `//ag:pubview`, đổi `published` (việc cụ thể: [contracts/pubview/README.md](../../contracts/pubview/README.md#việc-của-w1176-để-dựng-hai-view-giá)).
+
 ### W11.71 khung (10/10/2026, pf 000138)
 
 - `internal/platform/price`: `module.yaml` (sinh: `ports: [Catalog]`, `owns_schema: [pf_price, pf_price_pub]`), `port` (Profile, Catalog, PubSchema, `price.profile_not_found`), `domain` (mã, `valid_from` theo ngày VN, 5 nhóm hàng BRD + 8 đơn vị tính mặc định), `store`, `app`, `handler`.

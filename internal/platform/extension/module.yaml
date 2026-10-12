@@ -37,6 +37,7 @@ provides:
     - pf.extension.work_schedule.submitted/v1
   internal_events: []
   publications:
+    - pf_extension_pub.consolidation_closed/v1
     - pf_extension_pub.directive_target_ack/v1
     - pf_extension_pub.field_report/v1
     - pf_extension_pub.task/v1

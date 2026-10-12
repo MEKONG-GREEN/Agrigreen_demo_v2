@@ -1,0 +1,32 @@
+{
+  "view": "pf_price_pub.v1_board_daily",
+  "directive": "pf_price_pub.board_daily/v1",
+  "owner": "pf/price",
+  "status": "planned",
+  "package": "W11.10 (hợp đồng) — dựng ở W11.76 khi pf_price có bảng giá đã duyệt",
+  "migration": "migration công bố pf_pub_* hoặc pf_price_* của W11.76 (chưa cấp số)",
+  "consumers": ["KHTC — bộ đọc nguồn module (W11.64), Mẫu 1 mục A.III (W11.66)", "r_metrics, r_agg (thành viên r_price_pub)"],
+  "purpose": "Bảng giá ĐÃ DUYỆT theo ngày, mức toàn tỉnh (BRD KHTC §3.4, BRD Báo giá BG10; Q-084 đề xuất: giá 'từ – đến' = min/max toàn tỉnh). Chỉ phiên bản đã duyệt hiện hành của mỗi ngày; ngày đang mở duyệt vẫn trả phiên bản đã duyệt trước đó kèm board_reopened = true.",
+  "grain": "ngày báo giá × mặt hàng (toàn tỉnh)",
+  "key": ["profile", "board_date", "item_code"],
+  "closed_rule": "Nguồn đã chốt = phiên bản bảng giá đã duyệt mới nhất của ngày. Ngày chưa duyệt không có dòng; bên đọc lấy ngày đã duyệt gần nhất ≤ ngày chốt (Q-084 đề xuất của dev).",
+  "personal_data": false,
+  "columns": [
+    { "name": "tenant_id",       "type": "uuid",                     "nullable": false, "description": "Tenant (RLS p_tenant áp qua view)" },
+    { "name": "profile",         "type": "text",                     "nullable": false, "description": "Bên dùng cap/price (KN = 'kn')" },
+    { "name": "board_date",      "type": "date",                     "nullable": false, "description": "Ngày báo giá (giờ VN)" },
+    { "name": "week_key",        "type": "text",                     "nullable": false, "description": "Khóa tuần báo cáo của board_date theo lịch kỳ hệ thống (W11.03, vd 2026-W45) — LƯU lúc duyệt, không tính lại" },
+    { "name": "week_year",       "type": "integer",                  "nullable": false, "description": "Năm của số tuần" },
+    { "name": "board_version",   "type": "integer",                  "nullable": false, "description": "Phiên bản bảng giá đã duyệt của ngày (duyệt lại sau mở duyệt → tăng)" },
+    { "name": "approved_at",     "type": "timestamp with time zone", "nullable": false, "description": "Lúc duyệt phiên bản này" },
+    { "name": "board_reopened",  "type": "boolean",                  "nullable": false, "description": "Ngày đang mở duyệt (số có thể đổi ở phiên bản sau)" },
+    { "name": "item_code",       "type": "text",                     "nullable": false, "description": "Mã mặt hàng MH##### (W11.73)" },
+    { "name": "item_name",       "type": "text",                     "nullable": false, "description": "Tên mặt hàng theo phiên bản có hiệu lực tại board_date" },
+    { "name": "group_code",      "type": "text",                     "nullable": false, "description": "Mã nhóm hàng" },
+    { "name": "unit_code",       "type": "text",                     "nullable": false, "description": "Mã đơn vị tính" },
+    { "name": "price_min",       "type": "numeric",                  "nullable": false, "description": "Giá thấp nhất toàn tỉnh (đồng, decimal — R-CODE-01)" },
+    { "name": "price_max",       "type": "numeric",                  "nullable": false, "description": "Giá cao nhất toàn tỉnh" },
+    { "name": "price_avg",       "type": "numeric",                  "nullable": true,  "description": "Giá bình quân theo quy tắc của bảng giá (NULL nếu bảng giá không tính)" },
+    { "name": "points_reported", "type": "integer",                  "nullable": false, "description": "Số xã báo giá có giá mặt hàng trong phiên bản" }
+  ]
+}
