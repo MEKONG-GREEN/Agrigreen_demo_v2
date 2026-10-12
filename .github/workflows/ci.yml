@@ -684,3 +684,121 @@ jobs:
       - name: Dọn
         if: always()
         run: docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
+# ============================================================================
+#  HAI JOB THEM VAO .github/workflows/ci.yml
+#
+#  Chep nguyen khoi nay vao CUOI file ci.yml, giu dung muc thut dau dong
+#  (2 dau cach truoc ten job - cung muc voi "images:" san co).
+#
+#  KHONG phai sua gi khac trong ci.yml. Viec trien khai nam o mot file rieng:
+#  .github/workflows/trien-khai-demo.yml
+#
+#  Hai job nay chi lam MOT viec: xay not ba anh ma CI chua xay.
+#  CI cua du an da xay, quet SBOM/Trivy va ky cosign cho 11 anh roi; thieu
+#  dung postgres, web-ops va web-internal - ma web-internal dang tat tren
+#  may demo nen khong can.
+#
+#  Dieu kien: repository variable  AG_DEMO_DOMAIN = demo.mekonggreen.vn
+# ============================================================================
+
+  # ---------- Anh postgres (PostGIS + pgRouting, Dockerfile rieng) ---------
+  # Build o MOI lan chay (ke ca PR) de bat loi som; chi PUSH len ghcr khi da
+  # vao main. Cung cach ma job "images" san co dang lam.
+  images-extra:
+    name: Build va push anh postgres
+    needs: [lint, test, security]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      # ghcr.io BAT BUOC ten kho viet thuong; ten to chuc la MEKONG-GREEN.
+      - name: Ten kho chu thuong
+        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - name: Dang nhap ghcr (chi khi se push)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build va push
+        uses: docker/build-push-action@v6
+        with:
+          context: deploy/compose/postgres
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          tags: ghcr.io/${{ env.OWNER }}/agrigreen-postgres:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Quet de BAO CAO, khong chan. Anh nay dua tren postgis/postgis:17-3.5;
+      # mot CVE chua co ban va o anh goc ma chan luon thi ca duong ong deploy
+      # thanh con tin cua thuong nguon. Khi doi ngu da quen thi doi exit-code
+      # thanh "1" cho khop voi job images san co.
+      - name: Trivy - quet anh (bao cao, khong chan)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ghcr.io/${{ env.OWNER }}/agrigreen-postgres:${{ github.sha }}
+          severity: "CRITICAL,HIGH"
+          exit-code: "0"
+          ignore-unfixed: true
+
+  # ---------- Anh web-ops: ten mien duoc NHUNG LUC BUILD ------------------
+  # NEXT_PUBLIC_* di vao ma JavaScript luc build, khong doc duoc luc chay -
+  # chinh Dockerfile cua du an cung ghi "moi moi truong mot image". Vi vay
+  # anh nay co hau to "-demo": CHI dung duoc cho demo.mekonggreen.vn.
+  #
+  # NEXT_PUBLIC_DEPLOY_ENV=production + URL https la bat buoc: next.config.ts
+  # goi assertBuildEnv() va DUNG build neu ban production dung URL http.
+  images-web:
+    name: Build va push anh web-ops
+    needs: [lint, test, security]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      # Thieu bien nay thi anh web se tro ve "https://api." - hong mot cach
+      # kho doan. Dung ngay tai day con hon de no len song.
+      - name: Kiem bien AG_DEMO_DOMAIN
+        run: |
+          if [ -z "${{ vars.AG_DEMO_DOMAIN }}" ]; then
+            echo "::error::Chua dat repository variable AG_DEMO_DOMAIN (vd demo.mekonggreen.vn)"
+            exit 1
+          fi
+          echo "Ten mien demo: ${{ vars.AG_DEMO_DOMAIN }}"
+
+      - name: Ten kho chu thuong
+        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - name: Dang nhap ghcr (chi khi se push)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build va push web-ops
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/web-ops
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          tags: ghcr.io/${{ env.OWNER }}/agrigreen-web-ops-demo:${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_DEPLOY_ENV=production
+            NEXT_PUBLIC_API_BASE_URL=https://api.${{ vars.AG_DEMO_DOMAIN }}
+            NEXT_PUBLIC_ADMIN_API_BASE=https://admin.${{ vars.AG_DEMO_DOMAIN }}
+            NEXT_PUBLIC_OIDC_ISSUER=https://auth.${{ vars.AG_DEMO_DOMAIN }}/realms/agrigreen
+            NEXT_PUBLIC_OIDC_CLIENT_ID=agrigreen-web-ops
+            NEXT_PUBLIC_API_MOCK=0
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
