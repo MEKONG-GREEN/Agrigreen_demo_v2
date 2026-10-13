@@ -19,6 +19,8 @@ import (
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/handler"
+	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtc/app"
+	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtc/handler"
 	matapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/material/app"
 	mathandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/material/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
@@ -68,6 +70,8 @@ type Module struct {
 	svc *app.Service
 	rc  *rcapp.Service  // KN v7.7 P4: vòng đời báo cáo (extension/reportcycle, module_reportcycle.go)
 	mat *matapp.Service // KN v7.7 P7 FN-XA-03.06: sổ vật tư (extension/material)
+	// W11.61 (D4 KH1): Danh mục KHTC, danh sách CT/DA chủ (D20), Kế hoạch năm (extension/khtc).
+	khtc *khtcapp.Service
 }
 
 // New tạo module với pool của vai extension_app.
@@ -79,6 +83,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	}, rc: &rcapp.Service{DB: db, Clock: clk, Orgs: d.Orgs, Units: d.Units, Params: d.Params}}
 	// Tên người thao tác của sổ vật tư dùng chung danh bạ của vòng đời báo cáo (UseReportCycle nối sau).
 	m.mat = &matapp.Service{DB: db, Clock: clk, Catalogs: d.Catalogs, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.khtc = &khtcapp.Service{DB: db, Clock: clk, Names: func() partyport.ActorNames { return m.rc.Names }}
 	return m
 }
 
@@ -102,6 +107,7 @@ func (m *Module) UseKNContext(c accport.KNContextResolver, d accport.KNDirectory
 // xuất nội bộ: ghi egress_event, không bao giờ bị chặn kể cả AG_EGRESS_MODE=enforce.
 func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
 	m.svc.Egress, m.svc.EgressMode, m.svc.Log = cp, mode, log
+	m.khtc.Egress, m.khtc.EgressMode, m.khtc.Log = cp, mode, log // W11.61: "Xuất Excel" Kế hoạch năm
 }
 
 // UseTablePDF nối bộ dựng PDF bảng (pf/reports) cho "Xuất PDF" lịch công tác.
@@ -118,7 +124,15 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Handler{Svc: m.svc}.RegisterApp(rg)
 	rchandler.Handler{Svc: m.rc}.RegisterApp(rg)
 	mathandler.Handler{Svc: m.mat}.RegisterApp(rg)
+	khtchandler.Handler{Svc: m.khtc}.RegisterApp(rg)
 }
+
+// KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham
+// chiếu program_ref qua cổng này.
+func (m *Module) KHTCPrograms() port.KHTCPrograms { return khtcapp.Ports{Svc: m.khtc} }
+
+// KHTCPlans là cổng đọc Kế hoạch năm theo ngày hiệu lực (W11.62 kỳ KHTC, W11.63 phiếu, W11.65 mẫu).
+func (m *Module) KHTCPlans() port.KHTCPlans { return khtcapp.Ports{Svc: m.khtc} }
 
 // RegisterAdmin: module chưa có route quản trị (tham số SLA đặt qua pf/masterdata).
 func (m *Module) RegisterAdmin(*gin.RouterGroup) {}

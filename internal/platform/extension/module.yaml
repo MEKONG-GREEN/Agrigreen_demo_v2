@@ -19,7 +19,7 @@ depends:
   pf/reports: ">=1.0 <2"
   pf/sync: ">=1.0 <2"
 provides:
-  ports: [TablePDF]
+  ports: [KHTCPlans, KHTCPrograms, TablePDF]
   events:
     - pf.extension.consolidation.completed/v1
     - pf.extension.directive.issued/v1
