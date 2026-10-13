@@ -55,6 +55,7 @@ KN v7.7 (D2) coi **phòng ban là module**: `pf_party.department` bật theo tr�
 | `pf/workflow` (mới, W6.1) | `cap/workflow` | capability | Duyệt bốn mắt dùng chung (pf 000118) |
 | — | `cap/task` | — | Chưa có module. `cap/task` khai `hosts` ở `pf/extension` (W6.6) |
 | `pf/price` (mới, W11.71) | `cap/price` | capability | [ADR-0049](0049-cap-price-pf-price.md); khung pf 000138, nghiệp vụ Báo giá ở W11.72–W11.76 |
+| `pf/contact` (mới, W11.23) | `cap/directory` | capability | [ADR-0053](0053-cap-directory-pf-contact.md); Contact FN-13 dùng chung (pf 20261013165159), PII qua thẻ danh bạ của kho định danh |
 | `pf/hrm` (mới, W11.21) | `dom/hrm` | domain | [ADR-0050](0050-dom-hrm-pf-hrm.md); khung + danh mục nhân sự pf 000147, hồ sơ và nghiệp vụ HCTH ở W11.22–W11.28 |
 | `pf/extdata` | — | chốt ở W1.1 | Không có tên v4.1 tương ứng |
 | `pf/metering` | `dom/metering` | domain | ADR-0023 |
