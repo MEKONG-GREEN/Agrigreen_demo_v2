@@ -49,7 +49,11 @@ type Contract struct {
 	Key          []string `json:"key"`
 	ClosedRule   string   `json:"closed_rule"`
 	PersonalData bool     `json:"personal_data"`
-	Columns      []Column `json:"columns"`
+	// Family: họ hợp đồng <tên>/v<N> (ADR-0052) — nhiều view của NHIỀU module chủ cùng một hợp đồng cột (vd
+	// closed_figures/v1: nguồn vòng đời báo cáo cũ và kỳ native cap/forms). Mọi thành viên phải có cột giống hệt (tên,
+	// kiểu, nullable, thứ tự) — FamilyProblems. Rỗng = view đứng một mình.
+	Family  string   `json:"family,omitempty"`
+	Columns []Column `json:"columns"`
 }
 
 var (
@@ -105,6 +109,58 @@ func (c Contract) Problems() []string {
 		}
 	}
 	return p
+}
+
+var reFamily = regexp.MustCompile(`^[a-z][a-z0-9_]*/v[1-9][0-9]*$`)
+
+// FamilyProblems kiểm họ hợp đồng (ADR-0052): tên họ đúng dạng, đuôi phiên bản trùng phiên bản view, mỗi họ có ít nhất
+// hai view của các module chủ khác nhau, mọi thành viên có cột giống hệt (tên, kiểu, nullable, thứ tự).
+func FamilyProblems(cs []Contract) []string {
+	var p []string
+	byFamily := map[string][]Contract{}
+	for _, c := range cs {
+		if c.Family == "" {
+			continue
+		}
+		if !reFamily.MatchString(c.Family) || lastVersion(c.Family) != lastVersion(c.Directive) {
+			p = append(p, fmt.Sprintf("%s: họ %q phải dạng <tên>/v<N> cùng phiên bản với view", c.View, c.Family))
+		}
+		byFamily[c.Family] = append(byFamily[c.Family], c)
+	}
+	names := make([]string, 0, len(byFamily))
+	for f := range byFamily {
+		names = append(names, f)
+	}
+	sort.Strings(names)
+	for _, f := range names {
+		ms := byFamily[f]
+		owners := map[string]bool{}
+		for _, c := range ms {
+			owners[c.Owner] = true
+		}
+		if len(ms) < 2 || len(owners) != len(ms) {
+			p = append(p, fmt.Sprintf("họ %s cần ít nhất hai view của các module chủ khác nhau", f))
+		}
+		ref := ms[0]
+		for _, c := range ms[1:] {
+			if !sameColumns(ref.Columns, c.Columns) {
+				p = append(p, fmt.Sprintf("họ %s: cột của %s khác %s", f, c.View, ref.View))
+			}
+		}
+	}
+	return p
+}
+
+func sameColumns(a, b []Column) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Name != b[i].Name || a[i].Type != b[i].Type || a[i].Nullable != b[i].Nullable {
+			return false
+		}
+	}
+	return true
 }
 
 // All trả mọi hợp đồng nhúng, sắp theo view.

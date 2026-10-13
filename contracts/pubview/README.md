@@ -9,6 +9,17 @@ View công bố `pf_<module>_pub.v<N>_<tên>` (R-DB-10, W6.3 — [modules.md](..
 | [`pf_extension_pub.v1_consolidation_closed`](pf_extension_pub.consolidation_closed.v1.json) | `pf/extension` | **published** (pf 000144) | kỳ × biểu | Số liệu đã chốt (lần tổng hợp các xã lúc chốt) theo phòng × tỉnh × khóa kỳ + cờ chốt biểu/kỳ/khóa kỳ. Trồng trọt bây giờ; CNTS vào cùng view (`department_code = chan_nuoi_thuy_san`) |
 | [`pf_price_pub.v1_board_daily`](pf_price_pub.board_daily.v1.json) | `pf/price` | **published** (pf 000152, W11.76) | ngày × mặt hàng | Bảng giá đã duyệt theo ngày, min/max toàn tỉnh (Q-084) |
 | [`pf_price_pub.v1_ticket_week`](pf_price_pub.ticket_week.v1.json) | `pf/price` | **published** (pf 000152, W11.76) | tuần báo cáo × xã báo giá | Số phiếu giá đã thu thập theo tuần báo cáo + cờ tuần đã chốt |
+| [`pf_extension_pub.v1_closed_figures`](pf_extension_pub.closed_figures.v1.json) | `pf/extension` | **published** (pf 20261013065758) | kỳ × biểu | Họ `closed_figures/v1` ([ADR-0052](../../docs/adr/0052-hop-dong-so-lieu-da-chot-closed-figures.md)) — nguồn vòng đời báo cáo cũ (Trồng trọt), chiếu lại `v1_consolidation_closed` về cột chung |
+| [`pf_forms_pub.v1_closed_figures`](pf_forms_pub.closed_figures.v1.json) | `pf/forms` | **published** (pf 20261013065757) | kỳ native (một biểu) | Họ `closed_figures/v1` — kỳ native `cap/forms` (CNTS `kn_cnts`), ảnh chụp đóng băng lúc chốt, chỉ trường số |
+
+## Họ hợp đồng `closed_figures/v1` (ADR-0052)
+
+- Hai view, hai module chủ, **cột và thứ tự giống hệt** (`family` trong tệp JSON; `pubview.FamilyProblems` kiểm). KHTC đọc qua MỘT port `extension/port.KHTCSources` (vai `r_extension`, thành viên `r_extension_pub`, `r_forms_pub`, `r_price_pub` — `dbadmin.PubReaders`), không rẽ nhánh theo cột `source`.
+- `rows`: `[{key, unit, unit_kind, parent, region, indicator, nil_report, cells, confirmation}]`, chỉ ô số; `totals`: dòng tổng của nguồn hoặc `[]` (kỳ native — bên đọc cộng `rows`).
+- Danh tính kỳ nguồn (D8 — mỗi phòng một lịch tuần): `(calendar_id, calendar_version, period_key)` — khóa GỐC, chưa quy đổi. Quy đổi sang tuần KHTC: bảng chuyển đổi có phiên bản sau port (`ClosedFigures.Converted`, `kn.crosswalk/v1;attribution=source_end` — ADR-0052 §6).
+- `key_closed` của từng view chỉ tính trong nguồn đó; port tính `KeyClosedAll` trên cả họ.
+- Trồng trọt giữ vòng đời báo cáo lâu dài (W11.04 hủy): hai nguồn chính thức. Phòng mới dùng kỳ native: thêm profile vào `pf_forms_pub.v1_closed_figures` bằng `CREATE OR REPLACE VIEW`. Đổi cột = `closed_figures/v2` ở mọi nguồn cùng lúc.
+- Nguồn gốc cho ảnh chụp KHTC (W11.64): `source_module`, `closed_at`, `figures_hash` (sha256 số đã chốt, không gồm trạng thái xác nhận); D2: `confirmation_status`, `rows[].confirmation`, `status_hash` riêng. Port KHTC duy nhất `extension/port.KHTCSources` đọc thêm `pf_price_pub` (Báo giá) — ADR-0052 §7, §8.
 
 ## "Nguồn đã chốt" (QĐ-6, Q-048 — đề xuất của dev, chờ PO)
 
@@ -29,6 +40,7 @@ View công bố `pf_<module>_pub.v<N>_<tên>` (R-DB-10, W6.3 — [modules.md](..
   "package": "<gói>", "migration": "<pf 000xxx>",
   "consumers": ["..."], "purpose": "...", "grain": "...", "key": ["<cột>"], "closed_rule": "...",
   "personal_data": false,
+  "family": "<tên>/v<N> — tùy chọn, ADR-0052",
   "columns": [{ "name": "<cột>", "type": "<format_type của PostgreSQL>", "nullable": false, "description": "..." }]
 }
 ```

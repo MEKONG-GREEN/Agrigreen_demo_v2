@@ -211,6 +211,30 @@ func LoginRoles() []string {
 // mà không cần migration (ag_migrator không có CREATEROLE).
 var ExclusiveMembers = map[string][]string{AggRole: {AppAgg}}
 
+// PubReaders (ADR-0052 §4, gói PFPUB): module KHÔNG phải cap/analytics được đọc view công bố _pub — vai nhóm r_<module>
+// là thành viên r_<chủ>_pub (chỉ USAGE schema _pub + SELECT view công bố, không quyền nào trên schema nội bộ của chủ;
+// cổng cô lập schema W9.1 đã miễn *_pub). Khóa: module đọc; giá trị: module chủ view _pub. Mỗi mục mới rà soát như thay
+// đổi hợp đồng (bên đọc ghi vào consumers của contracts/pubview). Bootstrap cấp — migration không cấp được thành viên
+// (ag_migrator không có CREATEROLE), và cấp thẳng SELECT view cho r_<module> bị TestPubViewsDeclaredAndPrivileges_W63 chặn.
+var PubReaders = map[string][]string{
+	// KHTC (Phòng Kế hoạch – Tài chính, cài trong pf/extension — W11.61…W11.69, port extension/port.KHTCSources) đọc số
+	// đã chốt của Trồng trọt (pf_extension_pub), CNTS (pf_forms_pub, họ closed_figures/v1) và Báo giá (pf_price_pub).
+	"pf/extension": {"pf/extension", "pf/forms", "pf/price"},
+}
+
+// pubReaderRoles trả r_<chủ>_pub mà vai nhóm của module là thành viên theo PubReaders (chủ không có schema _pub → bỏ).
+func pubReaderRoles(module string, groups []ModuleGroup) []string {
+	var out []string
+	for _, owner := range PubReaders[module] {
+		for _, g := range groups {
+			if g.Module == owner && g.Pub != "" {
+				out = append(out, g.Pub)
+			}
+		}
+	}
+	return out
+}
+
 // OwnerRole trả vai chủ schema của module: own_<đoạn cuối>, vd pf/party → own_party (cùng đoạn với r_<module>).
 func OwnerRole(module string) string { return "own_" + strings.TrimPrefix(modreg.DBRole(module), "r_") }
 
@@ -236,6 +260,7 @@ func buildRoles() []Role {
 		if g.Module == AnalyticsModule {
 			member = append(member, pubs...)
 		}
+		member = append(member, pubReaderRoles(g.Module, groups)...)
 		out = append(out, Role{Name: g.Role, MemberOf: member, Clusters: g.Clusters})
 	}
 	out = append(out, Role{Name: OpsGroup, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF, migrations.MKG}})

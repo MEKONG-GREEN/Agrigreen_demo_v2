@@ -22,9 +22,10 @@ func pubRoles() []string {
 }
 
 // W6.3 (§14, ADR-0031 §2, R-DB-10): r_<module>_pub NOLOGIN cho đúng các module sở hữu schema _pub, tạo trước
-// vai phân tích; chỉ r_metrics (cap/analytics) là thành viên; không thuộc ag_shared_user, không vượt RLS.
+// vai phân tích; chỉ r_metrics (cap/analytics), r_agg và bên đọc đã rà soát (PubReaders, ADR-0052) là thành viên;
+// không thuộc ag_shared_user, không vượt RLS. PFPUB: + r_forms_pub (pf_forms_pub, pf 20261013065757).
 func TestPubRoles_W63(t *testing.T) {
-	want := []string{"r_cropcycle_pub", "r_extension_pub", "r_geo_pub", "r_mechanization_pub", "r_price_pub"}
+	want := []string{"r_cropcycle_pub", "r_extension_pub", "r_forms_pub", "r_geo_pub", "r_mechanization_pub", "r_price_pub"}
 	if got := pubRoles(); !slices.Equal(got, want) {
 		t.Fatalf("vai _pub: %v, muốn %v", got, want)
 	}
@@ -35,7 +36,7 @@ func TestPubRoles_W63(t *testing.T) {
 			t.Errorf("%s: %+v (vị trí %d, r_metrics %d)", name, r, ri, ai)
 		}
 		for _, o := range Roles {
-			if slices.Contains(o.MemberOf, name) && o.Name != modreg.DBRole(AnalyticsModule) && o.Name != AggRole {
+			if slices.Contains(o.MemberOf, name) && o.Name != modreg.DBRole(AnalyticsModule) && o.Name != AggRole && !pubReader(o.Name, name) {
 				t.Errorf("%s không được là thành viên %s", o.Name, name)
 			}
 		}
@@ -119,6 +120,7 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 		if g.Module == AnalyticsModule {
 			want = append(want, pubRoles()...) // W6.3: cap/analytics đọc mọi view _pub
 		}
+		want = append(want, pubReaderRoles(g.Module, groups)...) // ADR-0052: bên đọc _pub đã rà soát
 		if r.Login || r.BypassRLS || r.NoInherit || !slices.Equal(r.MemberOf, want) || len(r.Clusters) == 0 {
 			t.Errorf("%s: %+v", g.Role, r)
 		}
@@ -448,6 +450,48 @@ func TestLaterGroupsGrantKRef(t *testing.T) {
 			if !regexp.MustCompile(regexp.QuoteMeta(want)).Match(src) {
 				t.Errorf("%s: thiếu %q", file, want)
 			}
+		}
+	}
+}
+
+// pubReader: vai nhóm reader là thành viên vai _pub pub theo PubReaders (ADR-0052 §4).
+func pubReader(reader, pub string) bool {
+	for mod, owners := range PubReaders {
+		if modreg.DBRole(mod) != reader {
+			continue
+		}
+		for _, o := range owners {
+			if modreg.PubRole(o) == pub {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ADR-0052 §4 (PFPUB): KHTC trong pf/extension đọc họ hợp đồng closed_figures/v1 của hai nguồn — r_extension là thành
+// viên r_extension_pub, r_forms_pub, r_price_pub (tạo trước r_extension), không thành viên vai _pub nào khác; mục PubReaders chỉ trỏ
+// module có schema _pub.
+func TestPubReaders_PFPUB(t *testing.T) {
+	r, ri := roleByName(t, "r_extension")
+	for _, pub := range []string{"r_extension_pub", "r_forms_pub", "r_price_pub"} {
+		p, pi := roleByName(t, pub)
+		if !slices.Contains(r.MemberOf, pub) || pi > ri || p.BypassRLS {
+			t.Errorf("r_extension phải là thành viên %s (tạo trước): %+v", pub, r.MemberOf)
+		}
+	}
+	for _, m := range r.MemberOf {
+		if m != SharedUser && m != "r_extension_pub" && m != "r_forms_pub" && m != "r_price_pub" {
+			t.Errorf("r_extension thành viên thừa %s", m)
+		}
+	}
+	groups := ModuleGroups()
+	for mod, owners := range PubReaders {
+		if mod == AnalyticsModule {
+			t.Errorf("PubReaders không chứa cap/analytics (đã đọc mọi view)")
+		}
+		if got := pubReaderRoles(mod, groups); len(got) != len(owners) {
+			t.Errorf("PubReaders[%s] = %v: chủ không có schema _pub (%v)", mod, owners, got)
 		}
 	}
 }

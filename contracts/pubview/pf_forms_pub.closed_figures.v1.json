@@ -1,0 +1,226 @@
+{
+  "view": "pf_forms_pub.v1_closed_figures",
+  "directive": "pf_forms_pub.closed_figures/v1",
+  "owner": "pf/forms",
+  "status": "published",
+  "package": "PFPUB",
+  "migration": "pf 20261013065757",
+  "consumers": [
+    "KHTC — port duy nhất extension/port.KHTCSources (W11.61…W11.69, ảnh chụp W11.64), vai r_extension (thành viên r_extension_pub, r_forms_pub, r_price_pub — ADR-0052 §4, §7)",
+    "r_metrics, r_agg (thành viên mọi r_<module>_pub)"
+  ],
+  "purpose": "Họ hợp đồng thống nhất 'số liệu đã chốt theo phòng × tỉnh × khóa kỳ' cho KHTC (ADR-0052) — nguồn kỳ native cap/forms (CNTS profile kn_cnts: W11.05/05b/42) từ ảnh chụp đóng băng lúc chốt; chỉ trường số, không người nộp/rà soát.",
+  "grain": "kỳ nguồn × biểu (một dòng mỗi biểu của mỗi kỳ có khóa kỳ đã lưu; kỳ thu hồi/hủy không có dòng)",
+  "key": [
+    "calendar_id",
+    "calendar_version",
+    "period_type",
+    "period_key",
+    "province_code",
+    "form_code",
+    "source_period_id"
+  ],
+  "closed_rule": "Ảnh chụp đã chốt (QĐ-6 mặc định): số của lần chốt gần nhất chạm biểu (closed, auto_closed, reclosed / closed native); mở lại → cờ false, số cũ vẫn trả; chốt lại → số mới. key_closed = mọi biểu của mọi kỳ cùng khóa đã chốt (Q-048 đề xuất của dev).",
+  "personal_data": false,
+  "family": "closed_figures/v1",
+  "columns": [
+    {
+      "name": "tenant_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "Tenant (RLS p_tenant áp qua view)"
+    },
+    {
+      "name": "department_code",
+      "type": "text",
+      "nullable": false,
+      "description": "Mã phòng ban nguồn (trong_trot, chan_nuoi_thuy_san…) — partyport.Dept*"
+    },
+    {
+      "name": "province_code",
+      "type": "text",
+      "nullable": false,
+      "description": "Mã tỉnh của kỳ nguồn (đợt phát hành / Nút phát hành kỳ native)"
+    },
+    {
+      "name": "calendar_id",
+      "type": "text",
+      "nullable": false,
+      "description": "Lịch của nguồn (D8 — mỗi phòng một lịch tuần): mã phòng nguồn. Danh tính kỳ nguồn = (calendar_id, calendar_version, period_key)"
+    },
+    {
+      "name": "calendar_version",
+      "type": "text",
+      "nullable": false,
+      "description": "Phiên bản quy tắc chia kỳ của nguồn (v2, v1-tam… — đoạn đầu period_rule); 'unknown' nếu kỳ không ghi quy tắc"
+    },
+    {
+      "name": "period_type",
+      "type": "text",
+      "nullable": false,
+      "description": "day | week | ksgm_week | month | quarter | season | year | adhoc (loại kỳ của lịch kỳ hệ thống W11.03)"
+    },
+    {
+      "name": "period_key",
+      "type": "text",
+      "nullable": false,
+      "description": "Khóa GỐC của kỳ theo lịch nguồn, ĐÃ LƯU lúc phát hành (2026-W45, 2026-11-K2, 2026-11-05, 2026-11, 2026-Q4, 2026) — chưa quy đổi sang tuần KHTC (crosswalk ở port đọc, ADR-0052 §6)"
+    },
+    {
+      "name": "week_year",
+      "type": "integer",
+      "nullable": true,
+      "description": "Năm của số tuần — chỉ kỳ tuần"
+    },
+    {
+      "name": "period_rule",
+      "type": "text",
+      "nullable": true,
+      "description": "Thẻ quy tắc đầy đủ của nguồn (vd kn.period_rule/v2;week_start=tue;week=year;month=week_end) — đầu vào của crosswalk"
+    },
+    {
+      "name": "period_from",
+      "type": "date",
+      "nullable": true,
+      "description": "Ngày đầu kỳ (giờ VN)"
+    },
+    {
+      "name": "period_to",
+      "type": "date",
+      "nullable": true,
+      "description": "Ngày cuối kỳ (giờ VN)"
+    },
+    {
+      "name": "period_label",
+      "type": "text",
+      "nullable": false,
+      "description": "Nhãn kỳ hiển thị"
+    },
+    {
+      "name": "source",
+      "type": "text",
+      "nullable": false,
+      "description": "Nguồn: reportcycle (vòng đời báo cáo extension/reportcycle — Trồng trọt, nguồn lâu dài) | forms (kỳ native cap/forms — CNTS). Bên đọc KHÔNG rẽ nhánh theo cột này"
+    },
+    {
+      "name": "source_module",
+      "type": "text",
+      "nullable": false,
+      "description": "Module nguồn (nguồn gốc cho ảnh chụp KHTC): pf/extension | pf/forms"
+    },
+    {
+      "name": "source_period_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "Mã kỳ ở nguồn (report_period.id | pf_forms.period.id)"
+    },
+    {
+      "name": "form_code",
+      "type": "text",
+      "nullable": false,
+      "description": "Mã biểu (PL01, BM-04…)"
+    },
+    {
+      "name": "form_version_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "Phiên bản mẫu biểu ghim lúc phát hành"
+    },
+    {
+      "name": "form_closed",
+      "type": "boolean",
+      "nullable": false,
+      "description": "Biểu của kỳ đã chốt và không đơn vị nào của biểu đang mở lại"
+    },
+    {
+      "name": "period_closed",
+      "type": "boolean",
+      "nullable": false,
+      "description": "Kỳ đã chốt và không đơn vị × biểu nào đang mở lại"
+    },
+    {
+      "name": "key_closed",
+      "type": "boolean",
+      "nullable": false,
+      "description": "Mọi biểu của mọi kỳ cùng (phòng, tỉnh, loại kỳ, khóa kỳ) TRONG VIEW NÀY đã chốt — cờ 'nguồn đã chốt cho tuần X' (Q-048); bộ đọc KHTC tính lại trên cả họ"
+    },
+    {
+      "name": "closed_at",
+      "type": "timestamp with time zone",
+      "nullable": true,
+      "description": "Lần chốt gần nhất chạm biểu (NULL = chưa chốt lần nào)"
+    },
+    {
+      "name": "snapshot_id",
+      "type": "uuid",
+      "nullable": true,
+      "description": "Ảnh chụp đã chốt (lần tổng hợp | close_snapshot) — NULL = chưa có số đã chốt"
+    },
+    {
+      "name": "snapshot_no",
+      "type": "bigint",
+      "nullable": true,
+      "description": "Số thứ tự ảnh chụp của kỳ × biểu (tăng khi chốt lại có số mới)"
+    },
+    {
+      "name": "data_at",
+      "type": "timestamp with time zone",
+      "nullable": true,
+      "description": "Mốc dữ liệu: lúc ghi ảnh chụp"
+    },
+    {
+      "name": "provisional",
+      "type": "boolean",
+      "nullable": true,
+      "description": "Ảnh chụp còn đơn vị chưa nộp ('Tạm tính')"
+    },
+    {
+      "name": "units_total",
+      "type": "integer",
+      "nullable": true,
+      "description": "Số đơn vị nhận của biểu"
+    },
+    {
+      "name": "units_with_data",
+      "type": "integer",
+      "nullable": true,
+      "description": "Số đơn vị có bài trong ảnh chụp"
+    },
+    {
+      "name": "missing_units",
+      "type": "text[]",
+      "nullable": true,
+      "description": "Mã đơn vị chưa nộp lúc chụp"
+    },
+    {
+      "name": "rows",
+      "type": "jsonb",
+      "nullable": true,
+      "description": "Dòng đơn vị: [{key, unit, unit_kind, parent, region, indicator, nil_report, cells{trường|cột: chuỗi thập phân}, confirmation (confirmed | unconfirmed — D2)}] — chỉ ô số, gồm cột/trường lũy kế của nguồn (Q-047, D18)"
+    },
+    {
+      "name": "totals",
+      "type": "jsonb",
+      "nullable": true,
+      "description": "Dòng tổng do nguồn tính: [{key, kind (region|province), region, indicator, members, cells}]; '[]' khi nguồn không tổng hợp (kỳ native) — bên đọc cộng rows theo decimal"
+    },
+    {
+      "name": "confirmation_status",
+      "type": "text",
+      "nullable": false,
+      "description": "confirmed | unconfirmed — 'unconfirmed' khi có đơn vị trong rows chưa xác nhận (D2: HTX do TTKN tạo, báo cáo ghi 'Chưa xác nhận'); hiện mọi nguồn 'confirmed'"
+    },
+    {
+      "name": "figures_hash",
+      "type": "text",
+      "nullable": true,
+      "description": "sha256 (hex) của số đã chốt (dòng lõi KHÔNG gồm confirmation + totals) — đổi khi và chỉ khi số đã chốt đổi; W11.64 so với ảnh chụp 'Cập nhật số liệu' để báo 'Nguồn đã thay đổi'. NULL = chưa có số"
+    },
+    {
+      "name": "status_hash",
+      "type": "text",
+      "nullable": true,
+      "description": "sha256 (hex) riêng của trạng thái xác nhận từng đơn vị — nhận HTX (unconfirmed → confirmed) chỉ đổi băm này, không đổi figures_hash"
+    }
+  ]
+}

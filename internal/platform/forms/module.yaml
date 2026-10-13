@@ -13,11 +13,11 @@ provides:
   ports: [FacilityDirectory, Freezer, PeriodControl, Publisher, Validator]
   events: [pf.forms.period.closed/v1]
   internal_events: []
-  publications: []
+  publications: [pf_forms_pub.closed_figures/v1]
   data_products: []
 consumes:
   events: []
 permissions: []
 shares: []
-owns_schema: [pf_forms]
+owns_schema: [pf_forms, pf_forms_pub]
 enable: per_tenant
