@@ -40,6 +40,7 @@
 | 0036 | [Engine ba chế độ ở vùng nội bộ MKG, `lib/optcore` dùng chung](0036-engine-ba-che-do-vung-noi-bo-optcore.md) | Đề xuất — chờ MKG ký (A7); bổ sung ADR-0016; W8.1 ngay, W8.3 chờ MKG v1.3 |
 | 0037 | [Tách xác thực và phân quyền, không mạo danh](0037-tach-xac-thuc-va-phan-quyen-khong-mao-danh.md) | Đề xuất — chờ MKG ký (A7); ghi lại KN P1 (đã hiện thực, pf 000060–000061) làm `ResolveContext` ĐTK 1; phần còn lại W7.2 |
 | 0038 | [Bộ chạy migration theo module — sổ theo module, thứ tự topo, vai `own_<module>`](0038-bo-chay-migration-theo-module.md) | Đề xuất — hiện thực bước 1 ở W7.1 (sau cờ `AG_MIGRATE_RUNNER=v2`, mặc định v1 một bản phát hành) |
+| 0041 | [MFA theo nhóm cho cán bộ KN, phiên giữ theo D9, realm quản trị riêng, vô hiệu tài khoản 45 ngày](0041-mfa-theo-nhom-d24.md) | Chấp nhận — quyết định CEO D24, D25 (13/10/2026), ứng với v4.3 ADR-23/P-1…P-5; hiện thực gói MFA (pf 20261013134254, 20261013142347); sửa ADR-0010 |
 | 0049 | [`cap/price` = module năng lực `pf/price`](0049-cap-price-pf-price.md) | Đề xuất — khung hiện thực ở W11.71 (pf 000138); số 0039–0048 dành cho ADR khác của đợt |
 | 0050 | [`dom/hrm` = module nghiệp vụ `pf/hrm`; danh mục nhân sự ở module của chủ](0050-dom-hrm-pf-hrm.md) | Đề xuất — khung + danh mục nhân sự ở W11.21 (pf 000147); dữ liệu thật chờ Q-070 |
 | 0052 | [Đồng sở hữu dữ liệu MKG + HTX, neo HTX theo mã số thuế, HTX tạm "Chưa xác nhận" và nhận quyền](0052-dong-so-huu-mkg-htx-neo-mst.md) | Chấp nhận — quyết định CEO D2 (13/10/2026), trả lời H-1/QĐ-2; hiện thực gói D2 (pf 20261013091454) |
@@ -56,7 +57,6 @@ Số của ADR **chưa viết** mà tài liệu khác đã nhắc tới. Viết 
 |---|---|---|
 | 0039 | v4.3 ADR-21 — stack Go cho hệ nội bộ | [đối chiếu BRD KN §3.1](../kn/doi-chieu-brd-kn-2026-10.md#31-quy-ước), W10.00 |
 | 0040 | v4.3 ADR-22 — hai hệ thống thông tin | như trên |
-| 0041 | v4.3 ADR-23 — MFA theo nhóm, P-1…P-5 | như trên |
 | 0042 | v4.3 ADR-24 — chữ ký số trên lô | như trên, W10.07 |
 | 0043 | Vai trò kiểm soát/xử lý dữ liệu | như trên |
 | 0044 | Căn cứ an ninh mạng, cấp độ | như trên |

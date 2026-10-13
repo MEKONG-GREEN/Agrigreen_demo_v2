@@ -24,7 +24,7 @@
 | `migrate-bootstrap`, `migrate-up` | chạy một lần: tạo vai/database, áp migration | — |
 | `rabbitmq` | outbox → consumer | 5672, console 15672 |
 | `valkey` | cache (không phải nguồn sự thật) | 6379 |
-| `keycloak` | realm `agrigreen` (nhập từ `deploy/compose/keycloak/agrigreen-realm.json`) | 8180 |
+| `keycloak` | realm `agrigreen` (nhập từ `deploy/compose/keycloak/agrigreen-realm.json`) và realm quản trị riêng `agrigreen-kn-admin` (D25, `agrigreen-kn-admin-realm.json`) | 8180 |
 | `seaweedfs`, `s3-init` | kho S3 (SeaweedFS — MinIO đã ngừng phát hành image công khai); `s3-init` tạo bucket, thử bật versioning; tài khoản ứng dụng `agrigreen-app` chỉ Read/Write/List trên bucket | 9000 |
 | `otel-collector` | nhận OTLP, in ra log (exporter `debug`) | 4317, 4318 |
 | `identity-vault` | kho định danh (bề mặt Internal) | 8090 |
@@ -41,7 +41,7 @@ Ghi chú:
 - **Container ứng dụng** chạy `read_only`, `cap_drop: [ALL]`, `no-new-privileges`.
 - **Issuer OIDC** là `http://localhost:8180/realms/agrigreen`, tức địa chỉ trình duyệt thấy. Container không gọi được `localhost:8180`, nên `api-platform` và `identity-vault` lấy khóa ký qua `AG_OIDC_JWKS_URL=http://keycloak:8080/...`, vẫn so issuer và audience (R-54).
 - **Người dùng demo:** `.\scripts\dev-users.ps1 [-TenantId <uuid>] [-OrgRef <uuid>]` (hoặc `sh scripts/dev-users.sh`) tạo `dev-admin`, `dev-accounts`, `dev-viewer` với mật khẩu ngẫu nhiên in ra MỘT LẦN; vai [MFA] phải cấu hình TOTP ở lần đăng nhập đầu. `cmd/seed-synthetic` lấy token bằng `-kc-token-url … -kc-user dev-admin -kc-otp <6 số>` + `AG_SEED_KC_PASSWORD` qua client **chỉ-dev** `agrigreen-seed` (direct access grants — không bao giờ tạo ở staging/production). Dữ liệu MKG (lệnh gom, cuộn, phiếu cân, số cân khách): `go run ./cmd/seed-synthetic -plan mkg -mkg-token … -mkg-approver-token … -mkg-client-cert … -mkg-client-key … -mkg-ingest-ca …` (cần `cmd/api-internal` và `cmd/ingest` đang chạy; cờ ở chú thích package). Tài khoản cán bộ thật tạo qua Admin API `/v1/accounts/users` (pf/accounts, tài khoản dịch vụ `agrigreen-accounts`, `AG_KC_*`).
-- **Realm chưa có người dùng.** Tạo trong console Keycloak (http://localhost:8180, tài khoản `admin`, mật khẩu `KEYCLOAK_ADMIN_PASSWORD` trong `.env`). Đặt thuộc tính `tenant_id` (UUID), `org_ref` (UUID tổ chức trong pf/party) và gán vai. Vai ghi `[MFA]` trong mô tả chỉ dùng được trên Admin API sau khi cấu hình TOTP.
+- **Realm chưa có người dùng.** Tạo trong console Keycloak (http://localhost:8180, tài khoản `admin`, mật khẩu `KEYCLOAK_ADMIN_PASSWORD` trong `.env`). Đặt thuộc tính `tenant_id` (UUID), `org_ref` (UUID tổ chức trong pf/party) và gán vai. Vai ghi `[MFA]` trong mô tả chỉ dùng được trên Admin API sau khi cấu hình TOTP. Từ D24 (13/10/2026) cán bộ KN (`kn_user`, `kn_officer`, `kn_province_admin`, `kn_national_admin`) và mọi vai `[MFA]` bị hỏi TOTP khi đăng nhập (luồng `agrigreen browser`) — lần đầu phải quét mã QR bằng ứng dụng xác thực. Realm dev đã nhập trước gói MFA không tự cập nhật: xóa volume Keycloak để nhập lại, hoặc làm theo [runbook keycloak-mfa-d24](runbooks/keycloak-mfa-d24.md).
 - **CORS:** `AG_CORS_ORIGINS` mặc định `http://localhost:3000,http://127.0.0.1:3000`. So khớp chính xác; không chấp nhận `*`.
 - Xem trace và metric: `docker compose -f deploy/compose/docker-compose.yml logs -f otel-collector`.
 - Dọn toàn bộ, kể cả dữ liệu: `docker compose -f deploy/compose/docker-compose.yml down -v`.

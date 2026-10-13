@@ -670,7 +670,9 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			closeFn()
 			return nil, func() {}, err
 		}
-		acc := accounts.New(pfPool, clk, accounts.Deps{Directory: dir, Params: masterdata.New(pfPool, clk).Params()})
+		// AG_ACCOUNTS_DORMANT_DRY_RUN=true: chỉ đếm và ghi log (lần chạy đầu ở môi trường thật — runbook keycloak-mfa-d24).
+		dry := os.Getenv("AG_ACCOUNTS_DORMANT_DRY_RUN") == "true"
+		acc := accounts.New(pfPool, clk, accounts.Deps{Directory: dir, Params: masterdata.New(pfPool, clk).Params(), DormantDryRun: dry})
 		js = append(js, acc.Jobs(accounts.DormantTenants(out.pools[migrations.PF]), log)...)
 	}
 	if len(js) == 0 {

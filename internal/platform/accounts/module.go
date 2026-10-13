@@ -54,6 +54,8 @@ type Deps struct {
 	Names       partyport.ActorNames
 	// W1.4 (R-MOD-08): trạng thái bật module theo đơn vị — vai của module đã tắt không cấp được.
 	Modules partyport.ModuleEnablement
+	// DormantDryRun (D24): job accounts_dormant chỉ đếm, không báo trước/khóa (AG_ACCOUNTS_DORMANT_DRY_RUN).
+	DormantDryRun bool
 }
 
 // Module là pf/accounts đã nối.
@@ -64,7 +66,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs,
 		Households: d.Households, Vault: d.Vault, Params: d.Params, Departments: d.Departments, Units: d.Units, Names: d.Names,
-		Modules: d.Modules}}
+		Modules: d.Modules, DormantDryRun: d.DormantDryRun}}
 }
 
 // RegisterApp gắn route Application API của App HTX: tài khoản nông dân (quản lý
@@ -191,7 +193,7 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 					outcome = "error"
 				}
 				log.Info("vô hiệu tài khoản không hoạt động", "event", "job."+port.JobDormant, "checked", r.Checked,
-					"warned", r.Warned, "disabled", r.Disabled, "outcome", outcome)
+					"warned", r.Warned, "disabled", r.Disabled, "dry_run", r.DryRun, "outcome", outcome)
 			}
 			return err
 		},

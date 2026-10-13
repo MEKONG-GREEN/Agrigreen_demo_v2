@@ -10,8 +10,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
@@ -138,6 +140,12 @@ func TestDormantJobWarnsAt38AndDisablesAt45_D24(t *testing.T) {
 	}
 
 	clk.Advance(4 * 24 * time.Hour) // a, c: 45 ngày; b: 25 ngày
+	// Chạy thử (AG_ACCOUNTS_DORMANT_DRY_RUN): đếm đúng, không đổi gì.
+	dry := accounts.New(f.env.Pool(t, migrations.PF, dbadmin.AppPlatform), clk, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, DormantDryRun: true})
+	if r, err := dry.RunDormant(ctx, func(context.Context) ([]uuid.UUID, error) { return []uuid.UUID{f.tenant}, nil }); err != nil ||
+		!r.DryRun || r.Disabled != 2 || r.Warned != 0 || !enabled(a) || len(f.events(f.tenant, a)) != 3 {
+		t.Fatalf("chạy thử: %+v %v enabled(a)=%v", r, err, enabled(a))
+	}
 	if got := dormantRun(t, f); got != (accountsDormant{disabled: 2}) {
 		t.Fatalf("ngày 45: %+v", got)
 	}

@@ -20,6 +20,7 @@ provides:
   data_products: []
 consumes:
   events:
+    - pf.accounts.user.dormant_warning/v1
     - pf.content.alert.published/v1
     - pf.content.document.published/v1
     - pf.cropcycle.collection_schedule.received/v1

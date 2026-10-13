@@ -66,6 +66,9 @@ const (
 	// KindEgressAnomaly: khối lượng xuất dữ liệu bất thường lần đầu trong ngày (pf/metering, DLP — ADR-0024,
 	// G5) → người nhận DLP của tenant CHỦ DỮ LIỆU (EgressAnomalyRoles; migration pf 000083).
 	KindEgressAnomaly = "egress_anomaly"
+	// KindAccountDormant: tài khoản sắp bị khóa vì không hoạt động (pf.accounts.user.dormant_warning, D24) → chính
+	// tài khoản đó, trong ứng dụng + email (migration pf 20261013142347 mở rộng CHECK kind).
+	KindAccountDormant = "account_dormant"
 	// KindSyncNow là thông điệp dữ liệu "đồng bộ ngay" (US-SYNC-02) — không tạo thông báo.
 	KindSyncNow = "sync_now"
 )
@@ -113,6 +116,8 @@ const (
 	ConsumerEgressAnomaly = "pf.notify.egress_anomaly"
 	// ConsumerPrice: nhắc nhập giá Báo giá nông sản (pf.price.reminder.issued, W11.74).
 	ConsumerPrice = "pf.notify.price"
+	// ConsumerAccounts: báo trước khóa tài khoản không hoạt động (pf.accounts.user.dormant_warning, D24).
+	ConsumerAccounts = "pf.notify.accounts"
 )
 
 // EgressAnomalyRoles là người nhận cảnh báo xuất dữ liệu bất thường trong tenant chủ dữ liệu: người

@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
@@ -166,6 +167,8 @@ func (m *Module) Consumers() []Consumer {
 		{Name: port.ConsumerEgressAnomaly, Events: []string{meteringport.EventEgressAnomaly}, Handler: ev},
 		// W11.74 nhắc nhập giá; gói NOTIF: cảnh báo, xác minh, tổng hợp giờ khóa, duyệt / mở duyệt bảng giá.
 		{Name: port.ConsumerPrice, Events: domain.PriceEvents, Handler: ev},
+		// D24: báo trước khóa tài khoản không hoạt động (pf/accounts job accounts_dormant).
+		{Name: port.ConsumerAccounts, Events: []string{accport.EventUserDormantWarning}, Handler: ev},
 		{Name: port.ConsumerPush, Events: []string{port.EventPushRequested}, Handler: m.svc.HandlePush},
 		{Name: port.ConsumerEmail, Events: []string{port.EventEmailRequested}, Handler: m.svc.HandleEmail},
 	}

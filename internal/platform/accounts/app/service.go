@@ -83,6 +83,9 @@ type Service struct {
 	// Facilities (tùy chọn, W11.41): danh mục cơ sở giết mổ CNTS (pf/masterdata CNTSCatalogs) — kiểm phạm vi Cấp
 	// Xã theo cơ sở (facility_refs). Nil → chỉ kiểm dạng UUID như W11.07.
 	Facilities FacilityCatalog
+	// DormantDryRun (D24): job accounts_dormant chỉ đếm tài khoản sẽ báo trước / khóa, không ghi gì (chạy thử lần đầu
+	// ở môi trường thật — docs/runbooks/keycloak-mfa-d24.md).
+	DormantDryRun bool
 }
 
 // FacilityCatalog là phần cổng danh mục CNTS pf/accounts cần (masterdata/port.CNTSCatalogs thỏa mãn): ref không

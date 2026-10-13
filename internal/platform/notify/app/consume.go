@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
@@ -56,6 +57,13 @@ var HandledEvents = []string{
 // kể cả gọi thẳng hai lần, chỉ mục duy nhất (sự kiện, người nhận) chặn trùng.
 func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 	switch env.EventType {
+	case accport.EventUserDormantWarning:
+		// D24: báo trước khóa tài khoản không hoạt động → chính tài khoản (chuông + email).
+		n, err := domain.DormantWarningNotification(env.Payload, env.OccurredAt)
+		if err != nil {
+			return err
+		}
+		return s.deliver(ctx, tx, env, []domain.Notification{n})
 	case priceport.EventReminderIssued, priceport.EventAlertRaised, priceport.EventVerificationRequested,
 		priceport.EventVerificationResponded, priceport.EventVerificationDecided, priceport.EventLockSummarized,
 		priceport.EventBoardPublished, priceport.EventBoardReopened:

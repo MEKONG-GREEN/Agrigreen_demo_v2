@@ -44,8 +44,9 @@ const loginEventsScan = 50
 // TenantLister trả danh sách tenant cần chạy job.
 type TenantLister func(ctx context.Context) ([]uuid.UUID, error)
 
-// DormantResult đếm kết quả một lượt job.
+// DormantResult đếm kết quả một lượt job (chạy thử: số SẼ báo trước / khóa).
 type DormantResult struct {
+	DryRun   bool
 	Checked  int
 	Warned   int
 	Disabled int
@@ -90,7 +91,7 @@ func (s *Service) dormantPolicy(ctx context.Context, tid uuid.UUID, at time.Time
 
 // RunDormant là thân job port.JobDormant. Lỗi ở một tenant không chặn tenant khác (trả lỗi gộp).
 func (s *Service) RunDormant(ctx context.Context, tenants TenantLister) (DormantResult, error) {
-	var res DormantResult
+	res := DormantResult{DryRun: s.DormantDryRun}
 	if s.Dir == nil {
 		return res, errNoDirectoryYet
 	}
@@ -194,6 +195,15 @@ func (s *Service) dormantOne(ctx context.Context, sr port.SessionReader, tid uui
 	}
 	idle := IdleDays(last, now)
 	mark := strconv.FormatInt(last.Unix(), 10)
+	if s.DormantDryRun {
+		switch {
+		case idle >= pol.DisableDays:
+			res.Disabled++
+		case idle >= pol.WarnDays:
+			res.Warned++
+		}
+		return nil
+	}
 	switch {
 	case idle >= pol.DisableDays:
 		if err := s.Dir.SetEnabled(ctx, u.ID, false); err != nil {
