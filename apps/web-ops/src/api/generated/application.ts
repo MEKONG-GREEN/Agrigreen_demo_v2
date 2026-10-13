@@ -7875,9 +7875,17 @@ export interface components {
             lat: components["schemas"]["Decimal"];
             lon: components["schemas"]["Decimal"];
         };
+        /**
+         * @description D2 (ADR-0052): unconfirmed = HTX tạm do Khuyến nông/MKG lập, nhãn Chưa xác nhận — dữ liệu vẫn vào mọi danh sách, báo cáo và tổng; confirmed sau khi HTX thật nhận quyền theo mã số thuế
+         * @enum {string}
+         */
+        HTXConfirmationStatus: "confirmed" | "unconfirmed";
         Cooperative: components["schemas"]["Org"] & {
             /** @description Lý do vô hiệu hóa hiện tại */
             status_reason: string | null;
+            confirmation_status: components["schemas"]["HTXConfirmationStatus"];
+            /** @enum {string} */
+            confirmation_label: "Đã xác nhận" | "Chưa xác nhận";
             tax_code: string | null;
             /** @description Diện tích đăng ký hành chính (ha) */
             area_ha: components["schemas"]["Decimal"] | null;
@@ -12163,6 +12171,9 @@ export interface components {
             masked_phone: string | null;
         };
         KNCooperative: {
+            confirmation_status: components["schemas"]["HTXConfirmationStatus"];
+            /** @enum {string} */
+            confirmation_label: "Đã xác nhận" | "Chưa xác nhận";
             /** Format: uuid */
             ref: string;
             code: string;
@@ -15234,6 +15245,8 @@ export interface operations {
                 /** @description G-03: mã tỉnh hoặc xã hiện hành — chỉ HTX thuộc đơn vị này (và con cháu) giao với phạm vi người gọi; mã không có hiệu lực → 422 validation_failed (trường admin_unit) */
                 admin_unit?: string;
                 include_inactive?: boolean;
+                /** @description D2: lọc theo trạng thái xác nhận; vắng = mọi HTX (gồm HTX tạm Chưa xác nhận) */
+                confirmation?: components["schemas"]["HTXConfirmationStatus"];
                 cursor?: string;
                 limit?: number;
             };
@@ -23879,6 +23892,8 @@ export interface operations {
                 area_min?: string;
                 /** @description Diện tích tối đa (ha, decimal) */
                 area_max?: string;
+                /** @description D2: lọc theo trạng thái xác nhận; vắng = mọi HTX (gồm HTX tạm Chưa xác nhận) */
+                confirmation?: components["schemas"]["HTXConfirmationStatus"];
                 cursor?: string;
                 limit?: number;
             };

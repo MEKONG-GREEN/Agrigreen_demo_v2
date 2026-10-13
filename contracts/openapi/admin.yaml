@@ -697,6 +697,150 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/htx-anchors:
+    get:
+      summary: "D2 (ADR-0052): danh sách neo HTX theo mã số thuế (HTX tạm / đã nhận quyền)"
+      operationId: coopListHTXAnchors
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [provisional, claimed]}}
+        - {name: q, in: query, description: "Tiền tố mã số thuế (chuẩn hóa: bỏ khoảng trắng, gạch) hoặc mã tạm TMP-", schema: {type: string}}
+        - {name: after, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HTXAnchor"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "D2: Khuyến nông hoặc MKG lập HTX TẠM — gắn neo cho Nút HTX (MST hoặc mã tạm). MST trùng → 409 cooperative.htx_anchor_mst_taken (kèm existing_anchor_id)"
+      operationId: coopCreateHTXAnchor
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [org_ref, created_by]
+              properties:
+                org_ref: {type: string, format: uuid, description: "Nút HTX (kind=cooperative, đã có hồ sơ)"}
+                created_by: {type: string, enum: [kn, mkg], description: "mkg cần platform_admin"}
+                mst: {type: string, description: "Mã số thuế (10 số hoặc 10 + 3 số chi nhánh; khoảng trắng/gạch được bỏ). Vắng = mã tạm"}
+                agreement_ref: {type: string, minLength: 3, maxLength: 200, description: "Thỏa thuận HTX — basis_ref của share_grant cho Khuyến nông"}
+      responses:
+        "200": {description: Gọi lặp cùng Idempotency-Key, content: {application/json: {schema: {$ref: "#/components/schemas/HTXAnchor"}}}}
+        "201": {description: Đã lập, content: {application/json: {schema: {$ref: "#/components/schemas/HTXAnchor"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/htx-anchors/backfill:
+    post:
+      summary: "D2: neo HTX có trước D2 (HTX tạm do KN lập; khóa = MST hồ sơ hoặc mã tạm), có chạy thử"
+      operationId: coopBackfillHTXAnchors
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: {type: boolean, default: false}
+                limit: {type: integer, minimum: 1, maximum: 1000, default: 500}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [dry_run, created, with_mst, temp_code, items, skipped]
+                properties:
+                  dry_run: {type: boolean}
+                  created: {type: integer}
+                  with_mst: {type: integer}
+                  temp_code: {type: integer}
+                  items: {type: array, items: {type: object, additionalProperties: true}}
+                  skipped: {type: array, items: {type: object, additionalProperties: true}}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/htx-anchors/{anchor_id}:
+    get:
+      summary: "D2: chi tiết neo kèm sổ (vết kiểm toán: lập, gắn MST, nhận quyền)"
+      operationId: coopGetHTXAnchor
+      parameters:
+        - {name: anchor_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Neo
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/HTXAnchor"
+                  - type: object
+                    required: [events]
+                    properties:
+                      events: {type: array, items: {$ref: "#/components/schemas/HTXAnchorEvent"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/htx-anchors/{anchor_id}/mst:
+    post:
+      summary: "D2: gắn mã số thuế cho neo mã tạm (sự kiện mst_attached)"
+      operationId: coopAttachHTXAnchorMST
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: anchor_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mst]
+              properties:
+                mst: {type: string}
+      responses:
+        "200": {description: Neo sau khi gắn, content: {application/json: {schema: {$ref: "#/components/schemas/HTXAnchor"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/htx-anchors/{anchor_id}/claim:
+    post:
+      summary: "D2: HTX thật nhận quyền (MST đã xác minh, tài khoản HTX đã kích hoạt) — một lần mỗi neo, lũy đẳng, nguyên tử; dry_run trả báo cáo không ghi; Nút đích có dữ liệu → 409 cooperative.htx_anchor_claim_conflict kèm conflict_report"
+      operationId: coopClaimHTXAnchor
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: anchor_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account_ref, verified_mst, verification_ref]
+              properties:
+                account_ref: {type: string, format: uuid, description: "Tài khoản HTX đã kích hoạt"}
+                verified_mst: {type: string}
+                verification_ref: {type: string, minLength: 3, maxLength: 200, description: "Chứng cứ xác minh MST"}
+                target_org_ref: {type: string, format: uuid, description: "Nút HTX thật; vắng = Nút tạm của neo"}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {description: Báo cáo nhận quyền (cũng là details của dòng sổ claimed), content: {application/json: {schema: {$ref: "#/components/schemas/HTXClaimReport"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/cooperatives/{ref}/deactivate:
     post:
       summary: Vô hiệu hóa HTX (soft-delete) — lý do ≥ 20 ký tự; phát pf.party.org.deactivated để khóa tài khoản
@@ -6419,6 +6563,97 @@ components:
               replayed: {type: boolean}
               warnings: {type: array, items: {$ref: "#/components/schemas/KNWarning"}}
   schemas:
+    HTXAnchor:
+      type: object
+      description: "D2 (ADR-0052): neo HTX — định danh ổn định khóa theo MST; đồng sở hữu MKG + HTX"
+      required: [anchor_id, anchor_key, mst, temporary, status, created_by, provisional_org_ref, org_ref, aliases, htx_account_ref, agreement_ref,
+        co_owners, confirmation_status, confirmation_label, claimed_at, created_at]
+      properties:
+        anchor_id: {type: string, format: uuid}
+        anchor_key: {type: string, description: "MST chính tắc (NNNNNNNNNN hoặc NNNNNNNNNN-NNN) hoặc mã tạm TMP-XXXXXXXXXXXX"}
+        mst: {type: [string, "null"]}
+        temporary: {type: boolean, description: "true = chưa có MST (mã tạm)"}
+        status: {type: string, enum: [provisional, claimed]}
+        created_by: {type: string, enum: [kn, mkg]}
+        provisional_org_ref: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid, description: "Nút hiện hành"}
+        aliases: {type: array, items: {type: string, format: uuid}, description: "Mọi Nút của neo (Nút tạm, Nút nhận quyền)"}
+        htx_account_ref: {type: [string, "null"], format: uuid}
+        agreement_ref: {type: [string, "null"]}
+        co_owners: {type: array, items: {type: string, enum: [mkg, htx]}}
+        confirmation_status: {type: string, enum: [confirmed, unconfirmed]}
+        confirmation_label: {type: string, enum: ["Đã xác nhận", "Chưa xác nhận"]}
+        claimed_at: {type: [string, "null"], format: date-time}
+        created_at: {type: string, format: date-time}
+    HTXAnchorEvent:
+      type: object
+      required: [id, seq, action, anchor_key, mst, org_ref, verification_ref, details, actor_ref, event_time, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        action: {type: string, enum: [provisional_created, legacy_backfilled, mst_attached, claimed]}
+        anchor_key: {type: string}
+        mst: {type: [string, "null"]}
+        org_ref: {type: string, format: uuid}
+        verification_ref: {type: [string, "null"]}
+        details: {type: [object, "null"], additionalProperties: true}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+    HTXDataCounts:
+      type: object
+      required: [plots, memberships, seasons, farm_logs, season_areas]
+      properties:
+        plots: {type: integer}
+        memberships: {type: integer}
+        seasons: {type: integer}
+        farm_logs: {type: integer}
+        season_areas: {type: integer}
+    HTXClaimReport:
+      type: object
+      required: [anchor_id, dry_run, would_succeed, replayed, from, to, moved, conflicts, confirmation, data_copied]
+      properties:
+        anchor_id: {type: string, format: uuid}
+        dry_run: {type: boolean}
+        would_succeed: {type: boolean}
+        replayed: {type: boolean}
+        from: {$ref: "#/components/schemas/HTXClaimParty"}
+        to: {$ref: "#/components/schemas/HTXClaimParty"}
+        moved:
+          type: array
+          description: "Số dòng chuyển chủ (không sao chép) theo Nút"
+          items:
+            type: object
+            required: [org_ref, counts]
+            properties:
+              org_ref: {type: string, format: uuid}
+              counts: {$ref: "#/components/schemas/HTXDataCounts"}
+        alias_added: {type: string, format: uuid}
+        conflicts:
+          type: array
+          items:
+            type: object
+            required: [org_ref, reason, counts]
+            properties:
+              org_ref: {type: string, format: uuid}
+              reason: {type: string, enum: [target_has_data, target_has_other_anchor, tax_code_differs]}
+              counts: {$ref: "#/components/schemas/HTXDataCounts"}
+        confirmation:
+          type: object
+          required: [before, after]
+          properties:
+            before: {type: string}
+            after: {type: string}
+        data_copied: {type: boolean}
+        event_id: {type: string, format: uuid}
+    HTXClaimParty:
+      type: object
+      required: [party, org_ref]
+      properties:
+        party: {type: string, enum: [provisional, htx]}
+        created_by: {type: string, enum: [kn, mkg]}
+        account_ref: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid}
     # --- pf/reports ---
     ReportDefinition:
       type: object

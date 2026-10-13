@@ -486,6 +486,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/htx-anchors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** D2 (ADR-0052): danh sách neo HTX theo mã số thuế (HTX tạm / đã nhận quyền) */
+        get: operations["coopListHTXAnchors"];
+        put?: never;
+        /** D2: Khuyến nông hoặc MKG lập HTX TẠM — gắn neo cho Nút HTX (MST hoặc mã tạm). MST trùng → 409 cooperative.htx_anchor_mst_taken (kèm existing_anchor_id) */
+        post: operations["coopCreateHTXAnchor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/htx-anchors/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** D2: neo HTX có trước D2 (HTX tạm do KN lập; khóa = MST hồ sơ hoặc mã tạm), có chạy thử */
+        post: operations["coopBackfillHTXAnchors"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/htx-anchors/{anchor_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** D2: chi tiết neo kèm sổ (vết kiểm toán: lập, gắn MST, nhận quyền) */
+        get: operations["coopGetHTXAnchor"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/htx-anchors/{anchor_id}/mst": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** D2: gắn mã số thuế cho neo mã tạm (sự kiện mst_attached) */
+        post: operations["coopAttachHTXAnchorMST"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/htx-anchors/{anchor_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** D2: HTX thật nhận quyền (MST đã xác minh, tài khoản HTX đã kích hoạt) — một lần mỗi neo, lũy đẳng, nguyên tử; dry_run trả báo cáo không ghi; Nút đích có dữ liệu → 409 cooperative.htx_anchor_claim_conflict kèm conflict_report */
+        post: operations["coopClaimHTXAnchor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cooperatives/{ref}/deactivate": {
         parameters: {
             query?: never;
@@ -4261,6 +4347,110 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description D2 (ADR-0052): neo HTX — định danh ổn định khóa theo MST; đồng sở hữu MKG + HTX */
+        HTXAnchor: {
+            /** Format: uuid */
+            anchor_id: string;
+            /** @description MST chính tắc (NNNNNNNNNN hoặc NNNNNNNNNN-NNN) hoặc mã tạm TMP-XXXXXXXXXXXX */
+            anchor_key: string;
+            mst: string | null;
+            /** @description true = chưa có MST (mã tạm) */
+            temporary: boolean;
+            /** @enum {string} */
+            status: "provisional" | "claimed";
+            /** @enum {string} */
+            created_by: "kn" | "mkg";
+            /** Format: uuid */
+            provisional_org_ref: string;
+            /**
+             * Format: uuid
+             * @description Nút hiện hành
+             */
+            org_ref: string;
+            /** @description Mọi Nút của neo (Nút tạm, Nút nhận quyền) */
+            aliases: string[];
+            /** Format: uuid */
+            htx_account_ref: string | null;
+            agreement_ref: string | null;
+            co_owners: ("mkg" | "htx")[];
+            /** @enum {string} */
+            confirmation_status: "confirmed" | "unconfirmed";
+            /** @enum {string} */
+            confirmation_label: "Đã xác nhận" | "Chưa xác nhận";
+            /** Format: date-time */
+            claimed_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        HTXAnchorEvent: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            /** @enum {string} */
+            action: "provisional_created" | "legacy_backfilled" | "mst_attached" | "claimed";
+            anchor_key: string;
+            mst: string | null;
+            /** Format: uuid */
+            org_ref: string;
+            verification_ref: string | null;
+            details: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HTXDataCounts: {
+            plots: number;
+            memberships: number;
+            seasons: number;
+            farm_logs: number;
+            season_areas: number;
+        };
+        HTXClaimReport: {
+            /** Format: uuid */
+            anchor_id: string;
+            dry_run: boolean;
+            would_succeed: boolean;
+            replayed: boolean;
+            from: components["schemas"]["HTXClaimParty"];
+            to: components["schemas"]["HTXClaimParty"];
+            /** @description Số dòng chuyển chủ (không sao chép) theo Nút */
+            moved: {
+                /** Format: uuid */
+                org_ref: string;
+                counts: components["schemas"]["HTXDataCounts"];
+            }[];
+            /** Format: uuid */
+            alias_added?: string;
+            conflicts: {
+                /** Format: uuid */
+                org_ref: string;
+                /** @enum {string} */
+                reason: "target_has_data" | "target_has_other_anchor" | "tax_code_differs";
+                counts: components["schemas"]["HTXDataCounts"];
+            }[];
+            confirmation: {
+                before: string;
+                after: string;
+            };
+            data_copied: boolean;
+            /** Format: uuid */
+            event_id?: string;
+        };
+        HTXClaimParty: {
+            /** @enum {string} */
+            party: "provisional" | "htx";
+            /** @enum {string} */
+            created_by?: "kn" | "mkg";
+            /** Format: uuid */
+            account_ref?: string;
+            /** Format: uuid */
+            org_ref: string;
+        };
         ReportDefinition: {
             title: string;
             /** @enum {string} */
@@ -7803,6 +7993,241 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    coopListHTXAnchors: {
+        parameters: {
+            query?: {
+                status?: "provisional" | "claimed";
+                /** @description Tiền tố mã số thuế (chuẩn hóa: bỏ khoảng trắng, gạch) hoặc mã tạm TMP- */
+                q?: string;
+                after?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HTXAnchor"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    coopCreateHTXAnchor: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Nút HTX (kind=cooperative, đã có hồ sơ)
+                     */
+                    org_ref: string;
+                    /**
+                     * @description mkg cần platform_admin
+                     * @enum {string}
+                     */
+                    created_by: "kn" | "mkg";
+                    /** @description Mã số thuế (10 số hoặc 10 + 3 số chi nhánh; khoảng trắng/gạch được bỏ). Vắng = mã tạm */
+                    mst?: string;
+                    /** @description Thỏa thuận HTX — basis_ref của share_grant cho Khuyến nông */
+                    agreement_ref?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTXAnchor"];
+                };
+            };
+            /** @description Đã lập */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTXAnchor"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    coopBackfillHTXAnchors: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @default false */
+                    dry_run?: boolean;
+                    /** @default 500 */
+                    limit?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dry_run: boolean;
+                        created: number;
+                        with_mst: number;
+                        temp_code: number;
+                        items: {
+                            [key: string]: unknown;
+                        }[];
+                        skipped: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    coopGetHTXAnchor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                anchor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Neo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTXAnchor"] & {
+                        events: components["schemas"]["HTXAnchorEvent"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    coopAttachHTXAnchorMST: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                anchor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    mst: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Neo sau khi gắn */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTXAnchor"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    coopClaimHTXAnchor: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                anchor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Tài khoản HTX đã kích hoạt
+                     */
+                    account_ref: string;
+                    verified_mst: string;
+                    /** @description Chứng cứ xác minh MST */
+                    verification_ref: string;
+                    /**
+                     * Format: uuid
+                     * @description Nút HTX thật; vắng = Nút tạm của neo
+                     */
+                    target_org_ref?: string;
+                    /** @default false */
+                    dry_run?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Báo cáo nhận quyền (cũng là details của dòng sổ claimed) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTXClaimReport"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     partyDeactivateCooperative: {

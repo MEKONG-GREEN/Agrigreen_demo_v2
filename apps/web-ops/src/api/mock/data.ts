@@ -223,6 +223,9 @@ export const COOPERATIVES: MockCooperative[] = COMMUNES.flatMap((c, ci) => {
         representative_ref: null,
         active,
         status_reason: active ? null : "Tạm ngừng hoạt động theo đề nghị của HTX (giả lập)",
+        // D2: một phần HTX là HTX tạm do Khuyến nông lập — "Chưa xác nhận" tới khi HTX thật nhận quyền.
+        confirmation_status: n % 4 === 0 ? "unconfirmed" : "confirmed",
+        confirmation_label: n % 4 === 0 ? "Chưa xác nhận" : "Đã xác nhận",
         tax_code: `${1800000000 + n * 7919}`.slice(0, 10),
         area_ha: `${int(80, 950)}.${String(int(0, 9999)).padStart(4, "0")}`,
         established_on: `20${int(10, 23)}-0${int(1, 9)}-1${int(0, 9)}`,

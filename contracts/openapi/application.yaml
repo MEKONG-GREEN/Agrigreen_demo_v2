@@ -541,6 +541,7 @@ paths:
         - {name: q, in: query, schema: {type: string}}
         - {name: admin_unit, in: query, description: "G-03: mã tỉnh hoặc xã hiện hành — chỉ HTX thuộc đơn vị này (và con cháu) giao với phạm vi người gọi; mã không có hiệu lực → 422 validation_failed (trường admin_unit)", schema: {type: string}}
         - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+        - {name: confirmation, in: query, description: "D2: lọc theo trạng thái xác nhận; vắng = mọi HTX (gồm HTX tạm Chưa xác nhận)", schema: {$ref: "#/components/schemas/HTXConfirmationStatus"}}
         - {name: cursor, in: query, schema: {type: string}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
       responses:
@@ -6760,6 +6761,7 @@ paths:
         - {name: q, in: query, schema: {type: string}, description: "Tìm theo tên, Mã HTX, mã số thuế"}
         - {name: area_min, in: query, schema: {type: string}, description: "Diện tích tối thiểu (ha, decimal)"}
         - {name: area_max, in: query, schema: {type: string}, description: "Diện tích tối đa (ha, decimal)"}
+        - {name: confirmation, in: query, description: "D2: lọc theo trạng thái xác nhận; vắng = mọi HTX (gồm HTX tạm Chưa xác nhận)", schema: {$ref: "#/components/schemas/HTXConfirmationStatus"}}
         - {name: cursor, in: query, schema: {type: string}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
       responses:
@@ -10890,13 +10892,19 @@ components:
       properties:
         lat: {$ref: "#/components/schemas/Decimal"}
         lon: {$ref: "#/components/schemas/Decimal"}
+    HTXConfirmationStatus:
+      type: string
+      enum: [confirmed, unconfirmed]
+      description: "D2 (ADR-0052): unconfirmed = HTX tạm do Khuyến nông/MKG lập, nhãn Chưa xác nhận — dữ liệu vẫn vào mọi danh sách, báo cáo và tổng; confirmed sau khi HTX thật nhận quyền theo mã số thuế"
     Cooperative:
       allOf:
         - $ref: "#/components/schemas/Org"
         - type: object
-          required: [status_reason, tax_code, area_ha, established_on, location, location_provisional]
+          required: [status_reason, tax_code, area_ha, established_on, location, location_provisional, confirmation_status, confirmation_label]
           properties:
             status_reason: {type: [string, "null"], description: "Lý do vô hiệu hóa hiện tại"}
+            confirmation_status: {$ref: "#/components/schemas/HTXConfirmationStatus"}
+            confirmation_label: {type: string, enum: ["Đã xác nhận", "Chưa xác nhận"]}
             tax_code: {type: [string, "null"], pattern: "^[0-9]{10}(-[0-9]{3})?$"}
             area_ha: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}], description: "Diện tích đăng ký hành chính (ha)"}
             established_on: {type: [string, "null"], format: date}
@@ -14368,8 +14376,11 @@ components:
         masked_phone: {type: [string, "null"], description: "vd '0912•••123'"}
     KNCooperative:
       type: object
-      required: [ref, code, name, commune_code, area_ha, representative, household_count, active, status_reason, tax_code, head_office, updated_at]
+      required: [ref, code, name, commune_code, area_ha, representative, household_count, active, status_reason, tax_code, head_office, updated_at,
+        confirmation_status, confirmation_label]
       properties:
+        confirmation_status: {$ref: "#/components/schemas/HTXConfirmationStatus"}
+        confirmation_label: {type: string, enum: ["Đã xác nhận", "Chưa xác nhận"]}
         ref: {type: string, format: uuid}
         code: {type: string}
         name: {type: string}
