@@ -1403,9 +1403,7 @@
         "route": "/kn/khtc/ke-hoach-nam",
         "icon": "calendar",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -2692,8 +2690,15 @@
           "icon": "calendar",
           "badge_source": null,
           "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "children": []
+         },
+         {
+          "key": "admin.pb.khtc_danh_muc",
+          "label": "Danh mục KHTC",
+          "route": "/kn/phong-ban/ke_hoach_tai_chinh/danh-muc-khtc",
+          "icon": "catalog",
+          "badge_source": null,
+          "enabled": false,
           "children": []
          }
         ]

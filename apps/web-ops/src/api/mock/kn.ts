@@ -245,7 +245,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
     kn_tw: [soon("tw.khtc.bao_cao_tinh", "Báo cáo Tỉnh (KHTC)", "/kn/khtc/bao-cao-da-xuat", "report")],
     kn_tinh: [
       soon("tinh.khtc.ky_bao_cao", "Kỳ báo cáo & phiếu các phòng", "/kn/khtc/ky-bao-cao", "task"),
-      soon("tinh.khtc.ke_hoach_nam", "Kế hoạch năm", "/kn/khtc/ke-hoach-nam", "calendar"),
+      { key: "tinh.khtc.ke_hoach_nam", label: "Kế hoạch năm", route: "/kn/khtc/ke-hoach-nam", icon: "calendar" }, // W11.61
       soon("tinh.khtc.so_lieu_ngoai", "Số liệu nguồn ngoài", "/kn/khtc/so-lieu-ngoai", "database"),
       soon("tinh.khtc.mau_bao_cao", "Mẫu báo cáo KHTC", "/kn/khtc/mau-bao-cao", "table"),
       soon("tinh.khtc.tien_do", "Tiến độ các chương trình", "/kn/khtc/tien-do", "chart"),
@@ -293,7 +293,10 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, (base: string) => Item[]>> =
     { key: "admin.pb.cnts_danh_muc", label: "Danh mục CNTS", route: `${b}/danh-muc-cnts`, icon: "catalog" }, // W11.41
     { key: "admin.pb.cnts_bieu_ky", label: "Biểu kỳ Cấp Xã", route: `${b}/bieu-ky-cnts`, icon: "table" }, // W11.42
   ],
-  ke_hoach_tai_chinh: (b) => [soon("admin.pb.khtc_ke_hoach", "Kế hoạch năm", `${b}/ke-hoach-nam`, "calendar")],
+  ke_hoach_tai_chinh: (b) => [
+    { key: "admin.pb.khtc_ke_hoach", label: "Kế hoạch năm", route: `${b}/ke-hoach-nam`, icon: "calendar" }, // W11.61
+    { key: "admin.pb.khtc_danh_muc", label: "Danh mục KHTC", route: `${b}/danh-muc-khtc`, icon: "catalog" }, // W11.61
+  ],
   // W11.72: Xã báo giá + Kỳ báo giá & giờ khóa đã mở.
   thong_tin_truyen_thong: (b) => [
     { key: "admin.pb.bao_gia_xa", label: "Xã báo giá", route: "/kn/bao-gia/xa-bao-gia", icon: "map" },

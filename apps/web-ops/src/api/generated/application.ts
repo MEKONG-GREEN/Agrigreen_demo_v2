@@ -6934,6 +6934,212 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/kn/khtc/catalogs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-AD-04.01: Danh mục KHTC — mục hiện hành của một loại + số lượng mọi loại (Admin, Cấp Tỉnh) */
+        get: operations["knKhtcListCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/catalogs/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** FN-AD-04.01: thêm mục danh mục (Admin). Trùng mã → 409 */
+        post: operations["knKhtcCreateCatalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/catalogs/{kind}/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** FN-AD-04.01: sửa / ngừng dùng (active=false) / dùng lại — phiên bản mới (Admin) */
+        post: operations["knKhtcReviseCatalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/catalogs/{kind}/{code}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-AD-04.01: mọi phiên bản của một mục, mới nhất trước */
+        get: operations["knKhtcCatalogHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/programs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** D20: danh sách CT/DA chủ của KHTC (bản hiện hành) */
+        get: operations["knKhtcListPrograms"];
+        put?: never;
+        /** FN-TI-02.02 B7: thêm CT/DA (Admin, Cấp Tỉnh phòng KHTC) */
+        post: operations["knKhtcCreateProgram"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/programs/{ref}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa / ngừng (active=false) CT/DA — phiên bản mới */
+        post: operations["knKhtcReviseProgram"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/programs/{ref}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mọi phiên bản của CT/DA, mới nhất trước */
+        get: operations["knKhtcProgramHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TI-02.02: một phiên bản Kế hoạch năm (6 tab) — ?version=n, ?at=ngày (BR-DL-13), mặc định mới nhất */
+        get: operations["knKhtcGetPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử phiên bản kế hoạch năm (cũ trước) */
+        get: operations["knKhtcPlanVersions"];
+        put?: never;
+        /** Lưu kế hoạch năm: phiên bản 1 (lập) hoặc Điều chỉnh theo QĐ (≥ 2, bắt buộc số, ngày QĐ, ngày hiệu lực) — cả cây */
+        post: operations["knKhtcSavePlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}/copy-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sao chép từ năm trước: bản nháp (không ghi) từ phiên bản mới nhất năm N−1, chỉ nội dung còn theo dõi */
+        get: operations["knKhtcCopyDraft"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel một phiên bản kế hoạch năm (cả 6 tab; bố cục nhập lại được) */
+        get: operations["knKhtcExportPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}/import-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nhập Excel/CSV (bố cục của tệp xuất) thành bản nháp — không ghi; lỗi theo dòng */
+        post: operations["knKhtcImportDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -13905,6 +14111,201 @@ export interface components {
             /** @description Lý do chưa duyệt được */
             blockers: string[];
             reopen_days: number;
+        };
+        /** @enum {string} */
+        KhtcCatalogKind: "report_type" | "unit" | "field" | "funding_source" | "signer" | "recipient" | "basis" | "price_item";
+        KhtcActor: {
+            /** Format: uuid */
+            ref: string;
+            display: string | null;
+        };
+        KhtcCatalogInput: {
+            /** @description Chỉ khi thêm; a-z, 0-9, dấu chấm, gạch dưới, gạch ngang (đưa về chữ thường) */
+            code?: string;
+            name: string;
+            sort_order?: number;
+            /** @description false = ngừng dùng */
+            active?: boolean;
+            /** @description Người ký, nơi nhận, căn cứ */
+            default_for?: ("mau_1" | "mau_2" | "mau_3" | "mau_4" | "mau_5")[];
+            /** @description signer: title, authority; price_item: group, unit; unit: symbol; basis: document_no, date; recipient: address */
+            attrs?: {
+                [key: string]: string;
+            };
+        };
+        KhtcCatalogItem: {
+            kind: components["schemas"]["KhtcCatalogKind"];
+            code: string;
+            name: string;
+            sort_order: number;
+            active: boolean;
+            default_for: string[];
+            attrs: {
+                [key: string]: string;
+            };
+            version: number;
+            /** Format: uuid */
+            version_id: string;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["KhtcActor"];
+        };
+        /** @enum {string} */
+        KhtcProgramKind: "program" | "project" | "central_project" | "cooperation" | "research" | "advisory";
+        KhtcProgramInput: {
+            code: string;
+            name: string;
+            kind: components["schemas"]["KhtcProgramKind"];
+            field_code?: string;
+            owner_department?: string;
+            start_year?: number;
+            end_year?: number;
+            active?: boolean;
+            note?: string;
+        };
+        KhtcProgram: {
+            /**
+             * Format: uuid
+             * @description Định danh bền (module khác tham chiếu — D20)
+             */
+            ref: string;
+            code: string;
+            name: string;
+            kind: components["schemas"]["KhtcProgramKind"];
+            field_code: string | null;
+            owner_department: string | null;
+            start_year: number | null;
+            end_year: number | null;
+            active: boolean;
+            note: string | null;
+            version: number;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["KhtcActor"];
+        };
+        /** @enum {string} */
+        KhtcPlanTab: "programs" | "prev_year" | "central_project" | "cooperation" | "research" | "advisory";
+        KhtcPlanEntryInput: {
+            /** Format: uuid */
+            ref: string;
+            tab: components["schemas"]["KhtcPlanTab"];
+            /** @enum {string} */
+            kind: "program" | "group" | "item";
+            /** Format: uuid */
+            parent_ref?: string | null;
+            /** Format: uuid */
+            program_ref?: string | null;
+            sort_order?: number;
+            code?: string;
+            /** @description Dòng CT/DA để trống → tên trong danh sách chủ */
+            name?: string;
+            unit_code?: string;
+            /** @description Thập phân dạng chuỗi, ≤ 4 chữ số lẻ */
+            planned_qty?: string | null;
+            scale_note?: string;
+            /** @description Kinh phí KH (đồng), ≤ 2 chữ số lẻ */
+            budget?: string | null;
+            funding_code?: string;
+            field_code?: string;
+            /** @description Hạng mục: bắt buộc, đúng một phòng phụ trách */
+            department_code?: string;
+            communes?: string[];
+            points_count?: number | null;
+            /** @enum {string} */
+            data_source?: "" | "form" | "module";
+            source_key?: string;
+            /** @enum {string} */
+            tracking?: "" | "tracking" | "stopped";
+            /** Format: date */
+            stopped_from?: string | null;
+            stop_decision?: string;
+            note?: string;
+        };
+        KhtcPlanEntry: {
+            /** Format: uuid */
+            ref: string;
+            tab: components["schemas"]["KhtcPlanTab"];
+            /** @enum {string} */
+            kind: "program" | "group" | "item";
+            /** Format: uuid */
+            parent_ref: string | null;
+            /** Format: uuid */
+            program_ref: string | null;
+            program_code: string | null;
+            program_name: string | null;
+            /** @description Số La Mã của CT ở tab Các chương trình (BR-DL-21) */
+            roman: string | null;
+            sort_order: number;
+            code: string | null;
+            name: string;
+            unit_code: string | null;
+            planned_qty: string | null;
+            scale_note: string | null;
+            budget: string | null;
+            funding_code: string | null;
+            field_code: string | null;
+            department_code: string | null;
+            communes: string[];
+            points_count: number | null;
+            /** @enum {string|null} */
+            data_source: "form" | "module" | null;
+            source_key: string | null;
+            /** @enum {string} */
+            tracking: "tracking" | "stopped";
+            /** Format: date */
+            stopped_from: string | null;
+            stop_decision: string | null;
+            note: string | null;
+        };
+        KhtcPlanVersion: {
+            /** Format: uuid */
+            id: string;
+            year: number;
+            version: number;
+            /** @enum {string} */
+            basis: "initial" | "adjust";
+            decision_no: string | null;
+            /** Format: date */
+            decision_date: string | null;
+            /** Format: date */
+            effective_from: string;
+            copied_from_year: number | null;
+            note: string | null;
+            entries_count: number;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["KhtcActor"];
+        };
+        KhtcPlan: {
+            year: number;
+            version: components["schemas"]["KhtcPlanVersion"];
+            latest_version: number;
+            entries: components["schemas"]["KhtcPlanEntry"][];
+        };
+        KhtcPlanSave: {
+            /** @description Phiên bản mới nhất đang sửa (0 = chưa có) — khóa lạc quan */
+            base_version: number;
+            decision_no?: string;
+            /** Format: date */
+            decision_date?: string;
+            /**
+             * Format: date
+             * @description Vắng ở phiên bản 1 = 01/01
+             */
+            effective_from?: string;
+            copied_from_year?: number;
+            note?: string;
+            entries: components["schemas"]["KhtcPlanEntryInput"][];
+        };
+        KhtcPlanDraft: {
+            from_year: number | null;
+            from_version: number | null;
+            entries: components["schemas"]["KhtcPlanEntry"][];
+            problems: {
+                row: number | null;
+                field: string;
+                reason: string;
+            }[];
         };
     };
     responses: {
@@ -28273,6 +28674,472 @@ export interface operations {
             /** @description price.board_busy | price.board_state | price.board_stale | price.board_changed */
             409: components["responses"]["Problem"];
             /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    knKhtcListCatalog: {
+        parameters: {
+            query?: {
+                /** @description Vắng = mọi loại */
+                kind?: components["schemas"]["KhtcCatalogKind"];
+                include_retired?: boolean;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        counts: {
+                            kind: components["schemas"]["KhtcCatalogKind"];
+                            label: string;
+                            active: number;
+                            total: number;
+                        }[];
+                        items: components["schemas"]["KhtcCatalogItem"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    knKhtcCreateCatalog: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                kind: components["schemas"]["KhtcCatalogKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KhtcCatalogInput"];
+            };
+        };
+        responses: {
+            /** @description Gửi lặp cùng khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcCatalogItem"];
+                };
+            };
+            /** @description Phiên bản 1 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcCatalogItem"];
+                };
+            };
+            /** @description extension.khtc_catalog_exists | extension.khtc_default_conflict */
+            409: components["responses"]["Problem"];
+        };
+    };
+    knKhtcReviseCatalog: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                kind: components["schemas"]["KhtcCatalogKind"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KhtcCatalogInput"];
+            };
+        };
+        responses: {
+            /** @description Gửi lặp cùng khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcCatalogItem"];
+                };
+            };
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcCatalogItem"];
+                };
+            };
+            /** @description extension.khtc_catalog_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_default_conflict */
+            409: components["responses"]["Problem"];
+        };
+    };
+    knKhtcCatalogHistory: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                kind: components["schemas"]["KhtcCatalogKind"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KhtcCatalogItem"][];
+                    };
+                };
+            };
+            /** @description extension.khtc_catalog_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knKhtcListPrograms: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["KhtcProgramKind"];
+                include_retired?: boolean;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KhtcProgram"][];
+                    };
+                };
+            };
+        };
+    };
+    knKhtcCreateProgram: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KhtcProgramInput"];
+            };
+        };
+        responses: {
+            /** @description Gửi lặp cùng khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcProgram"];
+                };
+            };
+            /** @description Phiên bản 1 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcProgram"];
+                };
+            };
+            /** @description extension.khtc_program_exists */
+            409: components["responses"]["Problem"];
+        };
+    };
+    knKhtcReviseProgram: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KhtcProgramInput"];
+            };
+        };
+        responses: {
+            /** @description Gửi lặp cùng khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcProgram"];
+                };
+            };
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcProgram"];
+                };
+            };
+            /** @description extension.khtc_program_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_program_exists */
+            409: components["responses"]["Problem"];
+        };
+    };
+    knKhtcProgramHistory: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KhtcProgram"][];
+                    };
+                };
+            };
+            /** @description extension.khtc_program_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knKhtcGetPlan: {
+        parameters: {
+            query?: {
+                version?: number;
+                at?: string;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kế hoạch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcPlan"];
+                };
+            };
+            /** @description extension.khtc_plan_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knKhtcPlanVersions: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KhtcPlanVersion"][];
+                    };
+                };
+            };
+        };
+    };
+    knKhtcSavePlan: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KhtcPlanSave"];
+            };
+        };
+        responses: {
+            /** @description Gửi lặp cùng khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcPlan"];
+                };
+            };
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcPlan"];
+                };
+            };
+            /** @description extension.khtc_plan_version_conflict | extension.khtc_entry_in_use */
+            409: components["responses"]["Problem"];
+            /** @description extension.khtc_plan_invalid | extension.khtc_effective_date_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    knKhtcCopyDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bản nháp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcPlanDraft"];
+                };
+            };
+            /** @description extension.khtc_plan_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knKhtcExportPlan: {
+        parameters: {
+            query?: {
+                version?: number;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description extension.khtc_plan_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knKhtcImportDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Bản nháp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcPlanDraft"];
+                };
+            };
+            /** @description extension.khtc_import_invalid */
             422: components["responses"]["Problem"];
         };
     };

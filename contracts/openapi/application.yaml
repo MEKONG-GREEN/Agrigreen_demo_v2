@@ -9856,6 +9856,244 @@ paths:
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   # --- hết pf/price W11.76 ---
   # --- hết pf/price ---
+  # --- W11.61 (D4 KH1, BRD KHTC v2.2 FN-AD-04.01, FN-TI-02.02): Danh mục KHTC, danh sách CT/DA chủ (D20), Kế hoạch năm ---
+  /v1/kn/khtc/catalogs:
+    get:
+      summary: "FN-AD-04.01: Danh mục KHTC — mục hiện hành của một loại + số lượng mọi loại (Admin, Cấp Tỉnh)"
+      operationId: knKhtcListCatalog
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: kind, in: query, schema: {$ref: "#/components/schemas/KhtcCatalogKind"}, description: "Vắng = mọi loại"}
+        - {name: include_retired, in: query, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Danh mục
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [counts, items]
+                properties:
+                  counts:
+                    type: array
+                    items:
+                      type: object
+                      required: [kind, label, active, total]
+                      properties:
+                        kind: {$ref: "#/components/schemas/KhtcCatalogKind"}
+                        label: {type: string}
+                        active: {type: integer}
+                        total: {type: integer}
+                  items: {type: array, items: {$ref: "#/components/schemas/KhtcCatalogItem"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/catalogs/{kind}:
+    post:
+      summary: "FN-AD-04.01: thêm mục danh mục (Admin). Trùng mã → 409"
+      operationId: knKhtcCreateCatalog
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: kind, in: path, required: true, schema: {$ref: "#/components/schemas/KhtcCatalogKind"}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KhtcCatalogInput"}
+      responses:
+        "201": {description: Phiên bản 1, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcCatalogItem"}}}}
+        "200": {description: Gửi lặp cùng khóa, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcCatalogItem"}}}}
+        "409": {description: "extension.khtc_catalog_exists | extension.khtc_default_conflict", $ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/catalogs/{kind}/{code}/revise:
+    post:
+      summary: "FN-AD-04.01: sửa / ngừng dùng (active=false) / dùng lại — phiên bản mới (Admin)"
+      operationId: knKhtcReviseCatalog
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: kind, in: path, required: true, schema: {$ref: "#/components/schemas/KhtcCatalogKind"}}
+        - {name: code, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KhtcCatalogInput"}
+      responses:
+        "201": {description: Phiên bản mới, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcCatalogItem"}}}}
+        "200": {description: Gửi lặp cùng khóa, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcCatalogItem"}}}}
+        "404": {description: extension.khtc_catalog_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_default_conflict, $ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/catalogs/{kind}/{code}/history:
+    get:
+      summary: "FN-AD-04.01: mọi phiên bản của một mục, mới nhất trước"
+      operationId: knKhtcCatalogHistory
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: kind, in: path, required: true, schema: {$ref: "#/components/schemas/KhtcCatalogKind"}}
+        - {name: code, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/KhtcCatalogItem"}}}}
+        "404": {description: extension.khtc_catalog_not_found, $ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/programs:
+    get:
+      summary: "D20: danh sách CT/DA chủ của KHTC (bản hiện hành)"
+      operationId: knKhtcListPrograms
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: kind, in: query, schema: {$ref: "#/components/schemas/KhtcProgramKind"}}
+        - {name: include_retired, in: query, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/KhtcProgram"}}}}
+    post:
+      summary: "FN-TI-02.02 B7: thêm CT/DA (Admin, Cấp Tỉnh phòng KHTC)"
+      operationId: knKhtcCreateProgram
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KhtcProgramInput"}
+      responses:
+        "201": {description: Phiên bản 1, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcProgram"}}}}
+        "200": {description: Gửi lặp cùng khóa, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcProgram"}}}}
+        "409": {description: extension.khtc_program_exists, $ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/programs/{ref}/revise:
+    post:
+      summary: "Sửa / ngừng (active=false) CT/DA — phiên bản mới"
+      operationId: knKhtcReviseProgram
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KhtcProgramInput"}
+      responses:
+        "201": {description: Phiên bản mới, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcProgram"}}}}
+        "200": {description: Gửi lặp cùng khóa, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcProgram"}}}}
+        "404": {description: extension.khtc_program_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_program_exists, $ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/programs/{ref}/history:
+    get:
+      summary: Mọi phiên bản của CT/DA, mới nhất trước
+      operationId: knKhtcProgramHistory
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/KhtcProgram"}}}}
+        "404": {description: extension.khtc_program_not_found, $ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/plans/{year}:
+    get:
+      summary: "FN-TI-02.02: một phiên bản Kế hoạch năm (6 tab) — ?version=n, ?at=ngày (BR-DL-13), mặc định mới nhất"
+      operationId: knKhtcGetPlan
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: version, in: query, schema: {type: integer, minimum: 1}}
+        - {name: at, in: query, schema: {type: string, format: date}}
+      responses:
+        "200": {description: Kế hoạch, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcPlan"}}}}
+        "404": {description: extension.khtc_plan_not_found, $ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/plans/{year}/versions:
+    get:
+      summary: Lịch sử phiên bản kế hoạch năm (cũ trước)
+      operationId: knKhtcPlanVersions
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/KhtcPlanVersion"}}}}
+    post:
+      summary: "Lưu kế hoạch năm: phiên bản 1 (lập) hoặc Điều chỉnh theo QĐ (≥ 2, bắt buộc số, ngày QĐ, ngày hiệu lực) — cả cây"
+      operationId: knKhtcSavePlan
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KhtcPlanSave"}
+      responses:
+        "201": {description: Phiên bản mới, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcPlan"}}}}
+        "200": {description: Gửi lặp cùng khóa, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcPlan"}}}}
+        "409": {description: "extension.khtc_plan_version_conflict | extension.khtc_entry_in_use", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.khtc_plan_invalid | extension.khtc_effective_date_invalid", $ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/plans/{year}/copy-draft:
+    get:
+      summary: "Sao chép từ năm trước: bản nháp (không ghi) từ phiên bản mới nhất năm N−1, chỉ nội dung còn theo dõi"
+      operationId: knKhtcCopyDraft
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      responses:
+        "200": {description: Bản nháp, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcPlanDraft"}}}}
+        "404": {description: extension.khtc_plan_not_found, $ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/plans/{year}/export:
+    get:
+      summary: "Xuất Excel một phiên bản kế hoạch năm (cả 6 tab; bố cục nhập lại được)"
+      operationId: knKhtcExportPlan
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: version, in: query, schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+        "404": {description: extension.khtc_plan_not_found, $ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/plans/{year}/import-draft:
+    post:
+      summary: "Nhập Excel/CSV (bố cục của tệp xuất) thành bản nháp — không ghi; lỗi theo dòng"
+      operationId: knKhtcImportDraft
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      requestBody:
+        required: true
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+          text/csv: {schema: {type: string, format: binary}}
+      responses:
+        "200": {description: Bản nháp, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcPlanDraft"}}}}
+        "422": {description: extension.khtc_import_invalid, $ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -15982,3 +16220,176 @@ components:
             cancel_reopen: {type: boolean}
         blockers: {type: array, items: {type: string}, description: Lý do chưa duyệt được}
         reopen_days: {type: integer}
+    # --- W11.61: Danh mục KHTC, CT/DA, Kế hoạch năm ---
+    KhtcCatalogKind: {type: string, enum: [report_type, unit, field, funding_source, signer, recipient, basis, price_item]}
+    KhtcActor:
+      type: object
+      required: [ref, display]
+      properties:
+        ref: {type: string, format: uuid}
+        display: {type: [string, "null"]}
+    KhtcCatalogInput:
+      type: object
+      required: [name]
+      properties:
+        code: {type: string, description: "Chỉ khi thêm; a-z, 0-9, dấu chấm, gạch dưới, gạch ngang (đưa về chữ thường)"}
+        name: {type: string}
+        sort_order: {type: integer, minimum: 0}
+        active: {type: boolean, description: "false = ngừng dùng"}
+        default_for: {type: array, items: {type: string, enum: [mau_1, mau_2, mau_3, mau_4, mau_5]}, description: "Người ký, nơi nhận, căn cứ"}
+        attrs: {type: object, additionalProperties: {type: string}, description: "signer: title, authority; price_item: group, unit; unit: symbol; basis: document_no, date; recipient: address"}
+    KhtcCatalogItem:
+      type: object
+      required: [kind, code, name, sort_order, active, default_for, attrs, version, version_id, recorded_at, actor]
+      properties:
+        kind: {$ref: "#/components/schemas/KhtcCatalogKind"}
+        code: {type: string}
+        name: {type: string}
+        sort_order: {type: integer}
+        active: {type: boolean}
+        default_for: {type: array, items: {type: string}}
+        attrs: {type: object, additionalProperties: {type: string}}
+        version: {type: integer}
+        version_id: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+        actor: {$ref: "#/components/schemas/KhtcActor"}
+    KhtcProgramKind: {type: string, enum: [program, project, central_project, cooperation, research, advisory]}
+    KhtcProgramInput:
+      type: object
+      required: [code, name, kind]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        kind: {$ref: "#/components/schemas/KhtcProgramKind"}
+        field_code: {type: string}
+        owner_department: {type: string}
+        start_year: {type: integer}
+        end_year: {type: integer}
+        active: {type: boolean}
+        note: {type: string}
+    KhtcProgram:
+      type: object
+      required: [ref, code, name, kind, field_code, owner_department, start_year, end_year, active, note, version, recorded_at, actor]
+      properties:
+        ref: {type: string, format: uuid, description: "Định danh bền (module khác tham chiếu — D20)"}
+        code: {type: string}
+        name: {type: string}
+        kind: {$ref: "#/components/schemas/KhtcProgramKind"}
+        field_code: {type: [string, "null"]}
+        owner_department: {type: [string, "null"]}
+        start_year: {type: [integer, "null"]}
+        end_year: {type: [integer, "null"]}
+        active: {type: boolean}
+        note: {type: [string, "null"]}
+        version: {type: integer}
+        recorded_at: {type: string, format: date-time}
+        actor: {$ref: "#/components/schemas/KhtcActor"}
+    KhtcPlanTab: {type: string, enum: [programs, prev_year, central_project, cooperation, research, advisory]}
+    KhtcPlanEntryInput:
+      type: object
+      required: [ref, tab, kind]
+      properties:
+        ref: {type: string, format: uuid}
+        tab: {$ref: "#/components/schemas/KhtcPlanTab"}
+        kind: {type: string, enum: [program, group, item]}
+        parent_ref: {type: [string, "null"], format: uuid}
+        program_ref: {type: [string, "null"], format: uuid}
+        sort_order: {type: integer}
+        code: {type: string}
+        name: {type: string, description: "Dòng CT/DA để trống → tên trong danh sách chủ"}
+        unit_code: {type: string}
+        planned_qty: {type: [string, "null"], description: "Thập phân dạng chuỗi, ≤ 4 chữ số lẻ"}
+        scale_note: {type: string}
+        budget: {type: [string, "null"], description: "Kinh phí KH (đồng), ≤ 2 chữ số lẻ"}
+        funding_code: {type: string}
+        field_code: {type: string}
+        department_code: {type: string, description: "Hạng mục: bắt buộc, đúng một phòng phụ trách"}
+        communes: {type: array, items: {type: string}}
+        points_count: {type: [integer, "null"]}
+        data_source: {type: string, enum: ["", form, module]}
+        source_key: {type: string}
+        tracking: {type: string, enum: ["", tracking, stopped]}
+        stopped_from: {type: [string, "null"], format: date}
+        stop_decision: {type: string}
+        note: {type: string}
+    KhtcPlanEntry:
+      type: object
+      required: [ref, tab, kind, parent_ref, program_ref, program_code, program_name, roman, sort_order, code, name, unit_code, planned_qty, scale_note, budget, funding_code, field_code, department_code, communes, points_count, data_source, source_key, tracking, stopped_from, stop_decision, note]
+      properties:
+        ref: {type: string, format: uuid}
+        tab: {$ref: "#/components/schemas/KhtcPlanTab"}
+        kind: {type: string, enum: [program, group, item]}
+        parent_ref: {type: [string, "null"], format: uuid}
+        program_ref: {type: [string, "null"], format: uuid}
+        program_code: {type: [string, "null"]}
+        program_name: {type: [string, "null"]}
+        roman: {type: [string, "null"], description: "Số La Mã của CT ở tab Các chương trình (BR-DL-21)"}
+        sort_order: {type: integer}
+        code: {type: [string, "null"]}
+        name: {type: string}
+        unit_code: {type: [string, "null"]}
+        planned_qty: {type: [string, "null"]}
+        scale_note: {type: [string, "null"]}
+        budget: {type: [string, "null"]}
+        funding_code: {type: [string, "null"]}
+        field_code: {type: [string, "null"]}
+        department_code: {type: [string, "null"]}
+        communes: {type: array, items: {type: string}}
+        points_count: {type: [integer, "null"]}
+        data_source: {type: [string, "null"], enum: [form, module, null]}
+        source_key: {type: [string, "null"]}
+        tracking: {type: string, enum: [tracking, stopped]}
+        stopped_from: {type: [string, "null"], format: date}
+        stop_decision: {type: [string, "null"]}
+        note: {type: [string, "null"]}
+    KhtcPlanVersion:
+      type: object
+      required: [id, year, version, basis, decision_no, decision_date, effective_from, copied_from_year, note, entries_count, recorded_at, actor]
+      properties:
+        id: {type: string, format: uuid}
+        year: {type: integer}
+        version: {type: integer}
+        basis: {type: string, enum: [initial, adjust]}
+        decision_no: {type: [string, "null"]}
+        decision_date: {type: [string, "null"], format: date}
+        effective_from: {type: string, format: date}
+        copied_from_year: {type: [integer, "null"]}
+        note: {type: [string, "null"]}
+        entries_count: {type: integer}
+        recorded_at: {type: string, format: date-time}
+        actor: {$ref: "#/components/schemas/KhtcActor"}
+    KhtcPlan:
+      type: object
+      required: [year, version, latest_version, entries]
+      properties:
+        year: {type: integer}
+        version: {$ref: "#/components/schemas/KhtcPlanVersion"}
+        latest_version: {type: integer}
+        entries: {type: array, items: {$ref: "#/components/schemas/KhtcPlanEntry"}}
+    KhtcPlanSave:
+      type: object
+      required: [base_version, entries]
+      properties:
+        base_version: {type: integer, minimum: 0, description: "Phiên bản mới nhất đang sửa (0 = chưa có) — khóa lạc quan"}
+        decision_no: {type: string}
+        decision_date: {type: string, format: date}
+        effective_from: {type: string, format: date, description: "Vắng ở phiên bản 1 = 01/01"}
+        copied_from_year: {type: integer}
+        note: {type: string}
+        entries: {type: array, items: {$ref: "#/components/schemas/KhtcPlanEntryInput"}}
+    KhtcPlanDraft:
+      type: object
+      required: [from_year, from_version, entries, problems]
+      properties:
+        from_year: {type: [integer, "null"]}
+        from_version: {type: [integer, "null"]}
+        entries: {type: array, items: {$ref: "#/components/schemas/KhtcPlanEntry"}}
+        problems:
+          type: array
+          items:
+            type: object
+            required: [row, field, reason]
+            properties:
+              row: {type: [integer, "null"]}
+              field: {type: string}
+              reason: {type: string}

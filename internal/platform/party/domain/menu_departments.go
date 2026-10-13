@@ -80,7 +80,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 		},
 		port.AudienceTinh: {
 			soon("tinh.khtc.ky_bao_cao", "Kỳ báo cáo & phiếu các phòng", "/kn/khtc/ky-bao-cao", "task"),
-			soon("tinh.khtc.ke_hoach_nam", "Kế hoạch năm", "/kn/khtc/ke-hoach-nam", "calendar"),
+			// W11.61 (pf/extension, FN-TI-02.02): Kế hoạch năm + danh sách CT/DA (phòng khác chỉ xem).
+			{Key: "tinh.khtc.ke_hoach_nam", Label: "Kế hoạch năm", Route: "/kn/khtc/ke-hoach-nam", Icon: "calendar"},
 			soon("tinh.khtc.so_lieu_ngoai", "Số liệu nguồn ngoài", "/kn/khtc/so-lieu-ngoai", "database"),
 			soon("tinh.khtc.mau_bao_cao", "Mẫu báo cáo KHTC", "/kn/khtc/mau-bao-cao", "table"),
 			soon("tinh.khtc.tien_do", "Tiến độ các chương trình", "/kn/khtc/tien-do", "chart"),
@@ -140,7 +141,9 @@ var adminDeptBusiness = map[string][]MenuItem{
 		{Key: "admin.pb.cnts_bieu_ky", Label: "Biểu kỳ Cấp Xã", Route: adminDeptRoute("/bieu-ky-cnts"), Icon: "table"},    // W11.42
 	},
 	port.MenuProfileKeHoachTaiChinh: {
-		soon("admin.pb.khtc_ke_hoach", "Kế hoạch năm", adminDeptRoute("/ke-hoach-nam"), "calendar"),
+		// W11.61 (pf/extension): Kế hoạch năm (FN-TI-02.02) và Danh mục KHTC (FN-AD-04.01).
+		{Key: "admin.pb.khtc_ke_hoach", Label: "Kế hoạch năm", Route: adminDeptRoute("/ke-hoach-nam"), Icon: "calendar"},
+		{Key: "admin.pb.khtc_danh_muc", Label: "Danh mục KHTC", Route: adminDeptRoute("/danh-muc-khtc"), Icon: "catalog"},
 	},
 	// W11.72: Xã báo giá (FN-AD-04.02, phân công FN-AD-04.01) và Kỳ báo giá & giờ khóa (W11.74 FN-AD-04.04…06) đã mở.
 	port.MenuProfileThongTinTuyenTruyen: {
