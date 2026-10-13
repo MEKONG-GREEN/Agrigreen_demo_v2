@@ -5512,6 +5512,160 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/weeks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tuần báo cáo KHTC (Thứ Tư – Thứ Ba) của một năm — ô chọn "Tuần" kèm ngày */
+        get: operations["extensionKhtcWeeks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/form-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiếu cơ sở "Báo cáo cho KHTC" đã cài ở cap/forms (profile kn_khtc) */
+        get: operations["extensionKhtcFormTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/form-template/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cài phiếu cơ sở (Admin KN / reports_admin); đã cài thì giữ nguyên */
+        post: operations["extensionKhtcInstallFormTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách kỳ KHTC (mới trước) kèm trạng thái và tiến độ nộp */
+        get: operations["extensionKhtcPeriods"];
+        put?: never;
+        /** Mở kỳ và giao phiếu (một phiếu mỗi phòng, gắn kỳ nguồn) — Cấp Tỉnh Phòng KHTC */
+        post: operations["extensionKhtcOpenPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Kỳ "Nháp" của popup Mở kỳ — tên kỳ, khoảng thời gian, hạn, phiếu giao các phòng, nguồn module (chưa ghi) */
+        post: operations["extensionKhtcPreviewPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết kỳ — 4 thẻ đếm, tiến độ phiếu các phòng và nguồn module, log */
+        get: operations["extensionKhtcPeriod"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/deadline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa hạn nộp / hạn xuất (kỳ chưa đóng, chưa hủy) */
+        post: operations["extensionKhtcPeriodDeadline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đóng kỳ — Đủ dữ liệu, hoặc Trễ hạn quá hạn ≥ N ngày kèm lý do (BR-DL-15) */
+        post: operations["extensionKhtcClosePeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy kỳ mở nhầm — lý do bắt buộc (BR-DL-18); phiếu gỡ khỏi module các phòng */
+        post: operations["extensionKhtcCancelPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/hrm/status": {
         parameters: {
             query?: never;
@@ -14342,6 +14496,208 @@ export interface components {
                 field: string;
                 reason: string;
             }[];
+        };
+        KHTCWeek: {
+            no: number;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+        };
+        KHTCFormTemplate: {
+            code: string;
+            version: number;
+            title: string;
+            installed: boolean;
+        };
+        KHTCReason: {
+            /** @description 10–500 ký tự; bắt buộc khi hủy kỳ và khi đóng kỳ còn thiếu dữ liệu */
+            reason?: string;
+        };
+        KHTCOpenInput: {
+            /** @enum {string} */
+            report_type: "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+            /** @description Năm (năm kế hoạch với program) */
+            year?: number;
+            /** @description Tuần 1–52/53, tháng 1–12, quý 1–4 */
+            no?: number;
+            /**
+             * @description Phạm vi báo cáo quý (6 tháng: quý II; 9 tháng: quý III)
+             * @enum {string}
+             */
+            scope?: "quarter" | "half" | "nine_months";
+            /**
+             * Format: date
+             * @description program (Mẫu 5): Đến ngày
+             */
+            as_of_date?: string;
+            /** @description adhoc: tên báo cáo */
+            name?: string;
+            /**
+             * Format: date
+             * @description adhoc: từ ngày
+             */
+            from_date?: string;
+            /**
+             * Format: date
+             * @description adhoc: đến ngày
+             */
+            to_date?: string;
+            /**
+             * Format: date
+             * @description Ngày chốt (bỏ trống = mặc định)
+             */
+            cutoff_date?: string;
+            /**
+             * Format: date-time
+             * @description Hạn nộp phiếu (bỏ trống = mặc định; bắt buộc với program, adhoc)
+             */
+            due_at?: string;
+            /** Format: date-time */
+            export_due_at?: string;
+            /** @description Phòng tham gia (bỏ trống = theo Kế hoạch năm, hoặc mọi phòng đang áp dụng trừ KHTC) */
+            departments?: string[];
+        };
+        KHTCDept: {
+            code: string;
+            name: string;
+        };
+        KHTCSource: {
+            department: string;
+            source: string;
+            calendar_id: string;
+            calendar_version: string;
+            /** @description Khóa kỳ theo lịch của nguồn */
+            native_key: string;
+            label: string;
+            /** @description Đọc được trạng thái chốt */
+            known: boolean;
+            closed: boolean;
+            /** Format: date-time */
+            closed_at: string | null;
+        };
+        KHTCDraft: {
+            report_type: string;
+            year: number;
+            no: number | null;
+            scope: string | null;
+            period_key: string | null;
+            name: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /** Format: date */
+            cutoff_date: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            export_due_at: string;
+            /** @description Số lần gửi tối đa (Q-081: 3, chỉ đọc) */
+            max_submissions: number;
+            departments: components["schemas"]["KHTCDept"][];
+            due_required: boolean;
+            plan_departments: boolean;
+            departments_loaded: boolean;
+            sources: components["schemas"]["KHTCSource"][];
+            /** @description Bộ quy đổi kỳ nguồn đã nối */
+            sources_linked: boolean;
+            duplicate: null | {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** @description 0 = phiếu cơ sở chưa cài */
+            template_version: number;
+        };
+        KHTCForm: {
+            department: string;
+            department_name: string;
+            /** @enum {string} */
+            state: "not_started" | "draft" | "late" | "submitted" | "supplement" | "confirmed" | "locked" | "not_sent" | "withdrawn" | "not_available";
+            state_label: string;
+            attempt: number;
+            limit_reached: boolean;
+            can_request_supplement: boolean;
+            can_confirm: boolean;
+            /** Format: date-time */
+            last_submitted_at: string | null;
+            /** Format: date-time */
+            reviewed_at: string | null;
+            review_note: string;
+            late: boolean;
+        };
+        KHTCEvent: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            action: "deadline_changed" | "closed" | "cancelled";
+            forced: boolean;
+            reason: string | null;
+            /** Format: date-time */
+            due_at: string | null;
+            /** Format: date-time */
+            export_due_at: string | null;
+            state: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCPeriod: {
+            /** Format: uuid */
+            id: string;
+            report_type: string;
+            year: number;
+            no: number | null;
+            scope: string | null;
+            period_key: string | null;
+            name: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /** Format: date */
+            cutoff_date: string;
+            /**
+             * Format: date-time
+             * @description Hạn nộp hiệu lực (sau Sửa hạn nộp)
+             */
+            due_at: string;
+            /** Format: date-time */
+            export_due_at: string;
+            max_submissions: number;
+            departments: components["schemas"]["KHTCDept"][];
+            /**
+             * Format: uuid
+             * @description Kỳ native cap/forms (profile kn_khtc)
+             */
+            forms_period_id: string;
+            forms_status: string;
+            template_code: string;
+            period_rule: string;
+            /** @enum {string} */
+            state: "draft" | "opened" | "collecting" | "late" | "complete" | "closed" | "cancelled";
+            state_label: string;
+            overdue: boolean;
+            counts: {
+                forms: number;
+                forms_sent: number;
+                sources: number;
+                sources_closed: number;
+            };
+            forms: components["schemas"]["KHTCForm"][];
+            sources: components["schemas"]["KHTCSource"][];
+            events: components["schemas"]["KHTCEvent"][];
+            can_close: boolean;
+            /** @description Đóng ngoại lệ (cần lý do) */
+            close_forced: boolean;
+            can_cancel: boolean;
+            close_late_days: number;
+            /** Format: date-time */
+            opened_at: string;
+            /** Format: uuid */
+            opened_by: string;
         };
     };
     responses: {
@@ -25513,6 +25869,317 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description forms.period_not_found */
             404: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcWeeks: {
+        parameters: {
+            query: {
+                year: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 52 hoặc 53 tuần */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        year: number;
+                        items: components["schemas"]["KHTCWeek"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcFormTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản (0 = chưa cài) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCFormTemplate"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcInstallFormTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiếu cơ sở */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCFormTemplate"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPeriods: {
+        parameters: {
+            query?: {
+                /** @description Năm kế hoạch (bỏ trống = mọi năm) */
+                year?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KHTCPeriod"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcOpenPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCOpenInput"];
+            };
+        };
+        responses: {
+            /** @description Kỳ đã mở */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPeriod"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.template_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_period_duplicate */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPreviewPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCOpenInput"];
+            };
+        };
+        responses: {
+            /** @description Nháp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCDraft"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kỳ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPeriod"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPeriodDeadline: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date-time */
+                    due_at: string;
+                    /** Format: date-time */
+                    export_due_at?: string;
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Kỳ sau khi sửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPeriod"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_period_terminal */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcClosePeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCReason"];
+            };
+        };
+        responses: {
+            /** @description Kỳ đã đóng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPeriod"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_closable | extension.khtc_period_terminal */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcCancelPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCReason"];
+            };
+        };
+        responses: {
+            /** @description Kỳ đã hủy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPeriod"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_cancellable | extension.khtc_period_terminal */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
         };
     };
     hrmStatus: {

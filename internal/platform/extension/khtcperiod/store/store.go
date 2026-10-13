@@ -1,4 +1,4 @@
-// Package store: SQL của Kỳ KHTC (pf 000162 — pf_extension.khtc_period, khtc_period_event, khtc_period_source) trên
+// Package store: SQL của Kỳ KHTC (pf 20261013070316 — pf_extension.khtc_period, khtc_period_event, khtc_period_source) trên
 // pool vai của pf/extension, luôn trong giao dịch có ngữ cảnh tenant (RLS). Ba sổ chỉ ghi thêm (shared.apply_ledger).
 package store
 

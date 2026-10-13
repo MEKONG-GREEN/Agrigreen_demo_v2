@@ -1,6 +1,6 @@
 package kn77_test
 
-// W11.62 — Kỳ KHTC trên module THẬT: pf/extension (extension/khtcperiod, sổ pf 000162) + pf/forms (kỳ native kn_khtc)
+// W11.62 — Kỳ KHTC trên module THẬT: pf/extension (extension/khtcperiod, sổ pf 20261013070316) + pf/forms (kỳ native kn_khtc)
 // trên PostgreSQL. Phòng nộp phiếu, KHTC rà soát qua /v1/forms (route thật); mở/đóng/hủy kỳ qua use case Kỳ KHTC.
 
 import (

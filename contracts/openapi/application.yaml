@@ -7819,6 +7819,206 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
   # --- hết pf/forms ---
+  # --- pf/extension Kỳ KHTC (W11.62 — BRD KHTC v2.2 FN-TI-02.03, D4 KH2): mở kỳ bằng ô chọn (tên kỳ, khoảng thời gian, hạn tự
+  # điền), một phiếu mỗi phòng = kỳ native cap/forms profile kn_khtc (nộp, yêu cầu bổ sung/xác nhận ở /v1/forms), gắn kỳ nguồn
+  # (calendar_id, calendar_version, native_key), tiến độ phiếu + nguồn, sửa hạn, đóng kỳ, hủy kỳ. Cấp Tỉnh Phòng KHTC ghi. ---
+  /v1/extension/khtc/weeks:
+    get:
+      summary: Tuần báo cáo KHTC (Thứ Tư – Thứ Ba) của một năm — ô chọn "Tuần" kèm ngày
+      operationId: extensionKhtcWeeks
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      responses:
+        "200":
+          description: 52 hoặc 53 tuần
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [year, items]
+                properties:
+                  year: {type: integer}
+                  items: {type: array, items: {$ref: "#/components/schemas/KHTCWeek"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/form-template:
+    get:
+      summary: Phiếu cơ sở "Báo cáo cho KHTC" đã cài ở cap/forms (profile kn_khtc)
+      operationId: extensionKhtcFormTemplate
+      tags: [extension]
+      responses:
+        "200":
+          description: Phiên bản (0 = chưa cài)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormTemplate"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/form-template/install:
+    post:
+      summary: Cài phiếu cơ sở (Admin KN / reports_admin); đã cài thì giữ nguyên
+      operationId: extensionKhtcInstallFormTemplate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Phiếu cơ sở
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormTemplate"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods:
+    get:
+      summary: Danh sách kỳ KHTC (mới trước) kèm trạng thái và tiến độ nộp
+      operationId: extensionKhtcPeriods
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, schema: {type: integer}, description: Năm kế hoạch (bỏ trống = mọi năm)}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KHTCPeriod"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Mở kỳ và giao phiếu (một phiếu mỗi phòng, gắn kỳ nguồn) — Cấp Tỉnh Phòng KHTC
+      operationId: extensionKhtcOpenPeriod
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KHTCOpenInput"}
+      responses:
+        "201":
+          description: Kỳ đã mở
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCPeriod"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.template_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_period_duplicate, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/preview:
+    post:
+      summary: Kỳ "Nháp" của popup Mở kỳ — tên kỳ, khoảng thời gian, hạn, phiếu giao các phòng, nguồn module (chưa ghi)
+      operationId: extensionKhtcPreviewPeriod
+      tags: [extension]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KHTCOpenInput"}
+      responses:
+        "200":
+          description: Nháp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCDraft"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}:
+    get:
+      summary: Chi tiết kỳ — 4 thẻ đếm, tiến độ phiếu các phòng và nguồn module, log
+      operationId: extensionKhtcPeriod
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kỳ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCPeriod"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/deadline:
+    post:
+      summary: Sửa hạn nộp / hạn xuất (kỳ chưa đóng, chưa hủy)
+      operationId: extensionKhtcPeriodDeadline
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [due_at]
+              properties:
+                due_at: {type: string, format: date-time}
+                export_due_at: {type: string, format: date-time}
+                reason: {type: string}
+      responses:
+        "200":
+          description: Kỳ sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCPeriod"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_period_terminal, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/close:
+    post:
+      summary: Đóng kỳ — Đủ dữ liệu, hoặc Trễ hạn quá hạn ≥ N ngày kèm lý do (BR-DL-15)
+      operationId: extensionKhtcClosePeriod
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KHTCReason"}
+      responses:
+        "200":
+          description: Kỳ đã đóng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCPeriod"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_period_not_closable | extension.khtc_period_terminal", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/cancel:
+    post:
+      summary: Hủy kỳ mở nhầm — lý do bắt buộc (BR-DL-18); phiếu gỡ khỏi module các phòng
+      operationId: extensionKhtcCancelPeriod
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KHTCReason"}
+      responses:
+        "200":
+          description: Kỳ đã hủy
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCPeriod"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_period_not_cancellable | extension.khtc_period_terminal", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   # --- pf/hrm (dom/hrm, W11.21 — ADR-0050): danh mục nhân sự Phòng HCTH (BRD HCTH v3.0 FN-19, UR-ADM-08). Đọc: Admin và Cấp Tỉnh
   # của Phòng Hành chính – Tổng hợp (port.Access ở gốc lắp ráp); ghi: Admin. Mọi bản ghi là phiên bản (sổ chỉ ghi thêm); ngừng sử
   # dụng = phiên bản active=false (BR-01). Số thập phân (hệ số, PCCV, %) là chuỗi. Không dữ liệu cá nhân.
@@ -16402,3 +16602,164 @@ components:
               row: {type: [integer, "null"]}
               field: {type: string}
               reason: {type: string}
+    # --- pf/extension Kỳ KHTC (W11.62) ---
+    KHTCWeek:
+      type: object
+      required: ["no", from_date, to_date]
+      properties:
+        "no": {type: integer}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+    KHTCFormTemplate:
+      type: object
+      required: [code, version, title, installed]
+      properties:
+        code: {type: string}
+        version: {type: integer}
+        title: {type: string}
+        installed: {type: boolean}
+    KHTCReason:
+      type: object
+      properties:
+        reason: {type: string, description: "10–500 ký tự; bắt buộc khi hủy kỳ và khi đóng kỳ còn thiếu dữ liệu"}
+    KHTCOpenInput:
+      type: object
+      required: [report_type]
+      properties:
+        report_type: {type: string, enum: [week, month, quarter, year, program, adhoc]}
+        year: {type: integer, description: Năm (năm kế hoạch với program)}
+        "no": {type: integer, description: "Tuần 1–52/53, tháng 1–12, quý 1–4"}
+        scope: {type: string, enum: [quarter, half, nine_months], description: "Phạm vi báo cáo quý (6 tháng: quý II; 9 tháng: quý III)"}
+        as_of_date: {type: string, format: date, description: "program (Mẫu 5): Đến ngày"}
+        name: {type: string, description: "adhoc: tên báo cáo"}
+        from_date: {type: string, format: date, description: "adhoc: từ ngày"}
+        to_date: {type: string, format: date, description: "adhoc: đến ngày"}
+        cutoff_date: {type: string, format: date, description: Ngày chốt (bỏ trống = mặc định)}
+        due_at: {type: string, format: date-time, description: "Hạn nộp phiếu (bỏ trống = mặc định; bắt buộc với program, adhoc)"}
+        export_due_at: {type: string, format: date-time}
+        departments: {type: array, items: {type: string}, description: "Phòng tham gia (bỏ trống = theo Kế hoạch năm, hoặc mọi phòng đang áp dụng trừ KHTC)"}
+    KHTCDept:
+      type: object
+      required: [code, name]
+      properties:
+        code: {type: string}
+        name: {type: string}
+    KHTCSource:
+      type: object
+      required: [department, source, calendar_id, calendar_version, native_key, label, known, closed, closed_at]
+      properties:
+        department: {type: string}
+        source: {type: string}
+        calendar_id: {type: string}
+        calendar_version: {type: string}
+        native_key: {type: string, description: Khóa kỳ theo lịch của nguồn}
+        label: {type: string}
+        known: {type: boolean, description: Đọc được trạng thái chốt}
+        closed: {type: boolean}
+        closed_at: {type: [string, "null"], format: date-time}
+    KHTCDraft:
+      type: object
+      required: [report_type, year, "no", scope, period_key, name, from_date, to_date, cutoff_date, due_at, export_due_at, max_submissions,
+        departments, due_required, plan_departments, departments_loaded, sources, sources_linked, duplicate, template_version]
+      properties:
+        report_type: {type: string}
+        year: {type: integer}
+        "no": {type: [integer, "null"]}
+        scope: {type: [string, "null"]}
+        period_key: {type: [string, "null"]}
+        name: {type: string}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        cutoff_date: {type: string, format: date}
+        due_at: {type: string, format: date-time}
+        export_due_at: {type: string, format: date-time}
+        max_submissions: {type: integer, description: "Số lần gửi tối đa (Q-081: 3, chỉ đọc)"}
+        departments: {type: array, items: {$ref: "#/components/schemas/KHTCDept"}}
+        due_required: {type: boolean}
+        plan_departments: {type: boolean}
+        departments_loaded: {type: boolean}
+        sources: {type: array, items: {$ref: "#/components/schemas/KHTCSource"}}
+        sources_linked: {type: boolean, description: Bộ quy đổi kỳ nguồn đã nối}
+        duplicate:
+          oneOf:
+            - {type: "null"}
+            - type: object
+              required: [id, name]
+              properties:
+                id: {type: string, format: uuid}
+                name: {type: string}
+        template_version: {type: integer, description: "0 = phiếu cơ sở chưa cài"}
+    KHTCForm:
+      type: object
+      required: [department, department_name, state, state_label, attempt, limit_reached, can_request_supplement, can_confirm,
+        last_submitted_at, reviewed_at, review_note, late]
+      properties:
+        department: {type: string}
+        department_name: {type: string}
+        state: {type: string, enum: [not_started, draft, late, submitted, supplement, confirmed, locked, not_sent, withdrawn, not_available]}
+        state_label: {type: string}
+        attempt: {type: integer}
+        limit_reached: {type: boolean}
+        can_request_supplement: {type: boolean}
+        can_confirm: {type: boolean}
+        last_submitted_at: {type: [string, "null"], format: date-time}
+        reviewed_at: {type: [string, "null"], format: date-time}
+        review_note: {type: string}
+        late: {type: boolean}
+    KHTCEvent:
+      type: object
+      required: [id, action, forced, reason, due_at, export_due_at, state, actor_ref, at]
+      properties:
+        id: {type: string, format: uuid}
+        action: {type: string, enum: [deadline_changed, closed, cancelled]}
+        forced: {type: boolean}
+        reason: {type: [string, "null"]}
+        due_at: {type: [string, "null"], format: date-time}
+        export_due_at: {type: [string, "null"], format: date-time}
+        state: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        at: {type: string, format: date-time}
+    KHTCPeriod:
+      type: object
+      required: [id, report_type, year, "no", scope, period_key, name, from_date, to_date, cutoff_date, due_at, export_due_at, max_submissions,
+        departments, forms_period_id, forms_status, template_code, period_rule, state, state_label, overdue, counts, forms, sources, events,
+        can_close, close_forced, can_cancel, close_late_days, opened_at, opened_by]
+      properties:
+        id: {type: string, format: uuid}
+        report_type: {type: string}
+        year: {type: integer}
+        "no": {type: [integer, "null"]}
+        scope: {type: [string, "null"]}
+        period_key: {type: [string, "null"]}
+        name: {type: string}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        cutoff_date: {type: string, format: date}
+        due_at: {type: string, format: date-time, description: Hạn nộp hiệu lực (sau Sửa hạn nộp)}
+        export_due_at: {type: string, format: date-time}
+        max_submissions: {type: integer}
+        departments: {type: array, items: {$ref: "#/components/schemas/KHTCDept"}}
+        forms_period_id: {type: string, format: uuid, description: Kỳ native cap/forms (profile kn_khtc)}
+        forms_status: {type: string}
+        template_code: {type: string}
+        period_rule: {type: string}
+        state: {type: string, enum: [draft, opened, collecting, late, complete, closed, cancelled]}
+        state_label: {type: string}
+        overdue: {type: boolean}
+        counts:
+          type: object
+          required: [forms, forms_sent, sources, sources_closed]
+          properties:
+            forms: {type: integer}
+            forms_sent: {type: integer}
+            sources: {type: integer}
+            sources_closed: {type: integer}
+        forms: {type: array, items: {$ref: "#/components/schemas/KHTCForm"}}
+        sources: {type: array, items: {$ref: "#/components/schemas/KHTCSource"}}
+        events: {type: array, items: {$ref: "#/components/schemas/KHTCEvent"}}
+        can_close: {type: boolean}
+        close_forced: {type: boolean, description: Đóng ngoại lệ (cần lý do)}
+        can_cancel: {type: boolean}
+        close_late_days: {type: integer}
+        opened_at: {type: string, format: date-time}
+        opened_by: {type: string, format: uuid}
