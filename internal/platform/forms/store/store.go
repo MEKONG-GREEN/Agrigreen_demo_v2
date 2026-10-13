@@ -94,7 +94,15 @@ type Period struct {
 	EventTime       time.Time
 }
 
-const periodCols = `id, profile, template_id, template_code, template_version, label, due_at, units, owner_ref, publisher_level, actor_ref, event_time`
+// periodCols chọn cột kỳ; due_at là hạn HIỆU LỰC (lần "Sửa hạn nộp" cuối ở sổ phụ period_due — W11.62).
+var periodCols = periodSelect("")
+
+// periodSelect trả danh sách cột kỳ với bí danh bảng a ("" hoặc "p.").
+func periodSelect(a string) string {
+	return a + "id, " + a + "profile, " + a + "template_id, " + a + "template_code, " + a + "template_version, " + a + "label, " +
+		"pf_forms.effective_due(" + a + "tenant_id, " + a + "id, " + a + "due_at), " + a + "units, " + a + "owner_ref, " +
+		a + "publisher_level, " + a + "actor_ref, " + a + "event_time"
+}
 
 func scanPeriod(row pgx.Row) (Period, error) {
 	var p Period
@@ -484,4 +492,13 @@ func dateOrNil(t *time.Time) *string {
 	}
 	d := t.UTC().Format(time.DateOnly)
 	return &d
+}
+
+// InsertDue ghi một lần đổi hạn nộp của kỳ native (sổ phụ period_due, W11.62 — trigger: kỳ đang nhận bài, sai → AGF02).
+func InsertDue(ctx context.Context, tx pgx.Tx, tid, periodID uuid.UUID, due time.Time, reason string, actor uuid.UUID, at time.Time, idem string) error {
+	_, err := tx.Exec(ctx, `INSERT INTO pf_forms.period_due (id, tenant_id, stream_key, period_id, profile, due_at, reason, event_time, actor_ref,
+	    idem_key, rule_version)
+	  VALUES ($1, $2, 'due:' || $3::uuid::text, $3::uuid, '', $4, $5, $6, $7, $8, $9)`,
+		ids.New(), tid, periodID, due.UTC(), nilIfEmpty(reason), at.UTC(), actor, idem, domain.RuleVersion)
+	return err
 }

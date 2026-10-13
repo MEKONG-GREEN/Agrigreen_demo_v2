@@ -49,4 +49,7 @@ type PeriodControl interface {
 	ClosePeriod(ctx context.Context, profile string, id uuid.UUID, idem string) error
 	// CancelPeriod hủy kỳ đang mở, lý do 10–500 ký tự (ErrPeriodCancelled nếu đã hủy, ErrPeriodClosed nếu đã chốt).
 	CancelPeriod(ctx context.Context, profile string, id uuid.UUID, reason, idem string) error
+	// ChangeDue đổi hạn nộp của kỳ đang nhận bài (sổ phụ period_due, chỉ ghi thêm): cờ "Nộp trễ", trạng thái Trễ hạn và
+	// hạn gửi xuống thiết bị theo hạn mới. Kỳ đã chốt/hủy → ErrPeriodClosed. reason tùy chọn (≤ 500 ký tự).
+	ChangeDue(ctx context.Context, profile string, id uuid.UUID, due time.Time, reason, idem string) error
 }

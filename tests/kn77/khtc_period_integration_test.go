@@ -75,6 +75,7 @@ type khtcPeriod struct {
 		LimitReached         bool   `json:"limit_reached"`
 		CanRequestSupplement bool   `json:"can_request_supplement"`
 		CanConfirm           bool   `json:"can_confirm"`
+		Late                 bool   `json:"late"`
 	} `json:"forms"`
 	Events []struct {
 		Action string `json:"action"`
@@ -311,16 +312,39 @@ func TestKHTCPeriod_W1162(t *testing.T) {
 		}
 	})
 
-	t.Run("KH2 sửa hạn, hủy kỳ, mở lại đúng kỳ đã hủy", func(t *testing.T) {
-		w43 := map[string]any{"report_type": "week", "year": 2026, "no": 43, "departments": []string{tt}}
+	t.Run("KH2 sửa hạn nộp: gửi sau hạn cũ, trước hạn mới không bị tính trễ; hủy kỳ, mở lại đúng kỳ đã hủy", func(t *testing.T) {
+		// Đồng hồ đang ở 01/11 08:00 (giờ VN). Tuần 45: 04/11–10/11, hạn gốc 11/11 10:00.
+		w45 := map[string]any{"report_type": "week", "year": 2026, "no": 45, "departments": []string{tt, cn}}
 		var k khtcPeriod
-		c, b := f.khtc(http.MethodPost, "/periods", me, "", w43)
+		c, b := f.khtc(http.MethodPost, "/periods", me, "", w45)
 		f.ok(c, b, &k)
-		newDue := k.DueAt.Add(48 * time.Hour)
-		c, b = f.khtc(http.MethodPost, "/periods/"+k.ID+"/deadline", me, "", map[string]any{"due_at": newDue})
+		oldDue := k.DueAt
+		newDue := oldDue.Add(48 * time.Hour) // 13/11 10:00
+		c, b = f.khtc(http.MethodPost, "/periods/"+k.ID+"/deadline", me, "", map[string]any{"due_at": newDue, "reason": "Sở lùi hạn báo cáo"})
 		f.ok(c, b, &k)
 		if !k.DueAt.Equal(newDue) {
 			t.Fatalf("sửa hạn: %v", k.DueAt)
+		}
+		f.clk.Advance(11 * 24 * time.Hour) // 12/11 08:00: sau hạn gốc, trước hạn mới
+		f.submit(k.FormsPeriodID, tt)
+		k = f.get(k.ID)
+		for _, fr := range k.Forms {
+			if fr.Department == tt && fr.Late {
+				t.Fatalf("gửi trước hạn mới bị tính trễ: %+v", fr)
+			}
+			if fr.Department == cn && fr.State != "not_started" {
+				t.Fatalf("phòng chưa gửi trước hạn mới phải Chưa nhập: %+v", fr)
+			}
+		}
+		if k.State != "collecting" {
+			t.Fatalf("trước hạn mới: %s", k.State)
+		}
+		f.clk.Advance(2 * 24 * time.Hour) // 14/11 08:00: sau hạn mới → trễ
+		f.submit(k.FormsPeriodID, cn)
+		for _, fr := range f.get(k.ID).Forms {
+			if fr.Department == cn && !fr.Late {
+				t.Fatalf("gửi sau hạn mới phải trễ: %+v", fr)
+			}
 		}
 		c, b = f.khtc(http.MethodPost, "/periods/"+k.ID+"/cancel", me, "", map[string]any{"reason": "nhầm"})
 		f.fail(c, b, "validation_failed")
@@ -329,7 +353,7 @@ func TestKHTCPeriod_W1162(t *testing.T) {
 		if st, _, _, _, _ := k.form(t, tt); k.State != "cancelled" || k.FormsStatus != "cancelled" || st != "withdrawn" {
 			t.Fatalf("hủy kỳ: %s", b)
 		}
-		c, b = f.khtc(http.MethodPost, "/periods", me, "", w43)
+		c, b = f.khtc(http.MethodPost, "/periods", me, "", w45)
 		f.ok(c, b, nil)
 		var list struct{ Items []khtcPeriod }
 		c, b = f.khtc(http.MethodGet, "/periods?year=2026", me, "", nil)

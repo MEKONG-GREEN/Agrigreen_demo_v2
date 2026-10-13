@@ -6,7 +6,6 @@ package store
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -163,7 +162,7 @@ func PeriodsByIDs(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUI
 // PeriodsFiltered liệt kê kỳ native của profile (mới trước) lọc tùy chọn theo mã biểu và khoảng ngày của đặc tả
 // (kỳ có period_to ≥ from và period_from ≤ to; kỳ không gắn lịch luôn qua).
 func PeriodsFiltered(ctx context.Context, tx pgx.Tx, profile, code string, from, to *time.Time, limit int) ([]Period, error) {
-	rows, err := tx.Query(ctx, `SELECT `+prefixed("p.", periodCols)+` FROM pf_forms.period p
+	rows, err := tx.Query(ctx, `SELECT `+periodSelect("p.")+` FROM pf_forms.period p
 	    LEFT JOIN pf_forms.period_spec s ON s.tenant_id = p.tenant_id AND s.period_id = p.id
 	   WHERE p.profile = $1 AND ($2 = '' OR p.template_code = $2)
 	     AND ($3::date IS NULL OR s.period_to IS NULL OR s.period_to >= $3::date)
@@ -176,12 +175,3 @@ func PeriodsFiltered(ctx context.Context, tx pgx.Tx, profile, code string, from,
 }
 
 func jsonUnmarshal(s string, v any) error { return json.Unmarshal([]byte(s), v) }
-
-// prefixed gắn bí danh bảng vào danh sách cột "a, b, c".
-func prefixed(alias, cols string) string {
-	parts := strings.Split(cols, ", ")
-	for i, p := range parts {
-		parts[i] = alias + strings.TrimSpace(p)
-	}
-	return strings.Join(parts, ", ")
-}

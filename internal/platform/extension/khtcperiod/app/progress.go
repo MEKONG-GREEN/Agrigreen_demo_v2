@@ -246,8 +246,9 @@ func eventIdem(idem, action string, id uuid.UUID) string {
 	return "khtc:" + action + ":" + id.String() + ":" + idem
 }
 
-// ChangeDeadline "Sửa hạn nộp" — chỉ kỳ chưa đóng/hủy. Hạn của kỳ native cap/forms không đổi (sổ pf_forms không có sự
-// kiện sửa hạn): trạng thái Trễ hạn của phiếu ở màn KHTC tính theo hạn mới.
+// ChangeDeadline "Sửa hạn nộp" — chỉ kỳ chưa đóng/hủy. Đổi hạn của kỳ native cap/forms trước (sổ phụ period_due: cờ
+// "Nộp trễ" của lần gửi, Trễ hạn, hạn trên thiết bị theo hạn mới), rồi ghi sự kiện ở sổ KHTC; ghi sổ KHTC lỗi → trả hạn
+// native về hạn cũ (bù như "Mở kỳ").
 func (s *Service) ChangeDeadline(ctx context.Context, id uuid.UUID, in DeadlineInput, idem string) (Detail, error) {
 	c, err := s.writer(ctx)
 	if err != nil {
@@ -276,7 +277,17 @@ func (s *Service) ChangeDeadline(ctx context.Context, id uuid.UUID, in DeadlineI
 	if why, ok := domain.ValidReason(in.Reason); ok {
 		e.Reason = &why
 	}
+	reason := ""
+	if e.Reason != nil {
+		reason = *e.Reason
+	}
+	if err := s.Control.ChangeDue(ctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, in.DueAt, reason, eventIdem(idem, "forms-due", id)); err != nil {
+		return Detail{}, err
+	}
 	if err := s.appendEvent(ctx, c, e, eventIdem(idem, "deadline", id)); err != nil {
+		// Bù: trả hạn kỳ native về hạn hiệu lực cũ (best effort — lỗi bù không che lỗi gốc).
+		_ = s.Control.ChangeDue(ctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, d.DueAt, "Hoàn tác: ghi sổ KHTC không thành công",
+			eventIdem(idem, "forms-due-undo", id))
 		return Detail{}, err
 	}
 	return s.Get(ctx, id)
