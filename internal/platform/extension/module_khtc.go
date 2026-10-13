@@ -11,6 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	khtcfapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtcform/app"
+	khtcfhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtcform/handler"
 	khtcpapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtcperiod/app"
 	khtcphandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtcperiod/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
@@ -22,6 +24,7 @@ import (
 type KHTCDeps struct {
 	Forms       formsport.Publisher
 	Control     formsport.PeriodControl
+	Entry       formsport.Entry // W11.63: nhập, rà soát phiếu (thiếu → route phiếu trả 503)
 	Departments partyport.Departments
 	Crosswalk   port.KHTCSourceCrosswalk // gói PFPUB (bộ quy đổi kỳ nguồn)
 	Plan        port.KHTCPlanDepartments // W11.61 (phòng phụ trách theo Kế hoạch năm)
@@ -34,10 +37,31 @@ type KHTCDeps struct {
 // khtcPeriodService là use case Kỳ KHTC (trường Module.khtcPeriods).
 type khtcPeriodService = khtcpapp.Service
 
-// registerKHTCPeriods gắn route /v1/extension/khtc/*.
+// khtcFormService là use case phiếu Báo cáo cho KHTC (trường Module.khtcForms — W11.63).
+type khtcFormService = khtcfapp.Service
+
+// registerKHTCPeriods gắn route /v1/extension/khtc/* (kỳ — W11.62, phiếu — W11.63).
 func (m *Module) registerKHTCPeriods(rg *gin.RouterGroup) {
 	khtcphandler.Handler{Svc: m.khtcSvc()}.RegisterApp(rg)
+	khtcfhandler.Handler{Svc: m.khtcFormSvc()}.RegisterApp(rg)
 }
+
+// khtcFormSvc dựng use case phiếu KHTC (W11.63) và nối móc: Kế hoạch năm chỉ cho ngừng (không bỏ) hạng mục đã có số liệu ở
+// phiếu (W11.61 EntryUsage); bảng tiến độ kỳ hiện "Lưu nháp" (W11.62 Drafts).
+func (m *Module) khtcFormSvc() *khtcfapp.Service {
+	if m.khtcForms == nil {
+		m.khtcForms = &khtcfapp.Service{DB: m.svc.DB, Clock: m.svc.Clock, Plans: m.KHTCPlans(), Programs: m.KHTCPrograms()}
+		if m.khtc != nil {
+			m.khtc.EntryUsage = m.khtcForms.EntryUsage
+		}
+		m.khtcSvc().Drafts = m.khtcForms.Drafts
+	}
+	return m.khtcForms
+}
+
+// KHTCFormValidator là quy tắc cap/forms của profile kn_khtc (W11.63): bài nộp biểu KHTC-PHIEU phải mang bảng số liệu đã
+// niêm phong qua màn phiếu KHTC (gốc lắp ráp nối vào forms.Deps.Validators).
+func (m *Module) KHTCFormValidator() formsport.Validator { return khtcfapp.Validator{Svc: m.khtcFormSvc()} }
 
 func (m *Module) khtcSvc() *khtcpapp.Service {
 	if m.khtcPeriods == nil {
@@ -55,6 +79,9 @@ func (m *Module) khtcSvc() *khtcpapp.Service {
 func (m *Module) UseKHTCPeriods(d KHTCDeps) {
 	s := m.khtcSvc()
 	s.Forms, s.Control, s.MaxSubmissions = d.Forms, d.Control, d.MaxSubmissions
+	if d.Entry != nil {
+		m.khtcFormSvc().Entry = d.Entry
+	}
 	// Cổng tùy chọn: chỉ ghi khi có (nối riêng bằng Use* khác không bị xóa).
 	if d.Departments != nil {
 		s.Departments = d.Departments

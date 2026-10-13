@@ -76,7 +76,7 @@ var KNProfiles = []formsport.Profile{KNProfile, KNCNTSProfile, KNKHTCProfile}
 // mục cơ sở giết mổ (đơn vị lá BM-01), quy tắc chặn biểu kỳ CNTS, cổng phát hành kỳ native cho pf/extension.
 func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extension.Module, facilities formsport.FacilityDirectory) (*forms.Module, error) {
 	fm, err := forms.New(p, clk, forms.Deps{Approvals: wf.Approvals(), Profiles: KNProfiles, Facilities: facilities,
-		Validators: map[string]formsport.Validator{KNCNTSProfile.Name: kn.CNTSValidator()}})
+		Validators: map[string]formsport.Validator{KNCNTSProfile.Name: kn.CNTSValidator(), KNKHTCProfile.Name: kn.KHTCFormValidator()}})
 	if err != nil {
 		return nil, err
 	}
@@ -85,8 +85,10 @@ func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extens
 	kn.UseFormsFigures(fm.Figures()) // W11.44: tổng hợp CNTS BM-02, BM-18 đọc số liệu kỳ native theo lô
 	// W11.62: Kỳ KHTC — kỳ native kn_khtc (một phiếu mỗi phòng), tối đa KNKHTCProfile.MaxSubmissions lần gửi (tham số
 	// extension.khtc_max_submissions ghi đè). Kế hoạch năm (W11.61) nối trong pf/extension; bộ quy đổi kỳ nguồn (PFPUB) nối
-	// ngay dưới.
-	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), MaxSubmissions: KNKHTCProfile.MaxSubmissions})
+	// ngay dưới. W11.63: phiếu Báo cáo cho KHTC — nhập/rà soát qua cổng Entry; bài nộp kn_khtc phải mang bảng số liệu đã
+	// niêm phong (KHTCFormValidator ở trên).
+	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), Entry: fm.Entry(),
+		MaxSubmissions: KNKHTCProfile.MaxSubmissions})
 	// PFPUB (ADR-0053 §7): kỳ KHTC mở kèm kỳ nguồn quy đổi theo lịch D8; "Đủ dữ liệu" theo cờ chốt của nguồn.
 	kn.UseKHTCSourceCrosswalk(kn.KHTCSourceCrosswalk())
 	return fm, nil

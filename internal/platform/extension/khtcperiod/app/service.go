@@ -78,6 +78,9 @@ type Service struct {
 	Reports   extport.KHTCReportStates
 	// MaxSubmissions: số lần gửi tối đa mặc định (gốc lắp ráp đặt = KNKHTCProfile.MaxSubmissions).
 	MaxSubmissions int
+	// Drafts (tùy chọn, W11.63 nối): phòng đã "Lưu nháp" phiếu ở máy chủ, kèm số lần gửi đã thấy khi lưu — nháp sau lần gửi
+	// cuối, chưa gửi lần nào → trạng thái "Lưu nháp".
+	Drafts func(ctx context.Context, periodID uuid.UUID) (map[string]int64, error)
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

@@ -92,6 +92,9 @@ func (m *Module) Control() port.PeriodControl { return app.Control{Svc: m.svc} }
 // (W11.44 — KN CNTS BM-02, BM-18).
 func (m *Module) Figures() port.FiguresReader { return app.Figures{Svc: m.svc} }
 
+// Entry là cổng nhập/rà soát bài nộp cho module nghiệp vụ có màn nhập riêng (W11.63 — KN phiếu Báo cáo cho KHTC).
+func (m *Module) Entry() port.Entry { return app.Entry{Svc: m.svc} }
+
 // Freezer cho bên dùng có vòng đời kỳ riêng: ghi chốt/mở lại + ảnh chụp trong giao dịch của bên dùng.
 func (m *Module) Freezer() port.Freezer { return m.svc }
 

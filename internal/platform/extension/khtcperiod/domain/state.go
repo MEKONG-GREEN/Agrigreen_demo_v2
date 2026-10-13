@@ -139,7 +139,7 @@ func CanChangeDeadline(state string) error {
 // Trạng thái phiếu.
 const (
 	FormNotStarted = "not_started"   // Chưa nhập
-	FormDraft      = "draft"         // Lưu nháp — CHỪA CHỖ: nháp phiếu ở máy chủ thuộc W11.63 (cap/forms chưa có sổ nháp)
+	FormDraft      = "draft"         // Lưu nháp — nháp phiếu ở máy chủ (W11.63, sổ pf_extension.khtc_form_sheet)
 	FormLate       = "late"          // Trễ hạn — quá hạn, chưa gửi lần nào; vẫn gửi được
 	FormSubmitted  = "submitted"     // Đã gửi (lần n)
 	FormSupplement = "supplement"    // Yêu cầu bổ sung — số liệu lần n vẫn dùng cho báo cáo đến khi gửi lại
@@ -163,6 +163,7 @@ type FormFacts struct {
 	Overdue  bool   // quá hạn nộp của kỳ KHTC
 	Terminal string // sự kiện kết thúc của kỳ: "" | PeriodClosed | PeriodCancelled
 	Max      int    // số lần gửi tối đa (0 = không giới hạn)
+	Draft    bool   // W11.63: phòng đã "Lưu nháp" ở máy chủ sau lần gửi cuối (chưa gửi lần nào → Lưu nháp)
 }
 
 // FormView là trạng thái phiếu kèm thao tác KHTC được làm.
@@ -193,6 +194,8 @@ func FormStateOf(f FormFacts) FormView {
 		}
 	case f.Versions == 0 && f.Overdue:
 		v.State = FormLate
+	case f.Versions == 0 && f.Draft:
+		v.State = FormDraft
 	case f.Versions == 0:
 		v.State = FormNotStarted
 	case f.Decision == "accepted":

@@ -82,6 +82,8 @@ type Module struct {
 	ob *obapp.Service
 	// W11.64: bộ đọc nguồn module của Kỳ KHTC (extension/khtcsource, module_khtcsource.go).
 	khtcSrc *khtcSourceService
+	// W11.63: phiếu Báo cáo cho KHTC (extension/khtcform, module_khtc.go).
+	khtcForms *khtcFormService
 }
 
 // New tạo module với pool của vai extension_app.

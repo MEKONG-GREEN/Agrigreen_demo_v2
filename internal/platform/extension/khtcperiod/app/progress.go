@@ -3,6 +3,7 @@ package app
 // Chi tiết kỳ, bảng tiến độ phiếu + nguồn (B6), sửa hạn, đóng kỳ, hủy kỳ (B7), phiếu cơ sở ở cap/forms.
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -98,6 +99,10 @@ func (s *Service) project(ctx context.Context, c caller, p store.Period, evs []s
 		}
 	}
 	f := domain.Facts{Forms: len(p.Departments), Overdue: d.Overdue}
+	var drafts map[string]int64
+	if s.Drafts != nil && term == "" {
+		drafts, _ = s.Drafts(ctx, p.ID) // lỗi đọc nháp không chặn bảng tiến độ (chỉ mất nhãn "Lưu nháp")
+	}
 	for _, dept := range p.Departments {
 		row := FormRow{Department: dept, DepartmentName: names[dept]}
 		u, ok := byUnit[dept]
@@ -105,8 +110,9 @@ func (s *Service) project(ctx context.Context, c caller, p store.Period, evs []s
 		case !ok:
 			row.View = domain.FormView{State: domain.FormUnknown}
 		default:
+			n, hasDraft := drafts[dept]
 			row.View = domain.FormStateOf(domain.FormFacts{Versions: u.Versions, Decision: u.Decision, Overdue: d.Overdue, Terminal: term,
-				Max: p.MaxSubmissions})
+				Max: p.MaxSubmissions, Draft: hasDraft && n == u.Versions})
 			row.LastSubmittedAt, row.ReviewedAt, row.ReviewNote, row.Late = u.LastSubmittedAt, u.ReviewedAt, u.ReviewNote, u.Late
 		}
 		if u.Versions > 0 {
@@ -374,11 +380,13 @@ func (s *Service) Cancel(ctx context.Context, id uuid.UUID, reason, idem string)
 // Phiếu cơ sở ở cap/forms
 // ---------------------------------------------------------------------------
 
-// BaseFields là trường của phiếu cơ sở "Báo cáo cho KHTC" (W11.62): phần lời văn chung của BRD (kết quả trong kỳ, khó
-// khăn, nhiệm vụ kỳ tới, kiến nghị). Cột số theo Kế hoạch năm ("Từ Kế hoạch năm", "Lũy kế kỳ trước", "Điều chỉnh kỳ
-// trước") thuộc mẫu phiếu W11.63 — cài phiên bản mới cùng mã.
+// BaseFields là trường của biểu cap/forms "Báo cáo cho KHTC" (KHTC-PHIEU). Phiên bản 2 (W11.63): lưới hạng mục và mục lời
+// văn theo mẫu phiếu từng phòng nằm ở bảng số liệu pf_extension.khtc_form_sheet; bài nộp mang mã bảng đã niêm phong
+// (trường FieldSheet — profile kn_khtc có Validator của W11.63 bắt buộc). Bốn ô lời văn của phiên bản 1 (W11.62) giữ
+// để kỳ cũ đọc được, không còn bắt buộc.
 var BaseFields = []map[string]any{
-	{"key": "ket_qua", "label": "Kết quả thực hiện trong kỳ", "type": "text", "required": true, "group": "Báo cáo cho KHTC"},
+	{"key": FieldSheet, "label": "Bảng số liệu (hệ thống)", "type": "text", "required": false, "group": "Hệ thống"},
+	{"key": "ket_qua", "label": "Kết quả thực hiện trong kỳ", "type": "text", "required": false, "group": "Báo cáo cho KHTC"},
 	{"key": "kho_khan", "label": "Khó khăn, vướng mắc", "type": "text", "required": false, "group": "Báo cáo cho KHTC"},
 	{"key": "nhiem_vu_ky_toi", "label": "Nhiệm vụ kỳ tới", "type": "text", "required": false, "group": "Báo cáo cho KHTC"},
 	{"key": "kien_nghi", "label": "Kiến nghị, đề xuất", "type": "text", "required": false, "group": "Báo cáo cho KHTC"},
@@ -406,17 +414,20 @@ func (s *Service) Template(ctx context.Context) (TemplateState, error) {
 	return TemplateState{Code: ref.Code, Version: ref.Version, Title: ref.Title}, nil
 }
 
+// FieldSheet là trường mã bảng số liệu (khớp khtcform/domain.FieldSheet — W11.63).
+const FieldSheet = "bang_so_lieu"
+
 // InstallTemplate cài phiếu cơ sở (vai define_by của profile kn_khtc: Admin KN, reports_admin — cap/forms kiểm). Đã cài
-// → giữ nguyên.
+// phiên bản có trường bảng số liệu → giữ nguyên; phiên bản 1 (W11.62, chưa có trường) → cài phiên bản mới cùng mã.
 func (s *Service) InstallTemplate(ctx context.Context, idem string) (TemplateState, error) {
 	if s.Forms == nil {
 		return TemplateState{}, ErrDependency.WithDetail("chưa nối cap/forms cho Kỳ KHTC")
 	}
 	ref, err := s.Forms.LatestTemplate(ctx, domain.ProfileKHTC, domain.TemplateCode)
-	if err == nil {
+	if err == nil && bytes.Contains(ref.Fields, []byte(`"`+FieldSheet+`"`)) {
 		return TemplateState{Code: ref.Code, Version: ref.Version, Title: ref.Title}, nil
 	}
-	if !errors.Is(err, formsport.ErrTemplateNotFound) {
+	if err != nil && !errors.Is(err, formsport.ErrTemplateNotFound) {
 		return TemplateState{}, err
 	}
 	raw, err := json.Marshal(BaseFields)

@@ -11,6 +11,7 @@ depends:
   pf/workflow: ">=1.0 <2"
 provides:
   ports:
+    - Entry
     - FacilityDirectory
     - FiguresReader
     - Freezer
