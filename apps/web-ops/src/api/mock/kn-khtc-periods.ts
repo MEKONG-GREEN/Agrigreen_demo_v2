@@ -180,7 +180,7 @@ export function planOf(b: Input): Plan | { field: string; reason: string } {
 }
 
 // --- trạng thái ---
-interface Stored {
+export interface Stored {
   p: Period;
   submitted: Record<
     string,
@@ -189,6 +189,13 @@ interface Stored {
   terminal: "" | "closed" | "cancelled";
 }
 const STORE: Stored[] = [];
+/** W11.63: phiếu đã "Lưu nháp" ở máy chủ, khóa `${kỳ}:${phòng}` → số lần gửi đã thấy khi lưu (giả lập phiếu KHTC). */
+export const KHTC_DRAFTS = new Map<string, number>();
+/** W11.63: kho kỳ KHTC cho giả lập phiếu (kn-khtc-forms.ts). */
+export function khtcMockStore(): Stored[] {
+  seed();
+  return STORE;
+}
 let TEMPLATE_VERSION = 1;
 
 function project(s: Stored): Period {
@@ -206,7 +213,12 @@ function project(s: Stored): Period {
         : sub.decision === "accepted"
           ? "confirmed"
           : "locked";
-    else if (!sub) state = overdue ? "late" : "not_started";
+    else if (!sub)
+      state = overdue
+        ? "late"
+        : KHTC_DRAFTS.get(`${s.p.id}:${d.code}`) === 0
+          ? "draft"
+          : "not_started";
     else
       state =
         sub.decision === "accepted"

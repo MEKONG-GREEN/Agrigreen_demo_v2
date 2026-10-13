@@ -66,6 +66,7 @@ import { cntsPeriodRoutes } from "./kn-cnts-periods";
 import { khtcPeriodRoutes } from "./kn-khtc-periods";
 import { cntsOutbreakRoutes } from "./kn-cnts-outbreak";
 import { khtcSourceRoutes } from "./kn-khtc-sources";
+import { khtcFormRoutes } from "./kn-khtc-forms";
 import { hrmStaffRoutes } from "./kn-hrm-staff";
 import { contactRoutes } from "./kn-contact";
 import { hrmReportRoutes } from "./kn-hrm-reports";
@@ -160,6 +161,7 @@ const appRoutes: Route[] = [
   ...khtcPeriodRoutes, // W11.62 Kỳ KHTC (/v1/extension/khtc/*)
   ...cntsOutbreakRoutes, // W11.49 Báo cáo dịch bệnh BM-10, báo nghi dịch (/v1/extension/cnts/outbreaks*, /suspects*)
   ...khtcSourceRoutes, // W11.64 Cập nhật số liệu (/v1/extension/khtc/periods/{id}/sources*)
+  ...khtcFormRoutes, // W11.63 phiếu Báo cáo cho KHTC (/v1/extension/khtc/periods/{id}/forms/*, my-forms)
   // --- dom/hrm W11.22: hồ sơ nhân sự (/v1/hrm/access|units|staff*|permissions*) ---
   ...hrmStaffRoutes,
   // --- pf/contact W11.23: Contact dùng chung (/v1/contacts/*) — lọc trường theo vai ---

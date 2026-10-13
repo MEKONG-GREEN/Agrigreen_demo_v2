@@ -4,6 +4,7 @@
 // (ô chọn Loại / Năm / Tuần·Tháng·Quý, hệ thống tự điền khoảng thời gian, tên kỳ, hạn; số lần gửi tối đa chỉ đọc), chi
 // tiết kỳ (4 thẻ đếm, tiến độ phiếu các phòng và nguồn module, log), Sửa hạn nộp, Đóng kỳ, Hủy kỳ. Phòng nộp phiếu ở
 // module của phòng (/v1/forms, profile kn_khtc).
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
@@ -582,6 +583,7 @@ export function KhtcPeriodsScreen() {
                         <th>Lần gửi</th>
                         <th>Gửi lúc</th>
                         <th>Ghi chú</th>
+                        <th />
                       </tr>
                     </thead>
                     <tbody>
@@ -603,6 +605,16 @@ export function KhtcPeriodsScreen() {
                           </td>
                           <td>{dt(f.last_submitted_at)}</td>
                           <td>{f.review_note}</td>
+                          <td>
+                            {f.attempt ? (
+                              <Link
+                                className="btn"
+                                href={`/kn/khtc/ra-soat/${p.id}?department=${f.department}`}
+                              >
+                                Rà soát
+                              </Link>
+                            ) : null}
+                          </td>
                         </tr>
                       ))}
                       {p.sources.map((s) => (
@@ -629,6 +641,7 @@ export function KhtcPeriodsScreen() {
                           <td>
                             {s.calendar_id} {s.calendar_version}
                           </td>
+                          <td />
                         </tr>
                       ))}
                     </tbody>
