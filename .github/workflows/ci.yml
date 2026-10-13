@@ -759,7 +759,7 @@ jobs:
       # thanh con tin cua thuong nguon. Khi doi ngu da quen thi doi exit-code
       # thanh "1" cho khop voi job images san co.
       - name: Trivy - quet anh (bao cao, khong chan)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/agrigreen-postgres:${{ github.sha }}
           severity: "CRITICAL,HIGH"
