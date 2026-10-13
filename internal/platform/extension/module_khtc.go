@@ -1,7 +1,7 @@
 package extension
 
 // Nối Kỳ KHTC (W11.62 — extension/khtcperiod, BRD KHTC v2.2 FN-TI-02.03): kỳ KHTC = kỳ native cap/forms profile kn_khtc
-// (một phiếu mỗi phòng) + sổ riêng của KHTC (pf 20261013070316). Gốc lắp ráp gọi UseKHTCPeriods sau khi dựng pf/forms; route
+// (một phiếu mỗi phòng) + sổ riêng của KHTC (pf 20261013120542). Gốc lắp ráp gọi UseKHTCPeriods sau khi dựng pf/forms; route
 // /v1/extension/khtc/* luôn gắn (thiếu cap/forms → 503 extension.dependency_unavailable).
 
 import (

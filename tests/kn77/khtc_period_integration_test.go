@@ -1,6 +1,6 @@
 package kn77_test
 
-// W11.62 — Kỳ KHTC trên module THẬT qua HTTP: pf/extension (/v1/extension/khtc/*, sổ pf 20261013070316) + pf/forms
+// W11.62 — Kỳ KHTC trên module THẬT qua HTTP: pf/extension (/v1/extension/khtc/*, sổ pf 20261013120542) + pf/forms
 // (kỳ native kn_khtc, /v1/forms/* — phòng nộp, KHTC rà soát) trên PostgreSQL, middleware Idempotency-Key thật.
 // Tên kiểm thử con theo nhóm KH2 của BRD KHTC v2.2 (Mục II.4, II.5, FN-TI-02.03).
 

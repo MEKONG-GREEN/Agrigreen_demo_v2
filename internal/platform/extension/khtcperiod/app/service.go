@@ -6,7 +6,7 @@
 // Vì sao kỳ native cap/forms (không làm máy kỳ riêng): W11.05 đã có sẵn profile kn_khtc với đơn vị lá = phòng ban,
 // giới hạn lần gửi khóa ở DB (trg_submission_limit), rà soát bốn mắt (yêu cầu bổ sung = trả lại, xác nhận = chấp
 // nhận), Không nộp / Đã khóa lúc chốt, hủy kỳ là trạng thái cuối, ảnh chụp đóng băng. Kỳ KHTC chỉ thêm phần riêng của
-// KHTC (tên kỳ, khóa chống trùng, ngày chốt, hạn xuất, kỳ nguồn, đóng ngoại lệ) ở sổ pf_extension (pf 20261013070316).
+// KHTC (tên kỳ, khóa chống trùng, ngày chốt, hạn xuất, kỳ nguồn, đóng ngoại lệ) ở sổ pf_extension (pf 20261013120542).
 package app
 
 import (
