@@ -47,6 +47,8 @@ const (
 	DeptTrongTrot       = "trong_trot"
 	DeptChanNuoiThuySan = "chan_nuoi_thuy_san"
 	DeptKeHoachTaiChinh = "ke_hoach_tai_chinh"
+	// Phòng Thông tin Tuyên truyền — vận hành Báo giá (pf/price đọc tuần báo cáo qua Service.ReportWeekOf).
+	DeptThongTinTruyenThong = "thong_tin_truyen_thong"
 )
 
 // Phiên bản lịch (một dãy dùng chung cho mọi phòng — xem đầu tệp).
