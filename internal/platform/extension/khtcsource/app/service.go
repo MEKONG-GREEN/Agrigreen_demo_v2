@@ -37,7 +37,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
-// Mã lỗi (docs/errors/kn-extension-khtc-source.md). Không tìm thấy / đã đóng / phụ thuộc dùng chung mã của Kỳ KHTC.
+// Mã lỗi (docs/errors/pf-extension-khtc-source.md). Không tìm thấy / đã đóng / phụ thuộc dùng chung mã của Kỳ KHTC.
 var (
 	ErrNotFound   = problem.New(http.StatusNotFound, "extension.khtc_period_not_found", "Không tìm thấy kỳ KHTC")
 	ErrTerminal   = problem.New(http.StatusConflict, "extension.khtc_period_terminal", "Kỳ đã đóng hoặc đã hủy")

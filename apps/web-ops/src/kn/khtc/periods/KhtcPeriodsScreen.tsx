@@ -22,6 +22,7 @@ import {
   type KhtcPeriod,
   type KhtcReportType,
 } from "./api";
+import { KhtcSourcesPanel } from "./KhtcSourcesPanel";
 
 const KHTC = "ke_hoach_tai_chinh";
 
@@ -632,6 +633,7 @@ export function KhtcPeriodsScreen() {
                       ))}
                     </tbody>
                   </table>
+                  <KhtcSourcesPanel periodId={p.id} />
                   <h3>Log</h3>
                   <ul aria-label="Log kỳ">
                     <li>

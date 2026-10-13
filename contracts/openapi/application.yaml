@@ -8323,6 +8323,62 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
         "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  # --- pf/extension: bộ đọc nguồn module của Kỳ KHTC (W11.64 — BRD KHTC v2.2 BR-DL-02…04; ADR-0053 §8). "Cập nhật số liệu" chụp
+  # bất biến port KHTCSources (chỉ cán bộ KHTC phụ trách kỳ — người mở kỳ, ⚑3); "Nguồn đã thay đổi" so figures_hash (không so
+  # status_hash), chỉ cảnh báo. Số thập phân là chuỗi.
+  /v1/extension/khtc/periods/{id}/sources:
+    get:
+      summary: Trạng thái nguồn của kỳ — mốc dữ liệu từng nguồn, số đã chụp của hạng mục nguồn module, "Nguồn đã thay đổi"
+      operationId: extensionKhtcPeriodSources
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Trạng thái nguồn
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCSourceStatus"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/sources/refresh:
+    post:
+      summary: Cập nhật số liệu — ảnh chụp mới của số liệu nguồn đã chốt; lịch sử cũ → mới so với ảnh chụp trước
+      operationId: extensionKhtcPeriodSourcesRefresh
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Trạng thái nguồn sau khi chụp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCSourceStatus"}
+        "403": {description: "forbidden | extension.khtc_refresh_not_owner", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_period_terminal, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/sources/history:
+    get:
+      summary: Lịch sử Cập nhật số liệu — người bấm, thời điểm, giá trị cũ → mới (mới trước)
+      operationId: extensionKhtcPeriodSourcesHistory
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KHTCSourceHistoryItem"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
   # --- pf/hrm (dom/hrm, W11.21 — ADR-0050): danh mục nhân sự Phòng HCTH (BRD HCTH v3.0 FN-19, UR-ADM-08). Đọc: Admin và Cấp Tỉnh
   # của Phòng Hành chính – Tổng hợp (port.Access ở gốc lắp ráp); ghi: Admin. Mọi bản ghi là phiên bản (sổ chỉ ghi thêm); ngừng sử
   # dụng = phiên bản active=false (BR-01). Số thập phân (hệ số, PCCV, %) là chuỗi. Không dữ liệu cá nhân.
@@ -17671,6 +17727,129 @@ components:
       type: object
       properties:
         reason: {type: string, description: "10–500 ký tự; bắt buộc khi hủy kỳ và khi đóng kỳ còn thiếu dữ liệu"}
+    KHTCSourceSnapshot:
+      type: object
+      description: Một lần "Cập nhật số liệu" (W11.64) — bất biến.
+      required: [id, no, taken_at, actor_ref, closed, target_calendar, crosswalk_version, plan_version_id, figures_hash, status_hash, row_count, value_count, change_count]
+      properties:
+        id: {type: string, format: uuid}
+        no: {type: integer, format: int64, description: Số thứ tự ảnh chụp của kỳ}
+        taken_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        actor_name: {type: string}
+        closed: {type: boolean, description: Mọi phòng nguồn đã chốt cho mọi tuần của kỳ (D17)}
+        target_calendar: {type: string, description: "Lịch KHTC (D8), vd ke_hoach_tai_chinh:v2"}
+        crosswalk_version: {type: string}
+        plan_version_id: {type: string, format: uuid, nullable: true}
+        figures_hash: {type: string}
+        status_hash: {type: string}
+        row_count: {type: integer}
+        value_count: {type: integer}
+        change_count: {type: integer}
+    KHTCSourceAsOf:
+      type: object
+      description: Mốc dữ liệu của một nguồn (phòng × biểu).
+      required: [department, source_module, form_code, native_keys, closed_at, snapshot_no, closed, missing, unavailable, fallback, confirmation]
+      properties:
+        department: {type: string}
+        source_module: {type: string}
+        form_code: {type: string, nullable: true, description: "null: phòng không có số (Missing) hoặc nguồn chưa công bố"}
+        native_keys: {type: array, items: {type: string}, description: Khóa kỳ nguồn theo lịch của nguồn}
+        closed_at: {type: string, format: date-time, nullable: true}
+        snapshot_no: {type: integer, format: int64, nullable: true}
+        closed: {type: boolean}
+        missing: {type: boolean}
+        unavailable: {type: boolean}
+        fallback: {type: boolean, description: "Giá: ngày đã duyệt gần nhất trước kỳ (D22)"}
+        confirmation: {type: string, enum: [confirmed, unconfirmed]}
+    KHTCSourceEntry:
+      type: object
+      required: [ref, code, name]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+    KHTCSourceValue:
+      type: object
+      description: Số của một khóa nguồn module (hạng mục Kế hoạch năm) trong ảnh chụp — lũy kế của nguồn (D18), giá min/max toàn tỉnh (D22).
+      required: [source_key, entries, mode, invalid, cumulative, base, increment, year_to_date, sum, price_min, price_max, price_day, price_days, unconfirmed, closed, provisional, no_source, frozen, source_changed, fallback, unavailable, source_keys]
+      properties:
+        source_key: {type: string}
+        entries: {type: array, items: {$ref: "#/components/schemas/KHTCSourceEntry"}}
+        mode: {type: string, description: "cum | season | sum | price (rỗng khi khóa sai dạng)"}
+        invalid: {type: boolean, description: Khóa nguồn sai dạng — hạng mục không có số}
+        cumulative: {type: string, nullable: true}
+        base: {type: string, nullable: true}
+        base_ref: {type: string, description: "frozen:<tuần> | current:<tuần> | reset | start"}
+        increment: {type: string, nullable: true}
+        year_to_date: {type: string, nullable: true}
+        sum: {type: string, nullable: true}
+        price_min: {type: string, nullable: true}
+        price_max: {type: string, nullable: true}
+        price_day: {type: string, format: date, nullable: true}
+        price_days:
+          type: array
+          items:
+            type: object
+            required: [day, min, max]
+            properties:
+              day: {type: string, format: date}
+              min: {type: string}
+              max: {type: string}
+        unconfirmed: {type: string, nullable: true, description: "Phần Chưa xác nhận (D2), đã tính trong tổng"}
+        closed: {type: boolean}
+        provisional: {type: boolean, description: Tạm tính (BR-DL-03)}
+        no_source: {type: boolean}
+        frozen: {type: boolean}
+        source_changed: {type: boolean}
+        fallback: {type: boolean}
+        unavailable: {type: boolean}
+        source_keys: {type: array, items: {type: string}}
+    KHTCSourceChange:
+      type: object
+      description: Kỳ nguồn khác ảnh chụp ("Nguồn đã thay đổi" — chỉ cảnh báo).
+      required: [kind, target_key, department, source_module, form_code, native_key, closed_at, was_closed_at]
+      properties:
+        kind: {type: string, enum: [added, removed, figures]}
+        target_key: {type: string}
+        department: {type: string}
+        source_module: {type: string}
+        form_code: {type: string}
+        native_key: {type: string}
+        closed_at: {type: string, format: date-time, nullable: true}
+        was_closed_at: {type: string, format: date-time, nullable: true}
+    KHTCSourceStatus:
+      type: object
+      required: [period_id, owner_ref, terminal, can_refresh, source_changed, live, snapshot, as_of, values, changes]
+      properties:
+        period_id: {type: string, format: uuid}
+        owner_ref: {type: string, format: uuid, description: Cán bộ KHTC phụ trách kỳ (người mở kỳ — ⚑3)}
+        owner_name: {type: string}
+        terminal: {type: string, nullable: true, description: "closed | cancelled; null khi kỳ chưa đóng/hủy"}
+        can_refresh: {type: boolean}
+        source_changed: {type: boolean}
+        live: {type: boolean, description: Mốc dữ liệu đọc từ port (chưa có ảnh chụp)}
+        live_error: {type: string}
+        snapshot: {allOf: [{$ref: "#/components/schemas/KHTCSourceSnapshot"}], nullable: true}
+        as_of: {type: array, items: {$ref: "#/components/schemas/KHTCSourceAsOf"}}
+        values: {type: array, items: {$ref: "#/components/schemas/KHTCSourceValue"}}
+        changes: {type: array, items: {$ref: "#/components/schemas/KHTCSourceChange"}}
+    KHTCSourceHistoryItem:
+      type: object
+      required: [snapshot, changes]
+      properties:
+        snapshot: {$ref: "#/components/schemas/KHTCSourceSnapshot"}
+        changes:
+          type: array
+          items:
+            type: object
+            required: [source_key, entries, field, old, new]
+            properties:
+              source_key: {type: string}
+              entries: {type: array, items: {$ref: "#/components/schemas/KHTCSourceEntry"}}
+              field: {type: string, enum: [cumulative, increment, sum, price_min, price_max]}
+              old: {type: string, nullable: true}
+              new: {type: string, nullable: true}
     KHTCOpenInput:
       type: object
       required: [report_type]

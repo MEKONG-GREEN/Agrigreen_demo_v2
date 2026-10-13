@@ -5861,6 +5861,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/periods/{id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái nguồn của kỳ — mốc dữ liệu từng nguồn, số đã chụp của hạng mục nguồn module, "Nguồn đã thay đổi" */
+        get: operations["extensionKhtcPeriodSources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/sources/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cập nhật số liệu — ảnh chụp mới của số liệu nguồn đã chốt; lịch sử cũ → mới so với ảnh chụp trước */
+        post: operations["extensionKhtcPeriodSourcesRefresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/sources/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử Cập nhật số liệu — người bấm, thời điểm, giá trị cũ → mới (mới trước) */
+        get: operations["extensionKhtcPeriodSourcesHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/hrm/status": {
         parameters: {
             query?: never;
@@ -15422,6 +15473,142 @@ export interface components {
         KHTCReason: {
             /** @description 10–500 ký tự; bắt buộc khi hủy kỳ và khi đóng kỳ còn thiếu dữ liệu */
             reason?: string;
+        };
+        /** @description Một lần "Cập nhật số liệu" (W11.64) — bất biến. */
+        KHTCSourceSnapshot: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: int64
+             * @description Số thứ tự ảnh chụp của kỳ
+             */
+            no: number;
+            /** Format: date-time */
+            taken_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_name?: string;
+            /** @description Mọi phòng nguồn đã chốt cho mọi tuần của kỳ (D17) */
+            closed: boolean;
+            /** @description Lịch KHTC (D8), vd ke_hoach_tai_chinh:v2 */
+            target_calendar: string;
+            crosswalk_version: string;
+            /** Format: uuid */
+            plan_version_id: string | null;
+            figures_hash: string;
+            status_hash: string;
+            row_count: number;
+            value_count: number;
+            change_count: number;
+        };
+        /** @description Mốc dữ liệu của một nguồn (phòng × biểu). */
+        KHTCSourceAsOf: {
+            department: string;
+            source_module: string;
+            /** @description null: phòng không có số (Missing) hoặc nguồn chưa công bố */
+            form_code: string | null;
+            /** @description Khóa kỳ nguồn theo lịch của nguồn */
+            native_keys: string[];
+            /** Format: date-time */
+            closed_at: string | null;
+            /** Format: int64 */
+            snapshot_no: number | null;
+            closed: boolean;
+            missing: boolean;
+            unavailable: boolean;
+            /** @description Giá: ngày đã duyệt gần nhất trước kỳ (D22) */
+            fallback: boolean;
+            /** @enum {string} */
+            confirmation: "confirmed" | "unconfirmed";
+        };
+        KHTCSourceEntry: {
+            /** Format: uuid */
+            ref: string;
+            code: string;
+            name: string;
+        };
+        /** @description Số của một khóa nguồn module (hạng mục Kế hoạch năm) trong ảnh chụp — lũy kế của nguồn (D18), giá min/max toàn tỉnh (D22). */
+        KHTCSourceValue: {
+            source_key: string;
+            entries: components["schemas"]["KHTCSourceEntry"][];
+            /** @description cum | season | sum | price (rỗng khi khóa sai dạng) */
+            mode: string;
+            /** @description Khóa nguồn sai dạng — hạng mục không có số */
+            invalid: boolean;
+            cumulative: string | null;
+            base: string | null;
+            /** @description frozen:<tuần> | current:<tuần> | reset | start */
+            base_ref?: string;
+            increment: string | null;
+            year_to_date: string | null;
+            sum: string | null;
+            price_min: string | null;
+            price_max: string | null;
+            /** Format: date */
+            price_day: string | null;
+            price_days: {
+                /** Format: date */
+                day: string;
+                min: string;
+                max: string;
+            }[];
+            /** @description Phần Chưa xác nhận (D2), đã tính trong tổng */
+            unconfirmed: string | null;
+            closed: boolean;
+            /** @description Tạm tính (BR-DL-03) */
+            provisional: boolean;
+            no_source: boolean;
+            frozen: boolean;
+            source_changed: boolean;
+            fallback: boolean;
+            unavailable: boolean;
+            source_keys: string[];
+        };
+        /** @description Kỳ nguồn khác ảnh chụp ("Nguồn đã thay đổi" — chỉ cảnh báo). */
+        KHTCSourceChange: {
+            /** @enum {string} */
+            kind: "added" | "removed" | "figures";
+            target_key: string;
+            department: string;
+            source_module: string;
+            form_code: string;
+            native_key: string;
+            /** Format: date-time */
+            closed_at: string | null;
+            /** Format: date-time */
+            was_closed_at: string | null;
+        };
+        KHTCSourceStatus: {
+            /** Format: uuid */
+            period_id: string;
+            /**
+             * Format: uuid
+             * @description Cán bộ KHTC phụ trách kỳ (người mở kỳ — ⚑3)
+             */
+            owner_ref: string;
+            owner_name?: string;
+            /** @description closed | cancelled; null khi kỳ chưa đóng/hủy */
+            terminal: string | null;
+            can_refresh: boolean;
+            source_changed: boolean;
+            /** @description Mốc dữ liệu đọc từ port (chưa có ảnh chụp) */
+            live: boolean;
+            live_error?: string;
+            snapshot: components["schemas"]["KHTCSourceSnapshot"] | null;
+            as_of: components["schemas"]["KHTCSourceAsOf"][];
+            values: components["schemas"]["KHTCSourceValue"][];
+            changes: components["schemas"]["KHTCSourceChange"][];
+        };
+        KHTCSourceHistoryItem: {
+            snapshot: components["schemas"]["KHTCSourceSnapshot"];
+            changes: {
+                source_key: string;
+                entries: components["schemas"]["KHTCSourceEntry"][];
+                /** @enum {string} */
+                field: "cumulative" | "increment" | "sum" | "price_min" | "price_max";
+                old: string | null;
+                new: string | null;
+            }[];
         };
         KHTCOpenInput: {
             /** @enum {string} */
@@ -27644,6 +27831,94 @@ export interface operations {
             422: components["responses"]["Problem"];
             /** @description extension.dependency_unavailable */
             503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPeriodSources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trạng thái nguồn */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCSourceStatus"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPeriodSourcesRefresh: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trạng thái nguồn sau khi chụp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCSourceStatus"];
+                };
+            };
+            /** @description forbidden | extension.khtc_refresh_not_owner */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_period_terminal */
+            409: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPeriodSourcesHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KHTCSourceHistoryItem"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
         };
     };
     hrmStatus: {

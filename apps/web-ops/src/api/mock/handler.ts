@@ -64,6 +64,7 @@ import { priceTicketRoutes } from "./kn-price-tickets";
 import { cntsPeriodRoutes } from "./kn-cnts-periods";
 import { khtcPeriodRoutes } from "./kn-khtc-periods";
 import { cntsOutbreakRoutes } from "./kn-cnts-outbreak";
+import { khtcSourceRoutes } from "./kn-khtc-sources";
 import { hrmStaffRoutes } from "./kn-hrm-staff";
 import { apiClientAdminRoutes, meteringAdminRoutes } from "./g5";
 
@@ -154,6 +155,7 @@ const appRoutes: Route[] = [
   ...cntsPeriodRoutes, // W11.42 biểu kỳ Cấp Xã CNTS (/v1/extension/cnts/*, /v1/forms/* profile kn_cnts)
   ...khtcPeriodRoutes, // W11.62 Kỳ KHTC (/v1/extension/khtc/*)
   ...cntsOutbreakRoutes, // W11.49 Báo cáo dịch bệnh BM-10, báo nghi dịch (/v1/extension/cnts/outbreaks*, /suspects*)
+  ...khtcSourceRoutes, // W11.64 Cập nhật số liệu (/v1/extension/khtc/periods/{id}/sources*)
   // --- dom/hrm W11.22: hồ sơ nhân sự (/v1/hrm/access|units|staff*|permissions*) ---
   ...hrmStaffRoutes,
   ...priceBoardRoutes, // W11.76 duyệt / mở duyệt bảng giá ngày
