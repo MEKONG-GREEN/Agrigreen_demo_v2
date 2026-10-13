@@ -108,7 +108,9 @@ describe("lịch tuần theo phòng ban (D8)", () => {
     const w = d.split("week", "2026-09-22", "2026-09-28", "", cnts.rule, d.defaultDeadline("week", cnts.rule), 3);
     expect(w.map((p) => p.label)).toEqual(["Tuần 39/2026"]); // BRD CNTS: tuần 39 = 22/09–28/09/2026
     expect(d.calendarAt("ke_hoach_tai_chinh", "2026-11-04").calendar_version).toBe(2);
-    expect(d.calendarAt("ke_hoach_tai_chinh", "2026-10-28").calendar_version).toBe(1);
+    // W11.64: KHTC nạp sẵn Thứ Tư – Thứ Ba mọi ngày (không còn v1 trước 04/11).
+    expect(d.calendarAt("ke_hoach_tai_chinh", "2026-10-28").calendar_version).toBe(2);
+    expect(d.calendarAt("ke_hoach_tai_chinh", "2026-10-28").calendar_source).toBe("builtin");
     expect(d.parseRule(d.ruleTag(cnts.rule))).toEqual(cnts.rule);
     d.DEPT_PERIOD_RULES.set("trong_trot", "kn.period_rule/v2;week_start=thu;cal=trong_trot:v4");
     try {

@@ -156,7 +156,7 @@
 - Quyền: `r_extension` là thành viên `r_extension_pub`, `r_forms_pub`, `r_price_pub` (`dbadmin.PubReaders`, §4).
 - Port mức thấp `ClosedFigures` (kỳ nguồn nguyên dạng, `Converted`) giữ lại cho chẩn đoán và kiểm thử. KHTC chỉ dùng `KHTCSources`.
 - **Kỳ KHTC (W11.62):** `Module.KHTCSourceCrosswalk()` cài `port.KHTCSourceCrosswalk` bằng chính port này (`closedfig.KHTCCrosswalk`), nối ở `cmd/api-platform/assembly/forms.go` (`kn.UseKHTCSourceCrosswalk`).
-  - `Sources(kind, key, from, to, phòng)`: mọi kỳ nguồn (mỗi biểu) quy vào kỳ KHTC theo ngày cuối, tham chiếu (`calendar_id`, `calendar_version`, khóa gốc), mã nguồn `<module>:<biểu>` (vd `pf/forms:BM-04`, `pf/extension:PL01`, `pf/price:PRICE-BOARD`). Ngày duyệt giá lấy dự phòng (Fallback) không phải kỳ nguồn của kỳ.
+  - `Sources(kind, key, from, to, phòng)`: mọi kỳ nguồn (mỗi biểu) quy vào kỳ KHTC theo ngày cuối, tham chiếu (`calendar_id`, `calendar_version`, khóa gốc), mã nguồn `<module, "/" → "_">.<biểu>` viết thường (vd `pf_forms.bm-04`, `pf_extension.pl01`, `pf_price.price-board` — W11.64 đổi từ dạng `pf/forms:BM-04` để khớp ràng buộc cột `khtc_period_source.source`; kỳ không theo lịch tuần ghi `calendar_version` = `-`). Ngày duyệt giá lấy dự phòng (Fallback) không phải kỳ nguồn của kỳ.
   - `States(refs)`: cờ chốt (biểu của kỳ nguồn đã chốt và có số) và lần chốt gần nhất, cùng thứ tự; tham chiếu không còn khớp → chưa chốt. "Đủ dữ liệu" của Kỳ KHTC dùng cờ này.
   - Lịch KHTC = `(*reportcycle/app.Service).CalendarAt(ctx, ke_hoach_tai_chinh, ngày đầu kỳ)` (D8). Tenant lấy từ người gọi trong ctx.
 

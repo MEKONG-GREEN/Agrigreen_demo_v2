@@ -71,10 +71,17 @@ const (
 var CNTSRule = PeriodRule{Version: RuleVersionV2, WeekStart: time.Tuesday, WeekNumbering: WeekNumberingYear, MonthAlign: MonthAlignWeekEnd,
 	CalendarID: DeptChanNuoiThuySan, CalendarVersion: CalendarVersionCNTS}
 
+// KHTCRule là lịch tuần của Phòng Kế hoạch - Tài chính (W11.64, BRD KHTC v2.2 GD-05 "đã chốt"): Thứ Tư–Thứ Ba, tuần
+// 1 chứa 01/01, tháng/quý/năm theo Thứ Ba cuối — đúng lưới quy tắc v2 mặc định, nên phiên bản lịch là 2
+// (CalendarVersionDefault: cùng lưới với tag v2 không "cal=" đã lưu → cùng danh tính, không cần phiên bản riêng ≥ 3).
+var KHTCRule = PeriodRule{Version: RuleVersionV2, WeekStart: time.Wednesday, WeekNumbering: WeekNumberingYear, MonthAlign: MonthAlignWeekEnd,
+	CalendarID: DeptKeHoachTaiChinh, CalendarVersion: CalendarVersionDefault}
+
 // BuiltinCalendars là lịch riêng nạp sẵn trong mã, có hiệu lực NGAY với mọi ngày (CNTS chưa có số liệu thật nên không
-// cần ngày hiệu lực); tham số theo phòng (nếu có phiên bản hiệu lực) đè lên. Phòng không có ở đây theo tham số chung
-// (KHTC, Trồng trọt, Báo giá, HCTH: v2 Thứ Tư–Thứ Ba từ 04/11/2026).
-var BuiltinCalendars = map[string]PeriodRule{DeptChanNuoiThuySan: CNTSRule}
+// cần ngày hiệu lực; KHTC — W11.64 — lịch Thứ Tư–Thứ Ba BRD đã chốt, kỳ KHTC luôn theo lưới v2); tham số theo phòng
+// (nếu có phiên bản hiệu lực) đè lên. Phòng không có ở đây theo tham số chung (Trồng trọt, Báo giá, HCTH: v2 Thứ
+// Tư–Thứ Ba từ 04/11/2026).
+var BuiltinCalendars = map[string]PeriodRule{DeptChanNuoiThuySan: CNTSRule, DeptKeHoachTaiChinh: KHTCRule}
 
 // Calendar là lịch tuần của một phòng tại một thời điểm.
 type Calendar struct {

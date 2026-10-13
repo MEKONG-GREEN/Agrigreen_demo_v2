@@ -65,8 +65,11 @@ export const CALENDAR_VERSION_DEFAULT = 2;
 export const CALENDAR_VERSION_CNTS = 3;
 /** CNTS: Thứ Ba – Thứ Hai (BRD CNTS v3.7, tuần 39 = 22/09–28/09/2026), hiệu lực ngay. */
 export const CNTS_RULE: PeriodRule = { version: RULE_VERSION_V2, week_start: 2, week_numbering: "year", month_align: "week_end", calendar_id: DEPT_CNTS, calendar_version: CALENDAR_VERSION_CNTS };
+export const DEPT_KHTC = "ke_hoach_tai_chinh";
+/** KHTC: Thứ Tư – Thứ Ba (BRD KHTC v2.2 đã chốt), lưới v2 mặc định → phiên bản 2, hiệu lực mọi ngày (W11.64). */
+export const KHTC_RULE: PeriodRule = { ...DEFAULT_RULE, calendar_id: DEPT_KHTC, calendar_version: CALENDAR_VERSION_DEFAULT };
 /** Lịch nạp sẵn trong mã (domain.BuiltinCalendars). */
-export const BUILTIN_CALENDARS: Record<string, PeriodRule> = { [DEPT_CNTS]: CNTS_RULE };
+export const BUILTIN_CALENDARS: Record<string, PeriodRule> = { [DEPT_CNTS]: CNTS_RULE, [DEPT_KHTC]: KHTC_RULE };
 /** Giả lập tham số extension.report_period_rule:<phòng> (mã phòng → tag); trống = chưa có phiên bản. */
 export const DEPT_PERIOD_RULES = new Map<string, string>();
 

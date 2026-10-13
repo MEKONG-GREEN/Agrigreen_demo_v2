@@ -30,7 +30,8 @@ func TestCalendarAt_PerDepartment(t *testing.T) {
 	}{
 		{domain.DeptChanNuoiThuySan, "2026-10-13", "chan_nuoi_thuy_san:v3"},
 		{domain.DeptChanNuoiThuySan, "2026-11-10", "chan_nuoi_thuy_san:v3"},
-		{domain.DeptKeHoachTaiChinh, "2026-11-03", "ke_hoach_tai_chinh:v1"},
+		{domain.DeptKeHoachTaiChinh, "2026-01-07", "ke_hoach_tai_chinh:v2"}, // W11.64: KHTC nạp sẵn Thứ Tư–Thứ Ba mọi ngày
+		{domain.DeptKeHoachTaiChinh, "2026-11-03", "ke_hoach_tai_chinh:v2"},
 		{domain.DeptKeHoachTaiChinh, "2026-11-04", "ke_hoach_tai_chinh:v2"},
 		{domain.DeptTrongTrot, "2026-11-04", "trong_trot:v2"},
 	} {

@@ -41,8 +41,8 @@ func TestResolveCalendar(t *testing.T) {
 	}{
 		{"CNTS nạp sẵn, trước 04/11 (chưa có tham số)", DeptChanNuoiThuySan, "", "", "chan_nuoi_thuy_san:v3", CNTSRule.Tag(), CalendarSourceBuiltin},
 		{"CNTS nạp sẵn thắng tham số chung", DeptChanNuoiThuySan, "", v2, "chan_nuoi_thuy_san:v3", CNTSRule.Tag(), CalendarSourceBuiltin},
-		{"KHTC trước 04/11 → v1", DeptKeHoachTaiChinh, "", "", "ke_hoach_tai_chinh:v1", LegacyRule.Tag(), CalendarSourceLegacy},
-		{"KHTC từ 04/11 → v2 Thứ Tư", DeptKeHoachTaiChinh, "", v2, "ke_hoach_tai_chinh:v2", v2 + ";cal=ke_hoach_tai_chinh:v2", CalendarSourceGlobalParam},
+		{"KHTC nạp sẵn trước 04/11 → v2 Thứ Tư (W11.64)", DeptKeHoachTaiChinh, "", "", "ke_hoach_tai_chinh:v2", v2 + ";cal=ke_hoach_tai_chinh:v2", CalendarSourceBuiltin},
+		{"KHTC nạp sẵn thắng tham số chung v1", DeptKeHoachTaiChinh, "", LegacyRule.Tag(), "ke_hoach_tai_chinh:v2", v2 + ";cal=ke_hoach_tai_chinh:v2", CalendarSourceBuiltin},
 		{"Trồng trọt theo tham số chung", DeptTrongTrot, "", v2, "trong_trot:v2", v2 + ";cal=trong_trot:v2", CalendarSourceGlobalParam},
 		{"tham số chung mang cal → bỏ cal", DeptTrongTrot, "", v2 + ";cal=chan_nuoi_thuy_san:v9", "trong_trot:v2", v2 + ";cal=trong_trot:v2", CalendarSourceGlobalParam},
 		{"tham số theo phòng có phiên bản", DeptChanNuoiThuySan, "kn.period_rule/v2;week_start=mon;cal=chan_nuoi_thuy_san:v4", v2,
@@ -51,7 +51,7 @@ func TestResolveCalendar(t *testing.T) {
 			"kn.period_rule/v2;week_start=thu;week=year;month=week_end;cal=trong_trot:v2", CalendarSourceDepartmentParam},
 		{"tham số theo phòng mang cal phòng khác → bỏ qua", DeptChanNuoiThuySan, "kn.period_rule/v2;cal=trong_trot:v5", v2, "chan_nuoi_thuy_san:v3",
 			CNTSRule.Tag(), CalendarSourceBuiltin},
-		{"tham số theo phòng sai dạng → bỏ qua", DeptKeHoachTaiChinh, "rác", v2, "ke_hoach_tai_chinh:v2", v2 + ";cal=ke_hoach_tai_chinh:v2", CalendarSourceGlobalParam},
+		{"tham số theo phòng sai dạng → bỏ qua", DeptTrongTrot, "rác", v2, "trong_trot:v2", v2 + ";cal=trong_trot:v2", CalendarSourceGlobalParam},
 	}
 	for _, c := range cases {
 		cal := ResolveCalendar(c.dept, c.deptParam, c.global)

@@ -36,12 +36,21 @@ func tenantOf(ctx context.Context) (uuid.UUID, error) {
 	return p.TenantID, nil
 }
 
-// SourceCode là mã nguồn của tham chiếu: "<module nguồn>:<mã biểu>" (vd "pf/forms:BM-04", "pf/price:PRICE-BOARD").
-func SourceCode(module, form string) string { return module + ":" + form }
+// SourceCode là mã nguồn của tham chiếu: "<module nguồn, '/' → '_'>.<mã biểu>" viết thường (vd "pf_forms.bm-04",
+// "pf_price.price-board") — đúng ràng buộc cột pf_extension.khtc_period_source.source (^[a-z][a-z0-9_.-]{0,79}$; W11.64
+// sửa: dạng cũ "pf/forms:BM-04" làm hỏng giao dịch mở kỳ khi bộ quy đổi trả kỳ nguồn).
+func SourceCode(module, form string) string {
+	return strings.ToLower(strings.ReplaceAll(module, "/", "_") + "." + form)
+}
 
+// priceSourcePrefix là tiền tố mã nguồn của Báo giá (SourceCode("pf/price", …)).
+var priceSourcePrefix = SourceCode("pf/price", "")
+
+// calVer: phiên bản lịch dạng chữ của tham chiếu; kỳ không theo lịch tuần (BM-05, phiên bản nil) → "-" (cột
+// calendar_version NOT NULL, dài 1–80).
 func calVer(v *int) string {
 	if v == nil {
-		return ""
+		return "-"
 	}
 	return strconv.Itoa(*v)
 }
@@ -107,7 +116,7 @@ func (c KHTCCrosswalk) States(ctx context.Context, refs []port.KHTCSourceRef) ([
 	byDept := map[string][]string{}
 	var priceFrom, priceTo time.Time
 	for _, r := range refs {
-		if strings.HasPrefix(r.Source, "pf/price:") {
+		if strings.HasPrefix(r.Source, priceSourcePrefix) {
 			span, err := priceSpan(r)
 			if err != nil {
 				continue
@@ -180,7 +189,7 @@ func (c KHTCCrosswalk) States(ctx context.Context, refs []port.KHTCSourceRef) ([
 
 // priceSpan: khoảng ngày của tham chiếu Báo giá (ngày bảng giá hoặc tuần báo giá — lịch v2 mặc định).
 func priceSpan(r port.KHTCSourceRef) (rcdomain.Span, error) {
-	if strings.HasSuffix(r.Source, ":"+port.PriceFormBoard) {
+	if r.Source == SourceCode("pf/price", port.PriceFormBoard) {
 		return rcdomain.SpanOfKey(rcdomain.DefaultRule, rcdomain.PeriodDay, r.NativeKey, nil)
 	}
 	return rcdomain.SpanOfKey(rcdomain.DefaultRule, rcdomain.PeriodWeek, r.NativeKey, nil)
