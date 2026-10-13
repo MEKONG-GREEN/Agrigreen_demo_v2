@@ -132,7 +132,7 @@ func (pb Publisher) PublishBatch(ctx context.Context, in port.BatchInput, idem s
 	for i, pd := range in.Periods {
 		from, to := pd.From, pd.To
 		pi := PublishInput{Profile: in.Profile, Label: pd.Label, DueAt: pd.DueAt, Units: in.Units, UnitKind: kind, UnitParents: parents,
-			Period: &PeriodKey{Kind: pd.Kind, Key: pd.Key, From: &from, To: &to, Rule: pd.Rule}}
+			Period: &PeriodKey{Kind: pd.Kind, Key: pd.Key, From: &from, To: &to, Rule: pd.Rule}, MaxSubmissions: in.MaxSubmissions}
 		if n := len([]rune(strings.TrimSpace(pd.Label))); n < 1 || n > 200 || pd.DueAt.IsZero() {
 			return nil, problem.Validation.WithField("periods", "nhãn 1–200 ký tự và hạn nộp bắt buộc")
 		}

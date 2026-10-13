@@ -72,6 +72,8 @@ type Module struct {
 	mat *matapp.Service // KN v7.7 P7 FN-XA-03.06: sổ vật tư (extension/material)
 	// W11.61 (D4 KH1): Danh mục KHTC, danh sách CT/DA chủ (D20), Kế hoạch năm (extension/khtc).
 	khtc *khtcapp.Service
+
+	khtcPeriods *khtcPeriodService // W11.62: Kỳ KHTC (extension/khtcperiod, module_khtc.go)
 }
 
 // New tạo module với pool của vai extension_app.
@@ -125,6 +127,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	rchandler.Handler{Svc: m.rc}.RegisterApp(rg)
 	mathandler.Handler{Svc: m.mat}.RegisterApp(rg)
 	khtchandler.Handler{Svc: m.khtc}.RegisterApp(rg)
+	m.registerKHTCPeriods(rg) // W11.62
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham

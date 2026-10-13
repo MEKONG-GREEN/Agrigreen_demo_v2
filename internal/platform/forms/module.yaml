@@ -10,7 +10,7 @@ depends:
   pf/sync: ">=1.0 <2"
   pf/workflow: ">=1.0 <2"
 provides:
-  ports: [FacilityDirectory, Freezer, Publisher, Validator]
+  ports: [FacilityDirectory, Freezer, PeriodControl, Publisher, Validator]
   events: [pf.forms.period.closed/v1]
   internal_events: []
   publications: []

@@ -85,6 +85,9 @@ func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc
 // SyncSink trả Sink chiều lên forms_submission.
 func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
 
+// Control là cổng điều khiển kỳ native (tiến độ, chốt, hủy) cho module nghiệp vụ (W11.62 — KN Kỳ KHTC).
+func (m *Module) Control() port.PeriodControl { return app.Control{Svc: m.svc} }
+
 // Freezer cho bên dùng có vòng đời kỳ riêng: ghi chốt/mở lại + ảnh chụp trong giao dịch của bên dùng.
 func (m *Module) Freezer() port.Freezer { return m.svc }
 

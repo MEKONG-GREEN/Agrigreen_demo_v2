@@ -260,6 +260,9 @@ type BatchInput struct {
 	// UnitParents: mã xã cha song song với Units (cơ sở/hộ). Cơ sở có thể để trống — tra từ FacilityDirectory.
 	UnitParents []string
 	Periods     []PeriodDef
+	// MaxSubmissions: số lần gửi tối đa của mỗi đơn vị trong từng kỳ của lô (nil = mặc định của profile, 0 = không giới
+	// hạn) — W11.62: Kỳ KHTC đọc tham số số lần gửi tối đa (Q-081, D12) và truyền xuống.
+	MaxSubmissions *int
 }
 
 // PublishedPeriod là một kỳ đã phát hành của lô.

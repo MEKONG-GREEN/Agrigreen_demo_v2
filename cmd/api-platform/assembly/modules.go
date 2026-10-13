@@ -222,6 +222,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
+	kn.UseKHTCDepartments(pty.Departments()) // W11.62: phòng tham gia mặc định + tên phòng của Kỳ KHTC
 	snc := syncmod.New(unit, clk, syncmod.Deps{
 		Scope: pty.ScopeResolver(), Params: md.Params(), Vault: ext.Vault,
 		Files: ev.Files(), CursorKey: cursorKey(ext),

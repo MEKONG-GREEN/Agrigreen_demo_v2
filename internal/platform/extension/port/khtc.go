@@ -87,3 +87,47 @@ type KHTCPlans interface {
 	// số La Mã. Chưa có → ErrKHTCPlanNotFound.
 	PlanAt(ctx context.Context, year int, at time.Time) (KHTCPlan, error)
 }
+
+// ---------------------------------------------------------------------------
+// W11.62 — Kỳ KHTC (BRD KHTC v2.2 FN-TI-02.03, D4 KH2): cổng mà Kỳ KHTC CẦN từ gói khác. Gốc lắp ráp nối khi gói cài
+// xong; chưa nối → Kỳ KHTC vẫn chạy với giả định ghi trong docs/kn/gia-dinh/W11.62.md.
+// ---------------------------------------------------------------------------
+
+// KHTCSourceRef là tham chiếu tới MỘT kỳ nguồn của module phòng chuyên môn (Trồng trọt, CNTS, Giá…) mà kỳ KHTC lấy số
+// liệu. Kỳ KHTC KHÔNG tự đổi lịch: bộ quy đổi (crosswalk, gói PFPUB — QĐ D7/D8) trả khóa kỳ theo LỊCH CỦA NGUỒN; Kỳ
+// KHTC chỉ lưu bộ ba (calendar_id, calendar_version, native_key) kèm phòng ban và mã nguồn.
+type KHTCSourceRef struct {
+	Department      string // mã phòng ban sở hữu nguồn (vd chan_nuoi_thuy_san)
+	Source          string // mã nguồn trong hợp đồng _pub (vd "cnts.bm04", "trong_trot.consolidation", "price.board")
+	CalendarID      string // mã lịch kỳ của nguồn (D8: mỗi phòng giữ lịch riêng)
+	CalendarVersion string // phiên bản lịch kỳ của nguồn
+	NativeKey       string // khóa kỳ theo lịch của nguồn (vd "2026-W41", "2026-10-12")
+	Label           string // nhãn hiển thị (tùy chọn)
+}
+
+// KHTCSourceState là trạng thái chốt của một kỳ nguồn ("nguồn đã chốt" — QĐ-6, Q-048).
+type KHTCSourceState struct {
+	Closed   bool
+	ClosedAt *time.Time
+}
+
+// KHTCSourceCrosswalk là bộ quy đổi kỳ KHTC → kỳ nguồn và trạng thái chốt (hiện thực ở gói PFPUB). Quy tắc quy đổi
+// (QĐ CEO 13/10): một tuần nguồn thuộc tuần KHTC chứa NGÀY KẾT THÚC của nó; tháng/quý/năm KHTC gồm các tuần KHTC.
+type KHTCSourceCrosswalk interface {
+	// Sources trả các kỳ nguồn thuộc kỳ KHTC [from, to] (loại kỳ, khóa kỳ KHTC) cho các phòng ban departments.
+	Sources(ctx context.Context, kind, key string, from, to time.Time, departments []string) ([]KHTCSourceRef, error)
+	// States trả trạng thái chốt của từng tham chiếu (cùng thứ tự với refs).
+	States(ctx context.Context, refs []KHTCSourceRef) ([]KHTCSourceState, error)
+}
+
+// KHTCPlanDepartments trả phòng phụ trách các hạng mục của Kế hoạch năm có hiệu lực tại ngày on (W11.61 — danh mục
+// CT/DA, Kế hoạch năm). Chưa nối → KHTC chọn phòng tham gia khi mở kỳ (mặc định: mọi phòng ban đang áp dụng trừ KHTC).
+type KHTCPlanDepartments interface {
+	PlanDepartments(ctx context.Context, year int, on time.Time) ([]string, error)
+}
+
+// KHTCReportStates trả trạng thái bản báo cáo của kỳ KHTC (màn soạn — KH6). Chưa nối → mọi kỳ "Chưa soạn" (hủy kỳ
+// không bị chặn bởi Bản cuối).
+type KHTCReportStates interface {
+	HasFinal(ctx context.Context, periodID string) (bool, error)
+}
