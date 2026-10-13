@@ -59,7 +59,7 @@ type claims struct {
 //	                       khi AG_ENV=production (MFAPolicyFromEnv)
 type MFAPolicy struct {
 	// Disabled bỏ kiểm yếu tố thứ hai (Principal.MFA luôn true). Chỉ môi trường demo.
-	Disabled bool
+	Disabled      bool
 	Factors       []string // vai thường
 	StrongFactors []string // khi người gọi có ít nhất một vai trong StrongRoles
 	StrongRoles   []string
