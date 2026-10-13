@@ -92,17 +92,21 @@ var deptBusiness = map[string]map[string][]MenuItem{
 	// Thông tin Tuyên truyền — module Báo giá nông sản (BRD Báo giá v1.3 §VI.3).
 	port.MenuProfileThongTinTuyenTruyen: {
 		port.AudienceTW: {
-			soon("tw.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
-			soon("tw.bao_gia.bien_dong", "Báo cáo biến động giá", "/kn/bao-gia/bien-dong", "layers"),
+			// W11.77: báo cáo giá đã mở.
+			{Key: "tw.bao_gia.bang_gia", Label: "Bảng giá tổng hợp", Route: "/kn/bao-gia/bang-gia", Icon: "chart"},
+			{Key: "tw.bao_gia.dashboard", Label: "Dashboard theo vùng", Route: "/kn/bao-gia/dashboard-vung", Icon: "map"},
+			{Key: "tw.bao_gia.bien_dong", Label: "Báo cáo biến động giá", Route: "/kn/bao-gia/bien-dong", Icon: "layers"},
 			soon("tw.bao_gia.gia_thanh", "Giá thành sản xuất", "/kn/bao-gia/gia-thanh", "report"),
 		},
 		port.AudienceTinh: {
-			soon("tinh.bao_gia.tien_do", "Tiến độ nhập giá", "/kn/bao-gia/tien-do", "bell"),
+			{Key: "tinh.bao_gia.tien_do", Label: "Tiến độ nhập giá", Route: "/kn/bao-gia/tien-do", Icon: "bell"}, // W11.77
 			// W11.75: chi tiết báo giá, cảnh báo + xác minh, hiệu chỉnh / xóa / nhập thay (FN-TI-02.02…04, 02.09) — đã mở;
 			// nút "Duyệt bảng giá" thêm ở W11.76.
 			{Key: "tinh.bao_gia.kiem_duyet", Label: "Kiểm duyệt & công bố", Route: "/kn/bao-gia/kiem-duyet", Icon: "approve"},
-			soon("tinh.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
-			soon("tinh.bao_gia.bien_dong", "Báo cáo biến động giá", "/kn/bao-gia/bien-dong", "layers"),
+			{Key: "tinh.bao_gia.bang_gia", Label: "Bảng giá tổng hợp", Route: "/kn/bao-gia/bang-gia", Icon: "chart"},        // W11.77
+			{Key: "tinh.bao_gia.bien_dong", Label: "Báo cáo biến động giá", Route: "/kn/bao-gia/bien-dong", Icon: "layers"}, // W11.77
+			{Key: "tinh.bao_gia.dashboard", Label: "Dashboard theo vùng", Route: "/kn/bao-gia/dashboard-vung", Icon: "map"}, // W11.77
+			{Key: "tinh.bao_gia.thong_ke", Label: "Thống kê phiếu báo giá", Route: "/kn/bao-gia/thong-ke", Icon: "table"},   // W11.77
 			soon("tinh.bao_gia.dieu_tra", "Điều tra giá thành", "/kn/bao-gia/dieu-tra", "season"),
 			soon("tinh.bao_gia.mat_hang", "Mặt hàng", "/kn/bao-gia/mat-hang", "package"),
 			// W11.07: cấu hình kỳ báo giá, giờ khóa, nhắc, ngưỡng — chỉ QTNV (Báo giá v1.3 FN-AD-04.04…06). W11.72: màn
@@ -115,7 +119,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			{Key: "xa.bao_gia.nhap", Label: "Nhập báo giá", Route: "/kn/bao-gia/nhap", Icon: "upload"},
 			{Key: "xa.bao_gia.xac_minh", Label: "Yêu cầu xác minh", Route: "/kn/bao-gia/xac-minh", Icon: "check"},
 			{Key: "xa.bao_gia.lich_su", Label: "Lịch sử báo giá", Route: "/kn/bao-gia/lich-su", Icon: "journal"},
-			soon("xa.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
+			{Key: "xa.bao_gia.bang_gia", Label: "Bảng giá tổng hợp", Route: "/kn/bao-gia/bang-gia", Icon: "chart"},        // W11.77
+			{Key: "xa.bao_gia.bien_dong", Label: "Báo cáo biến động giá", Route: "/kn/bao-gia/bien-dong", Icon: "layers"}, // W11.77
 		},
 	},
 	// Hành chính - Tổng hợp (BRD HCTH v3.0 §VI.3; Cấp TW chỉ có Contact ở "Dùng chung").

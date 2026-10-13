@@ -7096,6 +7096,227 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/price/reports/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TI-02.01 Tiến độ nhập giá — xã đang hoạt động trong ngày báo giá, trạng thái phiếu tại lúc đọc, số mặt hàng ▲/▼, lần hệ thống đã nhắc; thẻ đếm trên bảng đã lọc. Ngày không phải ngày báo giá → ngày báo giá gần nhất trước đó (no_quote). Cấp Tỉnh, Admin */
+        get: operations["priceReportProgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/progress/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel Tiến độ nhập giá theo bộ lọc (luồng phụ FN-TI-02.01) */
+        get: operations["priceReportProgressExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TW-01.01 Bảng giá tổng hợp — phiên bản đã duyệt mới nhất của ngày (vắng → ngày công bố gần nhất), CT-04 theo nhóm vùng, tăng/giảm so bảng giá công bố liền trước; ngày đang mở duyệt → phiên bản cũ (updating). Mọi vai, chỉ xem */
+        get: operations["priceReportSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/summary/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel Bảng giá tổng hợp theo bộ lọc (B3 FN-TW-01.01) */
+        get: operations["priceReportSummaryExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/movement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TW-01.02 Báo cáo tăng giảm, biến động giá — kỳ ngày / tuần / tháng chứa ngày chọn so kỳ liền trước (giá kỳ = trung bình Giá trung bình các ngày công bố), thẻ tăng/giảm/đi ngang/số lần vượt ngưỡng, xu hướng 8 kỳ, chi tiết theo xã. Mọi vai, chỉ xem */
+        get: operations["priceReportMovement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/movement/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Báo cáo biến động đúng bộ lọc — Excel hoặc PDF; chỉ Cấp Tỉnh, Admin (BR-04, AC-03 FN-TW-01.02) */
+        get: operations["priceReportMovementExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TW-01.03 Dashboard tổng hợp giá theo vùng — ngày công bố gần nhất, thẻ chỉ số, giá trung bình mặt hàng Cơ bản theo nhóm vùng (all=true: mọi mặt hàng), biến động theo nhóm hàng, xu hướng 30 ngày công bố, bấm vùng → giá từng xã. Cấp TW, Cấp Tỉnh, Admin */
+        get: operations["priceReportDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/dashboard/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel số liệu Dashboard theo vùng (luồng phụ FN-TW-01.03) */
+        get: operations["priceReportDashboardExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TI-02.08 Thống kê phiếu báo giá theo cán bộ Xã — tháng (month) hoặc khoảng ngày; phải nộp = ngày báo giá đã qua giờ khóa mà xã hoạt động và có cán bộ Xã; nhập thay ở cột Nộp muộn của cán bộ phụ trách; tháng đã khóa (Q-085) đọc ảnh chụp. Cấp Tỉnh, Admin */
+        get: operations["priceReportStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/stats/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel Thống kê phiếu báo giá (B3 FN-TI-02.08) */
+        get: operations["priceReportStatsExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/stats/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách ngày phải nộp của một cán bộ Xã theo ngày và trạng thái (luồng phụ FN-TI-02.08; số liệu hiện tại) */
+        get: operations["priceReportStatsDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/stats/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khóa thống kê phiếu của một tháng đã kết thúc (Q-085) — chụp số liệu theo cán bộ Xã; chỉ Quản trị nghiệp vụ báo giá (D11) */
+        post: operations["priceReportStatsClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/stats/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở lại thống kê tháng đã khóa (lý do bắt buộc) — tính lại từ phiếu tới lần khóa sau; chỉ Quản trị nghiệp vụ báo giá (D11) */
+        post: operations["priceReportStatsReopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/kn/khtc/catalogs": {
         parameters: {
             query?: never;
@@ -10078,7 +10299,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened" | "integration_dead_lettered" | "area_feed_stale" | "price_reminder" | "price_alert" | "price_verify_request" | "price_verify_reply" | "price_verify_decision" | "price_lock_summary" | "price_board_approved" | "price_board_reopened";
+            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened" | "integration_dead_lettered" | "area_feed_stale" | "price_reminder" | "price_alert" | "price_verify_request" | "price_verify_reply" | "price_verify_decision" | "price_lock_summary" | "price_board_approved" | "price_board_reopened" | "price_proxy_entry";
             /** @enum {string} */
             severity: "urgent" | "normal";
             title: string;
@@ -14298,6 +14519,276 @@ export interface components {
             /** @description Lý do chưa duyệt được */
             blockers: string[];
             reopen_days: number;
+        };
+        PriceRef: {
+            code: string;
+            name: string;
+        };
+        /**
+         * @description Tăng / Giảm / Đi ngang (|Δ%| < ngưỡng đi ngang — CT-04); rỗng = kỳ trước không có giá
+         * @enum {string}
+         */
+        PriceTrend: "up" | "down" | "flat" | "";
+        PriceReportItem: {
+            item_code: string;
+            item_name: string;
+            group_code: string;
+            group_name: string;
+            unit_code: string;
+            unit_name: string;
+            /** @description Mặt hàng Cơ bản */
+            basic: boolean;
+        };
+        PricePointPrice: components["schemas"]["PriceReportItem"] & {
+            point_code: string;
+            point_name: string;
+            region_code: string;
+            region_name: string;
+            min: string;
+            max: string;
+            /** @description P (CT-01) */
+            mid: string;
+            late: boolean;
+        };
+        PriceProgressRow: components["schemas"]["PriceTicketRow"] & {
+            /** Format: date-time */
+            updated_at: string | null;
+            /** @description Lần hệ thống đã nhắc trong ngày */
+            reminders: string[];
+        };
+        PriceProgress: {
+            /** Format: date */
+            requested: string;
+            /** Format: date */
+            day: string;
+            /** @description Ngày chọn không phải ngày báo giá — hiển thị ngày báo giá gần nhất */
+            no_quote: boolean;
+            quote: boolean;
+            /** Format: date-time */
+            lock_at: string | null;
+            locked: boolean;
+            board: string;
+            /** Format: date-time */
+            now: string;
+            cards: {
+                points: number;
+                submitted: number;
+                draft: number;
+                not_entered: number;
+                missed: number;
+                late: number;
+                high: number;
+                low: number;
+                unassigned: number;
+                no_officer: number;
+            };
+            rows: components["schemas"]["PriceProgressRow"][];
+            regions: components["schemas"]["PriceRef"][];
+        };
+        PriceSummaryLine: components["schemas"]["PriceReportItem"] & {
+            min: string;
+            max: string;
+            avg: string;
+            points: number;
+            /** @description Giá trung bình kỳ trước */
+            prev: string | null;
+            change_pct: string | null;
+            trend: components["schemas"]["PriceTrend"];
+        };
+        PriceSummary: {
+            /** Format: date */
+            requested: string;
+            /**
+             * Format: date
+             * @description Ngày của bảng đang hiển thị; null = Chưa có dữ liệu
+             */
+            day: string | null;
+            version: number;
+            /** Format: date-time */
+            approved_at: string | null;
+            /** @description Chưa công bố hôm nay — bảng gần nhất */
+            not_today: boolean;
+            /** @description Đang cập nhật (mở duyệt) — phiên bản cũ */
+            updating: boolean;
+            /** Format: date */
+            prev_day: string | null;
+            flat_pct: string;
+            region: string;
+            read_only: boolean;
+            lines: components["schemas"]["PriceSummaryLine"][];
+            points: components["schemas"]["PricePointPrice"][];
+            regions: components["schemas"]["PriceRef"][];
+            groups: components["schemas"]["PriceRef"][];
+        };
+        PricePeriod: {
+            /** Format: date */
+            from: string | null;
+            /** Format: date */
+            to: string | null;
+            label: string;
+            /** @description Số ngày công bố trong kỳ */
+            days: number;
+        };
+        PriceMovementLine: components["schemas"]["PriceReportItem"] & {
+            cur: string | null;
+            prev: string | null;
+            change_pct: string | null;
+            trend: components["schemas"]["PriceTrend"];
+        };
+        PriceMovement: {
+            /** @enum {string} */
+            period: "day" | "week" | "month";
+            cur: components["schemas"]["PricePeriod"];
+            prev: components["schemas"]["PricePeriod"];
+            /** @description Chưa đủ dữ liệu so sánh */
+            insufficient: boolean;
+            flat_pct: string;
+            cards: {
+                up: number;
+                down: number;
+                flat: number;
+                /** @description Cảnh báo đã chốt trong kỳ */
+                exceeded: number;
+            };
+            lines: components["schemas"]["PriceMovementLine"][];
+            item: string;
+            trend: {
+                period: components["schemas"]["PricePeriod"];
+                avg: string | null;
+            }[];
+            points: {
+                point_code: string;
+                point_name: string;
+                region_name: string;
+                cur: string | null;
+                prev: string | null;
+                change_pct: string | null;
+                trend: components["schemas"]["PriceTrend"];
+            }[];
+            regions: components["schemas"]["PriceRef"][];
+            groups: components["schemas"]["PriceRef"][];
+            can_export: boolean;
+        };
+        PriceRegionAvg: {
+            region: string;
+            avg: string | null;
+            points: number;
+        };
+        PriceDashboardLine: {
+            item: components["schemas"]["PriceReportItem"];
+            avg: string;
+            prev: string | null;
+            change_pct: string | null;
+            trend: components["schemas"]["PriceTrend"];
+            regions: components["schemas"]["PriceRegionAvg"][];
+        };
+        PriceDashboard: {
+            /** Format: date */
+            requested: string;
+            /** Format: date */
+            day: string | null;
+            version: number;
+            /** Format: date-time */
+            approved_at: string | null;
+            not_today: boolean;
+            updating: boolean;
+            /** Format: date */
+            prev_day: string | null;
+            cards: {
+                up: number;
+                down: number;
+                flat: number;
+                /** @description Số xã có báo giá */
+                points: number;
+            };
+            regions: {
+                code: string;
+                name: string;
+                points: number;
+            }[];
+            lines: components["schemas"]["PriceDashboardLine"][];
+            groups: {
+                code: string;
+                name: string;
+                up: number;
+                down: number;
+                flat: number;
+            }[];
+            item: string;
+            trend: {
+                /** Format: date */
+                day: string;
+                avg: string | null;
+                regions: components["schemas"]["PriceRegionAvg"][];
+            }[];
+            region: string;
+            drill: components["schemas"]["PricePointPrice"][];
+        };
+        PriceStatRow: {
+            /** Format: uuid */
+            officer_ref: string;
+            officer_name: string | null;
+            point_code: string;
+            point_name: string;
+            region_code: string;
+            region_name: string;
+            required: number;
+            on_time: number;
+            late: number;
+            missed: number;
+            deleted: number;
+            adjusted_lines: number;
+        };
+        PriceStatMonth: {
+            seq: number;
+            /** @enum {string} */
+            status: "none" | "closed" | "open";
+            version: number;
+            reason: string | null;
+            /** Format: date-time */
+            at?: string;
+        };
+        PriceStats: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            monthly: boolean;
+            month: components["schemas"]["PriceStatMonth"] | null;
+            /** @description Số liệu từ ảnh chụp tháng đã khóa */
+            snapshot: boolean;
+            /** @description Ngày báo giá chưa qua giờ khóa (chưa tính) */
+            pending: number;
+            cards: {
+                quote_days: number;
+                required: number;
+                on_time: number;
+                late: number;
+                missed: number;
+            };
+            rows: components["schemas"]["PriceStatRow"][];
+            can_close: boolean;
+            can_reopen: boolean;
+            regions: components["schemas"]["PriceRef"][];
+        };
+        PriceStatDay: {
+            /** Format: date */
+            day: string;
+            point_code: string;
+            /** @enum {string} */
+            result: "on_time" | "late" | "missed";
+            view: string;
+            /** Format: uuid */
+            ticket_id: string | null;
+            deleted: number;
+            adjusted_lines: number;
+        };
+        PriceStatMonthOp: {
+            month: string;
+            /** @description Phiên bản khóa tháng đã thấy (0 = chưa khóa lần nào) */
+            seq: number;
+            /** @description Bắt buộc khi mở lại */
+            reason?: string;
         };
         /**
          * @description Mặt hàng giá cả ở cap/price (Q-082)
@@ -29381,6 +29872,432 @@ export interface operations {
             /** @description price.board_busy | price.board_state | price.board_stale | price.board_changed */
             409: components["responses"]["Problem"];
             /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportProgress: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                region?: string;
+                /** @description Mã trạng thái phiếu (not_entered, draft, submitted, locked, missed, late, approved) hoặc incomplete | unassigned | no_officer */
+                status?: string;
+                point?: string;
+                mine?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tiến độ nhập giá */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceProgress"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportProgressExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                region?: string;
+                status?: string;
+                point?: string;
+                mine?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceReportSummary: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                region?: string;
+                group?: string;
+                view?: "item" | "point";
+                /** @description Giá từng xã của một mặt hàng */
+                item?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng giá tổng hợp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSummary"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportSummaryExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                region?: string;
+                group?: string;
+                view?: "item" | "point";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | price.report_empty */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportMovement: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                period?: "day" | "week" | "month";
+                day?: string;
+                region?: string;
+                point?: string;
+                group?: string;
+                item?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Biến động giá */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceMovement"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportMovementExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                format?: "xlsx" | "pdf";
+                period?: "day" | "week" | "month";
+                day?: string;
+                region?: string;
+                point?: string;
+                group?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx / .pdf */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/pdf": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | price.report_empty */
+            422: components["responses"]["Problem"];
+            /** @description price.pdf_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    priceReportDashboard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                group?: string;
+                item?: string;
+                region?: string;
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceDashboard"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportDashboardExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                group?: string;
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | price.report_empty */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportStats: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                month?: string;
+                from?: string;
+                to?: string;
+                region?: string;
+                point?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thống kê phiếu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceStats"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportStatsExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                month?: string;
+                from?: string;
+                to?: string;
+                region?: string;
+                point?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportStatsDetail: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                officer: string;
+                month?: string;
+                from?: string;
+                to?: string;
+                point?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ngày phải nộp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        days: components["schemas"]["PriceStatDay"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportStatsClose: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceStatMonthOp"];
+            };
+        };
+        responses: {
+            /** @description Thống kê tháng sau khi khóa */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceStats"];
+                };
+            };
+            /** @description forbidden | price.board_steward_required */
+            403: components["responses"]["Problem"];
+            /** @description price.stat_month_open | price.stat_month_state | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportStatsReopen: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceStatMonthOp"];
+            };
+        };
+        responses: {
+            /** @description Thống kê tháng sau khi mở lại */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceStats"];
+                };
+            };
+            /** @description forbidden | price.board_steward_required */
+            403: components["responses"]["Problem"];
+            /** @description price.stat_month_state | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.reason_required */
             422: components["responses"]["Problem"];
         };
     };

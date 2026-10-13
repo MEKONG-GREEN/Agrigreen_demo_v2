@@ -254,15 +254,19 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
   },
   thong_tin_truyen_thong: {
     kn_tw: [
-      soon("tw.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
-      soon("tw.bao_gia.bien_dong", "Báo cáo biến động giá", "/kn/bao-gia/bien-dong", "layers"),
+      // W11.77: báo cáo giá đã mở.
+      { key: "tw.bao_gia.bang_gia", label: "Bảng giá tổng hợp", route: "/kn/bao-gia/bang-gia", icon: "chart" },
+      { key: "tw.bao_gia.dashboard", label: "Dashboard theo vùng", route: "/kn/bao-gia/dashboard-vung", icon: "map" },
+      { key: "tw.bao_gia.bien_dong", label: "Báo cáo biến động giá", route: "/kn/bao-gia/bien-dong", icon: "layers" },
       soon("tw.bao_gia.gia_thanh", "Giá thành sản xuất", "/kn/bao-gia/gia-thanh", "report"),
     ],
     kn_tinh: [
-      soon("tinh.bao_gia.tien_do", "Tiến độ nhập giá", "/kn/bao-gia/tien-do", "bell"),
+      { key: "tinh.bao_gia.tien_do", label: "Tiến độ nhập giá", route: "/kn/bao-gia/tien-do", icon: "bell" }, // W11.77
       { key: "tinh.bao_gia.kiem_duyet", label: "Kiểm duyệt & công bố", route: "/kn/bao-gia/kiem-duyet", icon: "approve" }, // W11.75
-      soon("tinh.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
-      soon("tinh.bao_gia.bien_dong", "Báo cáo biến động giá", "/kn/bao-gia/bien-dong", "layers"),
+      { key: "tinh.bao_gia.bang_gia", label: "Bảng giá tổng hợp", route: "/kn/bao-gia/bang-gia", icon: "chart" }, // W11.77
+      { key: "tinh.bao_gia.bien_dong", label: "Báo cáo biến động giá", route: "/kn/bao-gia/bien-dong", icon: "layers" }, // W11.77
+      { key: "tinh.bao_gia.dashboard", label: "Dashboard theo vùng", route: "/kn/bao-gia/dashboard-vung", icon: "map" }, // W11.77
+      { key: "tinh.bao_gia.thong_ke", label: "Thống kê phiếu báo giá", route: "/kn/bao-gia/thong-ke", icon: "table" }, // W11.77
       soon("tinh.bao_gia.dieu_tra", "Điều tra giá thành", "/kn/bao-gia/dieu-tra", "season"),
       soon("tinh.bao_gia.mat_hang", "Mặt hàng", "/kn/bao-gia/mat-hang", "package"),
       // W11.07: chỉ QTNV ở server; W11.72: đã mở (màn lịch báo giá W11.74).
@@ -273,7 +277,8 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       { key: "xa.bao_gia.nhap", label: "Nhập báo giá", route: "/kn/bao-gia/nhap", icon: "upload" },
       { key: "xa.bao_gia.xac_minh", label: "Yêu cầu xác minh", route: "/kn/bao-gia/xac-minh", icon: "check" },
       { key: "xa.bao_gia.lich_su", label: "Lịch sử báo giá", route: "/kn/bao-gia/lich-su", icon: "journal" },
-      soon("xa.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
+      { key: "xa.bao_gia.bang_gia", label: "Bảng giá tổng hợp", route: "/kn/bao-gia/bang-gia", icon: "chart" }, // W11.77
+      { key: "xa.bao_gia.bien_dong", label: "Báo cáo biến động giá", route: "/kn/bao-gia/bien-dong", icon: "layers" }, // W11.77
     ],
   },
   hanh_chinh_tong_hop: {

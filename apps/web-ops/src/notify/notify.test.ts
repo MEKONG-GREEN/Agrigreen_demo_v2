@@ -14,6 +14,7 @@ describe("KIND_LABEL — Báo giá nông sản", () => {
       "price_lock_summary",
       "price_board_approved",
       "price_board_reopened",
+      "price_proxy_entry",
     ] as const;
     for (const k of kinds) {
       expect(KIND_LABEL[k]).toBeTruthy();

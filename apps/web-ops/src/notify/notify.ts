@@ -38,6 +38,7 @@ export const KIND_LABEL: Record<Notification["kind"], string> = {
   price_lock_summary: "Tổng hợp khóa nhập giá",
   price_board_approved: "Bảng giá đã duyệt",
   price_board_reopened: "Bảng giá đang mở duyệt",
+  price_proxy_entry: "Cấp Tỉnh nhập thay báo giá", // W11.77 (FN-TI-02.09)
 };
 
 export function unreadCount(api: ApiClient): Promise<number> {

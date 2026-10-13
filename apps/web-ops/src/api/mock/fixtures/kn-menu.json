@@ -1640,9 +1640,16 @@
         "route": "/kn/bao-gia/bang-gia",
         "icon": "chart",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tw.bao_gia.dashboard",
+        "label": "Dashboard theo vùng",
+        "route": "/kn/bao-gia/dashboard-vung",
+        "icon": "map",
+        "badge_source": null,
+        "enabled": true,
         "children": []
        },
        {
@@ -1651,9 +1658,7 @@
         "route": "/kn/bao-gia/bien-dong",
         "icon": "layers",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -1810,9 +1815,7 @@
         "route": "/kn/bao-gia/tien-do",
         "icon": "bell",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -1830,9 +1833,7 @@
         "route": "/kn/bao-gia/bang-gia",
         "icon": "chart",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -1841,9 +1842,25 @@
         "route": "/kn/bao-gia/bien-dong",
         "icon": "layers",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.bao_gia.dashboard",
+        "label": "Dashboard theo vùng",
+        "route": "/kn/bao-gia/dashboard-vung",
+        "icon": "map",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.bao_gia.thong_ke",
+        "label": "Thống kê phiếu báo giá",
+        "route": "/kn/bao-gia/thong-ke",
+        "icon": "table",
+        "badge_source": null,
+        "enabled": true,
         "children": []
        },
        {
@@ -2002,9 +2019,16 @@
         "route": "/kn/bao-gia/bang-gia",
         "icon": "chart",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "xa.bao_gia.bien_dong",
+        "label": "Báo cáo biến động giá",
+        "route": "/kn/bao-gia/bien-dong",
+        "icon": "layers",
+        "badge_source": null,
+        "enabled": true,
         "children": []
        }
       ]

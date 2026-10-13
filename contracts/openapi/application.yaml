@@ -10064,6 +10064,277 @@ paths:
         "409": {description: price.board_busy | price.board_state | price.board_stale | price.board_changed, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   # --- hết pf/price W11.76 ---
+  # --- pf/price W11.77: báo cáo giá (FN-TI-02.01, FN-TI-02.08, FN-TW-01.01…03) ---
+  /v1/price/reports/progress:
+    get:
+      summary: "FN-TI-02.01 Tiến độ nhập giá — xã đang hoạt động trong ngày báo giá, trạng thái phiếu tại lúc đọc, số mặt hàng ▲/▼, lần hệ thống đã nhắc; thẻ đếm trên bảng đã lọc. Ngày không phải ngày báo giá → ngày báo giá gần nhất trước đó (no_quote). Cấp Tỉnh, Admin"
+      operationId: priceReportProgress
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: status, in: query, required: false, schema: {type: string}, description: "Mã trạng thái phiếu (not_entered, draft, submitted, locked, missed, late, approved) hoặc incomplete | unassigned | no_officer"}
+        - {name: point, in: query, required: false, schema: {type: string}}
+        - {name: mine, in: query, required: false, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Tiến độ nhập giá
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceProgress"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/reports/progress/export:
+    get:
+      summary: Xuất Excel Tiến độ nhập giá theo bộ lọc (luồng phụ FN-TI-02.01)
+      operationId: priceReportProgressExport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: status, in: query, required: false, schema: {type: string}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+        - {name: mine, in: query, required: false, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+  /v1/price/reports/summary:
+    get:
+      summary: "FN-TW-01.01 Bảng giá tổng hợp — phiên bản đã duyệt mới nhất của ngày (vắng → ngày công bố gần nhất), CT-04 theo nhóm vùng, tăng/giảm so bảng giá công bố liền trước; ngày đang mở duyệt → phiên bản cũ (updating). Mọi vai, chỉ xem"
+      operationId: priceReportSummary
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: group, in: query, required: false, schema: {type: string}}
+        - {name: view, in: query, required: false, schema: {type: string, enum: [item, point]}}
+        - {name: item, in: query, required: false, schema: {type: string}, description: Giá từng xã của một mặt hàng}
+      responses:
+        "200":
+          description: Bảng giá tổng hợp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSummary"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/reports/summary/export:
+    get:
+      summary: Xuất Excel Bảng giá tổng hợp theo bộ lọc (B3 FN-TW-01.01)
+      operationId: priceReportSummaryExport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: group, in: query, required: false, schema: {type: string}}
+        - {name: view, in: query, required: false, schema: {type: string, enum: [item, point]}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.report_empty, $ref: "#/components/responses/Problem"}
+  /v1/price/reports/movement:
+    get:
+      summary: "FN-TW-01.02 Báo cáo tăng giảm, biến động giá — kỳ ngày / tuần / tháng chứa ngày chọn so kỳ liền trước (giá kỳ = trung bình Giá trung bình các ngày công bố), thẻ tăng/giảm/đi ngang/số lần vượt ngưỡng, xu hướng 8 kỳ, chi tiết theo xã. Mọi vai, chỉ xem"
+      operationId: priceReportMovement
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: period, in: query, required: false, schema: {type: string, enum: [day, week, month]}}
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+        - {name: group, in: query, required: false, schema: {type: string}}
+        - {name: item, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Biến động giá
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceMovement"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/reports/movement/export:
+    get:
+      summary: Xuất Báo cáo biến động đúng bộ lọc — Excel hoặc PDF; chỉ Cấp Tỉnh, Admin (BR-04, AC-03 FN-TW-01.02)
+      operationId: priceReportMovementExport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: format, in: query, required: false, schema: {type: string, enum: [xlsx, pdf]}}
+        - {name: period, in: query, required: false, schema: {type: string, enum: [day, week, month]}}
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+        - {name: group, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Tệp .xlsx / .pdf
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+            application/pdf:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.report_empty, $ref: "#/components/responses/Problem"}
+        "503": {description: price.pdf_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/price/reports/dashboard:
+    get:
+      summary: "FN-TW-01.03 Dashboard tổng hợp giá theo vùng — ngày công bố gần nhất, thẻ chỉ số, giá trung bình mặt hàng Cơ bản theo nhóm vùng (all=true: mọi mặt hàng), biến động theo nhóm hàng, xu hướng 30 ngày công bố, bấm vùng → giá từng xã. Cấp TW, Cấp Tỉnh, Admin"
+      operationId: priceReportDashboard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: group, in: query, required: false, schema: {type: string}}
+        - {name: item, in: query, required: false, schema: {type: string}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: all, in: query, required: false, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Dashboard
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceDashboard"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/reports/dashboard/export:
+    get:
+      summary: Xuất Excel số liệu Dashboard theo vùng (luồng phụ FN-TW-01.03)
+      operationId: priceReportDashboardExport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: group, in: query, required: false, schema: {type: string}}
+        - {name: all, in: query, required: false, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.report_empty, $ref: "#/components/responses/Problem"}
+  /v1/price/reports/stats:
+    get:
+      summary: "FN-TI-02.08 Thống kê phiếu báo giá theo cán bộ Xã — tháng (month) hoặc khoảng ngày; phải nộp = ngày báo giá đã qua giờ khóa mà xã hoạt động và có cán bộ Xã; nhập thay ở cột Nộp muộn của cán bộ phụ trách; tháng đã khóa (Q-085) đọc ảnh chụp. Cấp Tỉnh, Admin"
+      operationId: priceReportStats
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: month, in: query, required: false, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - {name: from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Thống kê phiếu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceStats"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/reports/stats/export:
+    get:
+      summary: Xuất Excel Thống kê phiếu báo giá (B3 FN-TI-02.08)
+      operationId: priceReportStatsExport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: month, in: query, required: false, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - {name: from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/reports/stats/detail:
+    get:
+      summary: Danh sách ngày phải nộp của một cán bộ Xã theo ngày và trạng thái (luồng phụ FN-TI-02.08; số liệu hiện tại)
+      operationId: priceReportStatsDetail
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: officer, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: month, in: query, required: false, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - {name: from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Ngày phải nộp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [days]
+                properties:
+                  days: {type: array, items: {$ref: "#/components/schemas/PriceStatDay"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/reports/stats/close:
+    post:
+      summary: Khóa thống kê phiếu của một tháng đã kết thúc (Q-085) — chụp số liệu theo cán bộ Xã; chỉ Quản trị nghiệp vụ báo giá (D11)
+      operationId: priceReportStatsClose
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceStatMonthOp"}
+      responses:
+        "201":
+          description: Thống kê tháng sau khi khóa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceStats"}
+        "403": {description: forbidden | price.board_steward_required, $ref: "#/components/responses/Problem"}
+        "409": {description: price.stat_month_open | price.stat_month_state | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/reports/stats/reopen:
+    post:
+      summary: Mở lại thống kê tháng đã khóa (lý do bắt buộc) — tính lại từ phiếu tới lần khóa sau; chỉ Quản trị nghiệp vụ báo giá (D11)
+      operationId: priceReportStatsReopen
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceStatMonthOp"}
+      responses:
+        "201":
+          description: Thống kê tháng sau khi mở lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceStats"}
+        "403": {description: forbidden | price.board_steward_required, $ref: "#/components/responses/Problem"}
+        "409": {description: price.stat_month_state | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.reason_required, $ref: "#/components/responses/Problem"}
+  # --- hết pf/price W11.77 ---
   # --- hết pf/price ---
   # --- W11.61 (D4 KH1, BRD KHTC v2.2 FN-AD-04.01, FN-TI-02.02): Danh mục KHTC, danh sách CT/DA chủ (D20), Kế hoạch năm. Mọi route cần header X-AG-Context (client tự gắn) ---
   /v1/kn/khtc/catalogs:
@@ -12710,7 +12981,7 @@ components:
       description: Không chứa dữ liệu cá nhân. Cũng là data của entity đồng bộ "notification" (không có topic).
       properties:
         id: {type: string, format: uuid}
-        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated, household_registered, household_membership_changed, task_assigned, farm_log_pending, farm_log_reviewed, season_opened, integration_dead_lettered, area_feed_stale, price_reminder, price_alert, price_verify_request, price_verify_reply, price_verify_decision, price_lock_summary, price_board_approved, price_board_reopened]}
+        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated, household_registered, household_membership_changed, task_assigned, farm_log_pending, farm_log_reviewed, season_opened, integration_dead_lettered, area_feed_stale, price_reminder, price_alert, price_verify_request, price_verify_reply, price_verify_decision, price_lock_summary, price_board_approved, price_board_reopened, price_proxy_entry]}
         severity: {type: string, enum: [urgent, normal]}
         title: {type: string, maxLength: 300}
         body: {type: string, maxLength: 2000}
@@ -16429,6 +16700,302 @@ components:
             cancel_reopen: {type: boolean}
         blockers: {type: array, items: {type: string}, description: Lý do chưa duyệt được}
         reopen_days: {type: integer}
+    # --- pf/price W11.77: báo cáo giá ---
+    PriceRef:
+      type: object
+      required: [code, name]
+      properties:
+        code: {type: string}
+        name: {type: string}
+    PriceTrend: {type: string, enum: [up, down, flat, ""], description: "Tăng / Giảm / Đi ngang (|Δ%| < ngưỡng đi ngang — CT-04); rỗng = kỳ trước không có giá"}
+    PriceReportItem:
+      type: object
+      required: [item_code, item_name, group_code, group_name, unit_code, unit_name, basic]
+      properties:
+        item_code: {type: string}
+        item_name: {type: string}
+        group_code: {type: string}
+        group_name: {type: string}
+        unit_code: {type: string}
+        unit_name: {type: string}
+        basic: {type: boolean, description: Mặt hàng Cơ bản}
+    PricePointPrice:
+      allOf:
+        - $ref: "#/components/schemas/PriceReportItem"
+        - type: object
+          required: [point_code, point_name, region_code, region_name, min, max, mid, late]
+          properties:
+            point_code: {type: string}
+            point_name: {type: string}
+            region_code: {type: string}
+            region_name: {type: string}
+            min: {type: string}
+            max: {type: string}
+            mid: {type: string, description: P (CT-01)}
+            late: {type: boolean}
+    PriceProgressRow:
+      allOf:
+        - $ref: "#/components/schemas/PriceTicketRow"
+        - type: object
+          required: [updated_at, reminders]
+          properties:
+            updated_at: {type: [string, "null"], format: date-time}
+            reminders: {type: array, items: {type: string, format: date-time}, description: Lần hệ thống đã nhắc trong ngày}
+    PriceProgress:
+      type: object
+      required: [requested, day, no_quote, quote, lock_at, locked, board, now, cards, rows, regions]
+      properties:
+        requested: {type: string, format: date}
+        day: {type: string, format: date}
+        no_quote: {type: boolean, description: "Ngày chọn không phải ngày báo giá — hiển thị ngày báo giá gần nhất"}
+        quote: {type: boolean}
+        lock_at: {type: [string, "null"], format: date-time}
+        locked: {type: boolean}
+        board: {type: string}
+        now: {type: string, format: date-time}
+        cards:
+          type: object
+          required: [points, submitted, draft, not_entered, missed, late, high, low, unassigned, no_officer]
+          properties:
+            points: {type: integer}
+            submitted: {type: integer}
+            draft: {type: integer}
+            not_entered: {type: integer}
+            missed: {type: integer}
+            late: {type: integer}
+            high: {type: integer}
+            low: {type: integer}
+            unassigned: {type: integer}
+            no_officer: {type: integer}
+        rows: {type: array, items: {$ref: "#/components/schemas/PriceProgressRow"}}
+        regions: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+    PriceSummaryLine:
+      allOf:
+        - $ref: "#/components/schemas/PriceReportItem"
+        - type: object
+          required: [min, max, avg, points, prev, change_pct, trend]
+          properties:
+            min: {type: string}
+            max: {type: string}
+            avg: {type: string}
+            points: {type: integer}
+            prev: {type: [string, "null"], description: Giá trung bình kỳ trước}
+            change_pct: {type: [string, "null"]}
+            trend: {$ref: "#/components/schemas/PriceTrend"}
+    PriceSummary:
+      type: object
+      required: [requested, day, version, approved_at, not_today, updating, prev_day, flat_pct, region, read_only, lines, points, regions, groups]
+      properties:
+        requested: {type: string, format: date}
+        day: {type: [string, "null"], format: date, description: "Ngày của bảng đang hiển thị; null = Chưa có dữ liệu"}
+        version: {type: integer}
+        approved_at: {type: [string, "null"], format: date-time}
+        not_today: {type: boolean, description: Chưa công bố hôm nay — bảng gần nhất}
+        updating: {type: boolean, description: Đang cập nhật (mở duyệt) — phiên bản cũ}
+        prev_day: {type: [string, "null"], format: date}
+        flat_pct: {type: string}
+        region: {type: string}
+        read_only: {type: boolean}
+        lines: {type: array, items: {$ref: "#/components/schemas/PriceSummaryLine"}}
+        points: {type: array, items: {$ref: "#/components/schemas/PricePointPrice"}}
+        regions: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+        groups: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+    PricePeriod:
+      type: object
+      required: [from, to, label, days]
+      properties:
+        from: {type: [string, "null"], format: date}
+        to: {type: [string, "null"], format: date}
+        label: {type: string}
+        days: {type: integer, description: Số ngày công bố trong kỳ}
+    PriceMovementLine:
+      allOf:
+        - $ref: "#/components/schemas/PriceReportItem"
+        - type: object
+          required: [cur, prev, change_pct, trend]
+          properties:
+            cur: {type: [string, "null"]}
+            prev: {type: [string, "null"]}
+            change_pct: {type: [string, "null"]}
+            trend: {$ref: "#/components/schemas/PriceTrend"}
+    PriceMovement:
+      type: object
+      required: [period, cur, prev, insufficient, flat_pct, cards, lines, item, trend, points, regions, groups, can_export]
+      properties:
+        period: {type: string, enum: [day, week, month]}
+        cur: {$ref: "#/components/schemas/PricePeriod"}
+        prev: {$ref: "#/components/schemas/PricePeriod"}
+        insufficient: {type: boolean, description: Chưa đủ dữ liệu so sánh}
+        flat_pct: {type: string}
+        cards:
+          type: object
+          required: [up, down, flat, exceeded]
+          properties:
+            up: {type: integer}
+            down: {type: integer}
+            flat: {type: integer}
+            exceeded: {type: integer, description: Cảnh báo đã chốt trong kỳ}
+        lines: {type: array, items: {$ref: "#/components/schemas/PriceMovementLine"}}
+        item: {type: string}
+        trend:
+          type: array
+          items:
+            type: object
+            required: [period, avg]
+            properties:
+              period: {$ref: "#/components/schemas/PricePeriod"}
+              avg: {type: [string, "null"]}
+        points:
+          type: array
+          items:
+            type: object
+            required: [point_code, point_name, region_name, cur, prev, change_pct, trend]
+            properties:
+              point_code: {type: string}
+              point_name: {type: string}
+              region_name: {type: string}
+              cur: {type: [string, "null"]}
+              prev: {type: [string, "null"]}
+              change_pct: {type: [string, "null"]}
+              trend: {$ref: "#/components/schemas/PriceTrend"}
+        regions: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+        groups: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+        can_export: {type: boolean}
+    PriceRegionAvg:
+      type: object
+      required: [region, avg, points]
+      properties:
+        region: {type: string}
+        avg: {type: [string, "null"]}
+        points: {type: integer}
+    PriceDashboardLine:
+      type: object
+      required: [item, avg, prev, change_pct, trend, regions]
+      properties:
+        item: {$ref: "#/components/schemas/PriceReportItem"}
+        avg: {type: string}
+        prev: {type: [string, "null"]}
+        change_pct: {type: [string, "null"]}
+        trend: {$ref: "#/components/schemas/PriceTrend"}
+        regions: {type: array, items: {$ref: "#/components/schemas/PriceRegionAvg"}}
+    PriceDashboard:
+      type: object
+      required: [requested, day, version, approved_at, not_today, updating, prev_day, cards, regions, lines, groups, item, trend, region, drill]
+      properties:
+        requested: {type: string, format: date}
+        day: {type: [string, "null"], format: date}
+        version: {type: integer}
+        approved_at: {type: [string, "null"], format: date-time}
+        not_today: {type: boolean}
+        updating: {type: boolean}
+        prev_day: {type: [string, "null"], format: date}
+        cards:
+          type: object
+          required: [up, down, flat, points]
+          properties:
+            up: {type: integer}
+            down: {type: integer}
+            flat: {type: integer}
+            points: {type: integer, description: Số xã có báo giá}
+        regions:
+          type: array
+          items:
+            type: object
+            required: [code, name, points]
+            properties:
+              code: {type: string}
+              name: {type: string}
+              points: {type: integer}
+        lines: {type: array, items: {$ref: "#/components/schemas/PriceDashboardLine"}}
+        groups:
+          type: array
+          items:
+            type: object
+            required: [code, name, up, down, flat]
+            properties:
+              code: {type: string}
+              name: {type: string}
+              up: {type: integer}
+              down: {type: integer}
+              flat: {type: integer}
+        item: {type: string}
+        trend:
+          type: array
+          items:
+            type: object
+            required: [day, avg, regions]
+            properties:
+              day: {type: string, format: date}
+              avg: {type: [string, "null"]}
+              regions: {type: array, items: {$ref: "#/components/schemas/PriceRegionAvg"}}
+        region: {type: string}
+        drill: {type: array, items: {$ref: "#/components/schemas/PricePointPrice"}}
+    PriceStatRow:
+      type: object
+      required: [officer_ref, officer_name, point_code, point_name, region_code, region_name, required, on_time, late, missed, deleted, adjusted_lines]
+      properties:
+        officer_ref: {type: string, format: uuid}
+        officer_name: {type: [string, "null"]}
+        point_code: {type: string}
+        point_name: {type: string}
+        region_code: {type: string}
+        region_name: {type: string}
+        required: {type: integer}
+        on_time: {type: integer}
+        late: {type: integer}
+        missed: {type: integer}
+        deleted: {type: integer}
+        adjusted_lines: {type: integer}
+    PriceStatMonth:
+      type: object
+      required: [seq, status, version, reason]
+      properties:
+        seq: {type: integer}
+        status: {type: string, enum: [none, closed, open]}
+        version: {type: integer}
+        reason: {type: [string, "null"]}
+        at: {type: string, format: date-time}
+    PriceStats:
+      type: object
+      required: [from, to, monthly, month, snapshot, pending, cards, rows, can_close, can_reopen, regions]
+      properties:
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        monthly: {type: boolean}
+        month: {oneOf: [{$ref: "#/components/schemas/PriceStatMonth"}, {type: "null"}]}
+        snapshot: {type: boolean, description: Số liệu từ ảnh chụp tháng đã khóa}
+        pending: {type: integer, description: Ngày báo giá chưa qua giờ khóa (chưa tính)}
+        cards:
+          type: object
+          required: [quote_days, required, on_time, late, missed]
+          properties:
+            quote_days: {type: integer}
+            required: {type: integer}
+            on_time: {type: integer}
+            late: {type: integer}
+            missed: {type: integer}
+        rows: {type: array, items: {$ref: "#/components/schemas/PriceStatRow"}}
+        can_close: {type: boolean}
+        can_reopen: {type: boolean}
+        regions: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+    PriceStatDay:
+      type: object
+      required: [day, point_code, result, view, ticket_id, deleted, adjusted_lines]
+      properties:
+        day: {type: string, format: date}
+        point_code: {type: string}
+        result: {type: string, enum: [on_time, late, missed]}
+        view: {type: string}
+        ticket_id: {type: [string, "null"], format: uuid}
+        deleted: {type: integer}
+        adjusted_lines: {type: integer}
+    PriceStatMonthOp:
+      type: object
+      required: [month, seq]
+      properties:
+        month: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}
+        seq: {type: integer, description: Phiên bản khóa tháng đã thấy (0 = chưa khóa lần nào)}
+        reason: {type: string, description: Bắt buộc khi mở lại}
     # --- W11.61: Danh mục KHTC, CT/DA, Kế hoạch năm ---
     KhtcCatalogKind: {type: string, enum: [report_type, unit, field, funding_source, signer, recipient, basis], description: "Mặt hàng giá cả ở cap/price (Q-082)"}
     KhtcActor:
