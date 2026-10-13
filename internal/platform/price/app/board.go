@@ -564,8 +564,12 @@ func (s *TicketService) ReopenBoard(ctx context.Context, profile string, in Boar
 		}
 		w := boardWrite(prof, v, domain.BoardReopen, domain.BoardReopened)
 		w.Reason = reason
-		_, err := store.InsertBoard(ctx, tx, ids.New(), c.tenant, w, v.Now, c.ref, idemKey(idem, "board:reopen"))
-		return err
+		if _, err := store.InsertBoard(ctx, tx, ids.New(), c.tenant, w, v.Now, c.ref, idemKey(idem, "board:reopen")); err != nil {
+			return err
+		}
+		// NOTIF: chuông Cấp Tỉnh "bảng giá đang mở duyệt" (FN-TI-02.06) — không kèm lý do (văn bản tự do).
+		return enqueue(ctx, tx, c.tenant, v.Now, port.EventBoardReopened, port.BoardReopenedV1{Profile: prof.Name,
+			BoardDate: dayStr(v.Day), Version: v.Board.Version, ReopenedAt: v.Now.UTC().Format(time.RFC3339), ActorRef: c.ref})
 	})
 }
 

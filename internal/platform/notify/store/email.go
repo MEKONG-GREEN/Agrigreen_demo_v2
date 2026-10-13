@@ -11,7 +11,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Email theo người nhận (gói NOTIF, pf 000159). Không lưu địa chỉ.
+// Email theo người nhận (gói NOTIF, pf 20261013070025). Không lưu địa chỉ.
 // ---------------------------------------------------------------------------
 
 // InsertEmailDelivery xếp một lần gửi email của thông báo (một thông báo tối đa một lần — UNIQUE). Trả false nếu đã có.

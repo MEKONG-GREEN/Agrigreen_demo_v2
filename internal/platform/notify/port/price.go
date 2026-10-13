@@ -1,6 +1,6 @@
 package port
 
-// Thông báo Báo giá nông sản (gói NOTIF — G1, quyết định D5; pf/price → pf/notify, pf 000159): loại riêng, người nhận
+// Thông báo Báo giá nông sản (gói NOTIF — G1, quyết định D5; pf/price → pf/notify, pf 20261013070025): loại riêng, người nhận
 // Cấp Tỉnh, email theo từng người nhận.
 
 import (
@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Loại thông báo của Báo giá nông sản (CHECK kind — pf 000159).
+// Loại thông báo của Báo giá nông sản (CHECK kind — pf 20261013070025).
 const (
 	// KindPriceReminder: nhắc nhập giá lần 1 / lần 2 → cán bộ Xã (FN-XA-03.04; W11.74 tạm dùng report_task_due).
 	KindPriceReminder = "price_reminder"

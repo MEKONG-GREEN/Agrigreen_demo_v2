@@ -296,6 +296,11 @@ func TestPriceBoardsHTTP_W1176(t *testing.T) {
 	    AND payload->>'reapproval' = 'true' AND payload->>'version' = '2'`, tid, port.EventBoardPublished); n[0] != "1" {
 		t.Fatalf("sự kiện duyệt lại: %v", n)
 	}
+	// NOTIF: mỗi lần mở duyệt phát pf.price.board.reopened (phiên bản đang mở = 1), không kèm lý do.
+	if n := q(`SELECT count(*)::text FROM shared.outbox WHERE tenant_id = $1 AND event_type = $2
+	    AND payload->>'version' = '1' AND payload->>'board_date' = '2026-10-08' AND NOT payload ? 'reason'`, tid, port.EventBoardReopened); n[0] != "2" {
+		t.Fatalf("sự kiện mở duyệt: %v", n)
+	}
 	if pb, ok, err := tickets.Published(tenant.WithID(ctx, tid), "kn", time.Date(2026, 10, 8, 0, 0, 0, 0, time.UTC)); err != nil || !ok ||
 		pb.Version != 2 || len(pb.Lines) != 2 || pb.WeekKey != "2026-W41" {
 		t.Fatalf("port.Boards: %+v %v %v", pb, ok, err)

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { KIND_LABEL } from "./notify";
 
-// Gói NOTIF: chuông thông báo hiện nhãn tiếng Việt cho các loại thông báo Báo giá nông sản (pf 000159).
+// Gói NOTIF: chuông thông báo hiện nhãn tiếng Việt cho các loại thông báo Báo giá nông sản (pf 20261013070025).
 describe("KIND_LABEL — Báo giá nông sản", () => {
   it("có nhãn tiếng Việt cho mọi loại price_*", () => {
     const kinds = [

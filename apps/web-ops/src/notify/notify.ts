@@ -29,7 +29,7 @@ export const KIND_LABEL: Record<Notification["kind"], string> = {
   season_opened: "Nông dân mở vụ",
   integration_dead_lettered: "Đồng bộ vào hàng chờ lỗi",
   area_feed_stale: "Dữ liệu App HTX quá hạn độ tươi",
-  // Báo giá nông sản (gói NOTIF, pf 000159)
+  // Báo giá nông sản (gói NOTIF, pf 20261013070025)
   price_reminder: "Nhắc nhập giá",
   price_alert: "Cảnh báo biến động giá",
   price_verify_request: "Yêu cầu xác minh giá",
