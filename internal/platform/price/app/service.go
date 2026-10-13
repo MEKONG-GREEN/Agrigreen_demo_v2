@@ -38,6 +38,9 @@ type Service struct {
 	Reminders port.ReminderTargets
 	// Points: điểm nối của xã báo giá + phân công (W11.72): danh bạ cán bộ, "xã đã gửi phiếu" (W11.75).
 	Points PointHooks
+	// LockSummary (NOTIF): số liệu phiếu của ngày tại mốc khóa cho thông báo tổng hợp Cấp Tỉnh (FN-TI-02.03 B4). Module.New
+	// nối với phiếu W11.75; nil → mốc khóa không phát pf.price.lock.summarized.
+	LockSummary func(ctx context.Context, tx pgx.Tx, day time.Time) (port.DaySummary, error)
 }
 
 var _ port.Catalog = (*Service)(nil)

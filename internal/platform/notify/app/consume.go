@@ -46,7 +46,9 @@ var HandledEvents = []string{
 	ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived,
 	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale, mrvport.EventAlertRaised,
 	extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed, extport.EventWorkScheduleReminded,
-	meteringport.EventEgressAnomaly, priceport.EventReminderIssued,
+	meteringport.EventEgressAnomaly, priceport.EventReminderIssued, priceport.EventAlertRaised,
+	priceport.EventVerificationRequested, priceport.EventVerificationResponded, priceport.EventVerificationDecided,
+	priceport.EventLockSummarized, priceport.EventBoardPublished, priceport.EventBoardReopened,
 }
 
 // HandleEvent là inbox.Handler cho các sự kiện nguồn: dựng thông báo, xếp lần gửi
@@ -54,12 +56,10 @@ var HandledEvents = []string{
 // kể cả gọi thẳng hai lần, chỉ mục duy nhất (sự kiện, người nhận) chặn trùng.
 func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 	switch env.EventType {
-	case priceport.EventReminderIssued:
-		ns, err := domain.PriceReminderNotifications(env.Payload, env.OccurredAt)
-		if err != nil || len(ns) == 0 {
-			return err
-		}
-		return s.deliver(ctx, tx, env, ns)
+	case priceport.EventReminderIssued, priceport.EventAlertRaised, priceport.EventVerificationRequested,
+		priceport.EventVerificationResponded, priceport.EventVerificationDecided, priceport.EventLockSummarized,
+		priceport.EventBoardPublished, priceport.EventBoardReopened:
+		return s.onPrice(ctx, tx, env)
 	case extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed, extport.EventWorkScheduleReminded:
 		ns, err := domain.WorkScheduleNotifications(env.EventType, env.Payload, env.OccurredAt)
 		if err != nil {
@@ -445,6 +445,7 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, env outbox.Envelope, n
 	now := s.now()
 	var specs []sendSpec
 	kind := ""
+	mail := emailBatch{id: ids.New()}
 	for _, n := range ns {
 		n.ID, n.SourceEventID, n.SourceEventType = ids.New(), env.EventID, env.EventType
 		if !n.Normalize() {
@@ -477,6 +478,12 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, env outbox.Envelope, n
 		}
 		id := n.ID
 		specs = append(specs, sendSpec{tokens: toks, notificationID: &id, urgent: n.Urgent()})
+		if err := s.queueEmail(ctx, tx, env.TenantID, &mail, n, now); err != nil {
+			return err
+		}
+	}
+	if err := s.flushEmail(ctx, tx, env.TenantID, mail, now, env.TraceID); err != nil {
+		return err
 	}
 	return s.queueDeliveries(ctx, tx, env.TenantID, ids.New(), kind, now, specs...)
 }

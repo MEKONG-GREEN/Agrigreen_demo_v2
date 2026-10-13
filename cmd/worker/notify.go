@@ -65,10 +65,23 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	log.Info("kênh thông báo", "event", "startup", "push", ch.Pusher.Name(), "email", ch.Mailer != nil, "outcome", "ok")
 	// pf/cooperative (W3.3): nông hộ có thửa theo xã (schema pf_coop, r_cooperative).
 	coop := cooperative.New(coopPool, clk, cooperative.Deps{})
-	farmers := assembly.AreaFarmers{Households: coop.Households(),
-		Accounts: accounts.New(accPool, clk, accounts.Deps{}).FarmerAccounts()}
-	return notify.New(nPool, clk, notify.Deps{Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
-		DigestTo: ch.DigestTo, Log: log}), nil
+	// Gói NOTIF: email theo người nhận tra địa chỉ qua pf/accounts (Keycloak, AG_KC_*) lúc gửi; người nhận Cấp Tỉnh của
+	// Báo giá từ lần gán vai + cờ QTNV (pf_accounts, r_accounts).
+	kc, err := accounts.DirectoryFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	acc := accounts.New(accPool, clk, accounts.Deps{Directory: kc})
+	farmers := assembly.AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}
+	d := notify.Deps{Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
+		EmailMailer: ch.EmailMailer, DigestTo: ch.DigestTo, Log: log, LinkBase: os.Getenv("AG_WEB_OPS_URL"),
+		PriceDesk: assembly.NotifyPriceDesk{Holders: acc.RoleHolders(), Profiles: assembly.PriceProfiles()}}
+	if dir := acc.MailDirectory(); dir != nil {
+		d.Emails = assembly.NotifyEmails{Dir: dir}
+	} else {
+		log.Warn("chưa cấu hình AG_KC_* — thông báo chỉ gửi trong ứng dụng, không email theo người nhận", "event", "startup", "outcome", "skipped")
+	}
+	return notify.New(nPool, clk, d), nil
 }
 
 // notifyConsumers: một consumer mỗi nhóm sự kiện (pf.notify.directive, .content,

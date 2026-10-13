@@ -24,6 +24,7 @@ provides:
     - MailDirectory
     - ProfileUpdater
     - RecipientDirectory
+    - RoleHolders
     - SessionReader
     - StaffContacts
   events:

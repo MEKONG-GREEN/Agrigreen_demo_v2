@@ -177,7 +177,7 @@ func (s *TicketService) Correct(ctx context.Context, profile string, id uuid.UUI
 		if err != nil {
 			return err
 		}
-		t, _, err := s.ticketOp(ctx, tx, sc, id, version)
+		t, p, err := s.ticketOp(ctx, tx, sc, id, version)
 		if err != nil {
 			return err
 		}
@@ -232,6 +232,13 @@ func (s *TicketService) Correct(ctx context.Context, profile string, id uuid.UUI
 			}
 		}
 		if t, err = writeHeader(ctx, tx, sc, t, domain.OpCorrect, reason, idem); err != nil {
+			return err
+		}
+		codes := make([]string, 0, len(adj))
+		for _, a := range adj {
+			codes = append(codes, a.ItemCode)
+		}
+		if err := emitDecided(ctx, tx, sc, p, t.Day, t.ID, codes, port.DecisionAdjusted); err != nil { // NOTIF → cán bộ Xã
 			return err
 		}
 		sh, err = s.buildSheet(ctx, tx, sc, t.PointCode, t.Day, &t)
@@ -412,6 +419,8 @@ func (s *TicketService) RequestVerification(ctx context.Context, profile string,
 		if err != nil {
 			return err
 		}
+		reqs := map[uuid.UUID]*port.VerificationRequestedV1{} // NOTIF: một sự kiện mỗi phiếu
+		var order []uuid.UUID
 		for _, r := range refs {
 			a, t, p, err := s.alertOp(ctx, tx, sc, r)
 			if err != nil {
@@ -442,6 +451,21 @@ func (s *TicketService) RequestVerification(ctx context.Context, profile string,
 				return err
 			}
 			n++
+			q, ok := reqs[t.ID]
+			if !ok {
+				q = &port.VerificationRequestedV1{Profile: prof.Name, Day: dayStr(t.Day), PointCode: p.Code, PointName: p.Name,
+					TicketID: t.ID, RespondBy: rb.UTC().Format(time.RFC3339), OfficerRef: refPtr(p.Officer), RequesterRef: c.ref}
+				reqs[t.ID] = q
+				order = append(order, t.ID)
+			}
+			q.ItemCodes = append(q.ItemCodes, a.ItemCode)
+		}
+		for _, id := range order {
+			q := reqs[id]
+			q.ItemCodes = sortedCodes(q.ItemCodes)
+			if err := enqueue(ctx, tx, c.tenant, sc.now, port.EventVerificationRequested, *q); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -508,8 +532,12 @@ func (s *TicketService) Respond(ctx context.Context, profile string, in Response
 		}
 		x := a
 		x.Status, x.Response, x.ProposedMin, x.ProposedMax, x.Explanation = domain.AlertResponded, in.Choice, in.Min, in.Max, in.Explanation
-		_, err = store.InsertAlert(ctx, tx, ids.New(), c.tenant, x, sc.now, c.ref, idemKey(idem, "respond"))
-		return err
+		if _, err = store.InsertAlert(ctx, tx, ids.New(), c.tenant, x, sc.now, c.ref, idemKey(idem, "respond")); err != nil {
+			return err
+		}
+		return enqueue(ctx, tx, c.tenant, sc.now, port.EventVerificationResponded, port.VerificationRespondedV1{Profile: prof.Name, // NOTIF
+			Day: dayStr(t.Day), PointCode: p.Code, PointName: p.Name, TicketID: t.ID, ItemCode: a.ItemCode, Choice: in.Choice,
+			OwnerRef: refPtr(p.Owner), ResponderRef: c.ref})
 	})
 	return mapLedgerErr(err)
 }
@@ -565,8 +593,10 @@ func (s *TicketService) Decide(ctx context.Context, profile string, r AlertRef, 
 		default:
 			return problem.Validation.WithField("decision", "keep, exclude hoặc reopen")
 		}
-		_, err = store.InsertAlert(ctx, tx, ids.New(), c.tenant, x, sc.now, c.ref, idemKey(idem, "decide"))
-		return err
+		if _, err = store.InsertAlert(ctx, tx, ids.New(), c.tenant, x, sc.now, c.ref, idemKey(idem, "decide")); err != nil {
+			return err
+		}
+		return emitDecided(ctx, tx, sc, p, t.Day, t.ID, []string{a.ItemCode}, decisionOf(decision)) // NOTIF → cán bộ Xã
 	})
 	return mapLedgerErr(err)
 }

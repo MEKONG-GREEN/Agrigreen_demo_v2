@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.price.board.reopened/v1",
+  "title": "pf.price.board.reopened — payload",
+  "description": "Cấp Tỉnh mở duyệt bảng giá ngày đã duyệt (gói NOTIF; FN-TI-02.06; các vai khác vẫn thấy phiên bản version, nhãn 'Đang cập nhật'). Bên phát: ReopenBoard của W11.76. pf/notify gửi chuông cho Cấp Tỉnh. Không có lý do (văn bản tự do); không dữ liệu cá nhân.",
+  "x-event-type": "pf.price.board.reopened",
+  "x-schema-version": 1,
+  "x-producer": "pf/price",
+  "type": "object",
+  "required": [
+    "profile",
+    "board_date",
+    "version",
+    "reopened_at",
+    "actor_ref"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "description": "Bên dùng của cap/price (KN = kn)"
+    },
+    "board_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Ngày báo giá (giờ VN)"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Phiên bản đã duyệt đang mở"
+    },
+    "reopened_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

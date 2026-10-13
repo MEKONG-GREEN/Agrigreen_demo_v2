@@ -109,6 +109,10 @@ func (m *Module) ActorNames() partyport.ActorNames { return m.svc }
 // Assignments cho P4/P5: lần gán vai trò còn hiệu lực.
 func (m *Module) Assignments() port.Assignments { return m.svc }
 
+// RoleHolders (gói NOTIF): tài khoản theo vai / cờ nhiệm vụ trên lần gán (vd Cấp Tỉnh, QTNV báo giá) — người nhận thông
+// báo của consumer worker (tenant tường minh).
+func (m *Module) RoleHolders() port.RoleHolders { return m.svc }
+
 // KNPeople (W11.07) cho pf/hrm, Contact, đánh giá: phạm vi nhân sự của ngữ cảnh phiên (BR-04 HCTH, HS-37).
 func (m *Module) KNPeople() port.KNPeople { return m.svc }
 

@@ -66,10 +66,6 @@ const (
 	// KindEgressAnomaly: khối lượng xuất dữ liệu bất thường lần đầu trong ngày (pf/metering, DLP — ADR-0024,
 	// G5) → người nhận DLP của tenant CHỦ DỮ LIỆU (EgressAnomalyRoles; migration pf 000083).
 	KindEgressAnomaly = "egress_anomaly"
-	// KindPriceReminder: nhắc nhập giá Báo giá nông sản (pf/price W11.74, FN-XA-03.04) → cán bộ xã. DÙNG LẠI loại
-	// report_task_due ("tự nhắc trước hạn theo cấu hình", pf 000073): CHECK kind của pf_notify chỉ migration của
-	// pf/notify sửa được (agmodgraph) — loại riêng "price_reminder" cần một migration pf_notify (người tích hợp cấp số).
-	KindPriceReminder = KindReportTaskDue
 	// KindSyncNow là thông điệp dữ liệu "đồng bộ ngay" (US-SYNC-02) — không tạo thông báo.
 	KindSyncNow = "sync_now"
 )

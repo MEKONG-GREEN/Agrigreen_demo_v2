@@ -72,6 +72,9 @@ type Notification struct {
 	CreatedAt       time.Time
 	ReadAt          *time.Time
 	SyncSeq         int64
+	// Email: gửi thêm email tới người nhận (chỉ thông báo có RecipientRef; không lưu trong bảng notification — lần gửi
+	// xếp ở pf_notify.email_delivery, gói NOTIF).
+	Email bool
 }
 
 // Topic cho biết thông báo theo chủ đề.

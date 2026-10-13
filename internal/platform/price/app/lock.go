@@ -148,9 +148,22 @@ func (s *Service) recordLock(ctx context.Context, tid uuid.UUID, prof port.Profi
 			lag.Truncate(time.Second), plan.Schedule.LockAt)
 	}
 	err := s.tx(ctx, tid, func(tx pgx.Tx) error {
-		return store.InsertRun(ctx, tx, store.CalMeta{ID: ids.New(), Tenant: tid, EventTime: now, Actor: CalendarJobActor,
+		if err := store.InsertRun(ctx, tx, store.CalMeta{ID: ids.New(), Tenant: tid, EventTime: now, Actor: CalendarJobActor,
 			Idem: runIdem(prof.Name, plan.Day, domain.RunLock)}, prof.Name,
-			store.Run{Day: plan.Day, Kind: domain.RunLock, ScheduledAt: plan.LockAt, Note: note})
+			store.Run{Day: plan.Day, Kind: domain.RunLock, ScheduledAt: plan.LockAt, Note: note}); err != nil {
+			return err
+		}
+		if s.LockSummary == nil {
+			return nil
+		}
+		// NOTIF: thông báo tổng hợp 12:00 cho Cấp Tỉnh (FN-TI-02.03 B4) — cùng giao dịch với dòng nhật ký (đúng một lần).
+		sum, err := s.LockSummary(ctx, tx, plan.Day)
+		if err != nil {
+			return err
+		}
+		return enqueue(ctx, tx, tid, now, port.EventLockSummarized, port.LockSummarizedV1{Profile: prof.Name, Day: dayStr(plan.Day),
+			LockAt: plan.LockAt.UTC().Format(time.RFC3339), Points: sum.Points, Submitted: sum.Submitted, Late: sum.Late,
+			Missed: sum.Missed, OpenAlerts: sum.OpenAlerts})
 	})
 	if err != nil {
 		return CalendarJobResult{}, err

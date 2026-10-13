@@ -395,4 +395,62 @@ func TestPriceTicketsHTTP_W1175(t *testing.T) {
 	if err != nil || len(targets) != 1 || targets[0].CommuneCode != "XBG0002" {
 		t.Fatalf("nhắc lần 2 bỏ xã đã gửi: %+v %v", targets, err)
 	}
+
+	// ---- Gói NOTIF: sự kiện vòng đời cho pf/notify (outbox cùng giao dịch) ----
+	events := func(typ string) []string {
+		t.Helper()
+		var out []string
+		err := tenant.WithTenantTx(context.Background(), env.AdminPool(t, migrations.PF), tid, func(tx pgx.Tx) error {
+			rows, err := tx.Query(context.Background(), `SELECT payload::text FROM shared.outbox WHERE tenant_id = $1 AND event_type = $2
+			  ORDER BY occurred_at, id`, tid, typ)
+			if err != nil {
+				return err
+			}
+			out, err = pgx.CollectRows(rows, pgx.RowTo[string])
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	var raised port.AlertRaisedV1
+	if ps := events(port.EventAlertRaised); len(ps) == 0 || json.Unmarshal([]byte(ps[0]), &raised) != nil || raised.PointCode != "XBG0001" ||
+		raised.OwnerRef == nil || *raised.OwnerRef != tinhRef || len(raised.ItemCodes) == 0 || raised.PointName == "" {
+		t.Fatalf("pf.price.alert.raised → Cấp Tỉnh phụ trách: %v %+v", ps, raised)
+	}
+	var req port.VerificationRequestedV1
+	if ps := events(port.EventVerificationRequested); len(ps) != 1 || json.Unmarshal([]byte(ps[0]), &req) != nil ||
+		req.OfficerRef == nil || *req.OfficerRef != ctvA || strings.Join(req.ItemCodes, ",") != "MH00001,MH00002" ||
+		req.RequesterRef != tinhRef || req.RespondBy != "2026-10-09T06:30:00Z" {
+		t.Fatalf("pf.price.verification.requested (một sự kiện mỗi phiếu): %v %+v", ps, req)
+	}
+	var rep port.VerificationRespondedV1
+	if ps := events(port.EventVerificationResponded); len(ps) != 1 || json.Unmarshal([]byte(ps[0]), &rep) != nil ||
+		rep.OwnerRef == nil || *rep.OwnerRef != tinhRef || rep.Choice != "propose" || rep.ItemCode != "MH00001" || rep.ResponderRef != ctvA {
+		t.Fatalf("pf.price.verification.responded: %v %+v", ps, rep)
+	}
+	ps := events(port.EventVerificationDecided)
+	if len(ps) != 2 {
+		t.Fatalf("pf.price.verification.decided (hiệu chỉnh + loại): %v", ps)
+	}
+	for i, want := range []string{port.DecisionAdjusted, port.DecisionExcluded} {
+		var d port.VerificationDecidedV1
+		if json.Unmarshal([]byte(ps[i]), &d) != nil || d.Decision != want || d.OfficerRef == nil || *d.OfficerRef != ctvA || d.DeciderRef != tinhRef {
+			t.Fatalf("decided %d: %s", i, ps[i])
+		}
+	}
+	// Mốc khóa 12:00 ngày 12/10 (job price_calendar) phát tổng hợp cho Cấp Tỉnh đúng một lần: 2 xã, 1 đã gửi, 1 không nộp.
+	svc.LockSummary = tickets.LockSummary // như price.New
+	lockAt := time.Date(2026, 10, 12, 5, 0, 30, 0, time.UTC)
+	for i := 0; i < 2; i++ {
+		if _, err := svc.CalendarJobTenant(context.Background(), tid, lockAt); err != nil {
+			t.Fatalf("job khóa: %v", err)
+		}
+	}
+	var lockSum port.LockSummarizedV1
+	if ps := events(port.EventLockSummarized); len(ps) != 1 || json.Unmarshal([]byte(ps[0]), &lockSum) != nil || lockSum.Day != "2026-10-12" ||
+		lockSum.Points != 2 || lockSum.Submitted != 1 || lockSum.Missed != 1 || lockSum.Late != 0 || lockSum.OpenAlerts != 0 || lockSum.LockAt != "2026-10-12T05:00:00Z" {
+		t.Fatalf("pf.price.lock.summarized: %v %+v", ps, lockSum)
+	}
 }

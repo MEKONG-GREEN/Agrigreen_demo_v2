@@ -830,8 +830,14 @@ func (s *TicketService) writeEntry(ctx context.Context, tx pgx.Tx, sc *sheetCtx,
 		}
 	}
 	if in.Submit {
-		if err := s.syncAlerts(ctx, tx, sc, t.ID, items, merged, refs, idem); err != nil {
+		raised, err := s.syncAlerts(ctx, tx, sc, t.ID, items, merged, refs, idem)
+		if err != nil {
 			return store.Ticket{}, err
+		}
+		if source == domain.SourceXa { // NOTIF: Tạm tính mới → Cấp Tỉnh phụ trách (nhập thay: Cấp Tỉnh đã biết)
+			if err := emitAlertRaised(ctx, tx, sc, p, day, t.ID, raised); err != nil {
+				return store.Ticket{}, err
+			}
 		}
 	}
 	return t, nil
@@ -839,12 +845,14 @@ func (s *TicketService) writeEntry(ctx context.Context, tx pgx.Tx, sc *sheetCtx,
 
 // syncAlerts sinh / cập nhật / tự hủy cảnh báo khi phiếu được gửi (FN-TI-02.03 B1; Mục II.3.2): dòng vượt ngưỡng →
 // Tạm tính (hoặc giữ trạng thái đã yêu cầu xác minh / Xã đã phản hồi, cập nhật giá); dòng về dưới ngưỡng, hết giá →
-// tự hủy. Ngưỡng là ngưỡng đang hiệu lực lúc gửi (FN-AD-04.06 BR-03).
+// tự hủy. Ngưỡng là ngưỡng đang hiệu lực lúc gửi (FN-AD-04.06 BR-03). Trả mã mặt hàng có cảnh báo Tạm tính MỚI (chưa có
+// hoặc đã tự hủy trước đó) — cho thông báo Cấp Tỉnh (NOTIF).
 func (s *TicketService) syncAlerts(ctx context.Context, tx pgx.Tx, sc *sheetCtx, ticket uuid.UUID, items []domain.ItemState,
-	merged map[string]domain.Line, refs map[string]RefPrice, idem string) error {
+	merged map[string]domain.Line, refs map[string]RefPrice, idem string) ([]string, error) {
+	var raised []string
 	as, err := store.LoadAlerts(ctx, tx, []uuid.UUID{ticket})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	book := bookAlerts(as)
 	now, c := sc.now, sc.c
@@ -868,7 +876,7 @@ func (s *TicketService) syncAlerts(ctx context.Context, tx pgx.Tx, sc *sheetCtx,
 				x := store.Alert{TicketID: ticket, ItemCode: it.Code, Status: domain.AlertCancelled, Direction: cur.Direction, Ref: cur.Ref,
 					Price: cur.Price, ChangePct: cur.ChangePct, Threshold: cur.Threshold}
 				if err := write(x, "cancel"); err != nil {
-					return err
+					return nil, err
 				}
 			}
 			continue
@@ -877,6 +885,7 @@ func (s *TicketService) syncAlerts(ctx context.Context, tx pgx.Tx, sc *sheetCtx,
 			Price: ev.Price, ChangePct: ev.ChangePct, Threshold: ev.Threshold}
 		switch {
 		case !has || cur.Status == domain.AlertCancelled:
+			raised = append(raised, it.Code)
 		case domain.AlertOpenBeforeLock(cur.Status):
 			if cur.Direction == a.Direction && cur.Price.Equal(a.Price) && cur.Ref.Equal(a.Ref) && cur.Threshold.Equal(a.Threshold) {
 				continue
@@ -887,7 +896,7 @@ func (s *TicketService) syncAlerts(ctx context.Context, tx pgx.Tx, sc *sheetCtx,
 			continue // đã xử lý (sau giờ khóa) — không sinh lại
 		}
 		if err := write(a, "sync"); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	// Cảnh báo của mặt hàng không còn trên danh sách: tự hủy.
@@ -898,10 +907,10 @@ func (s *TicketService) syncAlerts(ctx context.Context, tx pgx.Tx, sc *sheetCtx,
 		x := store.Alert{TicketID: ticket, ItemCode: k.item, Status: domain.AlertCancelled, Direction: cur.Direction, Ref: cur.Ref,
 			Price: cur.Price, ChangePct: cur.ChangePct, Threshold: cur.Threshold}
 		if err := write(x, "cancel"); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return raised, nil
 }
 
 // mapLedgerErr đổi lỗi DB của sổ phiếu sang mã lỗi chung (trùng khóa → ghi đồng thời).

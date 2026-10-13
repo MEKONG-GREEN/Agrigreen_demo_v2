@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.price.verification.decided/v1",
+  "title": "pf.price.verification.decided — payload",
+  "description": "Cấp Tỉnh chốt cảnh báo / hiệu chỉnh giá của một phiếu (gói NOTIF; FN-TI-02.03 B6 'Cán bộ Xã nhận thông báo kết quả', FN-TI-02.04 hậu điều kiện). decision = kept | excluded | reopened | adjusted. pf/notify gửi chuông + email cho officer_ref. Ghi chú / lý do đọc trong ứng dụng; không dữ liệu cá nhân.",
+  "x-event-type": "pf.price.verification.decided",
+  "x-schema-version": 1,
+  "x-producer": "pf/price",
+  "type": "object",
+  "required": [
+    "profile",
+    "day",
+    "point_code",
+    "point_name",
+    "ticket_id",
+    "item_codes",
+    "decision",
+    "officer_ref",
+    "decider_ref"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "description": "Bên dùng của cap/price (KN = kn)"
+    },
+    "day": {
+      "type": "string",
+      "format": "date",
+      "description": "Ngày báo giá (giờ VN)"
+    },
+    "point_code": {
+      "type": "string",
+      "description": "Mã xã báo giá (XBG…)"
+    },
+    "point_name": {
+      "type": "string",
+      "description": "Tên xã theo ĐVHC (không phải dữ liệu cá nhân)"
+    },
+    "ticket_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "item_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "Mã mặt hàng"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "kept",
+        "excluded",
+        "reopened",
+        "adjusted"
+      ]
+    },
+    "officer_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "Cán bộ Xã phụ trách chính; null = chưa có"
+    },
+    "decider_ref": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

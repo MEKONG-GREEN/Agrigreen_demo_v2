@@ -9702,7 +9702,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened" | "integration_dead_lettered" | "area_feed_stale";
+            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened" | "integration_dead_lettered" | "area_feed_stale" | "price_reminder" | "price_alert" | "price_verify_request" | "price_verify_reply" | "price_verify_decision" | "price_lock_summary" | "price_board_approved" | "price_board_reopened";
             /** @enum {string} */
             severity: "urgent" | "normal";
             title: string;

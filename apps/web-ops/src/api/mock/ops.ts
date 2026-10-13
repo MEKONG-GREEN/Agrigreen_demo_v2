@@ -341,6 +341,19 @@ function inboxOf(p: MockPersona): Notification[] {
       title: `Tổ chức đã ngừng hoạt động: ${inactiveOrg.name}`, body: "Tài khoản thuộc tổ chức đã được khóa tự động.",
       deep_link: `/orgs/${inactiveOrg.ref}`, subject: inactiveOrg.ref,
     }),
+    // Báo giá nông sản (gói NOTIF): yêu cầu xác minh → Cấp Xã, tổng hợp khóa nhập 12:00 → Cấp Tỉnh.
+    n(6, {
+      kind: "price_verify_request", severity: "normal", topic: false, hoursAgo: 1,
+      title: "Yêu cầu xác minh giá — Mỹ Chánh, 12/10/2026",
+      body: "Cấp Tỉnh đề nghị xã kiểm tra lại 1 mặt hàng (DUA_LEO) của báo giá ngày 12/10/2026. Hạn phản hồi: 12/10/2026 13:30.",
+      deep_link: "/kn/bao-gia/xac-minh",
+    }),
+    n(7, {
+      kind: "price_lock_summary", severity: "normal", topic: false, hoursAgo: 3,
+      title: "Khóa nhập báo giá ngày 12/10/2026",
+      body: "Đã khóa nhập lúc 12/10/2026 12:00. 7/10 xã gửi đúng hạn, 1 nộp muộn, 2 không nộp; 3 cảnh báo chưa xử lý.",
+      deep_link: "/kn/bao-gia/kiem-duyet",
+    }),
   ];
   INBOX.set(p.id, list);
   return list;

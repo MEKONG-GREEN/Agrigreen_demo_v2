@@ -10,8 +10,11 @@ depends:
   pf/party: ">=2.0 <3"
   pf/sync: ">=1.0 <2"
 provides:
-  ports: [AreaFarmers, StaffDirectory]
-  events: [pf.notify.notification.created/v1, pf.notify.push.requested/v1]
+  ports: [AreaFarmers, EmailDirectory, PriceDesk, StaffDirectory]
+  events:
+    - pf.notify.email.requested/v1
+    - pf.notify.notification.created/v1
+    - pf.notify.push.requested/v1
   internal_events: []
   publications: []
   data_products: []
@@ -40,7 +43,14 @@ consumes:
     - pf.party.household.membership_changed/v1
     - pf.party.household.registered/v1
     - pf.party.org.deactivated/v1
+    - pf.price.alert.raised/v1
+    - pf.price.board.published/v1
+    - pf.price.board.reopened/v1
+    - pf.price.lock.summarized/v1
     - pf.price.reminder.issued/v1
+    - pf.price.verification.decided/v1
+    - pf.price.verification.requested/v1
+    - pf.price.verification.responded/v1
     - pf.sync.conflict.opened/v1
     - pf.sync.device.revoked/v1
     - pf.sync.integration.dead_lettered/v1

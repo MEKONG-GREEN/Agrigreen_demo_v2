@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -54,6 +55,11 @@ type fixture struct {
 	staff   *fakeStaff
 	pusher  *fakePusher
 	tenant  uuid.UUID
+	// Gói NOTIF: người nhận Cấp Tỉnh của Báo giá, danh bạ thư, kênh email theo người nhận (giả).
+	desk   *fakePriceDesk
+	emails *fakeEmails
+	mailer *rcptMailer
+	logs   *syncBuffer
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -62,11 +68,13 @@ func newFixture(t *testing.T) *fixture {
 	f := &fixture{t: t, iss: authztest.New(t), pool: env.Pool(t, migrations.PF, notify.DBRole), clk: clock.NewFixed(time.Now()),
 		scope: &fakeScope{scopes: map[uuid.UUID]authz.Scope{}}, devices: &fakeDevices{m: map[[2]uuid.UUID]syncport.DeviceInfo{}},
 		staff: &fakeStaff{staff: map[uuid.UUID][]port.StaffRef{}}, pusher: &fakePusher{invalid: map[string]bool{}, flaky: map[string]int{}},
-		tenant: ids.New()}
+		tenant: ids.New(), desk: &fakePriceDesk{}, emails: &fakeEmails{addr: map[uuid.UUID]string{}}, mailer: &rcptMailer{}, logs: &syncBuffer{}}
 	// ADR-0028 (W2.3): module chạy trên vai đăng nhập app_platform (NOINHERIT) — chỉ chạm pf_notify sau SET LOCAL ROLE r_notify.
 	appPool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	f.appDB = db.ForModule(appPool, notify.DBModule)
-	f.mod = notify.New(appPool, f.clk, notify.Deps{Scope: f.scope, Devices: f.devices, Staff: f.staff, Units: fakeUnits{}, Pusher: f.pusher})
+	f.mod = notify.New(appPool, f.clk, notify.Deps{Scope: f.scope, Devices: f.devices, Staff: f.staff, Units: fakeUnits{}, Pusher: f.pusher,
+		PriceDesk: f.desk, Emails: f.emails, EmailMailer: f.mailer, LinkBase: "https://kn.example.vn",
+		Log: slog.New(slog.NewTextHandler(f.logs, nil))})
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 1<<20)

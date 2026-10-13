@@ -63,6 +63,7 @@ func New(b tenant.Beginner, clk clock.Clock, profiles []port.Profile) (*Module, 
 	m.items.Hooks.HasPrice = m.tickets.HasPrice
 	m.items.Hooks.HasSheets = m.tickets.Submitted
 	m.tickets.WireBoard() // W11.76: Cấp Tỉnh chỉ sửa khi Chưa duyệt / Đang mở duyệt; CT-02 chỉ từ ngày đã duyệt
+	svc.LockSummary = m.tickets.LockSummary // NOTIF: thông báo tổng hợp lúc khóa nhập cho Cấp Tỉnh
 	return m, nil
 }
 

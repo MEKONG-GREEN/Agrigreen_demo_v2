@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.price.lock.summarized/v1",
+  "title": "pf.price.lock.summarized — payload",
+  "description": "Job price_calendar đã ghi mốc khóa nhập của ngày báo giá (gói NOTIF; FN-TI-02.03 B4 'gửi thông báo tổng hợp cho Cấp Tỉnh' lúc 12:00). Mỗi (tenant, bên dùng, ngày) đúng một lần, cùng giao dịch với nhật ký job. pf/notify gửi chuông + email cho Quản trị nghiệp vụ và cán bộ Cấp Tỉnh của bên dùng. Chỉ số đếm.",
+  "x-event-type": "pf.price.lock.summarized",
+  "x-schema-version": 1,
+  "x-producer": "pf/price",
+  "type": "object",
+  "required": [
+    "profile",
+    "day",
+    "lock_at",
+    "points",
+    "submitted",
+    "late",
+    "missed",
+    "open_alerts"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "description": "Bên dùng của cap/price (KN = kn)"
+    },
+    "day": {
+      "type": "string",
+      "format": "date",
+      "description": "Ngày báo giá (giờ VN)"
+    },
+    "lock_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "points": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Số xã phải báo giá"
+    },
+    "submitted": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Đã gửi đúng hạn"
+    },
+    "late": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Nộp muộn"
+    },
+    "missed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Không nộp"
+    },
+    "open_alerts": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Cảnh báo chưa xử lý"
+    }
+  }
+}

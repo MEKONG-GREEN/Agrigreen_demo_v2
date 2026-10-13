@@ -29,11 +29,11 @@ import (
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/channel"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/store"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
-	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/price/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
@@ -68,6 +68,14 @@ type Deps struct {
 	NudgeHourly   int
 	// SyncEntities: entity chiều xuống của pf/sync để kiểm entities[] của POST /v1/sync/nudge.
 	SyncEntities []string
+	// PriceDesk (gói NOTIF): người nhận Cấp Tỉnh của Báo giá nông sản (gốc lắp ráp, pf/accounts); nil → chủ đề Cấp Tỉnh.
+	PriceDesk port.PriceDesk
+	// Emails (gói NOTIF): tra email người nhận lúc gửi (pf/accounts — Keycloak); nil → không gửi email theo người nhận.
+	Emails port.EmailDirectory
+	// EmailMailer (gói NOTIF): kênh email theo người nhận (Channels.EmailMailer); nil → Mailer.
+	EmailMailer channel.Mailer
+	// LinkBase: gốc URL web-ops cho liên kết trong email (AG_WEB_OPS_URL).
+	LinkBase string
 }
 
 // Channels là kênh gửi ra ngoài đọc từ môi trường (cho cmd/worker).
@@ -75,6 +83,9 @@ type Channels struct {
 	Pusher   channel.Pusher
 	Mailer   channel.Mailer // nil khi chưa đặt AG_SMTP_HOST
 	DigestTo []string
+	// EmailMailer (gói NOTIF): kênh email theo người nhận — SMTP khi đặt AG_SMTP_HOST, không thì LogMailer (chỉ ghi log
+	// số người nhận + tiêu đề, Local/Dev). Bên gọi còn phải nối Deps.Emails thì mới gửi.
+	EmailMailer channel.Mailer
 }
 
 // ChannelsFromEnv: AG_FCM_* → FCM HTTP v1 (không đặt → chỉ ghi log);
@@ -89,8 +100,9 @@ func ChannelsFromEnv(log *slog.Logger) (Channels, error) {
 	if err != nil {
 		return Channels{}, err
 	}
+	out.EmailMailer = channel.LogMailer{Log: log}
 	if m != nil {
-		out.Mailer = m
+		out.Mailer, out.EmailMailer = m, m
 	}
 	return out, nil
 }
@@ -104,7 +116,7 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return &Module{svc: app.NewService(db.ForModule(b, DBModule), clk, app.Deps{
 		Scope: d.Scope, Devices: d.Devices, Staff: d.Staff, Units: d.Units, Farmers: d.Farmers, Pusher: d.Pusher, Mailer: d.Mailer,
 		DigestTo: d.DigestTo, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
-		SyncEntities: d.SyncEntities,
+		SyncEntities: d.SyncEntities, PriceDesk: d.PriceDesk, Emails: d.Emails, EmailMailer: d.EmailMailer, LinkBase: d.LinkBase,
 	})}
 }
 
@@ -152,8 +164,10 @@ func (m *Module) Consumers() []Consumer {
 		{Name: port.ConsumerWorkSchedule, Events: []string{extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed,
 			extport.EventWorkScheduleReminded}, Handler: ev},
 		{Name: port.ConsumerEgressAnomaly, Events: []string{meteringport.EventEgressAnomaly}, Handler: ev},
-		{Name: port.ConsumerPrice, Events: []string{priceport.EventReminderIssued}, Handler: ev},
+		// W11.74 nhắc nhập giá; gói NOTIF: cảnh báo, xác minh, tổng hợp giờ khóa, duyệt / mở duyệt bảng giá.
+		{Name: port.ConsumerPrice, Events: domain.PriceEvents, Handler: ev},
 		{Name: port.ConsumerPush, Events: []string{port.EventPushRequested}, Handler: m.svc.HandlePush},
+		{Name: port.ConsumerEmail, Events: []string{port.EventEmailRequested}, Handler: m.svc.HandleEmail},
 	}
 }
 
@@ -162,6 +176,12 @@ func (m *Module) EventHandler() inbox.Handler { return m.svc.HandleEvent }
 
 // PushHandler là handler của pf.notify.push.requested.
 func (m *Module) PushHandler() inbox.Handler { return m.svc.HandlePush }
+
+// EmailHandler là handler của pf.notify.email.requested (gói NOTIF).
+func (m *Module) EmailHandler() inbox.Handler { return m.svc.HandleEmail }
+
+// UsePriceDesk nối người nhận Cấp Tỉnh của Báo giá nông sản (gói NOTIF). Gốc lắp ráp gọi sau khi dựng pf/accounts.
+func (m *Module) UsePriceDesk(d port.PriceDesk) { m.svc.PriceDesk = d }
 
 // DigestTenants dựng bộ tìm tenant có email tóm tắt chờ gửi từ pool vai
 // ag_ops_jobs (worker, nối thẳng).

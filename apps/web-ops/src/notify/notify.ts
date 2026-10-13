@@ -29,6 +29,15 @@ export const KIND_LABEL: Record<Notification["kind"], string> = {
   season_opened: "Nông dân mở vụ",
   integration_dead_lettered: "Đồng bộ vào hàng chờ lỗi",
   area_feed_stale: "Dữ liệu App HTX quá hạn độ tươi",
+  // Báo giá nông sản (gói NOTIF, pf 000159)
+  price_reminder: "Nhắc nhập giá",
+  price_alert: "Cảnh báo biến động giá",
+  price_verify_request: "Yêu cầu xác minh giá",
+  price_verify_reply: "Xã phản hồi xác minh",
+  price_verify_decision: "Kết quả xử lý báo giá",
+  price_lock_summary: "Tổng hợp khóa nhập giá",
+  price_board_approved: "Bảng giá đã duyệt",
+  price_board_reopened: "Bảng giá đang mở duyệt",
 };
 
 export function unreadCount(api: ApiClient): Promise<number> {
