@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -25,7 +26,7 @@ func TestNormalizeMST_D2(t *testing.T) {
 	bad := []string{"", "031234567", "03123456789", "0312345678-000", "0312345678000", "03123A5678", "0312.345.678",
 		"0312345678-01", "03123456780012", "MST0312345678"}
 	for _, in := range bad {
-		if got, err := NormalizeMST(in); err != ErrMSTMalformed {
+		if got, err := NormalizeMST(in); !errors.Is(err, ErrMSTMalformed) {
 			t.Errorf("NormalizeMST(%q) = %q, %v; muốn ErrMSTMalformed", in, got, err)
 		}
 	}
