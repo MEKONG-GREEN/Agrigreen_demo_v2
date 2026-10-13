@@ -45,6 +45,8 @@ func (h Handler) Register(rg *gin.RouterGroup) {
 	rg.POST("/subjects/:ref/amend", h.Idem, h.amend)
 	rg.POST("/subjects/:ref/sections/:section", h.Idem, h.putSection)
 	rg.POST("/subjects/:ref/sections/:section/read", h.getSection)
+	// W11.28: đọc hồ sơ nhân sự theo lô (báo cáo Sở, dashboard) — phản hồi no-store, không qua Idem (R-40).
+	rg.POST("/subjects/batch-read", h.batchRead)
 	rg.GET("/pubkeys", h.pubkeys)
 	rg.GET("/pubkeys/households", h.householdPubkeys)
 }

@@ -316,6 +316,49 @@ paths:
         "410": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/Problem" }
         "429": { $ref: "#/components/responses/Problem" }
+  /v1/subjects/batch-read:
+    post:
+      summary: Đọc hồ sơ nhân sự theo lô (W11.28 — báo cáo Sở NS01–06, dashboard) — tối đa 200 chủ thể, một lượt hạn mức mỗi lần gọi; sổ ghi resolve/section_read từng chủ thể; MFA khi đọc định danh hoặc ngăn hrm.sensitive; ref lạ bị bỏ qua; không bao giờ trả CCCD
+      operationId: batchReadSubjects
+      parameters:
+        - $ref: "#/components/parameters/Purpose"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refs]
+              properties:
+                purpose: { type: string, enum: [hrm.profile, hrm.sensitive] }
+                refs: { type: array, minItems: 1, maxItems: 200, items: { type: string, format: uuid } }
+                identity: { type: boolean, description: "Họ tên, SĐT, địa chỉ — chỉ với hrm.profile" }
+                section: { type: string, enum: [hrm.profile, hrm.sensitive] }
+      responses:
+        "200":
+          description: Các chủ thể đọc được, theo thứ tự refs. Cache-Control no-store.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [ref]
+                      properties:
+                        ref: { type: string, format: uuid }
+                        full_name: { type: string }
+                        phone: { type: string }
+                        address: { type: string }
+                        fields: { type: object, additionalProperties: { type: string } }
+                        erased: { type: boolean }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
   /v1/pubkeys:
     get:
       summary: Khóa công khai của chủ thể chưa xóa theo địa bàn, cho đồng bộ xuống thiết bị (cursor, R-53)
