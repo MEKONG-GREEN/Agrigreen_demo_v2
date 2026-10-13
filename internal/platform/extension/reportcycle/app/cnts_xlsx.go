@@ -14,53 +14,28 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"github.com/xuri/excelize/v2"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
 )
 
+// sheetWriter gom dòng của một trang tính (tabular.Sheet — đổi sang số Excel ở shared/tabular, package này cấm float).
 type sheetWriter struct {
-	f         *excelize.File
-	name      string
-	line      int
-	bold, num int
-	boldNum   int
-	title     int
+	sh *tabular.Sheet
 }
 
-func newSheet(f *excelize.File, name string, first bool) (*sheetWriter, error) {
-	if first {
-		if err := f.SetSheetName("Sheet1", name); err != nil {
-			return nil, err
-		}
-	} else if _, err := f.NewSheet(name); err != nil {
-		return nil, err
-	}
-	w := &sheetWriter{f: f, name: name, line: 1}
-	var err error
-	if w.bold, err = f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}}); err != nil {
-		return nil, err
-	}
-	if w.title, err = f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Size: 13}}); err != nil {
-		return nil, err
-	}
-	fmtNum := "#,##0.###"
-	if w.num, err = f.NewStyle(&excelize.Style{CustomNumFmt: &fmtNum}); err != nil {
-		return nil, err
-	}
-	if w.boldNum, err = f.NewStyle(&excelize.Style{CustomNumFmt: &fmtNum, Font: &excelize.Font{Bold: true}}); err != nil {
-		return nil, err
-	}
-	return w, nil
+func newSheet(book *[]tabular.Sheet, name string) *sheetWriter {
+	*book = append(*book, tabular.Sheet{Name: name})
+	return &sheetWriter{sh: &(*book)[len(*book)-1]}
 }
 
 // cell là một ô: chuỗi hoặc số thập phân (chuỗi decimal → ô số).
 type cell struct {
 	s     string
 	num   bool
-	style int
+	title bool
 }
 
 func txt(s string) cell { return cell{s: s} }
@@ -73,58 +48,27 @@ func num(s string) cell {
 }
 
 func (w *sheetWriter) row(bold bool, cells ...cell) error {
+	out := make([]tabular.Cell, len(cells))
 	for j, c := range cells {
-		ref, err := excelize.CoordinatesToCellName(j+1, w.line)
-		if err != nil {
-			return err
-		}
-		style := c.style
 		if c.num {
-			d, err := decimal.NewFromString(c.s)
-			if err != nil {
+			if _, err := decimal.NewFromString(c.s); err != nil {
 				return err
 			}
-			if err := w.f.SetCellFloat(w.name, ref, d.InexactFloat64(), -1, 64); err != nil {
-				return err
-			}
-			if style == 0 {
-				style = w.num
-				if bold {
-					style = w.boldNum
-				}
-			}
-		} else if c.s != "" {
-			if err := w.f.SetCellStr(w.name, ref, c.s); err != nil {
-				return err
-			}
-			if style == 0 && bold {
-				style = w.bold
-			}
-		}
-		if style != 0 {
-			if err := w.f.SetCellStyle(w.name, ref, ref, style); err != nil {
-				return err
-			}
+			out[j] = tabular.Cell{Num: c.s, Bold: bold}
+		} else {
+			out[j] = tabular.Cell{Text: c.s, Bold: bold && c.s != "", Title: c.title}
 		}
 	}
-	w.line++
+	w.sh.Rows = append(w.sh.Rows, out)
 	return nil
 }
 
-func (w *sheetWriter) titleLine(s string) error {
-	return w.row(false, cell{s: s, style: w.title})
-}
+func (w *sheetWriter) blank() { w.sh.Rows = append(w.sh.Rows, nil) }
 
-func (w *sheetWriter) widths(ws ...float64) error {
-	for j, x := range ws {
-		col, err := excelize.ColumnNumberToName(j + 1)
-		if err != nil {
-			return err
-		}
-		if err := w.f.SetColWidth(w.name, col, col, x); err != nil {
-			return err
-		}
-	}
+func (w *sheetWriter) titleLine(s string) error { return w.row(false, cell{s: s, title: true}) }
+
+func (w *sheetWriter) widths(ws ...int) error {
+	w.sh.Widths = ws
 	return nil
 }
 
@@ -150,7 +94,7 @@ func (w *sheetWriter) header(c ShareContent, sh store.Share, title, period strin
 			return err
 		}
 	}
-	w.line++
+	w.blank()
 	return nil
 }
 
@@ -168,14 +112,13 @@ func joinCodes(xs []string) string {
 var facilityKindLabel = map[string]string{"tap_trung": "Tập trung", "nho_le": "Nhỏ lẻ"}
 
 func shareXLSX(c ShareContent, sh store.Share) ([]byte, error) {
-	f := excelize.NewFile()
-	defer func() { _ = f.Close() }()
+	var book []tabular.Sheet
 	var err error
 	switch {
 	case c.BM02 != nil:
-		err = bm02Sheet(f, c, sh)
+		err = bm02Sheet(&book, c, sh)
 	case c.BM18 != nil:
-		err = bm18Sheets(f, c, sh)
+		err = bm18Sheets(&book, c, sh)
 	default:
 		err = fmt.Errorf("nội dung phiên bản không có bảng")
 	}
@@ -183,18 +126,15 @@ func shareXLSX(c ShareContent, sh store.Share) ([]byte, error) {
 		return nil, err
 	}
 	var buf bytes.Buffer
-	if err := f.Write(&buf); err != nil {
+	if err := tabular.WriteSheetsXLSX(&buf, book); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
-func bm02Sheet(f *excelize.File, c ShareContent, sh store.Share) error {
+func bm02Sheet(book *[]tabular.Sheet, c ShareContent, sh store.Share) error {
 	v := c.BM02
-	w, err := newSheet(f, "BM-02", true)
-	if err != nil {
-		return err
-	}
+	w := newSheet(book, "BM-02")
 	title := "BÁO CÁO SỐ LƯỢNG KIỂM SOÁT GIẾT MỔ TUẦN"
 	if v.PeriodType == domain.AggMonth {
 		title = "BÁO CÁO SỐ LƯỢNG KIỂM SOÁT GIẾT MỔ THÁNG"
@@ -258,7 +198,7 @@ func bm02Sheet(f *excelize.File, c ShareContent, sh store.Share) error {
 		return err
 	}
 	if len(v.Adjustments) > 0 {
-		w.line++
+		w.blank()
 		if err := w.row(true, txt("Dòng điều chỉnh (cộng/trừ vào số tự cộng từ BM-01)")); err != nil {
 			return err
 		}
@@ -288,12 +228,9 @@ func bm02Sheet(f *excelize.File, c ShareContent, sh store.Share) error {
 	return w.widths(6, 10, 22, 30, 16, 16, 11, 11, 11, 11, 11, 14, 24)
 }
 
-func bm18Sheets(f *excelize.File, c ShareContent, sh store.Share) error {
+func bm18Sheets(book *[]tabular.Sheet, c ShareContent, sh store.Share) error {
 	v := c.BM18
-	w, err := newSheet(f, "TỔNG", true)
-	if err != nil {
-		return err
-	}
+	w := newSheet(book, "TỔNG")
 	if err := w.header(c, sh, "PHỤ LỤC 2 — ƯỚC KẾT QUẢ THỰC HIỆN CHỈ TIÊU SẢN XUẤT", "Phần III. Khai thác và nuôi trồng thủy sản — "+v.Week.Label); err != nil {
 		return err
 	}
@@ -351,7 +288,7 @@ func bm18Sheets(f *excelize.File, c ShareContent, sh store.Share) error {
 			return err
 		}
 	}
-	w.line++
+	w.blank()
 	if err := w.row(false, txt(fmt.Sprintf("Tổng hợp từ %d/%d xã có báo cáo BM-17 trong tuần.", v.UnitsReported, v.UnitsTotal))); err != nil {
 		return err
 	}
@@ -359,7 +296,7 @@ func bm18Sheets(f *excelize.File, c ShareContent, sh store.Share) error {
 		return err
 	}
 	for _, g := range domain.CatchGroups {
-		if err := bm18CatchSheet(f, c, sh, g); err != nil {
+		if err := bm18CatchSheet(book, c, sh, g); err != nil {
 			return err
 		}
 	}
@@ -369,12 +306,9 @@ func bm18Sheets(f *excelize.File, c ShareContent, sh store.Share) error {
 var catchSheetName = map[string]string{"ca": "Cá", "tom": "Tôm", "muc": "Mực", "khac": "TS khác"}
 
 // bm18CatchSheet: khai thác một nhóm theo xã (gom Khu vực, dòng cộng Khu vực) × tuần trong năm + lũy kế năm.
-func bm18CatchSheet(f *excelize.File, c ShareContent, sh store.Share, g domain.Key) error {
+func bm18CatchSheet(book *[]tabular.Sheet, c ShareContent, sh store.Share, g domain.Key) error {
 	v := c.BM18
-	w, err := newSheet(f, catchSheetName[g.Key], false)
-	if err != nil {
-		return err
-	}
+	w := newSheet(book, catchSheetName[g.Key])
 	if err := w.header(c, sh, "SẢN LƯỢNG KHAI THÁC — "+g.Label+" (tấn)", "Các tuần năm "+v.Week.To[:4]+" tới "+v.Week.Label); err != nil {
 		return err
 	}

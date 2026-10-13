@@ -176,8 +176,8 @@ func (f *cntsFx) closePeriod(pid string) {
 type cols struct{ Prev, Cur, QTD, YTD string }
 
 type bm18 struct {
-	Week struct{ Key string } `json:"week"`
-	Prev *struct{ Key string }
+	Week     struct{ Key string } `json:"week"`
+	Prev     *struct{ Key string }
 	Communes []struct {
 		CommuneCode  string          `json:"commune_code"`
 		Cells        map[string]cols `json:"cells"`
@@ -351,7 +351,9 @@ func TestCNTSAggregate_BM02_Adjustment_W1144(t *testing.T) {
 	if len(s.Periods) != 2 {
 		t.Fatalf("kỳ BM-01: %+v", s.Periods)
 	}
-	sp := func(heo string) map[string]string { return map[string]string{"trau_bo": "1", "heo": heo, "gia_cam": "10", "de": "0"} }
+	sp := func(heo string) map[string]string {
+		return map[string]string{"trau_bo": "1", "heo": heo, "gia_cam": "10", "de": "0"}
+	}
 	f.submit(s.Periods[0].ID, facA.String(), sp("20"))
 	f.submit(s.Periods[1].ID, facA.String(), sp("15"))
 	f.submit(s.Periods[0].ID, facB.String(), sp("5"))
