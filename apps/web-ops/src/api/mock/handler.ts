@@ -68,6 +68,7 @@ import { cntsOutbreakRoutes } from "./kn-cnts-outbreak";
 import { khtcSourceRoutes } from "./kn-khtc-sources";
 import { hrmStaffRoutes } from "./kn-hrm-staff";
 import { contactRoutes } from "./kn-contact";
+import { hrmReportRoutes } from "./kn-hrm-reports";
 import { apiClientAdminRoutes, meteringAdminRoutes } from "./g5";
 
 function sleep(ms: number) {
@@ -163,6 +164,7 @@ const appRoutes: Route[] = [
   ...hrmStaffRoutes,
   // --- pf/contact W11.23: Contact dùng chung (/v1/contacts/*) — lọc trường theo vai ---
   ...contactRoutes,
+  ...hrmReportRoutes, // W11.28 báo cáo Sở NS01–06, dashboard nhân sự (/v1/hrm/reports*, /v1/hrm/dashboard*)
   ...priceBoardRoutes, // W11.76 duyệt / mở duyệt bảng giá ngày
   ...priceReportRoutes, // W11.77 báo cáo giá
 

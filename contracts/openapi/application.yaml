@@ -9179,6 +9179,171 @@ paths:
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/HrmPermEntry"}}
         "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+  # --- W11.28 (pf 20261013230821): BÁO CÁO SỞ NS01–NS06 (FN-12) + DASHBOARD NHÂN SỰ (FN-06). Biểu Sở: cần export = all (và
+  # sensitive.view = all với biểu có trường TK); dữ liệu tại ngày chốt (as-of); họ tên/ngày sinh/TK đọc kho theo lô. Mọi lần
+  # xem trước, nhấn ô, xuất, tải ghi sổ report_log (lịch sử + tên trường nhạy cảm); tệp không lưu — tải = dựng lại + so SHA-256.
+  /v1/hrm/reports:
+    get:
+      summary: Danh sách 6 biểu báo cáo Sở kèm lần xuất gần nhất (FN-12 B1)
+      operationId: hrmReportList
+      tags: [hrm]
+      responses:
+        "200":
+          description: Sáu biểu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmReportSummary"}}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+  /v1/hrm/reports/{code}:
+    parameters:
+      - $ref: "#/components/parameters/HrmReportCode"
+    get:
+      summary: Xem trước biểu tại ngày chốt + kết quả quy tắc kiểm tra (R1–R3, R6, TK) và người liên quan (FN-12 B3) — ghi sổ preview
+      operationId: hrmReportPreview
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/HrmAt"
+      responses:
+        "200":
+          description: Biểu (Cache-Control no-store — có họ tên, trường nhạy cảm)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmReportView"}
+        "403": {description: forbidden | hrm.records_disabled | mfa_required (kho), $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.report_unknown, $ref: "#/components/responses/Problem"}
+  /v1/hrm/reports/{code}/export:
+    parameters:
+      - $ref: "#/components/parameters/HrmReportCode"
+    post:
+      summary: Xuất Excel theo mẫu Sở (FN-12 B4) — chạy quy tắc kiểm tra; lỗi mức chặn → 422 hrm.report_blocked. Trả tóm tắt KHÔNG PII; tệp tải ở /v1/hrm/report-exports/{id}/file
+      operationId: hrmReportExport
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                as_of: {type: string, format: date, description: "Ngày chốt (vắng → hôm nay)"}
+                preparer_id: {type: [string, "null"], format: uuid, description: "Người lập biểu — mã hồ sơ"}
+                signer_id: {type: [string, "null"], format: uuid, description: "Người ký (Giám đốc) — mã hồ sơ"}
+      responses:
+        "201":
+          description: Đã xuất
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmReportExported"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.report_unknown, $ref: "#/components/responses/Problem"}
+        "422": {description: hrm.report_blocked | validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/hrm/reports/{code}/history:
+    parameters:
+      - $ref: "#/components/parameters/HrmReportCode"
+    get:
+      summary: Lịch sử xuất và tải lại của biểu (không PII), mới trước
+      operationId: hrmReportHistory
+      tags: [hrm]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmReportLog"}}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.report_unknown, $ref: "#/components/responses/Problem"}
+  /v1/hrm/reports/{code}/cells:
+    parameters:
+      - $ref: "#/components/parameters/HrmReportCode"
+    get:
+      summary: Người được đếm ở một ô số của biểu thống kê NS05/NS06 (FN-12 luồng phụ) — lọc theo phạm vi profile.view; ghi sổ drill
+      operationId: hrmReportCell
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/HrmAt"
+        - {name: row, in: query, required: true, schema: {type: string}, description: "Khóa dòng (mã đơn vị, _center, _secondment)"}
+        - {name: col, in: query, required: true, schema: {type: string}, description: "Khóa cột số"}
+      responses:
+        "200":
+          description: Người được đếm (Cache-Control no-store)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, hidden]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmPersonBrief"}}
+                  hidden: {type: integer, minimum: 0, description: "Số người ngoài phạm vi xem"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.report_unknown, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed (biểu danh sách, cột không phải số), $ref: "#/components/responses/Problem"}
+  /v1/hrm/report-exports/{id}/file:
+    get:
+      summary: Tải lại tệp Excel của một lần xuất — dựng lại tại (ngày chốt, thời điểm biết), so SHA-256; X-Export-Drift true khi định danh ở kho đã đổi. Ghi sổ download + nhật ký hồ sơ; qua điểm kiểm soát xuất
+      operationId: hrmReportFile
+      tags: [hrm]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp .xlsx (Cache-Control no-store)
+          headers:
+            X-Export-Drift: {schema: {type: string, enum: ["true", "false"]}}
+            X-Export-Sha256: {schema: {type: string}}
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.export_not_found, $ref: "#/components/responses/Problem"}
+  /v1/hrm/dashboard:
+    get:
+      summary: Dashboard nhân sự tại ngày chốt (FN-06) — HCTH/Admin toàn Trung tâm, lãnh đạo phòng theo phạm vi profile.view; tổng = số dòng NS01 cùng ngày
+      operationId: hrmDashboard
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/HrmAt"
+      responses:
+        "200":
+          description: Số liệu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmDashboard"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+  /v1/hrm/dashboard/members:
+    get:
+      summary: Danh sách người của một chỉ số dashboard (FN-06 B3) — metric total | staff | joined | left | retire_soon | over_retire | type:<loại> | unit:<mã> | gender:<nam|nu|unknown> | age:<nhóm> | edu:<trình độ> | grade:<nhóm>
+      operationId: hrmDashboardMembers
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/HrmAt"
+        - {name: metric, in: query, required: true, schema: {type: string}}
+        - {name: offset, in: query, required: false, schema: {type: integer, minimum: 0}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang (Cache-Control no-store)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, items]
+                properties:
+                  total: {type: integer}
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmPersonBrief"}}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed (chỉ số lạ), $ref: "#/components/responses/Problem"}
   # --- hết pf/hrm ---
   # --- pf/contact (cap/directory, W11.23 — BRD HCTH v3.0 FN-13 Contact; Q-071, Q-072): danh bạ liên hệ dùng chung. Một người =
   # một bản ghi = một chủ thể kho định danh (BR-01); cán bộ thuộc tỉnh chiếu từ hồ sơ nhân sự pf/hrm (cổng AG_HRM_RECORDS), liên
@@ -11327,6 +11492,12 @@ components:
       required: false
       description: Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of
       schema: {type: string, format: date}
+    HrmReportCode:
+      name: code
+      in: path
+      required: true
+      description: Mã biểu báo cáo Sở
+      schema: {type: string, enum: [NS01, NS02, NS03, NS04, NS05, NS06]}
     HrmStaffId:
       name: id
       in: path
@@ -16248,6 +16419,157 @@ components:
         query: {type: object, additionalProperties: {type: string}}
         actor_ref: {type: string, format: uuid}
         recorded_at: {type: string, format: date-time}
+    HrmReportMeta:
+      type: object
+      required: [code, name, period, aggregate, sensitive_fields, source]
+      properties:
+        code: {type: string, enum: [NS01, NS02, NS03, NS04, NS05, NS06]}
+        name: {type: string}
+        period: {type: string, enum: [month, quarter, ad_hoc]}
+        aggregate: {type: boolean}
+        sensitive_fields: {type: array, items: {type: string}}
+        source: {type: string}
+    HrmCheckSummary:
+      type: object
+      required: [rule, level, ok, count]
+      properties:
+        rule: {type: string}
+        level: {type: string, enum: [block, warn]}
+        ok: {type: boolean}
+        count: {type: integer}
+    HrmReportLog:
+      type: object
+      required: [id, action, report, as_of, period, item_count, sensitive_fields, file_name, sha256, byte_size, check_status, checks, actor, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        action: {type: string, enum: [export, download, preview, drill]}
+        report: {type: string}
+        as_of: {type: string, format: date}
+        period: {type: string}
+        item_count: {type: integer}
+        sensitive_fields: {type: array, items: {type: string}}
+        file_name: {type: string}
+        sha256: {type: string}
+        byte_size: {type: integer}
+        check_status: {type: string}
+        checks: {type: array, items: {$ref: "#/components/schemas/HrmCheckSummary"}}
+        actor: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+        export_id: {type: [string, "null"], format: uuid}
+        drift: {type: [boolean, "null"]}
+        params: {type: object, additionalProperties: {type: string}}
+    HrmReportSummary:
+      allOf:
+        - $ref: "#/components/schemas/HrmReportMeta"
+        - type: object
+          required: [exports, last_export]
+          properties:
+            exports: {type: integer}
+            last_export:
+              oneOf:
+                - $ref: "#/components/schemas/HrmReportLog"
+                - type: "null"
+    HrmPersonBrief:
+      type: object
+      required: [id, code, type, name, unit, unit_name, position]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string}
+        type: {$ref: "#/components/schemas/HrmStaffType"}
+        name: {type: string, description: "Họ tên (rỗng khi người gọi không có vai kho)"}
+        unit: {type: string}
+        unit_name: {type: string}
+        position: {type: string}
+    HrmReportView:
+      type: object
+      required: [report, title, period, as_of, status, columns, rows, checks, people]
+      properties:
+        report: {$ref: "#/components/schemas/HrmReportMeta"}
+        title: {type: string}
+        period: {type: string}
+        as_of: {type: string, format: date}
+        status: {type: string, enum: [ready, warning, blocked]}
+        columns:
+          type: array
+          items:
+            type: object
+            required: [key, group, label, sensitive, numeric]
+            properties:
+              key: {type: string}
+              group: {type: string}
+              label: {type: string}
+              sensitive: {type: boolean}
+              numeric: {type: boolean}
+        rows:
+          type: array
+          items:
+            type: object
+            required: [kind, key, cells]
+            properties:
+              kind: {type: string, enum: [group, unit, person, total]}
+              key: {type: string}
+              cells: {type: array, items: {type: string}}
+              staff_id: {type: string, format: uuid}
+        checks:
+          type: array
+          items:
+            type: object
+            required: [rule, level, ok, message, people]
+            properties:
+              rule: {type: string}
+              level: {type: string, enum: [block, warn]}
+              ok: {type: boolean}
+              message: {type: string}
+              people: {type: array, items: {$ref: "#/components/schemas/HrmPersonBrief"}}
+        people: {type: integer}
+    HrmReportExported:
+      type: object
+      required: [id, file_name, sha256, byte_size, status, checks, download]
+      properties:
+        id: {type: string, format: uuid}
+        file_name: {type: string}
+        sha256: {type: string}
+        byte_size: {type: integer}
+        status: {type: string, enum: [ready, warning]}
+        checks:
+          type: array
+          items:
+            type: object
+            required: [rule, level, ok, message, count]
+            properties:
+              rule: {type: string}
+              level: {type: string}
+              ok: {type: boolean}
+              message: {type: string}
+              count: {type: integer}
+        download: {type: string}
+    HrmCount:
+      type: object
+      required: [key, name, count]
+      properties:
+        key: {type: string}
+        name: {type: string}
+        count: {type: integer}
+    HrmDashboard:
+      type: object
+      required: [as_of, scope, total, staff, by_type, by_unit, gender, age, education, grade_group, joined, left, retire_soon, over_retire, pii, elapsed_ms]
+      properties:
+        as_of: {type: string, format: date}
+        scope: {$ref: "#/components/schemas/HrmScope"}
+        total: {type: integer, description: "Viên chức Đang công tác = số dòng NS01 cùng ngày"}
+        staff: {type: integer, description: "Viên chức + HĐLĐ Đang công tác (dân số NS06)"}
+        by_type: {type: object, additionalProperties: {type: integer}}
+        by_unit: {type: array, items: {$ref: "#/components/schemas/HrmCount"}}
+        gender: {type: object, additionalProperties: {type: integer}}
+        age: {type: object, additionalProperties: {type: integer}}
+        education: {type: array, items: {$ref: "#/components/schemas/HrmCount"}}
+        grade_group: {type: object, additionalProperties: {type: integer}}
+        joined: {type: integer}
+        left: {type: integer}
+        retire_soon: {type: integer}
+        over_retire: {type: integer}
+        pii: {type: boolean, description: "false khi người xem không đọc được kho (giới tính, độ tuổi chưa rõ)"}
+        elapsed_ms: {type: integer}
     HrmSecondment:
       type: object
       required: [id, to_org, valid_from, valid_to]

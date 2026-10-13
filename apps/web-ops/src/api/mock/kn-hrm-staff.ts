@@ -1300,3 +1300,13 @@ export const hrmStaffRoutes: Route[] = [
     },
   },
 ];
+
+/** W11.28 (kn-hrm-reports.ts): báo cáo Sở và dashboard đọc cùng kho giả, phép chiếu, quyền và nhật ký của hồ sơ. */
+export const hrmStaffInternals = {
+  caller,
+  project,
+  on,
+  audit,
+  staff: (): readonly Staff[] => STORE.staff,
+  units: () => UNITS,
+};

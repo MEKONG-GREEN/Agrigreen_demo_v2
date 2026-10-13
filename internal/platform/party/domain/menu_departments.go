@@ -69,6 +69,8 @@ func needs(it MenuItem, n string) MenuItem {
 var sharedByAudience = map[string][]MenuItem{
 	port.AudienceTinh: {
 		needs(MenuItem{Key: "tinh.chung.nhan_su_phong", Label: "Nhân sự của phòng", Route: "/kn/nhan-su/cua-phong", Icon: "users"}, NeedsManager),
+		// W11.28 (FN-06 BR-02): lãnh đạo phòng xem dashboard nhân sự của phòng mình (máy chủ giới hạn phạm vi).
+		needs(MenuItem{Key: "tinh.chung.dashboard_nhan_su", Label: "Dashboard nhân sự", Route: "/kn/nhan-su/dashboard", Icon: "chart"}, NeedsManager),
 	},
 }
 
@@ -164,7 +166,10 @@ var deptBusiness = map[string]map[string][]MenuItem{
 	port.MenuProfileHanhChinhTongHop: {
 		port.AudienceTinh: {
 			// W11.22 (pf/hrm, FN-07, FN-08): hồ sơ nhân sự — danh sách + chi tiết theo thẻ.
+			// W11.28 (pf/hrm, FN-06, FN-12): dashboard nhân sự, biểu mẫu báo cáo Sở NS01–NS06.
+			{Key: "tinh.hcth.dashboard", Label: "Dashboard nhân sự", Route: "/kn/nhan-su/dashboard", Icon: "chart"},
 			{Key: "tinh.hcth.ho_so", Label: "Hồ sơ nhân sự", Route: "/kn/nhan-su/ho-so", Icon: "users"},
+			{Key: "tinh.hcth.bao_cao_so", Label: "Biểu mẫu báo cáo Sở", Route: "/kn/nhan-su/bao-cao-so", Icon: "report"},
 			soon("tinh.hcth.kho_tai_lieu", "Hồ sơ dữ liệu", "/kn/nhan-su/kho-tai-lieu", "library"),
 			soon("tinh.hcth.danh_gia", "Đánh giá", "/kn/nhan-su/danh-gia", "approve"),
 			// W11.21 (pf/hrm, FN-19): Cấp Tỉnh – HCTH xem danh mục nhân sự (Admin sửa).

@@ -214,7 +214,10 @@ const SHARED: Group = { key: "dung_chung", label: "Dùng chung", items: [{ key: 
 /** W11.07 (Q-067): mục "Dùng chung" thêm theo đối tượng — server chỉ trả cho lãnh đạo (Needs manager); bản giả lập trả đầy đủ như ca vàng. */
 const SHARED_BY_AUDIENCE: Partial<Record<KnRole, Item[]>> = {
   // W11.22 (pf/hrm): đã mở — hồ sơ trong phạm vi "đơn vị mình".
-  kn_tinh: [{ key: "tinh.chung.nhan_su_phong", label: "Nhân sự của phòng", route: "/kn/nhan-su/cua-phong", icon: "users" }],
+  kn_tinh: [
+    { key: "tinh.chung.nhan_su_phong", label: "Nhân sự của phòng", route: "/kn/nhan-su/cua-phong", icon: "users" },
+    { key: "tinh.chung.dashboard_nhan_su", label: "Dashboard nhân sự", route: "/kn/nhan-su/dashboard", icon: "chart" }, // W11.28 FN-06 BR-02
+  ],
 };
 
 /** Nhóm "Nghiệp vụ" theo khuôn × đối tượng (domain.deptBusiness) — mục "Sắp có" trừ mục gói đã làm (W11.21). */
@@ -287,7 +290,9 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
   },
   hanh_chinh_tong_hop: {
     kn_tinh: [
+      { key: "tinh.hcth.dashboard", label: "Dashboard nhân sự", route: "/kn/nhan-su/dashboard", icon: "chart" }, // W11.28 (pf/hrm, FN-06)
       { key: "tinh.hcth.ho_so", label: "Hồ sơ nhân sự", route: "/kn/nhan-su/ho-so", icon: "users" }, // W11.22 (pf/hrm)
+      { key: "tinh.hcth.bao_cao_so", label: "Biểu mẫu báo cáo Sở", route: "/kn/nhan-su/bao-cao-so", icon: "report" }, // W11.28 (FN-12)
       soon("tinh.hcth.kho_tai_lieu", "Hồ sơ dữ liệu", "/kn/nhan-su/kho-tai-lieu", "library"),
       soon("tinh.hcth.danh_gia", "Đánh giá", "/kn/nhan-su/danh-gia", "approve"),
       { key: "tinh.hcth.danh_muc", label: "Danh mục nhân sự", route: "/kn/nhan-su/danh-muc", icon: "catalog" }, // W11.21 (pf/hrm)

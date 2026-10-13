@@ -6463,6 +6463,154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/hrm/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách 6 biểu báo cáo Sở kèm lần xuất gần nhất (FN-12 B1) */
+        get: operations["hrmReportList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/reports/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        /** Xem trước biểu tại ngày chốt + kết quả quy tắc kiểm tra (R1–R3, R6, TK) và người liên quan (FN-12 B3) — ghi sổ preview */
+        get: operations["hrmReportPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/reports/{code}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xuất Excel theo mẫu Sở (FN-12 B4) — chạy quy tắc kiểm tra; lỗi mức chặn → 422 hrm.report_blocked. Trả tóm tắt KHÔNG PII; tệp tải ở /v1/hrm/report-exports/{id}/file */
+        post: operations["hrmReportExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/reports/{code}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        /** Lịch sử xuất và tải lại của biểu (không PII), mới trước */
+        get: operations["hrmReportHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/reports/{code}/cells": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        /** Người được đếm ở một ô số của biểu thống kê NS05/NS06 (FN-12 luồng phụ) — lọc theo phạm vi profile.view; ghi sổ drill */
+        get: operations["hrmReportCell"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/report-exports/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải lại tệp Excel của một lần xuất — dựng lại tại (ngày chốt, thời điểm biết), so SHA-256; X-Export-Drift true khi định danh ở kho đã đổi. Ghi sổ download + nhật ký hồ sơ; qua điểm kiểm soát xuất */
+        get: operations["hrmReportFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard nhân sự tại ngày chốt (FN-06) — HCTH/Admin toàn Trung tâm, lãnh đạo phòng theo phạm vi profile.view; tổng = số dòng NS01 cùng ngày */
+        get: operations["hrmDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/dashboard/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách người của một chỉ số dashboard (FN-06 B3) — metric total | staff | joined | left | retire_soon | over_retire | type:<loại> | unit:<mã> | gender:<nam|nu|unknown> | age:<nhóm> | edu:<trình độ> | grade:<nhóm> */
+        get: operations["hrmDashboardMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/contacts/access": {
         parameters: {
             query?: never;
@@ -13740,6 +13888,150 @@ export interface components {
             /** Format: date-time */
             recorded_at: string;
         };
+        HrmReportMeta: {
+            /** @enum {string} */
+            code: "NS01" | "NS02" | "NS03" | "NS04" | "NS05" | "NS06";
+            name: string;
+            /** @enum {string} */
+            period: "month" | "quarter" | "ad_hoc";
+            aggregate: boolean;
+            sensitive_fields: string[];
+            source: string;
+        };
+        HrmCheckSummary: {
+            rule: string;
+            /** @enum {string} */
+            level: "block" | "warn";
+            ok: boolean;
+            count: number;
+        };
+        HrmReportLog: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            action: "export" | "download" | "preview" | "drill";
+            report: string;
+            /** Format: date */
+            as_of: string;
+            period: string;
+            item_count: number;
+            sensitive_fields: string[];
+            file_name: string;
+            sha256: string;
+            byte_size: number;
+            check_status: string;
+            checks: components["schemas"]["HrmCheckSummary"][];
+            /** Format: uuid */
+            actor: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            export_id?: string | null;
+            drift?: boolean | null;
+            params?: {
+                [key: string]: string;
+            };
+        };
+        HrmReportSummary: components["schemas"]["HrmReportMeta"] & {
+            exports: number;
+            last_export: components["schemas"]["HrmReportLog"] | null;
+        };
+        HrmPersonBrief: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            type: components["schemas"]["HrmStaffType"];
+            /** @description Họ tên (rỗng khi người gọi không có vai kho) */
+            name: string;
+            unit: string;
+            unit_name: string;
+            position: string;
+        };
+        HrmReportView: {
+            report: components["schemas"]["HrmReportMeta"];
+            title: string;
+            period: string;
+            /** Format: date */
+            as_of: string;
+            /** @enum {string} */
+            status: "ready" | "warning" | "blocked";
+            columns: {
+                key: string;
+                group: string;
+                label: string;
+                sensitive: boolean;
+                numeric: boolean;
+            }[];
+            rows: {
+                /** @enum {string} */
+                kind: "group" | "unit" | "person" | "total";
+                key: string;
+                cells: string[];
+                /** Format: uuid */
+                staff_id?: string;
+            }[];
+            checks: {
+                rule: string;
+                /** @enum {string} */
+                level: "block" | "warn";
+                ok: boolean;
+                message: string;
+                people: components["schemas"]["HrmPersonBrief"][];
+            }[];
+            people: number;
+        };
+        HrmReportExported: {
+            /** Format: uuid */
+            id: string;
+            file_name: string;
+            sha256: string;
+            byte_size: number;
+            /** @enum {string} */
+            status: "ready" | "warning";
+            checks: {
+                rule: string;
+                level: string;
+                ok: boolean;
+                message: string;
+                count: number;
+            }[];
+            download: string;
+        };
+        HrmCount: {
+            key: string;
+            name: string;
+            count: number;
+        };
+        HrmDashboard: {
+            /** Format: date */
+            as_of: string;
+            scope: components["schemas"]["HrmScope"];
+            /** @description Viên chức Đang công tác = số dòng NS01 cùng ngày */
+            total: number;
+            /** @description Viên chức + HĐLĐ Đang công tác (dân số NS06) */
+            staff: number;
+            by_type: {
+                [key: string]: number;
+            };
+            by_unit: components["schemas"]["HrmCount"][];
+            gender: {
+                [key: string]: number;
+            };
+            age: {
+                [key: string]: number;
+            };
+            education: components["schemas"]["HrmCount"][];
+            grade_group: {
+                [key: string]: number;
+            };
+            joined: number;
+            left: number;
+            retire_soon: number;
+            over_retire: number;
+            /** @description false khi người xem không đọc được kho (giới tính, độ tuổi chưa rõ) */
+            pii: boolean;
+            elapsed_ms: number;
+        };
         HrmSecondment: {
             /** Format: uuid */
             id: string;
@@ -16552,6 +16844,8 @@ export interface components {
         HrmRuleKey: "promotion" | "achievement_conversion";
         /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
         HrmAt: string;
+        /** @description Mã biểu báo cáo Sở */
+        HrmReportCode: "NS01" | "NS02" | "NS03" | "NS04" | "NS05" | "NS06";
         HrmStaffId: string;
         HrmEventId: string;
         /** @description Ngày báo giá (giờ VN) */
@@ -29649,6 +29943,268 @@ export interface operations {
             };
             /** @description forbidden | hrm.records_disabled */
             403: components["responses"]["Problem"];
+        };
+    };
+    hrmReportList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sáu biểu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmReportSummary"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmReportPreview: {
+        parameters: {
+            query?: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+            };
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Biểu (Cache-Control no-store — có họ tên, trường nhạy cảm) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmReportView"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled | mfa_required (kho) */
+            403: components["responses"]["Problem"];
+            /** @description hrm.report_unknown */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmReportExport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: date
+                     * @description Ngày chốt (vắng → hôm nay)
+                     */
+                    as_of?: string;
+                    /**
+                     * Format: uuid
+                     * @description Người lập biểu — mã hồ sơ
+                     */
+                    preparer_id?: string | null;
+                    /**
+                     * Format: uuid
+                     * @description Người ký (Giám đốc) — mã hồ sơ
+                     */
+                    signer_id?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã xuất */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmReportExported"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.report_unknown */
+            404: components["responses"]["Problem"];
+            /** @description hrm.report_blocked | validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmReportHistory: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmReportLog"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.report_unknown */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmReportCell: {
+        parameters: {
+            query: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+                /** @description Khóa dòng (mã đơn vị, _center, _secondment) */
+                row: string;
+                /** @description Khóa cột số */
+                col: string;
+            };
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Người được đếm (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmPersonBrief"][];
+                        /** @description Số người ngoài phạm vi xem */
+                        hidden: number;
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.report_unknown */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed (biểu danh sách */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmReportFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx (Cache-Control no-store) */
+            200: {
+                headers: {
+                    "X-Export-Drift"?: "true" | "false";
+                    "X-Export-Sha256"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.export_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDashboard: {
+        parameters: {
+            query?: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số liệu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDashboard"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmDashboardMembers: {
+        parameters: {
+            query: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+                metric: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        total: number;
+                        items: components["schemas"]["HrmPersonBrief"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed (chỉ số lạ) */
+            422: components["responses"]["Problem"];
         };
     };
     contactAccess: {

@@ -264,6 +264,15 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.chung.dashboard_nhan_su",
+        "label": "Dashboard nhân sự",
+        "route": "/kn/nhan-su/dashboard",
+        "icon": "chart",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      }
@@ -612,6 +621,15 @@
         "label": "Nhân sự của phòng",
         "route": "/kn/nhan-su/cua-phong",
         "icon": "users",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chung.dashboard_nhan_su",
+        "label": "Dashboard nhân sự",
+        "route": "/kn/nhan-su/dashboard",
+        "icon": "chart",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -1185,6 +1203,15 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.chung.dashboard_nhan_su",
+        "label": "Dashboard nhân sự",
+        "route": "/kn/nhan-su/dashboard",
+        "icon": "chart",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      }
@@ -1651,6 +1678,15 @@
         "label": "Nhân sự của phòng",
         "route": "/kn/nhan-su/cua-phong",
         "icon": "users",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chung.dashboard_nhan_su",
+        "label": "Dashboard nhân sự",
+        "route": "/kn/nhan-su/dashboard",
+        "icon": "chart",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -2144,6 +2180,15 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.chung.dashboard_nhan_su",
+        "label": "Dashboard nhân sự",
+        "route": "/kn/nhan-su/dashboard",
+        "icon": "chart",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      }
@@ -2469,10 +2514,28 @@
       "label": "Nghiệp vụ",
       "items": [
        {
+        "key": "tinh.hcth.dashboard",
+        "label": "Dashboard nhân sự",
+        "route": "/kn/nhan-su/dashboard",
+        "icon": "chart",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
         "key": "tinh.hcth.ho_so",
         "label": "Hồ sơ nhân sự",
         "route": "/kn/nhan-su/ho-so",
         "icon": "users",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.hcth.bao_cao_so",
+        "label": "Biểu mẫu báo cáo Sở",
+        "route": "/kn/nhan-su/bao-cao-so",
+        "icon": "report",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -2593,6 +2656,15 @@
         "label": "Nhân sự của phòng",
         "route": "/kn/nhan-su/cua-phong",
         "icon": "users",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chung.dashboard_nhan_su",
+        "label": "Dashboard nhân sự",
+        "route": "/kn/nhan-su/dashboard",
+        "icon": "chart",
         "badge_source": null,
         "enabled": true,
         "children": []
