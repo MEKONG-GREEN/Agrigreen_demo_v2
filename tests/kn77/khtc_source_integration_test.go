@@ -195,7 +195,9 @@ func TestKH_UR_TI_13_RefreshOwnerOnlyDiffHistory(t *testing.T) {
 	}
 	g03, _ := ds.Case("G03")
 	w48 := khtcgolden.SourcePeriod{Key: "2026-W48", To: "2026-12-01", Cumulative: decimal.RequireFromString("3050"), Closed: true}
-	step := func(i int) []khtcgolden.SourcePeriod { return append([]khtcgolden.SourcePeriod{w48}, g03.Steps[i].SourcePeriods...) }
+	step := func(i int) []khtcgolden.SourcePeriod {
+		return append([]khtcgolden.SourcePeriod{w48}, g03.Steps[i].SourcePeriods...)
+	}
 
 	me, other := ids.New(), ids.New()
 	tt := partyport.DeptTrongTrot
