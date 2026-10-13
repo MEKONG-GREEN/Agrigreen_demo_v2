@@ -353,6 +353,15 @@ Bảng mới của các gói sau: migration riêng tên `<số>_pf_hrm_<việc>.
 
 **W11.22 hồ sơ nhân sự (pf 000150, vault 000004).** Sổ `pf_hrm.staff` (phiên bản đầu hồ sơ: mã, loại, `subject_ref`, `account_ref`, tên trường đã đổi), `staff_event` (quá trình có hiệu lực `valid_from` + mức chính xác, thay/hủy bằng `supersedes_id` + lý do), `record_access` (nhật ký xem/xem thẻ TK/xuất, chuỗi theo người xem), `perm_rule` (ma trận FN-20). `domain.Project` chiếu tại một ngày (trạng thái FN-08, đơn vị, chức vụ, ngạch – bậc); hệ số tra `grade_scale` as-of. Ma trận: nhóm vai suy từ `KNContext` (admin / hcth / manager / tinh / xa / tw) × phạm vi none/self/unit/all; "đơn vị" = `KNContext.InternalUnit` khớp đơn vị công tác hoặc đơn vị quản lý cán bộ xã (HS-37); "bản thân" = `account_ref`. PII: định danh (họ tên, SĐT, địa chỉ) + ngăn `hrm.profile` (ngày sinh, giới tính, email, ghi chú) với mục đích `hrm.profile`; ngăn `hrm.sensitive` (TK-01..06) với mục đích `hrm.sensitive` — `vault/identity/client.Profiles` (Amend, PutSection, GetSection; `client.AsProfiles`). Gốc lắp ráp: `hr.UseRecords(ext.Vault, assembly.KNHRMUnits{acc.InternalUnits()}, hrm.RecordsEnabled(os.Getenv, production))` — cờ `AG_HRM_RECORDS` ("1"/"0"; vắng = tắt ở production). Danh sách đọc nhãn che bớt (Display) từng dòng; chi tiết Resolve + GetSection; người gọi cần vai realm `vault_registrar` (Admin cấp) — chưa có vai kho riêng cho HCTH.
 
+## Kế hoạch năm KHTC trong `dom/extension` (W11.61)
+
+Gói con `internal/platform/extension/khtc` (schema `pf_extension`, migration pf 20261013070305), phòng ban `ke_hoach_tai_chinh`:
+
+- Sổ `khtc_catalog_item` (Danh mục KHTC, 7 loại), `khtc_program` (danh sách CT/DA chủ — quyết định D20), `khtc_plan_version` (phiên bản theo QĐ, `entries_hash`) + bảng chỉ ghi thêm `khtc_plan_entry` (cả cây mỗi phiên bản).
+- Cổng cho module khác: `extension/port.KHTCPrograms` (Program, Programs — CNTS W11.47 tham chiếu `program_ref`) và `extension/port.KHTCPlans` (PlanAt — phiên bản hiệu lực theo ngày, BR-DL-13; W11.62/63/65). Gốc lắp ráp lấy qua `Module.KHTCPrograms()`, `Module.KHTCPlans()`.
+- Móc chờ nối: `khtc/app.Service.ClosedCutoff` (W11.62 — chặn ngày hiệu lực trước ngày chốt kỳ đã đóng) và `EntryUsage` (W11.63 — dòng đã có số liệu không xóa).
+- `agnofloat` phủ cả gói con (kể cả kiểm thử).
+
 ## Khung giá `cap/price` (W11.71)
 
 [ADR-0049](../adr/0049-cap-price-pf-price.md); kiến trúc v4.1 §26. Module năng lực `pf/price` (`internal/platform/price`, `cap/price`, `enable: per_tenant`) sở hữu `pf_price` và `pf_price_pub` (pf 000138); vai `r_price` (không vai cũ, `app_platform` là thành viên), `r_price_pub` (đọc view công bố — chưa có view, `v1_board_daily` ở W11.76). Toàn module cấm float (agnofloat `floatFreeZones`, R-CODE-01): giá, % là decimal/`numeric`.
