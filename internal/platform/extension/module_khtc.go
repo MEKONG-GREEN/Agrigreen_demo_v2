@@ -61,7 +61,9 @@ func (m *Module) khtcFormSvc() *khtcfapp.Service {
 
 // KHTCFormValidator là quy tắc cap/forms của profile kn_khtc (W11.63): bài nộp biểu KHTC-PHIEU phải mang bảng số liệu đã
 // niêm phong qua màn phiếu KHTC (gốc lắp ráp nối vào forms.Deps.Validators).
-func (m *Module) KHTCFormValidator() formsport.Validator { return khtcfapp.Validator{Svc: m.khtcFormSvc()} }
+func (m *Module) KHTCFormValidator() formsport.Validator {
+	return khtcfapp.Validator{Svc: m.khtcFormSvc()}
+}
 
 func (m *Module) khtcSvc() *khtcpapp.Service {
 	if m.khtcPeriods == nil {

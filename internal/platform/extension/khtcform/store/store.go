@@ -103,7 +103,11 @@ func ByIDs(ctx context.Context, tx pgx.Tx, idl []uuid.UUID) (map[uuid.UUID]Sheet
 	if len(idl) == 0 {
 		return out, nil
 	}
-	rows, err := tx.Query(ctx, `SELECT `+cols+` FROM pf_extension.khtc_form_sheet WHERE id = ANY($1)`, idl)
+	strs := make([]string, 0, len(idl))
+	for _, id := range idl {
+		strs = append(strs, id.String())
+	}
+	rows, err := tx.Query(ctx, `SELECT `+cols+` FROM pf_extension.khtc_form_sheet WHERE id = ANY($1::uuid[])`, strs)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +150,7 @@ func UsedEntries(ctx context.Context, tx pgx.Tx, year int, refs []uuid.UUID) (ma
 	    UNION ALL
 	    SELECT a->>'entry_ref' FROM pf_extension.khtc_form_sheet s, jsonb_array_elements(s.content->'adjustments') a
 	     WHERE s.plan_year = $1 AND s.kind = 'sealed'
-	  ) u WHERE k = ANY($2)`, year, keys)
+	  ) u WHERE k = ANY($2::text[])`, year, keys)
 	if err != nil {
 		return nil, err
 	}

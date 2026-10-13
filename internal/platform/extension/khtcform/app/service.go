@@ -296,7 +296,8 @@ func (s *Service) fillGrid(ctx context.Context, c caller, f *Form) error {
 	if s.Plans == nil {
 		f.PlanMissing = true
 	} else {
-		plan, err := s.Plans.PlanAt(ctx, f.Period.Year, f.Period.Cutoff)
+		tctx := tenant.WithID(ctx, c.p.TenantID) // cổng Kế hoạch năm đọc tenant từ ctx
+		plan, err := s.Plans.PlanAt(tctx, f.Period.Year, f.Period.Cutoff)
 		switch {
 		case errors.Is(err, extport.ErrKHTCPlanNotFound):
 			f.PlanMissing = true
@@ -304,7 +305,7 @@ func (s *Service) fillGrid(ctx context.Context, c caller, f *Form) error {
 			return ErrDependency.WithDetail("Kế hoạch năm lỗi").WithCause(err)
 		default:
 			f.PlanVersion = &plan
-			f.Tabs = domain.BuildTabs(plan, f.Department, f.Period.From, s.programNames(ctx))
+			f.Tabs = domain.BuildTabs(plan, f.Department, f.Period.From, s.programNames(tctx))
 		}
 	}
 	// Kỳ tuần đã đóng trước kỳ này: cùng năm (Lũy kế kỳ trước + điều chỉnh) và năm trước (chỉ điều chỉnh để lưu vết).
