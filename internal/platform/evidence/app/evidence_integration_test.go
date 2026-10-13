@@ -434,3 +434,24 @@ func TestStorageInvariants_W65(t *testing.T) {
 		t.Fatalf("sync_app đọc pf_files: %v", err)
 	}
 }
+
+// W11.24: mục đích hr_records (tài liệu nhân sự pf/hrm) được phép mở, KHÔNG kiểm đồng ý của chủ thể (chủ thể là khóa kho
+// tài liệu, cơ sở là nghĩa vụ quản lý hồ sơ); mrv.evidence vẫn kiểm đồng ý.
+func TestOpenHRRecordsWithoutConsent_W1124(t *testing.T) {
+	f := newFx(t)
+	up := f.as(f.tid, f.orgA)
+	folder := ids.New()
+	f.res.set(folder, &port.Resolved{ViaShareGrant: true})
+	file, err := f.attach(up, &port.Subject{Module: mod, Type: "hr_folder", ID: folder})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.consent.denied[file.SubjectRef] = true
+	viewer := f.as(f.tid, f.orgB, client.RoleEvidenceViewer)
+	if _, _, err := f.svc.OpenContent(viewer, file.Ref, string(client.PurposeHRRecords)); err != nil {
+		t.Fatalf("hr_records không phụ thuộc đồng ý: %v", err)
+	}
+	if _, err := f.svc.Open(viewer, file.Ref, string(client.PurposeMRVEvidence)); code(err) != ErrConsentMissing.Code {
+		t.Fatalf("mrv.evidence vẫn kiểm đồng ý: %v", err)
+	}
+}

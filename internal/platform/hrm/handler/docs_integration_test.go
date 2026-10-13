@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -13,43 +14,87 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence"
+	evport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/hrm/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/hrm/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/envelope"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
 )
 
-// denyConsent: đồng ý của hộ luôn "chưa có" — tài liệu nhân sự (hr_records) không được phụ thuộc đồng ý.
-type denyConsent struct{}
+// fakeFiles là pf/evidence giả (kiểm thử module không import module khác — R-02): giữ bản mã, kiểm phong bì tối thiểu,
+// phân giải chủ thể qua Resolver của pf/hrm, mở tệp như evidence thật: vai vault_evidence_viewer, mục đích được phép,
+// chủ thể thấy được (ViaShareGrant), mở DEK qua kho định danh (giả) rồi giải mã. Kiểm thử thật của mục đích hr_records ở
+// evidence/app (TestOpenHRRecordsWithoutConsent_W1124).
+type fakeFiles struct {
+	vault *clienttest.Fake
+	res   evport.Resolver
+	files map[uuid.UUID]evport.File
+	blobs map[uuid.UUID][]byte
+}
 
-func (denyConsent) HasConsent(context.Context, uuid.UUID, string) (bool, error) { return false, nil }
-
-// withDocs nối pf/evidence thật (kho đối tượng cục bộ, kho định danh giả) cho fixture hồ sơ; người dùng có vai kho.
-func withDocs(t *testing.T, f *recFixture) {
-	objs, err := objstore.NewLocal(t.TempDir(), objstore.LocalOptions{PresignSecret: []byte("presign-secret-kiem-thu-0123456789"),
-		BaseURL: "http://objstore.test"})
-	if err != nil {
-		t.Fatal(err)
+func (x *fakeFiles) Attach(ctx context.Context, in evport.AttachInput) (evport.File, bool, error) {
+	if in.Subject == nil || in.Subject.Module != port.SubjectModule || in.FileRef == nil {
+		return evport.File{}, false, errors.New("thiếu chủ thể/file_ref")
 	}
-	ev := evidence.New(f.env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, evidence.Deps{Store: objs, Vault: f.vault,
-		Consent: denyConsent{}})
-	ev.UseResolver(port.SubjectModule, app.FileResolver{S: f.svc})
-	f.svc.UseDocs(ev.Files())
+	if _, err := x.res.Resolve(ctx, in.Subject.Type, in.Subject.ID); err != nil {
+		return evport.File{}, false, err
+	}
+	if envelope.SHA256Hex(in.Blob) != in.Meta.SHA256Ciphertext {
+		return evport.File{}, false, errors.New("băm bản mã")
+	}
+	ref := uuid.MustParse(*in.FileRef)
+	sub := *in.Subject
+	f := evport.File{Ref: ref, SubjectRef: uuid.MustParse(in.Meta.SubjectRef), Nonce: in.Meta.Nonce, WrappedDEK: in.Meta.WrappedDEK,
+		ContentType: in.Meta.ContentType, SHA256Ciphertext: in.Meta.SHA256Ciphertext, Subject: &sub}
+	x.files[ref], x.blobs[ref] = f, in.Blob
+	return f, true, nil
+}
+
+func (x *fakeFiles) Open(context.Context, uuid.UUID, string) (evport.Opened, error) {
+	return evport.Opened{}, errors.New("không dùng")
+}
+
+func (x *fakeFiles) OpenContent(ctx context.Context, ref uuid.UUID, purpose string) (string, []byte, error) {
+	if _, err := authz.Require(ctx, client.RoleEvidenceViewer); err != nil {
+		return "", nil, err
+	}
+	if purpose != string(client.PurposeHRRecords) {
+		return "", nil, problem.Forbidden
+	}
+	f, ok := x.files[ref]
+	if !ok {
+		return "", nil, problem.NotFound
+	}
+	r, err := x.res.Resolve(ctx, f.Subject.Type, f.Subject.ID)
+	if err != nil || !r.ViaShareGrant {
+		return "", nil, problem.Forbidden
+	}
+	dek, err := x.vault.Unwrap(ctx, client.Purpose(purpose), f.SubjectRef, f.WrappedDEK)
+	if err != nil {
+		return "", nil, err
+	}
+	pt, err := envelope.DecryptWithDEK(dek, f.Nonce, x.blobs[ref])
+	return f.ContentType, pt, err
+}
+
+// withDocs nối pf/evidence giả cho fixture hồ sơ; người dùng có vai kho (trừ "norole").
+func withDocs(t *testing.T, f *recFixture) *fakeFiles {
+	t.Helper()
+	ff := &fakeFiles{vault: f.vault, res: app.FileResolver{S: f.svc}, files: map[uuid.UUID]evport.File{}, blobs: map[uuid.UUID][]byte{}}
+	f.svc.UseDocs(ff)
 	for k, p := range f.who {
-		if k != "norole" {
-			p.Roles = append(p.Roles, client.RoleRegistrar, client.RoleEvidenceViewer)
-		}
+		p.Roles = append(p.Roles, client.RoleRegistrar, client.RoleEvidenceViewer)
 		f.who[k] = p
 	}
 	p := f.who["ld_tt"]
 	p.ActorRef, p.Roles = ids.New(), nil
 	f.who["norole"] = p
+	return ff
 }
 
 func (f *recFixture) upload(as string, meta map[string]any, name string, content []byte, want int) map[string]any {
@@ -129,7 +174,7 @@ func TestHRMDocsHTTP_W1124(t *testing.T) {
 	off.call("hcth", http.MethodGet, "/v1/hrm/docs?staff="+ids.New().String(), nil, http.StatusForbidden)
 
 	f := newRecFixture(t, true)
-	withDocs(t, f)
+	ff := withDocs(t, f)
 	f.call("", http.MethodGet, "/v1/hrm/docs/folders", nil, http.StatusUnauthorized)
 	f.call("realmonly", http.MethodGet, "/v1/hrm/docs/folders", nil, http.StatusForbidden)
 	f.call("admin", http.MethodPost, "/v1/hrm/defaults", nil, http.StatusCreated)
@@ -307,10 +352,13 @@ func TestHRMDocsHTTP_W1124(t *testing.T) {
 			t.Fatalf("%s phải thất bại", q)
 		}
 	}
-	var n int
-	if err := f.env.AdminPool(t, migrations.PF).QueryRow(context.Background(), `SELECT count(*) FROM pf_files.file
-	  WHERE tenant_id = $1 AND subject_module = 'pf/hrm' AND subject_type = 'hr_folder'`, f.tid).Scan(&n); err != nil || n != 2 {
-		t.Fatalf("tệp ở pf_files: %d %v", n, err)
+	if len(ff.files) != 2 {
+		t.Fatalf("tệp qua pf/evidence: %d", len(ff.files))
+	}
+	for _, x := range ff.files {
+		if x.Subject.Type != port.SubjectTypeFolder || bytes.Contains(ff.blobs[x.Ref], pdf[:8]) {
+			t.Fatalf("tệp: chủ thể %v, bản rõ trong bản mã", x.Subject)
+		}
 	}
 }
 
