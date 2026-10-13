@@ -1,4 +1,4 @@
-# ADR-0053: `cap/directory` = module năng lực `pf/contact` — danh bạ dùng chung, một bản ghi/người ở kho định danh, lọc trường ở API
+# ADR-0054: `cap/directory` = module năng lực `pf/contact` — danh bạ dùng chung, một bản ghi/người ở kho định danh, lọc trường ở API
 
 **Trạng thái:** Đề xuất — hiện thực ở W11.23 (14/10/2026, pf 20261013165159, vault 20261013165158); Q-071, Q-072 theo đề xuất của dev, chờ chủ sản phẩm · **Ngày:** 14/10/2026 (gói W11.23) · **Yêu cầu:** kiến trúc v4.1 §5, §7.1 (R-MOD-05, R-MOD-09), RB-3, R-04, R-14, R-41, R-42 · **Nguồn:** BRD Hành chính – Tổng hợp v3.0 FN-13 (UR-GEN-01, UR-GEN-02, UR-ADM-10, UR-HC-27, UR-QG-02, UR-XA-21); đối chiếu v4.3/MKG v1.4/BRD KN Phụ lục C mục H3, Q-071, Q-072 · **Thành phần:** `internal/platform/contact`, `internal/vault/identity` (thẻ danh bạ), `internal/platform/hrm` (port `Directory`), `cmd/api-platform/assembly/contact.go`, realm `vault_directory` · **Liên quan:** [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0050](0050-dom-hrm-pf-hrm.md)
 

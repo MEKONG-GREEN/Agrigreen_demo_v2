@@ -65,5 +65,5 @@ Lý do không đặt danh mục ở `cap/masterdata`: một bên dùng (chưa đ
 
 ### W11.23 Contact (14/10/2026)
 
-- Port `hrm/port.Directory` (`StaffDirectory`) cho `pf/contact` ([ADR-0053](0053-cap-directory-pf-contact.md)): hồ sơ chiếu tại hôm nay, chỉ mã tham chiếu và mã danh mục (không PII); áp cổng `AG_HRM_RECORDS`, không áp ma trận FN-20. Kho định danh chiếu năm sinh/email của ngăn `hrm.profile` vào thẻ danh bạ (mục đích `contact.directory`) — `pf/contact` không đọc ngăn hồ sơ.
+- Port `hrm/port.Directory` (`StaffDirectory`) cho `pf/contact` ([ADR-0054](0054-cap-directory-pf-contact.md)): hồ sơ chiếu tại hôm nay, chỉ mã tham chiếu và mã danh mục (không PII); áp cổng `AG_HRM_RECORDS`, không áp ma trận FN-20. Kho định danh chiếu năm sinh/email của ngăn `hrm.profile` vào thẻ danh bạ (mục đích `contact.directory`) — `pf/contact` không đọc ngăn hồ sơ.
 - Giả định: [W11.23](../kn/gia-dinh/W11.23.md).
