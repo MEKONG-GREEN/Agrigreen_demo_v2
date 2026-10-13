@@ -40,10 +40,11 @@ func scanFolder(r pgx.CollectableRow) (FolderRow, error) {
 	return x, err
 }
 
-// CurrentFolders trả phiên bản mới nhất của mọi thư mục (kể cả đã ẩn), sắp theo sort_order, tên.
+// CurrentFolders trả phiên bản mới nhất (truy vấn con trả nguyên dòng: cột biểu thức như coalesce(...) không giữ tên cột —
+// truy vấn ngoài phải đọc từ cột gốc) của mọi thư mục (kể cả đã ẩn), sắp theo sort_order, tên.
 func CurrentFolders(ctx context.Context, tx pgx.Tx) ([]FolderRow, error) {
 	rows, err := tx.Query(ctx, `SELECT `+folderCols+` FROM (
-	    SELECT DISTINCT ON (folder_id) `+folderCols+` FROM pf_hrm.doc_folder ORDER BY folder_id, seq DESC) v
+	    SELECT DISTINCT ON (folder_id) * FROM pf_hrm.doc_folder ORDER BY folder_id, seq DESC) v
 	  ORDER BY sort_order, name, folder_id`)
 	if err != nil {
 		return nil, err
@@ -130,7 +131,7 @@ func scanDoc(r pgx.CollectableRow) (DocRow, error) {
 // CurrentDocs trả phiên bản mới nhất của mọi tài liệu (kể cả đã ẩn), mới tải trước.
 func CurrentDocs(ctx context.Context, tx pgx.Tx) ([]DocRow, error) {
 	rows, err := tx.Query(ctx, `SELECT `+docCols+` FROM (
-	    SELECT DISTINCT ON (doc_id) `+docCols+` FROM pf_hrm.doc ORDER BY doc_id, seq DESC) v ORDER BY doc_id DESC`)
+	    SELECT DISTINCT ON (doc_id) * FROM pf_hrm.doc ORDER BY doc_id, seq DESC) v ORDER BY doc_id DESC`)
 	if err != nil {
 		return nil, err
 	}

@@ -9785,7 +9785,7 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/HrmFolderWrite"}
-        "400": {description: "validation_failed (khóa, nhóm quyền, phạm vi sai; nhóm Admin)", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (khóa, nhóm quyền, phạm vi sai; nhóm Admin)", $ref: "#/components/responses/Problem"}
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: hrm.folder_not_found, $ref: "#/components/responses/Problem"}
   /v1/hrm/docs/folders/{id}/hide:
@@ -9808,7 +9808,7 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/HrmFolderWrite"}
-        "400": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: hrm.folder_not_found, $ref: "#/components/responses/Problem"}
         "409": {description: hrm.folder_not_empty, $ref: "#/components/responses/Problem"}
@@ -9832,7 +9832,7 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/HrmFolderWrite"}
-        "400": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: hrm.folder_not_found, $ref: "#/components/responses/Problem"}
         "409": {description: hrm.folder_exists, $ref: "#/components/responses/Problem"}
@@ -9887,7 +9887,6 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/HrmDocWrite"}
-        "400": {description: validation_failed, $ref: "#/components/responses/Problem"}
         "403": {description: "forbidden | hrm.records_disabled (gắn nhân viên khi hồ sơ tắt)", $ref: "#/components/responses/Problem"}
         "404": {description: hrm.folder_not_found, $ref: "#/components/responses/Problem"}
         "413": {description: hrm.doc_too_large, $ref: "#/components/responses/Problem"}
@@ -9952,7 +9951,7 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/HrmDocWrite"}
-        "400": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: hrm.doc_not_found, $ref: "#/components/responses/Problem"}
   /v1/hrm/docs/{id}/restore:
@@ -9975,7 +9974,7 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/HrmDocWrite"}
-        "400": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: hrm.doc_not_found, $ref: "#/components/responses/Problem"}
   /v1/hrm/docs/{id}/content:

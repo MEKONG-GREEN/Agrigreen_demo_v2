@@ -275,7 +275,7 @@ const forbid = (msg: string) => problem(403, "forbidden", msg);
 function reasonOf(body: unknown): string | Response {
   const r = String((body as { reason?: string })?.reason ?? "").trim();
   return r.length < 10 || r.length > 500
-    ? problem(400, "validation_failed", "Validation failed", {
+    ? problem(422, "validation_failed", "Validation failed", {
         errors: [{ field: "reason", reason: "bắt buộc, 10–500 ký tự" }],
       })
     : r;

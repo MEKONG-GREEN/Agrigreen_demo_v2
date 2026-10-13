@@ -31890,12 +31890,12 @@ export interface operations {
                     "application/json": components["schemas"]["HrmFolderWrite"];
                 };
             };
-            /** @description validation_failed (khóa, nhóm quyền, phạm vi sai; nhóm Admin) */
-            400: components["responses"]["Problem"];
             /** @description forbidden */
             403: components["responses"]["Problem"];
             /** @description hrm.folder_not_found */
             404: components["responses"]["Problem"];
+            /** @description validation_failed (khóa, nhóm quyền, phạm vi sai; nhóm Admin) */
+            422: components["responses"]["Problem"];
         };
     };
     hrmDocFolderHide: {
@@ -31924,14 +31924,14 @@ export interface operations {
                     "application/json": components["schemas"]["HrmFolderWrite"];
                 };
             };
-            /** @description validation_failed */
-            400: components["responses"]["Problem"];
             /** @description forbidden */
             403: components["responses"]["Problem"];
             /** @description hrm.folder_not_found */
             404: components["responses"]["Problem"];
             /** @description hrm.folder_not_empty */
             409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
         };
     };
     hrmDocFolderRestore: {
@@ -31960,14 +31960,14 @@ export interface operations {
                     "application/json": components["schemas"]["HrmFolderWrite"];
                 };
             };
-            /** @description validation_failed */
-            400: components["responses"]["Problem"];
             /** @description forbidden */
             403: components["responses"]["Problem"];
             /** @description hrm.folder_not_found */
             404: components["responses"]["Problem"];
             /** @description hrm.folder_exists */
             409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
         };
     };
     hrmDocList: {
@@ -32040,8 +32040,6 @@ export interface operations {
                     "application/json": components["schemas"]["HrmDocWrite"];
                 };
             };
-            /** @description validation_failed */
-            400: components["responses"]["Problem"];
             /** @description forbidden | hrm.records_disabled (gắn nhân viên khi hồ sơ tắt) */
             403: components["responses"]["Problem"];
             /** @description hrm.folder_not_found */
@@ -32142,12 +32140,12 @@ export interface operations {
                     "application/json": components["schemas"]["HrmDocWrite"];
                 };
             };
-            /** @description validation_failed */
-            400: components["responses"]["Problem"];
             /** @description forbidden */
             403: components["responses"]["Problem"];
             /** @description hrm.doc_not_found */
             404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
         };
     };
     hrmDocRestore: {
@@ -32176,12 +32174,12 @@ export interface operations {
                     "application/json": components["schemas"]["HrmDocWrite"];
                 };
             };
-            /** @description validation_failed */
-            400: components["responses"]["Problem"];
             /** @description forbidden */
             403: components["responses"]["Problem"];
             /** @description hrm.doc_not_found */
             404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
         };
     };
     hrmDocContent: {

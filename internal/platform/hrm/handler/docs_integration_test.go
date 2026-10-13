@@ -91,6 +91,11 @@ func withDocs(t *testing.T, f *recFixture) *fakeFiles {
 		p.Roles = append(p.Roles, client.RoleRegistrar, client.RoleEvidenceViewer)
 		f.who[k] = p
 	}
+	x := f.who["xa"] // Cấp Xã thật luôn có Nút của lần gán (db: node_scope_required nếu thiếu)
+	k := *x.KN
+	k.OrgRef = ids.New()
+	x.KN = &k
+	f.who["xa"] = x
 	p := f.who["ld_tt"]
 	p.ActorRef, p.Roles = ids.New(), nil
 	f.who["norole"] = p
@@ -300,7 +305,7 @@ func TestHRMDocsHTTP_W1124(t *testing.T) {
 	// một người. Chỉ người quản lý toàn Trung tâm ở thư mục; Admin gốc.
 	f.call("ld_tt", http.MethodPost, "/v1/hrm/docs/folders/"+subID+"/acl", map[string]any{"acl": map[string]any{}}, http.StatusForbidden)
 	f.call("admin", http.MethodPost, "/v1/hrm/docs/folders/"+nangBac+"/acl", map[string]any{"acl": map[string]any{"role:admin": map[string]any{}}},
-		http.StatusBadRequest)
+		http.StatusUnprocessableEntity)
 	f.call("admin", http.MethodPost, "/v1/hrm/docs/folders/"+nangBac+"/acl", map[string]any{
 		"acl": map[string]any{"role:manager": map[string]any{"docs.view": "none"}}, "note": "Chặn lãnh đạo phòng"}, http.StatusOK)
 	if l := f.call("ld_tt", http.MethodGet, "/v1/hrm/docs", nil, http.StatusOK); l["total"] != json.Number("0") {
@@ -318,7 +323,7 @@ func TestHRMDocsHTTP_W1124(t *testing.T) {
 	}
 
 	// Xóa = ẩn: lý do bắt buộc; ẩn khỏi danh sách; người quản lý xem được khi include_hidden; hiện lại.
-	f.call("hcth", http.MethodPost, "/v1/hrm/docs/"+doc2+"/hide", map[string]any{"reason": "ngắn"}, http.StatusBadRequest)
+	f.call("hcth", http.MethodPost, "/v1/hrm/docs/"+doc2+"/hide", map[string]any{"reason": "ngắn"}, http.StatusUnprocessableEntity)
 	f.call("hcth", http.MethodPost, "/v1/hrm/docs/"+doc2+"/hide", map[string]any{"reason": "Tải nhầm tệp, thay bằng bản ký"}, http.StatusOK)
 	if l := f.call("hcth", http.MethodGet, "/v1/hrm/docs?folder="+khac, nil, http.StatusOK); l["total"] != json.Number("0") {
 		t.Fatalf("ẩn: %v", l)
