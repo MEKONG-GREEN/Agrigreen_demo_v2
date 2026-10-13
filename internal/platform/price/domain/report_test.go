@@ -68,10 +68,10 @@ func TestBG_FN_TI_02_08_TicketStatsPerOfficer(t *testing.T) {
 	var days []StatDay
 	for i := 0; i < 22; i++ {
 		r := StatOnTime
-		switch {
-		case i == 5:
+		switch i {
+		case 5:
 			r = StatLate
-		case i == 9 || i == 17:
+		case 9, 17:
 			r = StatMissed
 		}
 		sd := StatDay{Day: day0.AddDate(0, 0, i), Point: "XBG0001", Region: "an_giang", Officer: a, Result: r}
