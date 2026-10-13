@@ -54,7 +54,7 @@ var catalogDepends = map[string][]string{
 	"pf/cropcycle":     {"pf/apiclient", "pf/cooperative", "pf/party", "pf/sync"},
 	"pf/evidence":      {"vault/identity"},
 	"pf/extension":     {"pf/accounts", "pf/cooperative", "pf/forms", "pf/geo", "pf/masterdata", "pf/metrics", "pf/notify", "pf/party", "pf/reports", "pf/sync"},
-	"pf/forms":         {"pf/workflow"},
+	"pf/forms":         {"pf/sync", "pf/workflow"},
 	"pf/geo":           {"pf/apiclient", "pf/metrics", "pf/party"},
 	"pf/masterdata":    {"pf/kref", "pf/party", "pf/sync", "pf/workflow"},
 	"pf/mechanization": {"pf/cooperative", "pf/masterdata", "pf/metrics", "pf/party", "pf/reports", "vault/identity"},

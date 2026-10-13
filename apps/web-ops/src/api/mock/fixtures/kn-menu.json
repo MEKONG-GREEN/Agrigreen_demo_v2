@@ -919,9 +919,7 @@
         "route": "/kn/cnts/bieu-mau",
         "icon": "table",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -1082,6 +1080,15 @@
       "key": "nghiep_vu",
       "label": "Nghiệp vụ",
       "items": [
+       {
+        "key": "xa.cnts.bao_cao_ky",
+        "label": "Báo cáo kỳ CNTS",
+        "route": "/kn/cnts/bao-cao-ky",
+        "icon": "task",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
        {
         "key": "xa.cnts.lich",
         "label": "Lịch trực của tôi",
@@ -2622,6 +2629,15 @@
           "label": "Danh mục CNTS",
           "route": "/kn/phong-ban/chan_nuoi_thuy_san/danh-muc-cnts",
           "icon": "catalog",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
+         },
+         {
+          "key": "admin.pb.cnts_bieu_ky",
+          "label": "Biểu kỳ Cấp Xã",
+          "route": "/kn/phong-ban/chan_nuoi_thuy_san/bieu-ky-cnts",
+          "icon": "table",
           "badge_source": null,
           "enabled": false,
           "children": []

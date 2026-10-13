@@ -44,6 +44,12 @@ func (m *Module) UseDispatchHistory(h extensionsrc.DispatchHistory) { m.rc.Dispa
 // sự kiện + ảnh chụp đóng băng vào pf_forms, cùng giao dịch. Nil → không ghi.
 func (m *Module) UseFormsFreezer(f formsport.Freezer) { m.rc.Freezer = f }
 
+// UseFormsPublisher (W11.42) nối cổng phát hành kỳ native cap/forms cho biểu kỳ Cấp Xã CNTS (BM-01/04/05/17).
+func (m *Module) UseFormsPublisher(p formsport.Publisher) { m.rc.FormsNative = p }
+
+// CNTSValidator (W11.42) là quy tắc chặn của biểu kỳ CNTS cho profile kn_cnts của cap/forms.
+func (m *Module) CNTSValidator() formsport.Validator { return rcapp.CNTSValidator{} }
+
 // ReportSyncSource cho pf/sync (KN v7.7 P7): chiều xuống report_task, form_layout, report_submission của các xã phụ
 // trách trong ngữ cảnh Cấp Xã — field-app nhập báo cáo ngoại tuyến (N-07).
 func (m *Module) ReportSyncSource() syncport.Source { return rcapp.ReportSync{Svc: m.rc} }

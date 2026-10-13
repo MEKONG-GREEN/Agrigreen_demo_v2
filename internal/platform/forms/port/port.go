@@ -46,6 +46,8 @@ type Profile struct {
 	// MaxSubmissions: số lần gửi tối đa mặc định của một đơn vị trong kỳ (0 = không giới hạn); kỳ đặt riêng được khi
 	// phát hành. Lần gửi thứ MaxSubmissions khóa đơn vị (KHTC FN-TI-02.03, Q-081).
 	MaxSubmissions int
+	// RequireLateReason: gửi sau hạn nộp của kỳ phải có giải trình/lý do trễ (CNTS H05, H09 — W11.42).
+	RequireLateReason bool
 }
 
 // Loại đơn vị lá (W11.05). Đơn vị = người và luồng nhiều bước (HCTH, D3 §2.5) CHỪA CHỖ: hằng số có, cấu hình và
@@ -145,6 +147,12 @@ type Freezer interface {
 	Record(ctx context.Context, in MirrorInput) (MirrorResult, error)
 }
 
+// Entity đồng bộ ngoại tuyến (W11.42, docs/dev/sync-contract.md mục "Biểu kỳ cap/forms").
+const (
+	EntityFormsTask       = "forms_task"       // chiều xuống: công việc (kỳ × đơn vị trong phạm vi) kèm biểu và bài nộp cuối
+	EntityFormsSubmission = "forms_submission" // chiều lên: một lần gửi tạo ngoại tuyến
+)
+
 // EventProducerName là tên module phát sự kiện.
 const EventProducerName = "pf/forms"
 
@@ -188,4 +196,87 @@ var (
 	ErrInvalidTemplate  = problem.New(http.StatusUnprocessableEntity, "forms.template_invalid", "Định nghĩa biểu không hợp lệ")
 	ErrPeriodCancelled  = problem.New(http.StatusConflict, "forms.period_cancelled", "Kỳ đã hủy — không nộp, chốt hay mở lại được")
 	ErrSubmissionLimit  = problem.New(http.StatusConflict, "forms.submission_limit", "Đơn vị đã gửi đủ số lần tối đa của kỳ")
+	// W11.42 (pf 000149).
+	ErrVersionConflict = problem.New(http.StatusConflict, "forms.submission_conflict",
+		"Đã có người cập nhật báo cáo — tải bản mới rồi sửa lại (không ghi đè)")
+	ErrLateReason      = problem.New(http.StatusUnprocessableEntity, "forms.late_reason_required", "Gửi sau hạn nộp phải ghi lý do trễ (giải trình)")
+	ErrFacilityInvalid = problem.New(http.StatusUnprocessableEntity, "forms.facility_invalid",
+		"Cơ sở không có trong danh mục cơ sở giết mổ đang dùng hoặc không thuộc xã đã chọn")
 )
+
+// ---------------------------------------------------------------------------
+// W11.42: phụ thuộc tùy chọn do gốc lắp ráp nối, và cổng phát hành cho module nghiệp vụ.
+// ---------------------------------------------------------------------------
+
+// FacilityDirectory tra mã xã của cơ sở (đơn vị lá UnitFacility = facility_ref của danh mục cơ sở giết mổ CNTS,
+// pf/masterdata W11.41) tại ngày on. Cơ sở không có/không dùng tại ngày đó → không có trong kết quả.
+type FacilityDirectory interface {
+	FacilityCommunes(ctx context.Context, refs []uuid.UUID, on time.Time) (map[uuid.UUID]string, error)
+}
+
+// Issue là một lỗi chặn của quy tắc nghiệp vụ do bên dùng cài (Validator).
+type Issue struct {
+	Field  string
+	Reason string
+}
+
+// Validator kiểm thêm số liệu bài nộp theo quy tắc nghiệp vụ của bên dùng (vd CNTS: số liều tiêm ≤ tổng đàn).
+// Chạy sau kiểm kiểu của biểu; trả lỗi chặn (rỗng = qua). Gốc lắp ráp nối theo profile.
+type Validator interface {
+	Validate(ctx context.Context, templateCode string, values map[string]string) []Issue
+}
+
+// TemplateDef là định nghĩa biểu do module nghiệp vụ cài (Fields là JSON mảng trường — khớp domain.Field).
+type TemplateDef struct {
+	Profile, Code, Title string
+	Fields               json.RawMessage
+}
+
+// TemplateRef là phiên bản biểu đã có.
+type TemplateRef struct {
+	ID      uuid.UUID
+	Code    string
+	Version int64
+	Title   string
+	Fields  json.RawMessage
+}
+
+// PeriodDef là một kỳ của lô phát hành (khóa kỳ theo lịch kỳ hệ thống, hạn riêng).
+type PeriodDef struct {
+	Label    string
+	DueAt    time.Time
+	Kind     string
+	Key      string
+	From, To time.Time
+	Rule     string
+}
+
+// BatchInput là một lô kỳ cùng biểu, cùng đơn vị nhận (vd BM-01 một tháng = 30 kỳ ngày × các cơ sở).
+type BatchInput struct {
+	Profile    string
+	TemplateID uuid.UUID
+	UnitKind   string
+	Units      []string
+	// UnitParents: mã xã cha song song với Units (cơ sở/hộ). Cơ sở có thể để trống — tra từ FacilityDirectory.
+	UnitParents []string
+	Periods     []PeriodDef
+}
+
+// PublishedPeriod là một kỳ đã phát hành của lô.
+type PublishedPeriod struct {
+	ID    uuid.UUID
+	Key   string
+	Label string
+	DueAt time.Time
+}
+
+// Publisher là cổng phát hành kỳ native cho module nghiệp vụ (KN CNTS: pf/extension tính lịch kỳ W11.03, hạn
+// riêng từng biểu rồi phát hành qua đây). Người gọi lấy từ ctx (ngữ cảnh phiên KN) — kiểm quyền như REST.
+type Publisher interface {
+	// DefineTemplate ghi phiên bản mới của biểu (vai define_by của profile).
+	DefineTemplate(ctx context.Context, def TemplateDef, idem string) (TemplateRef, error)
+	// LatestTemplate trả phiên bản mới nhất của biểu (ErrTemplateNotFound nếu chưa có).
+	LatestTemplate(ctx context.Context, profile, code string) (TemplateRef, error)
+	// PublishBatch phát hành mọi kỳ của lô trong MỘT giao dịch (cấp publish_by).
+	PublishBatch(ctx context.Context, in BatchInput, idem string) ([]PublishedPeriod, error)
+}

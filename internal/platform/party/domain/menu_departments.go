@@ -53,7 +53,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 		port.AudienceTinh: {
 			soon("tinh.cnts.canh_bao", "Cảnh báo", "/kn/cnts/canh-bao", "zap"),
 			needs(soon("tinh.cnts.duyet_bao_cao", "Duyệt báo cáo", "/kn/cnts/duyet-bao-cao", "approve"), NeedsManager),
-			soon("tinh.cnts.bieu_mau", "Biểu mẫu & cấp quyền", "/kn/cnts/bieu-mau", "table"),
+			// W11.42: phát hành biểu kỳ Cấp Xã BM-01/04/05/17 (kỳ native cap/forms), theo dõi nộp, chốt/mở lại.
+			{Key: "tinh.cnts.bieu_mau", Label: "Biểu mẫu & cấp quyền", Route: "/kn/cnts/bieu-mau", Icon: "table"},
 			soon("tinh.cnts.lich", "Lịch trực KSGM & lịch tiêm", "/kn/cnts/lich", "calendar"),
 			soon("tinh.cnts.chien_dich", "Chiến dịch điều tra", "/kn/cnts/chien-dich", "megaphone"),
 			soon("tinh.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
@@ -63,6 +64,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			{Key: "tinh.cnts.danh_muc", Label: "Danh mục CNTS", Route: "/kn/cnts/danh-muc", Icon: "catalog"},
 		},
 		port.AudienceXa: {
+			// W11.42: nhập biểu kỳ Cấp Xã (KSGM hằng ngày, nhập liệu tuần, khai thác thủy sản, công việc tuần).
+			{Key: "xa.cnts.bao_cao_ky", Label: "Báo cáo kỳ CNTS", Route: "/kn/cnts/bao-cao-ky", Icon: "task"},
 			soon("xa.cnts.lich", "Lịch trực của tôi", "/kn/cnts/lich", "calendar"),
 			soon("xa.cnts.nhat_ky", "Hộ mô hình & nhật ký", "/kn/cnts/nhat-ky", "journal"),
 			soon("xa.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
@@ -133,6 +136,7 @@ var deptBusiness = map[string]map[string][]MenuItem{
 var adminDeptBusiness = map[string][]MenuItem{
 	port.MenuProfileChanNuoiThuySan: {
 		{Key: "admin.pb.cnts_danh_muc", Label: "Danh mục CNTS", Route: adminDeptRoute("/danh-muc-cnts"), Icon: "catalog"}, // W11.41
+		{Key: "admin.pb.cnts_bieu_ky", Label: "Biểu kỳ Cấp Xã", Route: adminDeptRoute("/bieu-ky-cnts"), Icon: "table"},    // W11.42
 	},
 	port.MenuProfileKeHoachTaiChinh: {
 		soon("admin.pb.khtc_ke_hoach", "Kế hoạch năm", adminDeptRoute("/ke-hoach-nam"), "calendar"),

@@ -190,6 +190,10 @@ type Field struct {
 	Required bool     `json:"required"`
 	Options  []string `json:"options,omitempty"` // choice
 	Unit     string   `json:"unit,omitempty"`    // đơn vị đo hiển thị (ha, tấn…)
+	// NonNegative: số (integer/decimal) không âm (W11.42 — CNTS "số âm → Chặn").
+	NonNegative bool `json:"non_negative,omitempty"`
+	// Group: nhóm hiển thị (vd "Tổng đàn", "Tiêm phòng trong tuần") — chỉ để vẽ màn nhập, không kiểm.
+	Group string `json:"group,omitempty"`
 }
 
 // ErrTemplate là lỗi định nghĩa biểu (field, thông báo).
@@ -274,8 +278,39 @@ func ValidateValues(fields []Field, values map[string]string) error {
 		if !ok {
 			return ErrTemplate{f.Key, "sai kiểu " + f.Type}
 		}
+		if f.NonNegative && (f.Type == TypeInteger || f.Type == TypeDecimal) && strings.HasPrefix(v, "-") {
+			return ErrTemplate{f.Key, "không được âm"}
+		}
 	}
 	return nil
+}
+
+// Numeric cho biết trường là số (integer/decimal).
+func (f Field) Numeric() bool { return f.Type == TypeInteger || f.Type == TypeDecimal }
+
+// isZero: chuỗi số bằng 0 ("0", "0.00", "-0").
+func isZero(v string) bool {
+	return strings.Trim(strings.TrimPrefix(v, "-"), "0.") == ""
+}
+
+// NilValues chuẩn hóa bài "Báo không phát sinh" (CNTS UR-XA-13; BM-01 cơ sở "Không hoạt động", BM-17 "Không phát
+// sinh" — W11.42): mọi trường số bằng 0 và khóa — số khác 0 → lỗi; ô số trống được điền "0". Trường chữ giữ nguyên.
+func NilValues(fields []Field, values map[string]string) (map[string]string, error) {
+	out := make(map[string]string, len(fields))
+	for k, v := range values {
+		out[k] = v
+	}
+	for _, f := range fields {
+		if !f.Numeric() {
+			continue
+		}
+		v := strings.TrimSpace(out[f.Key])
+		if v != "" && !isZero(v) {
+			return nil, ErrTemplate{f.Key, "báo không phát sinh: số liệu phải bằng 0"}
+		}
+		out[f.Key] = "0"
+	}
+	return out, nil
 }
 
 // ValidateUnits kiểm danh sách đơn vị nhận của kỳ (không rỗng, không trùng, đúng dạng mã).
@@ -376,7 +411,18 @@ const (
 	SubMissed           = "missed"            // Không nộp: chốt khi chưa gửi lần nào (tính 0)
 	SubClosedUnadjusted = "closed_unadjusted" // Đã chốt – chưa điều chỉnh: chốt khi đang bị trả lại (giữ số đã nộp)
 	SubAwaitingReopen   = "awaiting_reopen"   // Chờ mở kỳ: có bài đến sau lần chốt cuối (bản offline)
+	SubOverdue          = "overdue"           // Trễ hạn (W11.42, CNTS III.3.0 dòng 3): chưa gửi, kỳ còn nhận bài, quá hạn nộp
 )
+
+// DisplayStatus là UnitStatus kèm "Trễ hạn": đơn vị chưa gửi lần nào, kỳ còn nhận bài của đơn vị và now sau hạn due
+// (vẫn nhập, gửi được — III.3.0 dòng 3).
+func DisplayStatus(base string, st PeriodState, u string, heldAt *time.Time, due, now time.Time) string {
+	out := UnitStatus(base, st, u, heldAt)
+	if out == SubNone && st.AcceptsUnit(u) && now.After(due) {
+		return SubOverdue
+	}
+	return out
+}
 
 // ClosedFor cho biết kỳ đã chốt với đơn vị u (chốt, hoặc mở lại một phần không gồm u). Kỳ hủy không tính.
 func (s PeriodState) ClosedFor(u string) bool {
@@ -399,7 +445,7 @@ func UnitStatus(base string, st PeriodState, u string, heldAt *time.Time) string
 // ClosedStatus đổi trạng thái bài nộp lúc chốt: chưa gửi → Không nộp; trả lại → Đã chốt – chưa điều chỉnh.
 func ClosedStatus(base string) string {
 	switch base {
-	case SubNone:
+	case SubNone, SubOverdue:
 		return SubMissed
 	case SubReturned:
 		return SubClosedUnadjusted
@@ -446,6 +492,9 @@ type UnitSnapshot struct {
 	Values       map[string]string `json:"values"`
 	SubmittedBy  *string           `json:"submitted_by"`
 	ReviewedBy   *string           `json:"reviewed_by"`
+	// W11.42: bài "Báo không phát sinh", nộp trễ (sổ phụ submission_meta). Kỳ không có thông tin → bỏ trống.
+	NilReport bool `json:"nil_report,omitempty"`
+	Late      bool `json:"late,omitempty"`
 }
 
 // Snapshot là nội dung ảnh chụp đóng băng của kỳ native lúc chốt (§26: số đã chốt giữ nguyên dù sau đó nộp lại).

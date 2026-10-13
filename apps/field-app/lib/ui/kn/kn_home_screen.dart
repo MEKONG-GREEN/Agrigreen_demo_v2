@@ -9,6 +9,7 @@ import '../../domain/kn_report.dart';
 import '../providers.dart';
 import '../screens/sync_queue_screen.dart';
 import '../screens/work_schedule_screen.dart';
+import 'cnts_tasks_screen.dart';
 import 'kn_context_picker_screen.dart';
 import 'kn_cooperatives_screen.dart';
 import 'kn_machines_screen.dart';
@@ -29,6 +30,7 @@ IconData _iconFor(String key) => switch (key) {
   KnMenuKey.mayMoc => Icons.agriculture_outlined,
   KnMenuKey.thua => Icons.map_outlined,
   KnMenuKey.vatTu => Icons.inventory_2_outlined,
+  KnMenuKey.cntsBaoCaoKy => Icons.assignment_outlined,
   _ => Icons.circle_outlined,
 };
 
@@ -57,6 +59,7 @@ Widget? knScreenFor(KnMenuEntry e) => switch (e.key) {
   KnMenuKey.mayMoc => const KnMachinesScreen(),
   KnMenuKey.thua => const KnPlotsScreen(),
   KnMenuKey.vatTu => const KnMaterialsScreen(),
+  KnMenuKey.cntsBaoCaoKy => CntsTasksScreen(title: e.label),
   _ => null,
 };
 

@@ -400,6 +400,10 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	if raw, _ := json.Marshal(r.body); !strings.Contains(string(raw), `"status":"coming_soon","status_label":"Sắp có"`) {
 		t.Fatalf("mục Sắp có: %s", raw)
 	}
+	// W11.42: "Báo cáo kỳ CNTS" của Cấp Xã đã mở.
+	if keys := menuKeys(r); !slices.Contains(keys, "xa.cnts.bao_cao_ky") {
+		t.Fatalf("Cấp Xã CNTS có Báo cáo kỳ: %v", keys)
+	}
 	wantStatus(t, xa.appDo(http.MethodGet, "/v1/menu", nil), http.StatusUnprocessableEntity, "hai phòng ban đang áp dụng → phải chọn")
 	if it := adminDeptItem(t, root.appDo(http.MethodGet, "/v1/menu?org_ref="+tr.p89.String(), nil), "chan_nuoi_thuy_san"); it["enabled"] != true {
 		t.Fatalf("Admin thấy phòng ban vừa bật: %v", it)

@@ -223,7 +223,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
     kn_tinh: [
       soon("tinh.cnts.canh_bao", "Cảnh báo", "/kn/cnts/canh-bao", "zap"),
       soon("tinh.cnts.duyet_bao_cao", "Duyệt báo cáo", "/kn/cnts/duyet-bao-cao", "approve"),
-      soon("tinh.cnts.bieu_mau", "Biểu mẫu & cấp quyền", "/kn/cnts/bieu-mau", "table"),
+      { key: "tinh.cnts.bieu_mau", label: "Biểu mẫu & cấp quyền", route: "/kn/cnts/bieu-mau", icon: "table" }, // W11.42
       soon("tinh.cnts.lich", "Lịch trực KSGM & lịch tiêm", "/kn/cnts/lich", "calendar"),
       soon("tinh.cnts.chien_dich", "Chiến dịch điều tra", "/kn/cnts/chien-dich", "megaphone"),
       soon("tinh.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
@@ -232,6 +232,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       { key: "tinh.cnts.danh_muc", label: "Danh mục CNTS", route: "/kn/cnts/danh-muc", icon: "catalog" }, // W11.41
     ],
     kn_xa: [
+      { key: "xa.cnts.bao_cao_ky", label: "Báo cáo kỳ CNTS", route: "/kn/cnts/bao-cao-ky", icon: "task" }, // W11.42
       soon("xa.cnts.lich", "Lịch trực của tôi", "/kn/cnts/lich", "calendar"),
       soon("xa.cnts.nhat_ky", "Hộ mô hình & nhật ký", "/kn/cnts/nhat-ky", "journal"),
       soon("xa.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
@@ -287,7 +288,10 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
 
 /** Mục "Sắp có" thêm vào mục con phòng ban của Admin (domain.adminDeptBusiness). */
 const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, (base: string) => Item[]>> = {
-  chan_nuoi_thuy_san: (b) => [{ key: "admin.pb.cnts_danh_muc", label: "Danh mục CNTS", route: `${b}/danh-muc-cnts`, icon: "catalog" }], // W11.41
+  chan_nuoi_thuy_san: (b) => [
+    { key: "admin.pb.cnts_danh_muc", label: "Danh mục CNTS", route: `${b}/danh-muc-cnts`, icon: "catalog" }, // W11.41
+    { key: "admin.pb.cnts_bieu_ky", label: "Biểu kỳ Cấp Xã", route: `${b}/bieu-ky-cnts`, icon: "table" }, // W11.42
+  ],
   ke_hoach_tai_chinh: (b) => [soon("admin.pb.khtc_ke_hoach", "Kế hoạch năm", `${b}/ke-hoach-nam`, "calendar")],
   // W11.72: Xã báo giá + Kỳ báo giá & giờ khóa đã mở.
   thong_tin_truyen_thong: (b) => [

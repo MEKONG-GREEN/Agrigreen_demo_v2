@@ -44,6 +44,9 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/forms/periods/:id/snapshots", h.snapshots)
 	rg.POST("/forms/submissions/:id/review", h.review)
 	rg.GET("/forms/snapshots/:id", h.snapshot)
+	// W11.42: công việc (kỳ × đơn vị trong phạm vi), sao chép kỳ trước.
+	rg.GET("/forms/tasks", h.tasks)
+	rg.GET("/forms/periods/:id/previous", h.previous)
 }
 
 // ---------------------------------------------------------------------------
@@ -147,11 +150,32 @@ type submissionDTO struct {
 	At        string            `json:"event_time"`
 	Status    string            `json:"status"`
 	Review    *reviewDTO        `json:"review"`
+	// W11.42 (sổ phụ submission_meta; phiên bản trước pf 000149 → mặc định).
+	NilReport   bool    `json:"nil_report"`
+	Note        *string `json:"note"`
+	Explanation *string `json:"explanation"`
+	Late        bool    `json:"late"`
+	CapturedAt  *string `json:"captured_at"`
 }
 
-func submissionOf(s store.Submission, status string, r *domain.Review) submissionDTO {
-	return submissionDTO{ID: s.ID.String(), PeriodID: s.PeriodID.String(), Unit: s.Unit, Version: s.Version, Values: s.Values,
+func submissionOf(s store.Submission, status string, r *domain.Review, m ...*store.Meta) submissionDTO {
+	d := submissionDTO{ID: s.ID.String(), PeriodID: s.PeriodID.String(), Unit: s.Unit, Version: s.Version, Values: s.Values,
 		Submitter: s.Submitter.String(), At: ts(s.EventTime), Status: status, Review: reviewOf(r)}
+	if len(m) > 0 && m[0] != nil {
+		x := m[0]
+		d.NilReport, d.Late = x.NilReport, x.Late
+		if x.Note != "" {
+			d.Note = &x.Note
+		}
+		if x.Explanation != "" {
+			d.Explanation = &x.Explanation
+		}
+		if x.CapturedAt != nil {
+			c := ts(*x.CapturedAt)
+			d.CapturedAt = &c
+		}
+	}
+	return d
 }
 
 type unitDTO struct {
@@ -245,7 +269,7 @@ func viewOf(v app.PeriodView) periodViewDTO {
 	for _, u := range v.Units {
 		ud := unitDTO{Unit: u.Unit, Parent: u.Parent, Status: u.Status}
 		if u.Submission != nil {
-			sd := submissionOf(*u.Submission, domain.SubmissionStatus(true, u.Review), u.Review)
+			sd := submissionOf(*u.Submission, domain.SubmissionStatus(true, u.Review), u.Review, u.Meta)
 			ud.Submission = &sd
 		}
 		if h := u.Held; h != nil {
@@ -431,6 +455,11 @@ type submitReq struct {
 	Values map[string]string `json:"values"`
 	// CapturedAt: bản offline (lúc ghi trên thiết bị, RFC 3339) — kỳ đã chốt thì bài được giữ "Chờ mở kỳ" (202).
 	CapturedAt string `json:"captured_at"`
+	// W11.42: khóa lạc quan (phiên bản đã thấy, 0 = chưa có bài), báo không phát sinh, ghi chú (H08), giải trình (H09).
+	BaseVersion *int64 `json:"base_version"`
+	NilReport   bool   `json:"nil_report"`
+	Note        string `json:"note"`
+	Explanation string `json:"explanation"`
 }
 
 func (h Handler) submit(c *gin.Context) {
@@ -442,18 +471,17 @@ func (h Handler) submit(c *gin.Context) {
 	if !bindJSON(c, &req) {
 		return
 	}
-	var s app.SubmissionView
-	var err error
+	in := app.SubmitInput{Unit: req.Unit, Values: req.Values, BaseVersion: req.BaseVersion, NilReport: req.NilReport, Note: req.Note,
+		Explanation: req.Explanation}
 	if req.CapturedAt != "" {
 		at, perr := time.Parse(time.RFC3339, req.CapturedAt)
 		if perr != nil {
 			httpx.Fail(c, problem.Validation.WithField("captured_at", "RFC 3339"))
 			return
 		}
-		s, err = h.Svc.SubmitOffline(c.Request.Context(), c.Query("profile"), id, req.Unit, req.Values, at, idemKey(c))
-	} else {
-		s, err = h.Svc.Submit(c.Request.Context(), c.Query("profile"), id, req.Unit, req.Values, idemKey(c))
+		in.CapturedAt = &at
 	}
+	s, err := h.Svc.SubmitWith(c.Request.Context(), c.Query("profile"), id, in, idemKey(c))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -462,7 +490,7 @@ func (h Handler) submit(c *gin.Context) {
 	if s.Status == domain.SubAwaitingReopen {
 		code = http.StatusAccepted
 	}
-	c.JSON(code, submissionOf(s.Submission, s.Status, s.Review))
+	c.JSON(code, submissionOf(s.Submission, s.Status, s.Review, s.Meta))
 }
 
 func (h Handler) submissions(c *gin.Context) {
@@ -588,6 +616,60 @@ func (h Handler) snapshot(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, snapshotOf(s))
+}
+
+func (h Handler) tasks(c *gin.Context) {
+	f := app.TaskFilter{Code: c.Query("code")}
+	f.Limit, _ = strconv.Atoi(c.Query("limit"))
+	for _, x := range []struct {
+		field string
+		dst   **time.Time
+	}{{"from", &f.From}, {"to", &f.To}} {
+		raw := c.Query(x.field)
+		if raw == "" {
+			continue
+		}
+		d, err := time.Parse(time.DateOnly, raw)
+		if err != nil {
+			httpx.Fail(c, problem.Validation.WithField(x.field, "YYYY-MM-DD"))
+			return
+		}
+		*x.dst = &d
+	}
+	ts, err := h.Svc.Tasks(c.Request.Context(), c.Query("profile"), f)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	out := make([]app.TaskData, 0, len(ts))
+	for _, t := range ts {
+		out = append(out, app.TaskDataOf(t, t.Template))
+	}
+	c.JSON(http.StatusOK, gin.H{"items": out})
+}
+
+type previousDTO struct {
+	PeriodID   string        `json:"period_id"`
+	Label      string        `json:"label"`
+	Submission submissionDTO `json:"submission"`
+}
+
+func (h Handler) previous(c *gin.Context) {
+	id, ok := pathID(c, port.ErrPeriodNotFound)
+	if !ok {
+		return
+	}
+	p, err := h.Svc.Previous(c.Request.Context(), c.Query("profile"), id, c.Query("unit"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if p == nil {
+		c.JSON(http.StatusOK, gin.H{"previous": nil})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"previous": previousDTO{PeriodID: p.PeriodID.String(), Label: p.Label,
+		Submission: submissionOf(p.Submission, domain.SubSubmitted, nil, p.Meta)}})
 }
 
 // ---------------------------------------------------------------------------

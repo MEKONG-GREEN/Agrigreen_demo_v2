@@ -7363,6 +7363,82 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/KNRecordLogPage"}
         "404": {description: extension.material_record_not_found, $ref: "#/components/responses/Problem"}
+  # --- pf/extension CNTS: biểu kỳ Cấp Xã BM-01/04/05/17 (W11.42) — cài biểu vào cap/forms (profile kn_cnts), chia lịch kỳ
+  # (kỳ ngày, tuần W11.03 v2, tuần làm việc BM-05) với hạn riêng, phát hành lô kỳ native. Nộp, chốt, sao chép kỳ trước: /v1/forms. ---
+  /v1/extension/cnts/period-forms:
+    get:
+      summary: Biểu kỳ Cấp Xã CNTS và phiên bản đã cài ở cap/forms
+      operationId: extensionCntsPeriodForms
+      tags: [extension]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSPeriodForm"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/period-forms/install:
+    post:
+      summary: Cài (phiên bản mới) biểu chưa có hoặc khác định nghĩa chuẩn — Admin KN / reports_admin
+      operationId: extensionCntsInstallPeriodForms
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Danh sách sau khi cài
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSPeriodForm"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/period-series/preview:
+    post:
+      summary: Xem trước lô kỳ của một biểu (kỳ, hạn nộp, số công việc) — chưa ghi
+      operationId: extensionCntsPreviewSeries
+      tags: [extension]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSSeriesInput"}
+      responses:
+        "200":
+          description: Lô kỳ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSeries"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/period-series:
+    post:
+      summary: Phát hành lô kỳ native cap/forms của một biểu (một giao dịch; Cấp Tỉnh phòng CNTS; cơ sở phải thuộc xã)
+      operationId: extensionCntsPublishSeries
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSSeriesInput"}
+      responses:
+        "201":
+          description: Lô kỳ đã phát hành (periods[].id)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSeries"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.template_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | forms.facility_invalid", $ref: "#/components/responses/Problem"}
   # --- pf/forms (cap/forms, W6.2): biểu thu thập theo kỳ — phát hành, nộp, rà soát bốn mắt, chốt kèm ảnh chụp đóng băng, mở lại.
   # Bên dùng chọn bằng query `profile` (KN: kn). Route v1 cũ của KN (/v1/extension/report-*) chạy song song và ghi song song
   # chốt/mở lại kỳ + ảnh chụp sang pf_forms (origin = mirror). Ngữ cảnh KN: header X-AG-Context như các route KN khác.
@@ -7496,7 +7572,7 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: "forms.profile_not_found | forms.template_not_found", $ref: "#/components/responses/Problem"}
         "409": {description: forms.fixture_template, $ref: "#/components/responses/Problem"}
-        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | forms.facility_invalid", $ref: "#/components/responses/Problem"}
   /v1/forms/periods/{id}:
     get:
       summary: Kỳ kèm trạng thái chiếu từ sổ, bài nộp cuối của từng đơn vị trong phạm vi, ảnh chụp
@@ -7539,8 +7615,8 @@ paths:
               schema: {$ref: "#/components/schemas/FormsSubmission"}
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
-        "409": {description: "forms.period_closed | forms.submission_accepted | forms.submission_limit | forms.period_cancelled", $ref: "#/components/responses/Problem"}
-        "422": {description: "forms.values_invalid | forms.unit_not_in_period", $ref: "#/components/responses/Problem"}
+        "409": {description: "forms.period_closed | forms.submission_accepted | forms.submission_limit | forms.period_cancelled | forms.submission_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: "forms.values_invalid | forms.unit_not_in_period | forms.late_reason_required", $ref: "#/components/responses/Problem"}
     get:
       summary: Lịch sử phiên bản bài nộp của một đơn vị (mới trước) kèm rà soát
       operationId: formsSubmissions
@@ -7686,6 +7762,53 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/FormsSnapshot"}
         "404": {description: forms.snapshot_not_found, $ref: "#/components/responses/Problem"}
+  /v1/forms/tasks:
+    get:
+      summary: "W11.42 Công việc (kỳ × đơn vị trong phạm vi người gọi) kèm định nghĩa biểu và bài nộp cuối — màn Công việc cần làm (CNTS FN-08), theo dõi nộp"
+      operationId: formsTasks
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: code, in: query, schema: {type: string}, description: "Mã biểu (vd CNTS-BM04)"}
+        - {name: from, in: query, schema: {type: string, format: date}, description: "Kỳ có ngày cuối ≥ from"}
+        - {name: to, in: query, schema: {type: string, format: date}, description: "Kỳ có ngày đầu ≤ to"}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 60}, description: Số kỳ tối đa}
+      responses:
+        "200":
+          description: Danh sách (kỳ mới trước; kỳ đã hủy bỏ qua)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsTask"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
+  /v1/forms/periods/{id}/previous:
+    get:
+      summary: "W11.42 Sao chép kỳ trước (UR-XA-13): bài nộp cuối của đơn vị ở kỳ gần nhất trước đó của cùng biểu (null nếu chưa có)"
+      operationId: formsPrevious
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: unit, in: query, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Bài kỳ trước
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [previous]
+                properties:
+                  previous:
+                    oneOf:
+                      - {type: "null"}
+                      - {$ref: "#/components/schemas/FormsPrevious"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
   # --- hết pf/forms ---
   # --- pf/hrm (dom/hrm, W11.21 — ADR-0050): danh mục nhân sự Phòng HCTH (BRD HCTH v3.0 FN-19, UR-ADM-08). Đọc: Admin và Cấp Tỉnh
   # của Phòng Hành chính – Tổng hợp (port.Access ở gốc lắp ráp); ghi: Admin. Mọi bản ghi là phiên bản (sổ chỉ ghi thêm); ngừng sử
@@ -13772,6 +13895,8 @@ components:
         required: {type: boolean}
         options: {type: array, items: {type: string}}
         unit: {type: string}
+        non_negative: {type: boolean, description: "W11.42: số không âm (integer/decimal)"}
+        group: {type: string, description: "W11.42: nhóm hiển thị trên màn nhập (không kiểm)"}
     FormsTemplateInput:
       type: object
       required: [profile, code, title, fields]
@@ -13889,6 +14014,13 @@ components:
         unit: {type: string}
         values: {type: object, additionalProperties: {type: string}, description: "Khóa trường → giá trị chuỗi (thập phân dạng chuỗi, R-10)"}
         captured_at: {type: string, format: date-time, description: "Bản offline: lúc ghi trên thiết bị — kỳ đã chốt với đơn vị thì bài được giữ (202, Chờ mở kỳ)"}
+        base_version:
+          type: integer
+          minimum: 0
+          description: "W11.42 khóa lạc quan: số phiên bản cuối người nhập đã thấy (0 = chưa có bài). Khác phiên bản hiện tại → 409 forms.submission_conflict (không ghi đè). Vắng = không kiểm"
+        nil_report: {type: boolean, default: false, description: "W11.42 Báo không phát sinh (BM-01 cơ sở không hoạt động, BM-17 không phát sinh): mọi trường số = 0"}
+        note: {type: string, maxLength: 1000, description: "H08 ghi chú chung"}
+        explanation: {type: string, maxLength: 1000, description: "H09 giải trình / lý do trễ — bắt buộc khi gửi sau hạn với profile require_late_reason (kn_cnts)"}
     FormsSubmission:
       type: object
       required: [id, period_id, unit, version, values, submitter_ref, event_time, status, review]
@@ -13905,6 +14037,11 @@ components:
           oneOf:
             - {type: "null"}
             - {$ref: "#/components/schemas/FormsReview"}
+        nil_report: {type: boolean, description: "W11.42 Báo không phát sinh"}
+        note: {type: [string, "null"]}
+        explanation: {type: [string, "null"]}
+        late: {type: boolean, description: "W11.42 nộp sau hạn (DB tính từ captured_at hoặc event_time)"}
+        captured_at: {type: [string, "null"], format: date-time}
     FormsReviewInput:
       type: object
       required: [decision]
@@ -13940,8 +14077,8 @@ components:
         parent: {type: string, description: "Đơn vị lọc phạm vi: mã xã cha (cơ sở/hộ), chính unit với loại khác"}
         status:
           type: string
-          enum: [not_submitted, submitted, accepted, returned, missed, closed_unadjusted, awaiting_reopen]
-          description: "Khi kỳ đã chốt với đơn vị: missed = Không nộp, closed_unadjusted = Đã chốt – chưa điều chỉnh, awaiting_reopen = Chờ mở kỳ (W11.05)"
+          enum: [not_submitted, overdue, submitted, accepted, returned, missed, closed_unadjusted, awaiting_reopen]
+          description: "Khi kỳ đã chốt với đơn vị: missed = Không nộp, closed_unadjusted = Đã chốt – chưa điều chỉnh, awaiting_reopen = Chờ mở kỳ (W11.05). overdue = Trễ hạn: chưa gửi, kỳ còn nhận bài, quá hạn (W11.42)"
         submission:
           oneOf:
             - {type: "null"}
@@ -14120,6 +14257,105 @@ components:
             properties:
               award_code: {type: string, description: "Mã hình thức khen thưởng (award_form) đang dùng"}
               months: {type: integer, minimum: 1, maximum: 36}
+    FormsTask:
+      type: object
+      description: "W11.42 Một công việc (kỳ × đơn vị) — cùng dữ liệu với entity đồng bộ forms_task"
+      required: [id, profile, period_id, unit, unit_kind, parent, template_id, template_code, template_title, template_version, fields, label,
+        period_kind, period_key, period_from, period_to, due_at, period_status, open, status, version, submission_id, values, nil_report, note,
+        explanation, late, submitted_at, return_note, held_at]
+      properties:
+        id: {type: string, format: uuid, description: "UUIDv5 ổn định theo (kỳ, đơn vị)"}
+        profile: {type: string}
+        period_id: {type: string, format: uuid}
+        unit: {type: string}
+        unit_kind: {type: string, enum: [commune, facility, household, department]}
+        parent: {type: string}
+        template_id: {type: string, format: uuid}
+        template_code: {type: string}
+        template_title: {type: string}
+        template_version: {type: integer}
+        fields: {type: array, items: {$ref: "#/components/schemas/FormsField"}}
+        label: {type: string}
+        period_kind: {type: string}
+        period_key: {type: string}
+        period_from: {type: [string, "null"], format: date}
+        period_to: {type: [string, "null"], format: date}
+        due_at: {type: string, format: date-time}
+        period_status: {type: string, enum: [open, closed, reopened, cancelled]}
+        open: {type: boolean, description: Kỳ đang nhận bài của đơn vị}
+        status: {type: string, enum: [not_submitted, overdue, submitted, accepted, returned, missed, closed_unadjusted, awaiting_reopen]}
+        version: {type: integer, minimum: 0, description: "Phiên bản bài nộp cuối (0 = chưa có) — gửi lại làm base_version"}
+        submission_id: {type: [string, "null"], format: uuid}
+        values: {type: object, additionalProperties: {type: string}}
+        nil_report: {type: boolean}
+        note: {type: string}
+        explanation: {type: string}
+        late: {type: boolean}
+        submitted_at: {type: [string, "null"], format: date-time}
+        return_note: {type: [string, "null"], description: Lý do yêu cầu điều chỉnh}
+        held_at: {type: [string, "null"], format: date-time, description: Có bài giữ Chờ mở kỳ}
+    FormsPrevious:
+      type: object
+      required: [period_id, label, submission]
+      properties:
+        period_id: {type: string, format: uuid}
+        label: {type: string}
+        submission: {$ref: "#/components/schemas/FormsSubmission"}
+    # --- extension CNTS biểu kỳ Cấp Xã (W11.42) ---
+    CNTSPeriodForm:
+      type: object
+      required: [code, bm, title, unit_kind, period_type, deadline_offset_days, deadline_time, due, nil_label, fields, template_id,
+        template_version, template_up_to_date]
+      properties:
+        code: {type: string, enum: [CNTS-BM01, CNTS-BM04, CNTS-BM17, CNTS-BM05-I, CNTS-BM05-II]}
+        bm: {type: string}
+        title: {type: string}
+        unit_kind: {type: string, enum: [commune, facility]}
+        period_type: {type: string, enum: [day, week]}
+        deadline_offset_days: {type: integer}
+        deadline_time: {type: string}
+        due: {type: string, description: Mô tả hạn mặc định}
+        nil_label: {type: [string, "null"], description: "Nhãn Báo không phát sinh (null = biểu không có)"}
+        fields: {type: array, items: {$ref: "#/components/schemas/FormsField"}}
+        template_id: {type: [string, "null"], format: uuid, description: "Phiên bản đã cài ở cap/forms (null = chưa cài)"}
+        template_version: {type: [integer, "null"]}
+        template_up_to_date: {type: boolean}
+    CNTSSeriesInput:
+      type: object
+      required: [code, from_date, to_date, units]
+      properties:
+        code: {type: string}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        units: {type: array, minItems: 1, items: {type: string}, description: "Mã xã (BM-04/05/17) hoặc facility_ref cơ sở giết mổ (BM-01)"}
+        deadline:
+          type: object
+          required: [offset_days, time]
+          description: "Hạn khác mặc định: ngày cuối kỳ + offset_days lúc time (BM-05 Phần II: offset âm tính từ Thứ Hai)"
+          properties:
+            offset_days: {type: integer}
+            time: {type: string, pattern: "^[0-2][0-9]:[0-5][0-9]$"}
+    CNTSSeriesPeriod:
+      type: object
+      required: [id, kind, key, label, from_date, to_date, due_at, rule]
+      properties:
+        id: {type: [string, "null"], format: uuid, description: "Mã kỳ cap/forms (sau phát hành)"}
+        kind: {type: string}
+        key: {type: string}
+        label: {type: string}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        due_at: {type: string, format: date-time}
+        rule: {type: string}
+    CNTSSeries:
+      type: object
+      required: [code, unit_kind, units, tasks, periods]
+      properties:
+        code: {type: string}
+        unit_kind: {type: string}
+        units: {type: array, items: {type: string}}
+        tasks: {type: integer, description: Số công việc sẽ sinh (kỳ × đơn vị)}
+        periods: {type: array, items: {$ref: "#/components/schemas/CNTSSeriesPeriod"}}
     # --- pf/price (W11.71) ---
     PriceStatus:
       type: object

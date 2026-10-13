@@ -310,6 +310,26 @@ Chỉ `op: create`; `id` = UUIDv7 máy sinh = id bài nộp (P4 nhận gửi l�
 | Kỳ đã chốt | `rejected` `extension.period_closed` |
 | Công việc ngoài phạm vi / không có | `rejected` `extension.report_task_not_found` |
 
+## Biểu kỳ cap/forms (W11.42, field-app Cấp Xã — CNTS BM-01/04/05/17)
+
+Nguồn: `internal/platform/forms/app/sync.go` (`SyncSource`, `SyncSink`), `store/meta.go`; migration pf 000149 (`pf_forms.sync_feed`: trigger AFTER INSERT trên `period`, `period_event` native, `submission`, `review`, `held_submission` thêm một dòng `feed_seq` tăng dần — `unit_code '*'` = cả kỳ). Kiểm thử: `internal/platform/forms/app/cnts_integration_test.go` (`TestFormsCNTSPeriods_W1142`), field-app `test/cnts_period_test.dart`.
+
+Chỉ người gọi là CẤP LÁ của một profile (`kn_cnts`: vai `kn_xa` phòng CNTS) nhận/gửi; không có → Source trả 403 (pf/sync bỏ qua entity). Phạm vi = ngữ cảnh phiên (xã phụ trách; cơ sở/hộ lọc theo xã cha và giới hạn `facility_refs`/`household_refs` W11.07).
+
+- Chiều xuống `forms_task`: `id` = UUIDv5 cố định theo (kỳ, đơn vị) (`forms/app.TaskID`), `version` = `feed_seq`. `data` = `FormsTask` của OpenAPI (`/v1/forms/tasks`): kỳ, đơn vị, loại đơn vị, xã cha, biểu (mã, tên, phiên bản, `fields[]`), khóa/khoảng kỳ, `due_at`, `period_status`, `open`, `status` (kể cả `overdue`, `missed`, `awaiting_reopen`), phiên bản cuối `version` + `values`, `nil_report`, `note`, `explanation`, `late`, `return_note`, `held_at`. Kỳ hủy → tombstone. Máy tự tính lại "Trễ hạn" theo `due_at`.
+- Chiều lên `forms_submission`: chỉ `op: create`; `id` = UUIDv7 máy sinh = mã phiên bản (gửi lại cùng `id` → `duplicate`). `payload = {profile, period_id, unit, values{}, base_version, nil_report, note, explanation}`; `event_time` = `captured_at`. Đi qua `SubmitWith` của REST.
+
+| Tình huống | Kết quả |
+|---|---|
+| Hợp lệ, kỳ còn nhận bài | `accepted` |
+| Kỳ đã chốt với đơn vị | `accepted` + `code: forms.awaiting_reopen` — bài GIỮ "Chờ mở kỳ" (`held_submission`), lượt pull sau trả `status: awaiting_reopen` |
+| `base_version` khác phiên bản hiện tại | `rejected` `forms.submission_conflict` — KHÔNG ghi đè; máy báo tải bản mới |
+| Ô sai / quy tắc chặn | `rejected` `forms.values_invalid`, `errors[{field: <khóa trường>, reason}]` |
+| Gửi sau hạn thiếu `explanation` | `rejected` `forms.late_reason_required` |
+| Kỳ đã hủy | `rejected` `forms.period_cancelled` |
+
+`catalog_item` (pf/masterdata) từ W11.42 gồm cả 12 danh mục CNTS `cnts_*` (giá trị hiện hành; `attrs` như `GET /v1/masterdata/catalogs/{catalog}`).
+
 ## Tệp minh chứng
 
 `POST /v1/files` (multipart, Idempotency-Key):

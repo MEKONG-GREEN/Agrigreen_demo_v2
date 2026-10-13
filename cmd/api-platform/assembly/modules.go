@@ -216,12 +216,19 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	// W6.5: cap/evidence sở hữu pf_files — route /v1/files của pf/sync gọi port.Files; chủ thể pf/cooperative.
 	ev := wireEvidence(unit, clk, evidence.Deps{Store: store, Vault: ext.Vault, Scope: pty.ScopeResolver(),
 		Consent: pty.ConsentChecker()}, coop.Resolve())
+	// W6.2: cap/forms (/v1/forms/*), KN v1 ghi song song chốt/mở lại kỳ; W11.42: dựng trước pf/sync — biểu kỳ CNTS đồng bộ
+	// ngoại tuyến (forms_task, forms_submission).
+	fm, err := wireForms(unit, clk, wf, kn, md.CNTSCatalogs())
+	if err != nil {
+		return Modules{}, pools, err
+	}
 	snc := syncmod.New(unit, clk, syncmod.Deps{
 		Scope: pty.ScopeResolver(), Params: md.Params(), Vault: ext.Vault,
 		Files: ev.Files(), CursorKey: cursorKey(ext),
 		Sources: append([]syncport.Source{md.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource(), cc.SyncSource(),
-			kn.ReportSyncSource()}, coop.SyncSources()...), // KN v7.7 P7: report_task, form_layout, report_submission (Cấp Xã ngoại tuyến)
-		Sinks: append([]syncport.Sink{kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink(), cc.SyncSink(), kn.ReportSyncSink()}, coop.SyncSinks()...),
+			kn.ReportSyncSource(), fm.SyncSource()}, coop.SyncSources()...), // KN v7.7 P7: report_task, form_layout, report_submission (Cấp Xã ngoại tuyến); W11.42 forms_task
+		Sinks: append([]syncport.Sink{kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink(), cc.SyncSink(), kn.ReportSyncSink(), fm.SyncSink()},
+			coop.SyncSinks()...),
 	})
 	nt.UseSyncEntities(snc.PullEntities())               // KN US-SYNC-02: kiểm entities[] của nudge
 	snc.UseIntegrations(queueNames(), dlqDepthFromEnv()) // GIS US-SYNC-01: màn giám sát đồng bộ
@@ -267,10 +274,6 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	kn.UseReportCycle(extension.ReportCycleDeps{Forms: rep.Forms(), Regions: pty.Regions(), Assignments: acc.Assignments(), Names: acc.ActorNames(),
 		Log: slog.Default()})
 	kn.UseDispatchHistory(rep.DispatchHistory())
-	fm, err := wireForms(unit, clk, wf, kn) // W6.2: cap/forms (/v1/forms/*), KN v1 ghi song song chốt/mở lại kỳ
-	if err != nil {
-		return Modules{}, pools, err
-	}
 	// W11.71: cap/price (/v1/price/*), khung giá — ADR-0049; W11.72: danh bạ cán bộ phân công xã báo giá.
 	pr, err := wirePrice(unit, clk, PriceOfficers{Assignments: acc.Assignments(), Names: acc.ActorNames()})
 	if err != nil {

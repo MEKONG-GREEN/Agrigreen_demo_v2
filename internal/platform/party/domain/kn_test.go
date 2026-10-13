@@ -116,7 +116,8 @@ func TestFN_AD_04_03_NormalizeDepartment(t *testing.T) {
 var implementedMenu = map[string]bool{
 	"tinh.cnts.danh_muc": true, "admin.pb.cnts_danh_muc": true, // W11.41
 	"tinh.hcth.danh_muc": true, "admin.pb.hcth_danh_muc": true, // W11.21
-	"tinh.bao_gia.kiem_duyet": true, // W11.75 Kiểm duyệt & công bố (phiếu, xác minh, hiệu chỉnh)
+	"tinh.bao_gia.kiem_duyet": true,                                                            // W11.75 Kiểm duyệt & công bố (phiếu, xác minh, hiệu chỉnh)
+	"tinh.cnts.bieu_mau":      true, "xa.cnts.bao_cao_ky": true, "admin.pb.cnts_bieu_ky": true, // W11.42
 }
 
 // W11.06 (kn.menu/v3, D3 C6, D4 X2): khuôn theo phòng ban — nhóm "Nghiệp vụ" sau "Điều hành", nhóm

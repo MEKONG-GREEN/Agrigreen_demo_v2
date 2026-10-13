@@ -86,9 +86,10 @@ type Service struct {
 }
 
 // FacilityCatalog là phần cổng danh mục CNTS pf/accounts cần (masterdata/port.CNTSCatalogs thỏa mãn): ref không
-// phải cơ sở giết mổ đang dùng.
+// phải cơ sở giết mổ đang dùng; mã xã của cơ sở (W11.42 — cơ sở của lần gán Cấp Xã phải thuộc xã phụ trách).
 type FacilityCatalog interface {
 	UnknownFacilities(ctx context.Context, refs []uuid.UUID) ([]uuid.UUID, error)
+	FacilityCommunes(ctx context.Context, refs []uuid.UUID, on time.Time) (map[uuid.UUID]string, error)
 }
 
 // KNModule là module sở hữu nghiệp vụ của vai trò KN (kn_tw, kn_tinh, kn_xa).

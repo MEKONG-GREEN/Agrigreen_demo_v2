@@ -35,17 +35,19 @@ var KNProfile = formsport.Profile{
 // KNCNTSProfile là cấu hình cap/forms của Phòng Chăn nuôi – Thủy sản (W11.05, BRD CNTS v3.7): Tỉnh phát hành, rà soát,
 // chốt/mở lại; Xã nhập cho đơn vị lá là xã, cơ sở giết mổ (BM-01) hoặc hộ/điểm (nhật ký) — cơ sở/hộ lọc phạm vi theo
 // mã xã cha. Chỉ phiên của phòng CNTS (Admin định nghĩa biểu — Q-056 đề xuất "theo Profile từng phòng"). Không giới
-// hạn số lần gửi (CNTS BR-02 "được sửa và gửi lại đến khi chốt kỳ").
+// hạn số lần gửi (CNTS BR-02 "được sửa và gửi lại đến khi chốt kỳ"). W11.42: gửi sau hạn nộp phải ghi lý do trễ (H05,
+// H09); quy tắc chặn của biểu kỳ (extension CNTSValidator), cơ sở giết mổ kiểm theo danh mục CNTS (pf/masterdata).
 var KNCNTSProfile = formsport.Profile{
-	Name:        "kn_cnts",
-	Hierarchy:   []string{"TW", "TINH", "XA"},
-	Roles:       map[string]string{authz.KNTW: "TW", authz.KNTinh: "TINH", authz.KNXa: "XA"},
-	PublishBy:   "TINH",
-	CloseBy:     "TINH",
-	ReviewBy:    "TINH",
-	DefineBy:    []string{authz.KNAdmin, "reports_admin"},
-	UnitKinds:   []string{formsport.UnitCommune, formsport.UnitFacility, formsport.UnitHousehold},
-	Departments: []string{partyport.DeptChanNuoiThuySan},
+	Name:              "kn_cnts",
+	Hierarchy:         []string{"TW", "TINH", "XA"},
+	Roles:             map[string]string{authz.KNTW: "TW", authz.KNTinh: "TINH", authz.KNXa: "XA"},
+	PublishBy:         "TINH",
+	CloseBy:           "TINH",
+	ReviewBy:          "TINH",
+	DefineBy:          []string{authz.KNAdmin, "reports_admin"},
+	UnitKinds:         []string{formsport.UnitCommune, formsport.UnitFacility, formsport.UnitHousehold},
+	Departments:       []string{partyport.DeptChanNuoiThuySan},
+	RequireLateReason: true,
 }
 
 // KNKHTCProfile là cấu hình cap/forms của phiếu "Báo cáo cho KHTC" (W11.05, BRD KHTC v2.2): đơn vị lá là PHÒNG BAN.
@@ -70,12 +72,15 @@ var KNKHTCProfile = formsport.Profile{
 // KNProfiles là mọi cấu hình cap/forms của App Khuyến nông.
 var KNProfiles = []formsport.Profile{KNProfile, KNCNTSProfile, KNKHTCProfile}
 
-// wireForms dựng pf/forms (rà soát bốn mắt qua cap/workflow) và nối ghi song song vào vòng đời báo cáo KN.
-func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extension.Module) (*forms.Module, error) {
-	fm, err := forms.New(p, clk, forms.Deps{Approvals: wf.Approvals(), Profiles: KNProfiles})
+// wireForms dựng pf/forms (rà soát bốn mắt qua cap/workflow) và nối ghi song song vào vòng đời báo cáo KN. W11.42: danh
+// mục cơ sở giết mổ (đơn vị lá BM-01), quy tắc chặn biểu kỳ CNTS, cổng phát hành kỳ native cho pf/extension.
+func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extension.Module, facilities formsport.FacilityDirectory) (*forms.Module, error) {
+	fm, err := forms.New(p, clk, forms.Deps{Approvals: wf.Approvals(), Profiles: KNProfiles, Facilities: facilities,
+		Validators: map[string]formsport.Validator{KNCNTSProfile.Name: kn.CNTSValidator()}})
 	if err != nil {
 		return nil, err
 	}
 	kn.UseFormsFreezer(fm.Freezer())
+	kn.UseFormsPublisher(fm.Publisher())
 	return fm, nil
 }

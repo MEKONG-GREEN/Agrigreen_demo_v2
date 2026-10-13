@@ -26,9 +26,10 @@ var CNTSCatalogs = []string{
 	port.CatalogCNTSFishingGroup, port.CatalogCNTSIndicator, port.CatalogCNTSModelType, port.CatalogCNTSDocumentType,
 }
 
-// SyncCatalogs là các danh mục đồng bộ xuống thiết bị (entity catalog_item) — giữ nguyên hợp đồng đồng bộ hiện có;
-// danh mục CNTS chưa xuống thiết bị (mobile CNTS là W11.42).
-var SyncCatalogs = baseCatalogs
+// SyncCatalogs là các danh mục đồng bộ xuống thiết bị (entity catalog_item). W11.42: thêm 12 danh mục CNTS (field-app
+// Cấp Xã nhập biểu kỳ CNTS ngoại tuyến cần loài, vaccine, cơ sở giết mổ…) — cùng hợp đồng catalog_item (giá trị hiện
+// hành, không theo hiệu lực ngày).
+var SyncCatalogs = Catalogs
 
 // EffectiveDated cho biết danh mục lưu giá trị theo hiệu lực từ ngày (mọi danh mục CNTS).
 func EffectiveDated(catalog string) bool { return slices.Contains(CNTSCatalogs, catalog) }

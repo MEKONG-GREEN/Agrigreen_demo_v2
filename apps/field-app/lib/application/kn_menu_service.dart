@@ -20,6 +20,9 @@ abstract final class KnMenuKey {
   static const thua = 'xa.thu_thap.thua';
   static const vatTu = 'xa.thu_thap.vat_tu';
 
+  /// W11.42: biểu kỳ Cấp Xã CNTS (BM-01/04/05/17) — phòng Chăn nuôi – Thủy sản.
+  static const cntsBaoCaoKy = 'xa.cnts.bao_cao_ky';
+
   static const known = {
     congViec,
     lichCongTac,
@@ -32,6 +35,7 @@ abstract final class KnMenuKey {
     mayMoc,
     thua,
     vatTu,
+    cntsBaoCaoKy,
   };
 }
 

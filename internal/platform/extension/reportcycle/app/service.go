@@ -70,6 +70,7 @@ type Service struct {
 	Names       partyport.ActorNames         // tên người thao tác trong Log (tùy chọn)
 	Dispatches  extensionsrc.DispatchHistory // pf/reports: kỳ đã gửi Chi cục (tùy chọn)
 	Freezer     formsport.Freezer            // W6.2 cap/forms: ghi song song chốt/mở lại + ảnh chụp (tùy chọn)
+	FormsNative formsport.Publisher          // W11.42 cap/forms: cài biểu, phát hành lô kỳ native (biểu kỳ CNTS)
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

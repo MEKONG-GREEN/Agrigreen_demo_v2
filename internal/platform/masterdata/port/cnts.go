@@ -159,6 +159,9 @@ type CNTSCatalogs interface {
 	Facility(ctx context.Context, ref uuid.UUID, on time.Time) (SlaughterFacility, error)
 	// UnknownFacilities trả các ref KHÔNG phải cơ sở giết mổ đang dùng hôm nay (kiểm phạm vi Cấp Xã theo cơ sở).
 	UnknownFacilities(ctx context.Context, refs []uuid.UUID) ([]uuid.UUID, error)
+	// FacilityCommunes trả mã xã của các cơ sở giết mổ đang dùng tại ngày on (W11.42: cơ sở của lần gán Cấp Xã và
+	// đơn vị lá BM-01 phải thuộc xã). Ref không có/không dùng tại ngày on → vắng trong kết quả.
+	FacilityCommunes(ctx context.Context, refs []uuid.UUID, on time.Time) (map[uuid.UUID]string, error)
 	// ScheduleAt trả quy trình tiêm có hiệu lực tại ngày on.
 	ScheduleAt(ctx context.Context, code string, on time.Time) (VaccinationSchedule, error)
 	// VaccineSpecies trả ánh xạ vaccine → loài so sánh (quy tắc "số liều trong tuần ≤ tổng đàn") tại ngày on.

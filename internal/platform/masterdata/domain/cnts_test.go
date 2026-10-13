@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
@@ -16,9 +17,9 @@ func TestCNTS_CatalogsRegistered(t *testing.T) {
 	if domain.EffectiveDated(port.CatalogCrop) {
 		t.Fatal("danh mục Trồng trọt không theo hiệu lực")
 	}
-	for _, c := range domain.SyncCatalogs {
-		if domain.EffectiveDated(c) {
-			t.Fatal("chưa đồng bộ danh mục CNTS xuống thiết bị")
+	for _, c := range domain.CNTSCatalogs {
+		if !slices.Contains(domain.SyncCatalogs, c) {
+			t.Fatalf("W11.42: danh mục CNTS %s phải đồng bộ xuống thiết bị", c)
 		}
 	}
 }

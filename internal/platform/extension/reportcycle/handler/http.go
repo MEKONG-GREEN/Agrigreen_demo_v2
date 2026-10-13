@@ -66,6 +66,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/report-badges", h.badges)
 	g.GET("/commune-reports", h.communeReports)
 	g.GET("/commune-reports/stats", h.communeStats)
+
+	h.registerCNTS(g) // W11.42
 }
 
 func bind(c *gin.Context, v any) bool {

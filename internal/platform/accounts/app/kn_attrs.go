@@ -37,6 +37,9 @@ var (
 	// ErrFacilityInvalid (W11.41): facility_refs phải là cơ sở giết mổ đang dùng của danh mục CNTS (pf/masterdata).
 	ErrFacilityInvalid = problem.New(http.StatusUnprocessableEntity, "accounts.facility_invalid",
 		"Cơ sở không có trong danh mục cơ sở giết mổ đang dùng")
+	// ErrFacilityCommune (W11.42): cơ sở của lần gán Cấp Xã phải thuộc một xã phụ trách của lần gán.
+	ErrFacilityCommune = problem.New(http.StatusUnprocessableEntity, "accounts.facility_commune_mismatch",
+		"Cơ sở giết mổ không thuộc xã phụ trách của lần gán")
 	ErrContextReadOnly = problem.New(http.StatusForbidden, "accounts.context_read_only",
 		"Ngữ cảnh chỉ xem (Lãnh đạo đơn vị xem phòng ban khác, Ban Giám đốc) — không thao tác ghi được")
 	ErrDelegationNotFound  = problem.New(http.StatusNotFound, "accounts.delegation_not_found", "Không tìm thấy ủy quyền")
@@ -93,6 +96,18 @@ func (s *Service) SetAssignmentAttrs(ctx context.Context, user, id uuid.UUID, in
 		}
 		if len(unknown) > 0 {
 			return AttrsResult{}, ErrFacilityInvalid.With("facility_refs", unknown[0].String())
+		}
+		// W11.42 (mục mở của W11.41): cơ sở phải thuộc một xã phụ trách của lần gán Cấp Xã.
+		if asg.Role == port.KNXa {
+			communes, err := s.Facilities.FacilityCommunes(ctx, in.Facilities, s.now())
+			if err != nil {
+				return AttrsResult{}, err
+			}
+			for _, f := range in.Facilities {
+				if c := communes[f]; !slices.Contains(asg.Communes, c) {
+					return AttrsResult{}, ErrFacilityCommune.With("facility_refs", f.String()+" (xã "+c+")")
+				}
+			}
 		}
 	}
 	if in.InternalUnit != "" {

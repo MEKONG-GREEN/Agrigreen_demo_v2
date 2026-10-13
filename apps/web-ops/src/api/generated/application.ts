@@ -5178,6 +5178,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/period-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Biểu kỳ Cấp Xã CNTS và phiên bản đã cài ở cap/forms */
+        get: operations["extensionCntsPeriodForms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/period-forms/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cài (phiên bản mới) biểu chưa có hoặc khác định nghĩa chuẩn — Admin KN / reports_admin */
+        post: operations["extensionCntsInstallPeriodForms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/period-series/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xem trước lô kỳ của một biểu (kỳ, hạn nộp, số công việc) — chưa ghi */
+        post: operations["extensionCntsPreviewSeries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/period-series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phát hành lô kỳ native cap/forms của một biểu (một giao dịch; Cấp Tỉnh phòng CNTS; cơ sở phải thuộc xã) */
+        post: operations["extensionCntsPublishSeries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/forms/profiles": {
         parameters: {
             query?: never;
@@ -5394,6 +5462,40 @@ export interface paths {
         };
         /** Một ảnh chụp kèm nội dung đóng băng và kết quả kiểm băm (hash_valid) */
         get: operations["formsSnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.42 Công việc (kỳ × đơn vị trong phạm vi người gọi) kèm định nghĩa biểu và bài nộp cuối — màn Công việc cần làm (CNTS FN-08), theo dõi nộp */
+        get: operations["formsTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/periods/{id}/previous": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.42 Sao chép kỳ trước (UR-XA-13): bài nộp cuối của đơn vị ở kỳ gần nhất trước đó của cùng biểu (null nếu chưa có) */
+        get: operations["formsPrevious"];
         put?: never;
         post?: never;
         delete?: never;
@@ -11764,6 +11866,10 @@ export interface components {
             required: boolean;
             options?: string[];
             unit?: string;
+            /** @description W11.42: số không âm (integer/decimal) */
+            non_negative?: boolean;
+            /** @description W11.42: nhóm hiển thị trên màn nhập (không kiểm) */
+            group?: string;
         };
         FormsTemplateInput: {
             profile: string;
@@ -11912,6 +12018,17 @@ export interface components {
              * @description Bản offline: lúc ghi trên thiết bị — kỳ đã chốt với đơn vị thì bài được giữ (202, Chờ mở kỳ)
              */
             captured_at?: string;
+            /** @description W11.42 khóa lạc quan: số phiên bản cuối người nhập đã thấy (0 = chưa có bài). Khác phiên bản hiện tại → 409 forms.submission_conflict (không ghi đè). Vắng = không kiểm */
+            base_version?: number;
+            /**
+             * @description W11.42 Báo không phát sinh (BM-01 cơ sở không hoạt động, BM-17 không phát sinh): mọi trường số = 0
+             * @default false
+             */
+            nil_report: boolean;
+            /** @description H08 ghi chú chung */
+            note?: string;
+            /** @description H09 giải trình / lý do trễ — bắt buộc khi gửi sau hạn với profile require_late_reason (kn_cnts) */
+            explanation?: string;
         };
         FormsSubmission: {
             /** Format: uuid */
@@ -11930,6 +12047,14 @@ export interface components {
             /** @enum {string} */
             status: "submitted" | "accepted" | "returned" | "awaiting_reopen";
             review: null | components["schemas"]["FormsReview"];
+            /** @description W11.42 Báo không phát sinh */
+            nil_report?: boolean;
+            note?: string | null;
+            explanation?: string | null;
+            /** @description W11.42 nộp sau hạn (DB tính từ captured_at hoặc event_time) */
+            late?: boolean;
+            /** Format: date-time */
+            captured_at?: string | null;
         };
         FormsReviewInput: {
             /** @enum {string} */
@@ -11970,10 +12095,10 @@ export interface components {
             /** @description Đơn vị lọc phạm vi: mã xã cha (cơ sở/hộ), chính unit với loại khác */
             parent: string;
             /**
-             * @description Khi kỳ đã chốt với đơn vị: missed = Không nộp, closed_unadjusted = Đã chốt – chưa điều chỉnh, awaiting_reopen = Chờ mở kỳ (W11.05)
+             * @description Khi kỳ đã chốt với đơn vị: missed = Không nộp, closed_unadjusted = Đã chốt – chưa điều chỉnh, awaiting_reopen = Chờ mở kỳ (W11.05). overdue = Trễ hạn: chưa gửi, kỳ còn nhận bài, quá hạn (W11.42)
              * @enum {string}
              */
-            status: "not_submitted" | "submitted" | "accepted" | "returned" | "missed" | "closed_unadjusted" | "awaiting_reopen";
+            status: "not_submitted" | "overdue" | "submitted" | "accepted" | "returned" | "missed" | "closed_unadjusted" | "awaiting_reopen";
             submission: null | components["schemas"]["FormsSubmission"];
             held: null | components["schemas"]["FormsHeld"];
         };
@@ -12123,6 +12248,131 @@ export interface components {
                 award_code: string;
                 months: number;
             }[];
+        };
+        /** @description W11.42 Một công việc (kỳ × đơn vị) — cùng dữ liệu với entity đồng bộ forms_task */
+        FormsTask: {
+            /**
+             * Format: uuid
+             * @description UUIDv5 ổn định theo (kỳ, đơn vị)
+             */
+            id: string;
+            profile: string;
+            /** Format: uuid */
+            period_id: string;
+            unit: string;
+            /** @enum {string} */
+            unit_kind: "commune" | "facility" | "household" | "department";
+            parent: string;
+            /** Format: uuid */
+            template_id: string;
+            template_code: string;
+            template_title: string;
+            template_version: number;
+            fields: components["schemas"]["FormsField"][];
+            label: string;
+            period_kind: string;
+            period_key: string;
+            /** Format: date */
+            period_from: string | null;
+            /** Format: date */
+            period_to: string | null;
+            /** Format: date-time */
+            due_at: string;
+            /** @enum {string} */
+            period_status: "open" | "closed" | "reopened" | "cancelled";
+            /** @description Kỳ đang nhận bài của đơn vị */
+            open: boolean;
+            /** @enum {string} */
+            status: "not_submitted" | "overdue" | "submitted" | "accepted" | "returned" | "missed" | "closed_unadjusted" | "awaiting_reopen";
+            /** @description Phiên bản bài nộp cuối (0 = chưa có) — gửi lại làm base_version */
+            version: number;
+            /** Format: uuid */
+            submission_id: string | null;
+            values: {
+                [key: string]: string;
+            };
+            nil_report: boolean;
+            note: string;
+            explanation: string;
+            late: boolean;
+            /** Format: date-time */
+            submitted_at: string | null;
+            /** @description Lý do yêu cầu điều chỉnh */
+            return_note: string | null;
+            /**
+             * Format: date-time
+             * @description Có bài giữ Chờ mở kỳ
+             */
+            held_at: string | null;
+        };
+        FormsPrevious: {
+            /** Format: uuid */
+            period_id: string;
+            label: string;
+            submission: components["schemas"]["FormsSubmission"];
+        };
+        CNTSPeriodForm: {
+            /** @enum {string} */
+            code: "CNTS-BM01" | "CNTS-BM04" | "CNTS-BM17" | "CNTS-BM05-I" | "CNTS-BM05-II";
+            bm: string;
+            title: string;
+            /** @enum {string} */
+            unit_kind: "commune" | "facility";
+            /** @enum {string} */
+            period_type: "day" | "week";
+            deadline_offset_days: number;
+            deadline_time: string;
+            /** @description Mô tả hạn mặc định */
+            due: string;
+            /** @description Nhãn Báo không phát sinh (null = biểu không có) */
+            nil_label: string | null;
+            fields: components["schemas"]["FormsField"][];
+            /**
+             * Format: uuid
+             * @description Phiên bản đã cài ở cap/forms (null = chưa cài)
+             */
+            template_id: string | null;
+            template_version: number | null;
+            template_up_to_date: boolean;
+        };
+        CNTSSeriesInput: {
+            code: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /** @description Mã xã (BM-04/05/17) hoặc facility_ref cơ sở giết mổ (BM-01) */
+            units: string[];
+            /** @description Hạn khác mặc định: ngày cuối kỳ + offset_days lúc time (BM-05 Phần II: offset âm tính từ Thứ Hai) */
+            deadline?: {
+                offset_days: number;
+                time: string;
+            };
+        };
+        CNTSSeriesPeriod: {
+            /**
+             * Format: uuid
+             * @description Mã kỳ cap/forms (sau phát hành)
+             */
+            id: string | null;
+            kind: string;
+            key: string;
+            label: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /** Format: date-time */
+            due_at: string;
+            rule: string;
+        };
+        CNTSSeries: {
+            code: string;
+            unit_kind: string;
+            units: string[];
+            /** @description Số công việc sẽ sinh (kỳ × đơn vị) */
+            tasks: number;
+            periods: components["schemas"]["CNTSSeriesPeriod"][];
         };
         PriceStatus: {
             profile: string;
@@ -23403,6 +23653,118 @@ export interface operations {
             404: components["responses"]["Problem"];
         };
     };
+    extensionCntsPeriodForms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSPeriodForm"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsInstallPeriodForms: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách sau khi cài */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSPeriodForm"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsPreviewSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSSeriesInput"];
+            };
+        };
+        responses: {
+            /** @description Lô kỳ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSeries"];
+                };
+            };
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsPublishSeries: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSSeriesInput"];
+            };
+        };
+        responses: {
+            /** @description Lô kỳ đã phát hành (periods[].id) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSeries"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.template_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | forms.facility_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
     formsProfiles: {
         parameters: {
             query?: never;
@@ -23603,7 +23965,7 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description forms.fixture_template */
             409: components["responses"]["Problem"];
-            /** @description validation_failed */
+            /** @description validation_failed | forms.facility_invalid */
             422: components["responses"]["Problem"];
         };
     };
@@ -23708,9 +24070,9 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description forms.period_not_found */
             404: components["responses"]["Problem"];
-            /** @description forms.period_closed | forms.submission_accepted | forms.submission_limit | forms.period_cancelled */
+            /** @description forms.period_closed | forms.submission_accepted | forms.submission_limit | forms.period_cancelled | forms.submission_conflict */
             409: components["responses"]["Problem"];
-            /** @description forms.values_invalid | forms.unit_not_in_period */
+            /** @description forms.values_invalid | forms.unit_not_in_period | forms.late_reason_required */
             422: components["responses"]["Problem"];
         };
     };
@@ -23919,6 +24281,75 @@ export interface operations {
                 };
             };
             /** @description forms.snapshot_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    formsTasks: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+                /** @description Mã biểu (vd CNTS-BM04) */
+                code?: string;
+                /** @description Kỳ có ngày cuối ≥ from */
+                from?: string;
+                /** @description Kỳ có ngày đầu ≤ to */
+                to?: string;
+                /** @description Số kỳ tối đa */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách (kỳ mới trước; kỳ đã hủy bỏ qua) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FormsTask"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.profile_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    formsPrevious: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+                unit: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bài kỳ trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        previous: null | components["schemas"]["FormsPrevious"];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.period_not_found */
             404: components["responses"]["Problem"];
         };
     };

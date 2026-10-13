@@ -57,6 +57,7 @@ import { pricePointRoutes } from "./kn-price-points";
 import { cntsCatalogAdminRoutes, cntsCatalogAppRoutes } from "./kn-cnts-catalogs";
 import { hrmRoutes } from "./kn-hrm";
 import { priceTicketRoutes } from "./kn-price-tickets";
+import { cntsPeriodRoutes } from "./kn-cnts-periods";
 import { apiClientAdminRoutes, meteringAdminRoutes } from "./g5";
 
 function sleep(ms: number) {
@@ -142,6 +143,7 @@ const appRoutes: Route[] = [
   // --- dom/hrm W11.21: danh mục nhân sự HCTH (/v1/hrm/*) ---
   ...hrmRoutes,
   ...priceTicketRoutes, // W11.75 phiếu báo giá + xác minh
+  ...cntsPeriodRoutes, // W11.42 biểu kỳ Cấp Xã CNTS (/v1/extension/cnts/*, /v1/forms/* profile kn_cnts)
 
   // --- pf/extension ---
   {

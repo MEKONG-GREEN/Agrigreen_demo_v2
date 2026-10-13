@@ -36,8 +36,11 @@ type Service struct {
 	DB        tenant.Beginner // đã bọc db.ForModule(…, DBModule); nil → chỉ dùng được Freezer
 	Clock     clock.Clock
 	Approvals wfport.Approvals // cap/workflow: rà soát bốn mắt (nil → chỉ CHECK review_four_eyes ở DB)
-	profiles  map[string]port.Profile
-	order     []string
+	// W11.42: danh mục cơ sở (đơn vị lá UnitFacility — kiểm cơ sở thuộc xã) và quy tắc nghiệp vụ theo profile.
+	Facilities port.FacilityDirectory
+	Validators map[string]port.Validator
+	profiles   map[string]port.Profile
+	order      []string
 }
 
 var _ port.Freezer = (*Service)(nil)
@@ -82,6 +85,7 @@ type actor struct {
 	scope       authz.Scope
 	node        uuid.UUID
 	define      bool
+	kn          *authz.KNContext // ngữ cảnh phiên KN (nil: vai realm) — W11.07 giới hạn cơ sở/hộ của Cấp Xã
 }
 
 // resolve tìm profile và cấp của người gọi: ngữ cảnh phiên KN (vai, phạm vi, Nút) nếu có, không thì vai realm
@@ -97,7 +101,7 @@ func (s *Service) resolve(ctx context.Context, name string) (port.Profile, actor
 	}
 	a := actor{ref: p.ActorRef, tenant: p.TenantID, node: p.OrgRef}
 	if p.KN != nil {
-		a.role, a.scope, a.node, a.dept = p.KN.Role, p.KN.Scope, p.KN.OrgRef, p.KN.Department
+		a.role, a.scope, a.node, a.dept, a.kn = p.KN.Role, p.KN.Scope, p.KN.OrgRef, p.KN.Department, p.KN
 		a.level = prof.LevelOf(a.role, a.dept)
 		a.define = slices.Contains(prof.DefineBy, a.role)
 		if len(prof.Departments) > 0 && a.role != authz.KNAdmin && !slices.Contains(prof.Departments, a.dept) {
@@ -130,7 +134,21 @@ func (a actor) allowsUnit(spec domain.Spec, units []string, u string) bool {
 	if spec.UnitKind == port.UnitDepartment {
 		return a.scope.All || (a.leaf && a.dept == u) || (!a.leaf && a.level != "")
 	}
-	return a.scope.Allows(spec.Parent(units, u))
+	if !a.scope.Allows(spec.Parent(units, u)) {
+		return false
+	}
+	// W11.07/W11.42: Cấp Xã có giới hạn cơ sở/hộ chỉ thấy cơ sở/hộ trong danh sách của lần gán (mã đơn vị = UUID).
+	if a.kn != nil && (spec.UnitKind == port.UnitFacility || spec.UnitKind == port.UnitHousehold) {
+		ref, err := uuid.Parse(u)
+		if err != nil {
+			ref = uuid.Nil // mã không phải UUID: chỉ qua khi lần gán không giới hạn cơ sở/hộ
+		}
+		if spec.UnitKind == port.UnitFacility {
+			return a.kn.AllowsFacility(ref)
+		}
+		return a.kn.AllowsHousehold(ref)
+	}
+	return true
 }
 
 func (a actor) need(level, what string) error {
@@ -167,6 +185,8 @@ func classify(err error) error {
 		return port.ErrPeriodClosed.WithCause(err)
 	case pg.Code == "AGF03":
 		return port.ErrSubmissionLimit.WithCause(err)
+	case pg.Code == "AGF04":
+		return port.ErrVersionConflict.WithCause(err)
 	case pg.Code == "23514" && pg.ConstraintName == "review_four_eyes":
 		return problem.SelfApproval.WithCause(err)
 	case pg.Code == "23505":

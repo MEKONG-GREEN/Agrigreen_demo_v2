@@ -117,3 +117,28 @@ func TestClosedStatuses_W1105(t *testing.T) {
 		}
 	}
 }
+
+func TestNilValuesOverdue_W1142(t *testing.T) {
+	fs := []Field{{Key: "a", Type: TypeInteger, NonNegative: true}, {Key: "b", Type: TypeDecimal}, {Key: "c", Type: TypeText}}
+	if err := ValidateValues(fs, map[string]string{"a": "-1"}); err == nil {
+		t.Fatal("số âm phải bị chặn")
+	}
+	out, err := NilValues(fs, map[string]string{"b": "0.00", "c": "x"})
+	if err != nil || out["a"] != "0" || out["b"] != "0" || out["c"] != "x" {
+		t.Fatalf("không phát sinh: %v %v", out, err)
+	}
+	if _, err := NilValues(fs, map[string]string{"a": "2"}); err == nil {
+		t.Fatal("không phát sinh mà có số")
+	}
+	due := time.Date(2026, 10, 5, 2, 0, 0, 0, time.UTC)
+	st := StateOf([]Event{{Action: "published"}})
+	if s := DisplayStatus(SubNone, st, "u", nil, due, due.Add(time.Minute)); s != SubOverdue {
+		t.Fatalf("Trễ hạn: %s", s)
+	}
+	if s := DisplayStatus(SubNone, st, "u", nil, due, due); s != SubNone {
+		t.Fatalf("chưa quá hạn: %s", s)
+	}
+	if ClosedStatus(SubOverdue) != SubMissed {
+		t.Fatal("Trễ hạn lúc chốt → Không nộp")
+	}
+}

@@ -29,6 +29,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:agrigreen_mobile/application/boundary_service.dart';
 
+import 'cnts_period_service.dart';
 import 'consent_service.dart';
 import 'directive_service.dart';
 import 'evidence_service.dart';
@@ -112,6 +113,7 @@ class AppServices {
     required this.knContext,
     required this.knMenu,
     required this.knReports,
+    required this.cntsPeriods,
     required this.knData,
   });
 
@@ -152,6 +154,9 @@ class AppServices {
 
   /// KN v7.7 P7: công việc cần làm + nhập báo cáo ngoại tuyến.
   final KnReportService knReports;
+
+  /// W11.42: biểu kỳ Cấp Xã CNTS (cap/forms native) ngoại tuyến.
+  final CntsPeriodService cntsPeriods;
 
   /// KN v7.7 P7: thu thập dữ liệu (HTX, máy móc, thửa, vật tư).
   final KnCollectionService knData;
@@ -249,6 +254,15 @@ class AppServices {
         await sync.syncOnce(force: true, entities: entities);
       },
     );
+    final cntsPeriods = CntsPeriodService(
+      db: db,
+      refs: refs,
+      outbox: outbox,
+      clock: pf.clock,
+      syncNow: (entities) async {
+        await sync.syncOnce(force: true, entities: entities);
+      },
+    );
     final knMenu = KnMenuService(
       db: db,
       api: api,
@@ -316,6 +330,7 @@ class AppServices {
       knContext: knContext,
       knMenu: knMenu,
       knReports: knReports,
+      cntsPeriods: cntsPeriods,
       knData: KnCollectionService(
         db: db,
         api: api,

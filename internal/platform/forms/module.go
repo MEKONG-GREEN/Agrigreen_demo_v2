@@ -28,6 +28,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
+	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	wfport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/workflow/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
@@ -43,6 +44,10 @@ type Deps struct {
 	Approvals wfport.Approvals
 	// Profiles: cấu hình của từng bên dùng (KN: hierarchy [TW, TINH, XA], publish_by/close_by TINH).
 	Profiles []port.Profile
+	// W11.42: danh mục cơ sở giết mổ (đơn vị lá cơ sở — kiểm cơ sở thuộc xã; nil → không kiểm) và quy tắc nghiệp vụ
+	// theo profile (vd kn_cnts: số liều tiêm ≤ tổng đàn).
+	Facilities port.FacilityDirectory
+	Validators map[string]port.Validator
 }
 
 // Module là pf/forms đã nối.
@@ -59,8 +64,26 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) (*Module, error) {
 	if err != nil {
 		return nil, err
 	}
+	svc.Facilities, svc.Validators = d.Facilities, d.Validators
 	return &Module{svc: svc}, nil
 }
+
+// UseValidator nối quy tắc nghiệp vụ của bên dùng cho profile (gốc lắp ráp — bên cài quy tắc có thể dựng sau module).
+func (m *Module) UseValidator(profile string, v port.Validator) {
+	if m.svc.Validators == nil {
+		m.svc.Validators = map[string]port.Validator{}
+	}
+	m.svc.Validators[profile] = v
+}
+
+// Publisher là cổng phát hành kỳ native cho module nghiệp vụ (W11.42 — KN CNTS).
+func (m *Module) Publisher() port.Publisher { return app.Publisher{Svc: m.svc} }
+
+// SyncSource/SyncSink: đồng bộ ngoại tuyến forms_task / forms_submission (W11.42).
+func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc} }
+
+// SyncSink trả Sink chiều lên forms_submission.
+func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
 
 // Freezer cho bên dùng có vòng đời kỳ riêng: ghi chốt/mở lại + ảnh chụp trong giao dịch của bên dùng.
 func (m *Module) Freezer() port.Freezer { return m.svc }

@@ -359,6 +359,24 @@ func (p CNTSPort) UnknownFacilities(ctx context.Context, refs []uuid.UUID) ([]uu
 	return out, nil
 }
 
+// FacilityCommunes thực hiện port.CNTSCatalogs.
+func (p CNTSPort) FacilityCommunes(ctx context.Context, refs []uuid.UUID, on time.Time) (map[uuid.UUID]string, error) {
+	out := map[uuid.UUID]string{}
+	if len(refs) == 0 {
+		return out, nil
+	}
+	fs, err := p.FacilitiesAt(ctx, on, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range fs {
+		if slices.Contains(refs, f.Ref) {
+			out[f.Ref] = f.CommuneCode
+		}
+	}
+	return out, nil
+}
+
 // ScheduleAt thực hiện port.CNTSCatalogs.
 func (p CNTSPort) ScheduleAt(ctx context.Context, code string, on time.Time) (port.VaccinationSchedule, error) {
 	it, err := p.itemAt(ctx, port.CatalogCNTSVaccinationSchedule, code, on)
