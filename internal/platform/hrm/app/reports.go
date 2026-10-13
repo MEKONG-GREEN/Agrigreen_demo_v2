@@ -80,11 +80,18 @@ type population struct {
 	cat    domain.Catalog
 	rank   func(string) int
 	ret    domain.RetirementAges
+	known  time.Time // thời điểm biết: known đã cho, hoặc đồng hồ DB lúc nạp (khớp recorded_at của sổ)
 }
 
 func (s *Service) loadPopulation(ctx context.Context, c rc, asOf time.Time, known *time.Time) (population, error) {
 	pop := population{events: map[uuid.UUID][]domain.Event{}, cat: domain.Catalog{Items: map[domain.Kind]map[string]domain.CatItem{}}}
 	err := s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
+		if known != nil {
+			pop.known = *known
+		} else if err := tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&pop.known); err != nil {
+			return err
+		}
+		known := &pop.known
 		var err error
 		if pop.heads, err = store.CurrentStaffKnown(ctx, tx, known); err != nil {
 			return err
@@ -94,7 +101,7 @@ func (s *Service) loadPopulation(ctx context.Context, c rc, asOf time.Time, know
 			return err
 		}
 		for _, e := range evs {
-			if known == nil || !e.RecordedAt.After(*known) {
+			if !e.RecordedAt.After(*known) {
 				pop.events[e.StaffID] = append(pop.events[e.StaffID], e.Event)
 			}
 		}
@@ -229,6 +236,7 @@ type builtReport struct {
 	snaps   map[uuid.UUID]domain.Snapshot
 	cat     domain.Catalog
 	byActor map[uuid.UUID]uuid.UUID // tài khoản → hồ sơ (tên người xuất ở chân trang)
+	known   time.Time
 }
 
 // buildReport dựng biểu tại ngày chốt asOf theo thời điểm biết known (nil = hiện tại). extra: hồ sơ cần thêm họ tên
@@ -240,7 +248,7 @@ func (s *Service) buildReport(ctx context.Context, c rc, meta domain.ReportMeta,
 		return builtReport{}, err
 	}
 	b := builtReport{meta: meta, people: map[uuid.UUID]domain.Person{}, heads: map[uuid.UUID]store.StaffRow{},
-		snaps: map[uuid.UUID]domain.Snapshot{}, cat: pop.cat, byActor: map[uuid.UUID]uuid.UUID{}}
+		snaps: map[uuid.UUID]domain.Snapshot{}, cat: pop.cat, byActor: map[uuid.UUID]uuid.UUID{}, known: pop.known}
 	prevAsOf := domain.PeriodStart(domain.PeriodMonth, asOf).AddDate(0, 0, -1)
 	from := domain.PeriodStart(domain.PeriodMonth, asOf)
 	in := domain.BuildInput{AsOf: asOf, Period: meta.Period, Cat: pop.cat, PrevAsOf: prevAsOf, Retirement: pop.ret}
@@ -538,8 +546,7 @@ func (s *Service) ExportReport(ctx context.Context, code string, in ExportInput,
 	if day.After(s.day(time.Time{})) {
 		return ExportResult{}, problem.Validation.WithField("as_of", "ngày chốt sau hôm nay")
 	}
-	known := s.Clock.Now().UTC().Truncate(time.Microsecond)
-	b, err := s.buildReport(ctx, c, meta, day, &known, in.extra(), c.ref)
+	b, err := s.buildReport(ctx, c, meta, day, nil, in.extra(), c.ref)
 	if err != nil {
 		return ExportResult{}, err
 	}
@@ -552,6 +559,7 @@ func (s *Service) ExportReport(ctx context.Context, code string, in ExportInput,
 	if b.table.Blocked() {
 		return ExportResult{View: v}, port.ErrReportBlocked.WithDetail(blockedDetail(b.table))
 	}
+	known := b.known.UTC()
 	data, file, err := s.render(b, in, c.ref, known)
 	if err != nil {
 		return ExportResult{}, err

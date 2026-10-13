@@ -211,7 +211,7 @@ func (c Catalog) UnitName(code string) string {
 		return "Chưa xếp đơn vị"
 	}
 	for _, u := range c.Units {
-		if u.Code == code {
+		if u.Code == code && u.Name != "" {
 			return u.Name
 		}
 	}
