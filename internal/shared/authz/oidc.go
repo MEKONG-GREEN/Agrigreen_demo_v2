@@ -55,7 +55,11 @@ type claims struct {
 //	AG_MFA_STRONG_FACTORS  yếu tố thứ hai cho vai nhạy cảm (mặc định otp,mfa,hwk,swk)
 //	AG_MFA_STRONG_ROLES    vai nhạy cảm (mặc định platform_admin,vault_registrar,
 //	                       vault_evidence_viewer,vault_eraser)
+//	AG_MFA_DISABLED        1 = coi mọi phiên là đã qua yếu tố thứ hai — CHỈ cho demo/dev; bị từ chối
+//	                       khi AG_ENV=production (MFAPolicyFromEnv)
 type MFAPolicy struct {
+	// Disabled bỏ kiểm yếu tố thứ hai (Principal.MFA luôn true). Chỉ môi trường demo.
+	Disabled bool
 	Factors       []string // vai thường
 	StrongFactors []string // khi người gọi có ít nhất một vai trong StrongRoles
 	StrongRoles   []string
@@ -66,6 +70,7 @@ const (
 	EnvMFAFactors       = "AG_MFA_FACTORS"
 	EnvMFAStrongFactors = "AG_MFA_STRONG_FACTORS"
 	EnvMFAStrongRoles   = "AG_MFA_STRONG_ROLES"
+	EnvMFADisabled      = "AG_MFA_DISABLED"
 )
 
 // DefaultMFAPolicy: sms chỉ được tính cho vai thường. Tên vai kho định danh lặp lại
@@ -82,6 +87,12 @@ func DefaultMFAPolicy() MFAPolicy {
 // sách đặt ra nhưng rỗng (vd ",") bị từ chối để không vô tình tắt MFA.
 func MFAPolicyFromEnv(getenv func(string) string) (MFAPolicy, error) {
 	p := DefaultMFAPolicy()
+	if v := strings.TrimSpace(getenv(EnvMFADisabled)); v == "1" || strings.EqualFold(v, "true") {
+		if e := strings.ToLower(strings.TrimSpace(getenv("AG_ENV"))); e == "production" || e == "prod" {
+			return MFAPolicy{}, fmt.Errorf("authz: %s không được bật khi AG_ENV=production", EnvMFADisabled)
+		}
+		p.Disabled = true
+	}
 	for _, f := range []struct {
 		env string
 		dst *[]string
@@ -112,6 +123,9 @@ func (v *Verifier) WithMFAPolicy(p MFAPolicy) *Verifier {
 
 // satisfied cho biết amr có yếu tố thứ hai hợp lệ với tập vai roles.
 func (p MFAPolicy) satisfied(amr, roles []string) bool {
+	if p.Disabled {
+		return true
+	}
 	factors := p.Factors
 	for _, r := range roles {
 		if slices.Contains(p.StrongRoles, r) {

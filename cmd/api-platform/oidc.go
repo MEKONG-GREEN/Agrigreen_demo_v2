@@ -17,9 +17,19 @@ import (
 // thấy) khác địa chỉ nội bộ container gọi được (http://keycloak:8080/...).
 // Khóa tải lười khi có token đầu tiên, nên Keycloak chưa sẵn sàng không làm hỏng
 // khởi động.
+//
+// Chính sách yếu tố thứ hai đọc từ AG_MFA_* (authz.MFAPolicyFromEnv); AG_MFA_DISABLED=1 chỉ dành cho demo.
 func verifierFromEnv(ctx context.Context, issuer, audience string) (*authz.Verifier, error) {
-	if jwks := os.Getenv("AG_OIDC_JWKS_URL"); jwks != "" {
-		return authz.NewVerifierWithKeys(issuer, audience, oidc.NewRemoteKeySet(context.WithoutCancel(ctx), jwks)), nil
+	policy, err := authz.MFAPolicyFromEnv(os.Getenv)
+	if err != nil {
+		return nil, err
 	}
-	return authz.NewVerifier(ctx, issuer, audience)
+	if jwks := os.Getenv("AG_OIDC_JWKS_URL"); jwks != "" {
+		return authz.NewVerifierWithKeys(issuer, audience, oidc.NewRemoteKeySet(context.WithoutCancel(ctx), jwks)).WithMFAPolicy(policy), nil
+	}
+	v, err := authz.NewVerifier(ctx, issuer, audience)
+	if err != nil {
+		return nil, err
+	}
+	return v.WithMFAPolicy(policy), nil
 }
