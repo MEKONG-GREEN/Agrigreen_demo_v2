@@ -74,6 +74,14 @@ interface Period {
 const TEMPLATES = new Map<string, Tpl>();
 const PERIODS: Period[] = [];
 
+/** W11.44: kỳ đã phát hành (chưa hủy) kèm bài cuối từng đơn vị — giả lập tổng hợp BM-02, BM-18 đọc. */
+export function cntsPeriodFigures(code: string) {
+  return PERIODS.filter((p) => p.code === code && p.status !== "cancelled").map((p) => ({
+    id: p.id, key: p.key, from: p.from, to: p.to, status: p.status, units: p.units, parents: p.parents,
+    last: new Map([...p.subs].map(([u, l]) => [u, l.at(-1)!] as const)),
+  }));
+}
+
 /** Xóa trạng thái (kiểm thử). */
 export function resetCntsPeriods() {
   TEMPLATES.clear();

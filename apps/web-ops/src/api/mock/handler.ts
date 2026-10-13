@@ -61,6 +61,7 @@ import { khtcRoutes } from "./kn-khtc";
 import { priceBoardRoutes } from "./kn-price-boards";
 import { priceReportRoutes } from "./kn-price-reports";
 import { priceTicketRoutes } from "./kn-price-tickets";
+import { cntsAggregateRoutes } from "./kn-cnts-aggregate";
 import { cntsPeriodRoutes } from "./kn-cnts-periods";
 import { khtcPeriodRoutes } from "./kn-khtc-periods";
 import { cntsOutbreakRoutes } from "./kn-cnts-outbreak";
@@ -154,6 +155,7 @@ const appRoutes: Route[] = [
   ...khtcRoutes, // W11.61 Danh mục KHTC, CT/DA, Kế hoạch năm (/v1/kn/khtc/*)
   ...priceTicketRoutes, // W11.75 phiếu báo giá + xác minh
   ...cntsPeriodRoutes, // W11.42 biểu kỳ Cấp Xã CNTS (/v1/extension/cnts/*, /v1/forms/* profile kn_cnts)
+  ...cntsAggregateRoutes, // W11.44 tổng hợp CNTS Cấp Tỉnh (/v1/extension/cnts/bm02|bm18|aggregates|shares)
   ...khtcPeriodRoutes, // W11.62 Kỳ KHTC (/v1/extension/khtc/*)
   ...cntsOutbreakRoutes, // W11.49 Báo cáo dịch bệnh BM-10, báo nghi dịch (/v1/extension/cnts/outbreaks*, /suspects*)
   ...khtcSourceRoutes, // W11.64 Cập nhật số liệu (/v1/extension/khtc/periods/{id}/sources*)

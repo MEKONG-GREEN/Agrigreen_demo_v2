@@ -226,6 +226,8 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       soon("tinh.cnts.duyet_bao_cao", "Duyệt báo cáo", "/kn/cnts/duyet-bao-cao", "approve"),
       { key: "tinh.cnts.bieu_mau", label: "Biểu mẫu & cấp quyền", route: "/kn/cnts/bieu-mau", icon: "table" }, // W11.42
       { key: "tinh.cnts.dich_benh", label: "Báo cáo dịch bệnh", route: "/kn/cnts/dich-benh", icon: "shield" }, // W11.49
+      { key: "tinh.cnts.ksgm", label: "KSGM tuần, tháng", route: "/kn/cnts/ksgm", icon: "chart" }, // W11.44
+      { key: "tinh.cnts.phu_luc_2", label: "Thủy sản (Phụ lục 2)", route: "/kn/cnts/phu-luc-2", icon: "report" }, // W11.44
       soon("tinh.cnts.lich", "Lịch trực KSGM & lịch tiêm", "/kn/cnts/lich", "calendar"),
       soon("tinh.cnts.chien_dich", "Chiến dịch điều tra", "/kn/cnts/chien-dich", "megaphone"),
       soon("tinh.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),

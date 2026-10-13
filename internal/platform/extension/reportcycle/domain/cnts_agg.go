@@ -51,7 +51,10 @@ const (
 )
 
 // Key là một cột số (khóa, nhãn).
-type Key struct{ Key, Label string }
+type Key struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+}
 
 // KSGMSpecies là loài của BM-01 (thứ tự cột theo mẫu BCSLKSGM: Trâu bò, Heo, Gia cầm, Dê — KS-06…09).
 var KSGMSpecies = []Key{{"trau_bo", "Trâu bò"}, {"heo", "Heo"}, {"gia_cam", "Gia cầm"}, {"de", "Dê"}}

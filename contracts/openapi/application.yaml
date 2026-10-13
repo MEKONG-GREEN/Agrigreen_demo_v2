@@ -7728,6 +7728,217 @@ paths:
         "404": {description: extension.cnts_suspect_not_found, $ref: "#/components/responses/Problem"}
         "409": {description: "extension.cnts_suspect_version_conflict | extension.cnts_suspect_resolved", $ref: "#/components/responses/Problem"}
         "422": {description: "validation_failed | extension.cnts_suspect_invalid", $ref: "#/components/responses/Problem"}
+  # --- W11.44: tổng hợp CNTS Cấp Tỉnh — BM-02 KSGM tuần/tháng (+ dòng điều chỉnh chỉ ghi thêm), BM-18 Phụ lục 2 (khai
+  # thác BM-17 + nuôi trồng, lũy kế quý/năm), chốt/mở lại bảng tổng hợp (số công bố pf_extension_pub.v1_cnts_closed_figures
+  # cho KHTC — D17, D18), phiên bản tệp chia sẻ Chi cục (Excel). Cấp Tỉnh CNTS ghi; Cấp Quốc gia/Admin xem (truyền province). ---
+  /v1/extension/cnts/bm02:
+    get:
+      summary: BM-02 — KSGM theo cơ sở của một tuần KSGM (YYYY-MM-Kn) hoặc tháng (YYYY-MM) = tổng BM-01 + dòng điều chỉnh
+      operationId: extensionCntsBM02
+      tags: [extension]
+      parameters:
+        - {name: province, in: query, schema: {type: string}, description: "Mã tỉnh (chỉ Cấp Quốc gia/Admin)"}
+        - {name: period_type, in: query, schema: {type: string, enum: [ksgm_week, month]}}
+        - {name: key, in: query, schema: {type: string}, description: "2026-10-K2 | 2026-10; rỗng = tuần KSGM/tháng hiện tại"}
+        - {name: basis, in: query, schema: {type: string, enum: [submitted, closed]}, description: "Số đã gửi (mặc định) hoặc số đã chốt (ảnh chụp nguồn)"}
+      responses:
+        "200":
+          description: Bảng BM-02
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsBM02"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm02/adjustments:
+    post:
+      summary: Thêm dòng điều chỉnh BM-02 cho một cơ sở × một tuần KSGM (cộng/trừ, lý do 10–500 ký tự; chỉ ghi thêm)
+      operationId: extensionCntsBM02Adjust
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [week_key, facility_ref, deltas, reason]
+              properties:
+                week_key: {type: string, description: "Tuần KSGM YYYY-MM-Kn"}
+                facility_ref: {type: string, format: uuid}
+                deltas: {type: object, additionalProperties: {type: string}, description: "Loài (trau_bo, heo, gia_cam, de) → số thập phân, có thể âm"}
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Dòng điều chỉnh đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsAdjustment"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "409": {description: extension.cnts_aggregate_closed, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm18:
+    get:
+      summary: BM-18 Phụ lục 2 phần III — khai thác (tự cộng BM-17 theo xã) + nuôi trồng theo đối tượng; Tuần trước liền kề, Trong kỳ, Lũy kế quý, Lũy kế năm
+      operationId: extensionCntsBM18
+      tags: [extension]
+      parameters:
+        - {name: province, in: query, schema: {type: string}, description: "Mã tỉnh (chỉ Cấp Quốc gia/Admin)"}
+        - {name: week, in: query, schema: {type: string}, description: "Tuần CNTS YYYY-Www (Thứ Ba – Thứ Hai, D8); rỗng = tuần hiện tại"}
+        - {name: basis, in: query, schema: {type: string, enum: [submitted, closed]}}
+      responses:
+        "200":
+          description: Phụ lục 2
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsBM18"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm18/aquaculture:
+    post:
+      summary: Ghi số nuôi trồng của tuần theo đối tượng (dòng mới thay dòng trước; tuần BM-18 đã chốt → 409)
+      operationId: extensionCntsBM18Aquaculture
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [week, entries]
+              properties:
+                week: {type: string}
+                entries:
+                  type: array
+                  items:
+                    type: object
+                    required: [object]
+                    properties:
+                      object: {type: string, description: "Mã đối tượng (danh sách cnts.bm18_objects/v1)"}
+                      area: {type: [string, "null"], description: "Diện tích (ha) hoặc số lồng trong tuần"}
+                      output: {type: [string, "null"], description: "Sản lượng (tấn; ngọc trai: 1.000 viên) trong tuần"}
+                      note: {type: string}
+      responses:
+        "200":
+          description: Phụ lục 2 sau khi ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsBM18"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "409": {description: extension.cnts_aggregate_closed, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/aggregates/close:
+    post:
+      summary: Chốt bảng tổng hợp của một tuần (BM-02 tuần KSGM, BM-18 tuần CNTS) — mọi kỳ nguồn của tuần phải đã chốt (D17); số công bố đóng băng
+      operationId: extensionCntsAggregateClose
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CntsAggregateAction"}
+      responses:
+        "200":
+          description: Trạng thái chốt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsAggregateState"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_aggregate_sources_open | extension.cnts_aggregate_state", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/aggregates/reopen:
+    post:
+      summary: Mở lại bảng tổng hợp đã chốt (lý do 10–500 ký tự) — số đã công bố giữ tới lần chốt lại
+      operationId: extensionCntsAggregateReopen
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CntsAggregateAction"}
+      responses:
+        "200":
+          description: Trạng thái chốt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsAggregateState"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "409": {description: extension.cnts_aggregate_state, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/shares:
+    get:
+      summary: Phiên bản tệp chia sẻ Chi cục của một bảng
+      operationId: extensionCntsShares
+      tags: [extension]
+      parameters:
+        - {name: province, in: query, schema: {type: string}}
+        - {name: form, in: query, required: true, schema: {type: string, enum: [CNTS-BM02, CNTS-BM18]}}
+        - {name: period_type, in: query, required: true, schema: {type: string, enum: [ksgm_week, month, week]}}
+        - {name: key, in: query, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách (cũ trước)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CntsShare"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo phiên bản tệp chia sẻ Chi cục (số không đổi so với phiên bản cuối → trả phiên bản cuối, 200)
+      operationId: extensionCntsShareCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [form, period_type, period_key]
+              properties:
+                form: {type: string, enum: [CNTS-BM02, CNTS-BM18]}
+                period_type: {type: string, enum: [ksgm_week, month, week]}
+                period_key: {type: string}
+      responses:
+        "201":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsShareResult"}
+        "200":
+          description: Số không đổi — phiên bản cuối
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsShareResult"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/shares/{id}/xlsx:
+    get:
+      summary: Tải tệp Excel của một phiên bản (dựng lại từ nội dung đã lưu; BM-18 gồm sheet TỔNG = Phụ lục 2 và 4 sheet khai thác theo xã × tuần)
+      operationId: extensionCntsShareFile
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_share_not_found, $ref: "#/components/responses/Problem"}
   # --- pf/forms (cap/forms, W6.2): biểu thu thập theo kỳ — phát hành, nộp, rà soát bốn mắt, chốt kèm ảnh chụp đóng băng, mở lại.
   # Bên dùng chọn bằng query `profile` (KN: kn). Route v1 cũ của KN (/v1/extension/report-*) chạy song song và ghi song song
   # chốt/mở lại kỳ + ảnh chụp sang pf_forms (origin = mirror). Ngữ cảnh KN: header X-AG-Context như các route KN khác.
@@ -16646,6 +16857,213 @@ components:
       properties:
         current: {$ref: "#/components/schemas/CNTSSuspect"}
         versions: {type: array, items: {$ref: "#/components/schemas/CNTSSuspect"}}
+    # --- W11.44: tổng hợp CNTS Cấp Tỉnh ---
+    CntsKeySpan:
+      type: object
+      required: [key, label, from, to]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+    CntsKeyLabel:
+      type: object
+      required: [key, label]
+      properties:
+        key: {type: string}
+        label: {type: string}
+    CntsDecMap:
+      type: object
+      additionalProperties: {type: string}
+      description: Khóa → số thập phân (chuỗi)
+    CntsSources:
+      type: object
+      required: [count, closed, all_closed]
+      properties:
+        count: {type: integer}
+        closed: {type: integer}
+        all_closed: {type: boolean, description: "Mọi kỳ nguồn của tuần đã chốt (D17) — điều kiện chốt bảng"}
+    CntsAggregateAction:
+      type: object
+      required: [form, period_key]
+      properties:
+        form: {type: string, enum: [CNTS-BM02, CNTS-BM18]}
+        period_key: {type: string, description: "BM-02: tuần KSGM YYYY-MM-Kn; BM-18: tuần CNTS YYYY-Www"}
+        reason: {type: string, description: "Bắt buộc khi mở lại (10–500 ký tự)"}
+    CntsAggregateState:
+      type: object
+      required: [key, state, close_count, last_at, figures_hash, changed]
+      properties:
+        key: {type: string}
+        state: {type: string, enum: [none, closed, reopened]}
+        close_count: {type: integer}
+        last_at: {type: [string, "null"], format: date-time}
+        figures_hash: {type: [string, "null"]}
+        changed: {type: boolean, description: "Số tính lại từ ảnh chụp nguồn khác số đã chốt — Nguồn đã thay đổi"}
+    CntsShare:
+      type: object
+      required: [id, version, at, basis, recipient, channel, note, content_hash, actor_name]
+      properties:
+        id: {type: string, format: uuid}
+        version: {type: integer}
+        at: {type: string, format: date-time}
+        basis: {type: string, enum: [submitted, closed]}
+        recipient: {type: string}
+        channel: {type: string}
+        note: {type: string, description: "Thay đổi so với bản đã gửi ngày … (phiên bản n)"}
+        content_hash: {type: string}
+        actor_name: {type: string}
+    CntsShareResult:
+      type: object
+      required: [share, replayed]
+      properties:
+        share: {$ref: "#/components/schemas/CntsShare"}
+        replayed: {type: boolean}
+    CntsAdjustment:
+      type: object
+      required: [id, week_key, facility_ref, facility_name, commune_code, deltas, reason, actor_name, at, stale]
+      properties:
+        id: {type: string, format: uuid}
+        week_key: {type: string}
+        facility_ref: {type: string}
+        facility_name: {type: string}
+        commune_code: {type: string}
+        deltas: {$ref: "#/components/schemas/CntsDecMap"}
+        reason: {type: string}
+        actor_name: {type: string}
+        at: {type: string, format: date-time}
+        stale: {type: boolean, description: "BM-01 của tuần đổi sau khi điều chỉnh — cần xem lại"}
+    CntsBM02Row:
+      type: object
+      required: [facility_ref, facility_code, facility_name, facility_kind, stamps_gs, stamps_gc, commune_code, commune_name, auto, adjust, total,
+        days_expected, days_reported, missing_days, stale]
+      properties:
+        facility_ref: {type: string}
+        facility_code: {type: string}
+        facility_name: {type: string}
+        facility_kind: {type: string}
+        stamps_gs: {type: array, items: {type: string}}
+        stamps_gc: {type: array, items: {type: string}}
+        commune_code: {type: string}
+        commune_name: {type: string}
+        auto: {$ref: "#/components/schemas/CntsDecMap"}
+        adjust: {$ref: "#/components/schemas/CntsDecMap"}
+        total: {$ref: "#/components/schemas/CntsDecMap"}
+        days_expected: {type: integer}
+        days_reported: {type: integer}
+        missing_days: {type: integer}
+        stale: {type: boolean}
+    CntsBM02Commune:
+      type: object
+      required: [commune_code, commune_name, total, facilities]
+      properties:
+        commune_code: {type: string}
+        commune_name: {type: string}
+        total: {$ref: "#/components/schemas/CntsDecMap"}
+        facilities: {type: integer}
+    CntsBM02:
+      type: object
+      required: [province, period_type, period_key, label, from, to, prev_key, next_key, basis, weeks, species, rows, communes, auto, adjust, total,
+        sources, units_total, units_reported, adjustments, aggregates, shares]
+      properties:
+        province: {type: string}
+        period_type: {type: string, enum: [ksgm_week, month]}
+        period_key: {type: string}
+        label: {type: string}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        prev_key: {type: string}
+        next_key: {type: string}
+        basis: {type: string, enum: [submitted, closed]}
+        weeks: {type: array, items: {$ref: "#/components/schemas/CntsKeySpan"}}
+        species: {type: array, items: {$ref: "#/components/schemas/CntsKeyLabel"}}
+        rows: {type: array, items: {$ref: "#/components/schemas/CntsBM02Row"}}
+        communes: {type: array, items: {$ref: "#/components/schemas/CntsBM02Commune"}}
+        auto: {$ref: "#/components/schemas/CntsDecMap"}
+        adjust: {$ref: "#/components/schemas/CntsDecMap"}
+        total: {$ref: "#/components/schemas/CntsDecMap"}
+        sources: {$ref: "#/components/schemas/CntsSources"}
+        units_total: {type: integer}
+        units_reported: {type: integer}
+        adjustments: {type: array, items: {$ref: "#/components/schemas/CntsAdjustment"}}
+        aggregates: {type: array, items: {$ref: "#/components/schemas/CntsAggregateState"}}
+        shares: {type: array, items: {$ref: "#/components/schemas/CntsShare"}}
+    CntsCols:
+      type: object
+      required: [prev, cur, qtd, ytd]
+      properties:
+        prev: {type: string, description: Tuần trước liền kề}
+        cur: {type: string, description: Trong kỳ báo cáo}
+        qtd: {type: string, description: Lũy kế từ đầu quý (theo ngày cuối tuần)}
+        ytd: {type: string, description: Lũy kế từ đầu năm (theo ngày cuối tuần)}
+    CntsColsMap:
+      type: object
+      additionalProperties: {$ref: "#/components/schemas/CntsCols"}
+    CntsBM18Commune:
+      type: object
+      required: [commune_code, commune_name, region_code, region_name, cells, expected, reported, nil_report, missing_weeks, by_week]
+      properties:
+        commune_code: {type: string}
+        commune_name: {type: string}
+        region_code: {type: string}
+        region_name: {type: string}
+        cells: {$ref: "#/components/schemas/CntsColsMap"}
+        expected: {type: boolean}
+        reported: {type: boolean}
+        nil_report: {type: boolean}
+        missing_weeks: {type: array, items: {type: string}, description: "Thiếu kỳ (tuần trong năm có kỳ mà xã không nộp — tính 0)"}
+        by_week: {type: object, additionalProperties: {$ref: "#/components/schemas/CntsDecMap"}}
+    CntsBM18Region:
+      type: object
+      required: [region_code, region_name, sort, cells]
+      properties:
+        region_code: {type: string}
+        region_name: {type: string}
+        sort: {type: integer}
+        cells: {$ref: "#/components/schemas/CntsColsMap"}
+    CntsBM18Aqua:
+      type: object
+      required: [code, label, group, area_unit, output_unit, in_total, area, output, entered_area, entered_output, note]
+      properties:
+        code: {type: string}
+        label: {type: string}
+        group: {type: string}
+        area_unit: {type: string}
+        output_unit: {type: string}
+        in_total: {type: boolean}
+        area: {$ref: "#/components/schemas/CntsCols"}
+        output: {$ref: "#/components/schemas/CntsCols"}
+        entered_area: {type: [string, "null"]}
+        entered_output: {type: [string, "null"]}
+        note: {type: string}
+    CntsBM18:
+      type: object
+      required: [province, week, prev, prev_key, next_key, calendar, basis, groups, aqua_groups, weeks, communes, regions, catch, aqua, aqua_area,
+        aqua_output, total, sources, units_total, units_reported, missing_units, aggregate, shares]
+      properties:
+        province: {type: string}
+        week: {$ref: "#/components/schemas/CntsKeySpan"}
+        prev: {oneOf: [{$ref: "#/components/schemas/CntsKeySpan"}, {type: "null"}]}
+        prev_key: {type: string}
+        next_key: {type: string}
+        calendar: {type: string, description: "Lịch tuần (D8), vd chan_nuoi_thuy_san:v3"}
+        basis: {type: string, enum: [submitted, closed]}
+        groups: {type: array, items: {$ref: "#/components/schemas/CntsKeyLabel"}}
+        aqua_groups: {type: array, items: {$ref: "#/components/schemas/CntsKeyLabel"}}
+        weeks: {type: array, items: {$ref: "#/components/schemas/CntsKeySpan"}}
+        communes: {type: array, items: {$ref: "#/components/schemas/CntsBM18Commune"}}
+        regions: {type: array, items: {$ref: "#/components/schemas/CntsBM18Region"}}
+        catch: {$ref: "#/components/schemas/CntsColsMap"}
+        aqua: {type: array, items: {$ref: "#/components/schemas/CntsBM18Aqua"}}
+        aqua_area: {$ref: "#/components/schemas/CntsCols"}
+        aqua_output: {$ref: "#/components/schemas/CntsCols"}
+        total: {$ref: "#/components/schemas/CntsCols"}
+        sources: {$ref: "#/components/schemas/CntsSources"}
+        units_total: {type: integer}
+        units_reported: {type: integer}
+        missing_units: {type: array, items: {type: string}}
+        aggregate: {$ref: "#/components/schemas/CntsAggregateState"}
+        shares: {type: array, items: {$ref: "#/components/schemas/CntsShare"}}
     # --- pf/price (W11.71) ---
     PriceStatus:
       type: object

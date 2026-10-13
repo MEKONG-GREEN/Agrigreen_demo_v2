@@ -86,6 +86,10 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			{Key: "tinh.cnts.bieu_mau", Label: "Biểu mẫu & cấp quyền", Route: "/kn/cnts/bieu-mau", Icon: "table"},
 			// W11.49: Báo cáo dịch bệnh BM-10 — xem ổ dịch, diễn biến, tin báo nghi dịch; xác nhận kết thúc ổ dịch.
 			{Key: "tinh.cnts.dich_benh", Label: "Báo cáo dịch bệnh", Route: "/kn/cnts/dich-benh", Icon: "shield"},
+			// W11.44 (FN-16 — Báo cáo: KSGM tuần, tháng; Thủy sản (Phụ lục 2)): BM-02 + dòng điều chỉnh, BM-18 + nuôi trồng, lũy
+			// kế, chốt tuần (số công bố cho KHTC), tệp chia sẻ Chi cục có phiên bản.
+			{Key: "tinh.cnts.ksgm", Label: "KSGM tuần, tháng", Route: "/kn/cnts/ksgm", Icon: "chart"},
+			{Key: "tinh.cnts.phu_luc_2", Label: "Thủy sản (Phụ lục 2)", Route: "/kn/cnts/phu-luc-2", Icon: "report"},
 			soon("tinh.cnts.lich", "Lịch trực KSGM & lịch tiêm", "/kn/cnts/lich", "calendar"),
 			soon("tinh.cnts.chien_dich", "Chiến dịch điều tra", "/kn/cnts/chien-dich", "megaphone"),
 			soon("tinh.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
