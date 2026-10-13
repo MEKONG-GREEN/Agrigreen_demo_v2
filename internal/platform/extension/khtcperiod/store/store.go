@@ -140,7 +140,7 @@ func Events(ctx context.Context, tx pgx.Tx, periodIDs []uuid.UUID) (map[uuid.UUI
 		return out, nil
 	}
 	rows, err := tx.Query(ctx, `SELECT id, period_id, action, forced, reason, due_at, export_due_at, period_state, actor_ref, event_time, seq
-	  FROM pf_extension.khtc_period_event WHERE period_id = ANY($1) ORDER BY period_id, seq`, periodIDs)
+	  FROM pf_extension.khtc_period_event WHERE period_id = ANY($1::uuid[]) ORDER BY period_id, seq`, uuidStrings(periodIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -189,4 +189,12 @@ func Sources(ctx context.Context, tx pgx.Tx, periodID uuid.UUID) ([]Source, erro
 		err := r.Scan(&s.ID, &s.PeriodID, &s.Department, &s.Source, &s.CalendarID, &s.CalendarVersion, &s.NativeKey, &s.Label)
 		return s, err
 	})
+}
+
+func uuidStrings(xs []uuid.UUID) []string {
+	out := make([]string, len(xs))
+	for i, x := range xs {
+		out[i] = x.String()
+	}
+	return out
 }
