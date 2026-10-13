@@ -316,7 +316,7 @@ func TestKHTCPeriod_W1162(t *testing.T) {
 		}
 	})
 
-	t.Run("KH2 sửa hạn nộp: gửi sau hạn cũ, trước hạn mới không bị tính trễ; hủy kỳ, mở lại đúng kỳ đã hủy", func(t *testing.T) {
+	t.Run("KH2 sửa hạn nộp + D8: bản offline nhận sau hạn cũ, trước hạn mới không trễ; hủy kỳ, mở lại đúng kỳ đã hủy", func(t *testing.T) {
 		// Đồng hồ đang ở 01/11 08:00 (giờ VN). Tuần 45: 04/11–10/11, hạn gốc 11/11 10:00.
 		w45 := map[string]any{"report_type": "week", "year": 2026, "no": 45, "departments": []string{tt, cn}}
 		var k khtcPeriod
@@ -330,7 +330,12 @@ func TestKHTCPeriod_W1162(t *testing.T) {
 			t.Fatalf("sửa hạn: %v", k.DueAt)
 		}
 		f.clk.Advance(11 * 24 * time.Hour) // 12/11 08:00: sau hạn gốc, trước hạn mới
-		f.submit(k.FormsPeriodID, tt)
+		// Bản ghi trên thiết bị lúc 10/11 (trước hạn gốc), đồng bộ lên máy chủ 12/11 (sau hạn gốc, trước hạn mới): D8 tính trễ
+		// theo giờ máy chủ nhận bài, W11.62 so với hạn hiệu lực → không trễ.
+		c, b = f.do(http.MethodPost, "/v1/forms/periods/"+k.FormsPeriodID+"/submissions?profile=kn_khtc", authz.KNTinh, tt, uuid.Nil, "",
+			map[string]any{"unit": tt, "values": map[string]string{"ket_qua": "Bản offline"},
+				"captured_at": oldDue.Add(-24 * time.Hour).Format(time.RFC3339)})
+		f.ok(c, b, nil)
 		k = f.get(k.ID)
 		for _, fr := range k.Forms {
 			if fr.Department == tt && fr.Late {
@@ -343,8 +348,11 @@ func TestKHTCPeriod_W1162(t *testing.T) {
 		if k.State != "collecting" {
 			t.Fatalf("trước hạn mới: %s", k.State)
 		}
-		f.clk.Advance(2 * 24 * time.Hour) // 14/11 08:00: sau hạn mới → trễ
-		f.submit(k.FormsPeriodID, cn)
+		f.clk.Advance(2 * 24 * time.Hour) // 14/11 08:00: sau hạn mới → trễ, kể cả bản ghi trên thiết bị trước hạn mới (D8)
+		c, b = f.do(http.MethodPost, "/v1/forms/periods/"+k.FormsPeriodID+"/submissions?profile=kn_khtc", authz.KNTinh, cn, uuid.Nil, "",
+			map[string]any{"unit": cn, "values": map[string]string{"ket_qua": "Bản offline muộn"},
+				"captured_at": newDue.Add(-24 * time.Hour).Format(time.RFC3339)})
+		f.ok(c, b, nil)
 		for _, fr := range f.get(k.ID).Forms {
 			if fr.Department == cn && !fr.Late {
 				t.Fatalf("gửi sau hạn mới phải trễ: %+v", fr)

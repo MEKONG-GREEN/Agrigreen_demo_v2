@@ -3,8 +3,10 @@
 --   1. period_due — SỔ PHỤ (append-only, shared.apply_ledger) các lần đổi hạn nộp của một kỳ native: luồng 'due:<kỳ>',
 --      hạn mới, lý do (tùy chọn). Hạn HIỆU LỰC của kỳ = dòng cuối (seq lớn nhất), không có dòng → pf_forms.period.due_at
 --      (dòng kỳ không UPDATE — ADR-0012). Chỉ đổi khi kỳ chưa chốt và chưa hủy (sự kiện cuối published/reopened).
---   2. pf_forms.effective_due(): hạn hiệu lực; fn_bind_meta (pf 000149) tính cờ "Nộp trễ" theo hạn hiệu lực thay cho
---      period.due_at gốc — bài gửi sau hạn gốc nhưng trước hạn mới không bị đánh dấu trễ.
+--   2. pf_forms.effective_due(): hạn hiệu lực. fn_bind_meta GỘP hai quy tắc: D8 (pf 20261013091503 — trễ theo GIỜ MÁY
+--      CHỦ nhận bài, submission.event_time; captured_at của bản offline chỉ để kiểm toán) và W11.62 (so với hạn HIỆU LỰC
+--      thay cho period.due_at gốc): late = event_time > effective_due(kỳ). Bài nhận sau hạn gốc nhưng trước hạn mới
+--      (kể cả bản offline đồng bộ muộn) không bị đánh dấu trễ.
 --   3. Nguồn đồng bộ: mỗi lần đổi hạn ghi sync_feed cả kỳ ('*') để thiết bị nhận hạn mới.
 
 SET LOCAL lock_timeout = '5s';
@@ -71,7 +73,7 @@ AS $$
                     WHERE d.tenant_id = p_tenant AND d.period_id = p_period ORDER BY d.seq DESC LIMIT 1), p_base)
 $$;
 
--- fn_bind_meta (pf 000149) tính "Nộp trễ" theo hạn hiệu lực.
+-- fn_bind_meta: thân của D8 (pf 20261013091503) + hạn hiệu lực (W11.62).
 CREATE OR REPLACE FUNCTION pf_forms.fn_bind_meta() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
@@ -98,7 +100,9 @@ BEGIN
   NEW.period_id := s.period_id;
   NEW.unit_code := s.unit_code;
   NEW.profile   := s.profile;
-  NEW.late      := coalesce(NEW.captured_at, s.event_time) > v_due;
+  -- D8: trễ hạn theo giờ MÁY CHỦ nhận bài (event_time của phiên bản), không theo captured_at (giờ thiết bị —
+  -- có thể sai giờ máy hoặc bị chỉnh); captured_at vẫn lưu để kiểm toán. W11.62: so với hạn hiệu lực (sau "Sửa hạn nộp").
+  NEW.late      := s.event_time > v_due;
   RETURN NEW;
 END $$;
 
