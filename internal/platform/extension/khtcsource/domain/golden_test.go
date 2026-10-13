@@ -181,7 +181,7 @@ func cumulativeStep(t *testing.T, ds *khtcgolden.Dataset, c khtcgolden.Case, s k
 			t.Errorf("%s: closed/no_source/frozen/source_changed = %v/%v/%v/%v, cần %v/%v/%v/%v", at, v.Closed, v.NoSource, v.Frozen,
 				v.SourceChanged, e.Closed, e.NoSource, e.Frozen, e.SourceChanged)
 		}
-		if got := nativeKeys(v.SourceKeys); !slices.Equal(got, e.SourceKeys) && !(len(got) == 0 && len(e.SourceKeys) == 0) {
+		if got := nativeKeys(v.SourceKeys); !slices.Equal(got, e.SourceKeys) && (len(got) != 0 || len(e.SourceKeys) != 0) {
 			t.Errorf("%s: kỳ nguồn %v, cần %v", at, got, e.SourceKeys)
 		}
 	}
