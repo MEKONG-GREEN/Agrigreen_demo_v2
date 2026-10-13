@@ -241,3 +241,10 @@ func TestCrosswalk_GoldenKHTCQA_PFPUB(t *testing.T) {
 		}
 	}
 }
+
+// tests/kn77 (gốc lắp ráp, chỉ import port/) ghi chữ thẻ lịch CNTS của D8 — giữ khớp CNTSRule.Tag().
+func TestCNTSTagLiteral_PFPUB(t *testing.T) {
+	if got := rcdomain.CNTSRule.Tag(); got != "kn.period_rule/v2;week_start=tue;week=year;month=week_end;cal=chan_nuoi_thuy_san:v3" {
+		t.Fatalf("CNTSRule.Tag() = %s — sửa cntsRuleTag ở tests/kn77/closed_figures_pub_integration_test.go", got)
+	}
+}

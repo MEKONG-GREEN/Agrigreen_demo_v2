@@ -18,7 +18,6 @@ import (
 	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-	rcdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -45,6 +44,10 @@ type cntsFx struct {
 }
 
 const cntsDept = partyport.DeptChanNuoiThuySan
+
+// cntsRuleTag là thẻ lịch CNTS của D8 (reportcycle/domain.CNTSRule.Tag(): Thứ Ba – Thứ Hai, chan_nuoi_thuy_san:v3) —
+// gốc lắp ráp/kiểm thử chỉ import port/ (R-02) nên ghi chữ.
+const cntsRuleTag = "kn.period_rule/v2;week_start=tue;week=year;month=week_end;cal=chan_nuoi_thuy_san:v3"
 
 func setupCNTS(t *testing.T, f *fixture) *cntsFx {
 	t.Helper()
@@ -82,7 +85,7 @@ func setupCNTS(t *testing.T, f *fixture) *cntsFx {
 	  {"key":"heo_luy_ke","label":"Heo lũy kế","type":"integer"},{"key":"ty_le","label":"Tỷ lệ","type":"decimal"},
 	  {"key":"ghi_chu","label":"Ghi chú","type":"text"}]`)
 	week := []formsport.PeriodDef{{Label: "Tuần 37/2026", DueAt: f.clk.Now().Add(30 * 24 * time.Hour), Kind: "week", Key: "2026-W37",
-		From: time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC), Rule: rcdomain.CNTSRule.Tag()}}
+		From: time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC), Rule: cntsRuleTag}}
 	for _, p := range []struct {
 		code  string
 		units []string
@@ -249,7 +252,7 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 	// Danh tính lịch nguồn (D8) và quy đổi sang tuần KHTC (crosswalk v1, ADR-0052 §6): kỳ CNTS 08/09–14/09 quy vào tuần KHTC
 	// 2026-W37 (09/09 – 15/09, chứa ngày cuối 14/09) → Converted; đã chốt; Sum = số đã chốt.
 	// Kỳ CNTS theo lịch D8 Thứ Ba – Thứ Hai (08/09 – 14/09, thẻ mang cal=chan_nuoi_thuy_san:v3) → phiên bản 3.
-	if r := m["BM-T1"]; r.CalendarID != cntsDept || r.CalendarVersion == nil || *r.CalendarVersion != rcdomain.CalendarVersionCNTS || r.PeriodKey != "2026-W37" {
+	if r := m["BM-T1"]; r.CalendarID != cntsDept || r.CalendarVersion == nil || *r.CalendarVersion != 3 || r.PeriodKey != "2026-W37" {
 		t.Fatalf("danh tính lịch nguồn: %+v", r)
 	}
 	conv, err := reader.Converted(ctx, f.tenant, extport.ClosedFiguresQuery{Department: cntsDept}, extport.CrosswalkTarget{})
