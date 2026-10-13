@@ -35,6 +35,8 @@ type Service struct {
 	Access port.Access
 	// Rec: hồ sơ nhân sự (W11.22) — nil cho tới UseRecords; khi nil mọi route hồ sơ trả hrm.records_disabled.
 	Rec *Records
+	// Rep: cấu hình báo cáo Sở W11.28 (UseEgress, tiêu đề cơ quan).
+	Rep ReportsConfig
 }
 
 var _ port.Catalog = (*Service)(nil)

@@ -15,11 +15,16 @@
 // danh (định danh + ngăn hrm.profile; thẻ Thống kê BC Sở ở ngăn hrm.sensitive có khóa/mục đích riêng). Bật bằng
 // UseRecords + cờ AG_HRM_RECORDS (mặc định tắt ở production — Q-005).
 //
-// Gói sau của cùng module: W11.24 kho tài liệu, W11.25 nâng bậc, W11.26 đánh giá, W11.28
-// báo cáo Sở. Module khác chỉ import hrm/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
+// W11.28 (pf 20261013230821) — BÁO CÁO SỞ NS01–NS06 (FN-12) + DASHBOARD NHÂN SỰ (FN-06): biểu tại ngày chốt (as-of),
+// quy tắc kiểm chéo, nhấn ô xem người, sổ xuất (lịch sử + trường nhạy cảm), tệp Excel dựng lại được (SHA-256).
+//
+// Gói sau của cùng module: W11.24 kho tài liệu, W11.25 nâng bậc, W11.26 đánh giá. Module khác chỉ import hrm/port (R-02).
+// Tệp này là gốc lắp ráp cho cmd/api-platform.
 package hrm
 
 import (
+	"log/slog"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/hrm/app"
@@ -27,6 +32,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/hrm/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
@@ -51,6 +57,12 @@ func New(b tenant.Beginner, clk clock.Clock, acc port.Access) (*Module, error) {
 // hrm.records_disabled.
 func (m *Module) UseRecords(v client.Client, u port.Units, enabled bool) {
 	m.svc.UseRecords(v, u, enabled)
+}
+
+// UseEgress nối điểm kiểm soát xuất pf/metering cho lần tải tệp báo cáo Sở (W11.28, ADR-0024: kênh report_export, xuất
+// nội bộ → luôn observe). nil → không đo.
+func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
+	m.svc.Rep.Egress, m.svc.Rep.EgressMode, m.svc.Rep.Log = cp, mode, log
 }
 
 // RecordsEnabled đọc cờ bật hồ sơ (port.EnvRecords): "1" bật, "0" tắt; vắng → tắt ở production, bật ở môi trường khác.

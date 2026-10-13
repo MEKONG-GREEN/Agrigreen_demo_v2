@@ -37,6 +37,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/hrm/rules/:key", h.rule)
 	rg.POST("/hrm/rules/:key", h.addRule)
 	h.registerRecords(rg) // W11.22: hồ sơ nhân sự (records.go)
+	h.registerReports(rg) // W11.28: báo cáo Sở NS01–06, dashboard nhân sự (reports.go)
 }
 
 // decode đọc thân JSON, chặn trường lạ.

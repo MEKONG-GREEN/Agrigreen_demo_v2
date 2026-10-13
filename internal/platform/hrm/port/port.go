@@ -136,3 +136,11 @@ type DirectoryEntry struct {
 type Directory interface {
 	StaffDirectory(ctx context.Context) ([]DirectoryEntry, error)
 }
+// --- W11.28 (pf 20261013230821): báo cáo Sở NS01–NS06, dashboard nhân sự. ---
+
+// Lỗi báo cáo Sở (docs/errors/pf-hrm-reports.md).
+var (
+	ErrReportUnknown  = problem.New(http.StatusNotFound, "hrm.report_unknown", "Không có biểu báo cáo Sở này (NS01–NS06)")
+	ErrReportBlocked  = problem.New(http.StatusUnprocessableEntity, "hrm.report_blocked", "Số liệu không đạt quy tắc kiểm tra mức chặn — chưa xuất được biểu")
+	ErrExportNotFound = problem.New(http.StatusNotFound, "hrm.export_not_found", "Không có lần xuất báo cáo này")
+)
