@@ -2,7 +2,7 @@ package kn77_test
 
 // W11.44 — Tổng hợp CNTS Cấp Tỉnh trên module THẬT qua HTTP: pf/forms (kỳ native kn_cnts — BM-01, BM-17 nộp/chốt) +
 // pf/extension (/v1/extension/cnts/bm02|bm18|aggregates|shares, sổ pf 20261013170237) + view công bố
-// pf_extension_pub.v1_cnts_closed_figures (pf 20261013170238, họ closed_figures/v1 — ADR-0053) trên PostgreSQL.
+// pf_extension_pub.v1_closed_figures nhánh cnts_aggregate (pf 20261013170238, họ closed_figures/v1 — ADR-0053) và bộ đọc KHTC trên PostgreSQL.
 
 import (
 	"bytes"
@@ -21,6 +21,7 @@ import (
 
 	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -52,9 +53,10 @@ func (f facilityDir) FacilityCommunes(_ context.Context, refs []uuid.UUID, _ tim
 	return out, nil
 }
 
-type cntsFx struct {
+type aggFx struct {
 	*khtcFx
 	admin *pgtestAdmin
+	kn    *extension.Module
 }
 
 type pgtestAdmin struct {
@@ -62,11 +64,11 @@ type pgtestAdmin struct {
 	exec  func(sql string) error
 }
 
-func (f *cntsFx) adminExec(sql string) (struct{}, error) { return struct{}{}, f.admin.exec(sql) }
+func (f *aggFx) adminExec(sql string) (struct{}, error) { return struct{}{}, f.admin.exec(sql) }
 
-const cntsDept = partyport.DeptChanNuoiThuySan
+const aggDept = partyport.DeptChanNuoiThuySan
 
-func newCNTSFx(t *testing.T, facs facilityDir) *cntsFx {
+func newAggFx(t *testing.T, facs facilityDir) *aggFx {
 	env := pgtest.Get(t)
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	ops := env.Pool(t, migrations.PF, "platform_api")
@@ -120,16 +122,16 @@ func newCNTSFx(t *testing.T, facs facilityDir) *cntsFx {
 		_, err := adm.Exec(context.Background(), sql)
 		return err
 	}
-	return &cntsFx{khtcFx: f, admin: &pgtestAdmin{query: q, exec: ex}}
+	return &aggFx{khtcFx: f, admin: &pgtestAdmin{query: q, exec: ex}, kn: kn}
 }
 
 // call gọi API với phiên Cấp Tỉnh/Xã CNTS (phạm vi X1, X2) hoặc Admin.
-func (f *cntsFx) call(method, path, role string, body any) (int, []byte) {
+func (f *aggFx) call(method, path, role string, body any) (int, []byte) {
 	f.t.Helper()
 	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(method, path, bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
-	k := authz.KNContext{Role: role, Department: cntsDept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1", "X2"}}}
+	k := authz.KNContext{Role: role, Department: aggDept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1", "X2"}}}
 	if role == authz.KNAdmin {
 		k = authz.KNContext{Role: role, Scope: authz.Scope{All: true}}
 	}
@@ -154,7 +156,7 @@ type series struct {
 	} `json:"periods"`
 }
 
-func (f *cntsFx) publish(code, from, to string, units ...string) series {
+func (f *aggFx) publish(code, from, to string, units ...string) series {
 	var s series
 	c, b := f.call(http.MethodPost, "/v1/extension/cnts/period-series", authz.KNTinh, map[string]any{"code": code, "from_date": from,
 		"to_date": to, "units": units})
@@ -162,13 +164,13 @@ func (f *cntsFx) publish(code, from, to string, units ...string) series {
 	return s
 }
 
-func (f *cntsFx) submit(pid, unit string, values map[string]string) {
+func (f *aggFx) submit(pid, unit string, values map[string]string) {
 	c, b := f.call(http.MethodPost, "/v1/forms/periods/"+pid+"/submissions?profile=kn_cnts", authz.KNXa, map[string]any{"unit": unit,
 		"values": values, "explanation": "Gửi bổ sung sau hạn do mất mạng"})
 	f.ok(c, b, nil)
 }
 
-func (f *cntsFx) closePeriod(pid string) {
+func (f *aggFx) closePeriod(pid string) {
 	c, b := f.call(http.MethodPost, "/v1/forms/periods/"+pid+"/close?profile=kn_cnts", authz.KNTinh, nil)
 	f.ok(c, b, nil)
 }
@@ -204,7 +206,7 @@ func catchVals(ca, tom, muc, khac string) map[string]string {
 }
 
 func TestCNTSAggregate_BM18_PL2_CloseShare_W1144(t *testing.T) {
-	f := newCNTSFx(t, facilityDir{})
+	f := newAggFx(t, facilityDir{})
 	c, b := f.call(http.MethodPost, "/v1/extension/cnts/period-forms/install", authz.KNAdmin, nil)
 	f.ok(c, b, nil)
 	// BM-17 tuần 39 (22/09–28/09, quý III) và 40 (29/09–05/10, ngày cuối thuộc quý IV) cho X1, X2.
@@ -264,7 +266,7 @@ func TestCNTSAggregate_BM18_PL2_CloseShare_W1144(t *testing.T) {
 		    (SELECT sum((r->'cells'->>'tong_san_luong')::numeric) FROM jsonb_array_elements(rows) r)::text,
 		    (SELECT sum((r->'cells'->>'tong_san_luong_luy_ke_nam')::numeric) FROM jsonb_array_elements(rows) r)::text,
 		    (SELECT count(*) FROM jsonb_array_elements(rows) r WHERE r->>'confirmation' = 'confirmed'), source_module, figures_hash
-		  FROM pf_extension_pub.v1_cnts_closed_figures WHERE tenant_id = $1 AND form_code = 'CNTS-BM18' AND period_key = '2026-W40'`, f.tid)
+		  FROM pf_extension_pub.v1_closed_figures WHERE tenant_id = $1 AND source = 'cnts_aggregate' AND form_code = 'CNTS-BM18' AND period_key = '2026-W40'`, f.tid)
 		if len(rows) != 1 {
 			t.Fatalf("view: %v", rows)
 		}
@@ -275,6 +277,15 @@ func TestCNTSAggregate_BM18_PL2_CloseShare_W1144(t *testing.T) {
 		}
 		if r[7] != "12.25" || r[8] != "18.75" {
 			t.Fatalf("Σ tổng sản lượng (kỳ, lũy kế năm): %v %v", r[7], r[8])
+		}
+		// Bộ đọc KHTC (PFPUB — ClosedFigures/KHTCSources) thấy bảng tổng hợp qua cùng họ closed_figures/v1, không đổi mã.
+		figs, err := f.kn.ClosedFigures().ClosedFigures(context.Background(), f.tid, extport.ClosedFiguresQuery{
+			Department: aggDept, PeriodType: "week", PeriodKeys: []string{"2026-W40"}, FormCodes: []string{"CNTS-BM18"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(figs) != 1 || figs[0].Source != "cnts_aggregate" || !figs[0].FormClosed || !bytes.Contains(figs[0].Rows, []byte(`"tong_san_luong_luy_ke_nam"`)) {
+			t.Fatalf("bộ đọc KHTC: %+v", figs)
 		}
 		// Bảng đã chốt: nhập nuôi trồng bị chặn.
 		c, b = f.call(http.MethodPost, "/v1/extension/cnts/bm18/aquaculture", authz.KNTinh, map[string]any{"week": "2026-W40",
@@ -288,7 +299,7 @@ func TestCNTSAggregate_BM18_PL2_CloseShare_W1144(t *testing.T) {
 		c, b := f.call(http.MethodPost, "/v1/extension/cnts/aggregates/reopen", authz.KNTinh, map[string]any{"form": "CNTS-BM18",
 			"period_key": "2026-W40", "reason": "Bổ sung số cá tra tuần 40"})
 		f.ok(c, b, nil)
-		rows := f.admin.query(`SELECT form_closed, snapshot_no FROM pf_extension_pub.v1_cnts_closed_figures WHERE tenant_id = $1`, f.tid)
+		rows := f.admin.query(`SELECT form_closed, snapshot_no FROM pf_extension_pub.v1_closed_figures WHERE tenant_id = $1 AND source = 'cnts_aggregate'`, f.tid)
 		if len(rows) != 1 || rows[0][0] != false || rows[0][1] != int64(1) {
 			t.Fatalf("mở lại: %v", rows)
 		}
@@ -297,7 +308,7 @@ func TestCNTSAggregate_BM18_PL2_CloseShare_W1144(t *testing.T) {
 		f.ok(c, b, nil)
 		c, b = f.call(http.MethodPost, "/v1/extension/cnts/aggregates/close", authz.KNTinh, map[string]any{"form": "CNTS-BM18", "period_key": "2026-W40"})
 		f.ok(c, b, nil)
-		rows = f.admin.query(`SELECT form_closed, snapshot_no FROM pf_extension_pub.v1_cnts_closed_figures WHERE tenant_id = $1`, f.tid)
+		rows = f.admin.query(`SELECT form_closed, snapshot_no FROM pf_extension_pub.v1_closed_figures WHERE tenant_id = $1 AND source = 'cnts_aggregate'`, f.tid)
 		if rows[0][0] != true || rows[0][1] != int64(2) {
 			t.Fatalf("chốt lại: %v", rows)
 		}
@@ -343,7 +354,7 @@ func TestCNTSAggregate_BM18_PL2_CloseShare_W1144(t *testing.T) {
 
 func TestCNTSAggregate_BM02_Adjustment_W1144(t *testing.T) {
 	facA, facB := ids.New(), ids.New()
-	f := newCNTSFx(t, facilityDir{facA: "X1", facB: "X2"})
+	f := newAggFx(t, facilityDir{facA: "X1", facB: "X2"})
 	c, b := f.call(http.MethodPost, "/v1/extension/cnts/period-forms/install", authz.KNAdmin, nil)
 	f.ok(c, b, nil)
 	// BM-01 ngày 01–02/10/2026 (tuần KSGM 1 tháng 10: 01–07).
@@ -410,7 +421,7 @@ func TestCNTSAggregate_BM02_Adjustment_W1144(t *testing.T) {
 		"facility_ref": facA.String(), "deltas": map[string]string{"heo": "1"}, "reason": "Điều chỉnh sau khi chốt"})
 	f.fail(c, b, "extension.cnts_aggregate_closed")
 	rows := f.admin.query(`SELECT period_type, (SELECT sum((r->'cells'->>'heo')::numeric) FROM jsonb_array_elements(rows) r)::text
-	  FROM pf_extension_pub.v1_cnts_closed_figures WHERE tenant_id = $1 AND form_code = 'CNTS-BM02'`, f.tid)
+	  FROM pf_extension_pub.v1_closed_figures WHERE tenant_id = $1 AND source = 'cnts_aggregate' AND form_code = 'CNTS-BM02'`, f.tid)
 	if len(rows) != 1 || rows[0][0] != "ksgm_week" || rows[0][1] != "38" {
 		t.Fatalf("BM-02 công bố: %v", rows)
 	}

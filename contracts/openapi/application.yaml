@@ -7729,7 +7729,7 @@ paths:
         "409": {description: "extension.cnts_suspect_version_conflict | extension.cnts_suspect_resolved", $ref: "#/components/responses/Problem"}
         "422": {description: "validation_failed | extension.cnts_suspect_invalid", $ref: "#/components/responses/Problem"}
   # --- W11.44: tổng hợp CNTS Cấp Tỉnh — BM-02 KSGM tuần/tháng (+ dòng điều chỉnh chỉ ghi thêm), BM-18 Phụ lục 2 (khai
-  # thác BM-17 + nuôi trồng, lũy kế quý/năm), chốt/mở lại bảng tổng hợp (số công bố pf_extension_pub.v1_cnts_closed_figures
+  # thác BM-17 + nuôi trồng, lũy kế quý/năm), chốt/mở lại bảng tổng hợp (số công bố pf_extension_pub.v1_closed_figures (nhánh cnts_aggregate)
   # cho KHTC — D17, D18), phiên bản tệp chia sẻ Chi cục (Excel). Cấp Tỉnh CNTS ghi; Cấp Quốc gia/Admin xem (truyền province). ---
   /v1/extension/cnts/bm02:
     get:

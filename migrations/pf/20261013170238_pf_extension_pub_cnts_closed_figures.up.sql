@@ -1,20 +1,64 @@
--- pf_extension_pub: số đã chốt của bảng tổng hợp CNTS (BM-02 tuần KSGM, BM-18 Phụ lục 2 tuần CNTS) cho KHTC — W11.44.
--- Chỉ đụng schema pf_extension_pub. Hợp đồng: contracts/pubview/pf_extension_pub.cnts_closed_figures.v1.json — CỘT VÀ THỨ
--- TỰ GIỐNG HỆT họ closed_figures/v1 (ADR-0053 §1: pf_forms_pub.v1_closed_figures, pf_extension_pub.v1_closed_figures của
--- gói PFPUB) để bộ đọc KHTC (extension/port.KHTCSources) thêm MỘT nhánh UNION ALL mà không đổi mã quy đổi (ADR-0053 §3
--- "thêm nguồn mới = thêm view cùng family").
+-- pf_extension_pub.v1_closed_figures (họ closed_figures/v1 — ADR-0053): thêm nguồn BẢNG TỔNG HỢP CNTS Cấp Tỉnh (W11.44 —
+-- BM-02 KSGM tuần KSGM theo cơ sở = tổng BM-01 + dòng điều chỉnh; BM-18 Phụ lục 2 tuần CNTS = khai thác BM-17 theo xã + nuôi
+-- trồng theo đối tượng, kèm LŨY KẾ quý/năm của nguồn — D18). Theo ADR-0053 §3/§5: CREATE OR REPLACE VIEW, GIỮ NGUYÊN cột,
+-- thứ tự, kiểu và ý nghĩa; nhánh Trồng trọt chép NGUYÊN VĂN từ pf 20261013150110 (không đổi); nhánh mới `UNION ALL`.
+-- Bộ đọc KHTC (extension/closedfig, KHTCSources) đọc view này sẵn → không đổi mã bên đọc, không thêm hợp đồng/vai.
+-- Chỉ đụng schema pf_extension_pub.
 --
--- Một dòng = một kỳ tổng hợp (tỉnh × biểu × khóa kỳ) ĐÃ CHỐT ÍT NHẤT MỘT LẦN (pf_extension.cnts_agg_close). Số liệu = lần
--- chốt mới nhất (đóng băng: rows, totals, băm do app tính — lũy kế quý/năm là lũy kế CỦA NGUỒN, D18). Mở lại → cờ về
--- false, số của lần chốt trước vẫn trả (như PFPUB); chốt lại → số mới, snapshot_no tăng. App chỉ cho chốt khi MỌI kỳ nguồn
--- của tuần (BM-01 các ngày / BM-17) đã chốt (D17).
---   form_closed = period_closed  sự kiện cuối của kỳ tổng hợp là closed;
---   key_closed  mọi bảng tổng hợp cùng (phòng, tỉnh, loại kỳ, khóa kỳ) TRONG VIEW NÀY đã chốt.
--- Lịch nguồn (D8): (calendar_id, calendar_version) đọc từ ";cal=<phòng>:v<n>" của period_rule (lịch CNTS Thứ Ba – Thứ Hai);
--- period_key = khóa gốc ("2026-W41", "2026-10-K2"). Không dữ liệu cá nhân (R-14): không actor_ref, không lý do mở lại.
--- Trạng thái xác nhận (D2): bảng tổng hợp CNTS không có dòng HTX → mọi dòng 'confirmed'.
+-- Nhánh CNTS: một dòng = một kỳ tổng hợp (tỉnh × biểu × khóa kỳ) ĐÃ CHỐT ÍT NHẤT MỘT LẦN (pf_extension.cnts_agg_close,
+-- pf 20261013170237). Số = lần chốt mới nhất (đóng băng; app chỉ cho chốt khi MỌI kỳ nguồn của tuần đã chốt — D17).
+-- Mở lại → cờ về false, số của lần chốt trước vẫn trả; chốt lại → số mới, snapshot_no tăng (như nguồn kỳ native).
+--   source = 'cnts_aggregate', source_module = 'pf/extension', form_code = CNTS-BM02 (period_type ksgm_week) | CNTS-BM18 (week);
+--   source_period_id = mã ổn định của kỳ tổng hợp (domain.AggPeriodID), form_version_id = phiên bản định nghĩa bảng;
+--   key_closed = mọi bảng tổng hợp CNTS cùng (tỉnh, loại kỳ, khóa kỳ) đã chốt (phòng duy nhất của nhánh này);
+--   rows: BM-02 mỗi cơ sở {trau_bo, heo, gia_cam, de, <loài>_dieu_chinh, so_ngay_bao_cao}; BM-18 mỗi xã {khai_thac_<nhóm>,
+--   khai_thac_tong, tong_san_luong} + mỗi đối tượng nuôi trồng (unit_kind aquaculture_object) {nuoi_trong_*, tong_san_luong};
+--   mọi ô BM-18 có bản _luy_ke_quy, _luy_ke_nam (KHTC dùng Last). Σ tong_san_luong của rows = tổng sản lượng thủy sản.
+--   totals: dòng Khu vực/Toàn tỉnh do nguồn tính. figures_hash do app tính lúc chốt (sha256 [rows, totals]).
+-- Lịch nguồn (D8): ";cal=chan_nuoi_thuy_san:v3" của period_rule (Thứ Ba – Thứ Hai); period_key = khóa gốc.
+-- Không dữ liệu cá nhân (R-14): không actor_ref, không lý do mở lại, không sources.
 
-CREATE VIEW pf_extension_pub.v1_cnts_closed_figures AS
+CREATE OR REPLACE VIEW pf_extension_pub.v1_closed_figures AS
+  SELECT c.tenant_id, c.department_code, c.province_code,
+         coalesce(substring(c.period_rule from ';cal=([a-z][a-z0-9_]{1,39}):v[0-9]{1,4}(;|$)'), c.department_code) AS calendar_id,
+         -- calendar_version theo D8 (reportcycle/domain.CalendarOf): tag mang ";cal=<phòng>:v<n>" → n; tag cũ v1-tam → 1,
+         -- v2 → 2; tag không phải lịch kỳ (vd tuần làm việc BM-05 "cnts.work_week/v1") → NULL.
+         CASE WHEN c.period_rule ~ ';cal=[a-z][a-z0-9_]{1,39}:v[0-9]{1,4}(;|$)'
+                THEN substring(c.period_rule from ';cal=[a-z][a-z0-9_]{1,39}:v([0-9]{1,4})(;|$)')::integer
+              WHEN c.period_rule LIKE 'kn.period_rule/v1%' THEN 1
+              WHEN c.period_rule LIKE 'kn.period_rule/v2%' THEN 2 END AS calendar_version,
+         c.period_type, c.period_key, c.week_year, c.period_rule,
+         c.period_from, c.period_to, c.period_label,
+         'reportcycle'::text AS source, 'pf/extension'::text AS source_module, c.period_id AS source_period_id,
+         c.form_code, c.form_version_id,
+         c.form_closed, c.period_closed, c.key_closed, c.closed_at,
+         c.run_id AS snapshot_id, c.run_no::bigint AS snapshot_no, c.run_at AS data_at, c.provisional,
+         c.communes_total AS units_total, c.communes_with_data AS units_with_data, c.missing_communes AS missing_units,
+         CASE WHEN rc.rows IS NOT NULL THEN (
+           SELECT coalesce(jsonb_agg(e.v || jsonb_build_object('confirmation', 'confirmed') ORDER BY e.n), '[]'::jsonb)
+             FROM jsonb_array_elements(rc.rows) WITH ORDINALITY e(v, n)) END AS rows,
+         c.totals,
+         'confirmed'::text AS confirmation_status,
+         CASE WHEN c.run_id IS NOT NULL THEN encode(sha256(convert_to(jsonb_build_array(rc.rows, c.totals)::text, 'UTF8')), 'hex') END
+           AS figures_hash,
+         CASE WHEN rc.rows IS NOT NULL THEN encode(sha256(convert_to((
+           SELECT coalesce(jsonb_agg(jsonb_build_array(e.v -> 'key', 'confirmed') ORDER BY e.n), '[]'::jsonb)
+             FROM jsonb_array_elements(rc.rows) WITH ORDINALITY e(v, n))::text, 'UTF8')), 'hex') END AS status_hash
+    FROM pf_extension_pub.v1_consolidation_closed c
+    LEFT JOIN LATERAL (
+      SELECT CASE WHEN c.rows IS NOT NULL THEN (
+               SELECT coalesce(jsonb_agg(jsonb_build_object(
+                        'key', r.e -> 'key',
+                        'unit', r.e -> 'commune',
+                        'unit_kind', 'commune',
+                        'parent', 'null'::jsonb,
+                        'region', coalesce(r.e -> 'region', 'null'::jsonb),
+                        'indicator', coalesce(r.e -> 'indicator', 'null'::jsonb),
+                        'nil_report', false,
+                        'cells', coalesce(r.e -> 'cells', '{}'::jsonb)) ORDER BY r.n), '[]'::jsonb)
+                 FROM jsonb_array_elements(c.rows) WITH ORDINALITY r(e, n)) END AS rows) rc ON true
+  UNION ALL
+  SELECT * FROM (
   WITH ev AS (
     SELECT c.*,
            row_number() OVER (PARTITION BY c.tenant_id, c.stream_key ORDER BY c.seq DESC) AS rn,
@@ -50,6 +94,5 @@ CREATE VIEW pf_extension_pub.v1_cnts_closed_figures AS
            SELECT coalesce(jsonb_agg(jsonb_build_array(e.v -> 'key', 'confirmed') ORDER BY e.n), '[]'::jsonb)
              FROM jsonb_array_elements(s.rows) WITH ORDINALITY e(v, n))::text, 'UTF8')), 'hex') AS status_hash
     FROM snap s
-    JOIN last l ON l.tenant_id = s.tenant_id AND l.stream_key = s.stream_key;
-
-GRANT SELECT ON pf_extension_pub.v1_cnts_closed_figures TO r_extension_pub;
+    JOIN last l ON l.tenant_id = s.tenant_id AND l.stream_key = s.stream_key
+  ) cnts;

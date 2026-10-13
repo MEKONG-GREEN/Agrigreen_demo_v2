@@ -2,7 +2,7 @@ package app
 
 // Tổng hợp CNTS Cấp Tỉnh (W11.44 — BRD CNTS v3.7 UR-TINH-14, UR-TINH-15, FN-16; D4 CN4): BM-02 KSGM tuần KSGM/tháng (tổng
 // BM-01 + dòng điều chỉnh), BM-18 Phụ lục 2 tuần CNTS (khai thác từ BM-17 theo xã + nuôi trồng nhập theo đối tượng, lũy kế
-// quý/năm), chốt/mở lại bảng tổng hợp (số công bố cho KHTC qua pf_extension_pub.v1_cnts_closed_figures — D17, D18), phiên
+// quý/năm), chốt/mở lại bảng tổng hợp (số công bố cho KHTC qua pf_extension_pub.v1_closed_figures (nhánh cnts_aggregate) — D17, D18), phiên
 // bản tệp chia sẻ Chi cục (Excel, có Phụ lục 2). Số tự cộng tính khi đọc từ kỳ native cap/forms (FiguresReader); sổ chỉ
 // giữ phần người nhập và phần đóng băng (pf 20261013170237).
 

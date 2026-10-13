@@ -13,7 +13,7 @@
 --      BM-18 đã chốt → chặn.
 --   3. cnts_agg_close — chốt / mở lại bảng tổng hợp (BM-02 tuần KSGM, BM-18 tuần CNTS). Lần chốt ĐÓNG BĂNG số công bố
 --      theo hợp đồng closed_figures/v1 (ADR-0053: rows, totals, băm) — chỉ chốt được khi MỌI kỳ nguồn của tuần đã chốt
---      (D17, app kiểm); lũy kế trong ô là lũy kế của nguồn (D18). View pf_extension_pub.v1_cnts_closed_figures (migration
+--      (D17, app kiểm); lũy kế trong ô là lũy kế của nguồn (D18). View pf_extension_pub.v1_closed_figures (nhánh cnts_aggregate) (migration
 --      kế tiếp) công bố lần chốt mới nhất cho KHTC.
 --   4. cnts_agg_share — phiên bản tệp chia sẻ Chi cục Chăn nuôi và Thú y (BM-02 tuần/tháng, BM-18): nội dung bảng lúc
 --      chia sẻ + băm; phiên bản = seq của chuỗi (tỉnh × biểu × loại kỳ × khóa). Tệp Excel dựng lại từ nội dung đã lưu.
