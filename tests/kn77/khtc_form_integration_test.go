@@ -480,7 +480,7 @@ func TestKH_FN_PN_03_02_OrphanSealedSheetIgnored(t *testing.T) {
 		t.Fatalf("bảng mồ côi không phải lần gửi: %+v", k)
 	}
 	// Bảng mồ côi không tính "đã có số liệu": bỏ hạng mục khỏi kế hoạch (phiên bản 2) được.
-	body := map[string]any{"base_version": 1, "decision_no": "90/QĐ-SNN", "decision_date": "2026-11-20", "effective_from": "2026-12-01"}
+	body := map[string]any{"base_version": 1, "decision_no": "90/QĐ-SNN", "decision_date": "2026-10-13", "effective_from": "2026-12-01"}
 	var keep []map[string]any
 	for _, e := range f.planBody["entries"].([]map[string]any) {
 		if e["ref"] != f.item {
