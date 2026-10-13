@@ -24,7 +24,7 @@
     "check:api": "openapi-typescript ../../contracts/openapi/mkg-internal.yaml -o src/api/generated/mkg-internal.ts --check"
   },
   "dependencies": {
-    "next": "16.3.6",
+    "next": "16.3.8",
     "oidc-client-ts": "3.5.0",
     "openapi-fetch": "0.17.0",
     "react": "19.3.0",
