@@ -100,7 +100,7 @@ describe("kn.menu/v3 (W11.06): khuôn theo phòng ban + Dùng chung", () => {
       // W11.42 Biểu mẫu & cấp quyền, W11.49 Báo cáo dịch bệnh, W11.43 Cảnh báo, W11.22 Hồ sơ nhân sự, W11.77 báo cáo giá, W11.44 KSGM tuần, tháng + Thủy sản (Phụ lục 2)); còn lại "Sắp có".
       const open = new Set(["tinh.bao_gia.cau_hinh", "tinh.bao_gia.kiem_duyet", "tinh.bao_gia.tien_do", "tinh.bao_gia.bang_gia",
         "tinh.bao_gia.bien_dong", "tinh.bao_gia.dashboard", "tinh.bao_gia.thong_ke", "tinh.cnts.danh_muc", "tinh.cnts.bieu_mau", "tinh.cnts.dich_benh", "tinh.cnts.canh_bao", "tinh.hcth.danh_muc", "tinh.hcth.ho_so",
-        "tinh.cnts.ksgm", "tinh.cnts.phu_luc_2", "tinh.hcth.dashboard", "tinh.hcth.bao_cao_so"]);
+        "tinh.cnts.ksgm", "tinh.cnts.phu_luc_2", "tinh.hcth.dashboard", "tinh.hcth.bao_cao_so", "tinh.hcth.kho_tai_lieu"]);
       expect(biz.items.filter((i) => !open.has(i.key)).every((i) => i.status === "coming_soon")).toBe(true);
       const links = menuLinks(tree).map((l) => l.node.key);
       expect(links).toContain("tinh.dashboard"); // khung chung vẫn chạy
@@ -111,7 +111,7 @@ describe("kn.menu/v3 (W11.06): khuôn theo phòng ban + Dùng chung", () => {
           : code === "chan_nuoi_thuy_san"
             ? ["tinh.cnts.canh_bao", "tinh.cnts.bieu_mau", "tinh.cnts.dich_benh", "tinh.cnts.ksgm", "tinh.cnts.phu_luc_2", "tinh.cnts.danh_muc"]
             : code === "hanh_chinh_tong_hop"
-              ? ["tinh.hcth.dashboard", "tinh.hcth.ho_so", "tinh.hcth.bao_cao_so", "tinh.hcth.danh_muc"]
+              ? ["tinh.hcth.dashboard", "tinh.hcth.ho_so", "tinh.hcth.bao_cao_so", "tinh.hcth.kho_tai_lieu", "tinh.hcth.danh_muc"]
               : [],
       );
     }

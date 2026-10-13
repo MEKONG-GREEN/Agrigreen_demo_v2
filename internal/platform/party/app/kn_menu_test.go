@@ -21,7 +21,12 @@ func TestW1106_MenuViewComingSoonAndAlias(t *testing.T) {
 	if v.Version != "kn.menu/v3" || len(v.Groups) < 2 || v.Groups[1].Key != domain.GroupNghiepVu {
 		t.Fatalf("menu HCTH: %+v", v.Groups)
 	}
-	it := v.Groups[1].Items[3] // Dashboard, Hồ sơ nhân sự (W11.22), Báo cáo Sở (W11.28) đã mở; "Hồ sơ dữ liệu" còn Sắp có
+	var it MenuItemView
+	for _, item := range v.Groups[1].Items {
+		if item.Key == "tinh.hcth.danh_gia" {
+			it = item
+		}
+	}
 	if it.Enabled || it.Status != domain.ItemComingSoon || it.StatusLabel != "Sắp có" {
 		t.Fatalf("mục Sắp có: %+v", it)
 	}

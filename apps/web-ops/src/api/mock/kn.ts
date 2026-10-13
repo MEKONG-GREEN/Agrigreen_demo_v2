@@ -217,6 +217,7 @@ const SHARED_BY_AUDIENCE: Partial<Record<KnRole, Item[]>> = {
   kn_tinh: [
     { key: "tinh.chung.nhan_su_phong", label: "Nhân sự của phòng", route: "/kn/nhan-su/cua-phong", icon: "users" },
     { key: "tinh.chung.dashboard_nhan_su", label: "Dashboard nhân sự", route: "/kn/nhan-su/dashboard", icon: "chart" }, // W11.28 FN-06 BR-02
+    { key: "tinh.chung.tai_lieu_phong", label: "Tài liệu của phòng", route: "/kn/nhan-su/tai-lieu-phong", icon: "library" },
   ],
 };
 
@@ -294,7 +295,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       { key: "tinh.hcth.dashboard", label: "Dashboard nhân sự", route: "/kn/nhan-su/dashboard", icon: "chart" }, // W11.28 (pf/hrm, FN-06)
       { key: "tinh.hcth.ho_so", label: "Hồ sơ nhân sự", route: "/kn/nhan-su/ho-so", icon: "users" }, // W11.22 (pf/hrm)
       { key: "tinh.hcth.bao_cao_so", label: "Biểu mẫu báo cáo Sở", route: "/kn/nhan-su/bao-cao-so", icon: "report" }, // W11.28 (FN-12)
-      soon("tinh.hcth.kho_tai_lieu", "Hồ sơ dữ liệu", "/kn/nhan-su/kho-tai-lieu", "library"),
+      { key: "tinh.hcth.kho_tai_lieu", label: "Hồ sơ dữ liệu", route: "/kn/nhan-su/kho-tai-lieu", icon: "library" },
       soon("tinh.hcth.danh_gia", "Đánh giá", "/kn/nhan-su/danh-gia", "approve"),
       { key: "tinh.hcth.danh_muc", label: "Danh mục nhân sự", route: "/kn/nhan-su/danh-muc", icon: "catalog" }, // W11.21 (pf/hrm)
     ],
@@ -321,7 +322,7 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, (base: string) => Item[]>> =
   hanh_chinh_tong_hop: (b) => [
     { key: "admin.pb.hcth_danh_muc", label: "Danh mục nhân sự", route: `${b}/danh-muc-nhan-su`, icon: "catalog" }, // W11.21 (pf/hrm)
     { key: "admin.pb.hcth_phan_quyen", label: "Phân quyền hồ sơ", route: `${b}/phan-quyen-ho-so`, icon: "shield" }, // W11.22 (pf/hrm)
-    soon("admin.pb.hcth_thu_muc", "Thư mục tài liệu", `${b}/thu-muc-tai-lieu`, "library"),
+    { key: "admin.pb.hcth_thu_muc", label: "Thư mục tài liệu", route: `${b}/thu-muc-tai-lieu`, icon: "library" }, // W11.24 (pf/hrm)
   ],
 };
 

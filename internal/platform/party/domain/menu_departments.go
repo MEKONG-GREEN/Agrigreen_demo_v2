@@ -71,6 +71,7 @@ var sharedByAudience = map[string][]MenuItem{
 		needs(MenuItem{Key: "tinh.chung.nhan_su_phong", Label: "Nhân sự của phòng", Route: "/kn/nhan-su/cua-phong", Icon: "users"}, NeedsManager),
 		// W11.28 (FN-06 BR-02): lãnh đạo phòng xem dashboard nhân sự của phòng mình (máy chủ giới hạn phạm vi).
 		needs(MenuItem{Key: "tinh.chung.dashboard_nhan_su", Label: "Dashboard nhân sự", Route: "/kn/nhan-su/dashboard", Icon: "chart"}, NeedsManager),
+		needs(MenuItem{Key: "tinh.chung.tai_lieu_phong", Label: "Tài liệu của phòng", Route: "/kn/nhan-su/tai-lieu-phong", Icon: "library"}, NeedsManager),
 	},
 }
 
@@ -173,7 +174,7 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			{Key: "tinh.hcth.dashboard", Label: "Dashboard nhân sự", Route: "/kn/nhan-su/dashboard", Icon: "chart"},
 			{Key: "tinh.hcth.ho_so", Label: "Hồ sơ nhân sự", Route: "/kn/nhan-su/ho-so", Icon: "users"},
 			{Key: "tinh.hcth.bao_cao_so", Label: "Biểu mẫu báo cáo Sở", Route: "/kn/nhan-su/bao-cao-so", Icon: "report"},
-			soon("tinh.hcth.kho_tai_lieu", "Hồ sơ dữ liệu", "/kn/nhan-su/kho-tai-lieu", "library"),
+			{Key: "tinh.hcth.kho_tai_lieu", Label: "Hồ sơ dữ liệu", Route: "/kn/nhan-su/kho-tai-lieu", Icon: "library"},
 			soon("tinh.hcth.danh_gia", "Đánh giá", "/kn/nhan-su/danh-gia", "approve"),
 			// W11.21 (pf/hrm, FN-19): Cấp Tỉnh – HCTH xem danh mục nhân sự (Admin sửa).
 			{Key: "tinh.hcth.danh_muc", Label: "Danh mục nhân sự", Route: "/kn/nhan-su/danh-muc", Icon: "catalog"},
@@ -207,7 +208,8 @@ var adminDeptBusiness = map[string][]MenuItem{
 		{Key: "admin.pb.hcth_danh_muc", Label: "Danh mục nhân sự", Route: adminDeptRoute("/danh-muc-nhan-su"), Icon: "catalog"},
 		// W11.22 (pf/hrm, FN-20): ma trận phân quyền hồ sơ.
 		{Key: "admin.pb.hcth_phan_quyen", Label: "Phân quyền hồ sơ", Route: adminDeptRoute("/phan-quyen-ho-so"), Icon: "shield"},
-		soon("admin.pb.hcth_thu_muc", "Thư mục tài liệu", adminDeptRoute("/thu-muc-tai-lieu"), "library"),
+		// W11.24 (pf/hrm, FN-14, UR-ADM-10): cấu trúc thư mục tài liệu dùng chung + quyền thư mục.
+		{Key: "admin.pb.hcth_thu_muc", Label: "Thư mục tài liệu", Route: adminDeptRoute("/thu-muc-tai-lieu"), Icon: "library"},
 	},
 }
 

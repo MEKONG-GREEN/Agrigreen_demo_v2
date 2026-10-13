@@ -122,6 +122,7 @@ var implementedMenu = map[string]bool{
 	"tinh.hcth.ho_so": true, "admin.pb.hcth_phan_quyen": true, // W11.22
 	"tinh.cnts.dich_benh": true, "xa.cnts.dich_benh": true, // W11.49
 	"tinh.cnts.canh_bao": true, "xa.cnts.canh_bao": true, // W11.43
+	"tinh.hcth.kho_tai_lieu": true, "admin.pb.hcth_thu_muc": true, // W11.24
 	"tinh.khtc.ke_hoach_nam": true, "admin.pb.khtc_ke_hoach": true, "admin.pb.khtc_danh_muc": true, // W11.61
 	"tinh.khtc.ky_bao_cao": true, // W11.62
 	// W11.77 báo cáo giá
