@@ -28,6 +28,7 @@ provides:
     - RoleHolders
     - SessionReader
     - StaffContacts
+    - XaScopes
   events:
     - pf.accounts.assignment.changed/v1
     - pf.accounts.assignment.granted/v1

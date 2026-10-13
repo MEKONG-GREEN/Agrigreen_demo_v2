@@ -157,10 +157,10 @@ func CheckinsOf(ctx context.Context, tx pgx.Tx, schedules []uuid.UUID) (map[uuid
 	return out, err
 }
 
-// PurgeCheckinPoints xóa tọa độ check-in quá hạn lưu (purge_after < today) của tenant hiện tại, tối đa limit dòng.
+// PurgeCheckinPoints gọi pf_extension.purge_checkin_points: xóa một lô tọa độ check-in quá hạn lưu (purge_after < today)
+// của tenant hiện hành (bảng có hạn lưu, không phải sổ — QĐ-8).
 func PurgeCheckinPoints(ctx context.Context, tx pgx.Tx, today time.Time, limit int) (int, error) {
-	tag, err := tx.Exec(ctx, `DELETE FROM pf_extension.work_schedule_checkin_point
-	  WHERE (tenant_id, checkin_id) IN (SELECT tenant_id, checkin_id FROM pf_extension.work_schedule_checkin_point
-	    WHERE purge_after < $1::date LIMIT $2)`, today.Format(time.DateOnly), limit)
-	return int(tag.RowsAffected()), err
+	var n int64
+	err := tx.QueryRow(ctx, "SELECT pf_extension.purge_checkin_points($1::date, $2::int)", today.Format(time.DateOnly), limit).Scan(&n)
+	return int(n), err
 }

@@ -160,6 +160,27 @@ SELECT shared.apply_tenant_rls('pf_extension.work_schedule_checkin_point');
 CREATE TRIGGER trg_no_update BEFORE UPDATE ON pf_extension.work_schedule_checkin_point
   FOR EACH ROW EXECUTE FUNCTION shared.fn_immutable();
 
+-- Dọn tọa độ quá hạn lưu (job extension_work_schedule, theo lô, tenant hiện hành qua RLS — SECURITY INVOKER).
+CREATE FUNCTION pf_extension.purge_checkin_points(p_today date, p_limit integer DEFAULT 1000) RETURNS bigint
+LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
+DECLARE
+  n bigint;
+BEGIN
+  IF p_limit IS NULL OR p_limit < 1 OR p_limit > 100000 THEN
+    RAISE EXCEPTION 'purge_checkin_points: p_limit phải trong 1..100000' USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+  WITH gone AS (
+    DELETE FROM pf_extension.work_schedule_checkin_point p
+    WHERE (p.tenant_id, p.checkin_id) IN (
+      SELECT x.tenant_id, x.checkin_id FROM pf_extension.work_schedule_checkin_point x
+      WHERE x.purge_after < p_today ORDER BY x.purge_after LIMIT p_limit)
+    RETURNING 1)
+  SELECT count(*) INTO n FROM gone;
+  RETURN n;
+END $$;
+REVOKE ALL ON FUNCTION pf_extension.purge_checkin_points(date, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION pf_extension.purge_checkin_points(date, integer) TO r_extension;
+
 REVOKE ALL ON pf_extension.cnts_duty_roster, pf_extension.cnts_vaccination_batch, pf_extension.work_schedule_item_place,
   pf_extension.work_schedule_checkin, pf_extension.work_schedule_checkin_point FROM PUBLIC;
 GRANT SELECT, INSERT ON pf_extension.cnts_duty_roster, pf_extension.cnts_vaccination_batch,

@@ -30,6 +30,7 @@ provides:
     - TablePDF
   events:
     - pf.extension.cnts_alert.changed/v1
+    - pf.extension.cnts_duty.changed/v1
     - pf.extension.cnts_form.reminded/v1
     - pf.extension.consolidation.completed/v1
     - pf.extension.directive.issued/v1

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.cnts_duty.changed/v1",
+  "title": "pf.extension.cnts_duty.changed — payload",
+  "description": "Lịch trực KSGM (BM-03, BRD CNTS v3.7 UR-TINH-10, FN-15 — W11.46) của một tháng vừa lưu phiên bản mới và có viên chức bị đổi ca (thêm, bớt, đổi ca N/Đ/NĐ). Consumer gửi thông báo cho officer_refs (\"Đổi ca → thông báo viên chức liên quan\"). Không chứa ca trực chi tiết — consumer đọc qua API có phân quyền.",
+  "x-event-type": "pf.extension.cnts_duty.changed",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": ["month", "roster_id", "version", "officer_refs", "actor_ref", "department", "event_time"],
+  "properties": {
+    "month":        { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$", "description": "Tháng của lịch trực (YYYY-MM)" },
+    "roster_id":    { "type": "string", "format": "uuid", "description": "Dòng sổ pf_extension.cnts_duty_roster của phiên bản" },
+    "version":      { "type": "integer", "minimum": 1 },
+    "officer_refs": { "type": "array", "items": { "type": "string", "format": "uuid" }, "description": "Viên chức có ca thay đổi so với phiên bản trước" },
+    "actor_ref":    { "type": "string", "format": "uuid", "description": "Người lưu lịch" },
+    "department":   { "type": "string", "enum": ["chan_nuoi_thuy_san"] },
+    "event_time":   { "type": "string", "format": "date-time" }
+  }
+}

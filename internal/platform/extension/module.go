@@ -20,6 +20,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/app"
 	alertapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/cntsalert/app"
 	alerthandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/cntsalert/handler"
+	calapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/cntscal/app"
+	calhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/cntscal/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/handler"
 	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtc/app"
 	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtc/handler"
@@ -88,6 +90,8 @@ type Module struct {
 	khtcForms *khtcFormService
 	// W11.43 (D4 CN3): quy tắc liên biểu + 12 cảnh báo CNTS, vòng đời cảnh báo, nhắc nộp theo biểu (module_cntsalert.go).
 	alert *alertapp.Service
+	// W11.46 (D4 CN6): lịch trực KSGM BM-03, lịch tiêm phòng BM-07 (extension/cntscal).
+	cal *calapp.Service
 }
 
 // New tạo module với pool của vai extension_app.
@@ -102,6 +106,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.khtc = &khtcapp.Service{DB: db, Clock: clk, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.ob = &obapp.Service{DB: db, Clock: clk, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.alert = &alertapp.Service{DB: db, Clock: clk, Params: d.Params, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.cal = &calapp.Service{DB: db, Clock: clk, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	return m
 }
 
@@ -134,7 +139,10 @@ func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logge
 
 // UseCNTSCatalogs nối danh mục CNTS theo ngày của pf/masterdata (W11.41) cho Báo cáo dịch bệnh BM-10 (W11.49: bệnh,
 // vật nuôi). Chưa nối → lập/cập nhật ổ dịch, báo nghi dịch trả 503 extension.dependency_unavailable.
-func (m *Module) UseCNTSCatalogs(c mdport.CNTSCatalogs) { m.ob.Catalogs = c }
+func (m *Module) UseCNTSCatalogs(c mdport.CNTSCatalogs) { m.ob.Catalogs, m.cal.Catalogs = c, c }
+
+// UseXaScopes (W11.46) nối danh sách cán bộ Cấp Xã CNTS kèm phạm vi (pf/accounts) cho lưới lịch trực KSGM BM-03.
+func (m *Module) UseXaScopes(x accport.XaScopes) { m.cal.Officers = x }
 
 // UseTablePDF nối bộ dựng PDF bảng (pf/reports) cho "Xuất PDF" lịch công tác.
 func (m *Module) UseTablePDF(p port.TablePDF) { m.svc.TablePDF = p }
@@ -160,6 +168,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	obhandler.Handler{Svc: m.ob}.RegisterApp(rg)
 	m.registerKHTCSources(rg)                          // W11.64
 	alerthandler.Handler{Svc: m.alert}.RegisterApp(rg) // W11.43
+	calhandler.Handler{Svc: m.cal}.RegisterApp(rg)
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham
