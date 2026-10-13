@@ -345,7 +345,7 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 			t.Fatalf("tham chiếu thiếu danh tính lịch: %+v", r)
 		}
 	}
-	if !bySrc[cntsDept+"|pf/forms:BM-T1"] || !bySrc[dept+"|pf/extension:T01"] {
+	if !bySrc[cntsDept+"|pf_forms.bm-t1"] || !bySrc[dept+"|pf_extension.t01"] {
 		t.Fatalf("nguồn: %v", bySrc)
 	}
 	states, err := cw.States(x.tinhCtx, refs)
