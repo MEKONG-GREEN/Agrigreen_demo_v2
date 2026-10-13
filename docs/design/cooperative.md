@@ -29,7 +29,7 @@ Số liệu của bản này lấy từ mã ở cab0280: `migrations/pf/*.up.sql
 | D-7 | Giữ hai FK chéo schema `pf_coop.{cooperative,household_membership} → pf_party.org`. Ghi thành ngoại lệ có tên | Toàn vẹn tham chiếu do chủ bảng (`ag_migrator`) kiểm, không cần quyền chéo cho `r_coop`. Nút không bao giờ bị xóa, chỉ vô hiệu hóa |
 | D-8 | Giữ tên sự kiện v1 (`pf.party.household.*`, `pf.geo.plot*.*`, `pf.cropcycle.{season,farm_log,harvest,coop_season_area}.*`). Đổi chủ khai `//ag:event`, không đổi hợp đồng | Bên tiêu thụ hiện có (`mrv` khai lại tên sự kiện, `metrics`, `notify`, `mechanization`) không phải sửa. Tên `pf.coop.*` chỉ dùng cho v2 nếu cần |
 | D-9 | Không đổi đường dẫn HTTP, kể cả `/v1/partner/{cooperatives,plots,season-harvest-dates}`. Handler chuyển sang `pf/cooperative` | `mkg/fieldops` gọi qua HTTP (`adapter/directory.go`), nên không bị ảnh hưởng. W5.x (ADR-0033) thay `/v1/partner/*` sau |
-| D-10 | Phương án H-1 (a): chủ là tenant chương trình. Phạm vi trong đơn vị dùng `p_scope` theo Nút = `cooperative_ref` | ADR-0030 §7. Mục 11 nêu những gì đổi nếu chọn (b) |
+| D-10 | **Thay bởi [ADR-0052](../adr/0052-dong-so-huu-mkg-htx-neo-mst.md) (CEO D2, 13/10/2026): MKG + HTX đồng sở hữu, ghi ở neo HTX theo MST; `tenant_id` giữ nguyên = tenant lưu ký.** Trước đó: phương án H-1 (a): chủ là tenant chương trình. Phạm vi trong đơn vị dùng `p_scope` theo Nút = `cooperative_ref` | ADR-0030 §7. Mục 11 nêu những gì đổi nếu chọn (b) |
 
 ---
 
@@ -576,6 +576,8 @@ W3.5 vẫn **chặn** chờ dữ liệu UAT (C-9).
 ---
 
 ## 11. Giả định chủ dữ liệu (X-01, H-1)
+
+> **Đã quyết 13/10/2026 — [ADR-0052](../adr/0052-dong-so-huu-mkg-htx-neo-mst.md).** Không chọn nguyên (a) hay (b): dữ liệu giữ `tenant_id` (tenant lưu ký, không ghi bù sổ), chủ sở hữu (MKG + HTX) ghi ở neo `pf_coop.htx_anchor` theo MST; KN đọc qua `share_grant` (`basis_ref` = thỏa thuận HTX). Phần dưới giữ làm lịch sử.
 
 **Giả định của bản này:** phương án **(a)**, theo ADR-0009 và ADR-0030 §7.
 - `tenant_id` của mọi bảng `pf_coop` là tenant chương trình khuyến nông.

@@ -82,6 +82,8 @@ Worker `k/ref` dựng `k_ref.share_scope` = cấp phép `intra_platform` đang h
 
 ### 7. Câu hỏi mở H-1 (X-01): ai là đơn vị chủ dữ liệu HTX, nông hộ, thửa?
 
+> **Đã trả lời 13/10/2026 — [ADR-0052](0052-dong-so-huu-mkg-htx-neo-mst.md)** (CEO D2): MKG + HTX đồng sở hữu, neo theo MST; KN đọc qua nhánh chia sẻ (cột (b) của bảng dưới) với `basis_ref` = thỏa thuận HTX; `tenant_id` không đổi.
+
 ADR này **không** trả lời H-1. Cơ chế chạy được với cả hai câu trả lời; chỉ dữ liệu cấp phép khác nhau:
 
 | | (a) Chương trình khuyến nông là chủ (hiện trạng ADR-0009) | (b) Mỗi HTX / đơn vị vận hành App HTX là chủ |

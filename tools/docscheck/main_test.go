@@ -87,6 +87,9 @@ func TestPerPackageDocs_WHB(t *testing.T) {
 	put(t, root, "docs/kn/gia-dinh/README.md", "# quy ước")
 	put(t, root, "docs/kn/gia-dinh/W11.42.md", "## W11.42 — Biểu kỳ\n\n| a | [ADR](../../adr/0050-x.md) |\n")
 	put(t, root, "docs/roadmap.d/kn-2026-10/W11.42.md", "- [x] W11.42 (13/10/2026): xong — [giả định](../../kn/gia-dinh/W11.42.md)\n")
+	// Gói quyết định CEO (D<số>) cũng là mã gói hợp lệ.
+	put(t, root, "docs/kn/gia-dinh/D2.md", "## D2 — Gói quyết định CEO\n")
+	put(t, root, "docs/roadmap.d/kn-2026-10/D2.md", "- [x] D2: xong\n")
 	put(t, root, "docs/errors.md", "| HTTP | code |\n|---|---|\n| 409 | `price.old` | x |\n")
 	put(t, root, "docs/errors/pf-price.md", "### pf/price\n\n| HTTP | code | Khi nào |\n|---|---|---|\n| 409 | `price.new` | x |\n")
 	wantProblems(t, root, "docs/adr/0050-x.md: thiếu dòng")
