@@ -1,4 +1,4 @@
-// Package store là SQL của pf/contact (schema pf_contact, pf 20261013165159). Chạy trong giao dịch của module (vai
+// Package store là SQL của pf/contact (schema pf_contact, pf 20261013230912). Chạy trong giao dịch của module (vai
 // r_contact, db.ForModule); RLS p_tenant lọc tenant. Sổ chỉ ghi thêm: không có UPDATE/DELETE. Không cột PII.
 package store
 

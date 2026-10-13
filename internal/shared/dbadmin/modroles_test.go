@@ -425,7 +425,7 @@ var laterGroups = map[string]string{
 	"pf/cooperative": "pf/000131_pf_cooperative_schema.up.sql",        // W3.3: vai r_cooperative sinh khi module có owns_schema
 	"pf/price":       "pf/000138_pf_price.up.sql",                     // W11.71 (ADR-0049): khung cap/price
 	"pf/hrm":         "pf/000147_pf_hrm_catalog.up.sql",               // W11.21 (ADR-0050): dom/hrm, danh mục nhân sự
-	"pf/contact":     "pf/20261013165159_pf_contact_directory.up.sql", // W11.23: cap/directory, Contact (FN-13)
+	"pf/contact":     "pf/20261013230912_pf_contact_directory.up.sql", // W11.23: cap/directory, Contact (FN-13)
 }
 
 // pf 000092 (W2.5) cấp SELECT k_ref.* cho MỌI r_* của module pf lúc đó (R-DB-05) — danh sách ghi tay khớp
