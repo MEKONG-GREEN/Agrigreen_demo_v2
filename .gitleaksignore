@@ -47,3 +47,9 @@ f9976ecd56ac0fd983e046326b58aefd8c9318e8:tests/e2e/g4_scenario_test.go:generic-a
 # chuỗi dài 60 ký tự base64 = đúng 44 byte: KHOÁ CÔNG KHAI Ed25519. Khoá công
 # khai không phải bí mật.
 f4c09dce1f46d6294b1cbf601d9642cdb054dc92:apps/web-internal/src/api/mock/db.ts:generic-api-key:317
+
+# Văn xuôi tiếng Việt liệt kê tên các hợp đồng tích hợp (collection_schedule,
+# roll_count_statement, htx_roll_confirmation). Không có giá trị nào — quy tắc trúng vì
+# chuỗi định danh dài. Dùng vân tay chứ KHÔNG allowlist cả docs/: tài liệu là đúng chỗ một
+# bí mật dễ bị dán nhầm vào, nên đèn ở đó phải giữ.
+7f73faaa8ccbb07bbca547ee16391b372d13da2b:docs/runbooks/integration-batches.md:generic-api-key:103

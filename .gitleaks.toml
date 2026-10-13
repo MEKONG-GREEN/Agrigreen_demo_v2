@@ -64,6 +64,15 @@ paths = [
   '''^optimizer/tests/golden/''',
   '''^apps/web-ops/src/api/mock/forms/fixtures/''',
   '''^contracts/integration/examples/''',
+
+  # Hai tệp cấu hình của chính gitleaks. Một tệp có nhiệm vụ GHI LẠI các phát hiện thì tất
+  # nhiên phải nhắc tới chúng: chú thích trong .gitleaksignore trích nguyên văn chuỗi bị bắt
+  # để người duyệt sau còn đối chiếu được, và thế là chính nó bị bắt. Sửa chú thích KHÔNG gỡ
+  # được, vì gitleaks quét lịch sử và các dòng ấy đã nằm trong commit cũ — chỉ allowlist theo
+  # đường dẫn mới dứt điểm. Đổi lại: hai tệp này không còn được quét, nên đừng bao giờ dán
+  # giá trị thật vào chúng; chúng chỉ chứa vân tay và chú thích.
+  '''^\.gitleaksignore$''',
+  '''^\.gitleaks\.toml$''',
 ]
 regexes = [
   # UUID trần — xem lưu ý ở trên.
