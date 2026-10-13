@@ -69,6 +69,7 @@ import { cntsOutbreakRoutes } from "./kn-cnts-outbreak";
 import { khtcSourceRoutes } from "./kn-khtc-sources";
 import { khtcFormRoutes } from "./kn-khtc-forms";
 import { cntsAlertRoutes } from "./kn-cnts-alert";
+import { cntsCalRoutes } from "./kn-cnts-cal";
 import { hrmStaffRoutes } from "./kn-hrm-staff";
 import { contactRoutes } from "./kn-contact";
 import { hrmReportRoutes } from "./kn-hrm-reports";
@@ -162,6 +163,7 @@ const appRoutes: Route[] = [
   ...cntsPeriodRoutes, // W11.42 biểu kỳ Cấp Xã CNTS (/v1/extension/cnts/*, /v1/forms/* profile kn_cnts)
   ...cntsAggregateRoutes, // W11.44 tổng hợp CNTS Cấp Tỉnh (/v1/extension/cnts/bm02|bm18|aggregates|shares)
   ...khtcPeriodRoutes, // W11.62 Kỳ KHTC (/v1/extension/khtc/*)
+  ...cntsCalRoutes, // W11.46 lịch trực KSGM, lịch tiêm phòng, check-in lịch công tác
   ...cntsOutbreakRoutes, // W11.49 Báo cáo dịch bệnh BM-10, báo nghi dịch (/v1/extension/cnts/outbreaks*, /suspects*)
   ...khtcSourceRoutes, // W11.64 Cập nhật số liệu (/v1/extension/khtc/periods/{id}/sources*)
   ...khtcFormRoutes, // W11.63 phiếu Báo cáo cho KHTC (/v1/extension/khtc/periods/{id}/forms/*, my-forms)

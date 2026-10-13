@@ -151,7 +151,13 @@ export function ScheduleTags({ s, compact = false }: { s: Pick<WsSchedule, "stat
 // ---------------------------------------------------------------------------
 // Thẻ mục công tác
 // ---------------------------------------------------------------------------
-export type CardItem = WsItemInput & { conflict?: boolean; changed?: boolean; removed?: boolean };
+export type CardItem = WsItemInput & {
+  conflict?: boolean;
+  changed?: boolean;
+  removed?: boolean;
+  /** W11.46: check-in của mục (phòng có check-in). */
+  checkin?: { far: boolean; distance_m?: number | null } | null;
+};
 
 export function ItemCard({
   item,
@@ -180,7 +186,13 @@ export function ItemCard({
       {item.content}
       {item.conflict ? <span className="ws-flag f-conflict">trùng giờ</span> : null}
       {item.changed ? <span className="ws-flag f-changed">điều chỉnh</span> : null}
-      {place ? <span className="ws-place">{place}</span> : null}
+      {item.checkin ? (
+        <span className={`ws-flag ${item.checkin.far ? "f-conflict" : "f-changed"}`}>
+          {item.checkin.far ? "check-in xa" : "đã check-in"}
+          {item.checkin.distance_m !== null && item.checkin.distance_m !== undefined ? ` ${Math.round(item.checkin.distance_m)} m` : ""}
+        </span>
+      ) : null}
+      {place || item.place ? <span className="ws-place">{[place, item.place ? "có tọa độ" : ""].filter(Boolean).join(" · ")}</span> : null}
     </>
   );
   const title = `${item.content}${item.conflict ? " (trùng giờ)" : ""}${item.changed ? " (điều chỉnh, chờ duyệt lại)" : ""}`;

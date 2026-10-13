@@ -353,6 +353,8 @@ export function ApproveSchedules({ ws, api, readOnly = false }: { ws: WorkSchedu
                               <span className="ws-tags">
                                 <ScheduleTags s={r} compact />
                                 {r.conflict_count ? <StatusPill tone="warn">{r.conflict_count} mục trùng giờ</StatusPill> : null}
+                                {r.checkin_enabled && r.checkin_count ? <StatusPill tone="ok">{r.checkin_count} check-in</StatusPill> : null}
+                                {r.checkin_enabled && r.missed_checkin_count ? <StatusPill tone="bad">{r.missed_checkin_count} chưa check-in</StatusPill> : null}
                               </span>
                             </th>
                             {cells.map((c, i) => (
