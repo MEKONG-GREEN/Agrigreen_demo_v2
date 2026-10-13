@@ -279,8 +279,8 @@ func (s *Service) ksgmCheck(ctx context.Context, tx pgx.Tx, tid uuid.UUID, bm04 
 
 // bm01ChangedWeek: BM-01 đổi sau khi xã gửi BM-04 → so lại CN-06 của tuần chứa ngày đó (dòng 4).
 func (s *Service) bm01ChangedWeek(ctx context.Context, tx pgx.Tx, tid uuid.UUID, bm01 formsport.RecordedSubmission, rs *resolver) error {
-	if bm01.From == nil {
-		return nil
+	if bm01.From == nil || bm01.Version < 2 {
+		return nil // chỉ khi BM-01 ĐỔI (phiên bản sau) — bài đầu của ngày được so khi xã gửi BM-04
 	}
 	day := *bm01.From
 	from := day.AddDate(0, 0, -6)

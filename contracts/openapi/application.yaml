@@ -7370,6 +7370,178 @@ paths:
         "404": {description: extension.material_record_not_found, $ref: "#/components/responses/Problem"}
   # --- pf/extension CNTS: biểu kỳ Cấp Xã BM-01/04/05/17 (W11.42) — cài biểu vào cap/forms (profile kn_cnts), chia lịch kỳ
   # (kỳ ngày, tuần W11.03 v2, tuần làm việc BM-05) với hạn riêng, phát hành lô kỳ native. Nộp, chốt, sao chép kỳ trước: /v1/forms. ---
+  /v1/extension/cnts/alerts:
+    get:
+      summary: Cảnh báo CNTS (W11.43 — FN-13, UR-TINH-13, Mục III.5) trong phạm vi người gọi — Khẩn và chưa đóng trước
+      description: |
+        Cấp Tỉnh: cảnh báo trong phạm vi Nút; Cấp Xã: cảnh báo của các xã phụ trách và cảnh báo được giao cho mình; Admin: mọi
+        cảnh báo. status: open (chưa đóng), overdue (chưa đóng, quá hạn xử lý), new, assigned, in_progress, closed.
+      operationId: extensionCntsListAlerts
+      tags: [extension]
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string, enum: [open, overdue, new, assigned, in_progress, closed]}}
+        - {name: kind, in: query, required: false, schema: {type: string}}
+        - {name: level, in: query, required: false, schema: {type: string, enum: [urgent, attention]}}
+        - {name: template_code, in: query, required: false, schema: {type: string}}
+        - {name: mine, in: query, required: false, schema: {type: boolean}, description: Chỉ cảnh báo giao cho tôi}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 500}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertList"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/alerts/{ref}:
+    get:
+      summary: Cảnh báo CNTS kèm lịch sử vòng đời
+      operationId: extensionCntsGetAlert
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertDetail"}
+        "404": {description: extension.cnts_alert_not_found, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/alerts/{ref}/assign:
+    post:
+      summary: Cấp Tỉnh giao xử lý cảnh báo (Mới/Đã giao/Đang xử lý → Đã giao), hạn xử lý mặc định theo loại
+      operationId: extensionCntsAssignAlert
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSAlertAction"}
+      responses:
+        "200":
+          description: Đã giao
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertDetail"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_alert_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_alert_transition | extension.cnts_alert_version_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_alert_invalid, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/alerts/{ref}/start:
+    post:
+      summary: Người được giao nhận xử lý (Đã giao → Đang xử lý)
+      operationId: extensionCntsStartAlert
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSAlertAction"}
+      responses:
+        "200":
+          description: Đang xử lý
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertDetail"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_alert_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_alert_transition | extension.cnts_alert_version_conflict", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/alerts/{ref}/close:
+    post:
+      summary: Đóng cảnh báo với kết quả xử lý (≥ 10 ký tự) — người được giao, Cấp Tỉnh, Admin
+      operationId: extensionCntsCloseAlert
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSAlertAction"}
+      responses:
+        "200":
+          description: Đã đóng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertDetail"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_alert_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_alert_transition | extension.cnts_alert_version_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_alert_invalid, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/alert-assignees:
+    get:
+      summary: Cán bộ phòng CNTS của tỉnh được giao xử lý cảnh báo (Cấp Xã chỉ khi phụ trách xã đã chọn)
+      operationId: extensionCntsAlertAssignees
+      tags: [extension]
+      parameters:
+        - {name: commune_code, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertAssignees"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/alert-config:
+    get:
+      summary: Cấu hình nhắc nhở theo biểu (UR-TINH-08), xử lý theo loại cảnh báo, ngưỡng đang hiệu lực (tham số cnts.*)
+      operationId: extensionCntsAlertConfig
+      tags: [extension]
+      responses:
+        "200":
+          description: Cấu hình
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertConfig"}
+  /v1/extension/cnts/alert-config/forms/{code}:
+    put:
+      summary: Cấp Tỉnh lưu phiên bản mới cấu hình nhắc của biểu kỳ CNTS
+      operationId: extensionCntsPutFormReminder
+      tags: [extension]
+      parameters:
+        - {name: code, in: path, required: true, schema: {type: string, enum: [CNTS-BM01, CNTS-BM04, CNTS-BM17, CNTS-BM05-I, CNTS-BM05-II]}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSFormReminder"}
+      responses:
+        "200":
+          description: Đã lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertConfig"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_alert_config_invalid, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/alert-config/kinds/{kind}:
+    put:
+      summary: Cấp Tỉnh lưu phiên bản mới cấu hình xử lý của loại cảnh báo (hạn xử lý; mức Khẩn của môi trường nước)
+      operationId: extensionCntsPutAlertSetting
+      tags: [extension]
+      parameters:
+        - {name: kind, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSAlertSetting"}
+      responses:
+        "200":
+          description: Đã lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertConfig"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_alert_config_invalid, $ref: "#/components/responses/Problem"}
   /v1/extension/cnts/period-forms:
     get:
       summary: Biểu kỳ Cấp Xã CNTS và phiên bản đã cài ở cap/forms
@@ -17075,6 +17247,181 @@ components:
         label: {type: string}
         submission: {$ref: "#/components/schemas/FormsSubmission"}
     # --- extension CNTS biểu kỳ Cấp Xã (W11.42) ---
+    CNTSAlertActorRef:
+      type: object
+      required: [ref, display]
+      properties:
+        ref: {type: string, format: uuid}
+        display: {type: [string, "null"]}
+    CNTSAlert:
+      type: object
+      description: Cảnh báo CNTS (W11.43). detail.findings là các vi phạm theo trường (loài, nhóm), detail.summary tóm tắt.
+      required: [alert_ref, kind, kind_label, kind_no, level, status, overdue, commune_code, province_code, subject_kind, subject_ref,
+        template_code, period_key, period_ref, source_ref, title, detail, recipient_refs, assignee, raised_at, due_at, overdue_at, closed_at,
+        auto_closed, result, seq, updated_at, can_assign, can_start, can_close]
+      properties:
+        alert_ref: {type: string, format: uuid}
+        kind: {type: string}
+        kind_label: {type: string}
+        kind_no: {type: integer, description: Số dòng ở bảng Mục III.5 (0 = trễ nộp liên tiếp)}
+        level: {type: string, enum: [urgent, attention]}
+        status: {type: string, enum: [new, assigned, in_progress, closed]}
+        overdue: {type: boolean}
+        commune_code: {type: [string, "null"]}
+        province_code: {type: [string, "null"]}
+        subject_kind: {type: string, enum: [commune, facility, household, site, outbreak]}
+        subject_ref: {type: string}
+        template_code: {type: [string, "null"]}
+        period_key: {type: [string, "null"]}
+        period_ref: {type: [string, "null"], format: uuid}
+        source_ref: {type: [string, "null"], format: uuid}
+        title: {type: string}
+        detail: {type: object, additionalProperties: true}
+        recipient_refs: {type: array, items: {type: string, format: uuid}}
+        assignee:
+          oneOf:
+            - {$ref: "#/components/schemas/CNTSAlertActorRef"}
+            - {type: "null"}
+        raised_at: {type: string, format: date-time}
+        due_at: {type: string, format: date-time}
+        overdue_at: {type: [string, "null"], format: date-time}
+        closed_at: {type: [string, "null"], format: date-time}
+        auto_closed: {type: boolean}
+        result: {type: [string, "null"]}
+        seq: {type: integer, description: Số sự việc cuối (base_seq của khóa lạc quan)}
+        updated_at: {type: string, format: date-time}
+        can_assign: {type: boolean}
+        can_start: {type: boolean}
+        can_close: {type: boolean}
+    CNTSAlertList:
+      type: object
+      required: [items, counts]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/CNTSAlert"}}
+        counts:
+          type: object
+          required: [open, urgent_open, overdue]
+          properties:
+            open: {type: integer}
+            urgent_open: {type: integer}
+            overdue: {type: integer}
+    CNTSAlertHistory:
+      type: object
+      required: [seq, action, status_after, actor, assignee, due_at, note, event_time, support_reason]
+      properties:
+        seq: {type: integer}
+        action: {type: string, enum: [raised, assigned, started, closed, auto_closed, overdue]}
+        status_after: {type: string, enum: [new, assigned, in_progress, closed]}
+        actor: {$ref: "#/components/schemas/CNTSAlertActorRef"}
+        assignee:
+          oneOf:
+            - {$ref: "#/components/schemas/CNTSAlertActorRef"}
+            - {type: "null"}
+        due_at: {type: [string, "null"], format: date-time}
+        note: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+        support_reason: {type: [string, "null"]}
+    CNTSAlertDetail:
+      allOf:
+        - {$ref: "#/components/schemas/CNTSAlert"}
+        - type: object
+          required: [history]
+          properties:
+            history: {type: array, items: {$ref: "#/components/schemas/CNTSAlertHistory"}}
+    CNTSAlertAction:
+      type: object
+      properties:
+        base_seq: {type: integer, description: Số sự việc cuối đã thấy (0 = không kiểm)}
+        assignee_ref: {type: string, format: uuid, description: assign — bắt buộc}
+        due_at: {type: string, format: date-time, description: assign — hạn xử lý (mặc định theo loại)}
+        note: {type: string, maxLength: 1000}
+        result: {type: string, minLength: 10, maxLength: 2000, description: close — kết quả xử lý bắt buộc}
+    CNTSAlertAssignees:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [actor, level, communes, manager]
+            properties:
+              actor: {$ref: "#/components/schemas/CNTSAlertActorRef"}
+              level: {type: string, enum: [commune, province]}
+              communes: {type: array, items: {type: string}}
+              manager: {type: boolean}
+    CNTSFormReminder:
+      type: object
+      required: [before_due_hours, on_overdue, repeat_daily, repeat_at, late_streak, channels, message]
+      properties:
+        before_due_hours: {type: integer, minimum: 0, maximum: 168}
+        on_overdue: {type: boolean}
+        repeat_daily: {type: boolean}
+        repeat_at: {type: string, description: "HH:MM giờ Việt Nam"}
+        late_streak: {type: integer, minimum: 0, maximum: 12, description: Trễ liên tiếp từ n kỳ → cảnh báo (0 = tắt)}
+        channels: {type: array, items: {type: string, enum: [in_app, push, email]}}
+        message: {type: string, maxLength: 500, description: "Nội dung mẫu — {bieu}, {ky}, {han}"}
+    CNTSAlertSetting:
+      type: object
+      required: [sla_hours, urgent]
+      properties:
+        sla_hours: {type: integer, minimum: 1, maximum: 720}
+        urgent: {type: boolean, description: Chỉ loại có level_configurable}
+    CNTSAlertConfig:
+      type: object
+      required: [forms, kinds, thresholds]
+      properties:
+        forms:
+          type: array
+          items:
+            type: object
+            required: [code, label, reminder, custom, version, updated_at, updated_by, sent_today]
+            properties:
+              code: {type: string}
+              label: {type: string}
+              reminder: {$ref: "#/components/schemas/CNTSFormReminder"}
+              custom: {type: boolean}
+              version: {type: integer}
+              updated_at: {type: [string, "null"], format: date-time}
+              updated_by:
+                oneOf:
+                  - {$ref: "#/components/schemas/CNTSAlertActorRef"}
+                  - {type: "null"}
+              sent_today: {type: integer}
+        kinds:
+          type: array
+          items:
+            type: object
+            required: [kind, sla_hours, urgent, level, custom, version]
+            properties:
+              kind:
+                type: object
+                required: [code, no, label, default_level, level_configurable, recipients, source]
+                properties:
+                  code: {type: string}
+                  no: {type: integer}
+                  label: {type: string}
+                  default_level: {type: string, enum: [urgent, attention]}
+                  level_configurable: {type: boolean}
+                  recipients: {type: array, items: {type: string}}
+                  source: {type: string, enum: [forms, outbreak, job, log, schedule]}
+              sla_hours: {type: integer}
+              urgent: {type: boolean}
+              level: {type: string, enum: [urgent, attention]}
+              custom: {type: boolean}
+              version: {type: integer}
+        thresholds:
+          type: array
+          items:
+            type: object
+            required: [key, label, unit, value, version, effective_from]
+            properties:
+              key: {type: string}
+              label: {type: string}
+              unit: {type: string}
+              value: {type: [string, "null"], description: Số thập phân dạng chuỗi; null = chưa có giá trị đã duyệt}
+              version: {type: integer}
+              effective_from: {type: [string, "null"], format: date}
     CNTSPeriodForm:
       type: object
       required: [code, bm, title, unit_kind, period_type, deadline_offset_days, deadline_time, due, nil_label, fields, template_id,
