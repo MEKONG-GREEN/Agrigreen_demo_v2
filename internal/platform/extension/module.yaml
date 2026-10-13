@@ -29,6 +29,8 @@ provides:
     - KHTCSources
     - TablePDF
   events:
+    - pf.extension.cnts_alert.changed/v1
+    - pf.extension.cnts_form.reminded/v1
     - pf.extension.consolidation.completed/v1
     - pf.extension.directive.issued/v1
     - pf.extension.outbreak.reported/v1
@@ -54,7 +56,7 @@ provides:
     - pf_extension_pub.task_event/v1
   data_products: []
 consumes:
-  events: []
+  events: [pf.forms.submission.recorded/v1]
 permissions: []
 shares: []
 owns_schema: [pf_extension, pf_extension_pub]

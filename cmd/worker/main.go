@@ -591,6 +591,24 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Params: masterdata.New(mdPool, clk).Params()})
 		js = append(js, mrvMod.Jobs(mrv.PendingTenants(out.pools[migrations.PF]), log)...)
 	}
+	if selected(jobs, extension.JobCNTSAlert) {
+		// W11.43 (BRD CNTS FN-13, UR-TINH-08, UR-TINH-13): cảnh báo quá hạn xử lý → Lãnh đạo phòng, nhắc nộp biểu kỳ CNTS, trễ
+		// liên tiếp — cần cap/forms (SubmissionFeed) và gán vai trò (pf/accounts) → dựng module pf qua assembly.Build; tìm
+		// tenant bằng ag_ops_jobs (cột của cnts_alert_current, pf_forms.period).
+		mods, mpools, err := buildPlatform(ctx, direct)
+		prevClose := closeFn
+		closeFn = func() {
+			for _, p := range mpools {
+				p.Close()
+			}
+			prevClose()
+		}
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		js = append(js, mods.Extension.CNTSAlertJobs(extension.CNTSAlertTenants(out.pools[migrations.PF]), log)...)
+	}
 	if selected(jobs, extension.JobReportCycle) {
 		// KN v7.7 P4 — vòng đời báo cáo (tự chốt kỳ + tổng hợp "Hệ thống", chốt lại sau hạn mở, tự nhắc): cần engine mẫu
 		// (pf/reports), khu vực (pf/party), gán vai trò (pf/accounts) → dựng module pf qua assembly.Build (mỗi module một
@@ -679,7 +697,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		closeFn()
 		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + accport.JobDormant + ", " + extension.JobEscalation + ", " + extension.JobWorkSchedule + ", " +
 			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot +
-			", " + mrvport.JobReviewEscalator + ", " + extension.JobReportCycle +
+			", " + mrvport.JobReviewEscalator + ", " + extension.JobReportCycle + ", " + extension.JobCNTSAlert +
 			", " + apiclientport.JobKeyExpiry + ", " + apiclientport.JobFeedBuild + ", " + apiclientport.JobFeedRetention + ", " + apiclientport.JobWebhookDispatch +
 			", " + priceport.JobCalendar + ")")
 	}

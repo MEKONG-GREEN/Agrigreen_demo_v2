@@ -585,7 +585,8 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 			}
 		}
 		out = SubmissionView{Submission: sb, Status: domain.SubSubmitted, Meta: &m}
-		return nil
+		// W11.43: quy tắc liên biểu + cảnh báo của bên dùng chạy sau commit (consumer inbox đọc qua port.SubmissionFeed).
+		return enqueueRecorded(ctx, tx, a.tenant, profile, t.Code, sb, m)
 	})
 	return out, classify(err)
 }
@@ -1032,6 +1033,14 @@ func (s *Service) Snapshots(ctx context.Context, profile string, periodRef uuid.
 		return err
 	})
 	return out, err
+}
+
+// enqueueRecorded ghi sự kiện pf.forms.submission.recorded vào outbox trong giao dịch nộp bài (W11.43).
+func enqueueRecorded(ctx context.Context, tx pgx.Tx, tid uuid.UUID, profile, code string, sb store.Submission, m store.Meta) error {
+	return outbox.Enqueue(ctx, tx, outbox.Event{ID: ids.New(), TenantID: tid, Type: port.EventSubmissionRecorded, SchemaVersion: 1,
+		OccurredAt: sb.EventTime, Producer: port.EventProducerName, Payload: port.SubmissionRecordedV1{SubmissionID: sb.ID.String(),
+			PeriodRef: sb.PeriodID.String(), Profile: profile, TemplateCode: code, Unit: sb.Unit, Version: sb.Version, NilReport: m.NilReport,
+			Late: m.Late, ActorRef: sb.Submitter.String(), EventTime: sb.EventTime.Format(time.RFC3339Nano)}})
 }
 
 // enqueueClosed ghi sự kiện pf.forms.period.closed vào outbox trong giao dịch tx.

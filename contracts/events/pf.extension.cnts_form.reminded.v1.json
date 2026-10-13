@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.cnts_form.reminded/v1",
+  "title": "pf.extension.cnts_form.reminded — payload",
+  "description": "Nhắc nộp biểu kỳ Cấp Xã CNTS (W11.43 — BRD CNTS v3.7 UR-TINH-08, FN-13 BR-02): một sự kiện mỗi kỳ native × đơn vị chưa gửi × lượt nhắc (before = trước hạn, overdue = khi trễ, repeat = nhắc lặp mỗi ngày) theo cấu hình nhắc của biểu. channels là kênh Cấp Tỉnh chọn (in_app luôn có; email khi người nhận có email đã xác minh). message là nội dung mẫu đã thay {bieu}, {ky}, {han}.",
+  "x-event-type": "pf.extension.cnts_form.reminded",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": ["period_ref", "template_code", "period_label", "unit", "commune_code", "slot", "due_at", "message", "channels", "recipient_refs", "department", "event_time"],
+  "properties": {
+    "period_ref":     { "type": "string", "format": "uuid", "description": "Kỳ native cap/forms" },
+    "template_code":  { "type": "string" },
+    "period_label":   { "type": "string" },
+    "unit":           { "type": "string", "description": "Đơn vị lá chưa gửi (mã xã hoặc facility_ref)" },
+    "commune_code":   { "type": "string" },
+    "slot":           { "type": "string", "enum": ["before", "overdue", "repeat"] },
+    "due_at":         { "type": "string", "format": "date-time" },
+    "message":        { "type": "string", "maxLength": 500 },
+    "channels":       { "type": "array", "items": { "type": "string", "enum": ["in_app", "push", "email"] } },
+    "recipient_refs": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+    "department":     { "type": "string", "enum": ["chan_nuoi_thuy_san"] },
+    "event_time":     { "type": "string", "format": "date-time" }
+  }
+}

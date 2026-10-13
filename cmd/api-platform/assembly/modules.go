@@ -318,6 +318,9 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	pr.UseTablePDF(rep.TablePDF()) // W11.75: "Tải PDF" phiếu báo giá (FN-XA-03.02)
 	// KN v7.7 P1 → P5: vai, phòng ban, tỉnh, xã, cấp quản lý từ ngữ cảnh phiên + sổ gán vai trò (thay suy từ vai realm).
 	kn.UseKNContext(acc.ExtensionKNContext(), acc.ExtensionKNDirectory())
+	// W11.43: cảnh báo CNTS — bài nộp cap/forms (SubmissionFeed), người nhận theo sổ gán vai trò (cán bộ xã, Lãnh đạo phòng,
+	// người phụ trách biểu).
+	kn.UseCNTSAlerts(extension.CNTSAlertDeps{Feed: fm.SubmissionFeed(), Directory: acc.ExtensionKNDirectory(), Holders: acc.RoleHolders()})
 
 	// pf/waterway (G2): API ghi sổ đoạn/công trình, tạo job dựng và phát hành; worker dựng đồ thị (cmd/worker).
 	ww := waterway.New(unit, clk, waterway.Deps{Params: md.Params(), Catalogs: md.Catalogs()})

@@ -27,6 +27,8 @@ type UnitProgress struct {
 	LastSubmittedAt *time.Time
 	ReviewedAt      *time.Time
 	Late            bool // phiên bản cuối gửi sau hạn (sổ phụ submission_meta)
+	// Parent: xã cha của đơn vị (cơ sở/hộ → mã xã; = Unit với xã) — W11.43 (nhắc nộp, trễ liên tiếp).
+	Parent string
 }
 
 // PeriodProgress là trạng thái kỳ native kèm tiến độ từng đơn vị trong phạm vi người gọi.
@@ -39,6 +41,9 @@ type PeriodProgress struct {
 	Status         string // open | closed | reopened | cancelled
 	MaxSubmissions int    // 0 = không giới hạn
 	Units          []UnitProgress
+	// W11.43: khóa kỳ và khoảng ngày theo lịch kỳ (rỗng/nil = kỳ không gắn lịch).
+	PeriodKey string
+	From, To  *time.Time
 }
 
 // PeriodControl là cổng điều khiển kỳ native (đọc tiến độ, chốt, hủy).

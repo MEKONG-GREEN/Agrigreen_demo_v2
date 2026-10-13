@@ -168,6 +168,7 @@ func (m *Module) Consumers() []Consumer {
 		// W11.74 nhắc nhập giá; gói NOTIF: cảnh báo, xác minh, tổng hợp giờ khóa, duyệt / mở duyệt bảng giá.
 		{Name: port.ConsumerPrice, Events: domain.PriceEvents, Handler: ev},
 		// D24: báo trước khóa tài khoản không hoạt động (pf/accounts job accounts_dormant).
+		{Name: port.ConsumerCNTS, Events: domain.CNTSEvents, Handler: ev}, // W11.43: cảnh báo, nhắc nộp biểu kỳ CNTS
 		{Name: port.ConsumerAccounts, Events: []string{accport.EventUserDormantWarning}, Handler: ev},
 		{Name: port.ConsumerPush, Events: []string{port.EventPushRequested}, Handler: m.svc.HandlePush},
 		{Name: port.ConsumerEmail, Events: []string{port.EventEmailRequested}, Handler: m.svc.HandleEmail},

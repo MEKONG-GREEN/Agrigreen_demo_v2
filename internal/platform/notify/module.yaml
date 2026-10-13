@@ -28,6 +28,8 @@ consumes:
     - pf.cropcycle.farm_log.recorded/v1
     - pf.cropcycle.farm_log.reviewed/v1
     - pf.cropcycle.season.opened/v1
+    - pf.extension.cnts_alert.changed/v1
+    - pf.extension.cnts_form.reminded/v1
     - pf.extension.directive.issued/v1
     - pf.extension.period.reopened/v1
     - pf.extension.report_batch.issued/v1

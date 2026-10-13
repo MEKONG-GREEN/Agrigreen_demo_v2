@@ -56,6 +56,9 @@ var Consumers = []Consumer{
 		Handler: func(m Modules) inbox.Handler { return m.Cooperative.GpsLogHandler() }},
 	{Name: extport.GpsLogConsumer, Module: extension.DBModule, Events: []string{extport.EventSupportRequestSubmitted},
 		Handler: func(m Modules) inbox.Handler { return m.Extension.GpsLogHandler() }},
+	// W11.43: quy tắc liên biểu + cảnh báo CNTS sau commit (bài nộp kn_cnts, ổ dịch mới).
+	{Name: extport.CNTSAlertConsumer, Module: extension.DBModule, Events: extension.CNTSAlertEvents,
+		Handler: func(m Modules) inbox.Handler { return m.Extension.CNTSAlertHandler() }},
 	{Name: simport.SnapshotConsumer, Module: simulation.DBModule, Events: []string{simport.EventRunSubmitted},
 		Handler: func(m Modules) inbox.Handler { return m.Simulation.SnapshotHandler() }},
 	{Name: mrvport.FarmLogLinkConsumer, Module: mrv.DBModule, Events: mrvport.FarmLogLinkEvents,

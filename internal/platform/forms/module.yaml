@@ -17,8 +17,9 @@ provides:
     - Freezer
     - PeriodControl
     - Publisher
+    - SubmissionFeed
     - Validator
-  events: [pf.forms.period.closed/v1]
+  events: [pf.forms.period.closed/v1, pf.forms.submission.recorded/v1]
   internal_events: []
   publications: [pf_forms_pub.closed_figures/v1]
   data_products: []

@@ -18,6 +18,8 @@ import (
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/app"
+	alertapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/cntsalert/app"
+	alerthandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/cntsalert/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/handler"
 	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtc/app"
 	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtc/handler"
@@ -84,6 +86,8 @@ type Module struct {
 	khtcSrc *khtcSourceService
 	// W11.63: phiếu Báo cáo cho KHTC (extension/khtcform, module_khtc.go).
 	khtcForms *khtcFormService
+	// W11.43 (D4 CN3): quy tắc liên biểu + 12 cảnh báo CNTS, vòng đời cảnh báo, nhắc nộp theo biểu (module_cntsalert.go).
+	alert *alertapp.Service
 }
 
 // New tạo module với pool của vai extension_app.
@@ -97,6 +101,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.mat = &matapp.Service{DB: db, Clock: clk, Catalogs: d.Catalogs, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.khtc = &khtcapp.Service{DB: db, Clock: clk, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.ob = &obapp.Service{DB: db, Clock: clk, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.alert = &alertapp.Service{DB: db, Clock: clk, Params: d.Params, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	return m
 }
 
@@ -149,7 +154,8 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	khtchandler.Handler{Svc: m.khtc}.RegisterApp(rg)
 	m.registerKHTCPeriods(rg) // W11.62
 	obhandler.Handler{Svc: m.ob}.RegisterApp(rg)
-	m.registerKHTCSources(rg) // W11.64
+	m.registerKHTCSources(rg)                          // W11.64
+	alerthandler.Handler{Svc: m.alert}.RegisterApp(rg) // W11.43
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham

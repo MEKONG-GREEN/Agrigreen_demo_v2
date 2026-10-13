@@ -68,6 +68,13 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 		priceport.EventVerificationResponded, priceport.EventVerificationDecided, priceport.EventLockSummarized,
 		priceport.EventBoardPublished, priceport.EventBoardReopened, priceport.EventTicketProxied:
 		return s.onPrice(ctx, tx, env)
+	case extport.EventCNTSAlertChanged, extport.EventCNTSFormReminded:
+		// W11.43: cảnh báo CNTS (mới, giao, quá hạn) và nhắc nộp biểu kỳ CNTS.
+		ns, err := domain.CNTSNotifications(env.EventType, env.Payload, env.OccurredAt)
+		if err != nil || len(ns) == 0 {
+			return err
+		}
+		return s.deliver(ctx, tx, env, ns)
 	case extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed, extport.EventWorkScheduleReminded:
 		ns, err := domain.WorkScheduleNotifications(env.EventType, env.Payload, env.OccurredAt)
 		if err != nil {

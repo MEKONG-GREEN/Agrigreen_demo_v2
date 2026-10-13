@@ -49,6 +49,7 @@ var withIDAllowed = map[string]string{
 	"internal/platform/extension/app/support.go":           "tenant của Principal đã xác thực",
 	"internal/platform/extension/app/support_sync.go":      "tenant của Principal đã xác thực",
 	"internal/platform/extension/reportcycle/app/job.go":   "job theo từng tenant",
+	"internal/platform/extension/cntsalert/app/job.go":     "job theo từng tenant (W11.43)",
 	"internal/platform/geo/app/dataproduct.go":             "tenant dữ liệu dp_* đã kiểm GrantLookup ở apiclient/public — chờ grantlookup trả Grant (review M9)",
 	"internal/platform/mechanization/app/areasync.go":      "tenant của phong bì sự kiện",
 	"internal/platform/mechanization/app/areasynclog.go":   "job theo từng tenant",
