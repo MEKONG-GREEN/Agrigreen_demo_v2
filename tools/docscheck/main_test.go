@@ -97,6 +97,13 @@ func TestPerPackageDocs_WHB(t *testing.T) {
 	wantProblems(t, root, `dòng đầu phải là "## W11.43`, "không thuộc gói W11.43", "liên kết hỏng ../adr/0050-x.md")
 	_ = os.Remove(filepath.Join(root, "docs/kn/gia-dinh/W11.43.md"))
 
+	put(t, root, "docs/kn/gia-dinh/KHTCQA.md", "## KHTCQA — Ma trận nghiệm thu\n")
+	put(t, root, "docs/roadmap.d/kn-2026-10/KHTCQA.md", "- [x] KHTCQA (13/10/2026): xong\n")
+	wantProblems(t, root)
+	put(t, root, "docs/kn/gia-dinh/khtc_qa.md", "## khtc_qa — chữ thường\n")
+	wantProblems(t, root, "tên tệp phải là mã gói")
+	_ = os.Remove(filepath.Join(root, "docs/kn/gia-dinh/khtc_qa.md"))
+
 	put(t, root, "docs/roadmap.d/kn-2026-10/W11.76.md", "- [x] W11.75: dòng của gói khác\n")
 	wantProblems(t, root, `mỗi dòng phải là "- [ ] W11.76…"`)
 	_ = os.Remove(filepath.Join(root, "docs/roadmap.d/kn-2026-10/W11.76.md"))

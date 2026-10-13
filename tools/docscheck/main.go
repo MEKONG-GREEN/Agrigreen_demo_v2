@@ -153,7 +153,8 @@ func checkADR(root string) ([]string, error) {
 }
 
 var (
-	pkgFileRe = regexp.MustCompile(`^(W\d+\.\d+[a-z]?)\.md$`)
+	// Mã gói: W11.42, W11.05b, hoặc gói có tên (KHTCQA, WH-B).
+	pkgFileRe = regexp.MustCompile(`^(W\d+\.\d+[a-z]?|[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)\.md$`)
 	linkRe    = regexp.MustCompile(`\]\(([^)\s]+)\)`)
 )
 
