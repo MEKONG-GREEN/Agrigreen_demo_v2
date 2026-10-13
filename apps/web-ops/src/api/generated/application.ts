@@ -14126,8 +14126,8 @@ export interface components {
             sort_order?: number;
             /** @description false = ngừng dùng */
             active?: boolean;
-            /** @description Người ký, nơi nhận, căn cứ */
-            default_for?: ("mau_1" | "mau_2" | "mau_3" | "mau_4" | "mau_5")[];
+            /** @description mau_1…mau_5 — chỉ người ký, nơi nhận, căn cứ */
+            default_for?: string[];
             /** @description signer: title, authority; price_item: group, unit; unit: symbol; basis: document_no, date; recipient: address */
             attrs?: {
                 [key: string]: string;
@@ -28684,9 +28684,7 @@ export interface operations {
                 kind?: components["schemas"]["KhtcCatalogKind"];
                 include_retired?: boolean;
             };
-            header: {
-                "X-AG-Context": string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -28717,7 +28715,6 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "X-AG-Context": string;
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path: {
@@ -28757,7 +28754,6 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "X-AG-Context": string;
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path: {
@@ -28799,9 +28795,7 @@ export interface operations {
     knKhtcCatalogHistory: {
         parameters: {
             query?: never;
-            header: {
-                "X-AG-Context": string;
-            };
+            header?: never;
             path: {
                 kind: components["schemas"]["KhtcCatalogKind"];
                 code: string;
@@ -28831,9 +28825,7 @@ export interface operations {
                 kind?: components["schemas"]["KhtcProgramKind"];
                 include_retired?: boolean;
             };
-            header: {
-                "X-AG-Context": string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -28856,7 +28848,6 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "X-AG-Context": string;
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path?: never;
@@ -28894,7 +28885,6 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "X-AG-Context": string;
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path: {
@@ -28935,9 +28925,7 @@ export interface operations {
     knKhtcProgramHistory: {
         parameters: {
             query?: never;
-            header: {
-                "X-AG-Context": string;
-            };
+            header?: never;
             path: {
                 ref: string;
             };
@@ -28966,9 +28954,7 @@ export interface operations {
                 version?: number;
                 at?: string;
             };
-            header: {
-                "X-AG-Context": string;
-            };
+            header?: never;
             path: {
                 year: number;
             };
@@ -28992,9 +28978,7 @@ export interface operations {
     knKhtcPlanVersions: {
         parameters: {
             query?: never;
-            header: {
-                "X-AG-Context": string;
-            };
+            header?: never;
             path: {
                 year: number;
             };
@@ -29019,7 +29003,6 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "X-AG-Context": string;
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path: {
@@ -29060,9 +29043,7 @@ export interface operations {
     knKhtcCopyDraft: {
         parameters: {
             query?: never;
-            header: {
-                "X-AG-Context": string;
-            };
+            header?: never;
             path: {
                 year: number;
             };
@@ -29088,9 +29069,7 @@ export interface operations {
             query?: {
                 version?: number;
             };
-            header: {
-                "X-AG-Context": string;
-            };
+            header?: never;
             path: {
                 year: number;
             };
@@ -29115,7 +29094,6 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "X-AG-Context": string;
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path: {

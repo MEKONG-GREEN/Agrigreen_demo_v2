@@ -9856,14 +9856,13 @@ paths:
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   # --- hết pf/price W11.76 ---
   # --- hết pf/price ---
-  # --- W11.61 (D4 KH1, BRD KHTC v2.2 FN-AD-04.01, FN-TI-02.02): Danh mục KHTC, danh sách CT/DA chủ (D20), Kế hoạch năm ---
+  # --- W11.61 (D4 KH1, BRD KHTC v2.2 FN-AD-04.01, FN-TI-02.02): Danh mục KHTC, danh sách CT/DA chủ (D20), Kế hoạch năm. Mọi route cần header X-AG-Context (client tự gắn) ---
   /v1/kn/khtc/catalogs:
     get:
       summary: "FN-AD-04.01: Danh mục KHTC — mục hiện hành của một loại + số lượng mọi loại (Admin, Cấp Tỉnh)"
       operationId: knKhtcListCatalog
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - {name: kind, in: query, schema: {$ref: "#/components/schemas/KhtcCatalogKind"}, description: "Vắng = mọi loại"}
         - {name: include_retired, in: query, schema: {type: boolean}}
       responses:
@@ -9893,7 +9892,6 @@ paths:
       operationId: knKhtcCreateCatalog
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - $ref: "#/components/parameters/IdempotencyKey"
         - {name: kind, in: path, required: true, schema: {$ref: "#/components/schemas/KhtcCatalogKind"}}
       requestBody:
@@ -9911,7 +9909,6 @@ paths:
       operationId: knKhtcReviseCatalog
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - $ref: "#/components/parameters/IdempotencyKey"
         - {name: kind, in: path, required: true, schema: {$ref: "#/components/schemas/KhtcCatalogKind"}}
         - {name: code, in: path, required: true, schema: {type: string}}
@@ -9931,7 +9928,6 @@ paths:
       operationId: knKhtcCatalogHistory
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - {name: kind, in: path, required: true, schema: {$ref: "#/components/schemas/KhtcCatalogKind"}}
         - {name: code, in: path, required: true, schema: {type: string}}
       responses:
@@ -9947,7 +9943,6 @@ paths:
       operationId: knKhtcListPrograms
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - {name: kind, in: query, schema: {$ref: "#/components/schemas/KhtcProgramKind"}}
         - {name: include_retired, in: query, schema: {type: boolean}}
       responses:
@@ -9961,7 +9956,6 @@ paths:
       operationId: knKhtcCreateProgram
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
@@ -9978,7 +9972,6 @@ paths:
       operationId: knKhtcReviseProgram
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - $ref: "#/components/parameters/IdempotencyKey"
         - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
       requestBody:
@@ -9997,7 +9990,6 @@ paths:
       operationId: knKhtcProgramHistory
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
         "200":
@@ -10012,7 +10004,6 @@ paths:
       operationId: knKhtcGetPlan
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
         - {name: version, in: query, schema: {type: integer, minimum: 1}}
         - {name: at, in: query, schema: {type: string, format: date}}
@@ -10025,7 +10016,6 @@ paths:
       operationId: knKhtcPlanVersions
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
       responses:
         "200":
@@ -10038,7 +10028,6 @@ paths:
       operationId: knKhtcSavePlan
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - $ref: "#/components/parameters/IdempotencyKey"
         - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
       requestBody:
@@ -10057,7 +10046,6 @@ paths:
       operationId: knKhtcCopyDraft
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
       responses:
         "200": {description: Bản nháp, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcPlanDraft"}}}}
@@ -10068,7 +10056,6 @@ paths:
       operationId: knKhtcExportPlan
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
         - {name: version, in: query, schema: {type: integer, minimum: 1}}
       responses:
@@ -10083,7 +10070,6 @@ paths:
       operationId: knKhtcImportDraft
       tags: [extension]
       parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - $ref: "#/components/parameters/IdempotencyKey"
         - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
       requestBody:
@@ -16236,7 +16222,7 @@ components:
         name: {type: string}
         sort_order: {type: integer, minimum: 0}
         active: {type: boolean, description: "false = ngừng dùng"}
-        default_for: {type: array, items: {type: string, enum: [mau_1, mau_2, mau_3, mau_4, mau_5]}, description: "Người ký, nơi nhận, căn cứ"}
+        default_for: {type: array, items: {type: string}, description: "mau_1…mau_5 — chỉ người ký, nơi nhận, căn cứ"}
         attrs: {type: object, additionalProperties: {type: string}, description: "signer: title, authority; price_item: group, unit; unit: symbol; basis: document_no, date; recipient: address"}
     KhtcCatalogItem:
       type: object
