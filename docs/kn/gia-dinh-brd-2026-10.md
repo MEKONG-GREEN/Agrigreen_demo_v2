@@ -208,3 +208,22 @@ Chưa làm: app di động (`field-app`) chưa hiển thị `period_key`; lọc 
 | Bảng hệ số sửa ngày quá khứ | Cho phép (chuyển đổi dữ liệu cần bảng cũ); cùng ngày hiệu lực thì bản ghi sau thắng. Quyết định nâng bậc (W11.25) phải chụp hệ số lúc ban hành để BR-02 đúng cả khi sửa lùi | W11.25 |
 | Đơn vị công tác (HS-16, NS05) | Không ở danh mục này — dùng danh mục đơn vị nội bộ W11.07 (`pf_accounts.internal_unit`) | — |
 | Nạp danh mục/bảng hệ số từ Excel (luồng phụ FN-19) | Chưa làm (chờ dữ liệu Q-070; `cap/import`/`shared/tabular` ở W11.30) | W11.30 |
+
+## W11.75 — Nhập báo giá + xác minh (pf 000148)
+
+| Câu hỏi / mục | Lựa chọn đã dùng | Ở đâu | Đổi thế nào |
+|---|---|---|---|
+| Q-054 — Cấp Tỉnh sửa số gốc (Báo giá cho sửa giá, sửa ngày, xóa phiếu) | Chấp nhận theo phòng (đề xuất): Báo giá cho hiệu chỉnh / sửa ngày / xóa mềm — mọi thay đổi là phiên bản mới có lý do; giá Xã gửi giữ nguyên (in phiếu), bảng giá và giá tham chiếu dùng giá hiệu chỉnh | `app/ticket_review.go` | — |
+| Q-085 — phiếu in File 2 có ký số? | Không ký số (đề xuất): phiếu in có ô ký tay "Người lập phiếu", "Xác nhận của Phòng TTTT"; bố cục File 2 dựng lại dạng bảng (chưa có tệp mẫu gốc trong repo) | `PrintView.tsx`, `TicketService.PrintTickets` | Khi có File 2 gốc: chỉnh bố cục màn in / bộ dựng PDF |
+| "Đã duyệt" trong giá tham chiếu (CT-02) khi chưa có duyệt bảng giá (W11.76) | Chưa nối `TicketHooks.Board` → mọi phiếu Đã gửi / Nộp muộn của N ngày báo giá trước là "đã duyệt"; mọi ngày là "Chưa duyệt" (Cấp Tỉnh sửa được mọi ngày đã khóa) | `app.TicketHooks` | W11.76 nối `Module.SetTicketHooks` |
+| "Một phiếu chỉ một người sửa tại một thời điểm — Đang sửa bởi …" (BR-06 FN-TI-02.04) | Khóa lạc quan: mọi lần ghi gửi `version` đã đọc; người thứ hai nhận 409 `price.ticket_stale` và tải lại (không giữ khóa phiên) | `checkVersion` | Thêm khóa thuê (lease) có tên người nếu PO cần hiển thị "Đang sửa bởi" |
+| Trạng thái Không nộp / Đã khóa / Chờ rà soát / Quá hạn phản hồi | Chiếu lúc đọc theo `DayPlan.Locked` và `respond_by` (không job ghi lúc 12:00); "thông báo tổng hợp cho Cấp Tỉnh lúc 12:00" (B4 FN-TI-02.03) chưa gửi | `domain.TicketView`, `AlertView` | Job `price_calendar` (W11.74) phát thông báo khi nối `pf/notify` |
+| Yêu cầu xác minh gửi sau hạn phản hồi của ngày (phiếu nhập thay buổi chiều) | Hạn = giờ gửi + (hạn phản hồi − giờ khóa), tối thiểu 30 phút (mặc định +1 giờ 30) | `app.respondBy` | Tham số lịch W11.74 nếu PO chốt khác |
+| Ai nhập / sửa | Cấp Xã: xã mình phụ trách chính TẠI NGÀY báo giá, chỉ ngày hôm nay trước giờ khóa; Cấp Tỉnh: xã được phân công hoặc chưa phân công (`Point.HandledBy`); Admin: như Cấp Tỉnh mọi xã (hỗ trợ — BR-01 FN-TI-02.04); Cấp TW không đọc phiếu | `app/ticket.go` | — |
+| Lưu nháp sau khi đã gửi | Không cho (409 `conflict`) — sửa rồi "Gửi lại"; tránh phiếu Đã gửi trở về Bản nháp (BRD: Đã gửi → gửi lại) | `SaveEntry` | — |
+| Sửa ngày phiếu | Ngày mới phải là ngày báo giá đã qua giờ khóa, xã hoạt động, chưa có phiếu (AC-04), bảng giá chưa duyệt; cảnh báo giữ nguyên (không tính lại theo ngày mới) | `Redate` | — |
+| Giá nhập trên web "13.000" | Nhóm 3 chữ số sau dấu chấm (không dấu phẩy) = phân cách nghìn (VND); "12,5" = 12.5 | `kn/price/tickets/api.ts priceOf` | — |
+| Thông báo chuông / email (yêu cầu xác minh, phản hồi, kết quả xử lý, nhập thay) | Chưa gửi — cần sự kiện mới và consumer `pf/notify` (CHECK `kind` của `pf_notify` chỉ migration của `pf/notify` sửa) | — | Gói sau: sự kiện `pf.price.verification.*` + `pf/notify` |
+| Tệp minh chứng khi nhập thay (FN-TI-02.09 B3, tùy chọn) | Chưa làm — chỉ lý do | — | Nối `cap/files` |
+| Lịch sử báo giá dạng Lịch (FN-XA-03.03) | Chỉ dạng Danh sách | `HistoryScreen` | Gói sau |
+| Nhập trên điện thoại (UR-XA-01) | Web responsive (thẻ theo mặt hàng, gom nhóm) — `apps/field-app` chưa có mẫu KN báo giá; hoãn app di động | `globals.css .pb-line` | Gói sau nếu PO cần offline |

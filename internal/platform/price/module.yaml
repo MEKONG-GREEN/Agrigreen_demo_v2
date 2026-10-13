@@ -8,7 +8,16 @@ zones: [pf]
 version: 1.0.0
 depends: {}
 provides:
-  ports: [Calendar, Catalog, Items, Officers, Points, ReminderTargets, Thresholds]
+  ports:
+    - Calendar
+    - Catalog
+    - Items
+    - Officers
+    - Points
+    - ReminderTargets
+    - TablePDF
+    - Thresholds
+    - Tickets
   events: [pf.price.reminder.issued/v1]
   internal_events: []
   publications: []

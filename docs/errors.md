@@ -1065,5 +1065,20 @@ Route `/v1/price/*` (Application API). Lỗi chung: `unauthenticated` (401), `fo
 | 422 | `price.region_not_found` | W11.72: nhóm vùng không có hiệu lực tại ngày hiệu lực (thêm/sửa xã, sửa/ngưng nhóm vùng) |
 | 409 | `price.region_in_use` | W11.72: ngưng nhóm vùng còn xã báo giá đang hoặc sắp hoạt động |
 | 422 | `price.officer_invalid` | W11.72: người được phân công không phải cán bộ đúng cấp (Cấp Xã cho vai `xa`, Cấp Tỉnh cho vai `tinh`) của phòng ban báo giá (danh bạ pf/accounts) |
-| 403 | `price.point_not_assigned` | W11.72: Cấp Xã đề xuất mặt hàng cho xã báo giá mình không phụ trách chính hôm nay |
+| 403 | `price.point_not_assigned` | W11.72: Cấp Xã đề xuất mặt hàng cho xã báo giá mình không phụ trách chính hôm nay; W11.75: Cấp Xã xem / nhập phiếu, phản hồi xác minh của xã mình không phụ trách chính tại ngày báo giá |
+| 404 | `price.ticket_not_found` | W11.75: mã phiếu báo giá không có (chi tiết, nhật ký, hiệu chỉnh, sửa ngày, xóa, in) |
+| 409 | `price.ticket_stale` | W11.75: phiếu đã được người khác cập nhật sau khi đọc (`version` khác phiên bản hiện hành — một phiếu một người sửa, BR-06 FN-TI-02.04) |
+| 409 | `price.ticket_locked` | W11.75: Cấp Xã lưu / gửi phiếu khi đã qua giờ khóa của ngày báo giá (kiểm theo đồng hồ máy chủ, đúng giờ khóa — AC-04 FN-XA-03.01) |
+| 422 | `price.not_quote_day` | W11.75: ngày không phải ngày báo giá theo lịch, hoặc Cấp Xã nhập cho ngày khác hôm nay; sửa ngày / nhập thay sang ngày không phải ngày báo giá |
+| 422 | `price.ticket_incomplete` | W11.75: gửi phiếu còn mặt hàng chưa có giá / "Không có hàng", hoặc dòng bất thường chưa có ghi chú biến động (BR-03, BR-04 FN-XA-03.01); lưu nháp được |
+| 422 | `price.price_invalid` | W11.75: giá không phải số dương, thấp nhất > cao nhất, quá 2 số lẻ, thiếu một trong hai giá, "Không có hàng" kèm giá, mặt hàng không thuộc danh sách của xã (nhập, hiệu chỉnh, giá đề xuất của Xã) |
+| 409 | `price.ticket_not_locked` | W11.75: Cấp Tỉnh nhập thay / hiệu chỉnh / sửa ngày / xóa / chốt cảnh báo khi chưa qua giờ khóa của ngày |
+| 409 | `price.ticket_exists` | W11.75: nhập thay đè phiếu đã gửi (BR-01 FN-TI-02.09), sửa ngày sang ngày xã đã có phiếu (AC-04 FN-TI-02.04), Xã ghi đè phiếu nhập thay |
+| 409 | `price.board_approved` | W11.75: bảng giá của ngày đã duyệt / đang duyệt (W11.76) — mở duyệt trước khi sửa, nhập thay, xác minh |
+| 404 | `price.alert_not_found` | W11.75: không có cảnh báo cho phiếu + mặt hàng |
+| 409 | `price.alert_state` | W11.75: trạng thái cảnh báo không cho phép thao tác (yêu cầu xác minh khi quá hạn / đã xử lý; phản hồi khi không ở "Đã yêu cầu xác minh"; giữ nguyên / loại khi chưa khóa hoặc đã xử lý; mở lại khi bảng giá không đang mở duyệt) |
+| 409 | `price.respond_overdue` | W11.75: Xã phản hồi sau hạn phản hồi (AC-02 FN-XA-03.05) |
+| 422 | `price.reason_required` | W11.75: thiếu lý do nộp muộn / hiệu chỉnh / sửa ngày / xóa phiếu, nội dung yêu cầu xác minh, giải trình của Xã, ghi chú giữ nguyên / lý do loại |
+| 403 | `price.point_not_handled` | W11.75: cán bộ Cấp Tỉnh thao tác trên xã không được phân công cho mình (xã đã phân công cho cán bộ khác) |
+| 503 | `price.pdf_unavailable` | W11.75: "Tải PDF" phiếu khi gốc lắp ráp chưa nối bộ dựng PDF (pf/reports) — dùng Excel hoặc in từ trình duyệt |
 

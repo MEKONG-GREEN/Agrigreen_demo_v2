@@ -258,7 +258,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
     ],
     kn_tinh: [
       soon("tinh.bao_gia.tien_do", "Tiến độ nhập giá", "/kn/bao-gia/tien-do", "bell"),
-      soon("tinh.bao_gia.kiem_duyet", "Kiểm duyệt & công bố", "/kn/bao-gia/kiem-duyet", "approve"),
+      { key: "tinh.bao_gia.kiem_duyet", label: "Kiểm duyệt & công bố", route: "/kn/bao-gia/kiem-duyet", icon: "approve" }, // W11.75
       soon("tinh.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
       soon("tinh.bao_gia.bien_dong", "Báo cáo biến động giá", "/kn/bao-gia/bien-dong", "layers"),
       soon("tinh.bao_gia.dieu_tra", "Điều tra giá thành", "/kn/bao-gia/dieu-tra", "season"),
@@ -267,9 +267,10 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       { key: "tinh.bao_gia.cau_hinh", label: "Cấu hình báo giá", route: "/kn/bao-gia/cau-hinh", icon: "param" },
     ],
     kn_xa: [
-      soon("xa.bao_gia.nhap", "Nhập báo giá", "/kn/bao-gia/nhap", "upload"),
-      soon("xa.bao_gia.xac_minh", "Yêu cầu xác minh", "/kn/bao-gia/xac-minh", "check"),
-      soon("xa.bao_gia.lich_su", "Lịch sử báo giá", "/kn/bao-gia/lich-su", "journal"),
+      // W11.75: nhập báo giá, yêu cầu xác minh, lịch sử báo giá đã mở.
+      { key: "xa.bao_gia.nhap", label: "Nhập báo giá", route: "/kn/bao-gia/nhap", icon: "upload" },
+      { key: "xa.bao_gia.xac_minh", label: "Yêu cầu xác minh", route: "/kn/bao-gia/xac-minh", icon: "check" },
+      { key: "xa.bao_gia.lich_su", label: "Lịch sử báo giá", route: "/kn/bao-gia/lich-su", icon: "journal" },
       soon("xa.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
     ],
   },

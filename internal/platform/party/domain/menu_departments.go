@@ -93,7 +93,9 @@ var deptBusiness = map[string]map[string][]MenuItem{
 		},
 		port.AudienceTinh: {
 			soon("tinh.bao_gia.tien_do", "Tiến độ nhập giá", "/kn/bao-gia/tien-do", "bell"),
-			soon("tinh.bao_gia.kiem_duyet", "Kiểm duyệt & công bố", "/kn/bao-gia/kiem-duyet", "approve"),
+			// W11.75: chi tiết báo giá, cảnh báo + xác minh, hiệu chỉnh / xóa / nhập thay (FN-TI-02.02…04, 02.09) — đã mở;
+			// nút "Duyệt bảng giá" thêm ở W11.76.
+			{Key: "tinh.bao_gia.kiem_duyet", Label: "Kiểm duyệt & công bố", Route: "/kn/bao-gia/kiem-duyet", Icon: "approve"},
 			soon("tinh.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
 			soon("tinh.bao_gia.bien_dong", "Báo cáo biến động giá", "/kn/bao-gia/bien-dong", "layers"),
 			soon("tinh.bao_gia.dieu_tra", "Điều tra giá thành", "/kn/bao-gia/dieu-tra", "season"),
@@ -104,9 +106,10 @@ var deptBusiness = map[string]map[string][]MenuItem{
 				NeedsPriceAdmin),
 		},
 		port.AudienceXa: {
-			soon("xa.bao_gia.nhap", "Nhập báo giá", "/kn/bao-gia/nhap", "upload"),
-			soon("xa.bao_gia.xac_minh", "Yêu cầu xác minh", "/kn/bao-gia/xac-minh", "check"),
-			soon("xa.bao_gia.lich_su", "Lịch sử báo giá", "/kn/bao-gia/lich-su", "journal"),
+			// W11.75: nhập báo giá, yêu cầu xác minh, lịch sử báo giá (FN-XA-03.01…03, 03.05) — đã mở.
+			{Key: "xa.bao_gia.nhap", Label: "Nhập báo giá", Route: "/kn/bao-gia/nhap", Icon: "upload"},
+			{Key: "xa.bao_gia.xac_minh", Label: "Yêu cầu xác minh", Route: "/kn/bao-gia/xac-minh", Icon: "check"},
+			{Key: "xa.bao_gia.lich_su", Label: "Lịch sử báo giá", Route: "/kn/bao-gia/lich-su", Icon: "journal"},
 			soon("xa.bao_gia.bang_gia", "Bảng giá tổng hợp", "/kn/bao-gia/bang-gia", "chart"),
 		},
 	},

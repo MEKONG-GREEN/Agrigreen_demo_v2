@@ -1826,9 +1826,7 @@
         "route": "/kn/bao-gia/kiem-duyet",
         "icon": "approve",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -1984,9 +1982,7 @@
         "route": "/kn/bao-gia/nhap",
         "icon": "upload",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -1995,9 +1991,7 @@
         "route": "/kn/bao-gia/xac-minh",
         "icon": "check",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -2006,9 +2000,7 @@
         "route": "/kn/bao-gia/lich-su",
         "icon": "journal",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {

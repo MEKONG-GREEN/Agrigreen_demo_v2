@@ -444,3 +444,37 @@ function pointRoutes(): Route[] {
 }
 
 export const pricePointRoutes: Route[] = [...regionRoutes(), ...pointRoutes()];
+
+/** W11.75 (phiếu báo giá giả lập): xã báo giá đang hoạt động tại ngày at + người phụ trách. */
+export function mockPointsAt(at: string): {
+  code: string;
+  name: string;
+  region_code: string;
+  region_name: string;
+  officer_ref: string | null;
+  officer_name: string | null;
+  owner_ref: string | null;
+  owner_name: string | null;
+}[] {
+  const out = [];
+  for (const code of [...STORE.points.keys()].sort()) {
+    const st = pointState(code, at);
+    if (!st || st.state !== "active") continue;
+    const off = officerAt(code, "xa", at)?.ref ?? null;
+    const own = officerAt(code, "tinh", at)?.ref ?? null;
+    out.push({
+      code,
+      name: st.v.name,
+      region_code: st.v.region,
+      region_name: eff(STORE.regions.get(st.v.region), at)?.name ?? st.v.region,
+      officer_ref: off,
+      officer_name: OFFICERS.find((o) => o.ref === off)?.name ?? null,
+      owner_ref: own,
+      owner_name: OFFICERS.find((o) => o.ref === own)?.name ?? null,
+    });
+  }
+  return out;
+}
+
+/** Cán bộ Xã giả lập của persona Cấp Xã (phụ trách XBG0001). */
+export const MOCK_XA_OFFICER = OFFICERS[0]!.ref;

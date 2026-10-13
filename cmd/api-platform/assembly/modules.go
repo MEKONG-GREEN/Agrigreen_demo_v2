@@ -290,6 +290,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	pty.UseFormAvailability(rep.FormAvailability())
 	md.UseFormUsage(rep.FormUsage())
 	kn.UseTablePDF(rep.TablePDF()) // KN v7.7 P5: "Xuất PDF" lịch công tác
+	pr.UseTablePDF(rep.TablePDF()) // W11.75: "Tải PDF" phiếu báo giá (FN-XA-03.02)
 	// KN v7.7 P1 → P5: vai, phòng ban, tỉnh, xã, cấp quản lý từ ngữ cảnh phiên + sổ gán vai trò (thay suy từ vai realm).
 	kn.UseKNContext(acc.ExtensionKNContext(), acc.ExtensionKNDirectory())
 

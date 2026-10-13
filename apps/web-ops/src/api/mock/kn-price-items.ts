@@ -1218,3 +1218,20 @@ export const priceItemRoutes: Route[] = [
   ...setRoutes(),
   ...proposalRoutes(),
 ];
+
+/** W11.75 (phiếu báo giá giả lập): mặt hàng xã point báo giá tại ngày at, kèm tên nhóm hàng / đơn vị tính. */
+export function mockPointItems(point: string, at: string): (Item & { group_name: string; unit_name: string })[] {
+  const gate = gated(at);
+  const items = sortItems(
+    [...STORE.items.keys()]
+      .map((k) => view(k, at))
+      .filter((v): v is Item => !!v && v.state === "active" && !gate.has(v.code))
+      .filter((v) => v.kind === "basic" || effective(STORE.assigns.get(`${point}:${v.code}`), at)?.status === "active"),
+    at,
+  );
+  return items.map((it) => ({
+    ...it,
+    group_name: groupEff(it.group_code, at)?.name ?? it.group_code,
+    unit_name: UNITS.find(([c]) => c === it.unit_code)?.[1] ?? it.unit_code,
+  }));
+}

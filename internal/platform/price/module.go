@@ -15,6 +15,10 @@
 // W11.72 (pf 000145): xã báo giá ↔ ĐVHC có hiệu lực, nhóm vùng, phân công cán bộ Xã / Cấp Tỉnh theo ngày (port.Points);
 // cờ Quản trị nghiệp vụ (Profile.StewardDuty); nhắc nhập giá tới cán bộ Xã phụ trách (app.PointReminders).
 //
+// W11.75 (pf 000148): phiếu báo giá + xác minh — app.TicketService (port.Tickets): Xã nhập / gửi trước giờ khóa, cảnh báo
+// tạm tính, xác minh hai chiều, nhập thay, hiệu chỉnh, sửa ngày, xóa mềm, in phiếu; nối sẵn ItemHooks.HasPrice/HasSheets
+// và PointHooks.Submitted; điểm nối app.TicketHooks.Board cho W11.76 (SetTicketHooks).
+//
 // Module khác chỉ import price/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
 package price
 
@@ -34,8 +38,9 @@ var DBModule = app.DBModule
 
 // Module là pf/price đã nối.
 type Module struct {
-	svc   *app.Service
-	items *app.ItemService // W11.73 mặt hàng theo thời kỳ
+	svc     *app.Service
+	items   *app.ItemService   // W11.73 mặt hàng theo thời kỳ
+	tickets *app.TicketService // W11.75 phiếu báo giá + xác minh
 }
 
 // New tạo module trên pool b — vai đăng nhập của đơn vị (app_platform), là thành viên r_price. Cấu hình bên dùng sai → lỗi.
@@ -48,7 +53,12 @@ func New(b tenant.Beginner, clk clock.Clock, profiles []port.Profile) (*Module, 
 		return nil, err
 	}
 	svc.Reminders = app.PointReminders{S: svc} // W11.72: nhắc cán bộ Xã phụ trách từng xã báo giá
-	return &Module{svc: svc, items: app.NewItemService(svc)}, nil
+	m := &Module{svc: svc, items: app.NewItemService(svc), tickets: app.NewTicketService(svc)}
+	// W11.75: "đã gửi phiếu" cho nhắc lần 2 / ngưng xã (W11.72), "đã có giá / đã có phiếu gửi" cho mặt hàng (W11.73).
+	svc.Points.Submitted = m.tickets.Submitted
+	m.items.Hooks.HasPrice = m.tickets.HasPrice
+	m.items.Hooks.HasSheets = m.tickets.Submitted
+	return m, nil
 }
 
 // Points cho module khác (W11.75 phiếu, W11.77 tiến độ): xã báo giá đang hoạt động, người phụ trách theo ngày (W11.72).
@@ -58,8 +68,18 @@ func (m *Module) Points() port.Points { return m.svc }
 // công đúng cấp, tên ở danh sách xã. Không nối → không kiểm, không tên.
 func (m *Module) UseOfficers(o port.Officers) { m.svc.Points.Officers = o }
 
-// SetPointHooks thay toàn bộ điểm nối của xã báo giá (W11.75 nối Submitted — "xã đã gửi phiếu").
+// SetPointHooks thay toàn bộ điểm nối của xã báo giá. New đã nối Submitted với phiếu W11.75 ("xã đã gửi phiếu") — bên
+// gọi giữ trường đó nếu chỉ muốn đổi danh bạ (dùng UseOfficers).
 func (m *Module) SetPointHooks(h app.PointHooks) { m.svc.Points = h }
+
+// Tickets cho module khác (W11.76 bảng giá ngày, W11.77 tiến độ): phiếu và dòng giá đã gửi của một ngày.
+func (m *Module) Tickets() port.Tickets { return m.tickets }
+
+// SetTicketHooks nối điểm mở rộng của phiếu (W11.76: trạng thái bảng giá ngày) — gọi ở gốc lắp ráp trước khi phục vụ.
+func (m *Module) SetTicketHooks(h app.TicketHooks) { m.tickets.Hooks = h }
+
+// UseTablePDF nối bộ dựng PDF (pf/reports) cho "Tải PDF" phiếu báo giá (FN-XA-03.02). Không nối → 503.
+func (m *Module) UseTablePDF(p port.TablePDF) { m.tickets.PDF = p }
 
 // Catalog cho module khác: danh mục nền (đơn vị tính, nhóm hàng) có hiệu lực theo ngày.
 func (m *Module) Catalog() port.Catalog { return m.svc }
@@ -67,8 +87,8 @@ func (m *Module) Catalog() port.Catalog { return m.svc }
 // Items cho module khác (KHTC — Q-082; phiếu báo giá W11.75): mặt hàng theo thời kỳ, mặt hàng của xã theo ngày.
 func (m *Module) Items() port.Items { return m.items }
 
-// SetItemHooks nối điểm mở rộng của mặt hàng (W11.72 cờ QTNV, W11.74 lịch báo giá, W11.75 đã có giá/phiếu) — gọi ở gốc
-// lắp ráp trước khi phục vụ.
+// SetItemHooks thay điểm mở rộng của mặt hàng (W11.72 cờ QTNV, W11.74 lịch báo giá, W11.75 đã có giá/phiếu — New đã nối
+// HasPrice/HasSheets với phiếu) — gọi ở gốc lắp ráp trước khi phục vụ.
 func (m *Module) SetItemHooks(h app.ItemHooks) { m.items.Hooks = h }
 
 // WireItemCalendar nối "ngày báo giá kế tiếp" của mặt hàng (BR-02) với lịch báo giá W11.74 (port.Calendar) — gọi ở
@@ -78,8 +98,9 @@ func (m *Module) WireItemCalendar() { m.items.Hooks.NextDay = m.svc.NextQuoteDay
 // RegisterApp gắn route Application API /v1/price/*.
 func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Handler{Svc: m.svc}.RegisterApp(rg)
-	handler.ItemHandler{Svc: m.items}.RegisterApp(rg) // W11.73
-	handler.PointHandler{Svc: m.svc}.RegisterApp(rg)  // W11.72
+	handler.ItemHandler{Svc: m.items}.RegisterApp(rg)     // W11.73
+	handler.PointHandler{Svc: m.svc}.RegisterApp(rg)      // W11.72
+	handler.TicketHandler{Svc: m.tickets}.RegisterApp(rg) // W11.75
 }
 
 // RegisterAdmin: không có route Admin API.
