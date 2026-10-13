@@ -2135,6 +2135,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/work-schedules/{id}/items/{item_id}/checkin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check-in tại địa điểm công tác (CNTS CV-07, W11.46) — một mục một check-in, không sửa được; tọa độ lưu ở bảng có hạn lưu (QĐ-8) */
+        post: operations["extCheckinWorkScheduleItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/mechanization/owners": {
         parameters: {
             query?: never;
@@ -5405,6 +5422,110 @@ export interface paths {
         put?: never;
         /** Phát hành lô kỳ native cap/forms của một biểu (một giao dịch; Cấp Tỉnh phòng CNTS; cơ sở phải thuộc xã) */
         post: operations["extensionCntsPublishSeries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/duty-rosters/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch trực KSGM của tháng (BM-03, W11.46) — lưới cơ sở × viên chức × ngày, cảnh báo, lịch sử lưu (Cấp Tỉnh, Admin) */
+        get: operations["extensionCntsGetDutyRoster"];
+        put?: never;
+        /** Lưu lịch trực tháng thành phiên bản mới (cán bộ tổng hợp Cấp Tỉnh, Admin); cảnh báo không chặn; đổi ca phát pf.extension.cnts_duty.changed */
+        post: operations["extensionCntsSaveDutyRoster"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/my-duties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch trực KSGM của tôi (UR-XA-03) — ca của người gọi trong tháng, người trực cùng */
+        get: operations["extensionCntsMyDuties"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/vaccination-batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch tiêm phòng các lứa (BM-07, W11.46) trong phạm vi — bản hiện hành, trạng thái suy diễn (quá hạn = nhãn đỏ) */
+        get: operations["extensionCntsListVaccinationBatches"];
+        put?: never;
+        /** Tạo lịch tiêm theo quy trình của mô hình (FN-15 B4) — chủ nhiệm Cấp Tỉnh, Admin */
+        post: operations["extensionCntsCreateVaccinationBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/vaccination-batches/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết lịch tiêm của lứa kèm các phiên bản */
+        get: operations["extensionCntsGetVaccinationBatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/vaccination-batches/{ref}/doses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cập nhật mũi tiêm — Cấp Xã ghi ngày tiêm thực tế, ghi chú; chủ nhiệm Cấp Tỉnh còn sửa ngày dự kiến từng hộ */
+        post: operations["extensionCntsUpdateVaccinationDoses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/vaccination-batches/{ref}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy lịch tiêm của lứa (bắt buộc lý do) — chủ nhiệm Cấp Tỉnh, Admin */
+        post: operations["extensionCntsCancelVaccinationBatch"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10960,6 +11081,240 @@ export interface components {
          * @enum {string}
          */
         ExtWorkScheduleStatus: "draft" | "pending" | "approved" | "changes_requested";
+        /** @description Địa điểm công tác trên bản đồ (CNTS CV-06, W11.46) — địa điểm của công việc, không phải vị trí người */
+        ExtWorkSchedulePlace: {
+            lat: number;
+            lon: number;
+            /** @enum {string} */
+            source?: "map" | "gps";
+        };
+        ExtWorkScheduleCheckin: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            item_id: string;
+            /** Format: date */
+            day: string;
+            /** Format: date-time */
+            captured_at: string;
+            /** Format: date-time */
+            recorded_at: string;
+            accuracy_m: number | null;
+            /** @description Khoảng cách tới địa điểm đã đăng ký (null = mục chưa có địa điểm) */
+            distance_m: number | null;
+            /** @description Cách địa điểm quá ngưỡng (mặc định 500 m) — cảnh báo */
+            far: boolean;
+            weak_accuracy: boolean;
+            mock_location: boolean;
+            /** @description Có lưu tọa độ (cờ extension.work_schedule_checkin_store_point) */
+            point_stored: boolean;
+            /** @description Tọa độ — chỉ người đăng ký và người duyệt thấy; null khi không lưu hoặc đã quá hạn lưu */
+            location: null | {
+                lat: number;
+                lon: number;
+            };
+        };
+        ExtWorkScheduleCheckinResult: {
+            checkin: components["schemas"]["ExtWorkScheduleCheckin"];
+            warnings: components["schemas"]["ExtWorkScheduleWarning"][];
+        };
+        CNTSDutyCell: {
+            /** Format: uuid */
+            facility_ref: string;
+            /** Format: uuid */
+            officer_ref: string;
+            day: number;
+            /**
+             * @description N ngày, D (Đ) đêm, ND (NĐ) cả ngày đêm; ca đêm qua nửa đêm thuộc ngày bắt đầu ca
+             * @enum {string}
+             */
+            shift: "N" | "D" | "ND";
+        };
+        CNTSDutyRosterSave: {
+            /** @description Phiên bản đã thấy (0 = chưa có lịch) — khóa lạc quan */
+            base_version: number;
+            cells: components["schemas"]["CNTSDutyCell"][];
+            /** @enum {string} */
+            source?: "grid" | "copy" | "excel";
+            note?: string;
+        };
+        CNTSDutyFacility: {
+            /** Format: uuid */
+            ref: string;
+            code: string;
+            name: string;
+            commune_code: string;
+            kind: string | null;
+        };
+        CNTSDutyOfficer: {
+            /** Format: uuid */
+            ref: string;
+            display: string | null;
+            commune_codes: string[];
+            /** @description Giới hạn cơ sở (rỗng = cả xã phụ trách) */
+            facility_refs: string[];
+        };
+        CNTSDutyWarning: {
+            /** @enum {string} */
+            code: "facility_uncovered" | "double_shift" | "officer_not_granted";
+            message: string;
+            /** Format: uuid */
+            facility_ref: string | null;
+            /** Format: uuid */
+            officer_ref: string | null;
+            days: number[];
+        };
+        CNTSDutyVersion: {
+            version: number;
+            source: string;
+            cell_count: number;
+            note: string | null;
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_display: string | null;
+        };
+        CNTSDutyRoster: {
+            month: string;
+            days_in_month: number;
+            /** @description 0 = chưa lập */
+            version: number;
+            source: string | null;
+            note: string | null;
+            cells: components["schemas"]["CNTSDutyCell"][];
+            facilities: components["schemas"]["CNTSDutyFacility"][];
+            officers: components["schemas"]["CNTSDutyOfficer"][];
+            warnings: components["schemas"]["CNTSDutyWarning"][];
+            /** Format: date-time */
+            updated_at: string | null;
+            /** Format: uuid */
+            updated_by: string | null;
+            versions: components["schemas"]["CNTSDutyVersion"][];
+            can_edit: boolean;
+            /** @description Viên chức có ca thay đổi ở lần lưu này */
+            notified_officer_refs: string[];
+        };
+        CNTSMyDuty: {
+            /** Format: date */
+            date: string;
+            /** @enum {string} */
+            shift: "N" | "D" | "ND";
+            facility: {
+                /** Format: uuid */
+                ref: string;
+                code: string | null;
+                name: string | null;
+                commune_code: string | null;
+            };
+            colleagues: {
+                /** Format: uuid */
+                ref: string;
+                display: string | null;
+            }[];
+        };
+        CNTSMyDuties: {
+            month: string;
+            version: number;
+            items: components["schemas"]["CNTSMyDuty"][];
+        };
+        CNTSVaccinationDose: {
+            vaccine_code: string;
+            vaccine_name: string | null;
+            shot: number;
+            age_days: number;
+            /**
+             * Format: date
+             * @description Ngày nhận + ngày tuổi − tuổi lúc nhận (sửa được từng hộ)
+             */
+            expected_date: string;
+            /** Format: date */
+            actual_date: string | null;
+            note: string | null;
+            /** @description Quá ngày dự kiến chưa tiêm (nhãn đỏ) */
+            overdue: boolean;
+        };
+        CNTSVaccinationBatchCore: {
+            /** Format: uuid */
+            ref: string;
+            version: number;
+            /** @enum {string} */
+            event: "created" | "updated" | "dose_recorded" | "cancelled";
+            commune_code: string;
+            model_type_code: string;
+            model_type_name: string | null;
+            breed_code: string | null;
+            breed_name: string | null;
+            schedule_code: string;
+            schedule_name: string | null;
+            /** Format: date */
+            schedule_valid_from: string;
+            /** Format: uuid */
+            household_ref: string | null;
+            locality: string | null;
+            /** Format: date */
+            received_date: string;
+            age_at_receipt: number;
+            head_count: number | null;
+            doses: components["schemas"]["CNTSVaccinationDose"][];
+            note: string | null;
+            status_reason: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            actor_display?: string | null;
+        };
+        CNTSVaccinationBatch: components["schemas"]["CNTSVaccinationBatchCore"] & {
+            /** @enum {string} */
+            status: "open" | "overdue" | "done" | "cancelled";
+            overdue_count: number;
+            can_plan: boolean;
+            can_record: boolean;
+            next_dose: components["schemas"]["CNTSVaccinationDose"] | null;
+        };
+        CNTSVaccinationBatchDetail: components["schemas"]["CNTSVaccinationBatch"] & {
+            /** @description Mới nhất trước */
+            versions: components["schemas"]["CNTSVaccinationBatchCore"][];
+        };
+        CNTSVaccinationBatchCreate: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 máy khách sinh (tùy chọn)
+             */
+            id?: string | null;
+            commune_code: string;
+            model_type_code: string;
+            breed_code?: string | null;
+            /** @description Rỗng → chọn quy trình theo giống/loại mô hình tại ngày nhận giống */
+            schedule_code?: string | null;
+            /**
+             * Format: uuid
+             * @description Hộ mô hình — hoặc ghi địa bàn (không lưu họ tên tự do)
+             */
+            household_ref?: string | null;
+            locality?: string | null;
+            /** Format: date */
+            received_date: string;
+            age_at_receipt: number;
+            head_count?: number | null;
+            note?: string | null;
+        };
+        CNTSVaccinationDosesUpdate: {
+            base_version: number;
+            /** Format: date-time */
+            captured_at?: string | null;
+            doses: {
+                vaccine_code: string;
+                shot: number;
+                /** Format: date */
+                expected_date?: string | null;
+                /** Format: date */
+                actual_date?: string | null;
+                clear_actual?: boolean;
+                note?: string | null;
+            }[];
+        };
         ExtWorkScheduleItemInput: {
             /**
              * Format: uuid
@@ -10992,6 +11347,8 @@ export interface components {
             /** @description Thành phần phối hợp — không ghi SĐT/CCCD (RB-3) */
             participants?: string | null;
             note?: string | null;
+            /** @description Địa điểm trên bản đồ (CNTS CV-06) — check-in so khoảng cách */
+            place?: components["schemas"]["ExtWorkSchedulePlace"] | null;
         };
         ExtWorkScheduleItem: components["schemas"]["ExtWorkScheduleItemInput"] & {
             /**
@@ -11074,10 +11431,16 @@ export interface components {
         ExtWorkScheduleListItem: components["schemas"]["ExtWorkSchedule"] & {
             /** @description Mục của phiên bản hiện hành (lưới tuần) */
             items: components["schemas"]["ExtWorkScheduleItem"][];
+            /** @description Phòng ban dùng check-in GPS (W11.46) */
+            checkin_enabled?: boolean;
+            checkins?: components["schemas"]["ExtWorkScheduleCheckin"][];
+            checkin_count?: number;
+            /** @description Mục công tác ngoài cơ quan đã qua ngày chưa check-in */
+            missed_checkin_count?: number;
         };
         ExtWorkScheduleWarning: {
             /** @enum {string} */
-            code: "time_overlap" | "late_registration" | "outside_week";
+            code: "time_overlap" | "late_registration" | "outside_week" | "checkin_far" | "checkin_no_place" | "checkin_weak_gps" | "checkin_mock_location" | "checkin_missed";
             message: string;
             item_ids: string[];
         };
@@ -11100,6 +11463,12 @@ export interface components {
             approved_items: components["schemas"]["ExtWorkScheduleItem"][];
             warnings: components["schemas"]["ExtWorkScheduleWarning"][];
             versions: components["schemas"]["ExtWorkScheduleVersion"][];
+            /** @description Phòng ban dùng check-in GPS (W11.46) */
+            checkin_enabled?: boolean;
+            checkins?: components["schemas"]["ExtWorkScheduleCheckin"][];
+            checkin_count?: number;
+            /** @description Mục công tác ngoài cơ quan đã qua ngày chưa check-in */
+            missed_checkin_count?: number;
             can: {
                 edit: boolean;
                 submit: boolean;
@@ -11124,6 +11493,8 @@ export interface components {
             previous_week_start: string;
             /** @description Tuần trước có lịch để sao chép */
             previous_available: boolean;
+            /** @description Phòng ban của người gọi dùng check-in GPS (W11.46) — Mobile hiện nút Check-in */
+            checkin_enabled?: boolean;
         };
         ExtWorkScheduleCounts: {
             /** Format: date */
@@ -11166,6 +11537,17 @@ export interface components {
             province_approval: "peer" | "auto";
             /** @description Đang dùng giá trị mặc định tạm, chờ khách */
             provisional: boolean;
+            department_code?: string;
+            /**
+             * @description Q-057 theo phòng: levels = cấp quản lý (Trồng trọt); follower = người theo dõi được phân công hoặc lãnh đạo phòng (CNTS)
+             * @enum {string}
+             */
+            approver_rule?: "levels" | "follower";
+            checkin_enabled?: boolean;
+            checkin_far_m?: number;
+            /** @description Cờ QĐ-8: lưu tọa độ check-in (bảng có hạn lưu) */
+            checkin_store_point?: boolean;
+            checkin_point_retention_days?: number;
         };
         KNFieldChange: {
             field: string;
@@ -22093,6 +22475,62 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    extCheckinWorkScheduleItem: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    lat: number;
+                    lon: number;
+                    accuracy_m?: number | null;
+                    /**
+                     * Format: date-time
+                     * @description Giờ thiết bị lúc bấm Check-in (bản ngoại tuyến gửi muộn tối đa 7 ngày)
+                     */
+                    captured_at: string;
+                    /** @description Thiết bị báo vị trí giả lập */
+                    mock_location?: boolean;
+                    device_id?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleCheckinResult"];
+                };
+            };
+            /** @description Đã check-in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleCheckinResult"];
+                };
+            };
+            /** @description extension.schedule_not_found | extension.schedule_item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.checkin_exists | extension.checkin_disabled | extension.checkin_not_registered */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
     mechListOwners: {
         parameters: {
             query?: {
@@ -28603,6 +29041,268 @@ export interface operations {
             /** @description forms.template_not_found */
             404: components["responses"]["Problem"];
             /** @description validation_failed | forms.facility_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGetDutyRoster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tháng YYYY-MM */
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch trực (version 0 = chưa lập) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDutyRoster"];
+                };
+            };
+            /** @description forbidden (Cấp Xã dùng /my-duties) */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsSaveDutyRoster: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSDutyRosterSave"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDutyRoster"];
+                };
+            };
+            /** @description Đã lưu phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDutyRoster"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_roster_version_conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_roster_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsMyDuties: {
+        parameters: {
+            query: {
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ca trực */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMyDuties"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsListVaccinationBatches: {
+        parameters: {
+            query?: {
+                commune_code?: string;
+                household_ref?: string;
+                status?: "open" | "overdue" | "done" | "cancelled";
+                received_from?: string;
+                received_to?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSVaccinationBatch"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsCreateVaccinationBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSVaccinationBatchCreate"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSVaccinationBatchDetail"];
+                };
+            };
+            /** @description Đã lập */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSVaccinationBatchDetail"];
+                };
+            };
+            /** @description forbidden | extension.out_of_scope | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_vaccination_invalid | extension.cnts_vaccination_no_procedure */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGetVaccinationBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSVaccinationBatchDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_vaccination_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsUpdateVaccinationDoses: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSVaccinationDosesUpdate"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi phiên bản mới */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSVaccinationBatchDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_vaccination_version_conflict | extension.cnts_vaccination_cancelled */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_vaccination_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsCancelVaccinationBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    base_version: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã hủy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSVaccinationBatchDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
     };

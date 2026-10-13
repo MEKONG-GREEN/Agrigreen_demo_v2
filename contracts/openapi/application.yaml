@@ -3027,6 +3027,42 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/{id}/items/{item_id}/checkin:
+    post:
+      summary: Check-in tại địa điểm công tác (CNTS CV-07, W11.46) — một mục một check-in, không sửa được; tọa độ lưu ở bảng có hạn lưu (QĐ-8)
+      operationId: extCheckinWorkScheduleItem
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: item_id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lon, captured_at]
+              properties:
+                lat: {type: number, minimum: 8, maximum: 24}
+                lon: {type: number, minimum: 102, maximum: 118}
+                accuracy_m: {type: [number, "null"], minimum: 0}
+                captured_at: {type: string, format: date-time, description: "Giờ thiết bị lúc bấm Check-in (bản ngoại tuyến gửi muộn tối đa 7 ngày)"}
+                mock_location: {type: boolean, description: "Thiết bị báo vị trí giả lập"}
+                device_id: {type: [string, "null"]}
+      responses:
+        "201":
+          description: Đã check-in
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleCheckinResult"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleCheckinResult"}
+        "404": {description: "extension.schedule_not_found | extension.schedule_item_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.checkin_exists | extension.checkin_disabled | extension.checkin_not_registered", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   # Số liệu cân đối/báo cáo/dashboard đọc KẾT QUẢ ĐÃ LƯU theo vụ (FN-10 BR-04), không tính lại.
 
   # Phạm vi không phải toàn vùng: danh sách máy/chủ sở hữu/diện tích phải lọc theo cooperative_ref trong phạm vi.
@@ -7622,6 +7658,178 @@ paths:
         "422": {description: "validation_failed | forms.facility_invalid", $ref: "#/components/responses/Problem"}
   # --- pf/extension W11.49 (D4 CN9, BRD CNTS v3.7 FN-11, UR-XA-10): Báo cáo dịch bệnh BM-10 (ổ dịch có phiên bản diễn biến)
   # và báo nghi dịch. Phòng Chăn nuôi – Thủy sản: Cấp Xã lập/cập nhật, Cấp Tỉnh xem + kết thúc/mở lại, Cấp TW không có.
+  /v1/extension/cnts/duty-rosters/{month}:
+    get:
+      summary: Lịch trực KSGM của tháng (BM-03, W11.46) — lưới cơ sở × viên chức × ngày, cảnh báo, lịch sử lưu (Cấp Tỉnh, Admin)
+      operationId: extensionCntsGetDutyRoster
+      tags: [extension]
+      parameters:
+        - {name: month, in: path, required: true, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}, description: Tháng YYYY-MM}
+      responses:
+        "200":
+          description: Lịch trực (version 0 = chưa lập)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDutyRoster"}
+        "403": {description: "forbidden (Cấp Xã dùng /my-duties)", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Lưu lịch trực tháng thành phiên bản mới (cán bộ tổng hợp Cấp Tỉnh, Admin); cảnh báo không chặn; đổi ca phát pf.extension.cnts_duty.changed
+      operationId: extensionCntsSaveDutyRoster
+      tags: [extension]
+      parameters:
+        - {name: month, in: path, required: true, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSDutyRosterSave"}
+      responses:
+        "201":
+          description: Đã lưu phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDutyRoster"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDutyRoster"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "409": {description: extension.cnts_roster_version_conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_roster_invalid", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/my-duties:
+    get:
+      summary: Lịch trực KSGM của tôi (UR-XA-03) — ca của người gọi trong tháng, người trực cùng
+      operationId: extensionCntsMyDuties
+      tags: [extension]
+      parameters:
+        - {name: month, in: query, required: true, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+      responses:
+        "200":
+          description: Ca trực
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSMyDuties"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/vaccination-batches:
+    get:
+      summary: Lịch tiêm phòng các lứa (BM-07, W11.46) trong phạm vi — bản hiện hành, trạng thái suy diễn (quá hạn = nhãn đỏ)
+      operationId: extensionCntsListVaccinationBatches
+      tags: [extension]
+      parameters:
+        - {name: commune_code, in: query, required: false, schema: {type: string}}
+        - {name: household_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [open, overdue, done, cancelled]}}
+        - {name: received_from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: received_to, in: query, required: false, schema: {type: string, format: date}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 500}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSVaccinationBatch"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo lịch tiêm theo quy trình của mô hình (FN-15 B4) — chủ nhiệm Cấp Tỉnh, Admin
+      operationId: extensionCntsCreateVaccinationBatch
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSVaccinationBatchCreate"}
+      responses:
+        "201":
+          description: Đã lập
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSVaccinationBatchDetail"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSVaccinationBatchDetail"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_vaccination_invalid | extension.cnts_vaccination_no_procedure", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/vaccination-batches/{ref}:
+    get:
+      summary: Chi tiết lịch tiêm của lứa kèm các phiên bản
+      operationId: extensionCntsGetVaccinationBatch
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSVaccinationBatchDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_vaccination_not_found, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/vaccination-batches/{ref}/doses:
+    post:
+      summary: Cập nhật mũi tiêm — Cấp Xã ghi ngày tiêm thực tế, ghi chú; chủ nhiệm Cấp Tỉnh còn sửa ngày dự kiến từng hộ
+      operationId: extensionCntsUpdateVaccinationDoses
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSVaccinationDosesUpdate"}
+      responses:
+        "200":
+          description: Đã ghi phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSVaccinationBatchDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_vaccination_version_conflict | extension.cnts_vaccination_cancelled", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_vaccination_invalid", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/vaccination-batches/{ref}/cancel:
+    post:
+      summary: Hủy lịch tiêm của lứa (bắt buộc lý do) — chủ nhiệm Cấp Tỉnh, Admin
+      operationId: extensionCntsCancelVaccinationBatch
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [base_version, reason]
+              properties:
+                base_version: {type: integer, minimum: 1}
+                reason: {type: string, minLength: 5, maxLength: 1000}
+      responses:
+        "200":
+          description: Đã hủy
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSVaccinationBatchDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/outbreaks:
     get:
       summary: Ổ dịch (bản hiện hành) trong phạm vi + thống kê theo trạng thái, bệnh
@@ -14137,6 +14345,236 @@ components:
       type: string
       description: "draft = Nháp, pending = Chờ duyệt, approved = Đã duyệt, changes_requested = Yêu cầu chỉnh sửa"
       enum: [draft, pending, approved, changes_requested]
+    ExtWorkSchedulePlace:
+      type: object
+      required: [lat, lon]
+      description: "Địa điểm công tác trên bản đồ (CNTS CV-06, W11.46) — địa điểm của công việc, không phải vị trí người"
+      properties:
+        lat: {type: number, minimum: 8, maximum: 24}
+        lon: {type: number, minimum: 102, maximum: 118}
+        source: {type: string, enum: [map, gps]}
+    ExtWorkScheduleCheckin:
+      type: object
+      required: [id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location]
+      properties:
+        id: {type: string, format: uuid}
+        item_id: {type: string, format: uuid}
+        day: {type: string, format: date}
+        captured_at: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        accuracy_m: {type: [number, "null"]}
+        distance_m: {type: [number, "null"], description: "Khoảng cách tới địa điểm đã đăng ký (null = mục chưa có địa điểm)"}
+        far: {type: boolean, description: "Cách địa điểm quá ngưỡng (mặc định 500 m) — cảnh báo"}
+        weak_accuracy: {type: boolean}
+        mock_location: {type: boolean}
+        point_stored: {type: boolean, description: "Có lưu tọa độ (cờ extension.work_schedule_checkin_store_point)"}
+        location:
+          description: "Tọa độ — chỉ người đăng ký và người duyệt thấy; null khi không lưu hoặc đã quá hạn lưu"
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [lat, lon]
+              properties:
+                lat: {type: number}
+                lon: {type: number}
+    ExtWorkScheduleCheckinResult:
+      type: object
+      required: [checkin, warnings]
+      properties:
+        checkin: {$ref: "#/components/schemas/ExtWorkScheduleCheckin"}
+        warnings: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleWarning"}}
+    CNTSDutyCell:
+      type: object
+      required: [facility_ref, officer_ref, day, shift]
+      properties:
+        facility_ref: {type: string, format: uuid}
+        officer_ref: {type: string, format: uuid}
+        day: {type: integer, minimum: 1, maximum: 31}
+        shift: {type: string, enum: [N, D, ND], description: "N ngày, D (Đ) đêm, ND (NĐ) cả ngày đêm; ca đêm qua nửa đêm thuộc ngày bắt đầu ca"}
+    CNTSDutyRosterSave:
+      type: object
+      required: [base_version, cells]
+      properties:
+        base_version: {type: integer, minimum: 0, description: "Phiên bản đã thấy (0 = chưa có lịch) — khóa lạc quan"}
+        cells: {type: array, maxItems: 20000, items: {$ref: "#/components/schemas/CNTSDutyCell"}}
+        source: {type: string, enum: [grid, copy, excel]}
+        note: {type: string, maxLength: 1000}
+    CNTSDutyFacility:
+      type: object
+      required: [ref, code, name, commune_code, kind]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        commune_code: {type: string}
+        kind: {type: [string, "null"]}
+    CNTSDutyOfficer:
+      type: object
+      required: [ref, display, commune_codes, facility_refs]
+      properties:
+        ref: {type: string, format: uuid}
+        display: {type: [string, "null"]}
+        commune_codes: {type: array, items: {type: string}}
+        facility_refs: {type: array, items: {type: string, format: uuid}, description: "Giới hạn cơ sở (rỗng = cả xã phụ trách)"}
+    CNTSDutyWarning:
+      type: object
+      required: [code, message, facility_ref, officer_ref, days]
+      properties:
+        code: {type: string, enum: [facility_uncovered, double_shift, officer_not_granted]}
+        message: {type: string}
+        facility_ref: {type: [string, "null"], format: uuid}
+        officer_ref: {type: [string, "null"], format: uuid}
+        days: {type: array, items: {type: integer}}
+    CNTSDutyVersion:
+      type: object
+      required: [version, source, cell_count, note, at, actor_ref, actor_display]
+      properties:
+        version: {type: integer}
+        source: {type: string}
+        cell_count: {type: integer}
+        note: {type: [string, "null"]}
+        at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: [string, "null"]}
+    CNTSDutyRoster:
+      type: object
+      required: [month, days_in_month, version, source, note, cells, facilities, officers, warnings, updated_at, updated_by, versions, can_edit, notified_officer_refs]
+      properties:
+        month: {type: string}
+        days_in_month: {type: integer}
+        version: {type: integer, description: "0 = chưa lập"}
+        source: {type: [string, "null"]}
+        note: {type: [string, "null"]}
+        cells: {type: array, items: {$ref: "#/components/schemas/CNTSDutyCell"}}
+        facilities: {type: array, items: {$ref: "#/components/schemas/CNTSDutyFacility"}}
+        officers: {type: array, items: {$ref: "#/components/schemas/CNTSDutyOfficer"}}
+        warnings: {type: array, items: {$ref: "#/components/schemas/CNTSDutyWarning"}}
+        updated_at: {type: [string, "null"], format: date-time}
+        updated_by: {type: [string, "null"], format: uuid}
+        versions: {type: array, items: {$ref: "#/components/schemas/CNTSDutyVersion"}}
+        can_edit: {type: boolean}
+        notified_officer_refs: {type: array, items: {type: string, format: uuid}, description: "Viên chức có ca thay đổi ở lần lưu này"}
+    CNTSMyDuty:
+      type: object
+      required: [date, shift, facility, colleagues]
+      properties:
+        date: {type: string, format: date}
+        shift: {type: string, enum: [N, D, ND]}
+        facility:
+          type: object
+          required: [ref, code, name, commune_code]
+          properties:
+            ref: {type: string, format: uuid}
+            code: {type: [string, "null"]}
+            name: {type: [string, "null"]}
+            commune_code: {type: [string, "null"]}
+        colleagues:
+          type: array
+          items:
+            type: object
+            required: [ref, display]
+            properties:
+              ref: {type: string, format: uuid}
+              display: {type: [string, "null"]}
+    CNTSMyDuties:
+      type: object
+      required: [month, version, items]
+      properties:
+        month: {type: string}
+        version: {type: integer}
+        items: {type: array, items: {$ref: "#/components/schemas/CNTSMyDuty"}}
+    CNTSVaccinationDose:
+      type: object
+      required: [vaccine_code, vaccine_name, shot, age_days, expected_date, actual_date, note, overdue]
+      properties:
+        vaccine_code: {type: string}
+        vaccine_name: {type: [string, "null"]}
+        shot: {type: integer}
+        age_days: {type: integer}
+        expected_date: {type: string, format: date, description: "Ngày nhận + ngày tuổi − tuổi lúc nhận (sửa được từng hộ)"}
+        actual_date: {type: [string, "null"], format: date}
+        note: {type: [string, "null"]}
+        overdue: {type: boolean, description: "Quá ngày dự kiến chưa tiêm (nhãn đỏ)"}
+    CNTSVaccinationBatchCore:
+      type: object
+      required: [ref, version, event, commune_code, model_type_code, model_type_name, breed_code, breed_name, schedule_code, schedule_name,
+        schedule_valid_from, household_ref, locality, received_date, age_at_receipt, head_count, doses, note, status_reason, updated_at, updated_by]
+      properties:
+        ref: {type: string, format: uuid}
+        version: {type: integer}
+        event: {type: string, enum: [created, updated, dose_recorded, cancelled]}
+        commune_code: {type: string}
+        model_type_code: {type: string}
+        model_type_name: {type: [string, "null"]}
+        breed_code: {type: [string, "null"]}
+        breed_name: {type: [string, "null"]}
+        schedule_code: {type: string}
+        schedule_name: {type: [string, "null"]}
+        schedule_valid_from: {type: string, format: date}
+        household_ref: {type: [string, "null"], format: uuid}
+        locality: {type: [string, "null"]}
+        received_date: {type: string, format: date}
+        age_at_receipt: {type: integer}
+        head_count: {type: [integer, "null"]}
+        doses: {type: array, items: {$ref: "#/components/schemas/CNTSVaccinationDose"}}
+        note: {type: [string, "null"]}
+        status_reason: {type: [string, "null"]}
+        updated_at: {type: string, format: date-time}
+        updated_by: {type: string, format: uuid}
+        actor_display: {type: [string, "null"]}
+    CNTSVaccinationBatch:
+      allOf:
+        - $ref: "#/components/schemas/CNTSVaccinationBatchCore"
+        - type: object
+          required: [status, overdue_count, can_plan, can_record, next_dose]
+          properties:
+            status: {type: string, enum: [open, overdue, done, cancelled]}
+            overdue_count: {type: integer}
+            can_plan: {type: boolean}
+            can_record: {type: boolean}
+            next_dose: {oneOf: [{$ref: "#/components/schemas/CNTSVaccinationDose"}, {type: "null"}]}
+    CNTSVaccinationBatchDetail:
+      allOf:
+        - $ref: "#/components/schemas/CNTSVaccinationBatch"
+        - type: object
+          required: [versions]
+          properties:
+            versions: {type: array, items: {$ref: "#/components/schemas/CNTSVaccinationBatchCore"}, description: "Mới nhất trước"}
+    CNTSVaccinationBatchCreate:
+      type: object
+      required: [commune_code, model_type_code, received_date, age_at_receipt]
+      properties:
+        id: {type: [string, "null"], format: uuid, description: UUIDv7 máy khách sinh (tùy chọn)}
+        commune_code: {type: string}
+        model_type_code: {type: string}
+        breed_code: {type: [string, "null"]}
+        schedule_code: {type: [string, "null"], description: "Rỗng → chọn quy trình theo giống/loại mô hình tại ngày nhận giống"}
+        household_ref: {type: [string, "null"], format: uuid, description: "Hộ mô hình — hoặc ghi địa bàn (không lưu họ tên tự do)"}
+        locality: {type: [string, "null"], maxLength: 300}
+        received_date: {type: string, format: date}
+        age_at_receipt: {type: integer, minimum: 0, maximum: 3650}
+        head_count: {type: [integer, "null"], minimum: 1}
+        note: {type: [string, "null"], maxLength: 1000}
+    CNTSVaccinationDosesUpdate:
+      type: object
+      required: [base_version, doses]
+      properties:
+        base_version: {type: integer, minimum: 1}
+        captured_at: {type: [string, "null"], format: date-time}
+        doses:
+          type: array
+          minItems: 1
+          maxItems: 60
+          items:
+            type: object
+            required: [vaccine_code, shot]
+            properties:
+              vaccine_code: {type: string}
+              shot: {type: integer}
+              expected_date: {type: [string, "null"], format: date}
+              actual_date: {type: [string, "null"], format: date}
+              clear_actual: {type: boolean}
+              note: {type: [string, "null"], maxLength: 300}
     ExtWorkScheduleItemInput:
       type: object
       required: [day, session, content]
@@ -14152,6 +14590,7 @@ components:
         location: {type: [string, "null"], maxLength: 200, description: "Địa điểm cụ thể (ấp, cánh đồng…)"}
         participants: {type: [string, "null"], maxLength: 500, description: "Thành phần phối hợp — không ghi SĐT/CCCD (RB-3)"}
         note: {type: [string, "null"], maxLength: 1000}
+        place: {oneOf: [{$ref: "#/components/schemas/ExtWorkSchedulePlace"}, {type: "null"}], description: "Địa điểm trên bản đồ (CNTS CV-06) — check-in so khoảng cách"}
     ExtWorkScheduleItem:
       allOf:
         - $ref: "#/components/schemas/ExtWorkScheduleItemInput"
@@ -14212,11 +14651,15 @@ components:
           required: [items]
           properties:
             items: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleItem"}, description: "Mục của phiên bản hiện hành (lưới tuần)"}
+            checkin_enabled: {type: boolean, description: "Phòng ban dùng check-in GPS (W11.46)"}
+            checkins: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleCheckin"}}
+            checkin_count: {type: integer}
+            missed_checkin_count: {type: integer, description: "Mục công tác ngoài cơ quan đã qua ngày chưa check-in"}
     ExtWorkScheduleWarning:
       type: object
       required: [code, message, item_ids]
       properties:
-        code: {type: string, enum: [time_overlap, late_registration, outside_week]}
+        code: {type: string, enum: [time_overlap, late_registration, outside_week, checkin_far, checkin_no_place, checkin_weak_gps, checkin_mock_location, checkin_missed]}
         message: {type: string}
         item_ids: {type: array, items: {type: string, format: uuid}}
     ExtWorkScheduleVersion:
@@ -14239,6 +14682,10 @@ components:
         approved_items: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleItem"}, description: "Bản đã duyệt khi đang điều chỉnh (rỗng nếu không)"}
         warnings: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleWarning"}}
         versions: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleVersion"}}
+        checkin_enabled: {type: boolean, description: "Phòng ban dùng check-in GPS (W11.46)"}
+        checkins: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleCheckin"}}
+        checkin_count: {type: integer}
+        missed_checkin_count: {type: integer, description: "Mục công tác ngoài cơ quan đã qua ngày chưa check-in"}
         can:
           type: object
           required: [edit, submit, approve, request_changes]
@@ -14260,6 +14707,7 @@ components:
         schedule: {oneOf: [{$ref: "#/components/schemas/ExtWorkScheduleDetail"}, {type: "null"}]}
         previous_week_start: {type: string, format: date}
         previous_available: {type: boolean, description: "Tuần trước có lịch để sao chép"}
+        checkin_enabled: {type: boolean, description: "Phòng ban của người gọi dùng check-in GPS (W11.46) — Mobile hiện nút Check-in"}
     ExtWorkScheduleCounts:
       type: object
       required: [week_start, draft, pending, approved, changes_requested, unregistered, pending_open_weeks]
@@ -14293,6 +14741,12 @@ components:
         approver_levels: {type: array, items: {type: string}, description: "Cấp quản lý được duyệt (Q-05). Mặc định [truong_phong]"}
         province_approval: {type: string, enum: [peer, auto], description: "Lịch cán bộ Cấp Tỉnh: peer = người duyệt cấp quản lý khác người đăng ký; auto = tự duyệt khi gửi (Q-16). Mặc định peer"}
         provisional: {type: boolean, description: "Đang dùng giá trị mặc định tạm, chờ khách"}
+        department_code: {type: string}
+        approver_rule: {type: string, enum: [levels, follower], description: "Q-057 theo phòng: levels = cấp quản lý (Trồng trọt); follower = người theo dõi được phân công hoặc lãnh đạo phòng (CNTS)"}
+        checkin_enabled: {type: boolean}
+        checkin_far_m: {type: number}
+        checkin_store_point: {type: boolean, description: "Cờ QĐ-8: lưu tọa độ check-in (bảng có hạn lưu)"}
+        checkin_point_retention_days: {type: integer}
     KNFieldChange:
       type: object
       required: [field, old, new]
