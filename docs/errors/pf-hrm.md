@@ -1,0 +1,11 @@
+### pf/hrm (`dom/hrm` — kho tài liệu nhân sự, W11.24)
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 404 | `hrm.folder_not_found` | Thư mục không có, đã ẩn (khi ghi vào), hoặc người gọi không thấy (không lộ sự tồn tại) |
+| 409 | `hrm.folder_exists` | Tạo/đổi tên/hiện lại thư mục trùng tên (không phân biệt hoa thường) với thư mục đang dùng cùng cấp |
+| 409 | `hrm.folder_not_empty` | Ẩn thư mục còn thư mục con hoặc tài liệu đang hiện |
+| 404 | `hrm.doc_not_found` | Tài liệu không có hoặc ngoài phạm vi xem (tài liệu đã ẩn chỉ người quản lý thấy) |
+| 422 | `hrm.doc_format` | Đuôi tệp ngoài pdf, jpg, jpeg, png, docx, xlsx, doc, xls hoặc chữ ký đầu tệp không khớp đuôi |
+| 413 | `hrm.doc_too_large` | Tệp vượt 15 MB (trừ 1 KB phần phong bì) |
+| 503 | `hrm.docs_unavailable` | Chưa nối kho tệp `pf/evidence` hoặc kho định danh |
