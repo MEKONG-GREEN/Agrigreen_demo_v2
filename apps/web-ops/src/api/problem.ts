@@ -113,6 +113,7 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "extension.khtc_plan_invalid": "Kế hoạch năm chưa hợp lệ — xem lỗi từng dòng.",
   "extension.khtc_effective_date_invalid": "Số quyết định, ngày quyết định hoặc ngày hiệu lực chưa hợp lệ.",
   "extension.khtc_entry_in_use": "Dòng đã có số liệu — chỉ được ngừng theo dõi, không xóa.",
+  "extension.khtc_refresh_not_owner": "Chỉ cán bộ KHTC phụ trách kỳ được “Cập nhật số liệu”.",
   "extension.khtc_import_invalid": "Tệp Excel kế hoạch năm không đọc được.",
   // W11.49 Báo cáo dịch bệnh BM-10, báo nghi dịch
   "extension.cnts_outbreak_not_found": "Không có ổ dịch này (hoặc ngoài xã được phân công).",
