@@ -1,6 +1,6 @@
 # ADR-0052: Đồng sở hữu dữ liệu MKG + HTX, neo HTX theo mã số thuế, HTX tạm và nhận quyền
 
-**Trạng thái:** Chấp nhận — quyết định CEO D2 (13/10/2026); hiện thực ở gói D2 (pf 20261013065713) · **Ngày:** 13/10/2026 · **Trả lời:** H-1 ([cau-hoi-ton-dong.md](../cau-hoi-ton-dong.md)), QĐ-2 ([đối chiếu BRD KN](../kn/doi-chieu-brd-kn-2026-10.md)) · **Sửa đổi:** [ADR-0009](0009-mo-hinh-tenant.md) (ý nghĩa tenant giữ dữ liệu HTX), [ADR-0030](0030-doc-tai-cho-co-cap-phep.md) §7 (H-1 không còn mở), [docs/design/cooperative.md](../design/cooperative.md) D-10, §11 · **Thành phần:** `internal/platform/cooperative/anchor`, `internal/platform/cooperative/member/store/profile.go`, `internal/platform/cooperative/plot/app/sync.go`, `internal/platform/party/{app,handler}` (danh sách HTX), `apps/web-ops/src/app/quan-tri/neo-htx`, `migrations/pf/20261013065713_pf_coop_htx_anchor.up.sql`
+**Trạng thái:** Chấp nhận — quyết định CEO D2 (13/10/2026); hiện thực ở gói D2 (pf 20261013091454) · **Ngày:** 13/10/2026 · **Trả lời:** H-1 ([cau-hoi-ton-dong.md](../cau-hoi-ton-dong.md)), QĐ-2 ([đối chiếu BRD KN](../kn/doi-chieu-brd-kn-2026-10.md)) · **Sửa đổi:** [ADR-0009](0009-mo-hinh-tenant.md) (ý nghĩa tenant giữ dữ liệu HTX), [ADR-0030](0030-doc-tai-cho-co-cap-phep.md) §7 (H-1 không còn mở), [docs/design/cooperative.md](../design/cooperative.md) D-10, §11 · **Thành phần:** `internal/platform/cooperative/anchor`, `internal/platform/cooperative/member/store/profile.go`, `internal/platform/cooperative/plot/app/sync.go`, `internal/platform/party/{app,handler}` (danh sách HTX), `apps/web-ops/src/app/quan-tri/neo-htx`, `migrations/pf/20261013091454_pf_coop_htx_anchor.up.sql`
 
 ## Bối cảnh
 
@@ -156,7 +156,7 @@
 
 | Gói | Việc | Migration |
 |---|---|---|
-| D2 (13/10/2026) | Neo, HTX tạm, gắn MST, nhận quyền (lũy đẳng, nguyên tử, chạy thử, kiểm toán, xung đột), backfill, trạng thái xác nhận trên hồ sơ và danh sách HTX (lọc `?confirmation=`), phân giải bí danh ở sink thửa, cổng `HTXConfirmations`, màn web-ops `/quan-tri/neo-htx`. Kiểm thử: `anchor/domain` (chuẩn hóa, chi nhánh), `anchor/app` (trùng MST KN/MKG, sai dạng, chi nhánh, gắn MST, lũy đẳng, song song, lùi khi lỗi, xung đột, bí danh, xác nhận, backfill, chuỗi băm), `migrations` (RLS trước/sau nhận quyền), `plot/handler` (bản ghi ngoại tuyến), `party/handler` (nhãn + lọc) | pf 20261013065713 |
+| D2 (13/10/2026) | Neo, HTX tạm, gắn MST, nhận quyền (lũy đẳng, nguyên tử, chạy thử, kiểm toán, xung đột), backfill, trạng thái xác nhận trên hồ sơ và danh sách HTX (lọc `?confirmation=`), phân giải bí danh ở sink thửa, cổng `HTXConfirmations`, màn web-ops `/quan-tri/neo-htx`. Kiểm thử: `anchor/domain` (chuẩn hóa, chi nhánh), `anchor/app` (trùng MST KN/MKG, sai dạng, chi nhánh, gắn MST, lũy đẳng, song song, lùi khi lỗi, xung đột, bí danh, xác nhận, backfill, chuỗi băm), `migrations` (RLS trước/sau nhận quyền), `plot/handler` (bản ghi ngoại tuyến), `party/handler` (nhãn + lọc) | pf 20261013091454 |
 
 ## Còn mở
 

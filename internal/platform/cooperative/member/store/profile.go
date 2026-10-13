@@ -28,7 +28,7 @@ type Profile struct {
 	Confirmed bool
 }
 
-// confirmedExpr: Nút c.org_ref thuộc neo đã nhận quyền (pf_coop.htx_anchor_alias + htx_anchor, pf 20261013065713).
+// confirmedExpr: Nút c.org_ref thuộc neo đã nhận quyền (pf_coop.htx_anchor_alias + htx_anchor, pf 20261013091454).
 const confirmedExpr = `EXISTS (SELECT 1 FROM pf_coop.htx_anchor_alias al JOIN pf_coop.htx_anchor a
     ON a.tenant_id = al.tenant_id AND a.anchor_id = al.anchor_id
     WHERE al.tenant_id = c.tenant_id AND al.org_ref = c.org_ref AND a.status = 'claimed')`

@@ -42,7 +42,7 @@
 | 0038 | [Bộ chạy migration theo module — sổ theo module, thứ tự topo, vai `own_<module>`](0038-bo-chay-migration-theo-module.md) | Đề xuất — hiện thực bước 1 ở W7.1 (sau cờ `AG_MIGRATE_RUNNER=v2`, mặc định v1 một bản phát hành) |
 | 0049 | [`cap/price` = module năng lực `pf/price`](0049-cap-price-pf-price.md) | Đề xuất — khung hiện thực ở W11.71 (pf 000138); số 0039–0048 dành cho ADR khác của đợt |
 | 0050 | [`dom/hrm` = module nghiệp vụ `pf/hrm`; danh mục nhân sự ở module của chủ](0050-dom-hrm-pf-hrm.md) | Đề xuất — khung + danh mục nhân sự ở W11.21 (pf 000147); dữ liệu thật chờ Q-070 |
-| 0052 | [Đồng sở hữu dữ liệu MKG + HTX, neo HTX theo mã số thuế, HTX tạm "Chưa xác nhận" và nhận quyền](0052-dong-so-huu-mkg-htx-neo-mst.md) | Chấp nhận — quyết định CEO D2 (13/10/2026), trả lời H-1/QĐ-2; hiện thực gói D2 (pf 20261013065713) |
+| 0052 | [Đồng sở hữu dữ liệu MKG + HTX, neo HTX theo mã số thuế, HTX tạm "Chưa xác nhận" và nhận quyền](0052-dong-so-huu-mkg-htx-neo-mst.md) | Chấp nhận — quyết định CEO D2 (13/10/2026), trả lời H-1/QĐ-2; hiện thực gói D2 (pf 20261013091454) |
 
 ADR 0006, 0007, 0009, 0010, 0011 được chủ sản phẩm chấp nhận ngày 30/09/2026 trong phiên làm việc. Bảng đối chiếu cam kết → mã → kiểm thử ở [trien-khai-g1.md](trien-khai-g1.md).
 

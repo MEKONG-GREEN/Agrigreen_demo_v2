@@ -1,4 +1,4 @@
-// Package store: SQL của neo HTX (pf 20261013065713 — D2, ADR-0052): sổ pf_coop.htx_anchor_event, bảng chiếu htx_anchor,
+// Package store: SQL của neo HTX (pf 20261013091454 — D2, ADR-0052): sổ pf_coop.htx_anchor_event, bảng chiếu htx_anchor,
 // bí danh htx_anchor_alias, khóa nhận quyền htx_anchor_claim. Mọi hàm nhận pgx.Tx đã ở vai r_cooperative + tenant.
 package store
 

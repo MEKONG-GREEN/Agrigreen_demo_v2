@@ -11,7 +11,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// D2 (pf 20261013065713, ADR-0052): RLS trước và sau khi HTX thật nhận quyền neo. Mô hình đích: dữ liệu ở tenant LƯU KÝ
+// D2 (pf 20261013091454, ADR-0052): RLS trước và sau khi HTX thật nhận quyền neo. Mô hình đích: dữ liệu ở tenant LƯU KÝ
 // (đồng sở hữu MKG + HTX, tenant s của seedScope — HTX C1, C2); Khuyến nông là bên thứ ba ở tenant riêng v, đọc qua
 // cấp phép (share_scope, purpose khuyen-nong — basis_ref = thỏa thuận HTX ở share_grant_terms); MKG vận hành tenant
 // lưu ký không gắn Nút (cả tenant). Nhận quyền chỉ đổi neo (bảng chiếu + bí danh + khóa nhận quyền), không đổi dòng
