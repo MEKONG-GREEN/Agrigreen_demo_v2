@@ -35,6 +35,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.POST("/periods/:id/deadline", h.deadline)
 	g.POST("/periods/:id/close", h.closePeriod)
 	g.POST("/periods/:id/cancel", h.cancel)
+	// W11.11: "Báo cáo cho KHTC" phía phòng (FN-PN-03.01) — phiếu của phòng theo kỳ KHTC.
+	g.GET("/department-forms", h.departmentForms)
 }
 
 func bind(c *gin.Context, v any) bool {
@@ -438,4 +440,60 @@ func (h Handler) cancel(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, periodOf(d))
+}
+
+// ---------------------------------------------------------------------------
+// W11.11 — "Báo cáo cho KHTC" phía phòng (FN-PN-03.01)
+// ---------------------------------------------------------------------------
+
+type inboxRowDTO struct {
+	PeriodID        uuid.UUID  `json:"period_id"`
+	FormsPeriodID   uuid.UUID  `json:"forms_period_id"`
+	ReportType      string     `json:"report_type"`
+	ReportTypeLabel string     `json:"report_type_label"`
+	Year            int        `json:"year"`
+	Name            string     `json:"name"`
+	FromDate        string     `json:"from_date"`
+	ToDate          string     `json:"to_date"`
+	DueAt           time.Time  `json:"due_at"`
+	PeriodState     string     `json:"period_state"`
+	PeriodLabel     string     `json:"period_state_label"`
+	State           string     `json:"state"`
+	StateLabel      string     `json:"state_label"`
+	Attempt         int64      `json:"attempt"`
+	MaxSubmissions  int        `json:"max_submissions"`
+	LimitReached    bool       `json:"limit_reached"`
+	Late            bool       `json:"late"`
+	LastSubmittedAt *time.Time `json:"last_submitted_at"`
+	ReviewedAt      *time.Time `json:"reviewed_at"`
+	SupplementNote  *string    `json:"supplement_note"`
+	NeedsAction     bool       `json:"needs_action"`
+	Action          string     `json:"action"`
+	ActionLabel     string     `json:"action_label"`
+	EntryRoute      string     `json:"entry_route"`
+}
+
+func (h Handler) departmentForms(c *gin.Context) {
+	y, _ := strconv.Atoi(c.Query("year"))
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	in, err := h.Svc.DepartmentForms(c.Request.Context(), app.InboxQuery{View: c.Query("view"), Department: c.Query("department"), Year: y,
+		Limit: limit})
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	items := make([]inboxRowDTO, 0, len(in.Rows))
+	for _, r := range in.Rows {
+		p := r.Period
+		items = append(items, inboxRowDTO{PeriodID: p.ID, FormsPeriodID: p.FormsPeriodRef, ReportType: p.Type,
+			ReportTypeLabel: app.TypeLabels[p.Type], Year: p.Year, Name: p.Name, FromDate: day(p.From), ToDate: day(p.To), DueAt: r.DueAt,
+			PeriodState: r.PeriodState, PeriodLabel: domain.PeriodLabels[r.PeriodState], State: r.Form.State,
+			StateLabel: domain.FormLabels[r.Form.State], Attempt: r.Form.Attempt, MaxSubmissions: p.MaxSubmissions,
+			LimitReached: r.Form.LimitReached, Late: r.Late, LastSubmittedAt: r.LastSubmittedAt, ReviewedAt: r.ReviewedAt,
+			SupplementNote: ptrIf(r.SupplementNote), NeedsAction: r.NeedsAction, Action: r.Action, ActionLabel: app.ActionLabels[r.Action],
+			EntryRoute: r.EntryRoute})
+	}
+	c.JSON(http.StatusOK, gin.H{"department": in.Department, "department_name": in.DepartmentName, "view": in.View,
+		"read_only": in.ReadOnly, "counts": gin.H{"total": in.Counts.Total, "needs_action": in.Counts.NeedsAction,
+			"supplement": in.Counts.Supplement, "late": in.Counts.Late, "sent": in.Counts.Sent}, "items": items})
 }

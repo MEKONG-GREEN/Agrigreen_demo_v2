@@ -8019,6 +8019,30 @@ paths:
         "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
         "409": {description: "extension.khtc_period_not_cancellable | extension.khtc_period_terminal", $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/department-forms:
+    get:
+      summary: "Báo cáo cho KHTC" phía phòng (W11.11, FN-PN-03.01) — phiếu KHTC giao cho phòng của phiên theo kỳ KHTC
+      description: |
+        Một mã dùng chung cho mọi phòng chuyên môn (Trồng trọt, CNTS, Thông tin tuyên truyền, HCTH). Cấp Tỉnh chỉ thấy phiếu phòng
+        của phiên; Admin KN chọn phòng bằng `department`. view=current ("Phiếu kỳ này"): kỳ chưa đóng, "Cần xử lý" trước rồi hạn
+        gần nhất; view=sent ("Phiếu đã gửi"): phiếu đã gửi ≥ 1 lần. Kỳ đã hủy bị gỡ (BR-DL-18). Form nhập/gửi phiếu thuộc màn
+        `entry_route` (W11.63); gửi qua /v1/forms (profile kn_khtc).
+      operationId: extensionKhtcDepartmentForms
+      tags: [extension]
+      parameters:
+        - {name: view, in: query, schema: {type: string, enum: [current, sent], default: current}}
+        - {name: department, in: query, schema: {type: string}, description: Chỉ Admin KN — mã phòng cần xem (vai khác bỏ trống hoặc = phòng của phiên)}
+        - {name: year, in: query, schema: {type: integer}, description: Năm kế hoạch (bỏ trống = mọi năm)}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        "200":
+          description: Danh sách phiếu của phòng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCDepartmentForms"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
   # --- pf/hrm (dom/hrm, W11.21 — ADR-0050): danh mục nhân sự Phòng HCTH (BRD HCTH v3.0 FN-19, UR-ADM-08). Đọc: Admin và Cấp Tỉnh
   # của Phòng Hành chính – Tổng hợp (port.Access ở gốc lắp ráp); ghi: Admin. Mọi bản ghi là phiên bản (sổ chỉ ghi thêm); ngừng sử
   # dụng = phiên bản active=false (BR-01). Số thập phân (hệ số, PCCV, %) là chuỗi. Không dữ liệu cá nhân.
@@ -17273,6 +17297,55 @@ components:
         reviewed_at: {type: [string, "null"], format: date-time}
         review_note: {type: string}
         late: {type: boolean}
+    KHTCDepartmentForm:
+      type: object
+      description: Một phiếu KHTC của phòng trong một kỳ (W11.11, FN-PN-03.01)
+      required: [period_id, forms_period_id, report_type, report_type_label, year, name, from_date, to_date, due_at, period_state,
+        period_state_label, state, state_label, attempt, max_submissions, limit_reached, late, last_submitted_at, reviewed_at,
+        supplement_note, needs_action, action, action_label, entry_route]
+      properties:
+        period_id: {type: string, format: uuid, description: Id kỳ KHTC}
+        forms_period_id: {type: string, format: uuid, description: Id kỳ native cap/forms (gửi phiếu qua /v1/forms)}
+        report_type: {type: string, enum: [week, month, quarter, year, program, adhoc]}
+        report_type_label: {type: string}
+        year: {type: integer}
+        name: {type: string}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        due_at: {type: string, format: date-time, description: Hạn nộp hiệu lực}
+        period_state: {type: string, enum: [opened, late, closed], description: "Kỳ còn nhận phiếu (opened/late) hay đã đóng"}
+        period_state_label: {type: string}
+        state: {type: string, enum: [not_started, draft, late, submitted, supplement, confirmed, locked, not_sent]}
+        state_label: {type: string}
+        attempt: {type: integer, description: Lần gửi hiện hành (0 = chưa gửi)}
+        max_submissions: {type: integer, description: Số lần gửi tối đa (0 = không giới hạn)}
+        limit_reached: {type: boolean}
+        late: {type: boolean, description: Lần gửi cuối sau hạn}
+        last_submitted_at: {type: [string, "null"], format: date-time}
+        reviewed_at: {type: [string, "null"], format: date-time}
+        supplement_note: {type: [string, "null"], description: Nội dung yêu cầu bổ sung mới nhất (chỉ khi state = supplement)}
+        needs_action: {type: boolean, description: "Thuộc bộ lọc \"Cần xử lý\""}
+        action: {type: string, enum: [enter, continue, resubmit, view]}
+        action_label: {type: string}
+        entry_route: {type: string, description: "Màn nhập/xem phiếu của web-ops (W11.63): /kn/khtc/phieu/{period_id}[?department=]"}
+    KHTCDepartmentForms:
+      type: object
+      required: [department, department_name, view, read_only, counts, items]
+      properties:
+        department: {type: string}
+        department_name: {type: string}
+        view: {type: string, enum: [current, sent]}
+        read_only: {type: boolean, description: Phiên chỉ xem — mọi nút là Xem}
+        counts:
+          type: object
+          required: [total, needs_action, supplement, late, sent]
+          properties:
+            total: {type: integer}
+            needs_action: {type: integer}
+            supplement: {type: integer}
+            late: {type: integer}
+            sent: {type: integer}
+        items: {type: array, items: {$ref: "#/components/schemas/KHTCDepartmentForm"}}
     KHTCEvent:
       type: object
       required: [id, action, forced, reason, due_at, export_due_at, state, actor_ref, at]

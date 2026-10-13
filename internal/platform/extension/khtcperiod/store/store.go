@@ -89,6 +89,17 @@ func Periods(ctx context.Context, tx pgx.Tx, year, limit int) ([]Period, error) 
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Period, error) { return scanPeriod(r) })
 }
 
+// PeriodsOfDepartment liệt kê kỳ có phiếu của phòng dept (năm kế hoạch year, 0 = mọi năm), mới trước — W11.11 "Báo cáo
+// cho KHTC" phía phòng.
+func PeriodsOfDepartment(ctx context.Context, tx pgx.Tx, dept string, year, limit int) ([]Period, error) {
+	rows, err := tx.Query(ctx, `SELECT `+periodCols+` FROM pf_extension.khtc_period
+	  WHERE $1 = ANY(departments) AND ($2 = 0 OR plan_year = $2) ORDER BY id DESC LIMIT $3`, dept, year, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Period, error) { return scanPeriod(r) })
+}
+
 // LivePeriodByKey trả kỳ chưa hủy cùng loại + khóa (kiểm mở trùng trước khi phát hành phiếu) — nil nếu không có.
 func LivePeriodByKey(ctx context.Context, tx pgx.Tx, typ, key string) (*Period, error) {
 	p, err := scanPeriod(tx.QueryRow(ctx, `SELECT `+periodCols+` FROM pf_extension.khtc_period p
