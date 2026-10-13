@@ -9,8 +9,8 @@ View công bố `pf_<module>_pub.v<N>_<tên>` (R-DB-10, W6.3 — [modules.md](..
 | [`pf_extension_pub.v1_consolidation_closed`](pf_extension_pub.consolidation_closed.v1.json) | `pf/extension` | **published** (pf 000144) | kỳ × biểu | Số liệu đã chốt (lần tổng hợp các xã lúc chốt) theo phòng × tỉnh × khóa kỳ + cờ chốt biểu/kỳ/khóa kỳ. Trồng trọt bây giờ; CNTS vào cùng view (`department_code = chan_nuoi_thuy_san`) |
 | [`pf_price_pub.v1_board_daily`](pf_price_pub.board_daily.v1.json) | `pf/price` | **published** (pf 000152, W11.76) | ngày × mặt hàng | Bảng giá đã duyệt theo ngày, min/max toàn tỉnh (Q-084) |
 | [`pf_price_pub.v1_ticket_week`](pf_price_pub.ticket_week.v1.json) | `pf/price` | **published** (pf 000152, W11.76) | tuần báo cáo × xã báo giá | Số phiếu giá đã thu thập theo tuần báo cáo + cờ tuần đã chốt |
-| [`pf_extension_pub.v1_closed_figures`](pf_extension_pub.closed_figures.v1.json) | `pf/extension` | **published** (pf 20261013065758) | kỳ × biểu | Họ `closed_figures/v1` ([ADR-0053](../../docs/adr/0053-hop-dong-so-lieu-da-chot-closed-figures.md)) — nguồn vòng đời báo cáo cũ (Trồng trọt), chiếu lại `v1_consolidation_closed` về cột chung |
-| [`pf_forms_pub.v1_closed_figures`](pf_forms_pub.closed_figures.v1.json) | `pf/forms` | **published** (pf 20261013065757) | kỳ native (một biểu) | Họ `closed_figures/v1` — kỳ native `cap/forms` (CNTS `kn_cnts`), ảnh chụp đóng băng lúc chốt, chỉ trường số |
+| [`pf_extension_pub.v1_closed_figures`](pf_extension_pub.closed_figures.v1.json) | `pf/extension` | **published** (pf 20261013092923) | kỳ × biểu | Họ `closed_figures/v1` ([ADR-0053](../../docs/adr/0053-hop-dong-so-lieu-da-chot-closed-figures.md)) — nguồn vòng đời báo cáo cũ (Trồng trọt), chiếu lại `v1_consolidation_closed` về cột chung |
+| [`pf_forms_pub.v1_closed_figures`](pf_forms_pub.closed_figures.v1.json) | `pf/forms` | **published** (pf 20261013092921) | kỳ native (một biểu) | Họ `closed_figures/v1` — kỳ native `cap/forms` (CNTS `kn_cnts`), ảnh chụp đóng băng lúc chốt, chỉ trường số |
 
 ## Họ hợp đồng `closed_figures/v1` (ADR-0053)
 

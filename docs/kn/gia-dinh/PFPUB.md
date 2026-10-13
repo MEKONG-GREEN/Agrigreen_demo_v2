@@ -1,4 +1,4 @@
-## PFPUB — Hợp đồng số liệu đã chốt thống nhất (pf 20261013065757, 20261013065758)
+## PFPUB — Hợp đồng số liệu đã chốt thống nhất (pf 20261013092921, 20261013092923)
 
 | Câu hỏi / mục | Phương án đã chọn | Đổi ở đâu |
 |---|---|---|
@@ -6,7 +6,7 @@
 | Q-048 — "nguồn đã chốt cho tuần X" | `key_closed` = mọi biểu của mọi kỳ cùng (phòng, tỉnh, loại kỳ, khóa kỳ) trong view đã chốt; port KHTC tính `KeyClosedAll` trên cả hai nguồn. Phụ lục 2 nuôi trồng "không có chốt" của CNTS: biểu chưa phát hành kỳ native thì không tham gia cờ | Bên đọc W11.64 chọn `KeyClosedAll`/`FormClosed` |
 | Q-047 — lũy kế | Lũy kế của nguồn: trường lũy kế nằm trong `cells` (chỉ trường `integer`/`decimal`); KHTC không tính lại | — |
 | Phòng của kỳ native | Theo profile: `kn_cnts` → `chan_nuoi_thuy_san`; `kn` (chung), `kn_khtc` (phiếu của KHTC) không có dòng | `CASE` trong view — phòng mới dùng kỳ native thêm profile bằng `CREATE OR REPLACE VIEW` (Trồng trọt giữ vòng đời báo cáo — W11.04 hủy) |
-| Tỉnh của kỳ native | Tỉnh của Nút phát hành (`owner_ref` → `k_ref.org`, như `knActor` của pf/extension); Nút chưa đồng bộ k_ref → kỳ không có dòng | View pf 20261013065757 |
+| Tỉnh của kỳ native | Tỉnh của Nút phát hành (`owner_ref` → `k_ref.org`, như `knActor` của pf/extension); Nút chưa đồng bộ k_ref → kỳ không có dòng | View pf 20261013092921 |
 | `totals` của kỳ native | `[]` (cap/forms không tổng hợp); KHTC cộng `rows` theo decimal khi `totals` rỗng | W11.64 |
 | Dữ liệu cá nhân | Không công bố người nộp/rà soát, mã bài, trường văn bản tự do (ghi chú, kế hoạch, địa điểm BM-05) | — |
 | Đường đọc của KHTC (mục mở W11.10) | Thành viên vai `_pub` do bootstrap cấp (`dbadmin.PubReaders`: `r_extension` → `r_extension_pub`, `r_forms_pub`) + port `extension/port.ClosedFigures`; không cấp thẳng quyền view | ADR-0053 §4 |

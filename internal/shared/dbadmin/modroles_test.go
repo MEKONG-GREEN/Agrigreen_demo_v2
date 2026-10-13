@@ -23,7 +23,7 @@ func pubRoles() []string {
 
 // W6.3 (§14, ADR-0031 §2, R-DB-10): r_<module>_pub NOLOGIN cho đúng các module sở hữu schema _pub, tạo trước
 // vai phân tích; chỉ r_metrics (cap/analytics), r_agg và bên đọc đã rà soát (PubReaders, ADR-0053) là thành viên;
-// không thuộc ag_shared_user, không vượt RLS. PFPUB: + r_forms_pub (pf_forms_pub, pf 20261013065757).
+// không thuộc ag_shared_user, không vượt RLS. PFPUB: + r_forms_pub (pf_forms_pub, pf 20261013092921).
 func TestPubRoles_W63(t *testing.T) {
 	want := []string{"r_cropcycle_pub", "r_extension_pub", "r_forms_pub", "r_geo_pub", "r_mechanization_pub", "r_price_pub"}
 	if got := pubRoles(); !slices.Equal(got, want) {

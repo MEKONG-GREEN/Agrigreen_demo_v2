@@ -111,8 +111,8 @@ func (x *cntsFx) post(who caller, p string, body any) resp {
 }
 
 // TestPFPUB_ClosedFigures (ADR-0053): KHTC đọc số liệu đã chốt của HAI nguồn qua MỘT bộ đọc (extension/port.ClosedFigures)
-// trên họ hợp đồng closed_figures/v1 — CNTS kỳ native cap/forms (pf_forms_pub, pf 20261013065757) và Trồng trọt vòng đời báo
-// cáo cũ (pf_extension_pub, pf 20261013065758): chốt → thấy; mở lại → cờ về false, số cũ giữ; chốt lại → số mới; key_closed
+// trên họ hợp đồng closed_figures/v1 — CNTS kỳ native cap/forms (pf_forms_pub, pf 20261013092921) và Trồng trọt vòng đời báo
+// cáo cũ (pf_extension_pub, pf 20261013092923): chốt → thấy; mở lại → cờ về false, số cũ giữ; chốt lại → số mới; key_closed
 // (Q-048) theo mọi biểu của khóa kỳ; cách ly tenant (RLS qua view); không dữ liệu cá nhân; vai r_extension đọc view
 // _pub mà không đọc được bảng nội bộ của pf/forms.
 func TestPFPUB_ClosedFigures(t *testing.T) {
