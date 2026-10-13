@@ -5426,6 +5426,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/bm02": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** BM-02 — KSGM theo cơ sở của một tuần KSGM (YYYY-MM-Kn) hoặc tháng (YYYY-MM) = tổng BM-01 + dòng điều chỉnh */
+        get: operations["extensionCntsBM02"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/bm02/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thêm dòng điều chỉnh BM-02 cho một cơ sở × một tuần KSGM (cộng/trừ, lý do 10–500 ký tự; chỉ ghi thêm) */
+        post: operations["extensionCntsBM02Adjust"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/bm18": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** BM-18 Phụ lục 2 phần III — khai thác (tự cộng BM-17 theo xã) + nuôi trồng theo đối tượng; Tuần trước liền kề, Trong kỳ, Lũy kế quý, Lũy kế năm */
+        get: operations["extensionCntsBM18"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/bm18/aquaculture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi số nuôi trồng của tuần theo đối tượng (dòng mới thay dòng trước; tuần BM-18 đã chốt → 409) */
+        post: operations["extensionCntsBM18Aquaculture"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/aggregates/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chốt bảng tổng hợp của một tuần (BM-02 tuần KSGM, BM-18 tuần CNTS) — mọi kỳ nguồn của tuần phải đã chốt (D17); số công bố đóng băng */
+        post: operations["extensionCntsAggregateClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/aggregates/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở lại bảng tổng hợp đã chốt (lý do 10–500 ký tự) — số đã công bố giữ tới lần chốt lại */
+        post: operations["extensionCntsAggregateReopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiên bản tệp chia sẻ Chi cục của một bảng */
+        get: operations["extensionCntsShares"];
+        put?: never;
+        /** Tạo phiên bản tệp chia sẻ Chi cục (số không đổi so với phiên bản cuối → trả phiên bản cuối, 200) */
+        post: operations["extensionCntsShareCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/shares/{id}/xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải tệp Excel của một phiên bản (dựng lại từ nội dung đã lưu; BM-18 gồm sheet TỔNG = Phụ lục 2 và 4 sheet khai thác theo xã × tuần) */
+        get: operations["extensionCntsShareFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/forms/profiles": {
         parameters: {
             query?: never;
@@ -14284,6 +14421,206 @@ export interface components {
         CNTSSuspectDetail: {
             current: components["schemas"]["CNTSSuspect"];
             versions: components["schemas"]["CNTSSuspect"][];
+        };
+        CntsKeySpan: {
+            key: string;
+            label: string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+        };
+        CntsKeyLabel: {
+            key: string;
+            label: string;
+        };
+        /** @description Khóa → số thập phân (chuỗi) */
+        CntsDecMap: {
+            [key: string]: string;
+        };
+        CntsSources: {
+            count: number;
+            closed: number;
+            /** @description Mọi kỳ nguồn của tuần đã chốt (D17) — điều kiện chốt bảng */
+            all_closed: boolean;
+        };
+        CntsAggregateAction: {
+            /** @enum {string} */
+            form: "CNTS-BM02" | "CNTS-BM18";
+            /** @description BM-02: tuần KSGM YYYY-MM-Kn; BM-18: tuần CNTS YYYY-Www */
+            period_key: string;
+            /** @description Bắt buộc khi mở lại (10–500 ký tự) */
+            reason?: string;
+        };
+        CntsAggregateState: {
+            key: string;
+            /** @enum {string} */
+            state: "none" | "closed" | "reopened";
+            close_count: number;
+            /** Format: date-time */
+            last_at: string | null;
+            figures_hash: string | null;
+            /** @description Số tính lại từ ảnh chụp nguồn khác số đã chốt — Nguồn đã thay đổi */
+            changed: boolean;
+        };
+        CntsShare: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            /** Format: date-time */
+            at: string;
+            /** @enum {string} */
+            basis: "submitted" | "closed";
+            recipient: string;
+            channel: string;
+            /** @description Thay đổi so với bản đã gửi ngày … (phiên bản n) */
+            note: string;
+            content_hash: string;
+            actor_name: string;
+        };
+        CntsShareResult: {
+            share: components["schemas"]["CntsShare"];
+            replayed: boolean;
+        };
+        CntsAdjustment: {
+            /** Format: uuid */
+            id: string;
+            week_key: string;
+            facility_ref: string;
+            facility_name: string;
+            commune_code: string;
+            deltas: components["schemas"]["CntsDecMap"];
+            reason: string;
+            actor_name: string;
+            /** Format: date-time */
+            at: string;
+            /** @description BM-01 của tuần đổi sau khi điều chỉnh — cần xem lại */
+            stale: boolean;
+        };
+        CntsBM02Row: {
+            facility_ref: string;
+            facility_code: string;
+            facility_name: string;
+            facility_kind: string;
+            stamps_gs: string[];
+            stamps_gc: string[];
+            commune_code: string;
+            commune_name: string;
+            auto: components["schemas"]["CntsDecMap"];
+            adjust: components["schemas"]["CntsDecMap"];
+            total: components["schemas"]["CntsDecMap"];
+            days_expected: number;
+            days_reported: number;
+            missing_days: number;
+            stale: boolean;
+        };
+        CntsBM02Commune: {
+            commune_code: string;
+            commune_name: string;
+            total: components["schemas"]["CntsDecMap"];
+            facilities: number;
+        };
+        CntsBM02: {
+            province: string;
+            /** @enum {string} */
+            period_type: "ksgm_week" | "month";
+            period_key: string;
+            label: string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            prev_key: string;
+            next_key: string;
+            /** @enum {string} */
+            basis: "submitted" | "closed";
+            weeks: components["schemas"]["CntsKeySpan"][];
+            species: components["schemas"]["CntsKeyLabel"][];
+            rows: components["schemas"]["CntsBM02Row"][];
+            communes: components["schemas"]["CntsBM02Commune"][];
+            auto: components["schemas"]["CntsDecMap"];
+            adjust: components["schemas"]["CntsDecMap"];
+            total: components["schemas"]["CntsDecMap"];
+            sources: components["schemas"]["CntsSources"];
+            units_total: number;
+            units_reported: number;
+            adjustments: components["schemas"]["CntsAdjustment"][];
+            aggregates: components["schemas"]["CntsAggregateState"][];
+            shares: components["schemas"]["CntsShare"][];
+        };
+        CntsCols: {
+            /** @description Tuần trước liền kề */
+            prev: string;
+            /** @description Trong kỳ báo cáo */
+            cur: string;
+            /** @description Lũy kế từ đầu quý (theo ngày cuối tuần) */
+            qtd: string;
+            /** @description Lũy kế từ đầu năm (theo ngày cuối tuần) */
+            ytd: string;
+        };
+        CntsColsMap: {
+            [key: string]: components["schemas"]["CntsCols"];
+        };
+        CntsBM18Commune: {
+            commune_code: string;
+            commune_name: string;
+            region_code: string;
+            region_name: string;
+            cells: components["schemas"]["CntsColsMap"];
+            expected: boolean;
+            reported: boolean;
+            nil_report: boolean;
+            /** @description Thiếu kỳ (tuần trong năm có kỳ mà xã không nộp — tính 0) */
+            missing_weeks: string[];
+            by_week: {
+                [key: string]: components["schemas"]["CntsDecMap"];
+            };
+        };
+        CntsBM18Region: {
+            region_code: string;
+            region_name: string;
+            sort: number;
+            cells: components["schemas"]["CntsColsMap"];
+        };
+        CntsBM18Aqua: {
+            code: string;
+            label: string;
+            group: string;
+            area_unit: string;
+            output_unit: string;
+            in_total: boolean;
+            area: components["schemas"]["CntsCols"];
+            output: components["schemas"]["CntsCols"];
+            entered_area: string | null;
+            entered_output: string | null;
+            note: string;
+        };
+        CntsBM18: {
+            province: string;
+            week: components["schemas"]["CntsKeySpan"];
+            prev: components["schemas"]["CntsKeySpan"] | null;
+            prev_key: string;
+            next_key: string;
+            /** @description Lịch tuần (D8), vd chan_nuoi_thuy_san:v3 */
+            calendar: string;
+            /** @enum {string} */
+            basis: "submitted" | "closed";
+            groups: components["schemas"]["CntsKeyLabel"][];
+            aqua_groups: components["schemas"]["CntsKeyLabel"][];
+            weeks: components["schemas"]["CntsKeySpan"][];
+            communes: components["schemas"]["CntsBM18Commune"][];
+            regions: components["schemas"]["CntsBM18Region"][];
+            catch: components["schemas"]["CntsColsMap"];
+            aqua: components["schemas"]["CntsBM18Aqua"][];
+            aqua_area: components["schemas"]["CntsCols"];
+            aqua_output: components["schemas"]["CntsCols"];
+            total: components["schemas"]["CntsCols"];
+            sources: components["schemas"]["CntsSources"];
+            units_total: number;
+            units_reported: number;
+            missing_units: string[];
+            aggregate: components["schemas"]["CntsAggregateState"];
+            shares: components["schemas"]["CntsShare"][];
         };
         PriceStatus: {
             profile: string;
@@ -27122,6 +27459,321 @@ export interface operations {
             409: components["responses"]["Problem"];
             /** @description validation_failed | extension.cnts_suspect_invalid */
             422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsBM02: {
+        parameters: {
+            query?: {
+                /** @description Mã tỉnh (chỉ Cấp Quốc gia/Admin) */
+                province?: string;
+                period_type?: "ksgm_week" | "month";
+                /** @description 2026-10-K2 | 2026-10; rỗng = tuần KSGM/tháng hiện tại */
+                key?: string;
+                /** @description Số đã gửi (mặc định) hoặc số đã chốt (ảnh chụp nguồn) */
+                basis?: "submitted" | "closed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng BM-02 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsBM02"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsBM02Adjust: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Tuần KSGM YYYY-MM-Kn */
+                    week_key: string;
+                    /** Format: uuid */
+                    facility_ref: string;
+                    /** @description Loài (trau_bo, heo, gia_cam, de) → số thập phân, có thể âm */
+                    deltas: {
+                        [key: string]: string;
+                    };
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Dòng điều chỉnh đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsAdjustment"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_aggregate_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsBM18: {
+        parameters: {
+            query?: {
+                /** @description Mã tỉnh (chỉ Cấp Quốc gia/Admin) */
+                province?: string;
+                /** @description Tuần CNTS YYYY-Www (Thứ Ba – Thứ Hai, D8); rỗng = tuần hiện tại */
+                week?: string;
+                basis?: "submitted" | "closed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phụ lục 2 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsBM18"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsBM18Aquaculture: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    week: string;
+                    entries: {
+                        /** @description Mã đối tượng (danh sách cnts.bm18_objects/v1) */
+                        object: string;
+                        /** @description Diện tích (ha) hoặc số lồng trong tuần */
+                        area?: string | null;
+                        /** @description Sản lượng (tấn; ngọc trai: 1.000 viên) trong tuần */
+                        output?: string | null;
+                        note?: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Phụ lục 2 sau khi ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsBM18"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_aggregate_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsAggregateClose: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CntsAggregateAction"];
+            };
+        };
+        responses: {
+            /** @description Trạng thái chốt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsAggregateState"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_aggregate_sources_open | extension.cnts_aggregate_state */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsAggregateReopen: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CntsAggregateAction"];
+            };
+        };
+        responses: {
+            /** @description Trạng thái chốt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsAggregateState"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_aggregate_state */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsShares: {
+        parameters: {
+            query: {
+                province?: string;
+                form: "CNTS-BM02" | "CNTS-BM18";
+                period_type: "ksgm_week" | "month" | "week";
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách (cũ trước) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CntsShare"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsShareCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    form: "CNTS-BM02" | "CNTS-BM18";
+                    /** @enum {string} */
+                    period_type: "ksgm_week" | "month" | "week";
+                    period_key: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Số không đổi — phiên bản cuối */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsShareResult"];
+                };
+            };
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsShareResult"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsShareFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_share_not_found */
+            404: components["responses"]["Problem"];
         };
     };
     formsProfiles: {

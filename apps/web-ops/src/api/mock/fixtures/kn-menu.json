@@ -1016,6 +1016,24 @@
         "children": []
        },
        {
+        "key": "tinh.cnts.ksgm",
+        "label": "KSGM tuần, tháng",
+        "route": "/kn/cnts/ksgm",
+        "icon": "chart",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.cnts.phu_luc_2",
+        "label": "Thủy sản (Phụ lục 2)",
+        "route": "/kn/cnts/phu-luc-2",
+        "icon": "report",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
         "key": "tinh.cnts.lich",
         "label": "Lịch trực KSGM \u0026 lịch tiêm",
         "route": "/kn/cnts/lich",
