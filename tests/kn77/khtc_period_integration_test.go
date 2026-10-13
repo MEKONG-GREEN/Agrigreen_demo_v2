@@ -1,13 +1,15 @@
 package kn77_test
 
-// W11.62 — Kỳ KHTC trên module THẬT: pf/extension (extension/khtcperiod, sổ pf 20261013070316) + pf/forms (kỳ native kn_khtc)
-// trên PostgreSQL. Phòng nộp phiếu, KHTC rà soát qua /v1/forms (route thật); mở/đóng/hủy kỳ qua use case Kỳ KHTC.
+// W11.62 — Kỳ KHTC trên module THẬT qua HTTP: pf/extension (/v1/extension/khtc/*, sổ pf 20261013070316) + pf/forms
+// (kỳ native kn_khtc, /v1/forms/* — phòng nộp, KHTC rà soát) trên PostgreSQL, middleware Idempotency-Key thật.
+// Tên kiểm thử con theo nhóm KH2 của BRD KHTC v2.2 (Mục II.4, II.5, FN-TI-02.03).
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,23 +20,21 @@ import (
 
 	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
-	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtcperiod/app"
-	khtcdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtcperiod/domain"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// crosswalk giả của gói PFPUB: một kỳ nguồn CNTS cho mỗi kỳ KHTC, trạng thái chốt điều khiển được.
+// crosswalk giả của gói PFPUB: một kỳ nguồn CNTS cho mỗi tuần KHTC, trạng thái chốt điều khiển được.
 type crosswalk struct{ closed bool }
 
 func (c *crosswalk) Sources(_ context.Context, kind, key string, _, _ time.Time, depts []string) ([]extport.KHTCSourceRef, error) {
@@ -55,12 +55,53 @@ func (c *crosswalk) States(_ context.Context, refs []extport.KHTCSourceRef) ([]e
 	return out, nil
 }
 
+type khtcPeriod struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	State          string    `json:"state"`
+	FormsPeriodID  string    `json:"forms_period_id"`
+	FormsStatus    string    `json:"forms_status"`
+	DueAt          time.Time `json:"due_at"`
+	MaxSubmissions int       `json:"max_submissions"`
+	CanClose       bool      `json:"can_close"`
+	CloseForced    bool      `json:"close_forced"`
+	Counts         struct {
+		Sources int `json:"sources"`
+	} `json:"counts"`
+	Forms []struct {
+		Department           string `json:"department"`
+		State                string `json:"state"`
+		Attempt              int64  `json:"attempt"`
+		LimitReached         bool   `json:"limit_reached"`
+		CanRequestSupplement bool   `json:"can_request_supplement"`
+		CanConfirm           bool   `json:"can_confirm"`
+	} `json:"forms"`
+	Events []struct {
+		Action string `json:"action"`
+		Forced bool   `json:"forced"`
+	} `json:"events"`
+	// nháp
+	Duplicate       *struct{ ID string } `json:"duplicate"`
+	Sources         []json.RawMessage    `json:"sources"`
+	TemplateVersion int64                `json:"template_version"`
+}
+
+func (p khtcPeriod) form(t *testing.T, dept string) (string, int64, bool, bool, bool) {
+	t.Helper()
+	for _, f := range p.Forms {
+		if f.Department == dept {
+			return f.State, f.Attempt, f.LimitReached, f.CanRequestSupplement, f.CanConfirm
+		}
+	}
+	t.Fatalf("không có phiếu %s: %+v", dept, p.Forms)
+	return "", 0, false, false, false
+}
+
 type khtcFx struct {
 	t    *testing.T
-	svc  *khtcapp.Service
 	clk  *clock.Fixed
 	cw   *crosswalk
-	r    *gin.Engine
+	eng  *gin.Engine
 	tid  uuid.UUID
 	node uuid.UUID
 }
@@ -68,205 +109,233 @@ type khtcFx struct {
 func newKHTCFx(t *testing.T) *khtcFx {
 	env := pgtest.Get(t)
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
+	ops := env.Pool(t, migrations.PF, "platform_api")
 	// 08:00 Thứ Tư 14/10/2026 giờ VN — tuần 41 (07/10–13/10) vừa kết thúc, hạn nộp 10:00 hôm nay.
 	clk := clock.NewFixed(time.Date(2026, 10, 14, 1, 0, 0, 0, time.UTC))
 	fm, err := forms.New(pool, clk, forms.Deps{Profiles: []formsport.Profile{platformasm.KNKHTCProfile}})
 	if err != nil {
 		t.Fatal(err)
 	}
+	kn := extension.New(pool, clk, extension.Deps{})
 	cw := &crosswalk{}
-	f := &khtcFx{t: t, clk: clk, cw: cw, tid: ids.New(), node: ids.New(),
-		svc: &khtcapp.Service{DB: db.ForModule(pool, extension.DBModule), Clock: clk, Forms: fm.Publisher(), Control: fm.Control(),
-			Crosswalk: cw, MaxSubmissions: platformasm.KNKHTCProfile.MaxSubmissions}}
-	gin.SetMode(gin.TestMode)
-	f.r = gin.New()
-	f.r.Use(func(c *gin.Context) {
+	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), Crosswalk: cw,
+		MaxSubmissions: platformasm.KNKHTCProfile.MaxSubmissions})
+	f := &khtcFx{t: t, clk: clk, cw: cw, tid: ids.New(), node: ids.New()}
+	f.eng = httpx.NewEngine(slog.New(slog.NewTextHandler(io.Discard, nil)), 8<<20)
+	g := f.eng.Group("/v1", func(c *gin.Context) {
 		var k authz.KNContext
 		_ = json.Unmarshal([]byte(c.GetHeader("X-Test-KN")), &k)
 		actor, _ := uuid.Parse(c.GetHeader("X-Test-Actor"))
 		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), authz.Principal{ActorRef: actor, TenantID: f.tid, KN: &k}))
-	})
-	fm.RegisterApp(f.r.Group("/v1"))
+	}, idempotency.Middleware(ops))
+	fm.RegisterApp(g)
+	kn.RegisterApp(g)
 	return f
 }
 
-func (f *khtcFx) as(role, dept string, actor uuid.UUID) context.Context {
-	if actor == uuid.Nil {
-		actor = ids.New()
-	}
-	k := authz.KNContext{Role: role, Department: dept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1"}}}
-	if role == authz.KNAdmin {
-		k = authz.KNContext{Role: role, Scope: authz.Scope{All: true}}
-	}
-	return authz.WithPrincipal(context.Background(), authz.Principal{ActorRef: actor, TenantID: f.tid, KN: &k})
-}
-
-// call gọi route /v1/forms như phiên (vai, phòng ban, người) — trả JSON.
-func (f *khtcFx) call(method, path, role, dept string, actor uuid.UUID, body any) map[string]any {
+// do gọi API như phiên (vai, phòng ban, người); idem rỗng → khóa mới. Trả mã HTTP và thân.
+func (f *khtcFx) do(method, path, role, dept string, actor uuid.UUID, idem string, body any) (int, []byte) {
 	f.t.Helper()
 	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(method, path, bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
-	k, _ := json.Marshal(authz.KNContext{Role: role, Department: dept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1"}}})
-	req.Header.Set("X-Test-KN", string(k))
-	req.Header.Set("X-Test-Actor", actor.String())
-	w := httptest.NewRecorder()
-	f.r.ServeHTTP(w, req)
-	if w.Code >= 300 {
-		f.t.Fatalf("%s %s → %d %s", method, path, w.Code, w.Body.String())
+	k := authz.KNContext{Role: role, Department: dept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1"}}}
+	if role == authz.KNAdmin {
+		k = authz.KNContext{Role: role, Scope: authz.Scope{All: true}}
 	}
-	var out map[string]any
-	_ = json.Unmarshal(w.Body.Bytes(), &out)
-	return out
+	kj, _ := json.Marshal(k)
+	req.Header.Set("X-Test-KN", string(kj))
+	if actor == uuid.Nil {
+		actor = ids.New()
+	}
+	req.Header.Set("X-Test-Actor", actor.String())
+	if method == http.MethodPost {
+		if idem == "" {
+			idem = "t-" + ids.New().String()
+		}
+		req.Header.Set(idempotency.Header, idem)
+	}
+	w := httptest.NewRecorder()
+	f.eng.ServeHTTP(w, req)
+	return w.Code, w.Body.Bytes()
 }
 
-func (f *khtcFx) submit(fid uuid.UUID, dept string) string {
-	out := f.call(http.MethodPost, "/v1/forms/periods/"+fid.String()+"/submissions?profile=kn_khtc", authz.KNTinh, dept, ids.New(),
+func (f *khtcFx) ok(code int, b []byte, out any) {
+	f.t.Helper()
+	if code >= 300 {
+		f.t.Fatalf("HTTP %d: %s", code, b)
+	}
+	if out != nil {
+		if err := json.Unmarshal(b, out); err != nil {
+			f.t.Fatal(err)
+		}
+	}
+}
+
+func (f *khtcFx) fail(code int, b []byte, want string) {
+	f.t.Helper()
+	var p struct{ Code string }
+	_ = json.Unmarshal(b, &p)
+	if p.Code != want {
+		f.t.Fatalf("muốn %s, có HTTP %d %s", want, code, b)
+	}
+}
+
+const khtcDept = partyport.DeptKeHoachTaiChinh
+
+func (f *khtcFx) khtc(method, path string, actor uuid.UUID, idem string, body any) (int, []byte) {
+	return f.do(method, "/v1/extension/khtc"+path, authz.KNTinh, khtcDept, actor, idem, body)
+}
+
+func (f *khtcFx) get(id string) khtcPeriod {
+	var p khtcPeriod
+	c, b := f.khtc(http.MethodGet, "/periods/"+id, uuid.Nil, "", nil)
+	f.ok(c, b, &p)
+	return p
+}
+
+func (f *khtcFx) submit(fid, dept string) string {
+	var s struct{ ID string }
+	c, b := f.do(http.MethodPost, "/v1/forms/periods/"+fid+"/submissions?profile=kn_khtc", authz.KNTinh, dept, uuid.Nil, "",
 		map[string]any{"unit": dept, "values": map[string]string{"ket_qua": "Tập huấn 3 lớp"}})
-	return out["id"].(string)
+	f.ok(c, b, &s)
+	return s.ID
 }
 
 func (f *khtcFx) review(subID, decision string, khtc uuid.UUID) {
-	f.call(http.MethodPost, "/v1/forms/submissions/"+subID+"/review?profile=kn_khtc", authz.KNTinh, partyport.DeptKeHoachTaiChinh, khtc,
+	c, b := f.do(http.MethodPost, "/v1/forms/submissions/"+subID+"/review?profile=kn_khtc", authz.KNTinh, khtcDept, khtc, "",
 		map[string]any{"decision": decision, "note": "Bổ sung số liệu lớp tập huấn"})
-}
-
-func wantCode(t *testing.T, err error, code string) {
-	t.Helper()
-	var p *problem.Problem
-	if !errors.As(err, &p) || p.Code != code {
-		t.Fatalf("muốn %s, có %v", code, err)
-	}
-}
-
-func formOf(t *testing.T, d khtcapp.Detail, dept string) khtcapp.FormRow {
-	t.Helper()
-	for _, r := range d.Forms {
-		if r.Department == dept {
-			return r
-		}
-	}
-	t.Fatalf("không có phiếu %s", dept)
-	return khtcapp.FormRow{}
+	f.ok(c, b, nil)
 }
 
 func TestKHTCPeriod_W1162(t *testing.T) {
 	f := newKHTCFx(t)
-	khtcActor := ids.New()
-	khtc := f.as(authz.KNTinh, partyport.DeptKeHoachTaiChinh, khtcActor)
+	me := ids.New()
 	tt, cn := partyport.DeptTrongTrot, partyport.DeptChanNuoiThuySan
-	week41 := khtcapp.OpenInput{Request: khtcdomain.Request{Type: khtcdomain.TypeWeek, Year: 2026, No: 41}, Departments: []string{tt, cn}}
+	week41 := map[string]any{"report_type": "week", "year": 2026, "no": 41, "departments": []string{tt, cn}}
+	var p khtcPeriod
 
-	// Phòng khác không mở kỳ; chưa cài phiếu cơ sở → 404.
-	_, err := f.svc.Open(f.as(authz.KNTinh, tt, uuid.Nil), week41, "k-tt")
-	wantCode(t, err, "forbidden")
-	_, err = f.svc.Open(khtc, week41, "k0")
-	wantCode(t, err, "forms.template_not_found")
-	if _, err := f.svc.InstallTemplate(f.as(authz.KNAdmin, "", uuid.Nil), "tpl"); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("KH2 quyền và phiếu cơ sở", func(t *testing.T) {
+		c, b := f.do(http.MethodPost, "/v1/extension/khtc/periods", authz.KNTinh, tt, uuid.Nil, "", week41)
+		f.fail(c, b, "forbidden")
+		c, b = f.khtc(http.MethodPost, "/periods", me, "", week41)
+		f.fail(c, b, "forms.template_not_found")
+		c, b = f.do(http.MethodPost, "/v1/extension/khtc/form-template/install", authz.KNAdmin, "", uuid.Nil, "", nil)
+		f.ok(c, b, nil)
+	})
 
-	// Nháp: tên kỳ, khoảng thời gian, hạn tự điền; nguồn CNTS gắn theo bộ quy đổi.
-	dr, err := f.svc.Preview(khtc, week41)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if dr.Plan.Name != "Tuần 41 năm 2026 (từ ngày 07/10/2026 đến ngày 13/10/2026)" || dr.MaxSubmissions != 3 || len(dr.Sources) != 1 ||
-		dr.TemplateVersion == 0 || dr.Duplicate != nil {
-		t.Fatalf("nháp: %+v", dr)
-	}
+	t.Run("KH2 mở kỳ: tên kỳ, hạn 10:00 Thứ Tư, một phiếu mỗi phòng, nguồn, không trùng", func(t *testing.T) {
+		var dr khtcPeriod
+		c, b := f.khtc(http.MethodPost, "/periods/preview", me, "", week41)
+		f.ok(c, b, &dr)
+		if dr.Name != "Tuần 41 năm 2026 (từ ngày 07/10/2026 đến ngày 13/10/2026)" || dr.MaxSubmissions != 3 || len(dr.Sources) != 1 ||
+			dr.TemplateVersion == 0 || dr.Duplicate != nil {
+			t.Fatalf("nháp: %s", b)
+		}
+		if got := dr.DueAt.In(clock.Zone()).Format("2006-01-02 15:04"); got != "2026-10-14 10:00" {
+			t.Fatalf("hạn nộp KHTC: %s", got)
+		}
+		c, b = f.khtc(http.MethodPost, "/periods", me, "open-w41-key", week41)
+		f.ok(c, b, &p)
+		st, _, _, _, _ := p.form(t, tt)
+		if p.State != "opened" || len(p.Forms) != 2 || st != "not_started" || p.Counts.Sources != 1 || p.MaxSubmissions != 3 {
+			t.Fatalf("mở kỳ: %s", b)
+		}
+		var again khtcPeriod
+		c, b = f.khtc(http.MethodPost, "/periods", me, "open-w41-key", week41)
+		f.ok(c, b, &again)
+		if again.ID != p.ID {
+			t.Fatalf("gọi lặp: %s ≠ %s", again.ID, p.ID)
+		}
+		c, b = f.khtc(http.MethodPost, "/periods", me, "", week41)
+		f.fail(c, b, "extension.khtc_period_duplicate")
+	})
 
-	// Mở kỳ: một phiếu mỗi phòng (kỳ native kn_khtc), Đã mở. Gọi lặp cùng khóa → cùng kỳ; khóa khác → trùng.
-	d, err := f.svc.Open(khtc, week41, "k1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.State != khtcdomain.PeriodOpened || len(d.Forms) != 2 || formOf(t, d, tt).View.State != khtcdomain.FormNotStarted ||
-		d.Counts.Sources != 1 || d.Period.MaxSubmissions != 3 {
-		t.Fatalf("mở kỳ: %+v", d)
-	}
-	again, err := f.svc.Open(khtc, week41, "k1")
-	if err != nil || again.Period.ID != d.Period.ID {
-		t.Fatalf("gọi lặp: %v %v", again.Period.ID, err)
-	}
-	_, err = f.svc.Open(khtc, week41, "k2")
-	wantCode(t, err, "extension.khtc_period_duplicate")
-	fid := d.Period.FormsPeriodRef
+	t.Run("KH2 phiếu: yêu cầu bổ sung, lần gửi 3 tự khóa", func(t *testing.T) {
+		s1 := f.submit(p.FormsPeriodID, tt)
+		p = f.get(p.ID)
+		if _, _, _, sup, _ := p.form(t, tt); p.State != "collecting" || !sup {
+			t.Fatalf("sau lần 1: %s %+v", p.State, p.Forms)
+		}
+		f.review(s1, "returned", me)
+		if st, _, _, _, _ := f.get(p.ID).form(t, tt); st != "supplement" {
+			t.Fatalf("yêu cầu bổ sung: %s", st)
+		}
+		s2 := f.submit(p.FormsPeriodID, tt)
+		f.review(s2, "returned", me)
+		f.submit(p.FormsPeriodID, tt)
+		p = f.get(p.ID)
+		if _, n, lim, sup, conf := p.form(t, tt); n != 3 || !lim || sup || !conf {
+			t.Fatalf("lần 3: n=%d lim=%v sup=%v conf=%v", n, lim, sup, conf)
+		}
+		c, b := f.do(http.MethodPost, "/v1/forms/periods/"+p.FormsPeriodID+"/submissions?profile=kn_khtc", authz.KNTinh, tt, uuid.Nil, "",
+			map[string]any{"unit": tt, "values": map[string]string{"ket_qua": "lần 4"}})
+		f.fail(c, b, "forms.submission_limit")
+	})
 
-	// Trồng trọt gửi → Đang thu thập. KHTC yêu cầu bổ sung, phòng gửi lại tới lần 3 → tự khóa (chỉ xác nhận).
-	s1 := f.submit(fid, tt)
-	if d, _ = f.svc.Get(khtc, d.Period.ID); d.State != khtcdomain.PeriodCollecting || !formOf(t, d, tt).View.CanRequestSupplement {
-		t.Fatalf("sau lần gửi 1: %s %+v", d.State, formOf(t, d, tt))
-	}
-	f.review(s1, "returned", khtcActor)
-	if d, _ = f.svc.Get(khtc, d.Period.ID); formOf(t, d, tt).View.State != khtcdomain.FormSupplement {
-		t.Fatalf("yêu cầu bổ sung: %+v", formOf(t, d, tt))
-	}
-	s2 := f.submit(fid, tt)
-	f.review(s2, "returned", khtcActor)
-	f.submit(fid, tt)
-	d, _ = f.svc.Get(khtc, d.Period.ID)
-	if v := formOf(t, d, tt).View; v.Attempt != 3 || !v.LimitReached || v.CanRequestSupplement || !v.CanConfirm {
-		t.Fatalf("lần 3: %+v", v)
-	}
+	t.Run("KH2 đủ dữ liệu khi mọi phiếu gửi và nguồn chốt, đóng kỳ", func(t *testing.T) {
+		f.submit(p.FormsPeriodID, cn)
+		if p = f.get(p.ID); p.State != "collecting" {
+			t.Fatalf("nguồn chưa chốt: %s", p.State)
+		}
+		f.cw.closed = true
+		if p = f.get(p.ID); p.State != "complete" || !p.CanClose || p.CloseForced {
+			t.Fatalf("đủ dữ liệu: %s", p.State)
+		}
+		c, b := f.khtc(http.MethodPost, "/periods/"+p.ID+"/close", me, "", map[string]any{})
+		f.ok(c, b, &p)
+		if st, _, _, _, _ := p.form(t, tt); p.State != "closed" || p.FormsStatus != "closed" || st != "locked" {
+			t.Fatalf("đóng kỳ: %s", b)
+		}
+		c, b = f.khtc(http.MethodPost, "/periods/"+p.ID+"/cancel", me, "", map[string]any{"reason": "Mở nhầm loại báo cáo"})
+		f.fail(c, b, "extension.khtc_period_terminal")
+	})
 
-	// CNTS gửi, nguồn chưa chốt → chưa đủ; nguồn chốt → Đủ dữ liệu → đóng kỳ thường.
-	f.submit(fid, cn)
-	if d, _ = f.svc.Get(khtc, d.Period.ID); d.State != khtcdomain.PeriodCollecting {
-		t.Fatalf("nguồn chưa chốt: %s", d.State)
-	}
-	f.cw.closed = true
-	if d, _ = f.svc.Get(khtc, d.Period.ID); d.State != khtcdomain.PeriodComplete || !d.CanClose || d.CloseForced {
-		t.Fatalf("đủ dữ liệu: %s %+v", d.State, d.Counts)
-	}
-	if d, err = f.svc.Close(khtc, d.Period.ID, "", "c1"); err != nil || d.State != khtcdomain.PeriodClosed || d.FormsStatus != "closed" ||
-		formOf(t, d, tt).View.State != khtcdomain.FormLocked {
-		t.Fatalf("đóng kỳ: %v %s %s", err, d.State, d.FormsStatus)
-	}
-	_, err = f.svc.Cancel(khtc, d.Period.ID, "Mở nhầm loại báo cáo", "x1")
-	wantCode(t, err, "extension.khtc_period_terminal")
+	t.Run("KH2 đóng ngoại lệ khi Trễ hạn ≥ 3 ngày, lý do bắt buộc", func(t *testing.T) {
+		var m khtcPeriod
+		c, b := f.khtc(http.MethodPost, "/periods", me, "", map[string]any{"report_type": "month", "year": 2026, "no": 10, "departments": []string{tt, cn}})
+		f.ok(c, b, &m)
+		f.submit(m.FormsPeriodID, tt)
+		c, b = f.khtc(http.MethodPost, "/periods/"+m.ID+"/close", me, "", map[string]any{})
+		f.fail(c, b, "extension.khtc_period_not_closable")
+		f.clk.Advance(18 * 24 * time.Hour) // 01/11: quá hạn 28/10 10:00 hơn 3 ngày
+		if m = f.get(m.ID); m.State != "late" || !m.CloseForced {
+			t.Fatalf("trễ hạn: %s %v", m.State, m.CloseForced)
+		}
+		c, b = f.khtc(http.MethodPost, "/periods/"+m.ID+"/close", me, "", map[string]any{})
+		f.fail(c, b, "validation_failed")
+		c, b = f.khtc(http.MethodPost, "/periods/"+m.ID+"/close", me, "", map[string]any{"reason": "Phòng CNTS chưa gửi phiếu sau 4 ngày quá hạn"})
+		f.ok(c, b, &m)
+		if st, _, _, _, _ := m.form(t, cn); st != "not_sent" || !m.Events[len(m.Events)-1].Forced {
+			t.Fatalf("đóng ngoại lệ: %s", b)
+		}
+	})
 
-	// Tháng 10 (đến 27/10): quá hạn ≥ 3 ngày, còn thiếu → đóng ngoại lệ, lý do bắt buộc; phiếu chưa gửi → Không gửi.
-	m10, err := f.svc.Open(khtc, khtcapp.OpenInput{Request: khtcdomain.Request{Type: khtcdomain.TypeMonth, Year: 2026, No: 10},
-		Departments: []string{tt, cn}}, "m10")
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.submit(m10.Period.FormsPeriodRef, tt)
-	_, err = f.svc.Close(khtc, m10.Period.ID, "", "c2")
-	wantCode(t, err, "extension.khtc_period_not_closable")
-	f.clk.Advance(18 * 24 * time.Hour) // 01/11: quá hạn 28/10 10:00 hơn 3 ngày
-	if d, _ = f.svc.Get(khtc, m10.Period.ID); d.State != khtcdomain.PeriodLate || !d.CloseForced {
-		t.Fatalf("trễ hạn: %s %v", d.State, d.CloseForced)
-	}
-	_, err = f.svc.Close(khtc, m10.Period.ID, "", "c3")
-	wantCode(t, err, "validation_failed")
-	if d, err = f.svc.Close(khtc, m10.Period.ID, "Phòng CNTS chưa gửi phiếu sau 4 ngày quá hạn", "c4"); err != nil ||
-		formOf(t, d, cn).View.State != khtcdomain.FormNotSent || !d.Events[len(d.Events)-1].Forced {
-		t.Fatalf("đóng ngoại lệ: %v %+v", err, d.Forms)
-	}
-
-	// Sửa hạn nộp, hủy kỳ (lý do bắt buộc), mở lại đúng kỳ đó sau khi hủy.
-	w43 := khtcapp.OpenInput{Request: khtcdomain.Request{Type: khtcdomain.TypeWeek, Year: 2026, No: 43}, Departments: []string{tt}}
-	k43, err := f.svc.Open(khtc, w43, "w43")
-	if err != nil {
-		t.Fatal(err)
-	}
-	newDue := k43.DueAt.Add(48 * time.Hour)
-	if d, err = f.svc.ChangeDeadline(khtc, k43.Period.ID, khtcapp.DeadlineInput{DueAt: newDue}, "dl"); err != nil || !d.DueAt.Equal(newDue) {
-		t.Fatalf("sửa hạn: %v %v", err, d.DueAt)
-	}
-	_, err = f.svc.Cancel(khtc, k43.Period.ID, "nhầm", "x2")
-	wantCode(t, err, "validation_failed")
-	if d, err = f.svc.Cancel(khtc, k43.Period.ID, "Mở nhầm tuần báo cáo", "x3"); err != nil || d.State != khtcdomain.PeriodCancelled ||
-		d.FormsStatus != "cancelled" || formOf(t, d, tt).View.State != khtcdomain.FormWithdrawn {
-		t.Fatalf("hủy kỳ: %v %s %s", err, d.State, d.FormsStatus)
-	}
-	if _, err := f.svc.Open(khtc, w43, "w43b"); err != nil {
-		t.Fatalf("mở lại kỳ đã hủy: %v", err)
-	}
-	list, err := f.svc.List(khtc, 2026, 10)
-	if err != nil || len(list) != 4 {
-		t.Fatalf("danh sách: %d %v", len(list), err)
-	}
+	t.Run("KH2 sửa hạn, hủy kỳ, mở lại đúng kỳ đã hủy", func(t *testing.T) {
+		w43 := map[string]any{"report_type": "week", "year": 2026, "no": 43, "departments": []string{tt}}
+		var k khtcPeriod
+		c, b := f.khtc(http.MethodPost, "/periods", me, "", w43)
+		f.ok(c, b, &k)
+		newDue := k.DueAt.Add(48 * time.Hour)
+		c, b = f.khtc(http.MethodPost, "/periods/"+k.ID+"/deadline", me, "", map[string]any{"due_at": newDue})
+		f.ok(c, b, &k)
+		if !k.DueAt.Equal(newDue) {
+			t.Fatalf("sửa hạn: %v", k.DueAt)
+		}
+		c, b = f.khtc(http.MethodPost, "/periods/"+k.ID+"/cancel", me, "", map[string]any{"reason": "nhầm"})
+		f.fail(c, b, "validation_failed")
+		c, b = f.khtc(http.MethodPost, "/periods/"+k.ID+"/cancel", me, "", map[string]any{"reason": "Mở nhầm tuần báo cáo"})
+		f.ok(c, b, &k)
+		if st, _, _, _, _ := k.form(t, tt); k.State != "cancelled" || k.FormsStatus != "cancelled" || st != "withdrawn" {
+			t.Fatalf("hủy kỳ: %s", b)
+		}
+		c, b = f.khtc(http.MethodPost, "/periods", me, "", w43)
+		f.ok(c, b, nil)
+		var list struct{ Items []khtcPeriod }
+		c, b = f.khtc(http.MethodGet, "/periods?year=2026", me, "", nil)
+		f.ok(c, b, &list)
+		if len(list.Items) != 4 {
+			t.Fatalf("danh sách: %d", len(list.Items))
+		}
+	})
 }
