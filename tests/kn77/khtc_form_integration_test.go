@@ -28,6 +28,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -70,7 +71,9 @@ func newKHTCFormFx(t *testing.T) *kfFx {
 		var k authz.KNContext
 		_ = json.Unmarshal([]byte(c.GetHeader("X-Test-KN")), &k)
 		actor, _ := uuid.Parse(c.GetHeader("X-Test-Actor"))
-		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), authz.Principal{ActorRef: actor, TenantID: base.tid, KN: &k}))
+		// Như httpx.Authenticate: người gọi + tenant ở ctx (cổng Kế hoạch năm đọc tenant từ ctx).
+		ctx := tenant.WithID(c.Request.Context(), base.tid)
+		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, authz.Principal{ActorRef: actor, TenantID: base.tid, KN: &k}))
 	}, idempotency.Middleware(ops))
 	fm.RegisterApp(g)
 	kn.RegisterApp(g)
