@@ -132,6 +132,9 @@ var implementedMenu = map[string]bool{
 	"admin.pb.bao_cao_khtc": true,                              // W11.11
 	"tinh.cnts.ksgm":        true, "tinh.cnts.phu_luc_2": true, // W11.44
 	"tinh.hcth.dashboard": true, "tinh.hcth.bao_cao_so": true, // W11.28
+	// W11.46 lịch trực KSGM, lịch tiêm, lịch công tác CNTS
+	"tinh.cnts.lich": true, "tinh.cnts.lich_tiem": true, "tinh.cnts.lich_cong_tac": true,
+	"xa.cnts.lich": true, "xa.cnts.lich_tiem": true, "xa.cnts.lich_cong_tac": true,
 }
 
 // W11.06 (kn.menu/v3, D3 C6, D4 X2): khuôn theo phòng ban — nhóm "Nghiệp vụ" sau "Điều hành", nhóm

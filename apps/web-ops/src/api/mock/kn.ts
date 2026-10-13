@@ -232,7 +232,9 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       { key: "tinh.cnts.dich_benh", label: "Báo cáo dịch bệnh", route: "/kn/cnts/dich-benh", icon: "shield" }, // W11.49
       { key: "tinh.cnts.ksgm", label: "KSGM tuần, tháng", route: "/kn/cnts/ksgm", icon: "chart" }, // W11.44
       { key: "tinh.cnts.phu_luc_2", label: "Thủy sản (Phụ lục 2)", route: "/kn/cnts/phu-luc-2", icon: "report" }, // W11.44
-      soon("tinh.cnts.lich", "Lịch trực KSGM & lịch tiêm", "/kn/cnts/lich", "calendar"),
+      { key: "tinh.cnts.lich", label: "Lịch trực KSGM", route: "/kn/cnts/lich-truc", icon: "calendar" }, // W11.46
+      { key: "tinh.cnts.lich_tiem", label: "Lịch tiêm phòng", route: "/kn/cnts/lich-tiem", icon: "check" }, // W11.46
+      { key: "tinh.cnts.lich_cong_tac", label: "Lịch công tác", route: "/kn/nhiem-vu/lich-cong-tac", icon: "calendar", badge: "extension.work_schedules.pending" }, // W11.46
       soon("tinh.cnts.chien_dich", "Chiến dịch điều tra", "/kn/cnts/chien-dich", "megaphone"),
       soon("tinh.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
       soon("tinh.cnts.du_an_knqg", "Dự án KNQG / Điểm trình diễn", "/kn/cnts/du-an-knqg", "report"),
@@ -243,7 +245,9 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       { key: "xa.cnts.bao_cao_ky", label: "Báo cáo kỳ CNTS", route: "/kn/cnts/bao-cao-ky", icon: "task" }, // W11.42
       { key: "xa.cnts.dich_benh", label: "Báo cáo dịch bệnh", route: "/kn/cnts/dich-benh", icon: "shield" }, // W11.49
       { key: "xa.cnts.canh_bao", label: "Cảnh báo", route: "/kn/cnts/canh-bao", icon: "zap" }, // W11.43
-      soon("xa.cnts.lich", "Lịch trực của tôi", "/kn/cnts/lich", "calendar"),
+      { key: "xa.cnts.lich", label: "Lịch trực của tôi", route: "/kn/cnts/lich-truc", icon: "calendar" }, // W11.46
+      { key: "xa.cnts.lich_tiem", label: "Lịch tiêm", route: "/kn/cnts/lich-tiem", icon: "check" }, // W11.46
+      { key: "xa.cnts.lich_cong_tac", label: "Lịch công tác", route: "/kn/nhiem-vu/lich-cong-tac", icon: "calendar" }, // W11.46
       soon("xa.cnts.nhat_ky", "Hộ mô hình & nhật ký", "/kn/cnts/nhat-ky", "journal"),
       soon("xa.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
       soon("xa.cnts.diem_trinh_dien", "Điểm trình diễn", "/kn/cnts/du-an-knqg", "report"),

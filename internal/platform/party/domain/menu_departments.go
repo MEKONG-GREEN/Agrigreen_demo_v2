@@ -94,7 +94,10 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			// kế, chốt tuần (số công bố cho KHTC), tệp chia sẻ Chi cục có phiên bản.
 			{Key: "tinh.cnts.ksgm", Label: "KSGM tuần, tháng", Route: "/kn/cnts/ksgm", Icon: "chart"},
 			{Key: "tinh.cnts.phu_luc_2", Label: "Thủy sản (Phụ lục 2)", Route: "/kn/cnts/phu-luc-2", Icon: "report"},
-			soon("tinh.cnts.lich", "Lịch trực KSGM & lịch tiêm", "/kn/cnts/lich", "calendar"),
+			// W11.46: lịch trực KSGM BM-03, lịch tiêm phòng BM-07, lịch công tác (BM-06, duyệt lịch cán bộ xã, check-in).
+			{Key: "tinh.cnts.lich", Label: "Lịch trực KSGM", Route: "/kn/cnts/lich-truc", Icon: "calendar"},
+			{Key: "tinh.cnts.lich_tiem", Label: "Lịch tiêm phòng", Route: "/kn/cnts/lich-tiem", Icon: "check"},
+			{Key: "tinh.cnts.lich_cong_tac", Label: "Lịch công tác", Route: "/kn/nhiem-vu/lich-cong-tac", Icon: "calendar", BadgeSource: BadgeScheduleApprovals},
 			soon("tinh.cnts.chien_dich", "Chiến dịch điều tra", "/kn/cnts/chien-dich", "megaphone"),
 			soon("tinh.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
 			soon("tinh.cnts.du_an_knqg", "Dự án KNQG / Điểm trình diễn", "/kn/cnts/du-an-knqg", "report"),
@@ -109,7 +112,10 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			{Key: "xa.cnts.dich_benh", Label: "Báo cáo dịch bệnh", Route: "/kn/cnts/dich-benh", Icon: "shield"},
 			// W11.43: cảnh báo của các xã phụ trách, xử lý cảnh báo được giao (FN-13 Cấp Xã).
 			{Key: "xa.cnts.canh_bao", Label: "Cảnh báo", Route: "/kn/cnts/canh-bao", Icon: "zap"},
-			soon("xa.cnts.lich", "Lịch trực của tôi", "/kn/cnts/lich", "calendar"),
+			// W11.46: lịch trực KSGM của tôi, lịch tiêm (ghi ngày tiêm thực tế), lịch công tác + check-in.
+			{Key: "xa.cnts.lich", Label: "Lịch trực của tôi", Route: "/kn/cnts/lich-truc", Icon: "calendar"},
+			{Key: "xa.cnts.lich_tiem", Label: "Lịch tiêm", Route: "/kn/cnts/lich-tiem", Icon: "check"},
+			{Key: "xa.cnts.lich_cong_tac", Label: "Lịch công tác", Route: "/kn/nhiem-vu/lich-cong-tac", Icon: "calendar"},
 			soon("xa.cnts.nhat_ky", "Hộ mô hình & nhật ký", "/kn/cnts/nhat-ky", "journal"),
 			soon("xa.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
 			soon("xa.cnts.diem_trinh_dien", "Điểm trình diễn", "/kn/cnts/du-an-knqg", "report"),

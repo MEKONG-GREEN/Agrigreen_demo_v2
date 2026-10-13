@@ -1069,13 +1069,29 @@
        },
        {
         "key": "tinh.cnts.lich",
-        "label": "Lịch trực KSGM \u0026 lịch tiêm",
-        "route": "/kn/cnts/lich",
+        "label": "Lịch trực KSGM",
+        "route": "/kn/cnts/lich-truc",
         "icon": "calendar",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.cnts.lich_tiem",
+        "label": "Lịch tiêm phòng",
+        "route": "/kn/cnts/lich-tiem",
+        "icon": "check",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.cnts.lich_cong_tac",
+        "label": "Lịch công tác",
+        "route": "/kn/nhiem-vu/lich-cong-tac",
+        "icon": "calendar",
+        "badge_source": "extension.work_schedules.pending",
+        "enabled": true,
         "children": []
        },
        {
@@ -1319,12 +1335,28 @@
        {
         "key": "xa.cnts.lich",
         "label": "Lịch trực của tôi",
-        "route": "/kn/cnts/lich",
+        "route": "/kn/cnts/lich-truc",
         "icon": "calendar",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "xa.cnts.lich_tiem",
+        "label": "Lịch tiêm",
+        "route": "/kn/cnts/lich-tiem",
+        "icon": "check",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "xa.cnts.lich_cong_tac",
+        "label": "Lịch công tác",
+        "route": "/kn/nhiem-vu/lich-cong-tac",
+        "icon": "calendar",
+        "badge_source": null,
+        "enabled": true,
         "children": []
        },
        {
