@@ -228,9 +228,7 @@ func (s *Service) ImportDraft(ctx context.Context, year int, data []byte) (Draft
 			}
 		}
 		if v := get("communes"); v != "" {
-			for _, c := range strings.FieldsFunc(v, func(r rune) bool { return r == ',' || r == ';' || r == ' ' }) {
-				e.Communes = append(e.Communes, c)
-			}
+			e.Communes = append(e.Communes, strings.FieldsFunc(v, func(r rune) bool { return r == ',' || r == ';' || r == ' ' })...)
 		}
 		if v := get("source"); v != "" {
 			e.DataSource = sources[tabular.NormalizeHeader(v)]

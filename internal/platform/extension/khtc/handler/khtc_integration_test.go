@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -125,7 +126,9 @@ func (u user) send(method, path, idem, ctype string, body io.Reader) resp {
 	defer func() { _ = res.Body.Close() }()
 	raw, _ := io.ReadAll(res.Body)
 	var m map[string]any
-	_ = json.Unmarshal(raw, &m)
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber() // số giữ dạng chuỗi (R-10: không float trong vùng KHTC, cả kiểm thử)
+	_ = dec.Decode(&m)
 	return resp{status: res.StatusCode, raw: raw, body: m, header: res.Header}
 }
 
@@ -188,7 +191,7 @@ func TestFN_AD_04_01_Catalog(t *testing.T) {
 	off := false
 	r = admin.post("/v1/kn/khtc/catalogs/unit/ha/revise", map[string]any{"name": "Héc ta", "active": off})
 	want(t, r, http.StatusCreated, "", "ngừng dùng")
-	if r.body["version"].(float64) != 2 || r.body["active"] != false {
+	if r.body["version"].(json.Number).String() != "2" || r.body["active"] != false {
 		t.Fatalf("phiên bản ngừng: %s", r.raw)
 	}
 	r = tinh.get("/v1/kn/khtc/catalogs?kind=unit")
@@ -197,7 +200,7 @@ func TestFN_AD_04_01_Catalog(t *testing.T) {
 		t.Fatalf("mục đã ngừng vẫn hiện: %s", r.raw)
 	}
 	counts := objs(r.body["counts"])
-	if len(counts) != 8 || str(counts[1], "kind") != "unit" || counts[1]["total"].(float64) != 1 || counts[4]["active"].(float64) != 2 {
+	if len(counts) != 8 || str(counts[1], "kind") != "unit" || counts[1]["total"].(json.Number).String() != "1" || counts[4]["active"].(json.Number).String() != "2" {
 		t.Fatalf("số lượng: %s", r.raw)
 	}
 	r = tinh.get("/v1/kn/khtc/catalogs/unit/ha/history")
@@ -250,7 +253,7 @@ func TestD20_ProgramMaster(t *testing.T) {
 	if err != nil || p.Active || p.Version != 2 || p.Code != "CT-01" {
 		t.Fatalf("cổng Program: %+v %v", p, err)
 	}
-	if _, err := ps.Program(ctx, ids.New()); err != port.ErrKHTCProgramNotFound {
+	if _, err := ps.Program(ctx, ids.New()); !errors.Is(err, port.ErrKHTCProgramNotFound) {
 		t.Fatalf("cổng Program không có: %v", err)
 	}
 	if l, _ := ps.Programs(ctx, port.KHTCProgramFilter{}); len(l) != 0 {
@@ -302,12 +305,12 @@ func TestFN_TI_02_02_AnnualPlan(t *testing.T) {
 	want(t, r, http.StatusCreated, "", "lập kế hoạch")
 	v1 := r.body["version"].(map[string]any)
 	es := objs(r.body["entries"])
-	if v1["version"].(float64) != 1 || str(v1, "basis") != "initial" || str(v1, "effective_from") != "2027-01-01" || len(es) != 5 ||
+	if v1["version"].(json.Number).String() != "1" || str(v1, "basis") != "initial" || str(v1, "effective_from") != "2027-01-01" || len(es) != 5 ||
 		str(es[0], "name") != "Chương trình KN trồng trọt" || str(es[0], "roman") != "I" || str(es[2], "planned_qty") != "120.5" ||
 		str(es[2], "program_ref") != prog1 || str(es[2], "program_code") != "CT-I" {
 		t.Fatalf("phiên bản 1: %s", r.raw)
 	}
-	if r2 := tinh.do(http.MethodPost, "/v1/kn/khtc/plans/2027/versions", k, first); r2.status >= 300 || r2.body["latest_version"].(float64) != 1 {
+	if r2 := tinh.do(http.MethodPost, "/v1/kn/khtc/plans/2027/versions", k, first); r2.status >= 300 || r2.body["latest_version"].(json.Number).String() != "1" {
 		t.Fatalf("gửi lặp: %s", r2.raw)
 	}
 
@@ -318,7 +321,7 @@ func TestFN_TI_02_02_AnnualPlan(t *testing.T) {
 	adj["entries"].([]map[string]any)[2]["planned_qty"] = "150"
 	r = tinh.post("/v1/kn/khtc/plans/2027/versions", adj)
 	want(t, r, http.StatusCreated, "", "điều chỉnh")
-	if r.body["latest_version"].(float64) != 2 || str(objs(r.body["entries"])[2], "planned_qty") != "150" {
+	if r.body["latest_version"].(json.Number).String() != "2" || str(objs(r.body["entries"])[2], "planned_qty") != "150" {
 		t.Fatalf("phiên bản 2: %s", r.raw)
 	}
 	want(t, tinh.post("/v1/kn/khtc/plans/2027/versions", planBody(1, prog1, prog2, map[string]any{"effective_from": "2027-08-01"})),
@@ -326,7 +329,7 @@ func TestFN_TI_02_02_AnnualPlan(t *testing.T) {
 
 	r = tt.get("/v1/kn/khtc/plans/2027?at=2027-03-01")
 	want(t, r, http.StatusOK, "", "phòng chuyên môn xem theo ngày")
-	if r.body["version"].(map[string]any)["version"].(float64) != 1 || str(objs(r.body["entries"])[2], "planned_qty") != "120.5" {
+	if r.body["version"].(map[string]any)["version"].(json.Number).String() != "1" || str(objs(r.body["entries"])[2], "planned_qty") != "120.5" {
 		t.Fatalf("phiên bản theo ngày: %s", r.raw)
 	}
 	r = tinh.get("/v1/kn/khtc/plans/2027/versions")
@@ -340,7 +343,7 @@ func TestFN_TI_02_02_AnnualPlan(t *testing.T) {
 		pl.Entries[2].PlannedQty.String() != "150" || pl.Entries[2].Department != "trong_trot" {
 		t.Fatalf("cổng PlanAt: %+v %v", pl, err)
 	}
-	if _, err := f.mod.KHTCPlans().PlanAt(ctx, 2026, t0); err != port.ErrKHTCPlanNotFound {
+	if _, err := f.mod.KHTCPlans().PlanAt(ctx, 2026, t0); !errors.Is(err, port.ErrKHTCPlanNotFound) {
 		t.Fatalf("cổng PlanAt năm chưa có: %v", err)
 	}
 
@@ -348,7 +351,7 @@ func TestFN_TI_02_02_AnnualPlan(t *testing.T) {
 	r = tinh.get("/v1/kn/khtc/plans/2028/copy-draft")
 	want(t, r, http.StatusOK, "", "sao chép")
 	drafts := objs(r.body["entries"])
-	if len(drafts) != 5 || str(drafts[0], "ref") == str(es[0], "ref") || r.body["from_version"].(float64) != 2 {
+	if len(drafts) != 5 || str(drafts[0], "ref") == str(es[0], "ref") || r.body["from_version"].(json.Number).String() != "2" {
 		t.Fatalf("bản nháp sao chép: %s", r.raw)
 	}
 
