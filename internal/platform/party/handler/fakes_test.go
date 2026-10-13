@@ -355,6 +355,9 @@ func (f *fakeCoopProfiles) MatchProfiles(ctx context.Context, q partyport.CoopPr
 		if q.AreaMax != nil && (p.AreaHa == nil || p.AreaHa.GreaterThan(*q.AreaMax)) {
 			continue
 		}
+		if q.Confirmation != "" && p.Confirmed != (q.Confirmation == partyport.CoopConfirmed) {
+			continue
+		}
 		out = append(out, ref)
 	}
 	return out, nil
