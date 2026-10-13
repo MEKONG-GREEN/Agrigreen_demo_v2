@@ -7448,6 +7448,286 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: forms.template_not_found, $ref: "#/components/responses/Problem"}
         "422": {description: "validation_failed | forms.facility_invalid", $ref: "#/components/responses/Problem"}
+  # --- pf/extension W11.49 (D4 CN9, BRD CNTS v3.7 FN-11, UR-XA-10): Báo cáo dịch bệnh BM-10 (ổ dịch có phiên bản diễn biến)
+  # và báo nghi dịch. Phòng Chăn nuôi – Thủy sản: Cấp Xã lập/cập nhật, Cấp Tỉnh xem + kết thúc/mở lại, Cấp TW không có.
+  /v1/extension/cnts/outbreaks:
+    get:
+      summary: Ổ dịch (bản hiện hành) trong phạm vi + thống kê theo trạng thái, bệnh
+      operationId: extensionCntsListOutbreaks
+      tags: [extension]
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string, enum: [reported, monitoring, closed]}}
+        - {name: commune, in: query, required: false, schema: {type: string}}
+        - {name: disease, in: query, required: false, schema: {type: string}, description: Mã bệnh (danh mục cnts_disease)}
+        - {name: from, in: query, required: false, schema: {type: string, format: date}, description: Ngày tiếp nhận (DB-02) từ}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}, description: Ngày tiếp nhận (DB-02) đến}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreakList"}
+        "403": {description: "forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Cấp Xã lập báo cáo dịch bệnh BM-10 và gửi Cấp Tỉnh (phiên bản 1; phát pf.extension.outbreak.reported)
+      operationId: extensionCntsReportOutbreak
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSOutbreakInput"}
+      responses:
+        "201":
+          description: Đã gửi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "403": {description: "forbidden | extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_outbreak_invalid | extension.support_reason_required", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/outbreak-points:
+    get:
+      summary: Lớp ổ dịch cho bản đồ (GeoJSON FeatureCollection, WGS84) — mặc định bỏ ổ dịch đã kết thúc
+      operationId: extensionCntsOutbreakPoints
+      tags: [extension]
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string, enum: [reported, monitoring, closed]}}
+        - {name: commune, in: query, required: false, schema: {type: string}}
+        - {name: disease, in: query, required: false, schema: {type: string}}
+        - {name: from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}}
+        - {name: include_closed, in: query, required: false, schema: {type: boolean}}
+      responses:
+        "200":
+          description: GeoJSON
+          content:
+            application/geo+json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreakPoints"}
+        "403": {description: "forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/outbreaks/{ref}:
+    get:
+      summary: Ổ dịch — bản hiện hành và mọi phiên bản diễn biến (mới nhất trước)
+      operationId: extensionCntsGetOutbreak
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreakDetail"}
+        "404": {description: extension.cnts_outbreak_not_found, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/outbreaks/{ref}/progress:
+    post:
+      summary: Cấp Xã cập nhật diễn biến (phiên bản mới đủ trường; khóa lạc quan base_version)
+      operationId: extensionCntsUpdateOutbreak
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSOutbreakInput"}
+      responses:
+        "201":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_outbreak_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_outbreak_version_conflict | extension.cnts_outbreak_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_outbreak_invalid", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/outbreaks/{ref}/close:
+    post:
+      summary: Cấp Tỉnh xác nhận kết thúc ổ dịch (có lý do)
+      operationId: extensionCntsCloseOutbreak
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSStatusInput"}
+      responses:
+        "201":
+          description: Đã kết thúc
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_outbreak_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_outbreak_version_conflict | extension.cnts_outbreak_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_outbreak_invalid", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/outbreaks/{ref}/reopen:
+    post:
+      summary: Cấp Tỉnh mở lại ổ dịch đã kết thúc (có lý do)
+      operationId: extensionCntsReopenOutbreak
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSStatusInput"}
+      responses:
+        "201":
+          description: Đã mở lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_outbreak_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_outbreak_version_conflict | extension.cnts_outbreak_not_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_outbreak_invalid", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/suspects:
+    get:
+      summary: Tin báo nghi dịch (bản hiện hành) trong phạm vi
+      operationId: extensionCntsListSuspects
+      tags: [extension]
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string, enum: [reported, confirmed, dismissed]}}
+        - {name: commune, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSSuspect"}}
+        "403": {description: "forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Cấp Xã ghi nhận tin báo nghi dịch (vị trí không bắt buộc)
+      operationId: extensionCntsReportSuspect
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSSuspectInput"}
+      responses:
+        "201":
+          description: Đã ghi nhận
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSuspect"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSuspect"}
+        "403": {description: "forbidden | extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_suspect_invalid, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/suspects/{ref}:
+    get:
+      summary: Tin báo nghi dịch — mọi phiên bản (mới nhất trước)
+      operationId: extensionCntsGetSuspect
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSuspectDetail"}
+        "404": {description: extension.cnts_suspect_not_found, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/suspects/{ref}/confirm:
+    post:
+      summary: Cấp Xã xác nhận tin báo → tạo ổ dịch (một giao dịch; vị trí trống lấy vị trí của tin báo)
+      operationId: extensionCntsConfirmSuspect
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSOutbreakInput"}
+      responses:
+        "201":
+          description: Ổ dịch đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_suspect_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_suspect_version_conflict | extension.cnts_suspect_resolved", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_outbreak_invalid", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/suspects/{ref}/dismiss:
+    post:
+      summary: Cấp Xã bác bỏ tin báo nghi dịch (có lý do)
+      operationId: extensionCntsDismissSuspect
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSStatusInput"}
+      responses:
+        "201":
+          description: Đã bác bỏ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSuspect"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSuspect"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_suspect_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_suspect_version_conflict | extension.cnts_suspect_resolved", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_suspect_invalid", $ref: "#/components/responses/Problem"}
   # --- pf/forms (cap/forms, W6.2): biểu thu thập theo kỳ — phát hành, nộp, rà soát bốn mắt, chốt kèm ảnh chụp đóng băng, mở lại.
   # Bên dùng chọn bằng query `profile` (KN: kn). Route v1 cũ của KN (/v1/extension/report-*) chạy song song và ghi song song
   # chốt/mở lại kỳ + ảnh chụp sang pf_forms (origin = mirror). Ngữ cảnh KN: header X-AG-Context như các route KN khác.
@@ -15859,6 +16139,184 @@ components:
         units: {type: array, items: {type: string}}
         tasks: {type: integer, description: Số công việc sẽ sinh (kỳ × đơn vị)}
         periods: {type: array, items: {$ref: "#/components/schemas/CNTSSeriesPeriod"}}
+    # --- pf/extension W11.49: Báo cáo dịch bệnh BM-10, báo nghi dịch ---
+    CNTSLocation:
+      type: object
+      required: [lat, lon]
+      description: Tọa độ WGS84 (độ thập phân, chuỗi) — DB-05; trong lãnh thổ Việt Nam (vĩ độ 8–24, kinh độ 102–118)
+      properties:
+        lat: {type: string, examples: ["10.2534100"]}
+        lon: {type: string, examples: ["105.9721000"]}
+        accuracy_m: {type: [string, "null"], description: Sai số GPS (m)}
+        source: {type: [string, "null"], enum: [gps, map, null], description: GPS thiết bị hoặc chọn trên bản đồ}
+    CNTSOutbreakInput:
+      type: object
+      description: >-
+        Nội dung BM-10 (DB-01…DB-13). Lập mới: mọi trường bắt buộc; cập nhật diễn biến / xác nhận tin báo: gửi lại đủ trường
+        (mỗi lần là một phiên bản). Xác nhận tin báo: commune_code, location, source, received_at trống lấy theo tin báo.
+      properties:
+        base_version: {type: integer, description: Phiên bản người nhập đã thấy (bắt buộc khi cập nhật, xác nhận tin báo)}
+        commune_code: {type: string}
+        disease_code: {type: string, description: DB-01 mã danh mục cnts_disease}
+        species_code: {type: string, description: Mã danh mục cnts_species}
+        received_at: {type: string, format: date-time, description: DB-02}
+        source: {type: string, enum: [ubnd_xa, nong_ho, can_bo], description: DB-03}
+        household_ref: {type: [string, "null"], format: uuid, description: DB-04 hộ (pf/cooperative)}
+        locality: {type: string, description: DB-04 địa bàn (ấp, khu vực) — không ghi họ tên, số điện thoại; bắt buộc khi không có household_ref}
+        location: {oneOf: [{$ref: "#/components/schemas/CNTSLocation"}, {type: "null"}]}
+        herd_size: {type: integer, minimum: 1, description: DB-06}
+        herd_age_days: {type: [integer, "null"]}
+        dead: {type: integer, minimum: 0, description: DB-07 lũy kế; ≤ herd_size}
+        symptoms: {type: string, description: DB-08}
+        sample_date: {type: string, format: date, description: DB-09}
+        lab_name: {type: string}
+        lab_result: {type: string}
+        culled_head: {type: [integer, "null"], description: DB-10 lũy kế; ≤ herd_size}
+        culled_kg: {type: [string, "null"]}
+        chemical_liters: {type: [string, "null"]}
+        buffer_note: {type: string, description: DB-11 (vẽ vùng ở bản đồ — GĐ2)}
+        prevention_note: {type: string, description: DB-12}
+        attachment_refs: {type: array, maxItems: 10, items: {type: string, format: uuid}, description: DB-13 mã tệp pf_files}
+        as_of: {type: string, format: date, description: Ngày diễn biến (mặc định ngày tiếp nhận ở bản 1, hôm nay ở bản sau); không lùi}
+        progress_note: {type: string, description: Diễn biến của lần cập nhật}
+        captured_at: {type: string, format: date-time, description: Giờ thiết bị của bản ngoại tuyến}
+    CNTSOutbreak:
+      type: object
+      required: [ref, version, version_id, event, status, commune_code, disease_code, disease_name, species_code, species_name,
+        received_at, source, suspect_ref, household_ref, locality, location, herd_size, herd_age_days, dead, symptoms, sample_date,
+        lab_name, lab_result, culled_head, culled_kg, chemical_liters, buffer_note, prevention_note, attachment_refs, as_of,
+        progress_note, status_reason, captured_at, recorded_at, actor]
+      properties:
+        ref: {type: string, format: uuid}
+        version: {type: integer}
+        version_id: {type: string, format: uuid}
+        event: {type: string, enum: [reported, updated, closed, reopened]}
+        status: {type: string, enum: [reported, monitoring, closed], description: Đã gửi / Đang theo dõi / Đã kết thúc}
+        commune_code: {type: string}
+        disease_code: {type: string}
+        disease_name: {type: string}
+        species_code: {type: string}
+        species_name: {type: string}
+        received_at: {type: string, format: date-time}
+        source: {type: string, enum: [ubnd_xa, nong_ho, can_bo]}
+        suspect_ref: {type: [string, "null"], format: uuid}
+        household_ref: {type: [string, "null"], format: uuid}
+        locality: {type: [string, "null"]}
+        location: {oneOf: [{$ref: "#/components/schemas/CNTSLocation"}, {type: "null"}]}
+        herd_size: {type: integer}
+        herd_age_days: {type: [integer, "null"]}
+        dead: {type: integer}
+        symptoms: {type: string}
+        sample_date: {type: [string, "null"], format: date}
+        lab_name: {type: [string, "null"]}
+        lab_result: {type: [string, "null"]}
+        culled_head: {type: [integer, "null"]}
+        culled_kg: {type: [string, "null"]}
+        chemical_liters: {type: [string, "null"]}
+        buffer_note: {type: [string, "null"]}
+        prevention_note: {type: [string, "null"]}
+        attachment_refs: {type: array, items: {type: string, format: uuid}}
+        as_of: {type: string, format: date}
+        progress_note: {type: [string, "null"]}
+        status_reason: {type: [string, "null"]}
+        captured_at: {type: [string, "null"], format: date-time}
+        recorded_at: {type: string, format: date-time}
+        actor: {$ref: "#/components/schemas/KhtcActor"}
+    CNTSCount:
+      type: object
+      required: [key, label, count]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        count: {type: integer}
+    CNTSOutbreakList:
+      type: object
+      required: [items, by_status, by_disease]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/CNTSOutbreak"}}
+        by_status: {type: array, items: {$ref: "#/components/schemas/CNTSCount"}}
+        by_disease: {type: array, items: {$ref: "#/components/schemas/CNTSCount"}}
+    CNTSOutbreakDetail:
+      type: object
+      required: [current, versions]
+      properties:
+        current: {$ref: "#/components/schemas/CNTSOutbreak"}
+        versions: {type: array, items: {$ref: "#/components/schemas/CNTSOutbreak"}}
+    CNTSOutbreakPoints:
+      type: object
+      required: [type, features]
+      properties:
+        type: {type: string, enum: [FeatureCollection]}
+        features:
+          type: array
+          items:
+            type: object
+            required: [type, id, geometry, properties]
+            properties:
+              type: {type: string, enum: [Feature]}
+              id: {type: string, format: uuid}
+              geometry:
+                type: object
+                required: [type, coordinates]
+                properties:
+                  type: {type: string, enum: [Point]}
+                  coordinates: {type: array, items: {type: number}, minItems: 2, maxItems: 2, description: "[kinh độ, vĩ độ]"}
+              properties: {type: object, additionalProperties: true}
+    CNTSStatusInput:
+      type: object
+      required: [base_version, reason]
+      properties:
+        base_version: {type: integer}
+        reason: {type: string, maxLength: 1000}
+    CNTSSuspectInput:
+      type: object
+      required: [commune_code, reporter_kind, observed_at, description]
+      properties:
+        commune_code: {type: string}
+        reporter_kind: {type: string, enum: [nong_ho, ubnd_xa, can_bo]}
+        observed_at: {type: string, format: date-time}
+        species_code: {type: string}
+        disease_code: {type: string, description: Bệnh nghi ngờ (tùy chọn)}
+        household_ref: {type: [string, "null"], format: uuid}
+        locality: {type: string}
+        location: {oneOf: [{$ref: "#/components/schemas/CNTSLocation"}, {type: "null"}]}
+        affected: {type: [integer, "null"]}
+        dead: {type: [integer, "null"]}
+        description: {type: string, maxLength: 2000}
+        attachment_refs: {type: array, maxItems: 10, items: {type: string, format: uuid}}
+        captured_at: {type: string, format: date-time}
+    CNTSSuspect:
+      type: object
+      required: [ref, version, version_id, status, commune_code, reporter_kind, observed_at, species_code, disease_code, household_ref,
+        locality, location, affected, dead, description, attachment_refs, outbreak_ref, status_reason, captured_at, recorded_at, actor]
+      properties:
+        ref: {type: string, format: uuid}
+        version: {type: integer}
+        version_id: {type: string, format: uuid}
+        status: {type: string, enum: [reported, confirmed, dismissed]}
+        commune_code: {type: string}
+        reporter_kind: {type: string, enum: [nong_ho, ubnd_xa, can_bo]}
+        observed_at: {type: string, format: date-time}
+        species_code: {type: [string, "null"]}
+        disease_code: {type: [string, "null"]}
+        household_ref: {type: [string, "null"], format: uuid}
+        locality: {type: [string, "null"]}
+        location: {oneOf: [{$ref: "#/components/schemas/CNTSLocation"}, {type: "null"}]}
+        affected: {type: [integer, "null"]}
+        dead: {type: [integer, "null"]}
+        description: {type: string}
+        attachment_refs: {type: array, items: {type: string, format: uuid}}
+        outbreak_ref: {type: [string, "null"], format: uuid}
+        status_reason: {type: [string, "null"]}
+        captured_at: {type: [string, "null"], format: date-time}
+        recorded_at: {type: string, format: date-time}
+        actor: {$ref: "#/components/schemas/KhtcActor"}
+    CNTSSuspectDetail:
+      type: object
+      required: [current, versions]
+      properties:
+        current: {$ref: "#/components/schemas/CNTSSuspect"}
+        versions: {type: array, items: {$ref: "#/components/schemas/CNTSSuspect"}}
     # --- pf/price (W11.71) ---
     PriceStatus:
       type: object

@@ -83,6 +83,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			needs(soon("tinh.cnts.duyet_bao_cao", "Duyệt báo cáo", "/kn/cnts/duyet-bao-cao", "approve"), NeedsManager),
 			// W11.42: phát hành biểu kỳ Cấp Xã BM-01/04/05/17 (kỳ native cap/forms), theo dõi nộp, chốt/mở lại.
 			{Key: "tinh.cnts.bieu_mau", Label: "Biểu mẫu & cấp quyền", Route: "/kn/cnts/bieu-mau", Icon: "table"},
+			// W11.49: Báo cáo dịch bệnh BM-10 — xem ổ dịch, diễn biến, tin báo nghi dịch; xác nhận kết thúc ổ dịch.
+			{Key: "tinh.cnts.dich_benh", Label: "Báo cáo dịch bệnh", Route: "/kn/cnts/dich-benh", Icon: "shield"},
 			soon("tinh.cnts.lich", "Lịch trực KSGM & lịch tiêm", "/kn/cnts/lich", "calendar"),
 			soon("tinh.cnts.chien_dich", "Chiến dịch điều tra", "/kn/cnts/chien-dich", "megaphone"),
 			soon("tinh.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),
@@ -94,6 +96,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 		port.AudienceXa: {
 			// W11.42: nhập biểu kỳ Cấp Xã (KSGM hằng ngày, nhập liệu tuần, khai thác thủy sản, công việc tuần).
 			{Key: "xa.cnts.bao_cao_ky", Label: "Báo cáo kỳ CNTS", Route: "/kn/cnts/bao-cao-ky", Icon: "task"},
+			// W11.49: lập BM-10, cập nhật diễn biến, ghi nhận / xác nhận báo nghi dịch.
+			{Key: "xa.cnts.dich_benh", Label: "Báo cáo dịch bệnh", Route: "/kn/cnts/dich-benh", Icon: "shield"},
 			soon("xa.cnts.lich", "Lịch trực của tôi", "/kn/cnts/lich", "calendar"),
 			soon("xa.cnts.nhat_ky", "Hộ mô hình & nhật ký", "/kn/cnts/nhat-ky", "journal"),
 			soon("xa.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),

@@ -205,6 +205,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	mrvMod.UseValveGrants(pty.ValveGrants())
 	kn.UseGpsLog(g.GpsLog()) // HTX US-GPS-03: log GPS yêu cầu hỗ trợ (pf.extension.gps_log)
 
+	kn.UseCNTSCatalogs(md.CNTSCatalogs()) // W11.49: bệnh, vật nuôi của Báo cáo dịch bệnh BM-10 (danh mục CNTS theo ngày)
+
 	// pf/notify cần sổ thiết bị của pf/sync (gắn token đẩy) và là Source của pf/sync:
 	// dùng cổng thiết bị độc lập (syncmod.NewDevices) để không vòng phụ thuộc. API chỉ
 	// xếp lần gửi đẩy; gửi thật ở consumer pf.notify.push của worker.

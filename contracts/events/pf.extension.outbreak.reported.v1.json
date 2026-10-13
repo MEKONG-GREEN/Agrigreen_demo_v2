@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.outbreak.reported/v1",
+  "title": "pf.extension.outbreak.reported — payload",
+  "description": "Ổ dịch mới đã gửi Cấp Tỉnh (BRD CNTS v3.7 FN-11, BM-10 — W11.49): Cấp Xã lập báo cáo dịch bệnh hoặc xác nhận báo nghi dịch. Nguồn của cảnh báo Khẩn số 12 (FN-11 BR-01, FN-13) và lớp ổ dịch trên bản đồ (FN-18). Không chứa dữ liệu cá nhân (không hộ, không tọa độ) — consumer đọc chi tiết qua API có phân quyền.",
+  "x-event-type": "pf.extension.outbreak.reported",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": ["outbreak_ref", "version_id", "commune_code", "disease_code", "species_code", "notifiable", "suspect_ref", "received_at", "reported_at", "reporter_ref", "department", "herd_size", "dead", "as_of", "rule_version", "province_code"],
+  "properties": {
+    "outbreak_ref":  { "type": "string", "format": "uuid", "description": "Định danh bền của ổ dịch" },
+    "version_id":    { "type": "string", "format": "uuid", "description": "Mã phiên bản 1 (dòng sổ pf_extension.cnts_outbreak)" },
+    "commune_code":  { "type": "string" },
+    "disease_code":  { "type": "string", "description": "Mã danh mục CNTS cnts_disease" },
+    "species_code":  { "type": "string", "description": "Mã danh mục CNTS cnts_species" },
+    "notifiable":    { "type": "boolean", "description": "Bệnh phải công bố dịch (thuộc tính notifiable của danh mục bệnh)" },
+    "suspect_ref":   { "type": ["string", "null"], "format": "uuid", "description": "Tin báo nghi dịch đã xác nhận (nếu có)" },
+    "received_at":   { "type": "string", "format": "date-time", "description": "DB-02 thời điểm tiếp nhận thông tin" },
+    "reported_at":   { "type": "string", "format": "date-time" },
+    "reporter_ref":  { "type": "string", "format": "uuid", "description": "actor_ref của cán bộ gửi" },
+    "department":    { "type": "string", "enum": ["chan_nuoi_thuy_san"] },
+    "herd_size":     { "type": "integer", "minimum": 1 },
+    "dead":          { "type": "integer", "minimum": 0 },
+    "as_of":         { "type": "string", "format": "date" },
+    "rule_version":  { "type": "string" },
+    "province_code": { "type": ["string", "null"], "description": "Tỉnh của xã (danh mục ĐVHC)" }
+  }
+}

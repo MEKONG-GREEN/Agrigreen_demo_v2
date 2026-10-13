@@ -5254,6 +5254,178 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/outbreaks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ổ dịch (bản hiện hành) trong phạm vi + thống kê theo trạng thái, bệnh */
+        get: operations["extensionCntsListOutbreaks"];
+        put?: never;
+        /** Cấp Xã lập báo cáo dịch bệnh BM-10 và gửi Cấp Tỉnh (phiên bản 1; phát pf.extension.outbreak.reported) */
+        post: operations["extensionCntsReportOutbreak"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreak-points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lớp ổ dịch cho bản đồ (GeoJSON FeatureCollection, WGS84) — mặc định bỏ ổ dịch đã kết thúc */
+        get: operations["extensionCntsOutbreakPoints"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreaks/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ổ dịch — bản hiện hành và mọi phiên bản diễn biến (mới nhất trước) */
+        get: operations["extensionCntsGetOutbreak"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreaks/{ref}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Xã cập nhật diễn biến (phiên bản mới đủ trường; khóa lạc quan base_version) */
+        post: operations["extensionCntsUpdateOutbreak"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreaks/{ref}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh xác nhận kết thúc ổ dịch (có lý do) */
+        post: operations["extensionCntsCloseOutbreak"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreaks/{ref}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh mở lại ổ dịch đã kết thúc (có lý do) */
+        post: operations["extensionCntsReopenOutbreak"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/suspects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tin báo nghi dịch (bản hiện hành) trong phạm vi */
+        get: operations["extensionCntsListSuspects"];
+        put?: never;
+        /** Cấp Xã ghi nhận tin báo nghi dịch (vị trí không bắt buộc) */
+        post: operations["extensionCntsReportSuspect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/suspects/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tin báo nghi dịch — mọi phiên bản (mới nhất trước) */
+        get: operations["extensionCntsGetSuspect"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/suspects/{ref}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Xã xác nhận tin báo → tạo ổ dịch (một giao dịch; vị trí trống lấy vị trí của tin báo) */
+        post: operations["extensionCntsConfirmSuspect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/suspects/{ref}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Xã bác bỏ tin báo nghi dịch (có lý do) */
+        post: operations["extensionCntsDismissSuspect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/forms/profiles": {
         parameters: {
             query?: never;
@@ -13615,6 +13787,229 @@ export interface components {
             /** @description Số công việc sẽ sinh (kỳ × đơn vị) */
             tasks: number;
             periods: components["schemas"]["CNTSSeriesPeriod"][];
+        };
+        /** @description Tọa độ WGS84 (độ thập phân, chuỗi) — DB-05; trong lãnh thổ Việt Nam (vĩ độ 8–24, kinh độ 102–118) */
+        CNTSLocation: {
+            /** @example 10.2534100 */
+            lat: string;
+            /** @example 105.9721000 */
+            lon: string;
+            /** @description Sai số GPS (m) */
+            accuracy_m?: string | null;
+            /**
+             * @description GPS thiết bị hoặc chọn trên bản đồ
+             * @enum {string|null}
+             */
+            source?: "gps" | "map" | null;
+        };
+        /** @description Nội dung BM-10 (DB-01…DB-13). Lập mới: mọi trường bắt buộc; cập nhật diễn biến / xác nhận tin báo: gửi lại đủ trường (mỗi lần là một phiên bản). Xác nhận tin báo: commune_code, location, source, received_at trống lấy theo tin báo. */
+        CNTSOutbreakInput: {
+            /** @description Phiên bản người nhập đã thấy (bắt buộc khi cập nhật */
+            base_version?: number;
+            commune_code?: string;
+            /** @description DB-01 mã danh mục cnts_disease */
+            disease_code?: string;
+            /** @description Mã danh mục cnts_species */
+            species_code?: string;
+            /**
+             * Format: date-time
+             * @description DB-02
+             */
+            received_at?: string;
+            /**
+             * @description DB-03
+             * @enum {string}
+             */
+            source?: "ubnd_xa" | "nong_ho" | "can_bo";
+            /**
+             * Format: uuid
+             * @description DB-04 hộ (pf/cooperative)
+             */
+            household_ref?: string | null;
+            /** @description DB-04 địa bàn (ấp */
+            locality?: string;
+            location?: components["schemas"]["CNTSLocation"] | null;
+            /** @description DB-06 */
+            herd_size?: number;
+            herd_age_days?: number | null;
+            /** @description DB-07 lũy kế; ≤ herd_size */
+            dead?: number;
+            /** @description DB-08 */
+            symptoms?: string;
+            /**
+             * Format: date
+             * @description DB-09
+             */
+            sample_date?: string;
+            lab_name?: string;
+            lab_result?: string;
+            /** @description DB-10 lũy kế; ≤ herd_size */
+            culled_head?: number | null;
+            culled_kg?: string | null;
+            chemical_liters?: string | null;
+            /** @description DB-11 (vẽ vùng ở bản đồ — GĐ2) */
+            buffer_note?: string;
+            /** @description DB-12 */
+            prevention_note?: string;
+            /** @description DB-13 mã tệp pf_files */
+            attachment_refs?: string[];
+            /**
+             * Format: date
+             * @description Ngày diễn biến (mặc định ngày tiếp nhận ở bản 1
+             */
+            as_of?: string;
+            /** @description Diễn biến của lần cập nhật */
+            progress_note?: string;
+            /**
+             * Format: date-time
+             * @description Giờ thiết bị của bản ngoại tuyến
+             */
+            captured_at?: string;
+        };
+        CNTSOutbreak: {
+            /** Format: uuid */
+            ref: string;
+            version: number;
+            /** Format: uuid */
+            version_id: string;
+            /** @enum {string} */
+            event: "reported" | "updated" | "closed" | "reopened";
+            /**
+             * @description Đã gửi / Đang theo dõi / Đã kết thúc
+             * @enum {string}
+             */
+            status: "reported" | "monitoring" | "closed";
+            commune_code: string;
+            disease_code: string;
+            disease_name: string;
+            species_code: string;
+            species_name: string;
+            /** Format: date-time */
+            received_at: string;
+            /** @enum {string} */
+            source: "ubnd_xa" | "nong_ho" | "can_bo";
+            /** Format: uuid */
+            suspect_ref: string | null;
+            /** Format: uuid */
+            household_ref: string | null;
+            locality: string | null;
+            location: components["schemas"]["CNTSLocation"] | null;
+            herd_size: number;
+            herd_age_days: number | null;
+            dead: number;
+            symptoms: string;
+            /** Format: date */
+            sample_date: string | null;
+            lab_name: string | null;
+            lab_result: string | null;
+            culled_head: number | null;
+            culled_kg: string | null;
+            chemical_liters: string | null;
+            buffer_note: string | null;
+            prevention_note: string | null;
+            attachment_refs: string[];
+            /** Format: date */
+            as_of: string;
+            progress_note: string | null;
+            status_reason: string | null;
+            /** Format: date-time */
+            captured_at: string | null;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["KhtcActor"];
+        };
+        CNTSCount: {
+            key: string;
+            label: string;
+            count: number;
+        };
+        CNTSOutbreakList: {
+            items: components["schemas"]["CNTSOutbreak"][];
+            by_status: components["schemas"]["CNTSCount"][];
+            by_disease: components["schemas"]["CNTSCount"][];
+        };
+        CNTSOutbreakDetail: {
+            current: components["schemas"]["CNTSOutbreak"];
+            versions: components["schemas"]["CNTSOutbreak"][];
+        };
+        CNTSOutbreakPoints: {
+            /** @enum {string} */
+            type: "FeatureCollection";
+            features: {
+                /** @enum {string} */
+                type: "Feature";
+                /** Format: uuid */
+                id: string;
+                geometry: {
+                    /** @enum {string} */
+                    type: "Point";
+                    /** @description [kinh độ, vĩ độ] */
+                    coordinates: number[];
+                };
+                properties: {
+                    [key: string]: unknown;
+                };
+            }[];
+        };
+        CNTSStatusInput: {
+            base_version: number;
+            reason: string;
+        };
+        CNTSSuspectInput: {
+            commune_code: string;
+            /** @enum {string} */
+            reporter_kind: "nong_ho" | "ubnd_xa" | "can_bo";
+            /** Format: date-time */
+            observed_at: string;
+            species_code?: string;
+            /** @description Bệnh nghi ngờ (tùy chọn) */
+            disease_code?: string;
+            /** Format: uuid */
+            household_ref?: string | null;
+            locality?: string;
+            location?: components["schemas"]["CNTSLocation"] | null;
+            affected?: number | null;
+            dead?: number | null;
+            description: string;
+            attachment_refs?: string[];
+            /** Format: date-time */
+            captured_at?: string;
+        };
+        CNTSSuspect: {
+            /** Format: uuid */
+            ref: string;
+            version: number;
+            /** Format: uuid */
+            version_id: string;
+            /** @enum {string} */
+            status: "reported" | "confirmed" | "dismissed";
+            commune_code: string;
+            /** @enum {string} */
+            reporter_kind: "nong_ho" | "ubnd_xa" | "can_bo";
+            /** Format: date-time */
+            observed_at: string;
+            species_code: string | null;
+            disease_code: string | null;
+            /** Format: uuid */
+            household_ref: string | null;
+            locality: string | null;
+            location: components["schemas"]["CNTSLocation"] | null;
+            affected: number | null;
+            dead: number | null;
+            description: string;
+            attachment_refs: string[];
+            /** Format: uuid */
+            outbreak_ref: string | null;
+            status_reason: string | null;
+            /** Format: date-time */
+            captured_at: string | null;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["KhtcActor"];
+        };
+        CNTSSuspectDetail: {
+            current: components["schemas"]["CNTSSuspect"];
+            versions: components["schemas"]["CNTSSuspect"][];
         };
         PriceStatus: {
             profile: string;
@@ -25866,6 +26261,456 @@ export interface operations {
             /** @description forms.template_not_found */
             404: components["responses"]["Problem"];
             /** @description validation_failed | forms.facility_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsListOutbreaks: {
+        parameters: {
+            query?: {
+                status?: "reported" | "monitoring" | "closed";
+                commune?: string;
+                /** @description Mã bệnh (danh mục cnts_disease) */
+                disease?: string;
+                /** @description Ngày tiếp nhận (DB-02) từ */
+                from?: string;
+                /** @description Ngày tiếp nhận (DB-02) đến */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreakList"];
+                };
+            };
+            /** @description forbidden | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsReportOutbreak: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSOutbreakInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description Đã gửi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description forbidden | extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_invalid | extension.support_reason_required */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsOutbreakPoints: {
+        parameters: {
+            query?: {
+                status?: "reported" | "monitoring" | "closed";
+                commune?: string;
+                disease?: string;
+                from?: string;
+                to?: string;
+                include_closed?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description GeoJSON */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/geo+json": components["schemas"]["CNTSOutbreakPoints"];
+                };
+            };
+            /** @description forbidden | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGetOutbreak: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreakDetail"];
+                };
+            };
+            /** @description extension.cnts_outbreak_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsUpdateOutbreak: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSOutbreakInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_version_conflict | extension.cnts_outbreak_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_outbreak_invalid */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsCloseOutbreak: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description Đã kết thúc */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_version_conflict | extension.cnts_outbreak_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_outbreak_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsReopenOutbreak: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description Đã mở lại */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_version_conflict | extension.cnts_outbreak_not_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_outbreak_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsListSuspects: {
+        parameters: {
+            query?: {
+                status?: "reported" | "confirmed" | "dismissed";
+                commune?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSSuspect"][];
+                    };
+                };
+            };
+            /** @description forbidden | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsReportSuspect: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSSuspectInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSuspect"];
+                };
+            };
+            /** @description Đã ghi nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSuspect"];
+                };
+            };
+            /** @description forbidden | extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_suspect_invalid */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGetSuspect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSuspectDetail"];
+                };
+            };
+            /** @description extension.cnts_suspect_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsConfirmSuspect: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSOutbreakInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description Ổ dịch đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_suspect_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_suspect_version_conflict | extension.cnts_suspect_resolved */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_outbreak_invalid */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDismissSuspect: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSuspect"];
+                };
+            };
+            /** @description Đã bác bỏ */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSuspect"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_suspect_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_suspect_version_conflict | extension.cnts_suspect_resolved */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_suspect_invalid */
             422: components["responses"]["Problem"];
         };
     };

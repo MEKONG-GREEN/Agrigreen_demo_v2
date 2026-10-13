@@ -23,6 +23,8 @@ import (
 	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtc/handler"
 	matapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/material/app"
 	mathandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/material/handler"
+	obapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/outbreak/app"
+	obhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/outbreak/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	rcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/app"
 	rchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/handler"
@@ -76,6 +78,8 @@ type Module struct {
 	khtcPeriods *khtcPeriodService // W11.62: Kỳ KHTC (extension/khtcperiod, module_khtc.go)
 	// PFPUB/D2: trạng thái xác nhận HTX cho số liệu đã chốt (module_closedfig.go).
 	htx port.HTXConfirmations
+	// W11.49 (D4 CN9): Báo cáo dịch bệnh BM-10, báo nghi dịch (extension/outbreak).
+	ob *obapp.Service
 }
 
 // New tạo module với pool của vai extension_app.
@@ -88,6 +92,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	// Tên người thao tác của sổ vật tư dùng chung danh bạ của vòng đời báo cáo (UseReportCycle nối sau).
 	m.mat = &matapp.Service{DB: db, Clock: clk, Catalogs: d.Catalogs, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.khtc = &khtcapp.Service{DB: db, Clock: clk, Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.ob = &obapp.Service{DB: db, Clock: clk, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	return m
 }
 
@@ -114,6 +119,10 @@ func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logge
 	m.khtc.Egress, m.khtc.EgressMode, m.khtc.Log = cp, mode, log // W11.61: "Xuất Excel" Kế hoạch năm
 }
 
+// UseCNTSCatalogs nối danh mục CNTS theo ngày của pf/masterdata (W11.41) cho Báo cáo dịch bệnh BM-10 (W11.49: bệnh,
+// vật nuôi). Chưa nối → lập/cập nhật ổ dịch, báo nghi dịch trả 503 extension.dependency_unavailable.
+func (m *Module) UseCNTSCatalogs(c mdport.CNTSCatalogs) { m.ob.Catalogs = c }
+
 // UseTablePDF nối bộ dựng PDF bảng (pf/reports) cho "Xuất PDF" lịch công tác.
 func (m *Module) UseTablePDF(p port.TablePDF) { m.svc.TablePDF = p }
 
@@ -130,6 +139,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	mathandler.Handler{Svc: m.mat}.RegisterApp(rg)
 	khtchandler.Handler{Svc: m.khtc}.RegisterApp(rg)
 	m.registerKHTCPeriods(rg) // W11.62
+	obhandler.Handler{Svc: m.ob}.RegisterApp(rg)
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham

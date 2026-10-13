@@ -1019,6 +1019,15 @@
         "children": []
        },
        {
+        "key": "tinh.cnts.dich_benh",
+        "label": "Báo cáo dịch bệnh",
+        "route": "/kn/cnts/dich-benh",
+        "icon": "shield",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
         "key": "tinh.cnts.lich",
         "label": "Lịch trực KSGM \u0026 lịch tiêm",
         "route": "/kn/cnts/lich",
@@ -1229,6 +1238,15 @@
         "label": "Báo cáo kỳ CNTS",
         "route": "/kn/cnts/bao-cao-ky",
         "icon": "task",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "xa.cnts.dich_benh",
+        "label": "Báo cáo dịch bệnh",
+        "route": "/kn/cnts/dich-benh",
+        "icon": "shield",
         "badge_source": null,
         "enabled": true,
         "children": []

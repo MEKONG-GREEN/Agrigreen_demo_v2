@@ -31,6 +31,7 @@ provides:
   events:
     - pf.extension.consolidation.completed/v1
     - pf.extension.directive.issued/v1
+    - pf.extension.outbreak.reported/v1
     - pf.extension.period.closed/v1
     - pf.extension.period.reopened/v1
     - pf.extension.report_batch.issued/v1
