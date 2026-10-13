@@ -66,6 +66,7 @@ import { khtcPeriodRoutes } from "./kn-khtc-periods";
 import { cntsOutbreakRoutes } from "./kn-cnts-outbreak";
 import { khtcSourceRoutes } from "./kn-khtc-sources";
 import { hrmStaffRoutes } from "./kn-hrm-staff";
+import { contactRoutes } from "./kn-contact";
 import { apiClientAdminRoutes, meteringAdminRoutes } from "./g5";
 
 function sleep(ms: number) {
@@ -158,6 +159,8 @@ const appRoutes: Route[] = [
   ...khtcSourceRoutes, // W11.64 Cập nhật số liệu (/v1/extension/khtc/periods/{id}/sources*)
   // --- dom/hrm W11.22: hồ sơ nhân sự (/v1/hrm/access|units|staff*|permissions*) ---
   ...hrmStaffRoutes,
+  // --- pf/contact W11.23: Contact dùng chung (/v1/contacts/*) — lọc trường theo vai ---
+  ...contactRoutes,
   ...priceBoardRoutes, // W11.76 duyệt / mở duyệt bảng giá ngày
   ...priceReportRoutes, // W11.77 báo cáo giá
 

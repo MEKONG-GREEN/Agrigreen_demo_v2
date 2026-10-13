@@ -114,9 +114,8 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(page).toHaveURL(/\/kn\/tong-quan$/);
     await expect(page.getByRole("heading", { level: 1, name: /Xin chào, admin\.mekong/ })).toBeVisible();
     await expect(groupLabels(page)).toHaveText(["Điều hành", "Phòng ban", "Quản trị hệ thống", "Dùng chung"]);
-    // kn.menu/v3 (W11.06): Contact (module dùng chung chưa có) hiện mờ "Sắp có", không phải liên kết.
-    await expect(menuNav(page).locator(".nav-item.is-disabled", { hasText: "Contact" })).toContainText("Sắp có");
-    await expect(menuNav(page).getByRole("link", { name: /Contact/ })).toHaveCount(0);
+    // W11.23: "Dùng chung > Contact" (pf/contact) là liên kết thường của mọi vai.
+    await expect(menuNav(page).getByRole("link", { name: /Contact/ })).toHaveAttribute("href", "/kn/dung-chung/contact");
     const closed = menuNav(page).locator(".nav-item.is-disabled", { hasText: "Chăn nuôi - TS" });
     await expect(closed).toContainText("Chưa mở");
     await expect(menuNav(page).getByRole("link", { name: /Chăn nuôi/ })).toHaveCount(0);

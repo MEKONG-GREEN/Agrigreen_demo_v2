@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { listChildUnits, unitResolver } from "@/api/adapters/units";
 import { unwrap } from "@/api/client";
@@ -256,6 +257,10 @@ export default function RosterPage() {
   return (
     <>
       <PageHead title="Danh bạ trực" subtitle="Tra cứu cán bộ đang trực theo địa bàn, gọi hoặc nhắn tin một chạm" />
+      {/* W11.23 (Q-072): danh bạ liên hệ dùng chung là Contact (pf/contact); màn này chỉ còn trạng thái trực. */}
+      <p className="mute small" data-testid="contact-hint">
+        Danh bạ liên hệ cán bộ, đơn vị các cấp: <Link href="/kn/dung-chung/contact">Dùng chung › Contact</Link>.
+      </p>
       {selfService ? <MyStatus onChanged={roster.reload} /> : null}
       <section className="card sec" aria-labelledby="db-list">
         <div className="sec-h">
