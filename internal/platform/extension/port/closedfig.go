@@ -32,14 +32,14 @@ const CrosswalkV1 = "kn.crosswalk/v1;attribution=source_end"
 type CrosswalkTarget struct {
 	Version    string // CrosswalkV1
 	CalendarID string // mặc định ke_hoach_tai_chinh
-	RuleTag    string // thẻ quy tắc chia kỳ của lịch đích (tham số extension.period_rule của KHTC)
+	RuleTag    string // thẻ quy tắc của lịch đích — Calendar.Rule.Tag() của (*reportcycle/app.Service).CalendarAt(ctx, KHTC, ngày)
 	PeriodType string // week (mặc định) | month | quarter | year | day
 }
 
 // SourcePeriodRef là danh tính một kỳ nguồn đã quy vào kỳ đích.
 type SourcePeriodRef struct {
 	CalendarID      string
-	CalendarVersion string
+	CalendarVersion *int   // D8: 1 v1, 2 v2 mặc định, 3 CNTS…; nil = kỳ không theo lịch tuần (BM-05)
 	NativeKey       string // khóa gốc theo lịch nguồn, vd 2026-W45
 	PeriodType      string
 	From, To        time.Time
@@ -64,7 +64,7 @@ type TargetFigure struct {
 	ProvinceCode          string
 	FormCode              string
 	TargetCalendarID      string
-	TargetCalendarVersion string
+	TargetCalendarVersion int
 	TargetRule            string
 	TargetType            string
 	TargetKey             string
@@ -116,7 +116,7 @@ type KHTCQuery struct {
 type KHTCPeriod struct {
 	RuleVersion           string
 	TargetCalendarID      string
-	TargetCalendarVersion string
+	TargetCalendarVersion int
 	TargetRule            string
 	TargetType            string
 	TargetKey             string
@@ -168,7 +168,7 @@ type ClosedFigure struct {
 	ProvinceCode   string
 	// Danh tính kỳ nguồn (D8): (CalendarID, CalendarVersion, PeriodKey = khóa gốc).
 	CalendarID      string
-	CalendarVersion string
+	CalendarVersion *int // nil = kỳ không theo lịch tuần của phòng (tuần làm việc BM-05)
 	PeriodType      string
 	PeriodKey       string
 	WeekYear        *int

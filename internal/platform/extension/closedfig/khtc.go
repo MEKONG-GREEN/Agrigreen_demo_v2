@@ -29,6 +29,9 @@ import (
 // PriceDepartment là phòng chủ dữ liệu Báo giá (BRD Báo giá v1.3).
 const PriceDepartment = partyport.DeptThongTinTruyenThong
 
+// priceCalendarVersion: Báo giá theo lịch v2 mặc định (D8 — phòng Báo giá không có lịch riêng; W11.76 ReportWeekOf).
+var priceCalendarVersion = rcdomain.CalendarVersionDefault
+
 // priceProfile là bên dùng cap/price của KN.
 const priceProfile = "kn"
 
@@ -62,10 +65,11 @@ type PriceTicketRow struct {
 
 // Periods thực hiện port.KHTCSources.
 func (r Reader) Periods(ctx context.Context, tid uuid.UUID, q port.KHTCQuery) ([]port.KHTCPeriod, error) {
-	t, rule, err := normTarget(q.Target)
+	t, tc, err := normTarget(q.Target)
 	if err != nil {
 		return nil, err
 	}
+	rule := tc.Rule
 	first, err := rule.PeriodOf(t.PeriodType, q.From, nil)
 	if err != nil {
 		return nil, err
@@ -116,32 +120,10 @@ func (r Reader) Periods(ctx context.Context, tid uuid.UUID, q port.KHTCQuery) ([
 	if err != nil {
 		return nil, err
 	}
-	return Assemble(conv, t, rule, wFrom, wTo, q.Departments, priceOK, wants(q.Departments, PriceDepartment)), nil
+	return Assemble(conv, t, tc, wFrom, wTo, q.Departments, priceOK, wants(q.Departments, PriceDepartment)), nil
 }
 
 func wants(depts []string, d string) bool { return len(depts) == 0 || slices.Contains(depts, d) }
-
-func normTarget(t port.CrosswalkTarget) (port.CrosswalkTarget, rcdomain.PeriodRule, error) {
-	if t.Version == "" {
-		t.Version = port.CrosswalkV1
-	}
-	if t.PeriodType == "" {
-		t.PeriodType = rcdomain.PeriodWeek
-	}
-	if t.CalendarID == "" {
-		t.CalendarID = partyport.DeptKeHoachTaiChinh
-	}
-	rule := rcdomain.DefaultRule
-	if t.RuleTag != "" {
-		r, err := rcdomain.ParseRule(t.RuleTag)
-		if err != nil {
-			return t, rule, fmt.Errorf("closedfig: lịch đích: %w", err)
-		}
-		rule = r
-	}
-	t.RuleTag = rule.Tag()
-	return t, rule, nil
-}
 
 func readPrice(ctx context.Context, tx pgx.Tx, boardFrom, to, weekFrom time.Time) ([]PriceBoardRow, []PriceTicketRow, error) {
 	rows, err := tx.Query(ctx, `SELECT board_date, board_version::bigint, approved_at, board_reopened, item_code, price_min::text,
@@ -172,7 +154,7 @@ func PriceFigures(province string, boards []PriceBoardRow, tickets []PriceTicket
 	var out []port.ClosedFigure
 	base := func(pt, key string, from, to time.Time, form string) port.ClosedFigure {
 		f, t := from, to
-		return port.ClosedFigure{DepartmentCode: PriceDepartment, ProvinceCode: province, CalendarID: PriceDepartment, CalendarVersion: "v2",
+		return port.ClosedFigure{DepartmentCode: PriceDepartment, ProvinceCode: province, CalendarID: PriceDepartment, CalendarVersion: &priceCalendarVersion,
 			PeriodType: pt, PeriodKey: key, PeriodFrom: &f, PeriodTo: &t, PeriodLabel: key, Source: "price", SourceModule: "pf/price",
 			SourcePeriodID: uuid.NewSHA1(uuid.NameSpaceURL, []byte("pf/price:"+form+":"+key)), FormCode: form,
 			ConfirmationStatus: port.ConfirmationConfirmed}
@@ -246,7 +228,7 @@ func setRows(f *port.ClosedFigure, rows []map[string]any) {
 // Assemble dựng kỳ KHTC từ kết quả quy đổi (hàm thuần): mọi kỳ đích trong [wFrom, wTo] (kể cả kỳ không có số), mỗi kỳ
 // đủ các phòng (yêu cầu hoặc có số trong khoảng; Báo giá luôn có khi được yêu cầu/không lọc — Unavailable nếu view chưa
 // có). Báo giá không có ngày duyệt trong kỳ → PRICE-BOARD lấy Last của kỳ đích gần nhất trước đó (Fallback, D22).
-func Assemble(conv []port.TargetFigure, t port.CrosswalkTarget, rule rcdomain.PeriodRule, wFrom, wTo time.Time,
+func Assemble(conv []port.TargetFigure, t port.CrosswalkTarget, tc rcdomain.Calendar, wFrom, wTo time.Time,
 	depts []string, priceOK, priceWanted bool) []port.KHTCPeriod {
 	deptSet := map[string]bool{}
 	for _, d := range depts {
@@ -277,12 +259,12 @@ func Assemble(conv []port.TargetFigure, t port.CrosswalkTarget, rule rcdomain.Pe
 	sort.Strings(names)
 	var out []port.KHTCPeriod
 	for d := wFrom; !d.After(wTo); {
-		span, err := rule.PeriodOf(t.PeriodType, d, nil)
+		span, err := tc.Rule.PeriodOf(t.PeriodType, d, nil)
 		if err != nil {
 			break
 		}
-		p := port.KHTCPeriod{RuleVersion: t.Version, TargetCalendarID: t.CalendarID, TargetCalendarVersion: strings.TrimPrefix(rule.Version, "kn.period_rule/"),
-			TargetRule: rule.Tag(), TargetType: t.PeriodType, TargetKey: span.Key, TargetFrom: span.From, TargetTo: span.To, Closed: len(names) > 0}
+		p := port.KHTCPeriod{RuleVersion: t.Version, TargetCalendarID: tc.ID, TargetCalendarVersion: tc.Version,
+			TargetRule: tc.Rule.Tag(), TargetType: t.PeriodType, TargetKey: span.Key, TargetFrom: span.From, TargetTo: span.To, Closed: len(names) > 0}
 		for _, dept := range names {
 			forms := byKey[span.Key][dept]
 			df := port.DepartmentFigures{DepartmentCode: dept, Forms: forms}
@@ -300,7 +282,7 @@ func Assemble(conv []port.TargetFigure, t port.CrosswalkTarget, rule rcdomain.Pe
 				}
 			}
 			df.Missing = len(df.Forms) == 0 && !df.Unavailable
-			df.Closed = !df.Missing && !df.Unavailable
+			df.Closed = !df.Unavailable // không kỳ nguồn nào quy vào (Missing) → đã chốt (KHTCQA, D17)
 			mods := map[string]bool{}
 			for _, f := range df.Forms {
 				df.Closed = df.Closed && f.KeyClosed

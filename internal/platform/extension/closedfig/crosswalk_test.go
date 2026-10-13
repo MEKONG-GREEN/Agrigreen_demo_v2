@@ -13,19 +13,20 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	rcdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	khtcgolden "github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/golden/khtc"
 )
 
-// cntsTag: lịch CNTS Thứ Ba – Thứ Hai (D8), khác lịch KHTC mặc định Thứ Tư – Thứ Ba.
-const cntsTag = "kn.period_rule/v2;week_start=tue;week=year;month=week_end"
-
+// cntsRule: lịch CNTS Thứ Ba – Thứ Hai (D8, chan_nuoi_thuy_san:v3), khác lịch KHTC mặc định Thứ Tư – Thứ Ba.
 func cntsRule(t *testing.T) rcdomain.PeriodRule {
 	t.Helper()
-	r, err := rcdomain.ParseRule(cntsTag)
-	if err != nil {
-		t.Fatal(err)
+	c, err := rcdomain.CalendarOf(rcdomain.DeptChanNuoiThuySan, rcdomain.CNTSRule.Tag())
+	if err != nil || c.Version != rcdomain.CalendarVersionCNTS {
+		t.Fatalf("lịch CNTS: %+v %v", c, err)
 	}
-	return r
+	return c.Rule
 }
+
+func intp(v int) *int { return &v }
 
 func d(y int, m time.Month, day int) time.Time { return time.Date(y, m, day, 0, 0, 0, 0, time.UTC) }
 
@@ -33,7 +34,7 @@ func d(y int, m time.Month, day int) time.Time { return time.Date(y, m, day, 0, 
 func fig(pt, key string, from, to time.Time, form string, closed bool, cells map[string]string) port.ClosedFigure {
 	rows, _ := json.Marshal([]map[string]any{{"key": "X1", "unit": "X1", "unit_kind": "commune", "indicator": nil, "cells": cells}})
 	snap := ids.New()
-	f := port.ClosedFigure{DepartmentCode: "chan_nuoi_thuy_san", ProvinceCode: "89", CalendarID: "chan_nuoi_thuy_san", CalendarVersion: "v2",
+	f := port.ClosedFigure{DepartmentCode: "chan_nuoi_thuy_san", ProvinceCode: "89", CalendarID: "chan_nuoi_thuy_san", CalendarVersion: intp(rcdomain.CalendarVersionCNTS),
 		PeriodType: pt, PeriodKey: key, PeriodFrom: &from, PeriodTo: &to, Source: port.ClosedSourceForms, SourceModule: "pf/forms", SourcePeriodID: ids.New(),
 		FormCode: form, FormVersionID: uuid.Nil, FormClosed: closed, PeriodClosed: closed, SnapshotID: &snap, Rows: rows}
 	return f
@@ -90,9 +91,9 @@ func TestCrosswalk_StraddlingWeek_PFPUB(t *testing.T) {
 	}
 	o := out[0]
 	if o.TargetKey != "2026-W37" || !o.TargetFrom.Equal(d(2026, 9, 9)) || !o.TargetTo.Equal(d(2026, 9, 15)) || !o.Converted || !o.Closed ||
-		o.RuleVersion != port.CrosswalkV1 || o.TargetCalendarID != "ke_hoach_tai_chinh" || o.TargetCalendarVersion != "v2" ||
+		o.RuleVersion != port.CrosswalkV1 || o.TargetCalendarID != "ke_hoach_tai_chinh" || o.TargetCalendarVersion != rcdomain.CalendarVersionDefault ||
 		o.Sum["heo"] != "7" || o.Last["heo"] != "7" || len(o.Sources) != 1 || o.Sources[0].NativeKey != f.PeriodKey ||
-		o.LastSourceKey != "chan_nuoi_thuy_san:v2:"+f.PeriodKey {
+		o.LastSourceKey != "chan_nuoi_thuy_san:v3:"+f.PeriodKey {
 		t.Fatalf("tuần vắt: %+v", o)
 	}
 	// Lịch nguồn trùng lịch đích → không Converted.
@@ -192,5 +193,51 @@ func TestCrosswalk_CumulativeAndClosed_PFPUB(t *testing.T) {
 	}
 	if _, err := Convert(nil, port.CrosswalkTarget{Version: "kn.crosswalk/v9"}); err == nil {
 		t.Fatal("phiên bản lạ phải lỗi")
+	}
+}
+
+// KHTCQA (tests/golden/khtc/crosswalk.csv): mọi dòng đối chứng — Trồng trọt v2, Trồng trọt v1 (tuần Thứ Hai, có W53),
+// CNTS (Thứ Ba – Thứ Hai, có W53, vắt năm), Báo giá (kỳ ngày) — Convert cho đúng tuần KHTC và khoảng ngày.
+func TestCrosswalk_GoldenKHTCQA_PFPUB(t *testing.T) {
+	ds, err := khtcgolden.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dept := map[string]string{"trong_trot": "trong_trot", "trong_trot_v1": "trong_trot", "cnts": rcdomain.DeptChanNuoiThuySan,
+		"bao_gia": rcdomain.DeptThongTinTruyenThong}
+	day := func(s string) time.Time {
+		v, err := rcdomain.ParseDate(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	tgt := port.CrosswalkTarget{RuleTag: ds.Rules["khtc"]}
+	if len(ds.Crosswalk) < 20 {
+		t.Fatalf("crosswalk.csv: %d dòng", len(ds.Crosswalk))
+	}
+	for _, row := range ds.Crosswalk {
+		pt := rcdomain.PeriodWeek
+		var ver *int
+		if tag := ds.Rules[row.Source]; tag == "day" {
+			pt = rcdomain.PeriodDay
+		} else {
+			c, err := rcdomain.CalendarOf(dept[row.Source], tag)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ver = &c.Version
+			if s, err := rcdomain.SpanOfKey(c.Rule, pt, row.SourceKey, nil); err != nil || s.From.Format(time.DateOnly) != row.From ||
+				s.To.Format(time.DateOnly) != row.To {
+				t.Fatalf("%s %s %s: khóa gốc ↔ khoảng ngày %+v %v", row.CaseID, row.Source, row.SourceKey, s, err)
+			}
+		}
+		f := fig(pt, row.SourceKey, day(row.From), day(row.To), "F", true, map[string]string{"x": "1"})
+		f.CalendarID, f.CalendarVersion = dept[row.Source], ver
+		o := convert(t, []port.ClosedFigure{f}, tgt)
+		if len(o) != 1 || o[0].TargetKey != row.KHTCWeek || o[0].TargetFrom.Format(time.DateOnly) != row.KHTCFrom ||
+			o[0].TargetTo.Format(time.DateOnly) != row.KHTCTo {
+			t.Fatalf("%s %s %s → %+v, muốn %s (%s – %s)", row.CaseID, row.Source, row.SourceKey, o, row.KHTCWeek, row.KHTCFrom, row.KHTCTo)
+		}
 	}
 }

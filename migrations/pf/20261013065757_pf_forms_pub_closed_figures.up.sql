@@ -23,8 +23,8 @@
 -- rows: [{key, unit, unit_kind, parent, region, indicator, nil_report, cells, confirmation}] — mỗi đơn vị CÓ bài trong ảnh chụp; cells
 -- CHỈ các trường số (integer, decimal) của phiên bản biểu, chuỗi thập phân như đã nộp (gồm trường lũy kế của nguồn —
 -- Q-047: KHTC đọc lũy kế của nguồn). totals: '[]' (kỳ native không tổng hợp; bên đọc cộng rows theo decimal).
--- Lịch nguồn (D8 — mỗi phòng một lịch tuần): calendar_id = phòng nguồn, calendar_version = phiên bản quy tắc trong
--- period_rule ("v2" của "kn.period_rule/v2;week_start=tue;…"), period_key = khóa GỐC của kỳ theo lịch đó. Không quy
+-- Lịch nguồn (D8 — mỗi phòng một lịch tuần, reportcycle/domain.CalendarOf): (calendar_id, calendar_version) đọc từ
+-- ";cal=<phòng>:v<n>" của period_rule (vd chan_nuoi_thuy_san:v3); tag cũ → (phòng, 1|2); period_key = khóa GỐC. Không quy
 -- đổi sang tuần KHTC ở đây: bảng chuyển đổi (crosswalk) có phiên bản nằm sau port đọc của KHTC (ADR-0052 §6).
 -- Không dữ liệu cá nhân (R-14): KHÔNG submitted_by/reviewed_by/submission_id của ảnh chụp, không trường văn bản tự do
 -- (ghi chú, kế hoạch công tác, địa điểm), không actor_ref.
@@ -72,9 +72,13 @@ CREATE VIEW pf_forms_pub.v1_closed_figures AS
      WHERE x.department_code IS NOT NULL AND x.province_code IS NOT NULL)
   SELECT x.tenant_id, x.department_code, x.province_code,
          -- Danh tính lịch của nguồn (D8: mỗi phòng một lịch): (calendar_id, calendar_version, period_key = khóa gốc).
-         x.department_code AS calendar_id,
-         CASE WHEN x.period_rule LIKE 'kn.period_rule/%' THEN split_part(substr(x.period_rule, 16), ';', 1)
-              ELSE coalesce(nullif(split_part(x.period_rule, ';', 1), ''), 'unknown') END AS calendar_version,
+         coalesce(substring(x.period_rule from ';cal=([a-z][a-z0-9_]{1,39}):v[0-9]{1,4}(;|$)'), x.department_code) AS calendar_id,
+         -- calendar_version theo D8 (reportcycle/domain.CalendarOf): tag mang ";cal=<phòng>:v<n>" → n; tag cũ v1-tam → 1,
+         -- v2 → 2; tag không phải lịch kỳ (vd tuần làm việc BM-05 "cnts.work_week/v1") → NULL.
+         CASE WHEN x.period_rule ~ ';cal=[a-z][a-z0-9_]{1,39}:v[0-9]{1,4}(;|$)'
+                THEN substring(x.period_rule from ';cal=[a-z][a-z0-9_]{1,39}:v([0-9]{1,4})(;|$)')::integer
+              WHEN x.period_rule LIKE 'kn.period_rule/v1%' THEN 1
+              WHEN x.period_rule LIKE 'kn.period_rule/v2%' THEN 2 END AS calendar_version,
          x.period_kind AS period_type, x.period_key,
          CASE WHEN x.period_kind = 'week' AND x.period_key ~ '^[0-9]{4}-W[0-9]{2}$' THEN left(x.period_key, 4)::integer END
            AS week_year,

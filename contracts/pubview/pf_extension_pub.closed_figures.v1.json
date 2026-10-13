@@ -46,13 +46,13 @@
       "name": "calendar_id",
       "type": "text",
       "nullable": false,
-      "description": "Lịch của nguồn (D8 — mỗi phòng một lịch tuần): mã phòng nguồn. Danh tính kỳ nguồn = (calendar_id, calendar_version, period_key)"
+      "description": "Lịch của nguồn (D8): mã phòng (cal= của period_rule, vắng → phòng của kỳ). Danh tính kỳ nguồn = (calendar_id, calendar_version, period_key) — reportcycle/domain.CalendarRef"
     },
     {
       "name": "calendar_version",
-      "type": "text",
-      "nullable": false,
-      "description": "Phiên bản quy tắc chia kỳ của nguồn (v2, v1-tam… — đoạn đầu period_rule); 'unknown' nếu kỳ không ghi quy tắc"
+      "type": "integer",
+      "nullable": true,
+      "description": "Phiên bản lịch D8 (1 = v1 Thứ Hai–Chủ nhật, 2 = v2 mặc định Thứ Tư–Thứ Ba, 3 = CNTS Thứ Ba–Thứ Hai, …) — reportcycle/domain.CalendarOf; NULL = kỳ không theo lịch tuần (tuần làm việc BM-05)"
     },
     {
       "name": "period_type",

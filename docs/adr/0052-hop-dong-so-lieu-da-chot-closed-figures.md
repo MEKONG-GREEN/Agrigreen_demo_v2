@@ -28,7 +28,11 @@
   - Cờ: `form_closed`, `period_closed`, `key_closed`, `closed_at`.
   - Số đã chốt: `snapshot_id`, `snapshot_no` (bigint), `data_at`, `provisional`, `units_total`, `units_with_data`, `missing_units`, `rows`, `totals`.
   - Xác nhận và nguồn gốc (§8): `confirmation_status`, `figures_hash`, `status_hash`.
-- Hạt: kỳ nguồn × biểu. Danh tính kỳ nguồn (D8) là **(`calendar_id`, `calendar_version`, `period_key` = khóa gốc)**, vd `chan_nuoi_thuy_san:v2:2026-W45`. `calendar_id` = phòng nguồn, `calendar_version` = phiên bản quy tắc trong `period_rule`, còn `period_rule` mang thẻ đầy đủ (`week_start`, cách đánh số, căn tháng). Khóa dòng: (`calendar_id`, `calendar_version`, `period_type`, `period_key`, `province_code`, `form_code`, `source_period_id`). View **không** quy đổi sang lịch KHTC (§6).
+- Hạt: kỳ nguồn × biểu. Danh tính kỳ nguồn (D8) là **(`calendar_id`, `calendar_version`, `period_key` = khóa gốc)**, vd `chan_nuoi_thuy_san:v3:2026-W45`, theo API lịch của gói D8 (`reportcycle/domain`: `Calendar`, `CalendarOf`, `CalendarRef`).
+  - `calendar_id` là mã phòng; `calendar_version` (integer) dùng một dãy chung: 1 = v1 (Thứ Hai – Chủ nhật), 2 = v2 mặc định (Thứ Tư – Thứ Ba), 3 = CNTS (Thứ Ba – Thứ Hai), ….
+  - View đọc `;cal=<phòng>:v<n>` trong `period_rule`. Thẻ cũ không có `cal=` → (phòng của kỳ, 1 nếu v1-tam, 2 nếu v2), đúng như `CalendarOf`. Thẻ không phải lịch kỳ (tuần làm việc BM-05) → `calendar_version` NULL; quy đổi vẫn theo ngày cuối.
+  - `period_rule` mang thẻ đầy đủ (`week_start`, cách đánh số, căn tháng, `cal=`).
+  - Khóa dòng: (`calendar_id`, `calendar_version`, `period_type`, `period_key`, `province_code`, `form_code`, `source_period_id`). View **không** quy đổi sang lịch KHTC (§6).
 - `rows` dùng một dạng phần tử chung: `{key, unit, unit_kind, parent, region, indicator, nil_report, cells, confirmation}`. `cells` chỉ chứa **ô số** dạng chuỗi thập phân. Với nguồn cũ, `unit` là mã xã và `region` là khu vực. Với kỳ native, `unit` là xã, cơ sở hoặc hộ, và `parent` là mã xã cha.
 - `totals` là dòng tổng do nguồn tính: `{key, kind, region, indicator, members, cells}`. Nguồn không tổng hợp (kỳ native) trả `[]`, và bên đọc tự cộng `rows` theo decimal.
 - Hợp đồng nằm trong `contracts/pubview/<schema>.closed_figures.v1.json` với trường `family: "closed_figures/v1"`. `pubview.FamilyProblems` kiểm hai điều:
@@ -107,7 +111,8 @@
   2. `Sum`: tổng decimal **chính xác** các ô số của mọi đơn vị × mọi kỳ nguồn quy vào. Kỳ ngày (vd BM-01) vì thế cộng đúng theo tuần KHTC.
   3. `Last`: tổng ô của kỳ nguồn có ngày cuối muộn nhất, tức lũy kế của nguồn tại cuối kỳ đích. **Số tăng của tuần KHTC = hiệu hai lũy kế** ở cuối hai kỳ đích liên tiếp (`closedfig.Increment`).
   4. Ô nào là số phát sinh (dùng `Sum`) và ô nào là lũy kế (dùng `Last`) do mẫu phiếu KHTC (W11.63) quy định. Bảng chuyển đổi trả cả hai.
-  5. `Closed` (phía KHTC) = **mọi** kỳ nguồn của biểu quy vào kỳ đích đã chốt và có số. `KeyClosed` = như thế cho **mọi biểu của phòng** (D17).
+  5. `Closed` (phía KHTC) = **mọi** kỳ nguồn của biểu quy vào kỳ đích đã chốt và có số. `KeyClosed` = như thế cho **mọi biểu của phòng** (D17). Phòng không có kỳ nguồn nào quy vào kỳ đích → coi là đã chốt, nhưng vẫn gắn cờ `Missing` (quy tắc của bộ đối chứng KHTCQA).
+  6. Lịch đích lấy theo D8: `CrosswalkTarget.RuleTag` = `Calendar.Rule.Tag()` của `(*reportcycle/app.Service).CalendarAt(ctx, ke_hoach_tai_chinh, ngày)`; rỗng → quy tắc v2 mặc định, tức lịch (`ke_hoach_tai_chinh`, 2). `TargetCalendarVersion` là số nguyên D8.
 - **Kết quả trả cả kỳ nguồn lẫn kỳ đích:**
   - `Sources[]`: `calendar_id`, `calendar_version`, khóa gốc, khoảng ngày, nguồn, mã kỳ, cờ chốt, `Converted`.
   - Kỳ đích: `TargetCalendarID`, `TargetCalendarVersion`, `TargetRule`, `TargetType`, `TargetKey`, `TargetFrom`, `TargetTo`.
@@ -128,7 +133,7 @@
     - `SourceModule`;
     - `Forms[]`: các `TargetFigure` của §6 — số `Sum`/`Last` đã tách theo xác nhận, và `Sources[]` giữ danh tính kỳ nguồn cùng nguồn gốc;
     - `Closed`;
-    - `Missing`: phòng được yêu cầu nhưng không kỳ nguồn nào quy vào;
+    - `Missing`: phòng được yêu cầu nhưng không kỳ nguồn nào quy vào (vẫn tính là đã chốt — D17/KHTCQA);
     - `Unavailable`: nguồn chưa công bố view;
     - `Fallback`: Báo giá, D22.
   - `Closed` của kỳ = mọi phòng đã chốt (D17).
@@ -200,4 +205,5 @@
   - Cột `source_module`, `confirmation_status`, `figures_hash`, `status_hash` và `rows[].confirmation` (§8).
   - Kiểm thử đơn vị `closedfig/khtc_test.go`: Báo giá ngày duyệt cuối và Fallback, số phiếu, Missing, Unavailable, tách xác nhận, nhận HTX chỉ đổi băm trạng thái.
   - Kiểm thử tích hợp đọc kỳ KHTC 2026-W37 gồm Trồng trọt, CNTS, Báo giá (view W11.76 đọc thật bằng `r_price_pub`; tenant chưa có bảng giá duyệt → Missing); kiểm băm số không đổi khi mở lại và đổi khi chốt lại với số mới.
+- Theo gói D8 (lịch theo phòng — dựng trên nhánh `d8cal`, hai commit D8 nằm dưới commit PFPUB cho tới khi D8 gộp vào dev): `calendar_version` thành integer theo `CalendarOf`; lịch đích qua `CalendarOf`; khóa kỳ nguồn `CalendarRef(id, v):native_key`. Kiểm thử đối chứng `TestCrosswalk_GoldenKHTCQA_PFPUB` chạy `Convert` trên mọi dòng `tests/golden/khtc/crosswalk.csv` (Trồng trọt v1/v2, CNTS Thứ Ba – Thứ Hai, Báo giá kỳ ngày, W53, vắt năm) và kiểm `SpanOfKey` khóa gốc ↔ khoảng ngày.
 - D8 (cập nhật cùng ngày): thêm cột `calendar_id`, `calendar_version` vào họ hợp đồng. Bảng chuyển đổi `closedfig.Convert` + `Increment` + `ClosedFigures.Converted`, kiểm thử đơn vị `closedfig/crosswalk_test.go`. Kiểm thử tích hợp đọc quy đổi kỳ CNTS sang tuần KHTC.

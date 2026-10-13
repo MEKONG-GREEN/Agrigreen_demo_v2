@@ -9,16 +9,21 @@
 -- communes_* → units_*, period_id → source_period_id; bỏ batch_id, template_id (riêng của nguồn này).
 -- rows chuẩn hóa về [{key, unit, unit_kind = commune, parent = null, region, indicator, nil_report = false, cells}];
 -- totals giữ nguyên dạng [{key, kind, region, indicator, members, cells}] (dòng Khu vực/Toàn tỉnh do nguồn tổng hợp).
--- Lịch nguồn (D8): calendar_id = phòng, calendar_version = phiên bản trong period_rule của đợt, period_key = khóa gốc.
+-- Lịch nguồn (D8, reportcycle/domain.CalendarOf): (calendar_id, calendar_version) từ ";cal=<phòng>:v<n>" của
+-- period_rule; tag cũ → (phòng, 1 nếu v1-tam, 2 nếu v2); period_key = khóa gốc.
 -- Nguồn gốc (W11.64), trạng thái xác nhận (D2), băm số/băm trạng thái: như pf 20261013065757.
 -- Nguồn LÂU DÀI (quyết định 13/10/2026: Trồng trọt giữ vòng đời báo cáo riêng, không cắt sang cap/forms — W11.04 hủy).
 -- Không dữ liệu cá nhân (R-14): view gốc không công bố sources/actor_ref.
 
 CREATE VIEW pf_extension_pub.v1_closed_figures AS
   SELECT c.tenant_id, c.department_code, c.province_code,
-         c.department_code AS calendar_id,
-         CASE WHEN c.period_rule LIKE 'kn.period_rule/%' THEN split_part(substr(c.period_rule, 16), ';', 1)
-              ELSE coalesce(nullif(split_part(c.period_rule, ';', 1), ''), 'unknown') END AS calendar_version,
+         coalesce(substring(c.period_rule from ';cal=([a-z][a-z0-9_]{1,39}):v[0-9]{1,4}(;|$)'), c.department_code) AS calendar_id,
+         -- calendar_version theo D8 (reportcycle/domain.CalendarOf): tag mang ";cal=<phòng>:v<n>" → n; tag cũ v1-tam → 1,
+         -- v2 → 2; tag không phải lịch kỳ (vd tuần làm việc BM-05 "cnts.work_week/v1") → NULL.
+         CASE WHEN c.period_rule ~ ';cal=[a-z][a-z0-9_]{1,39}:v[0-9]{1,4}(;|$)'
+                THEN substring(c.period_rule from ';cal=[a-z][a-z0-9_]{1,39}:v([0-9]{1,4})(;|$)')::integer
+              WHEN c.period_rule LIKE 'kn.period_rule/v1%' THEN 1
+              WHEN c.period_rule LIKE 'kn.period_rule/v2%' THEN 2 END AS calendar_version,
          c.period_type, c.period_key, c.week_year, c.period_rule,
          c.period_from, c.period_to, c.period_label,
          'reportcycle'::text AS source, 'pf/extension'::text AS source_module, c.period_id AS source_period_id,

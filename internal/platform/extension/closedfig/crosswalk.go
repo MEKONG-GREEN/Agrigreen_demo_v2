@@ -66,30 +66,11 @@ func (b byStatus) total() map[string]decimal.Decimal {
 
 // Convert quy đổi kỳ nguồn sang lịch đích t (hàm thuần). Kỳ nguồn không có ngày cuối (vụ, đột xuất) bị bỏ qua.
 func Convert(figs []port.ClosedFigure, t port.CrosswalkTarget) ([]port.TargetFigure, error) {
-	ver := t.Version
-	if ver == "" {
-		ver = port.CrosswalkV1
+	t, tc, err := normTarget(t)
+	if err != nil {
+		return nil, err
 	}
-	if ver != port.CrosswalkV1 {
-		return nil, fmt.Errorf("closedfig: phiên bản bảng chuyển đổi không hỗ trợ: %s", ver)
-	}
-	rule := rcdomain.DefaultRule
-	if t.RuleTag != "" {
-		r, err := rcdomain.ParseRule(t.RuleTag)
-		if err != nil {
-			return nil, fmt.Errorf("closedfig: lịch đích: %w", err)
-		}
-		rule = r
-	}
-	pt := t.PeriodType
-	if pt == "" {
-		pt = rcdomain.PeriodWeek
-	}
-	cal := t.CalendarID
-	if cal == "" {
-		cal = partyport.DeptKeHoachTaiChinh
-	}
-	calVer := strings.TrimPrefix(rule.Version, "kn.period_rule/")
+	ver, rule, pt, cal, calVer := t.Version, tc.Rule, t.PeriodType, tc.ID, tc.Version
 	groups := map[groupKey]*group{}
 	var order []groupKey
 	for _, f := range figs {
@@ -99,7 +80,7 @@ func Convert(figs []port.ClosedFigure, t port.CrosswalkTarget) ([]port.TargetFig
 		end := dateOnly(*f.PeriodTo)
 		span, err := rule.PeriodOf(pt, end, nil)
 		if err != nil {
-			return nil, fmt.Errorf("closedfig: kỳ đích của %s:%s:%s: %w", f.CalendarID, f.CalendarVersion, f.PeriodKey, err)
+			return nil, fmt.Errorf("closedfig: kỳ đích của %s: %w", sourceKey(f.CalendarID, f.CalendarVersion, f.PeriodKey), err)
 		}
 		from := end
 		if f.PeriodFrom != nil {
@@ -128,11 +109,11 @@ func Convert(figs []port.ClosedFigure, t port.CrosswalkTarget) ([]port.TargetFig
 		}
 		cells, err := rowCells(f.Rows)
 		if err != nil {
-			return nil, fmt.Errorf("closedfig: rows của %s:%s:%s: %w", f.CalendarID, f.CalendarVersion, f.PeriodKey, err)
+			return nil, fmt.Errorf("closedfig: rows của %s: %w", sourceKey(f.CalendarID, f.CalendarVersion, f.PeriodKey), err)
 		}
 		g.sum.add(cells)
 		if !g.hasLast || end.After(g.lastEnd) {
-			g.last, g.lastEnd, g.hasLast, g.out.LastSourceKey = cells, end, true, f.CalendarID+":"+f.CalendarVersion+":"+f.PeriodKey
+			g.last, g.lastEnd, g.hasLast, g.out.LastSourceKey = cells, end, true, sourceKey(f.CalendarID, f.CalendarVersion, f.PeriodKey)
 		}
 	}
 	// KeyClosed: mọi biểu của phòng quy vào cùng kỳ đích.
@@ -193,6 +174,41 @@ func Increment(prev, cur map[string]string) map[string]string {
 	return out
 }
 
+// sourceKey là danh tính kỳ nguồn "<calendar_id>:v<n>:<native_key>" (D8 — reportcycle/domain.CalendarRef);
+// kỳ không theo lịch tuần (phiên bản nil) → "<calendar_id>:-:<native_key>".
+func sourceKey(id string, v *int, key string) string {
+	if v == nil {
+		return id + ":-:" + key
+	}
+	return rcdomain.CalendarRef(id, *v) + ":" + key
+}
+
+// normTarget điền mặc định của lịch đích và trả lịch D8 của nó: thẻ quy tắc rỗng → quy tắc v2 mặc định (Thứ Tư – Thứ Ba)
+// → lịch (KHTC, 2); thẻ mang ";cal=<phòng>:v<n>" → đúng lịch đó (reportcycle/domain.CalendarOf).
+func normTarget(t port.CrosswalkTarget) (port.CrosswalkTarget, rcdomain.Calendar, error) {
+	if t.Version == "" {
+		t.Version = port.CrosswalkV1
+	}
+	if t.Version != port.CrosswalkV1 {
+		return t, rcdomain.Calendar{}, fmt.Errorf("closedfig: phiên bản bảng chuyển đổi không hỗ trợ: %s", t.Version)
+	}
+	if t.PeriodType == "" {
+		t.PeriodType = rcdomain.PeriodWeek
+	}
+	if t.CalendarID == "" {
+		t.CalendarID = partyport.DeptKeHoachTaiChinh
+	}
+	if t.RuleTag == "" {
+		t.RuleTag = rcdomain.DefaultRule.Tag()
+	}
+	c, err := rcdomain.CalendarOf(t.CalendarID, t.RuleTag)
+	if err != nil {
+		return t, c, fmt.Errorf("closedfig: lịch đích: %w", err)
+	}
+	t.CalendarID, t.RuleTag = c.ID, c.Rule.Tag()
+	return t, c, nil
+}
+
 // CellKey là khóa ô của Sum/Last: "<chỉ tiêu>/<ô>" khi dòng có chỉ tiêu, không thì "<ô>".
 func CellKey(indicator, cell string) string {
 	if indicator == "" {
@@ -250,7 +266,7 @@ func combine(refs []port.SourcePeriodRef, status bool) string {
 		if v != nil {
 			x = *v
 		}
-		_, _ = fmt.Fprintf(h, "%s:%s:%s:%s:%s:%s;", r.SourceModule, r.CalendarID, r.CalendarVersion, r.NativeKey, r.FormCode, x)
+		_, _ = fmt.Fprintf(h, "%s:%s:%s:%s;", r.SourceModule, sourceKey(r.CalendarID, r.CalendarVersion, r.NativeKey), r.FormCode, x)
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }

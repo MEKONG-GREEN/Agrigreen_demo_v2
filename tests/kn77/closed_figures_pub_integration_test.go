@@ -18,6 +18,7 @@ import (
 	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	rcdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -81,7 +82,7 @@ func setupCNTS(t *testing.T, f *fixture) *cntsFx {
 	  {"key":"heo_luy_ke","label":"Heo lũy kế","type":"integer"},{"key":"ty_le","label":"Tỷ lệ","type":"decimal"},
 	  {"key":"ghi_chu","label":"Ghi chú","type":"text"}]`)
 	week := []formsport.PeriodDef{{Label: "Tuần 37/2026", DueAt: f.clk.Now().Add(30 * 24 * time.Hour), Kind: "week", Key: "2026-W37",
-		From: time.Date(2026, 9, 9, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC), Rule: "kn.period_rule/v2"}}
+		From: time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC), Rule: rcdomain.CNTSRule.Tag()}}
 	for _, p := range []struct {
 		code  string
 		units []string
@@ -245,9 +246,10 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 		t.Fatalf("sau chốt lại: %+v", r)
 	}
 
-	// Danh tính lịch nguồn (D8) và quy đổi sang tuần KHTC (crosswalk v1, ADR-0052 §6): kỳ CNTS 09/09–15/09 trùng tuần KHTC
-	// 2026-W37 → không Converted; đã chốt; Sum = số đã chốt.
-	if r := m["BM-T1"]; r.CalendarID != cntsDept || r.CalendarVersion != "v2" || r.PeriodKey != "2026-W37" {
+	// Danh tính lịch nguồn (D8) và quy đổi sang tuần KHTC (crosswalk v1, ADR-0052 §6): kỳ CNTS 08/09–14/09 quy vào tuần KHTC
+	// 2026-W37 (09/09 – 15/09, chứa ngày cuối 14/09) → Converted; đã chốt; Sum = số đã chốt.
+	// Kỳ CNTS theo lịch D8 Thứ Ba – Thứ Hai (08/09 – 14/09, thẻ mang cal=chan_nuoi_thuy_san:v3) → phiên bản 3.
+	if r := m["BM-T1"]; r.CalendarID != cntsDept || r.CalendarVersion == nil || *r.CalendarVersion != rcdomain.CalendarVersionCNTS || r.PeriodKey != "2026-W37" {
 		t.Fatalf("danh tính lịch nguồn: %+v", r)
 	}
 	conv, err := reader.Converted(ctx, f.tenant, extport.ClosedFiguresQuery{Department: cntsDept}, extport.CrosswalkTarget{})
@@ -255,7 +257,7 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 		t.Fatalf("quy đổi: %+v %v", conv, err)
 	}
 	for _, o := range conv {
-		if o.TargetKey != "2026-W37" || o.Converted || !o.Closed || !o.KeyClosed || o.RuleVersion != extport.CrosswalkV1 || len(o.Sources) != 1 {
+		if o.TargetKey != "2026-W37" || !o.Converted || !o.Closed || !o.KeyClosed || o.RuleVersion != extport.CrosswalkV1 || len(o.Sources) != 1 {
 			t.Fatalf("kỳ KHTC: %+v", o)
 		}
 		if o.FormCode == "BM-T1" && (o.Sum["heo"] != "15" || o.Last["heo_luy_ke"] != "125") {
@@ -284,7 +286,7 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 	ttm := tt()
 	r01 := ttm["T01"]
 	if len(ttm) != 2 || !r01.FormClosed || !r01.PeriodClosed || !r01.KeyClosed || !r01.KeyClosedAll || r01.SnapshotID == nil || r01.SnapshotNo == nil ||
-		r01.ProvinceCode != "89" || r01.PeriodType != "week" || r01.CalendarID != dept || r01.CalendarVersion == "" || r01.CalendarVersion == "unknown" || r01.WeekYear == nil || *r01.WeekYear != 2026 {
+		r01.ProvinceCode != "89" || r01.PeriodType != "week" || r01.CalendarID != dept || r01.CalendarVersion == nil || *r01.CalendarVersion != 1 || r01.WeekYear == nil || *r01.WeekYear != 2026 {
 		t.Fatalf("Trồng trọt sau chốt: %+v", ttm)
 	}
 	if got := unitCells(r01, c1); got["F"] != "20" {
@@ -299,7 +301,7 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 	// tuần nguồn 07/09 – 13/09), CNTS (kỳ native), Báo giá (pf_price_pub — chưa có bảng giá duyệt → Missing).
 	ps, err := f.ext.KHTCSources().Periods(ctx, f.tenant, extport.KHTCQuery{Province: "89", From: time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC),
 		To: time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC)})
-	if err != nil || len(ps) != 1 || ps[0].TargetKey != "2026-W37" || ps[0].Closed || len(ps[0].Departments) != 3 {
+	if err != nil || len(ps) != 1 || ps[0].TargetKey != "2026-W37" || !ps[0].Closed || len(ps[0].Departments) != 3 {
 		t.Fatalf("kỳ KHTC: %+v %v", ps, err)
 	}
 	for _, df := range ps[0].Departments {
@@ -315,8 +317,9 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 				t.Fatalf("Trồng trọt: %+v", df)
 			}
 		case "thong_tin_truyen_thong":
-			// View giá có (W11.76, đọc thật qua r_price_pub) nhưng tenant chưa có bảng giá duyệt → Missing, chưa chốt.
-			if df.Unavailable || !df.Missing || df.Closed || df.SourceModule != "pf/price" {
+			// View giá có (W11.76, đọc thật qua r_price_pub) nhưng tenant chưa có bảng giá duyệt → Missing; không kỳ nguồn
+			// nào quy vào → coi là đã chốt (KHTCQA, D17) nên kỳ KHTC chốt khi Trồng trọt và CNTS đã chốt.
+			if df.Unavailable || !df.Missing || !df.Closed || df.SourceModule != "pf/price" {
 				t.Fatalf("Báo giá: %+v", df)
 			}
 		default:

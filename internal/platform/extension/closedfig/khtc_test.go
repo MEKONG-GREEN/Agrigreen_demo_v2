@@ -57,13 +57,13 @@ func TestKHTCAssemble_PriceAndDepartments_PFPUB(t *testing.T) {
 	r := cntsRule(t)
 	cnts := weekFig(r, d(2026, 9, 14), "BM-04", map[string]string{"heo": "7"})
 	figs = append(figs, cnts)
-	tgt, rule, err := normTarget(port.CrosswalkTarget{})
+	tgt, cal, err := normTarget(port.CrosswalkTarget{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	conv := convert(t, figs, tgt)
 	from, to := d(2026, 9, 9), d(2026, 9, 22) // tuần W37, W38
-	ps := Assemble(conv, tgt, rule, from, to, []string{PriceDepartment, "chan_nuoi_thuy_san", "trong_trot"}, true, true)
+	ps := Assemble(conv, tgt, cal, from, to, []string{PriceDepartment, "chan_nuoi_thuy_san", "trong_trot"}, true, true)
 	if len(ps) != 2 || ps[0].TargetKey != "2026-W37" || ps[1].TargetKey != "2026-W38" || ps[0].RuleVersion != port.CrosswalkV1 {
 		t.Fatalf("kỳ KHTC: %+v", ps)
 	}
@@ -99,8 +99,9 @@ func TestKHTCAssemble_PriceAndDepartments_PFPUB(t *testing.T) {
 	if c := dept(p37, "chan_nuoi_thuy_san"); !c.Closed || c.SourceModule != "pf/forms" || form(c, "BM-04").Sources[0].NativeKey != cnts.PeriodKey {
 		t.Fatalf("CNTS tuần 37: %+v", c)
 	}
-	if tt := dept(p37, "trong_trot"); !tt.Missing || tt.Closed || p37.Closed {
-		t.Fatalf("Trồng trọt không có số → Missing, kỳ chưa chốt: %+v %v", tt, p37.Closed)
+	// KHTCQA/D17: không kỳ nguồn nào quy vào → đã chốt (vẫn gắn Missing); mọi phòng chốt → kỳ KHTC chốt.
+	if tt := dept(p37, "trong_trot"); !tt.Missing || !tt.Closed || !p37.Closed || p37.TargetCalendarVersion != rcdomain.CalendarVersionDefault {
+		t.Fatalf("Trồng trọt không có số → Missing, đã chốt: %+v %+v", tt, p37)
 	}
 	// Tuần 38: không ngày duyệt → ngày duyệt gần nhất (14/09) — Fallback; không có phiếu tuần.
 	p38 := dept(ps[1], PriceDepartment)
@@ -108,13 +109,13 @@ func TestKHTCAssemble_PriceAndDepartments_PFPUB(t *testing.T) {
 		t.Fatalf("fallback D22: %+v %+v", p38, b)
 	}
 	// View giá chưa có (trước W11.76) → Unavailable, kỳ không chốt.
-	un := Assemble(convert(t, []port.ClosedFigure{cnts}, tgt), tgt, rule, from, from, nil, false, true)
+	un := Assemble(convert(t, []port.ClosedFigure{cnts}, tgt), tgt, cal, from, from, nil, false, true)
 	if p := dept(un[0], PriceDepartment); !p.Unavailable || p.Closed || p.Missing || un[0].Closed {
 		t.Fatalf("giá chưa công bố: %+v", p)
 	}
 	// Tháng của KHTC: cùng dữ liệu, kỳ đích tháng.
-	mt, mrule, _ := normTarget(port.CrosswalkTarget{PeriodType: rcdomain.PeriodMonth})
-	if m := Assemble(convert(t, figs, mt), mt, mrule, from, from, nil, true, true); len(m) != 1 || m[0].TargetKey != "2026-09" {
+	mt, mcal, _ := normTarget(port.CrosswalkTarget{PeriodType: rcdomain.PeriodMonth})
+	if m := Assemble(convert(t, figs, mt), mt, mcal, from, from, nil, true, true); len(m) != 1 || m[0].TargetKey != "2026-09" {
 		t.Fatalf("kỳ tháng: %+v", m)
 	}
 	_ = time.UTC
