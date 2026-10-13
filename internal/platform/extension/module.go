@@ -72,8 +72,13 @@ type Module struct {
 	mat *matapp.Service // KN v7.7 P7 FN-XA-03.06: sổ vật tư (extension/material)
 	// W11.61 (D4 KH1): Danh mục KHTC, danh sách CT/DA chủ (D20), Kế hoạch năm (extension/khtc).
 	khtc *khtcapp.Service
+<<<<<<< HEAD
 
 	khtcPeriods *khtcPeriodService // W11.62: Kỳ KHTC (extension/khtcperiod, module_khtc.go)
+=======
+	// PFPUB/D2: trạng thái xác nhận HTX cho số liệu đã chốt (module_closedfig.go).
+	htx port.HTXConfirmations
+>>>>>>> 6cd0e625 (PFPUB: trạng thái xác nhận HTX theo cổng D2 (dòng unit_kind=cooperative), ADR đổi số 0053)
 }
 
 // New tạo module với pool của vai extension_app.

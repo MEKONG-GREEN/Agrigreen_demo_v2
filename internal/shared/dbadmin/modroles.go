@@ -211,7 +211,7 @@ func LoginRoles() []string {
 // mà không cần migration (ag_migrator không có CREATEROLE).
 var ExclusiveMembers = map[string][]string{AggRole: {AppAgg}}
 
-// PubReaders (ADR-0052 §4, gói PFPUB): module KHÔNG phải cap/analytics được đọc view công bố _pub — vai nhóm r_<module>
+// PubReaders (ADR-0053 §4, gói PFPUB): module KHÔNG phải cap/analytics được đọc view công bố _pub — vai nhóm r_<module>
 // là thành viên r_<chủ>_pub (chỉ USAGE schema _pub + SELECT view công bố, không quyền nào trên schema nội bộ của chủ;
 // cổng cô lập schema W9.1 đã miễn *_pub). Khóa: module đọc; giá trị: module chủ view _pub. Mỗi mục mới rà soát như thay
 // đổi hợp đồng (bên đọc ghi vào consumers của contracts/pubview). Bootstrap cấp — migration không cấp được thành viên

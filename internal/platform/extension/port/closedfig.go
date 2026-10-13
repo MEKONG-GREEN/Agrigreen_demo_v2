@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// ClosedFigures là bộ đọc "số liệu đã chốt" thống nhất cho KHTC (ADR-0052, gói PFPUB): đọc họ hợp đồng
+// ClosedFigures là bộ đọc "số liệu đã chốt" thống nhất cho KHTC (ADR-0053, gói PFPUB): đọc họ hợp đồng
 // closed_figures/v1 — pf_extension_pub.v1_closed_figures (vòng đời báo cáo cũ, Trồng trọt) và
 // pf_forms_pub.v1_closed_figures (kỳ native cap/forms, CNTS) — trong MỘT giao dịch chỉ đọc của tenant, bằng vai
 // r_extension (thành viên r_extension_pub, r_forms_pub — dbadmin.PubReaders). Port mức thấp (chẩn đoán, kiểm thử); KHTC
@@ -18,7 +18,7 @@ import (
 type ClosedFigures interface {
 	// ClosedFigures trả kỳ nguồn nguyên dạng (lịch của nguồn — D8).
 	ClosedFigures(ctx context.Context, tenantID uuid.UUID, q ClosedFiguresQuery) ([]ClosedFigure, error)
-	// Converted quy đổi kỳ nguồn sang kỳ KHTC theo bảng chuyển đổi có phiên bản (ADR-0052 §6): mỗi kỳ nguồn thuộc kỳ
+	// Converted quy đổi kỳ nguồn sang kỳ KHTC theo bảng chuyển đổi có phiên bản (ADR-0053 §6): mỗi kỳ nguồn thuộc kỳ
 	// đích chứa NGÀY CUỐI của kỳ nguồn; không chia tỷ lệ. q lọc kỳ nguồn (PeriodKeys là khóa GỐC).
 	Converted(ctx context.Context, tenantID uuid.UUID, q ClosedFiguresQuery, t CrosswalkTarget) ([]TargetFigure, error)
 }
@@ -90,7 +90,7 @@ type TargetFigure struct {
 	StatusHash  string
 }
 
-// KHTCSources là port DUY NHẤT phía KHTC (W11.61…W11.69, ADR-0052 §7): theo từng kỳ KHTC, số đã chốt của từng phòng
+// KHTCSources là port DUY NHẤT phía KHTC (W11.61…W11.69, ADR-0053 §7): theo từng kỳ KHTC, số đã chốt của từng phòng
 // nguồn (Trồng trọt — vòng đời báo cáo, tuần Thứ Tư – Thứ Ba; CNTS — kỳ native cap/forms, lịch riêng Thứ Ba – Thứ Hai;
 // Báo giá — pf_price_pub) đã quy đổi sang lịch KHTC, giữ danh tính kỳ nguồn, cờ chốt và nguồn gốc (băm). KHTC chụp kết
 // quả khi cán bộ bấm "Cập nhật số liệu" (bất biến ở phía KHTC) và chỉ so băm để cảnh báo — không ghi đè.
@@ -154,6 +154,15 @@ const (
 	ConfirmationConfirmed   = "confirmed"
 	ConfirmationUnconfirmed = "unconfirmed"
 )
+
+// UnitKindCooperative là loại đơn vị của dòng HTX (unit = mã Nút HTX) — trạng thái xác nhận lấy từ HTXConfirmations.
+const UnitKindCooperative = "cooperative"
+
+// HTXConfirmations là cổng trạng thái xác nhận HTX của gói D2 (cooperative/port.HTXConfirmations — cùng chữ ký;
+// cooperative.Module.HTXConfirmations() thỏa interface này): Nút HTX → confirmed | unconfirmed trong tenant của ctx.
+type HTXConfirmations interface {
+	Confirmations(ctx context.Context, coops []uuid.UUID) (map[uuid.UUID]string, error)
+}
 
 // Nguồn của dòng (cột source) — chỉ để chẩn đoán, KHTC không rẽ nhánh theo nguồn.
 const (

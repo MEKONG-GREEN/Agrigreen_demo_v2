@@ -16,7 +16,7 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 )
 
-// Bảng chuyển đổi kỳ nguồn → kỳ KHTC (ADR-0052 §6, D8: mỗi phòng một lịch tuần; KHTC Thứ Tư – Thứ Ba).
+// Bảng chuyển đổi kỳ nguồn → kỳ KHTC (ADR-0053 §6, D8: mỗi phòng một lịch tuần; KHTC Thứ Tư – Thứ Ba).
 //
 // port.CrosswalkV1 ("kn.crosswalk/v1;attribution=source_end"):
 //   - mỗi kỳ nguồn thuộc ĐÚNG MỘT kỳ đích — kỳ đích chứa NGÀY CUỐI của kỳ nguồn (lịch đích, PeriodOf); không chia tỷ lệ;

@@ -110,7 +110,7 @@ func (x *cntsFx) post(who caller, p string, body any) resp {
 	return who.do(x.srv, http.MethodPost, p, key(), body)
 }
 
-// TestPFPUB_ClosedFigures (ADR-0052): KHTC đọc số liệu đã chốt của HAI nguồn qua MỘT bộ đọc (extension/port.ClosedFigures)
+// TestPFPUB_ClosedFigures (ADR-0053): KHTC đọc số liệu đã chốt của HAI nguồn qua MỘT bộ đọc (extension/port.ClosedFigures)
 // trên họ hợp đồng closed_figures/v1 — CNTS kỳ native cap/forms (pf_forms_pub, pf 20261013065757) và Trồng trọt vòng đời báo
 // cáo cũ (pf_extension_pub, pf 20261013065758): chốt → thấy; mở lại → cờ về false, số cũ giữ; chốt lại → số mới; key_closed
 // (Q-048) theo mọi biểu của khóa kỳ; cách ly tenant (RLS qua view); không dữ liệu cá nhân; vai r_extension đọc view
@@ -249,7 +249,7 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 		t.Fatalf("sau chốt lại: %+v", r)
 	}
 
-	// Danh tính lịch nguồn (D8) và quy đổi sang tuần KHTC (crosswalk v1, ADR-0052 §6): kỳ CNTS 08/09–14/09 quy vào tuần KHTC
+	// Danh tính lịch nguồn (D8) và quy đổi sang tuần KHTC (crosswalk v1, ADR-0053 §6): kỳ CNTS 08/09–14/09 quy vào tuần KHTC
 	// 2026-W37 (09/09 – 15/09, chứa ngày cuối 14/09) → Converted; đã chốt; Sum = số đã chốt.
 	// Kỳ CNTS theo lịch D8 Thứ Ba – Thứ Hai (08/09 – 14/09, thẻ mang cal=chan_nuoi_thuy_san:v3) → phiên bản 3.
 	if r := m["BM-T1"]; r.CalendarID != cntsDept || r.CalendarVersion == nil || *r.CalendarVersion != 3 || r.PeriodKey != "2026-W37" {
@@ -300,7 +300,7 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 		t.Fatalf("dòng Toàn tỉnh của nguồn: %s %v", r01.Totals, err)
 	}
 
-	// Port KHTC (ADR-0052 §7): một kỳ KHTC 2026-W37 (Thứ Tư 09/09 – Thứ Ba 15/09) gồm Trồng trọt (vòng đời báo cáo,
+	// Port KHTC (ADR-0053 §7): một kỳ KHTC 2026-W37 (Thứ Tư 09/09 – Thứ Ba 15/09) gồm Trồng trọt (vòng đời báo cáo,
 	// tuần nguồn 07/09 – 13/09), CNTS (kỳ native), Báo giá (pf_price_pub — chưa có bảng giá duyệt → Missing).
 	ps, err := f.ext.KHTCSources().Periods(ctx, f.tenant, extport.KHTCQuery{Province: "89", From: time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC),
 		To: time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC)})

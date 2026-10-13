@@ -49,7 +49,7 @@ type Contract struct {
 	Key          []string `json:"key"`
 	ClosedRule   string   `json:"closed_rule"`
 	PersonalData bool     `json:"personal_data"`
-	// Family: họ hợp đồng <tên>/v<N> (ADR-0052) — nhiều view của NHIỀU module chủ cùng một hợp đồng cột (vd
+	// Family: họ hợp đồng <tên>/v<N> (ADR-0053) — nhiều view của NHIỀU module chủ cùng một hợp đồng cột (vd
 	// closed_figures/v1: nguồn vòng đời báo cáo cũ và kỳ native cap/forms). Mọi thành viên phải có cột giống hệt (tên,
 	// kiểu, nullable, thứ tự) — FamilyProblems. Rỗng = view đứng một mình.
 	Family  string   `json:"family,omitempty"`
@@ -113,7 +113,7 @@ func (c Contract) Problems() []string {
 
 var reFamily = regexp.MustCompile(`^[a-z][a-z0-9_]*/v[1-9][0-9]*$`)
 
-// FamilyProblems kiểm họ hợp đồng (ADR-0052): tên họ đúng dạng, đuôi phiên bản trùng phiên bản view, mỗi họ có ít nhất
+// FamilyProblems kiểm họ hợp đồng (ADR-0053): tên họ đúng dạng, đuôi phiên bản trùng phiên bản view, mỗi họ có ít nhất
 // hai view của các module chủ khác nhau, mọi thành viên có cột giống hệt (tên, kiểu, nullable, thứ tự).
 func FamilyProblems(cs []Contract) []string {
 	var p []string

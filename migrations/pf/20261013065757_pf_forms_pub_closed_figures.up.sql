@@ -1,11 +1,11 @@
--- pf_forms_pub: hợp đồng "số liệu đã chốt" thống nhất cho KHTC — nguồn kỳ native `cap/forms` (gói PFPUB, ADR-0052;
+-- pf_forms_pub: hợp đồng "số liệu đã chốt" thống nhất cho KHTC — nguồn kỳ native `cap/forms` (gói PFPUB, ADR-0053;
 -- BRD KN 10/2026 — D4 X6, QĐ-6, Q-047, Q-048). Họ hợp đồng closed_figures/v1: pf_forms_pub.v1_closed_figures (tệp này)
 -- và pf_extension_pub.v1_closed_figures (pf 20261013065758, nguồn vòng đời báo cáo cũ) có CỘT VÀ THỨ TỰ GIỐNG HỆT —
 -- contracts/pubview/pf_forms_pub.closed_figures.v1.json. Chỉ đụng schema pf_forms_pub (module pf/forms).
 --
 -- Một dòng = một kỳ native có khóa kỳ đã lưu (period_spec.period_key, W11.05) của profile có phòng nguồn (kn_cnts →
 -- chan_nuoi_thuy_san; profile khác — kn chung, kn_khtc là phiếu của chính KHTC — không có dòng; thêm profile =
--- CREATE OR REPLACE VIEW giữ nguyên cột, ADR-0052 §3). Kỳ đã hủy không có dòng. Mỗi kỳ native có đúng một biểu.
+-- CREATE OR REPLACE VIEW giữ nguyên cột, ADR-0053 §3). Kỳ đã hủy không có dòng. Mỗi kỳ native có đúng một biểu.
 -- Tỉnh = tỉnh của Nút phát hành (owner_ref → k_ref.org, cùng quy tắc với pf/extension knActor): TTKN tỉnh → mã đơn vị
 -- hành chính của Nút; Nút khác → tỉnh cha của đơn vị hành chính có hiệu lực. Không xác định được tỉnh → không có dòng.
 --
@@ -25,7 +25,7 @@
 -- Q-047: KHTC đọc lũy kế của nguồn). totals: '[]' (kỳ native không tổng hợp; bên đọc cộng rows theo decimal).
 -- Lịch nguồn (D8 — mỗi phòng một lịch tuần, reportcycle/domain.CalendarOf): (calendar_id, calendar_version) đọc từ
 -- ";cal=<phòng>:v<n>" của period_rule (vd chan_nuoi_thuy_san:v3); tag cũ → (phòng, 1|2); period_key = khóa GỐC. Không quy
--- đổi sang tuần KHTC ở đây: bảng chuyển đổi (crosswalk) có phiên bản nằm sau port đọc của KHTC (ADR-0052 §6).
+-- đổi sang tuần KHTC ở đây: bảng chuyển đổi (crosswalk) có phiên bản nằm sau port đọc của KHTC (ADR-0053 §6).
 -- Không dữ liệu cá nhân (R-14): KHÔNG submitted_by/reviewed_by/submission_id của ảnh chụp, không trường văn bản tự do
 -- (ghi chú, kế hoạch công tác, địa điểm), không actor_ref.
 -- Chủ view ag_migrator (NOBYPASSRLS), mọi bảng gốc FORCE RLS (pf_forms.* sổ apply_ledger, k_ref.* apply_tenant_rls) →
@@ -34,7 +34,7 @@
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'r_forms_pub' AND NOT rolcanlogin) THEN
-    RAISE EXCEPTION 'thiếu vai nhóm r_forms_pub (NOLOGIN) — chạy cmd/migrate bootstrap trước migrate up (ADR-0031, ADR-0052)';
+    RAISE EXCEPTION 'thiếu vai nhóm r_forms_pub (NOLOGIN) — chạy cmd/migrate bootstrap trước migrate up (ADR-0031, ADR-0053)';
   END IF;
 END
 $$;

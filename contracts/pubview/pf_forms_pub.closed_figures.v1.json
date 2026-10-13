@@ -6,10 +6,10 @@
   "package": "PFPUB",
   "migration": "pf 20261013065757",
   "consumers": [
-    "KHTC — port duy nhất extension/port.KHTCSources (W11.61…W11.69, ảnh chụp W11.64), vai r_extension (thành viên r_extension_pub, r_forms_pub, r_price_pub — ADR-0052 §4, §7)",
+    "KHTC — port duy nhất extension/port.KHTCSources (W11.61…W11.69, ảnh chụp W11.64), vai r_extension (thành viên r_extension_pub, r_forms_pub, r_price_pub — ADR-0053 §4, §7)",
     "r_metrics, r_agg (thành viên mọi r_<module>_pub)"
   ],
-  "purpose": "Họ hợp đồng thống nhất 'số liệu đã chốt theo phòng × tỉnh × khóa kỳ' cho KHTC (ADR-0052) — nguồn kỳ native cap/forms (CNTS profile kn_cnts: W11.05/05b/42) từ ảnh chụp đóng băng lúc chốt; chỉ trường số, không người nộp/rà soát.",
+  "purpose": "Họ hợp đồng thống nhất 'số liệu đã chốt theo phòng × tỉnh × khóa kỳ' cho KHTC (ADR-0053) — nguồn kỳ native cap/forms (CNTS profile kn_cnts: W11.05/05b/42) từ ảnh chụp đóng băng lúc chốt; chỉ trường số, không người nộp/rà soát.",
   "grain": "kỳ nguồn × biểu (một dòng mỗi biểu của mỗi kỳ có khóa kỳ đã lưu; kỳ thu hồi/hủy không có dòng)",
   "key": [
     "calendar_id",
@@ -64,7 +64,7 @@
       "name": "period_key",
       "type": "text",
       "nullable": false,
-      "description": "Khóa GỐC của kỳ theo lịch nguồn, ĐÃ LƯU lúc phát hành (2026-W45, 2026-11-K2, 2026-11-05, 2026-11, 2026-Q4, 2026) — chưa quy đổi sang tuần KHTC (crosswalk ở port đọc, ADR-0052 §6)"
+      "description": "Khóa GỐC của kỳ theo lịch nguồn, ĐÃ LƯU lúc phát hành (2026-W45, 2026-11-K2, 2026-11-05, 2026-11, 2026-Q4, 2026) — chưa quy đổi sang tuần KHTC (crosswalk ở port đọc, ADR-0053 §6)"
     },
     {
       "name": "week_year",

@@ -22,7 +22,7 @@ func pubRoles() []string {
 }
 
 // W6.3 (§14, ADR-0031 §2, R-DB-10): r_<module>_pub NOLOGIN cho đúng các module sở hữu schema _pub, tạo trước
-// vai phân tích; chỉ r_metrics (cap/analytics), r_agg và bên đọc đã rà soát (PubReaders, ADR-0052) là thành viên;
+// vai phân tích; chỉ r_metrics (cap/analytics), r_agg và bên đọc đã rà soát (PubReaders, ADR-0053) là thành viên;
 // không thuộc ag_shared_user, không vượt RLS. PFPUB: + r_forms_pub (pf_forms_pub, pf 20261013065757).
 func TestPubRoles_W63(t *testing.T) {
 	want := []string{"r_cropcycle_pub", "r_extension_pub", "r_forms_pub", "r_geo_pub", "r_mechanization_pub", "r_price_pub"}
@@ -120,7 +120,7 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 		if g.Module == AnalyticsModule {
 			want = append(want, pubRoles()...) // W6.3: cap/analytics đọc mọi view _pub
 		}
-		want = append(want, pubReaderRoles(g.Module, groups)...) // ADR-0052: bên đọc _pub đã rà soát
+		want = append(want, pubReaderRoles(g.Module, groups)...) // ADR-0053: bên đọc _pub đã rà soát
 		if r.Login || r.BypassRLS || r.NoInherit || !slices.Equal(r.MemberOf, want) || len(r.Clusters) == 0 {
 			t.Errorf("%s: %+v", g.Role, r)
 		}
@@ -454,7 +454,7 @@ func TestLaterGroupsGrantKRef(t *testing.T) {
 	}
 }
 
-// pubReader: vai nhóm reader là thành viên vai _pub pub theo PubReaders (ADR-0052 §4).
+// pubReader: vai nhóm reader là thành viên vai _pub pub theo PubReaders (ADR-0053 §4).
 func pubReader(reader, pub string) bool {
 	for mod, owners := range PubReaders {
 		if modreg.DBRole(mod) != reader {
@@ -469,7 +469,7 @@ func pubReader(reader, pub string) bool {
 	return false
 }
 
-// ADR-0052 §4 (PFPUB): KHTC trong pf/extension đọc họ hợp đồng closed_figures/v1 của hai nguồn — r_extension là thành
+// ADR-0053 §4 (PFPUB): KHTC trong pf/extension đọc họ hợp đồng closed_figures/v1 của hai nguồn — r_extension là thành
 // viên r_extension_pub, r_forms_pub, r_price_pub (tạo trước r_extension), không thành viên vai _pub nào khác; mục PubReaders chỉ trỏ
 // module có schema _pub.
 func TestPubReaders_PFPUB(t *testing.T) {

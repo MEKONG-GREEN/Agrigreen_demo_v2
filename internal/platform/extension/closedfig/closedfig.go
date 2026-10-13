@@ -1,4 +1,4 @@
-// Package closedfig cài port.ClosedFigures (ADR-0052, gói PFPUB): bộ đọc "số liệu đã chốt" thống nhất cho KHTC trên họ
+// Package closedfig cài port.ClosedFigures (ADR-0053, gói PFPUB): bộ đọc "số liệu đã chốt" thống nhất cho KHTC trên họ
 // hợp đồng closed_figures/v1 — hai view công bố cùng cột: pf_extension_pub.v1_closed_figures (pf 20261013065758, vòng đời báo
 // cáo cũ) và pf_forms_pub.v1_closed_figures (pf 20261013065757, kỳ native cap/forms). Giao dịch chỉ đọc của tenant trên pool
 // của module (db.ForModule → SET LOCAL ROLE r_extension; quyền đọc hai view qua thành viên r_extension_pub, r_forms_pub
@@ -20,6 +20,8 @@ import (
 // Reader đọc họ hợp đồng closed_figures/v1.
 type Reader struct {
 	DB tenant.Beginner // pool của module (đã bọc db.ForModule)
+	// HTX: cổng trạng thái xác nhận HTX (D2); nil → dòng HTX là "Chưa xác nhận" (htx.go).
+	HTX port.HTXConfirmations
 }
 
 var (
@@ -55,7 +57,10 @@ func (r Reader) ClosedFigures(ctx context.Context, tid uuid.UUID, q port.ClosedF
 		out, err = readFamily(ctx, tx, tid, q)
 		return err
 	})
-	return out, err
+	if err != nil {
+		return nil, err
+	}
+	return out, applyHTX(ctx, r.HTX, out)
 }
 
 // readFamily đọc họ closed_figures/v1 (hai view) trong giao dịch tx của tenant.

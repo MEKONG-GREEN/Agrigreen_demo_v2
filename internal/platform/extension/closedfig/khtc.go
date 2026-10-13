@@ -1,6 +1,6 @@
 package closedfig
 
-// KHTCSources (ADR-0052 §7): port duy nhất phía KHTC — theo từng kỳ KHTC, số đã chốt của từng phòng nguồn đã quy đổi
+// KHTCSources (ADR-0053 §7): port duy nhất phía KHTC — theo từng kỳ KHTC, số đã chốt của từng phòng nguồn đã quy đổi
 // sang lịch KHTC (crosswalk §6), giữ danh tính kỳ nguồn, cờ chốt, nguồn gốc (băm) và tách confirmed/unconfirmed (D2).
 // Nguồn: họ closed_figures/v1 (Trồng trọt — pf_extension_pub; CNTS — pf_forms_pub) và Báo giá (pf_price_pub.v1_board_daily,
 // v1_ticket_week — W11.76) đọc trong CÙNG một giao dịch chỉ đọc của tenant (một mốc nhất quán cho ảnh chụp "Cập nhật số
@@ -108,6 +108,9 @@ func (r Reader) Periods(ctx context.Context, tid uuid.UUID, q port.KHTCQuery) ([
 		return nil
 	})
 	if err != nil {
+		return nil, err
+	}
+	if err := applyHTX(ctx, r.HTX, figs); err != nil {
 		return nil, err
 	}
 	var keep []port.ClosedFigure

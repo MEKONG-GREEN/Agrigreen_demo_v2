@@ -6,10 +6,10 @@
   "package": "PFPUB",
   "migration": "pf 20261013065758",
   "consumers": [
-    "KHTC — port duy nhất extension/port.KHTCSources (W11.61…W11.69, ảnh chụp W11.64), vai r_extension (thành viên r_extension_pub, r_forms_pub, r_price_pub — ADR-0052 §4, §7)",
+    "KHTC — port duy nhất extension/port.KHTCSources (W11.61…W11.69, ảnh chụp W11.64), vai r_extension (thành viên r_extension_pub, r_forms_pub, r_price_pub — ADR-0053 §4, §7)",
     "r_metrics, r_agg (thành viên mọi r_<module>_pub)"
   ],
-  "purpose": "Họ hợp đồng thống nhất 'số liệu đã chốt theo phòng × tỉnh × kỳ nguồn' cho KHTC (ADR-0052) — nguồn vòng đời báo cáo extension/reportcycle (Trồng trọt, tuần Thứ Tư – Thứ Ba). Nguồn chính thức, lâu dài (Trồng trọt giữ biểu riêng — W11.04 hủy); chiếu lại v1_consolidation_closed về cột chung.",
+  "purpose": "Họ hợp đồng thống nhất 'số liệu đã chốt theo phòng × tỉnh × kỳ nguồn' cho KHTC (ADR-0053) — nguồn vòng đời báo cáo extension/reportcycle (Trồng trọt, tuần Thứ Tư – Thứ Ba). Nguồn chính thức, lâu dài (Trồng trọt giữ biểu riêng — W11.04 hủy); chiếu lại v1_consolidation_closed về cột chung.",
   "grain": "kỳ nguồn × biểu (một dòng mỗi biểu của mỗi kỳ có khóa kỳ đã lưu; kỳ thu hồi/hủy không có dòng)",
   "key": [
     "calendar_id",
@@ -64,7 +64,7 @@
       "name": "period_key",
       "type": "text",
       "nullable": false,
-      "description": "Khóa GỐC của kỳ theo lịch nguồn, ĐÃ LƯU lúc phát hành (2026-W45, 2026-11-K2, 2026-11-05, 2026-11, 2026-Q4, 2026) — chưa quy đổi sang tuần KHTC (crosswalk ở port đọc, ADR-0052 §6)"
+      "description": "Khóa GỐC của kỳ theo lịch nguồn, ĐÃ LƯU lúc phát hành (2026-W45, 2026-11-K2, 2026-11-05, 2026-11, 2026-Q4, 2026) — chưa quy đổi sang tuần KHTC (crosswalk ở port đọc, ADR-0053 §6)"
     },
     {
       "name": "week_year",

@@ -1,4 +1,4 @@
-# ADR-0052: Một hợp đồng `_pub` có phiên bản cho "số liệu đã chốt" — họ `closed_figures/v1`, port KHTC `KHTCSources`, bên đọc qua thành viên vai `_pub`
+# ADR-0053: Một hợp đồng `_pub` có phiên bản cho "số liệu đã chốt" — họ `closed_figures/v1`, port KHTC `KHTCSources`, bên đọc qua thành viên vai `_pub`
 
 **Trạng thái:** Đề xuất — hiện thực ở gói PFPUB (13/10/2026, pf 20261013065757, pf 20261013065758); PO (CEO) đã chốt D8 (mỗi phòng một lịch tuần, KHTC quy đổi), D17 ("đã chốt" = mọi biểu nguồn của tuần đã chốt), D18 (lũy kế của nguồn là chuẩn); người dùng chốt: Trồng trọt giữ vòng đời báo cáo riêng (W11.04 hủy), KHTC tổng hợp số của từng phòng ngay ở G1, D2 (HTX "Chưa xác nhận") · **Ngày:** 13/10/2026 · **Yêu cầu:** R-DB-10, R-DB-02, R-DB-03, R-14, kiến trúc v4.1 §13, §14, §26 · **Nguồn:** BRD KHTC v2.2 BR-DL-02…04, đối chiếu BRD KN 10/2026 Phụ lục D X6, QĐ-6, Q-047, Q-048, review đội (W11.61–W11.69) · **Thành phần:** `migrations/pf/000153_pf_forms_pub_closed_figures.up.sql`, `migrations/pf/000154_pf_extension_pub_closed_figures.up.sql`, `contracts/pubview`, `internal/shared/dbadmin` (`PubReaders`), `internal/platform/extension/port/closedfig.go`, `internal/platform/extension/closedfig`, `internal/platform/forms/port/pub.go` · **Liên quan:** [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0031](0031-vai-tong-hop-r-agg.md), [contracts/pubview](../../contracts/pubview/README.md)
 
@@ -170,10 +170,18 @@
 - `TargetFigure.FiguresHash` gộp (sha256) danh tính và `figures_hash` của mọi kỳ nguồn quy vào kỳ KHTC. Băm này đổi khi số của bất kỳ kỳ nguồn nào đổi, hoặc khi tập kỳ nguồn đổi.
 - **D2 — HTX do TTKN tạo, "Chưa xác nhận":**
   - mỗi phần tử `rows` có `confirmation` (`confirmed` | `unconfirmed`); cột `confirmation_status` = `unconfirmed` nếu có đơn vị chưa xác nhận;
-  - **hiện mọi nguồn trả `confirmed`**. Gói D2 thay biểu thức bằng trạng thái thật bằng `CREATE OR REPLACE VIEW`, **không đổi cột**, nên hợp đồng ổn định;
+  - nguồn của trạng thái: cổng `cooperative/port.HTXConfirmations` của gói D2. Nút HTX là bí danh của neo HTX **đã nhận quyền** → `confirmed`; HTX tạm hoặc chưa neo → `unconfirmed`;
+  - port KHTC nhận cổng qua `extension/port.HTXConfirmations` (cùng chữ ký; gốc lắp ráp nối `kn.UseHTXConfirmations(coop.HTXConfirmations())` khi D2 gộp). Chưa nối → dòng HTX là `unconfirmed` (thận trọng);
+  - **quy tắc theo hạt** (dòng của hợp đồng là xã, cơ sở, hộ, mặt hàng, xã báo giá — không phải HTX):
+    - dòng có `unit_kind = cooperative` (`unit` = mã Nút HTX) lấy trạng thái từ cổng D2;
+    - dòng của đơn vị khác không phải HTX → giữ trạng thái của nguồn. View hiện trả `confirmed`; nguồn nào sau này góp số theo HTX thì phát dòng `unit_kind = cooperative`, và view có thể ghi trạng thái thật bằng `CREATE OR REPLACE VIEW` mà **không đổi cột**;
+    - kỳ × biểu: `confirmation_status = unconfirmed` nếu có **ít nhất một** dòng chưa xác nhận;
+    - phần chưa xác nhận lộ ra ở `SumUnconfirmed`/`LastUnconfirmed` (cộng theo dòng). `totals` do nguồn tính (dòng Khu vực/Toàn tỉnh của Trồng trọt) không tách được;
+  - hiện chưa nguồn nào phát dòng HTX (Trồng trọt gộp theo xã, CNTS theo xã/cơ sở/hộ), nên số hiện tại đều `confirmed` theo đúng quy tắc;
   - số "Chưa xác nhận" vẫn vào báo cáo: `Sum`/`Last` là tổng, kèm `SumConfirmed`/`SumUnconfirmed` và `LastConfirmed`/`LastUnconfirmed` (tổng tách hai phần, decimal chính xác);
   - **trạng thái không vào `figures_hash`**. Nó có băm riêng `status_hash` (và `TargetFigure.StatusHash`). Nhận HTX (unconfirmed → confirmed) chỉ đổi `status_hash`, nên không gây cảnh báo "Nguồn đã thay đổi" giả.
 - Báo giá: view giá không có cột băm, nên `PriceFigures` tính `figures_hash`/`status_hash` ở Go theo cùng quy tắc.
+- Khi cổng D2 đổi trạng thái một dòng HTX, port tính lại `status_hash` ở Go (sha256 của `key=trạng thái` theo thứ tự dòng). `figures_hash` không đổi.
 
 ## Hệ quả
 
@@ -205,5 +213,6 @@
   - Cột `source_module`, `confirmation_status`, `figures_hash`, `status_hash` và `rows[].confirmation` (§8).
   - Kiểm thử đơn vị `closedfig/khtc_test.go`: Báo giá ngày duyệt cuối và Fallback, số phiếu, Missing, Unavailable, tách xác nhận, nhận HTX chỉ đổi băm trạng thái.
   - Kiểm thử tích hợp đọc kỳ KHTC 2026-W37 gồm Trồng trọt, CNTS, Báo giá (view W11.76 đọc thật bằng `r_price_pub`; tenant chưa có bảng giá duyệt → Missing); kiểm băm số không đổi khi mở lại và đổi khi chốt lại với số mới.
+- Theo gói D2 (neo HTX): `extension/port.HTXConfirmations`, `Module.UseHTXConfirmations`, `closedfig/htx.go` (quy tắc theo hạt §8), kiểm thử `TestApplyHTX_D2_PFPUB` (HTX đã nhận quyền / HTX tạm / chưa nối cổng, tách tổng, nhận quyền chỉ đổi băm trạng thái). Nối ở gốc lắp ráp sau khi D2 gộp (một dòng trong `cmd/api-platform/assembly`).
 - Theo gói D8 (lịch theo phòng — dựng trên nhánh `d8cal`, hai commit D8 nằm dưới commit PFPUB cho tới khi D8 gộp vào dev): `calendar_version` thành integer theo `CalendarOf`; lịch đích qua `CalendarOf`; khóa kỳ nguồn `CalendarRef(id, v):native_key`. Kiểm thử đối chứng `TestCrosswalk_GoldenKHTCQA_PFPUB` chạy `Convert` trên mọi dòng `tests/golden/khtc/crosswalk.csv` (Trồng trọt v1/v2, CNTS Thứ Ba – Thứ Hai, Báo giá kỳ ngày, W53, vắt năm) và kiểm `SpanOfKey` khóa gốc ↔ khoảng ngày.
 - D8 (cập nhật cùng ngày): thêm cột `calendar_id`, `calendar_version` vào họ hợp đồng. Bảng chuyển đổi `closedfig.Convert` + `Increment` + `ClosedFigures.Converted`, kiểm thử đơn vị `closedfig/crosswalk_test.go`. Kiểm thử tích hợp đọc quy đổi kỳ CNTS sang tuần KHTC.

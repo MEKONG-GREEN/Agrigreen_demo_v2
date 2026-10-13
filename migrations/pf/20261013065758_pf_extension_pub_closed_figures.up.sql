@@ -1,5 +1,5 @@
 -- pf_extension_pub: hợp đồng "số liệu đã chốt" thống nhất cho KHTC — nguồn vòng đời báo cáo extension/reportcycle
--- (Trồng trọt — nguồn chính thức, lâu dài) (gói PFPUB, ADR-0052; BRD KN 10/2026 — D4 X6, QĐ-6, Q-047, Q-048). Họ hợp đồng
+-- (Trồng trọt — nguồn chính thức, lâu dài) (gói PFPUB, ADR-0053; BRD KN 10/2026 — D4 X6, QĐ-6, Q-047, Q-048). Họ hợp đồng
 -- closed_figures/v1: CỘT VÀ THỨ TỰ GIỐNG HỆT pf_forms_pub.v1_closed_figures (pf 20261013065757, nguồn kỳ native) —
 -- contracts/pubview/pf_extension_pub.closed_figures.v1.json. Chỉ đụng schema pf_extension_pub (module pf/extension).
 --

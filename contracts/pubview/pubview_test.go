@@ -57,7 +57,7 @@ func TestProblems(t *testing.T) {
 	}
 }
 
-// ADR-0052 (PFPUB): họ hợp đồng closed_figures/v1 — hai view của hai module chủ, cột giống hệt; cả hai published.
+// ADR-0053 (PFPUB): họ hợp đồng closed_figures/v1 — hai view của hai module chủ, cột giống hệt; cả hai published.
 func TestFamilies_PFPUB(t *testing.T) {
 	cs, err := All()
 	if err != nil {
