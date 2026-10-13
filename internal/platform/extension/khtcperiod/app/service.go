@@ -270,13 +270,14 @@ func (s *Service) pickDepartments(ctx context.Context, req, avail []string, load
 		if err != nil {
 			return nil, ErrDependency.WithDetail("Kế hoạch năm lỗi").WithCause(err)
 		}
-		d.PlanDepartments = true
 		for _, code := range pd {
 			if (!loaded || slices.Contains(avail, code)) && code != partyport.DeptKeHoachTaiChinh && !slices.Contains(out, code) {
 				out = append(out, code)
 			}
 		}
-	} else {
+		d.PlanDepartments = len(out) > 0
+	}
+	if len(out) == 0 { // chưa có Kế hoạch năm hiệu lực (hoặc chưa phân phòng phụ trách) → mọi phòng đang áp dụng trừ KHTC
 		out = append(out, avail...)
 	}
 	if len(out) == 0 {
@@ -435,4 +436,24 @@ func (s *Service) Weeks(ctx context.Context, year int) ([]Week, error) {
 		out = append(out, Week{No: no, From: w.From, To: w.To})
 	}
 	return out, nil
+}
+
+// ClosedCutoff là móc của Kế hoạch năm (W11.61 khtc/app.Service.ClosedCutoff, BR-DL-13): ngày chốt của kỳ KHTC đã đóng
+// gần nhất của năm — phiên bản kế hoạch có ngày hiệu lực không sau ngày đó bị chặn. Tenant lấy từ người gọi; nil = chưa
+// có kỳ đóng.
+func (s *Service) ClosedCutoff(ctx context.Context, year int) (*time.Time, error) {
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return nil, problem.Unauthenticated
+	}
+	if s.DB == nil {
+		return nil, nil
+	}
+	var t *time.Time
+	err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		var e error
+		t, e = store.LastClosedCutoff(ctx, tx, year)
+		return e
+	})
+	return t, err
 }

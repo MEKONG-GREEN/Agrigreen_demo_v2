@@ -290,6 +290,10 @@ func TestKHTCPeriod_W1162(t *testing.T) {
 		}
 		c, b = f.khtc(http.MethodPost, "/periods/"+p.ID+"/cancel", me, "", map[string]any{"reason": "Mở nhầm loại báo cáo"})
 		f.fail(c, b, "extension.khtc_period_terminal")
+		// BR-DL-13 (W11.61 móc ClosedCutoff): Kế hoạch năm không được có ngày hiệu lực không sau ngày chốt 13/10 của kỳ đã đóng.
+		c, b = f.do(http.MethodPost, "/v1/kn/khtc/plans/2026/versions", authz.KNTinh, khtcDept, me, "",
+			map[string]any{"base_version": 0, "effective_from": "2026-10-01", "entries": []any{}})
+		f.fail(c, b, "extension.khtc_effective_date_invalid")
 	})
 
 	t.Run("KH2 đóng ngoại lệ khi Trễ hạn ≥ 3 ngày, lý do bắt buộc", func(t *testing.T) {

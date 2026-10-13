@@ -198,3 +198,13 @@ func uuidStrings(xs []uuid.UUID) []string {
 	}
 	return out
 }
+
+// LastClosedCutoff trả ngày chốt muộn nhất của các kỳ KHTC ĐÃ ĐÓNG thuộc năm kế hoạch year (nil nếu chưa có kỳ đóng).
+func LastClosedCutoff(ctx context.Context, tx pgx.Tx, year int) (*time.Time, error) {
+	var t *time.Time
+	err := tx.QueryRow(ctx, `SELECT max(p.cutoff_date) FROM pf_extension.khtc_period p
+	  WHERE p.plan_year = $1
+	    AND EXISTS (SELECT 1 FROM pf_extension.khtc_period_event e WHERE e.tenant_id = p.tenant_id AND e.period_id = p.id
+	                  AND e.action = 'closed')`, year).Scan(&t)
+	return t, err
+}

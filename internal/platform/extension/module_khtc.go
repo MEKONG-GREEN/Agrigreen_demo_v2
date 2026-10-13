@@ -5,6 +5,10 @@ package extension
 // /v1/extension/khtc/* luôn gắn (thiếu cap/forms → 503 extension.dependency_unavailable).
 
 import (
+	"context"
+	"errors"
+	"time"
+
 	"github.com/gin-gonic/gin"
 
 	khtcpapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtcperiod/app"
@@ -37,7 +41,12 @@ func (m *Module) registerKHTCPeriods(rg *gin.RouterGroup) {
 
 func (m *Module) khtcSvc() *khtcpapp.Service {
 	if m.khtcPeriods == nil {
-		m.khtcPeriods = &khtcpapp.Service{DB: m.svc.DB, Clock: m.svc.Clock, Params: m.svc.Params}
+		// W11.61 ↔ W11.62: phòng phụ trách theo Kế hoạch năm hiệu lực (KHTCPlans.PlanAt); Kế hoạch năm chặn ngày hiệu lực
+		// trước ngày chốt của kỳ KHTC đã đóng gần nhất (BR-DL-13).
+		m.khtcPeriods = &khtcpapp.Service{DB: m.svc.DB, Clock: m.svc.Clock, Params: m.svc.Params, Plan: planDepartments{plans: m.KHTCPlans()}}
+		if m.khtc != nil {
+			m.khtc.ClosedCutoff = m.khtcPeriods.ClosedCutoff
+		}
 	}
 	return m.khtcPeriods
 }
@@ -69,3 +78,27 @@ func (m *Module) UseKHTCPlanDepartments(p port.KHTCPlanDepartments) { m.khtcSvc(
 
 // UseKHTCDepartments nối danh mục phòng ban (pf/party) — phòng tham gia mặc định và tên phòng.
 func (m *Module) UseKHTCDepartments(d partyport.Departments) { m.khtcSvc().Departments = d }
+
+// planDepartments cài port.KHTCPlanDepartments trên Kế hoạch năm (W11.61): phòng phụ trách các hạng mục đang theo dõi
+// của phiên bản hiệu lực tại ngày on (BR-DL-13). Chưa có kế hoạch → rỗng (Kỳ KHTC lấy mọi phòng đang áp dụng trừ KHTC).
+type planDepartments struct{ plans port.KHTCPlans }
+
+func (p planDepartments) PlanDepartments(ctx context.Context, year int, on time.Time) ([]string, error) {
+	plan, err := p.plans.PlanAt(ctx, year, on)
+	if errors.Is(err, port.ErrKHTCPlanNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, e := range plan.Entries {
+		if e.Department == "" || e.Tracking == "stopped" || seen[e.Department] {
+			continue
+		}
+		seen[e.Department] = true
+		out = append(out, e.Department)
+	}
+	return out, nil
+}

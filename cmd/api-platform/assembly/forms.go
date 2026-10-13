@@ -83,8 +83,8 @@ func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extens
 	kn.UseFormsFreezer(fm.Freezer())
 	kn.UseFormsPublisher(fm.Publisher())
 	// W11.62: Kỳ KHTC — kỳ native kn_khtc (một phiếu mỗi phòng), tối đa KNKHTCProfile.MaxSubmissions lần gửi (tham số
-	// extension.khtc_max_submissions ghi đè). Bộ quy đổi kỳ nguồn (PFPUB), Kế hoạch năm (W11.61): nối khi gói cài xong
-	// (kn.UseKHTCSourceCrosswalk, kn.UseKHTCPlanDepartments).
+	// extension.khtc_max_submissions ghi đè). Kế hoạch năm (W11.61) nối trong pf/extension; bộ quy đổi kỳ nguồn (PFPUB) nối
+	// khi gói cài xong (kn.UseKHTCSourceCrosswalk).
 	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), MaxSubmissions: KNKHTCProfile.MaxSubmissions})
 	return fm, nil
 }
