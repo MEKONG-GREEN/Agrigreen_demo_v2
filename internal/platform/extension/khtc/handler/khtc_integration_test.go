@@ -177,7 +177,9 @@ func TestFN_AD_04_01_Catalog(t *testing.T) {
 	k := key()
 	r := admin.do(http.MethodPost, "/v1/kn/khtc/catalogs/signer", k, signer)
 	want(t, r, http.StatusCreated, "", "người ký")
-	want(t, admin.do(http.MethodPost, "/v1/kn/khtc/catalogs/signer", k, signer), http.StatusOK, "", "gửi lặp cùng khóa")
+	if r2 := admin.do(http.MethodPost, "/v1/kn/khtc/catalogs/signer", k, signer); r2.status >= 300 || str(r2.body, "version_id") != str(r.body, "version_id") {
+		t.Fatalf("gửi lặp cùng khóa: %s", r2.raw)
+	}
 	other := map[string]any{"code": "pgd", "name": "Phó giám đốc B", "default_for": []string{"mau_2"}, "attrs": map[string]string{"title": "Phó giám đốc"}}
 	want(t, admin.post("/v1/kn/khtc/catalogs/signer", other), http.StatusConflict, "extension.khtc_default_conflict", "hai người ký mặc định")
 	other["default_for"] = []string{"mau_3"}
@@ -295,8 +297,8 @@ func TestFN_TI_02_02_AnnualPlan(t *testing.T) {
 	r := tinh.post("/v1/kn/khtc/plans/2027/versions", bad)
 	want(t, r, http.StatusUnprocessableEntity, "extension.khtc_plan_invalid", "hạng mục thiếu phòng phụ trách")
 
-	k := key()
-	r = tinh.do(http.MethodPost, "/v1/kn/khtc/plans/2027/versions", k, planBody(0, prog1, prog2, nil))
+	k, first := key(), planBody(0, prog1, prog2, nil)
+	r = tinh.do(http.MethodPost, "/v1/kn/khtc/plans/2027/versions", k, first)
 	want(t, r, http.StatusCreated, "", "lập kế hoạch")
 	v1 := r.body["version"].(map[string]any)
 	es := objs(r.body["entries"])
@@ -305,7 +307,9 @@ func TestFN_TI_02_02_AnnualPlan(t *testing.T) {
 		str(es[2], "program_ref") != prog1 || str(es[2], "program_code") != "CT-I" {
 		t.Fatalf("phiên bản 1: %s", r.raw)
 	}
-	want(t, tinh.do(http.MethodPost, "/v1/kn/khtc/plans/2027/versions", k, planBody(0, prog1, prog2, nil)), http.StatusOK, "", "gửi lặp")
+	if r2 := tinh.do(http.MethodPost, "/v1/kn/khtc/plans/2027/versions", k, first); r2.status >= 300 || r2.body["latest_version"].(float64) != 1 {
+		t.Fatalf("gửi lặp: %s", r2.raw)
+	}
 
 	// Điều chỉnh theo QĐ.
 	adj := planBody(1, prog1, prog2, map[string]any{"decision_no": "", "effective_from": "2027-07-01"})
