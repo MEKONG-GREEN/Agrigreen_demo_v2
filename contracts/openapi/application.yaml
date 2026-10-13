@@ -8590,6 +8590,136 @@ paths:
                   items: {type: array, items: {$ref: "#/components/schemas/KHTCSourceHistoryItem"}}
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+  # --- pf/extension phiếu Báo cáo cho KHTC (W11.63 rút gọn — FN-PN-03.01, FN-PN-03.02, FN-TI-02.04, FN-AD-04.02) ---
+  /v1/extension/khtc/form-templates:
+    get:
+      summary: Mẫu phiếu số liệu KHTC nạp sẵn (4 phòng + mẫu chung) — loại cột Cố định / Từ Kế hoạch năm / Lũy kế kỳ trước / Nhập / Công thức
+      operationId: extensionKhtcFormTemplates
+      tags: [extension]
+      responses:
+        "200":
+          description: Mẫu phiếu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [column_kinds, items]
+                properties:
+                  column_kinds: {type: array, items: {type: string}}
+                  items: {type: array, items: {$ref: "#/components/schemas/KHTCFormSheetTemplate"}}
+  /v1/extension/khtc/my-forms:
+    get:
+      summary: Phiếu kỳ này / phiếu đã gửi của một phòng (Cấp Tỉnh của phòng; Phòng KHTC, Admin xem phòng bất kỳ)
+      operationId: extensionKhtcMyForms
+      tags: [extension]
+      parameters:
+        - {name: department, in: query, required: true, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        "200":
+          description: Phiếu (kỳ mới trước; kỳ đã hủy bị gỡ)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KHTCFormTask"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/forms/{dept}:
+    get:
+      summary: Phiếu của phòng trong kỳ KHTC — lưới hạng mục theo Kế hoạch năm, lời văn, kết quả kiểm tra, lịch sử gửi
+      operationId: extensionKhtcForm
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: Kỳ KHTC (sổ W11.62)}
+        - {name: dept, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Phiếu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormSheet"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_form_not_found, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/forms/{dept}/draft:
+    post:
+      summary: Lưu nháp ở máy chủ (không giới hạn; không kiểm bắt buộc)
+      operationId: extensionKhtcFormDraft
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: dept, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KHTCFormSaveInput"}
+      responses:
+        "200":
+          description: Phiếu sau khi lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormSheet"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_form_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_form_locked | forms.submission_conflict", $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/forms/{dept}/submit:
+    post:
+      summary: Gửi KHTC — kiểm 3 quy tắc, niêm phong bảng số liệu, nộp lần n ở cap/forms (tối đa 3 lần, lần 3 tự khóa)
+      operationId: extensionKhtcFormSubmit
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: dept, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KHTCFormSaveInput"}
+      responses:
+        "200":
+          description: Phiếu đã gửi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormSheet"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_form_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_form_locked | forms.submission_conflict | forms.submission_limit | extension.khtc_form_template_outdated", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.khtc_form_invalid (trường issues: kết quả kiểm tra)", $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/forms/{dept}/review:
+    post:
+      summary: Rà soát — Yêu cầu bổ sung (returned, bắt buộc nội dung) hoặc Xác nhận (accepted); Cấp Tỉnh Phòng KHTC, bốn mắt
+      operationId: extensionKhtcFormReview
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: dept, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: {type: string, enum: [returned, accepted]}
+                note: {type: string}
+      responses:
+        "200":
+          description: Phiếu sau rà soát
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormSheet"}
+        "403": {description: "forbidden | self_approval", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_form_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_form_not_reviewable, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   # --- pf/hrm (dom/hrm, W11.21 — ADR-0050): danh mục nhân sự Phòng HCTH (BRD HCTH v3.0 FN-19, UR-ADM-08). Đọc: Admin và Cấp Tỉnh
   # của Phòng Hành chính – Tổng hợp (port.Access ở gốc lắp ráp); ghi: Admin. Mọi bản ghi là phiên bản (sổ chỉ ghi thêm); ngừng sử
   # dụng = phiên bản active=false (BR-01). Số thập phân (hệ số, PCCV, %) là chuỗi. Không dữ liệu cá nhân.
@@ -19053,3 +19183,198 @@ components:
         close_late_days: {type: integer}
         opened_at: {type: string, format: date-time}
         opened_by: {type: string, format: uuid}
+    # --- pf/extension phiếu Báo cáo cho KHTC (W11.63) ---
+    KHTCFormColumn:
+      type: object
+      required: [letter, title, kind, dtype]
+      properties:
+        letter: {type: string}
+        title: {type: string}
+        kind: {type: string, enum: [fixed, from_plan, prior_cumulative, input, formula]}
+        dtype: {type: string, enum: [number, integer, text]}
+        unit: {type: string}
+        source: {type: string}
+        input: {type: string, enum: [done, status, content, people, budget]}
+        formula: {type: string, enum: [adjust, cumulative, percent]}
+        required: {type: boolean}
+        non_negative: {type: boolean}
+        note: {type: string}
+    KHTCFormSection:
+      type: object
+      required: [key, title]
+      properties:
+        key: {type: string}
+        title: {type: string}
+        required: {type: boolean}
+    KHTCFormSheetTemplate:
+      type: object
+      required: [code, version, department, title, requirements, columns, sections]
+      properties:
+        code: {type: string}
+        version: {type: integer}
+        department: {type: string}
+        title: {type: string}
+        requirements: {type: string}
+        columns: {type: array, items: {$ref: "#/components/schemas/KHTCFormColumn"}}
+        sections: {type: array, items: {$ref: "#/components/schemas/KHTCFormSection"}}
+    KHTCFormCell:
+      type: object
+      properties:
+        done: {type: string, description: Thực hiện trong kỳ (số thập phân, không âm)}
+        status: {type: string}
+        content: {type: string}
+        people: {type: string}
+        budget: {type: string}
+    KHTCFormAdjustment:
+      type: object
+      required: [entry_ref, period_id, amount, reason]
+      properties:
+        entry_ref: {type: string}
+        period_id: {type: string, description: Kỳ KHTC tuần đã khóa được điều chỉnh}
+        period_year: {type: integer}
+        period_name: {type: string}
+        amount: {type: string, description: "Dương: phần chưa báo cáo; âm: phần ghi thừa"}
+        reason: {type: string}
+    KHTCFormContent:
+      type: object
+      required: [cells, adjustments, texts]
+      properties:
+        cells: {type: object, additionalProperties: {$ref: "#/components/schemas/KHTCFormCell"}}
+        adjustments: {type: array, items: {$ref: "#/components/schemas/KHTCFormAdjustment"}}
+        texts: {type: object, additionalProperties: {type: string}}
+    KHTCFormSaveInput:
+      type: object
+      required: [sheet, base_attempt]
+      properties:
+        sheet: {$ref: "#/components/schemas/KHTCFormContent"}
+        base_attempt: {type: integer, description: Số lần đã gửi người nhập thấy khi mở phiếu (khóa lạc quan)}
+    KHTCFormIssue:
+      type: object
+      required: [rule, severity, adjustment, message]
+      properties:
+        rule: {type: string, enum: [template, negative_reason, over_plan]}
+        severity: {type: string, enum: [error, warning]}
+        entry_ref: {type: string}
+        letter: {type: string}
+        adjustment: {type: integer, description: "Chỉ số dòng điều chỉnh; -1 = không"}
+        section: {type: string}
+        message: {type: string}
+    KHTCFormRow:
+      type: object
+      required: [entry_ref, "no", code, name, unit, planned_qty, scale_note, module_sourced, source_key, cells, over_plan]
+      properties:
+        entry_ref: {type: string}
+        "no": {type: integer}
+        code: {type: string}
+        name: {type: string}
+        unit: {type: string}
+        planned_qty: {type: [string, "null"]}
+        scale_note: {type: string}
+        module_sourced: {type: boolean, description: "Nguồn module (BR-DL-10) — không có ô nhập"}
+        source_key: {type: string}
+        cells: {type: object, additionalProperties: {type: string}, description: Ô hệ thống theo chữ cái cột}
+        over_plan: {type: boolean}
+    KHTCFormTab:
+      type: object
+      required: [key, label, plan, rows]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        plan: {type: string}
+        rows: {type: array, items: {$ref: "#/components/schemas/KHTCFormRow"}}
+    KHTCFormSheet:
+      type: object
+      required: [period, department, department_name, state, state_label, attempt, limit_reached, can_request_supplement, can_confirm,
+        can_review, editable, overdue, request_note, template, grid, plan_missing, plan, tabs, content, content_source, draft_at, valid,
+        issues, adj_periods, submissions]
+      properties:
+        period:
+          type: object
+          required: [id, name, report_type, year, from_date, to_date, cutoff_date, due_at, max_submissions, terminal]
+          properties:
+            id: {type: string, format: uuid}
+            name: {type: string}
+            report_type: {type: string}
+            year: {type: integer}
+            from_date: {type: string, format: date}
+            to_date: {type: string, format: date}
+            cutoff_date: {type: string, format: date}
+            due_at: {type: string, format: date-time}
+            max_submissions: {type: integer}
+            terminal: {type: string, description: "rỗng | closed | cancelled"}
+        department: {type: string}
+        department_name: {type: string}
+        state: {type: string, enum: [not_started, draft, late, submitted, supplement, confirmed, locked, not_sent, withdrawn, not_available]}
+        state_label: {type: string}
+        attempt: {type: integer}
+        limit_reached: {type: boolean}
+        can_request_supplement: {type: boolean}
+        can_confirm: {type: boolean}
+        can_review: {type: boolean}
+        editable: {type: boolean}
+        overdue: {type: boolean}
+        request_note: {type: string}
+        template: {$ref: "#/components/schemas/KHTCFormSheetTemplate"}
+        grid: {type: boolean, description: "Phiếu tuần có lưới hạng mục (tháng/quý/năm chỉ lời văn — BR-DL-06)"}
+        plan_missing: {type: boolean}
+        plan:
+          oneOf:
+            - {type: "null"}
+            - type: object
+              required: [version, decision_no, effective_from, version_id, decision_date]
+              properties:
+                version: {type: integer}
+                decision_no: {type: string}
+                effective_from: {type: string, format: date}
+                version_id: {type: string, format: uuid}
+                decision_date: {type: [string, "null"], format: date}
+        tabs: {type: array, items: {$ref: "#/components/schemas/KHTCFormTab"}}
+        content: {$ref: "#/components/schemas/KHTCFormContent"}
+        content_source: {type: string, enum: [draft, submitted, empty]}
+        draft_at: {type: [string, "null"], format: date-time}
+        valid: {type: boolean}
+        issues: {type: array, items: {$ref: "#/components/schemas/KHTCFormIssue"}}
+        adj_periods:
+          type: array
+          items:
+            type: object
+            required: [id, name, year]
+            properties:
+              id: {type: string, format: uuid}
+              name: {type: string}
+              year: {type: integer}
+        submissions:
+          type: array
+          items:
+            type: object
+            required: [id, attempt, submitted_at, late, decision, review_note, reviewed_at]
+            properties:
+              id: {type: string, format: uuid}
+              attempt: {type: integer}
+              submitted_at: {type: string, format: date-time}
+              late: {type: boolean}
+              decision: {type: string}
+              review_note: {type: string}
+              reviewed_at: {type: [string, "null"], format: date-time}
+    KHTCFormTask:
+      type: object
+      required: [period_id, name, report_type, year, from_date, to_date, due_at, overdue, state, state_label, attempt, max_submissions,
+        limit_reached, request_note, last_submitted_at, late, actionable]
+      properties:
+        period_id: {type: string, format: uuid}
+        name: {type: string}
+        report_type: {type: string}
+        year: {type: integer}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        due_at: {type: string, format: date-time}
+        overdue: {type: boolean}
+        state: {type: string, enum: [not_started, draft, late, submitted, supplement, confirmed, locked, not_sent, withdrawn, not_available]}
+        state_label: {type: string}
+        attempt: {type: integer}
+        max_submissions: {type: integer}
+        limit_reached: {type: boolean}
+        request_note: {type: string}
+        last_submitted_at: {type: [string, "null"], format: date-time}
+        late: {type: boolean}
+        actionable: {type: boolean, description: "Cần xử lý: Chưa nhập, Lưu nháp (nút Tiếp tục), Trễ hạn, Yêu cầu bổ sung"}
