@@ -1,6 +1,6 @@
 package app
 
-// Báo cáo giá từ bảng giá ĐÃ DUYỆT (W11.77, pf 20261013133657; BRD Báo giá nông sản v1.3 FN-TW-01.01 Bảng giá tổng hợp,
+// Báo cáo giá từ bảng giá ĐÃ DUYỆT (W11.77, pf 20261013164235; BRD Báo giá nông sản v1.3 FN-TW-01.01 Bảng giá tổng hợp,
 // FN-TW-01.02 Báo cáo tăng giảm / biến động, FN-TW-01.03 Dashboard theo vùng; Mục II.4 CT-04). Mọi số liệu lấy qua
 // port.Boards (Published / PublishedBetween — phiên bản đã duyệt hiện hành của mỗi ngày, ảnh chụp lúc duyệt); không đọc
 // phiếu chưa duyệt. Ngày đang mở duyệt vẫn hiện phiên bản cũ, nhãn "Đang cập nhật" (AC-03 FN-TW-01.01).
@@ -58,7 +58,7 @@ func reopenedView(b domain.Board, now time.Time) bool {
 	return view == domain.BoardReopened || (view == domain.BoardApproving && b.BaseStatus == domain.BoardReopened)
 }
 
-// rebuildPoints dựng giá theo xã của phiên bản duyệt trước pf 20261013133657 (chưa có ảnh chụp board_point) từ phiếu:
+// rebuildPoints dựng giá theo xã của phiên bản duyệt trước pf 20261013164235 (chưa có ảnh chụp board_point) từ phiếu:
 // chỉ khi ngày KHÔNG mở duyệt — bảng giá Đã duyệt chặn mọi sửa phiếu nên số liệu hiện tại = số liệu lúc duyệt.
 func (s *TicketService) rebuildPoints(ctx context.Context, tx pgx.Tx, prof port.Profile, day time.Time, b domain.Board,
 	now time.Time) ([]port.BoardPointLine, error) {

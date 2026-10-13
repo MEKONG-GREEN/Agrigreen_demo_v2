@@ -23,7 +23,7 @@
 // (CT-04) + phiếu của mỗi phiên bản, khóa tuần lưu lúc duyệt, sự kiện pf.price.board.published, port.Boards, view
 // pf_price_pub.v1_board_daily / v1_ticket_week; New nối TicketHooks.Board/Approved (giá tham chiếu chỉ từ ngày đã duyệt).
 //
-// W11.77 (pf 20261013133657): báo cáo giá — Tiến độ nhập giá, Bảng giá tổng hợp, Biến động giá, Dashboard theo vùng,
+// W11.77 (pf 20261013164235): báo cáo giá — Tiến độ nhập giá, Bảng giá tổng hợp, Biến động giá, Dashboard theo vùng,
 // Thống kê phiếu theo cán bộ Xã + khóa tháng (Q-085); ảnh chụp giá theo xã của mỗi phiên bản đã duyệt (port.Boards
 // PointLines, PublishedBetween); sự kiện pf.price.ticket.proxied (nhập thay → cán bộ Xã); xuất qua điểm kiểm soát xuất
 // (UseEgress).

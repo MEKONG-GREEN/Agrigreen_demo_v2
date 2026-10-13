@@ -121,6 +121,10 @@ var implementedMenu = map[string]bool{
 	"tinh.hcth.ho_so": true, "admin.pb.hcth_phan_quyen": true, // W11.22
 	"tinh.khtc.ke_hoach_nam": true, "admin.pb.khtc_ke_hoach": true, "admin.pb.khtc_danh_muc": true, // W11.61
 	"tinh.khtc.ky_bao_cao": true, // W11.62
+	// W11.77 báo cáo giá
+	"tw.bao_gia.bang_gia": true, "tw.bao_gia.dashboard": true, "tw.bao_gia.bien_dong": true,
+	"tinh.bao_gia.tien_do": true, "tinh.bao_gia.bang_gia": true, "tinh.bao_gia.bien_dong": true, "tinh.bao_gia.dashboard": true,
+	"tinh.bao_gia.thong_ke": true, "xa.bao_gia.bang_gia": true, "xa.bao_gia.bien_dong": true,
 }
 
 // W11.06 (kn.menu/v3, D3 C6, D4 X2): khuôn theo phòng ban — nhóm "Nghiệp vụ" sau "Điều hành", nhóm

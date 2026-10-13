@@ -29,7 +29,7 @@ const (
 	// KindPriceBoardReopened: bảng giá ngày đang mở duyệt → Cấp Tỉnh + QTNV (FN-TI-02.06).
 	KindPriceBoardReopened = "price_board_reopened"
 	// KindPriceProxyEntry: Cấp Tỉnh nhập thay báo giá Nộp muộn → cán bộ Xã phụ trách (FN-TI-02.09; W11.77, pf
-	// 20261013133703).
+	// 20261013164236).
 	KindPriceProxyEntry = "price_proxy_entry"
 )
 

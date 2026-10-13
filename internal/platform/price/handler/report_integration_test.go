@@ -25,7 +25,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// Báo cáo giá W11.77 (pf 20261013133657; BRD Báo giá v1.3) qua HTTP, một kịch bản hai ngày báo giá 08/10 và 09/10/2026, ba
+// Báo cáo giá W11.77 (pf 20261013164235; BRD Báo giá v1.3) qua HTTP, một kịch bản hai ngày báo giá 08/10 và 09/10/2026, ba
 // xã (hai xã nhóm vùng An Giang, một xã Kiên Giang):
 //   - BG-FN-TI-02.01 Tiến độ nhập giá: thẻ khớp bảng sau lọc (AC-02), "Hệ thống đã nhắc" từ nhật ký job (AC-03), Bản nháp
 //     11:59 → Không nộp sau 12:00 (AC-04), nhập thay hiện Nộp muộn (FN-TI-02.09 AC-01), xuất Excel;

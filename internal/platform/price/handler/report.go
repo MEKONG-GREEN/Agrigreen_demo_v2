@@ -1,6 +1,6 @@
 package handler
 
-// HTTP báo cáo giá (W11.77, pf 20261013133657; BRD Báo giá v1.3 FN-TI-02.01, FN-TI-02.08, FN-TW-01.01…03) — Application
+// HTTP báo cáo giá (W11.77, pf 20261013164235; BRD Báo giá v1.3 FN-TI-02.01, FN-TI-02.08, FN-TW-01.01…03) — Application
 // API /v1/price/reports/*. Hợp đồng ở contracts/openapi/application.yaml, mục pf/price W11.77. Giá, % là chuỗi decimal.
 
 import (

@@ -1,6 +1,6 @@
 package store
 
-// SQL của báo cáo giá (W11.77, pf 20261013133657): dòng giá theo xã của phiên bản đã duyệt (board_point), đọc bảng giá
+// SQL của báo cáo giá (W11.77, pf 20261013164235): dòng giá theo xã của phiên bản đã duyệt (board_point), đọc bảng giá
 // đã duyệt theo khoảng ngày, khóa tháng thống kê phiếu (stat_month, stat_month_line). Giá qua text ↔ decimal (không float
 // — R-CODE-01).
 

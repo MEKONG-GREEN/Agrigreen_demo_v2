@@ -139,7 +139,7 @@ func TallyStats(days []StatDay) []StatRow {
 	return out
 }
 
-// Trạng thái khóa tháng của thống kê phiếu (Q-085, pf 20261013133657).
+// Trạng thái khóa tháng của thống kê phiếu (Q-085, pf 20261013164235).
 const (
 	StatMonthClose   = "close"
 	StatMonthReopen  = "reopen"
