@@ -71,6 +71,9 @@ type Service struct {
 	Dispatches  extensionsrc.DispatchHistory // pf/reports: kỳ đã gửi Chi cục (tùy chọn)
 	Freezer     formsport.Freezer            // W6.2 cap/forms: ghi song song chốt/mở lại + ảnh chụp (tùy chọn)
 	FormsNative formsport.Publisher          // W11.42 cap/forms: cài biểu, phát hành lô kỳ native (biểu kỳ CNTS)
+	// W11.44: số liệu kỳ native theo lô (tổng hợp BM-02, BM-18) và danh mục cơ sở giết mổ (tên, mộc dấu — tùy chọn).
+	FormsFigures   formsport.FiguresReader
+	CNTSFacilities CNTSFacilityCatalog
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

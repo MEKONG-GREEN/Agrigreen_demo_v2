@@ -229,6 +229,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
+	kn.UseCNTSFacilities(md.CNTSCatalogs())  // W11.44: tên, mộc dấu cơ sở giết mổ của bảng BM-02
 	kn.UseKHTCDepartments(pty.Departments()) // W11.62: phòng tham gia mặc định + tên phòng của Kỳ KHTC
 	snc := syncmod.New(unit, clk, syncmod.Deps{
 		Scope: pty.ScopeResolver(), Params: md.Params(), Vault: ext.Vault,

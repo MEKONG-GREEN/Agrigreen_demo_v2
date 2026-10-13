@@ -82,6 +82,7 @@ func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extens
 	}
 	kn.UseFormsFreezer(fm.Freezer())
 	kn.UseFormsPublisher(fm.Publisher())
+	kn.UseFormsFigures(fm.Figures()) // W11.44: tổng hợp CNTS BM-02, BM-18 đọc số liệu kỳ native theo lô
 	// W11.62: Kỳ KHTC — kỳ native kn_khtc (một phiếu mỗi phòng), tối đa KNKHTCProfile.MaxSubmissions lần gửi (tham số
 	// extension.khtc_max_submissions ghi đè). Kế hoạch năm (W11.61) nối trong pf/extension; bộ quy đổi kỳ nguồn (PFPUB) nối
 	// ngay dưới.

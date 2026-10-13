@@ -47,6 +47,12 @@ func (m *Module) UseFormsFreezer(f formsport.Freezer) { m.rc.Freezer = f }
 // UseFormsPublisher (W11.42) nối cổng phát hành kỳ native cap/forms cho biểu kỳ Cấp Xã CNTS (BM-01/04/05/17).
 func (m *Module) UseFormsPublisher(p formsport.Publisher) { m.rc.FormsNative = p }
 
+// UseFormsFigures (W11.44) nối cổng đọc số liệu kỳ native theo lô cho tổng hợp CNTS (BM-02, BM-18). Nil → 503.
+func (m *Module) UseFormsFigures(f formsport.FiguresReader) { m.rc.FormsFigures = f }
+
+// UseCNTSFacilities (W11.44) nối danh mục cơ sở giết mổ (pf/masterdata CNTSCatalogs) cho tên, mộc dấu của BM-02 (tùy chọn).
+func (m *Module) UseCNTSFacilities(c rcapp.CNTSFacilityCatalog) { m.rc.CNTSFacilities = c }
+
 // CNTSValidator (W11.42) là quy tắc chặn của biểu kỳ CNTS cho profile kn_cnts của cap/forms.
 func (m *Module) CNTSValidator() formsport.Validator { return rcapp.CNTSValidator{} }
 
