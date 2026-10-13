@@ -25,7 +25,8 @@ func TestW1106_MenuViewComingSoonAndAlias(t *testing.T) {
 	if it.Enabled || it.Status != domain.ItemComingSoon || it.StatusLabel != "Sắp có" {
 		t.Fatalf("mục Sắp có: %+v", it)
 	}
-	if last := v.Groups[len(v.Groups)-1]; last.Key != domain.GroupDungChung || last.Items[0].Enabled {
+	// W11.23: Contact (pf/contact) đã mở — mục thường của nhóm "Dùng chung".
+	if last := v.Groups[len(v.Groups)-1]; last.Key != domain.GroupDungChung || !last.Items[0].Enabled || last.Items[0].Status != "" {
 		t.Fatalf("Dùng chung: %+v", last)
 	}
 	// Mục đang chạy của khung chung vẫn bấm được.
