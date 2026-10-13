@@ -1,4 +1,4 @@
-// Package store: SQL Danh mục KHTC, danh sách CT/DA, Kế hoạch năm (pf_extension.khtc_*, migration pf 000161) trên pool
+// Package store: SQL Danh mục KHTC, danh sách CT/DA, Kế hoạch năm (pf_extension.khtc_*, migration pf 20261013070305) trên pool
 // vai extension_app, luôn trong giao dịch có ngữ cảnh tenant (RLS). Ba sổ chỉ ghi thêm (shared.apply_ledger: DB tính seq,
 // prev_hash, row_hash, chống trùng idem_key); khtc_plan_entry chỉ ghi thêm (shared.apply_append_only).
 package store
