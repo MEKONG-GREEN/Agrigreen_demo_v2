@@ -26,7 +26,7 @@ export type KhtcCatalogList = { counts: { kind: KhtcCatalogKind; label: string; 
 
 export const KHTC_DEPT = "ke_hoach_tai_chinh";
 
-export const CATALOG_KINDS: KhtcCatalogKind[] = ["report_type", "unit", "field", "funding_source", "signer", "recipient", "basis", "price_item"];
+export const CATALOG_KINDS: KhtcCatalogKind[] = ["report_type", "unit", "field", "funding_source", "signer", "recipient", "basis"];
 export const KIND_LABEL: Record<KhtcCatalogKind, string> = {
   report_type: "Loại báo cáo",
   unit: "Đơn vị tính",
@@ -35,17 +35,12 @@ export const KIND_LABEL: Record<KhtcCatalogKind, string> = {
   signer: "Người ký",
   recipient: "Nơi nhận",
   basis: "Căn cứ",
-  price_item: "Mặt hàng giá cả",
 };
 /** Thuộc tính theo loại (nhãn). */
 export const KIND_ATTRS: Partial<Record<KhtcCatalogKind, { key: string; label: string; required?: boolean }[]>> = {
   signer: [
     { key: "title", label: "Chức vụ", required: true },
     { key: "authority", label: "Thẩm quyền ký" },
-  ],
-  price_item: [
-    { key: "group", label: "Nhóm hàng" },
-    { key: "unit", label: "ĐVT", required: true },
   ],
   unit: [{ key: "symbol", label: "Ký hiệu" }],
   basis: [

@@ -29,16 +29,15 @@ const (
 	KindSigner        = "signer"         // Người ký (họ tên, chức vụ, thẩm quyền ký, mặc định cho mẫu)
 	KindRecipient     = "recipient"      // Nơi nhận (mặc định cho mẫu)
 	KindBasis         = "basis"          // Căn cứ (mặc định cho mẫu)
-	KindPriceItem     = "price_item"     // Mặt hàng giá cả (nhóm hàng, mặt hàng, ĐVT)
 )
 
 // CatalogKinds theo thứ tự cột trái màn Danh mục KHTC.
-var CatalogKinds = []string{KindReportType, KindUnit, KindField, KindFundingSource, KindSigner, KindRecipient, KindBasis, KindPriceItem}
+var CatalogKinds = []string{KindReportType, KindUnit, KindField, KindFundingSource, KindSigner, KindRecipient, KindBasis}
 
 // KindLabel là nhãn tiếng Việt của loại danh mục.
 var KindLabel = map[string]string{
 	KindReportType: "Loại báo cáo", KindUnit: "Đơn vị tính", KindField: "Lĩnh vực", KindFundingSource: "Nguồn kinh phí",
-	KindSigner: "Người ký", KindRecipient: "Nơi nhận", KindBasis: "Căn cứ", KindPriceItem: "Mặt hàng giá cả",
+	KindSigner: "Người ký", KindRecipient: "Nơi nhận", KindBasis: "Căn cứ",
 }
 
 // Templates là 5 mẫu báo cáo KHTC (Mẫu 1 tuần, 2 tháng, 3 quý/6/9 tháng, 4 năm, 5 tiến độ các CT).
@@ -161,7 +160,6 @@ type CatalogItem struct {
 // attrKeys: thuộc tính cho phép theo loại.
 var attrKeys = map[string][]string{
 	KindSigner:    {"title", "authority"},  // chức vụ, thẩm quyền ký (vd "KT. GIÁM ĐỐC")
-	KindPriceItem: {"group", "unit"},       // nhóm hàng, ĐVT
 	KindUnit:      {"symbol"},              // ký hiệu (ha, con, tấn …)
 	KindBasis:     {"document_no", "date"}, // số văn bản, ngày
 	KindRecipient: {"address"},
@@ -222,9 +220,6 @@ func NormalizeCatalog(c *CatalogItem) Errors {
 			continue
 		}
 		attrs[k] = v
-	}
-	if c.Kind == KindPriceItem && attrs["unit"] == "" {
-		es.add("attrs.unit", "mặt hàng giá cả bắt buộc ĐVT")
 	}
 	if c.Kind == KindSigner && attrs["title"] == "" {
 		es.add("attrs.title", "người ký bắt buộc chức vụ")

@@ -1,6 +1,6 @@
 "use client";
 
-// FN-AD-04.01 — Danh mục KHTC (BRD KHTC v2.2; W11.61, pf/extension). Cột trái: 8 loại danh mục kèm số lượng; bảng mục
+// FN-AD-04.01 — Danh mục KHTC (BRD KHTC v2.2; W11.61, pf/extension). Cột trái: 7 loại danh mục kèm số lượng; bảng mục
 // của loại đang chọn; Admin thêm, sửa, ngừng dùng/dùng lại (mục đã dùng không xóa), chọn mẫu áp dụng mặc định (người
 // ký, nơi nhận, căn cứ — một mẫu chỉ một người ký mặc định đang dùng). Cấp Tỉnh chỉ xem. Nhập Excel danh mục: hoãn.
 import { useState } from "react";
@@ -53,7 +53,7 @@ export function KhtcCatalogScreen() {
           ) : null
         }
       >
-        Loại báo cáo, ĐVT, lĩnh vực, nguồn kinh phí, người ký, nơi nhận, căn cứ, mặt hàng giá cả. Đổi mặc định chỉ áp dụng cho bản soạn mới.
+        Loại báo cáo, ĐVT, lĩnh vực, nguồn kinh phí, người ký, nơi nhận, căn cứ (mặt hàng giá cả quản lý ở Báo giá). Đổi mặc định chỉ áp dụng cho bản soạn mới.
       </PageHeader>
       {!rights.catalog ? <ReadOnlyNotice>Chỉ xem — Admin quản lý Danh mục KHTC.</ReadOnlyNotice> : null}
       {act.problem ? <ProblemAlert problem={act.problem} /> : null}

@@ -200,7 +200,7 @@ func TestFN_AD_04_01_Catalog(t *testing.T) {
 		t.Fatalf("mục đã ngừng vẫn hiện: %s", r.raw)
 	}
 	counts := objs(r.body["counts"])
-	if len(counts) != 8 || str(counts[1], "kind") != "unit" || counts[1]["total"].(json.Number).String() != "1" || counts[4]["active"].(json.Number).String() != "2" {
+	if len(counts) != 7 || str(counts[1], "kind") != "unit" || counts[1]["total"].(json.Number).String() != "1" || counts[4]["active"].(json.Number).String() != "2" {
 		t.Fatalf("số lượng: %s", r.raw)
 	}
 	r = tinh.get("/v1/kn/khtc/catalogs/unit/ha/history")

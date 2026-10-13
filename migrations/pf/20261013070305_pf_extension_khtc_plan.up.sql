@@ -2,7 +2,8 @@
 -- DANH MỤC KHTC + DANH SÁCH CHƯƠNG TRÌNH/DỰ ÁN (CT/DA) + KẾ HOẠCH NĂM có phiên bản theo quyết định (QĐ).
 --
 -- 1. khtc_catalog_item — sổ chỉ ghi thêm (shared.apply_ledger): Danh mục KHTC FN-AD-04.01 — loại báo cáo, ĐVT, lĩnh vực,
---    nguồn kinh phí, người ký, nơi nhận, căn cứ, mặt hàng giá cả. Mỗi dòng là MỘT phiên bản của (kind, code) — chuỗi
+--    nguồn kinh phí, người ký, nơi nhận, căn cứ. Mặt hàng giá cả KHÔNG ở đây —
+--    một danh mục ở `cap/price` (Q-082 đề xuất của dev), KHTC đọc. Mỗi dòng là MỘT phiên bản của (kind, code) — chuỗi
 --    '<kind>:<code>', version = seq; bản mới nhất là hiện hành. "Ngừng dùng" = phiên bản status 'retired' (mục đã dùng
 --    không xóa). default_for = các mẫu báo cáo (mau_1…mau_5) nhận mục này làm mặc định (người ký, nơi nhận, căn cứ).
 --    Thuộc tính riêng của loại (chức vụ, thẩm quyền ký của người ký; nhóm hàng, ĐVT của mặt hàng) ở attrs.
@@ -26,7 +27,7 @@ CREATE TABLE pf_extension.khtc_catalog_item (
   stream_key        text        NOT NULL,                 -- '<kind>:<code>'
   seq               bigint      NOT NULL,                 -- = số phiên bản
   kind              text        NOT NULL CHECK (kind IN ('report_type', 'unit', 'field', 'funding_source', 'signer',
-                                  'recipient', 'basis', 'price_item')),
+                                  'recipient', 'basis')),
   code              text        NOT NULL CHECK (code ~ '^[a-z0-9][a-z0-9._-]{0,39}$'),
   name              text        NOT NULL CHECK (char_length(name) BETWEEN 1 AND 500),
   sort_order        integer     NOT NULL CHECK (sort_order BETWEEN 0 AND 100000),

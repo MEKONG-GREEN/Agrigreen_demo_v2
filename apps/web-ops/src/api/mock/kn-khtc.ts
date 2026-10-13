@@ -19,7 +19,7 @@ type Entry = S["KhtcPlanEntry"];
 type Version = S["KhtcPlanVersion"];
 type EntryIn = S["KhtcPlanEntryInput"];
 
-const KINDS = ["report_type", "unit", "field", "funding_source", "signer", "recipient", "basis", "price_item"] as const;
+const KINDS = ["report_type", "unit", "field", "funding_source", "signer", "recipient", "basis"] as const;
 const LABEL: Record<string, string> = {
   report_type: "Loại báo cáo",
   unit: "Đơn vị tính",
@@ -28,7 +28,6 @@ const LABEL: Record<string, string> = {
   signer: "Người ký",
   recipient: "Nơi nhận",
   basis: "Căn cứ",
-  price_item: "Mặt hàng giá cả",
 };
 const KHTC = "ke_hoach_tai_chinh";
 const ACTOR = { ref: "01990000-0000-7000-8000-00000000a001", display: "Cán bộ KHTC (giả lập)" };

@@ -123,7 +123,7 @@ func TestEntriesHashStable(t *testing.T) {
 	}
 }
 
-// FN-AD-04.01: mặc định cho mẫu chỉ với người ký/nơi nhận/căn cứ; người ký bắt buộc chức vụ; mặt hàng bắt buộc ĐVT.
+// FN-AD-04.01: mặc định cho mẫu chỉ với người ký/nơi nhận/căn cứ; người ký bắt buộc chức vụ.
 func TestFN_AD_04_01_NormalizeCatalog(t *testing.T) {
 	ok := CatalogItem{Kind: KindSigner, Code: " GD ", Name: "Nguyễn Văn A", DefaultFor: []string{"mau_2", "mau_1", "mau_1"},
 		Attrs: map[string]string{"title": "Giám đốc"}}
@@ -134,8 +134,8 @@ func TestFN_AD_04_01_NormalizeCatalog(t *testing.T) {
 	if es := NormalizeCatalog(&bad); len(es) != 1 {
 		t.Fatalf("ĐVT có mặc định cho mẫu: %v", es)
 	}
-	pi := CatalogItem{Kind: KindPriceItem, Code: "lua", Name: "Lúa"}
-	if es := NormalizeCatalog(&pi); len(es) != 1 || es[0].Field != "attrs.unit" {
-		t.Fatalf("mặt hàng thiếu ĐVT: %v", es)
+	sg := CatalogItem{Kind: KindSigner, Code: "pgd", Name: "B"}
+	if es := NormalizeCatalog(&sg); len(es) != 1 || es[0].Field != "attrs.title" {
+		t.Fatalf("người ký thiếu chức vụ: %v", es)
 	}
 }

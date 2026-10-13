@@ -116,9 +116,9 @@ describe("màn hình", () => {
     expect(screen.getAllByRole("tab")).toHaveLength(6);
     expect(screen.getByRole("button", { name: "Điều chỉnh theo QĐ" })).toBeTruthy();
   });
-  it("Danh mục KHTC hiện 8 loại", async () => {
+  it("Danh mục KHTC hiện 7 loại", async () => {
     render(<KhtcCatalogScreen />);
     await waitFor(() => expect(screen.getByText("Héc ta")).toBeTruthy());
-    expect(screen.getAllByRole("tab")).toHaveLength(8);
+    expect(screen.getAllByRole("tab")).toHaveLength(7);
   });
 });

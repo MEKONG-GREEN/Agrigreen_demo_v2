@@ -14112,8 +14112,11 @@ export interface components {
             blockers: string[];
             reopen_days: number;
         };
-        /** @enum {string} */
-        KhtcCatalogKind: "report_type" | "unit" | "field" | "funding_source" | "signer" | "recipient" | "basis" | "price_item";
+        /**
+         * @description Mặt hàng giá cả ở cap/price (Q-082)
+         * @enum {string}
+         */
+        KhtcCatalogKind: "report_type" | "unit" | "field" | "funding_source" | "signer" | "recipient" | "basis";
         KhtcActor: {
             /** Format: uuid */
             ref: string;
@@ -14128,7 +14131,7 @@ export interface components {
             active?: boolean;
             /** @description mau_1…mau_5 — chỉ người ký, nơi nhận, căn cứ */
             default_for?: string[];
-            /** @description signer: title, authority; price_item: group, unit; unit: symbol; basis: document_no, date; recipient: address */
+            /** @description signer: title, authority; unit: symbol; basis: document_no, date; recipient: address */
             attrs?: {
                 [key: string]: string;
             };

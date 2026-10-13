@@ -16207,7 +16207,7 @@ components:
         blockers: {type: array, items: {type: string}, description: Lý do chưa duyệt được}
         reopen_days: {type: integer}
     # --- W11.61: Danh mục KHTC, CT/DA, Kế hoạch năm ---
-    KhtcCatalogKind: {type: string, enum: [report_type, unit, field, funding_source, signer, recipient, basis, price_item]}
+    KhtcCatalogKind: {type: string, enum: [report_type, unit, field, funding_source, signer, recipient, basis], description: "Mặt hàng giá cả ở cap/price (Q-082)"}
     KhtcActor:
       type: object
       required: [ref, display]
@@ -16223,7 +16223,7 @@ components:
         sort_order: {type: integer, minimum: 0}
         active: {type: boolean, description: "false = ngừng dùng"}
         default_for: {type: array, items: {type: string}, description: "mau_1…mau_5 — chỉ người ký, nơi nhận, căn cứ"}
-        attrs: {type: object, additionalProperties: {type: string}, description: "signer: title, authority; price_item: group, unit; unit: symbol; basis: document_no, date; recipient: address"}
+        attrs: {type: object, additionalProperties: {type: string}, description: "signer: title, authority; unit: symbol; basis: document_no, date; recipient: address"}
     KhtcCatalogItem:
       type: object
       required: [kind, code, name, sort_order, active, default_for, attrs, version, version_id, recorded_at, actor]
