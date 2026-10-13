@@ -80,6 +80,8 @@ type Module struct {
 	htx port.HTXConfirmations
 	// W11.49 (D4 CN9): Báo cáo dịch bệnh BM-10, báo nghi dịch (extension/outbreak).
 	ob *obapp.Service
+	// W11.64: bộ đọc nguồn module của Kỳ KHTC (extension/khtcsource, module_khtcsource.go).
+	khtcSrc *khtcSourceService
 }
 
 // New tạo module với pool của vai extension_app.
@@ -140,6 +142,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	khtchandler.Handler{Svc: m.khtc}.RegisterApp(rg)
 	m.registerKHTCPeriods(rg) // W11.62
 	obhandler.Handler{Svc: m.ob}.RegisterApp(rg)
+	m.registerKHTCSources(rg) // W11.64
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham

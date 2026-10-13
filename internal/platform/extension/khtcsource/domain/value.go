@@ -84,7 +84,9 @@ type Value struct {
 // Provisional: số "Tạm tính" (BR-DL-03) — nguồn chưa chốt hoặc chưa công bố.
 func (v Value) Provisional() bool { return !v.Closed || v.Unavailable }
 
-func dayOnly(t time.Time) time.Time { return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC) }
+func dayOnly(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+}
 
 func dec(s string) (decimal.Decimal, bool) {
 	d, err := decimal.NewFromString(strings.TrimSpace(s))
