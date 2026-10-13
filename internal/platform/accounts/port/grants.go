@@ -41,7 +41,7 @@ var ManagedRoles = []string{
 	"content_editor_national", "content_editor_province", "content_reviewer",
 	"mrv_collector", "mrv_reviewer", "mrv_viewer", "mrv_exporter",
 	"device_admin", "sync_conflict_resolver",
-	"vault_registrar", "vault_display", "vault_evidence_viewer", "vault_eraser", "vault_pubkey_sync",
+	"vault_registrar", "vault_display", "vault_directory", "vault_evidence_viewer", "vault_eraser", "vault_pubkey_sync",
 }
 
 // MFARoles là vai đánh dấu [MFA] trong realm: người giữ vai phải cấu hình TOTP

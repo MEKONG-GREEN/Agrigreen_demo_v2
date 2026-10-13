@@ -419,3 +419,58 @@ func (f *Fake) GetSection(ctx context.Context, purpose client.Purpose, ref uuid.
 	}
 	return out, nil
 }
+
+var _ client.Directory = (*Fake)(nil)
+
+// Cards thực hiện client.Directory (W11.23): bám kho thật — chỉ trường được hỏi; năm sinh/email lấy ngăn contact.card
+// trước, rồi ngăn hrm.profile (năm của ngày sinh); ref lạ bị bỏ qua; ghi một Access "card" mỗi chủ thể.
+func (f *Fake) Cards(ctx context.Context, purpose client.Purpose, refs []uuid.UUID, fields []string) ([]client.Card, error) {
+	tid, actor, err := f.start(ctx, domain.OpCard, purpose, true)
+	if err != nil {
+		return nil, err
+	}
+	if !domain.AllowedPurpose(domain.OpCard, string(purpose)) {
+		return nil, problem.Validation.WithField("purpose", "không thuộc danh mục mục đích của thao tác card")
+	}
+	if !domain.ValidCardFields(fields) || len(refs) > client.MaxCardRefs {
+		return nil, problem.Validation.WithField("fields", "trường thẻ không hợp lệ")
+	}
+	want := map[string]bool{}
+	for _, x := range fields {
+		want[x] = true
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]client.Card, 0, len(refs))
+	for _, ref := range refs {
+		s, ok := f.subjects[ref]
+		if !ok || s.tenant != tid {
+			continue
+		}
+		f.record(domain.OpCard, purpose, ref, actor)
+		c := client.Card{Ref: ref, Erased: s.erased}
+		if s.erased {
+			out = append(out, c)
+			continue
+		}
+		cc, hp := s.sections[domain.SectionContactCard], s.sections[domain.SectionHRMProfile]
+		if want[domain.CardFullName] {
+			c.FullName = s.id.FullName
+		}
+		if want[domain.CardPhone] {
+			c.Phone = s.id.Phone
+		}
+		if want[domain.CardBirthYear] {
+			if c.BirthYear = cc["birth_year"]; c.BirthYear == "" {
+				c.BirthYear = domain.BirthYear(hp["birth_date"])
+			}
+		}
+		if want[domain.CardEmail] {
+			if c.Email = cc["email"]; c.Email == "" {
+				c.Email = hp["email"]
+			}
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}

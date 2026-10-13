@@ -72,3 +72,6 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 
 // RegisterAdmin: không có route Admin API.
 func (m *Module) RegisterAdmin(*gin.RouterGroup) {}
+
+// Directory cho pf/contact (W11.23): cán bộ thuộc tỉnh — mã tham chiếu kho, đơn vị, chức vụ; tôn trọng AG_HRM_RECORDS.
+func (m *Module) Directory() port.Directory { return m.svc }

@@ -14,16 +14,35 @@ import (
 
 var _ mdport.StaffNames = (*Service)(nil)
 
-// DisplayNames thực hiện port.StaffNames: tên hiển thị của cán bộ trong danh
-// bạ theo actor_ref (kể cả cán bộ đã ngừng hoạt động). Tenant lấy từ context.
+// DisplayNames thực hiện port.StaffNames: tên hiển thị của cán bộ theo actor_ref (kể cả cán bộ đã ngừng hoạt động).
+// Tenant lấy từ context. W11.23 (Q-072): Contact dùng chung (ContactNames) trước — lỗi của Contact không chặn (dùng dự
+// phòng); tài khoản Contact không biết mới đọc danh bạ trực pf_extension.staff.
 func (s *Service) DisplayNames(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID]string, error) {
 	out := map[uuid.UUID]string{}
 	if len(refs) == 0 {
 		return out, nil
 	}
+	missing := refs
+	if s.ContactNames != nil {
+		if m, err := s.ContactNames.DisplayNames(ctx, refs); err == nil && len(m) > 0 {
+			missing = make([]uuid.UUID, 0, len(refs))
+			for _, r := range refs {
+				if n, ok := m[r]; ok {
+					out[r] = n
+				} else {
+					missing = append(missing, r)
+				}
+			}
+		}
+	}
+	if len(missing) == 0 {
+		return out, nil
+	}
 	err := tenant.FromCtxTx(ctx, s.DB, func(tx pgx.Tx) error {
-		var e error
-		out, e = store.StaffNames(ctx, tx, refs)
+		m, e := store.StaffNames(ctx, tx, missing)
+		for k, v := range m {
+			out[k] = v
+		}
 		return e
 	})
 	return out, err

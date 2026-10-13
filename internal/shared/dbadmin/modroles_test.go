@@ -103,8 +103,8 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	groups := ModuleGroups()
 	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + pf/evidence + pf/cooperative (W3.3) + pf/price (W11.71) + pf/hrm (W11.21)
 	// + 7 mkg có vai cũ + mkg/engine (W8.2, không vai cũ) + vault/identity; pf/extdata không schema.
-	if len(groups) != 33 || len(legacyGroups()) != 25 {
-		t.Errorf("số vai nhóm: %d (muốn 33, 25 có vai cũ): %v", len(groups), groups)
+	if len(groups) != 34 || len(legacyGroups()) != 25 {
+		t.Errorf("số vai nhóm: %d (muốn 34 — thêm pf/contact W11.23, 25 có vai cũ): %v", len(groups), groups)
 	}
 	if slices.ContainsFunc(groups, func(g ModuleGroup) bool { return g.Module == "pf/extdata" }) {
 		t.Error("pf/extdata không có schema — không có vai nhóm")
@@ -209,6 +209,10 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	// W11.21: api-platform ghép pf/hrm (ADR-0050) — app_platform là thành viên r_hrm.
 	if !slices.Contains(plat.MemberOf, "r_hrm") {
 		t.Errorf("r_hrm: app_platform %v", plat.MemberOf)
+	}
+	// W11.23: api-platform ghép pf/contact (cap/directory) — app_platform là thành viên r_contact.
+	if !slices.Contains(plat.MemberOf, "r_contact") {
+		t.Errorf("r_contact: app_platform %v", plat.MemberOf)
 	}
 	// W8.2: api-internal ghép mkg/engine (job engine_observation_feed) — app_internal là thành viên r_engine (chỉ cụm mkg).
 	if in, _ := roleByName(t, AppInternal); !slices.Contains(in.MemberOf, "r_engine") {
@@ -418,9 +422,10 @@ var laterGroups = map[string]string{
 	"pf/workflow":    "pf/000118_pf_workflow.up.sql",
 	"pf/forms":       "pf/000122_pf_forms_grants.up.sql",
 	"pf/evidence":    "pf/000123_pf_evidence.up.sql",
-	"pf/cooperative": "pf/000131_pf_cooperative_schema.up.sql", // W3.3: vai r_cooperative sinh khi module có owns_schema
-	"pf/price":       "pf/000138_pf_price.up.sql",              // W11.71 (ADR-0049): khung cap/price
-	"pf/hrm":         "pf/000147_pf_hrm_catalog.up.sql",        // W11.21 (ADR-0050): dom/hrm, danh mục nhân sự
+	"pf/cooperative": "pf/000131_pf_cooperative_schema.up.sql",        // W3.3: vai r_cooperative sinh khi module có owns_schema
+	"pf/price":       "pf/000138_pf_price.up.sql",                     // W11.71 (ADR-0049): khung cap/price
+	"pf/hrm":         "pf/000147_pf_hrm_catalog.up.sql",               // W11.21 (ADR-0050): dom/hrm, danh mục nhân sự
+	"pf/contact":     "pf/20261013165159_pf_contact_directory.up.sql", // W11.23: cap/directory, Contact (FN-13)
 }
 
 // pf 000092 (W2.5) cấp SELECT k_ref.* cho MỌI r_* của module pf lúc đó (R-DB-05) — danh sách ghi tay khớp

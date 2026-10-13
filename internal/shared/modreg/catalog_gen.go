@@ -13,6 +13,7 @@ var catalog = []CatalogEntry{
 	{Name: "mkg/orders", Kind: "domain", Enable: "always", Permissions: []string{"sales_approver", "sales_officer"}, Zones: []string{"mkg"}, OwnsSchema: []string{"mkg_orders"}, Shares: []string{}},
 	{Name: "pf/accounts", Kind: "kernel", Enable: "always", Permissions: []string{"account_admin", "account_admin_province", "farmer", "kn_user", "login_totp_required"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_accounts"}, Shares: []string{}},
 	{Name: "pf/apiclient", Kind: "kernel", Enable: "always", Permissions: []string{"api_client_admin", "api_client_approver"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_apiclient"}, Shares: []string{}},
+	{Name: "pf/contact", Kind: "capability", Enable: "always", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_contact"}, Shares: []string{}},
 	{Name: "pf/content", Kind: "capability", Enable: "per_tenant", Permissions: []string{"content_editor_national", "content_editor_province", "content_reviewer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_content"}, Shares: []string{}},
 	{Name: "pf/cooperative", Kind: "domain", Enable: "per_tenant", Permissions: []string{"coop_manager", "farmer", "plot_editor", "plot_viewer", "sop_admin"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_coop"}, Shares: []string{"diary_entry", "household", "plot", "season"}},
 	{Name: "pf/cropcycle", Kind: "domain", Enable: "per_tenant", Permissions: []string{"coop_manager", "mkg_sync"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_cropcycle", "pf_cropcycle_pub"}, Shares: []string{}},
@@ -36,7 +37,7 @@ var catalog = []CatalogEntry{
 	{Name: "pf/sync", Kind: "capability", Enable: "per_tenant", Permissions: []string{"device_admin", "sync_conflict_resolver"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_sync"}, Shares: []string{}},
 	{Name: "pf/waterway", Kind: "domain", Enable: "per_tenant", Permissions: []string{"waterway_editor", "waterway_publisher"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_waterway"}, Shares: []string{}},
 	{Name: "pf/workflow", Kind: "capability", Enable: "always", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_workflow"}, Shares: []string{}},
-	{Name: "vault/identity", Kind: "kernel", Enable: "always", Permissions: []string{"farmer", "vault_display", "vault_eraser", "vault_evidence_viewer", "vault_pubkey_sync", "vault_registrar"}, Zones: []string{"vault"}, OwnsSchema: []string{"vault"}, Shares: []string{}},
+	{Name: "vault/identity", Kind: "kernel", Enable: "always", Permissions: []string{"farmer", "vault_directory", "vault_display", "vault_eraser", "vault_evidence_viewer", "vault_pubkey_sync", "vault_registrar"}, Zones: []string{"vault"}, OwnsSchema: []string{"vault"}, Shares: []string{}},
 }
 
 var catalogDepends = map[string][]string{
@@ -49,6 +50,7 @@ var catalogDepends = map[string][]string{
 	"mkg/orders":       {"mkg/hub"},
 	"pf/accounts":      {"pf/party", "vault/identity"},
 	"pf/apiclient":     {"pf/party"},
+	"pf/contact":       {"vault/identity"},
 	"pf/content":       {"pf/masterdata", "pf/party", "pf/sync"},
 	"pf/cooperative":   {"pf/apiclient", "pf/geo", "pf/masterdata", "pf/metrics", "pf/party", "pf/reports", "pf/sync", "vault/identity"},
 	"pf/cropcycle":     {"pf/apiclient", "pf/cooperative", "pf/party", "pf/sync"},

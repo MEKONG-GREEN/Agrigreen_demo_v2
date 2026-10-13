@@ -8,7 +8,7 @@ zones: [vault]
 version: 1.0.0
 depends: {}
 provides:
-  ports: [Client, Profiles]
+  ports: [Client, Directory, Profiles]
   events: []
   internal_events: []
   publications: []
@@ -17,6 +17,7 @@ consumes:
   events: []
 permissions:
     - farmer
+    - vault_directory
     - vault_display
     - vault_eraser
     - vault_evidence_viewer

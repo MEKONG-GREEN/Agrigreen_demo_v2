@@ -88,6 +88,8 @@ type Service struct {
 	// Thiếu → suy từ vai realm + phạm vi đơn vị, danh bạ trực pf_extension.staff.
 	KNContext   accport.KNContextResolver
 	KNDirectory accport.KNDirectory
+	// ContactNames (tùy chọn, W11.23 pf/contact): tên cán bộ theo tài khoản từ Contact — đọc trước danh bạ trực (Q-072).
+	ContactNames partyport.ActorNames
 	// TablePDF (tùy chọn, pf/reports): "Xuất PDF" lịch công tác. Thiếu → 503.
 	TablePDF port.TablePDF
 	// Egress (tùy chọn, G5 ADR-0024 + quyết định A5): điểm kiểm soát xuất dùng chung (pf/metering) cho "Xuất

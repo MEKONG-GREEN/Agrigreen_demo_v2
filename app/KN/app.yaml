@@ -4,6 +4,7 @@ app: KN
 description: Khuyến nông TW/Tỉnh/Xã (bề mặt KN v7.7 của web-ops, gồm phòng ban Trồng trọt; app hiện trường)
 modules:
   pf/accounts: ">=1.0 <2"      # ngữ cảnh phiên KN (P1, /v1/me), tài khoản cán bộ
+  pf/contact: ">=1.0 <2"       # cap/directory: Contact dùng chung (FN-13), /v1/contacts/* (W11.23)
   pf/content: ">=1.0 <2"       # thư viện số, tài liệu (/v1/documents, /v1/library)
   pf/cooperative: ">=1.0 <2"   # dom/cooperative: HTX, hộ, thửa, vụ (W3.2 mặt tiền; W3.3 chuyển dữ liệu)
   pf/cropcycle: ">=2.0 <3"     # xem mùa vụ HTX trong phạm vi (dom/cooperative shared-read)

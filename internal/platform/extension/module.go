@@ -131,6 +131,11 @@ func (m *Module) UseTablePDF(p port.TablePDF) { m.svc.TablePDF = p }
 // GpsLogHandler là inbox.Handler của consumer port.GpsLogConsumer (vai extension_app).
 func (m *Module) GpsLogHandler() inbox.Handler { return m.svc.HandleGpsLog }
 
+// UseContactNames (W11.23, Q-072 — đề xuất của dev: Contact thay danh bạ trực): tên cán bộ đọc từ Contact dùng chung
+// (hồ sơ nhân sự + kho định danh) TRƯỚC; cột display_name dạng rõ của pf_extension.staff chỉ còn là nguồn dự phòng cho
+// tài khoản chưa có hồ sơ nhân sự hoặc lời gọi không có người dùng (job).
+func (m *Module) UseContactNames(n partyport.ActorNames) { m.svc.ContactNames = n }
+
 // StaffNames cho module khác tra tên cán bộ trong danh bạ (qua port, G-07/G-09).
 func (m *Module) StaffNames() mdport.StaffNames { return m.svc }
 

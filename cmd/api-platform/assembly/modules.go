@@ -12,6 +12,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/contact"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port/farmerid"
@@ -95,6 +96,7 @@ type Modules struct {
 	Forms         *forms.Module     // W6.2 cap/forms: biểu theo kỳ, chốt kỳ kèm ảnh chụp đóng băng
 	Price         *price.Module     // W11.71 cap/price: khung giá — danh mục nền, /v1/price/* (ADR-0049)
 	HRM           *hrm.Module       // W11.21 dom/hrm: danh mục nhân sự HCTH (FN-19), /v1/hrm/* (ADR-0050)
+	Contact       *contact.Module   // W11.23 cap/directory: Contact dùng chung (FN-13), /v1/contacts/*
 }
 
 // Named trả module kèm tên repo (module.yaml) theo thứ tự gắn route.
@@ -105,7 +107,7 @@ func (m Modules) Named() []NamedModule {
 		{"pf/notify", m.Notify}, {"pf/accounts", m.Accounts}, {"pf/reports", m.Reports}, {"pf/waterway", m.Waterway},
 		{"pf/simulation", m.Simulation}, {"pf/cropcycle", m.CropCycle}, {"pf/cooperative", m.Cooperative}, {"pf/metrics", m.Metrics},
 		{"pf/extdata", m.ExtData}, {"pf/metering", m.Metering}, {"pf/apiclient", m.APIClient}, {"pf/forms", m.Forms},
-		{"pf/price", m.Price}, {"pf/hrm", m.HRM},
+		{"pf/price", m.Price}, {"pf/hrm", m.HRM}, {"pf/contact", m.Contact},
 	}
 }
 
@@ -294,6 +296,14 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	// W11.22: hồ sơ nhân sự — PII qua kho định danh (ngăn hồ sơ vault 000004), đơn vị nội bộ của pf/accounts (W11.07);
 	// mặc định TẮT ở production (AG_HRM_RECORDS, chờ DPIA — Q-005).
 	hr.UseRecords(ext.Vault, KNHRMUnits{Units: acc.InternalUnits()}, hrm.RecordsEnabled(os.Getenv, residency.Production(os.Getenv)))
+	// W11.23: cap/directory — Contact dùng chung (FN-13). Cán bộ thuộc tỉnh chiếu từ hồ sơ nhân sự (cùng cổng AG_HRM_RECORDS),
+	// PII qua thẻ danh bạ của kho định danh; tên cán bộ của danh bạ trực pf/extension đọc từ Contact trước (Q-072).
+	ct, err := contact.New(unit, clk, KNContactAccess, ext.Vault)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	ct.UseStaff(KNContactStaff{Dir: hr.Directory()}, KNContactLabels{Units: acc.InternalUnits(), AdminUnits: md.AdminUnits()})
+	kn.UseContactNames(ct.Names())
 	pty.UseOrgImpact(kn.OpenPeriodsImpact())
 	pty.UseDepartmentUsage(kn.ReportUsage())
 	// W11.02 (FN-AD-04.03): đếm bản ghi theo phòng ban ở mọi module mang department_code — mẫu/gửi Chi cục, máy móc HTX,
@@ -400,7 +410,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
 		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Cooperative: coop, Metrics: met, ExtData: ed, Metering: meter, APIClient: apic,
-		Forms: fm, Price: pr, HRM: hr}, pools, nil
+		Forms: fm, Price: pr, HRM: hr, Contact: ct}, pools, nil
 }
 
 // EgressModeFromEnv đọc AG_EGRESS_MODE (ADR-0024 mục 2): rỗng → observe; giá trị lạ → lỗi khởi động.

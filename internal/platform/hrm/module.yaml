@@ -9,7 +9,7 @@ version: 1.0.0
 depends:
   vault/identity: ">=1.0 <2"
 provides:
-  ports: [Catalog, Units]
+  ports: [Catalog, Directory, Units]
   events: []
   internal_events: []
   publications: []

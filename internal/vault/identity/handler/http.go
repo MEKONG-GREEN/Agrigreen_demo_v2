@@ -34,6 +34,8 @@ type Handler struct {
 func (h Handler) Register(rg *gin.RouterGroup) {
 	rg.POST("/subjects", h.Idem, h.create)
 	rg.POST("/subjects/lookup", h.lookup)
+	// W11.23: thẻ danh bạ theo lô (pf/contact) — POST vì thân mang danh sách ref; phản hồi no-store, không qua Idem.
+	rg.POST("/subjects/cards", h.cards)
 	rg.GET("/subjects/:ref/display", h.display)
 	rg.POST("/subjects/:ref/resolve", h.resolve)
 	rg.POST("/subjects/:ref/unwrap", h.unwrap)
@@ -291,4 +293,36 @@ func (h Handler) getSection(c *gin.Context) {
 	}
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, client.SectionResponse{Ref: ref.String(), Section: section, Fields: out})
+}
+
+func (h Handler) cards(c *gin.Context) {
+	var req client.CardsRequest
+	if !bind(c, &req) {
+		return
+	}
+	if len(req.Refs) > client.MaxCardRefs {
+		httpx.Fail(c, problem.Validation.WithField("refs", "tối đa 200 chủ thể mỗi lần"))
+		return
+	}
+	refs := make([]uuid.UUID, 0, len(req.Refs))
+	for _, r := range req.Refs {
+		ref, err := uuid.Parse(r)
+		if err != nil {
+			httpx.Fail(c, problem.Validation.WithField("refs", "mã tham chiếu không hợp lệ"))
+			return
+		}
+		refs = append(refs, ref)
+	}
+	out, err := h.Svc.Cards(c.Request.Context(), purposeOf(c, req.Purpose), refs, req.Fields)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	items := make([]client.CardItem, 0, len(out))
+	for _, x := range out {
+		items = append(items, client.CardItem{Ref: x.Ref.String(), FullName: x.FullName, Phone: x.Phone, BirthYear: x.BirthYear,
+			Email: x.Email, Erased: x.Erased})
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, client.CardsResponse{Items: items})
 }

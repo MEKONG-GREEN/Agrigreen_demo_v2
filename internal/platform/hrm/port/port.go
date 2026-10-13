@@ -110,3 +110,29 @@ var (
 	ErrNotApplicable    = problem.New(http.StatusUnprocessableEntity, "hrm.not_applicable", "Thẻ hoặc thao tác không áp dụng cho loại nhân sự này")
 	ErrPermissionLocked = problem.New(http.StatusUnprocessableEntity, "hrm.permission_locked", "Quyền của Admin cố định, không chỉnh được")
 )
+
+// --- W11.23 (Contact FN-13): nguồn cán bộ thuộc tỉnh cho danh bạ dùng chung pf/contact. ---
+
+// DirectoryEntry là một hồ sơ nhân sự cho danh bạ — KHÔNG PII: họ tên, SĐT, năm sinh, email đọc ở kho định danh qua
+// SubjectRef (một bản ghi/người — FN-13 BR-01). Trạng thái, đơn vị, chức vụ là phép chiếu tại hôm nay.
+type DirectoryEntry struct {
+	StaffID      uuid.UUID
+	SubjectRef   uuid.UUID
+	AccountRef   uuid.UUID // tài khoản (sub Keycloak) của chính nhân sự; Nil nếu chưa gắn
+	Code         string    // mã hồ sơ HS-01
+	Type         string    // vien_chuc | hop_dong | can_bo_xa
+	Status       string    // active | left | none (FN-08)
+	Unit         string    // đơn vị công tác HS-16 (mã đơn vị nội bộ)
+	MgmtUnit     string    // đơn vị quản lý HS-37 (cán bộ xã)
+	Commune      string    // xã/phường của cán bộ xã
+	Position     string    // mã chức vụ
+	PositionName string    // tên chức vụ (danh mục FN-19)
+	Title        string    // chức danh ghi trong sự kiện chức vụ (nếu có)
+}
+
+// Directory là nguồn cán bộ thuộc tỉnh (gồm cán bộ khuyến nông cấp xã) cho Contact (W11.23). Tenant lấy từ Principal
+// trong ctx. KHÔNG áp ma trận quyền hồ sơ FN-20 (Contact có quyền riêng — BRD FN-13, FN-20 "xem Contact"); CÓ áp cổng
+// dữ liệu thật AG_HRM_RECORDS: tắt → ErrRecordsDisabled (Contact khi đó chỉ có liên hệ ngoài tỉnh).
+type Directory interface {
+	StaffDirectory(ctx context.Context) ([]DirectoryEntry, error)
+}
