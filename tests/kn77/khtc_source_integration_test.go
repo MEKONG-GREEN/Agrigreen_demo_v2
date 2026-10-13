@@ -2,8 +2,8 @@ package kn77_test
 
 // W11.64 — "Cập nhật số liệu" trên module THẬT qua HTTP: pf/extension (/v1/extension/khtc/periods/{id}/sources*, sổ
 // pf 20261013175705) + Kỳ KHTC (W11.62) + Kế hoạch năm (W11.61) + pf/forms trên PostgreSQL. Port KHTCSources nạp bộ dữ
-// liệu đối chứng KHTCQA (tests/golden/khtc, ca G03 — sửa lùi lũy kế) qua đúng bảng chuyển đổi PFPUB (closedfig.Convert,
-// Assemble). Kiểm: chỉ cán bộ phụ trách bấm (⚑3), ảnh chụp bất biến + lịch sử cũ → mới khớp golden G03 s3, "Nguồn đã
+// liệu đối chứng KHTCQA (tests/golden/khtc, ca G03 — sửa lùi lũy kế) ở dạng kết quả của port (đường Convert → Assemble
+// kiểm ở khtcsource/domain/golden_test.go). Kiểm: chỉ cán bộ phụ trách bấm (⚑3), ảnh chụp bất biến + lịch sử cũ → mới khớp golden G03 s3, "Nguồn đã
 // thay đổi" theo figures_hash (không theo status_hash), tuần đã đóng giữ số và làm gốc (frozen), kỳ đã đóng không cập nhật.
 
 import (
@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -23,9 +24,7 @@ import (
 
 	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/closedfig"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-	rc "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -36,11 +35,12 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 	khtcgolden "github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/golden/khtc"
 )
 
-// goldenReader là port KHTCSources giả: kỳ nguồn Trồng trọt (PL01, ô lua_td/luy_ke) theo một bước của golden.
+// goldenReader là port KHTCSources giả (dạng kết quả của closedfig.Assemble — gốc lắp ráp không import closedfig): kỳ nguồn Trồng trọt (PL01, ô lua_td/luy_ke) theo một bước của golden.
 type goldenReader struct {
 	mu      sync.Mutex
 	periods []khtcgolden.SourcePeriod
@@ -59,38 +59,46 @@ func hexSHA(s string) *string {
 	return &x
 }
 
+// khtcWeek trả khoảng ngày của tuần KHTC "YYYY-Www" (Thứ Tư – Thứ Ba, tuần 1 chứa 01/01 — lịch v2, golden Q1).
+func khtcWeek(key string) (time.Time, time.Time) {
+	var y, w int
+	_, _ = fmt.Sscanf(key, "%d-W%d", &y, &w)
+	jan1 := time.Date(y, 1, 1, 0, 0, 0, 0, time.UTC)
+	start := jan1.AddDate(0, 0, -((int(jan1.Weekday()) - int(time.Wednesday) + 7) % 7))
+	from := start.AddDate(0, 0, 7*(w-1))
+	return from, from.AddDate(0, 0, 6)
+}
+
+// Periods dựng kỳ KHTC như port KHTCSources (closedfig.Assemble) cho các tuần có kỳ nguồn Trồng trọt: tuần Trồng trọt
+// trùng tuần KHTC (v2), một kỳ nguồn mỗi tuần, ô "LUA_TD/luy_ke" = lũy kế nguồn.
 func (g *goldenReader) Periods(_ context.Context, _ uuid.UUID, q extport.KHTCQuery) ([]extport.KHTCPeriod, error) {
 	g.mu.Lock()
 	ps, status := g.periods, g.status
 	g.mu.Unlock()
-	cal, err := rc.CalendarOf(rc.DeptKeHoachTaiChinh, q.Target.RuleTag)
-	if err != nil {
-		return nil, err
-	}
-	t := extport.CrosswalkTarget{Version: extport.CrosswalkV1, CalendarID: cal.ID, RuleTag: cal.Rule.Tag(), PeriodType: rc.PeriodWeek}
-	var figs []extport.ClosedFigure
+	var out []extport.KHTCPeriod
 	for _, p := range ps {
-		span, err := rc.SpanOfKey(rc.DefaultRule, rc.PeriodWeek, p.Key, nil)
-		if err != nil {
-			return nil, err
+		from, to := khtcWeek(p.Key)
+		if to.Before(q.From) || to.After(q.To) {
+			continue
 		}
-		from, to := span.From, span.To
-		ver, sn := rc.CalendarVersionDefault, int64(1)
-		rows := `[{"key":"30001","unit":"30001","indicator":"LUA_TD","cells":{"luy_ke":"` + p.Cumulative.String() + `"},"confirmation":"confirmed"}]`
-		figs = append(figs, extport.ClosedFigure{DepartmentCode: partyport.DeptTrongTrot, CalendarID: partyport.DeptTrongTrot, CalendarVersion: &ver,
-			PeriodType: rc.PeriodWeek, PeriodKey: p.Key, PeriodFrom: &from, PeriodTo: &to, SourceModule: "pf/extension",
-			SourcePeriodID: uuid.NewSHA1(uuid.NameSpaceURL, []byte(p.Key)), FormCode: "PL01", FormClosed: p.Closed, PeriodClosed: p.Closed,
-			KeyClosed: p.Closed, KeyClosedAll: p.Closed, ClosedAt: &to, SnapshotNo: &sn, Rows: json.RawMessage(rows), Totals: json.RawMessage("[]"),
-			ConfirmationStatus: extport.ConfirmationConfirmed, FiguresHash: hexSHA(p.Key + "=" + p.Cumulative.String()),
-			StatusHash: hexSHA(p.Key + "=" + status)})
+		ver, sn := 2, int64(1)
+		closedAt := to
+		src := extport.SourcePeriodRef{CalendarID: partyport.DeptTrongTrot, CalendarVersion: &ver, NativeKey: p.Key, PeriodType: "week",
+			From: from, To: to, Source: "reportcycle", SourceModule: "pf/extension", SourcePeriodID: uuid.NewSHA1(uuid.NameSpaceURL, []byte(p.Key)),
+			FormCode: "PL01", Closed: p.Closed, ClosedAt: &closedAt, SnapshotNo: &sn, FiguresHash: hexSHA(p.Key + "=" + p.Cumulative.String()),
+			StatusHash: hexSHA(p.Key + "=" + status), ConfirmationStatus: extport.ConfirmationConfirmed,
+			Cells: map[string]string{"LUA_TD/luy_ke": p.Cumulative.String()}}
+		cells := map[string]string{"LUA_TD/luy_ke": p.Cumulative.String()}
+		fig := extport.TargetFigure{RuleVersion: extport.CrosswalkV1, DepartmentCode: partyport.DeptTrongTrot, FormCode: "PL01",
+			TargetCalendarID: partyport.DeptKeHoachTaiChinh, TargetCalendarVersion: 2, TargetType: "week", TargetKey: p.Key, TargetFrom: from,
+			TargetTo: to, Sources: []extport.SourcePeriodRef{src}, Closed: p.Closed, KeyClosed: p.Closed, Sum: cells, Last: cells,
+			SumConfirmed: cells, LastConfirmed: cells, FiguresHash: *src.FiguresHash, StatusHash: *src.StatusHash}
+		out = append(out, extport.KHTCPeriod{RuleVersion: extport.CrosswalkV1, TargetCalendarID: partyport.DeptKeHoachTaiChinh,
+			TargetCalendarVersion: 2, TargetType: "week", TargetKey: p.Key, TargetFrom: from, TargetTo: to, Closed: p.Closed,
+			Departments: []extport.DepartmentFigures{{DepartmentCode: partyport.DeptTrongTrot, SourceModule: "pf/extension",
+				Forms: []extport.TargetFigure{fig}, Closed: p.Closed}}})
 	}
-	conv, err := closedfig.Convert(figs, t)
-	if err != nil {
-		return nil, err
-	}
-	first, _ := cal.Rule.PeriodOf(rc.PeriodWeek, q.From, nil)
-	last, _ := cal.Rule.PeriodOf(rc.PeriodWeek, q.To, nil)
-	return closedfig.Assemble(conv, t, cal, first.From, last.To, q.Departments, false, false), nil
+	return out, nil
 }
 
 type srcStatus struct {
@@ -185,6 +193,7 @@ func TestKH_UR_TI_13_RefreshOwnerOnlyDiffHistory(t *testing.T) {
 		_ = json.Unmarshal([]byte(c.GetHeader("X-Test-KN")), &k)
 		actor, _ := uuid.Parse(c.GetHeader("X-Test-Actor"))
 		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), authz.Principal{ActorRef: actor, TenantID: f.tid, KN: &k}))
+		c.Request = c.Request.WithContext(tenant.WithID(c.Request.Context(), f.tid))
 	}, idempotency.Middleware(ops))
 	fm.RegisterApp(g)
 	kn.RegisterApp(g)
