@@ -100,7 +100,7 @@
       "name": "source",
       "type": "text",
       "nullable": false,
-      "description": "Nguồn: reportcycle (vòng đời báo cáo extension/reportcycle — Trồng trọt, nguồn lâu dài) | forms (kỳ native cap/forms — CNTS) | cnts_aggregate (W11.44: bảng tổng hợp CNTS Cấp Tỉnh CNTS-BM02 tuần KSGM, CNTS-BM18 Phụ lục 2 tuần CNTS kèm lũy kế _luy_ke_quy/_luy_ke_nam — pf 20261013170238). Bên đọc KHÔNG rẽ nhánh theo cột này"
+      "description": "Nguồn: reportcycle (vòng đời báo cáo extension/reportcycle — Trồng trọt, nguồn lâu dài) | forms (kỳ native cap/forms — CNTS) | cnts_aggregate (W11.44: bảng tổng hợp CNTS Cấp Tỉnh CNTS-BM02 tuần KSGM, CNTS-BM18 Phụ lục 2 tuần CNTS kèm lũy kế _luy_ke_quy/_luy_ke_nam — pf 20261013230936). Bên đọc KHÔNG rẽ nhánh theo cột này"
     },
     {
       "name": "source_module",

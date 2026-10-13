@@ -4,7 +4,7 @@ package app
 // BM-01 + dòng điều chỉnh), BM-18 Phụ lục 2 tuần CNTS (khai thác từ BM-17 theo xã + nuôi trồng nhập theo đối tượng, lũy kế
 // quý/năm), chốt/mở lại bảng tổng hợp (số công bố cho KHTC qua pf_extension_pub.v1_closed_figures (nhánh cnts_aggregate) — D17, D18), phiên
 // bản tệp chia sẻ Chi cục (Excel, có Phụ lục 2). Số tự cộng tính khi đọc từ kỳ native cap/forms (FiguresReader); sổ chỉ
-// giữ phần người nhập và phần đóng băng (pf 20261013170237).
+// giữ phần người nhập và phần đóng băng (pf 20261013230931).
 
 import (
 	"context"

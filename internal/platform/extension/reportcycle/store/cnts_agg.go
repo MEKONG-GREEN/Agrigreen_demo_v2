@@ -1,6 +1,6 @@
 package store
 
-// W11.44: SQL của tổng hợp CNTS Cấp Tỉnh (pf 20261013170237 — pf_extension.cnts_bm02_adjustment, cnts_aqua_entry,
+// W11.44: SQL của tổng hợp CNTS Cấp Tỉnh (pf 20261013230931 — pf_extension.cnts_bm02_adjustment, cnts_aqua_entry,
 // cnts_agg_close, cnts_agg_share). Bốn sổ chỉ ghi thêm (shared.apply_ledger); luôn trong giao dịch có ngữ cảnh tenant.
 
 import (

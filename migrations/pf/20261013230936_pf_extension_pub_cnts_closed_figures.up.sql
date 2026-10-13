@@ -6,7 +6,7 @@
 -- Chỉ đụng schema pf_extension_pub.
 --
 -- Nhánh CNTS: một dòng = một kỳ tổng hợp (tỉnh × biểu × khóa kỳ) ĐÃ CHỐT ÍT NHẤT MỘT LẦN (pf_extension.cnts_agg_close,
--- pf 20261013170237). Số = lần chốt mới nhất (đóng băng; app chỉ cho chốt khi MỌI kỳ nguồn của tuần đã chốt — D17).
+-- pf 20261013230931). Số = lần chốt mới nhất (đóng băng; app chỉ cho chốt khi MỌI kỳ nguồn của tuần đã chốt — D17).
 -- Mở lại → cờ về false, số của lần chốt trước vẫn trả; chốt lại → số mới, snapshot_no tăng (như nguồn kỳ native).
 --   source = 'cnts_aggregate', source_module = 'pf/extension', form_code = CNTS-BM02 (period_type ksgm_week) | CNTS-BM18 (week);
 --   source_period_id = mã ổn định của kỳ tổng hợp (domain.AggPeriodID), form_version_id = phiên bản định nghĩa bảng;

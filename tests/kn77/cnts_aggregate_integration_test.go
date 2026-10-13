@@ -1,8 +1,8 @@
 package kn77_test
 
 // W11.44 — Tổng hợp CNTS Cấp Tỉnh trên module THẬT qua HTTP: pf/forms (kỳ native kn_cnts — BM-01, BM-17 nộp/chốt) +
-// pf/extension (/v1/extension/cnts/bm02|bm18|aggregates|shares, sổ pf 20261013170237) + view công bố
-// pf_extension_pub.v1_closed_figures nhánh cnts_aggregate (pf 20261013170238, họ closed_figures/v1 — ADR-0053) và bộ đọc KHTC trên PostgreSQL.
+// pf/extension (/v1/extension/cnts/bm02|bm18|aggregates|shares, sổ pf 20261013230931) + view công bố
+// pf_extension_pub.v1_closed_figures nhánh cnts_aggregate (pf 20261013230936, họ closed_figures/v1 — ADR-0053) và bộ đọc KHTC trên PostgreSQL.
 
 import (
 	"bytes"
