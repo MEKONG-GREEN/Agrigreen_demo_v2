@@ -244,7 +244,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
   ke_hoach_tai_chinh: {
     kn_tw: [soon("tw.khtc.bao_cao_tinh", "Báo cáo Tỉnh (KHTC)", "/kn/khtc/bao-cao-da-xuat", "report")],
     kn_tinh: [
-      soon("tinh.khtc.ky_bao_cao", "Kỳ báo cáo & phiếu các phòng", "/kn/khtc/ky-bao-cao", "task"),
+      { key: "tinh.khtc.ky_bao_cao", label: "Kỳ báo cáo & phiếu các phòng", route: "/kn/khtc/ky-bao-cao", icon: "task" }, // W11.62
       { key: "tinh.khtc.ke_hoach_nam", label: "Kế hoạch năm", route: "/kn/khtc/ke-hoach-nam", icon: "calendar" }, // W11.61
       soon("tinh.khtc.so_lieu_ngoai", "Số liệu nguồn ngoài", "/kn/khtc/so-lieu-ngoai", "database"),
       soon("tinh.khtc.mau_bao_cao", "Mẫu báo cáo KHTC", "/kn/khtc/mau-bao-cao", "table"),

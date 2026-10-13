@@ -79,7 +79,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			soon("tw.khtc.bao_cao_tinh", "Báo cáo Tỉnh (KHTC)", "/kn/khtc/bao-cao-da-xuat", "report"),
 		},
 		port.AudienceTinh: {
-			soon("tinh.khtc.ky_bao_cao", "Kỳ báo cáo & phiếu các phòng", "/kn/khtc/ky-bao-cao", "task"),
+			// W11.62: Kỳ KHTC — mở kỳ, tiến độ phiếu các phòng + nguồn, đóng/hủy kỳ.
+			{Key: "tinh.khtc.ky_bao_cao", Label: "Kỳ báo cáo & phiếu các phòng", Route: "/kn/khtc/ky-bao-cao", Icon: "task"},
 			// W11.61 (pf/extension, FN-TI-02.02): Kế hoạch năm + danh sách CT/DA (phòng khác chỉ xem).
 			{Key: "tinh.khtc.ke_hoach_nam", Label: "Kế hoạch năm", Route: "/kn/khtc/ke-hoach-nam", Icon: "calendar"},
 			soon("tinh.khtc.so_lieu_ngoai", "Số liệu nguồn ngoài", "/kn/khtc/so-lieu-ngoai", "database"),

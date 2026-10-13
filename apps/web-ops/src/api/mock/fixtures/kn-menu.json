@@ -1392,9 +1392,7 @@
         "route": "/kn/khtc/ky-bao-cao",
         "icon": "task",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
