@@ -118,7 +118,7 @@ func TestW11_05b_PeriodTypesAndKeys(t *testing.T) {
 	}
 	batchID, p1 := str(obj(r.body, "batch"), "id"), str(ps[0], "id")
 	if n := f.count(`SELECT count(*) FROM pf_extension.report_period_key WHERE tenant_id = $1 AND batch_id = $2::uuid AND period_type = 'ksgm_week'
-	    AND period_rule = 'kn.period_rule/v2;week_start=wed;week=year;month=week_end' AND week_year IS NULL`, f.tenant, batchID); n != 4 {
+	    AND period_rule = 'kn.period_rule/v2;week_start=wed;week=year;month=week_end;cal=trong_trot:v2' AND week_year IS NULL`, f.tenant, batchID); n != 4 {
 		t.Fatalf("sổ khóa kỳ: %d dòng", n)
 	}
 
@@ -163,7 +163,7 @@ func TestW11_05b_PeriodTypesAndKeys(t *testing.T) {
 
 	ctx := context.Background()
 	p2 := str(ps[1], "id")
-	rule := "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+	rule := "kn.period_rule/v2;week_start=wed;week=year;month=week_end;cal=trong_trot:v2" // D8: tag mang lịch của phòng
 	// key ghi một dòng khóa kỳ bằng SQL thô của vai pf/extension (như store.InsertPeriodKey).
 	key := func(tx pgx.Tx, period, pt, k string) error {
 		_, err := tx.Exec(ctx, `INSERT INTO pf_extension.report_period_key (id, tenant_id, stream_key, period_id, batch_id, period_type, period_key,
