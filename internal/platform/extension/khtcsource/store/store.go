@@ -100,9 +100,11 @@ func Snapshots(ctx context.Context, tx pgx.Tx, periodID uuid.UUID, limit int) ([
 func InsertRows(ctx context.Context, tx pgx.Tx, tid uuid.UUID, s *Snapshot, rows []domain.Row, newID func() uuid.UUID, idem string) error {
 	b := &pgx.Batch{}
 	for i, r := range rows {
-		var cells []byte
+		var cells *string // jsonb dạng chữ (pgx gửi []byte như bytea)
 		if r.Cells != nil {
-			cells, _ = json.Marshal(r.Cells)
+			raw, _ := json.Marshal(r.Cells)
+			x := string(raw)
+			cells = &x
 		}
 		var from, to *string
 		if r.From != nil {
@@ -126,6 +128,26 @@ func InsertRows(ctx context.Context, tx pgx.Tx, tid uuid.UUID, s *Snapshot, rows
 			s.EventTime.UTC(), s.ActorRef, idem+":row:"+strconv.Itoa(i), domain.RuleVersion)
 	}
 	return tx.SendBatch(ctx, b).Close()
+}
+
+func uuidStrings(xs []uuid.UUID) []string {
+	out := make([]string, len(xs))
+	for i, x := range xs {
+		out[i] = x.String()
+	}
+	return out
+}
+
+func parseUUIDs(xs []string) ([]uuid.UUID, error) {
+	out := make([]uuid.UUID, 0, len(xs))
+	for _, x := range xs {
+		u, err := uuid.Parse(x)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, nil
 }
 
 func nilIfEmpty(s string) *string {
@@ -226,19 +248,16 @@ func InsertValues(ctx context.Context, tx pgx.Tx, tid uuid.UUID, s *Snapshot, va
 		if v.V.PriceDay != "" {
 			priceDay = &v.V.PriceDay
 		}
-		refs := v.EntryRefs
-		if refs == nil {
-			refs = []uuid.UUID{}
-		}
+		refs := uuidStrings(v.EntryRefs)
 		b.Queue(`INSERT INTO pf_extension.khtc_snapshot_value (id, tenant_id, stream_key, snapshot_id, period_id, source_key, entry_refs, mode,
 		    cumulative, base, base_ref, increment, year_to_date, sum_value, price_min, price_max, price_day, unconfirmed, closed, no_source,
 		    frozen, source_changed, fallback, unavailable, detail, event_time, actor_ref, idem_key, rule_version)
-		  VALUES ($1, $2, 'khtc_snapshot_value:' || $3::uuid::text, $3::uuid, $4, $5, $6, $7, $8::numeric, $9::numeric, $10, $11::numeric,
+		  VALUES ($1, $2, 'khtc_snapshot_value:' || $3::uuid::text, $3::uuid, $4, $5, $6::uuid[], $7, $8::numeric, $9::numeric, $10, $11::numeric,
 		    $12::numeric, $13::numeric, $14::numeric, $15::numeric, $16::date, $17::numeric, $18, $19, $20, $21, $22, $23, $24::jsonb, $25, $26,
 		    $27, $28)`,
 			newID(), tid, s.ID, s.PeriodID, v.SourceKey, refs, mode, decArg(v.V.Cumulative), decArg(v.V.Base), nilIfEmpty(v.V.BaseRef),
 			decArg(v.V.Increment), decArg(v.V.YearToDate), decArg(v.V.Sum), decArg(v.V.Min), decArg(v.V.Max), priceDay, decArg(v.V.Unconfirmed),
-			v.V.Closed, v.V.NoSource, v.V.Frozen, v.V.SourceChanged, v.V.Fallback, v.V.Unavailable, raw, s.EventTime.UTC(), s.ActorRef,
+			v.V.Closed, v.V.NoSource, v.V.Frozen, v.V.SourceChanged, v.V.Fallback, v.V.Unavailable, string(raw), s.EventTime.UTC(), s.ActorRef,
 			idem+":val:"+strconv.Itoa(i), domain.RuleVersion)
 	}
 	return tx.SendBatch(ctx, b).Close()
@@ -250,7 +269,7 @@ func Values(ctx context.Context, tx pgx.Tx, snapshotID uuid.UUID) ([]Value, erro
 }
 
 func values(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]Value, error) {
-	rows, err := tx.Query(ctx, `SELECT snapshot_id, source_key, entry_refs, mode, cumulative::text, base::text, coalesce(base_ref, ''),
+	rows, err := tx.Query(ctx, `SELECT snapshot_id, source_key, entry_refs::text[], mode, cumulative::text, base::text, coalesce(base_ref, ''),
 	    increment::text, year_to_date::text, sum_value::text, price_min::text, price_max::text, coalesce(to_char(price_day, 'YYYY-MM-DD'), ''),
 	    unconfirmed::text, closed, no_source, frozen, source_changed, fallback, unavailable, detail
 	  FROM pf_extension.khtc_snapshot_value WHERE `+where+` ORDER BY snapshot_id, seq`, args...)
@@ -262,11 +281,16 @@ func values(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]Value,
 		var sid uuid.UUID
 		var cum, base, inc, ytd, sum, lo, hi, unc *string
 		var raw []byte
-		if err := r.Scan(&sid, &v.SourceKey, &v.EntryRefs, &v.V.Mode, &cum, &base, &v.V.BaseRef, &inc, &ytd, &sum, &lo, &hi, &v.V.PriceDay, &unc,
+		var refs []string
+		if err := r.Scan(&sid, &v.SourceKey, &refs, &v.V.Mode, &cum, &base, &v.V.BaseRef, &inc, &ytd, &sum, &lo, &hi, &v.V.PriceDay, &unc,
 			&v.V.Closed, &v.V.NoSource, &v.V.Frozen, &v.V.SourceChanged, &v.V.Fallback, &v.V.Unavailable, &raw); err != nil {
 			return v, err
 		}
 		v.V.SourceKey = v.SourceKey
+		var perr error
+		if v.EntryRefs, perr = parseUUIDs(refs); perr != nil {
+			return v, perr
+		}
 		if v.V.Mode == "invalid" {
 			v.Invalid, v.V.Mode = true, ""
 		}
@@ -314,13 +338,10 @@ type Change struct {
 func InsertChanges(ctx context.Context, tx pgx.Tx, tid uuid.UUID, s *Snapshot, chs []Change, newID func() uuid.UUID, idem string) error {
 	b := &pgx.Batch{}
 	for i, c := range chs {
-		refs := c.EntryRefs
-		if refs == nil {
-			refs = []uuid.UUID{}
-		}
+		refs := uuidStrings(c.EntryRefs)
 		b.Queue(`INSERT INTO pf_extension.khtc_snapshot_change (id, tenant_id, stream_key, snapshot_id, prev_snapshot_id, period_id, source_key,
 		    entry_refs, field, old_value, new_value, event_time, actor_ref, idem_key, rule_version)
-		  VALUES ($1, $2, 'khtc_snapshot_change:' || $3::uuid::text, $3::uuid, $4, $5, $6, $7, $8, $9::numeric, $10::numeric, $11, $12, $13, $14)`,
+		  VALUES ($1, $2, 'khtc_snapshot_change:' || $3::uuid::text, $3::uuid, $4, $5, $6, $7::uuid[], $8, $9::numeric, $10::numeric, $11, $12, $13, $14)`,
 			newID(), tid, s.ID, c.PrevSnapshotID, s.PeriodID, c.SourceKey, refs, c.Field, decArg(c.Old), decArg(c.New), s.EventTime.UTC(),
 			s.ActorRef, idem+":chg:"+strconv.Itoa(i), domain.RuleVersion)
 	}
@@ -329,7 +350,7 @@ func InsertChanges(ctx context.Context, tx pgx.Tx, tid uuid.UUID, s *Snapshot, c
 
 // Changes đọc lịch sử thay đổi của kỳ, ảnh chụp mới trước.
 func Changes(ctx context.Context, tx pgx.Tx, periodID uuid.UUID) ([]Change, error) {
-	rows, err := tx.Query(ctx, `SELECT c.snapshot_id, c.prev_snapshot_id, c.source_key, c.entry_refs, c.field, c.old_value::text,
+	rows, err := tx.Query(ctx, `SELECT c.snapshot_id, c.prev_snapshot_id, c.source_key, c.entry_refs::text[], c.field, c.old_value::text,
 	    c.new_value::text, c.actor_ref, c.event_time
 	  FROM pf_extension.khtc_snapshot_change c WHERE c.period_id = $1 ORDER BY c.event_time DESC, c.snapshot_id DESC, c.seq`, periodID)
 	if err != nil {
@@ -338,10 +359,14 @@ func Changes(ctx context.Context, tx pgx.Tx, periodID uuid.UUID) ([]Change, erro
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Change, error) {
 		var c Change
 		var o, n *string
-		if err := r.Scan(&c.SnapshotID, &c.PrevSnapshotID, &c.SourceKey, &c.EntryRefs, &c.Field, &o, &n, &c.ActorRef, &c.EventTime); err != nil {
+		var refs []string
+		if err := r.Scan(&c.SnapshotID, &c.PrevSnapshotID, &c.SourceKey, &refs, &c.Field, &o, &n, &c.ActorRef, &c.EventTime); err != nil {
 			return c, err
 		}
 		var err error
+		if c.EntryRefs, err = parseUUIDs(refs); err != nil {
+			return c, err
+		}
 		if c.Old, err = decOf(o); err != nil {
 			return c, err
 		}

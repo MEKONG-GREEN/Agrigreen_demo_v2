@@ -150,13 +150,13 @@ func windowFrom(r rc.PeriodRule, from, to time.Time) (time.Time, error) {
 }
 
 // planKeys trả khóa nguồn module của Kế hoạch năm hiệu lực tại ngày chốt của kỳ → hạng mục dùng khóa (BR-DL-10).
-func (s *Service) planKeys(ctx context.Context, p pstore.Period) (*uuid.UUID, map[string][]uuid.UUID, map[uuid.UUID]port.KHTCPlanEntry, error) {
+func (s *Service) planKeys(ctx context.Context, tid uuid.UUID, p pstore.Period) (*uuid.UUID, map[string][]uuid.UUID, map[uuid.UUID]port.KHTCPlanEntry, error) {
 	keys := map[string][]uuid.UUID{}
 	entries := map[uuid.UUID]port.KHTCPlanEntry{}
 	if s.Plans == nil {
 		return nil, keys, entries, nil
 	}
-	plan, err := s.Plans.PlanAt(ctx, p.Year, p.Cutoff)
+	plan, err := s.Plans.PlanAt(tenant.WithID(ctx, tid), p.Year, p.Cutoff)
 	if errors.Is(err, port.ErrKHTCPlanNotFound) {
 		return nil, keys, entries, nil
 	}
@@ -257,7 +257,7 @@ func (s *Service) Refresh(ctx context.Context, id uuid.UUID, idem string) (Statu
 	if err != nil {
 		return Status{}, ErrDependency.WithDetail("đọc số liệu nguồn lỗi").WithCause(err)
 	}
-	planVer, keys, _, err := s.planKeys(ctx, p)
+	planVer, keys, _, err := s.planKeys(ctx, c.p.TenantID, p)
 	if err != nil {
 		return Status{}, err
 	}
@@ -502,7 +502,7 @@ func (s *Service) Status(ctx context.Context, id uuid.UUID) (Status, error) {
 	if snap != nil {
 		st.ActorName = nm[snap.ActorRef]
 	}
-	if _, _, entries, err := s.planKeys(ctx, p); err == nil {
+	if _, _, entries, err := s.planKeys(ctx, c.p.TenantID, p); err == nil {
 		st.Entries = entries
 	}
 	cal := calendarOf(p)
@@ -567,6 +567,6 @@ func (s *Service) History(ctx context.Context, id uuid.UUID) ([]HistoryEntry, ma
 	for _, sn := range snaps {
 		out = append(out, HistoryEntry{Snapshot: sn, ActorName: nm[sn.ActorRef], Changes: by[sn.ID]})
 	}
-	_, _, entries, _ := s.planKeys(ctx, p)
+	_, _, entries, _ := s.planKeys(ctx, c.p.TenantID, p)
 	return out, entries, nil
 }
