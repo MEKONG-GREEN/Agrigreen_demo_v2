@@ -37,6 +37,8 @@ type Service struct {
 	Rec *Records
 	// Rep: cấu hình báo cáo Sở W11.28 (UseEgress, tiêu đề cơ quan).
 	Rep ReportsConfig
+	// Docs: kho tài liệu nhân sự (W11.24, docs.go) — nil cho tới UseDocs.
+	Docs *DocStore
 }
 
 var _ port.Catalog = (*Service)(nil)

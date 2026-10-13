@@ -22,8 +22,13 @@ const MaxClockSkew = 5 * time.Minute
 // RuleVersion của sổ truy cập pf_files.access_log.
 const RuleVersion = "evidence.access/v1"
 
-// Purposes là mục đích được phép đọc tệp minh chứng (R-42).
-var Purposes = map[string]bool{string(client.PurposeMRVEvidence): true, string(client.PurposeFieldSupport): true}
+// Purposes là mục đích được phép đọc tệp minh chứng (R-42). W11.24: hr_records — tài liệu nhân sự của pf/hrm (FN-14).
+var Purposes = map[string]bool{string(client.PurposeMRVEvidence): true, string(client.PurposeFieldSupport): true,
+	string(client.PurposeHRRecords): true}
+
+// NeedsConsent cho biết mục đích có cơ sở là đồng ý của chủ thể (hộ — pf/party). hr_records (W11.24) có cơ sở là nghĩa
+// vụ quản lý hồ sơ viên chức, chủ thể giữ khóa là "kho tài liệu" của tenant — không kiểm đồng ý.
+func NeedsConsent(purpose string) bool { return purpose != string(client.PurposeHRRecords) }
 
 // Thao tác và kết quả quyết định mở tệp ghi vào sổ truy cập (CHECK của pf_files.access_log, pf 000123).
 const (
@@ -40,6 +45,10 @@ const (
 var contentTypes = map[string]bool{
 	"image/jpeg": true, "image/png": true, "image/webp": true, "image/heic": true,
 	"application/pdf": true, "video/mp4": true,
+	// W11.24 (pf/hrm FN-14): tài liệu nhân sự Word/Excel.
+	"application/msword": true, "application/vnd.ms-excel": true,
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":       true,
 }
 
 var (

@@ -20,6 +20,12 @@
 //
 // Gói sau của cùng module: W11.24 kho tài liệu, W11.25 nâng bậc, W11.26 đánh giá. Module khác chỉ import hrm/port (R-02).
 // Tệp này là gốc lắp ráp cho cmd/api-platform.
+// W11.24 (pf 20261013191234) — KHO TÀI LIỆU NHÂN SỰ (FN-14): cây thư mục, phân loại, quyền thư mục (ghi đè ma trận FN-20
+// cho docs.view/docs.manage), tệp qua pf/evidence (mục đích hr_records, khóa của chủ thể "kho tài liệu" ở kho định danh),
+// xóa = ẩn, nhật ký xem trước/tải xuống. Bật bằng UseDocs; tài liệu gắn nhân viên theo cờ AG_HRM_RECORDS.
+//
+// Gói sau của cùng module: W11.25 nâng bậc, W11.26 đánh giá, W11.28
+// báo cáo Sở. Module khác chỉ import hrm/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
 package hrm
 
 import (
@@ -27,6 +33,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	evport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/hrm/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/hrm/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/hrm/port"
@@ -75,6 +82,13 @@ func RecordsEnabled(getenv func(string) string, production bool) bool {
 	}
 	return !production
 }
+
+// UseDocs bật kho tài liệu nhân sự (W11.24, FN-14): tệp qua pf/evidence (mục đích hr_records). Gọi sau UseRecords (kho định
+// danh giữ khóa kho tài liệu); gốc lắp ráp nối thêm FileResolver cho pf/evidence (chủ thể 'pf/hrm' / 'hr_folder').
+func (m *Module) UseDocs(f evport.Files) { m.svc.UseDocs(f) }
+
+// FileResolver là Resolver của pf/hrm cho pf/evidence (W11.24).
+func (m *Module) FileResolver() evport.Resolver { return app.FileResolver{S: m.svc} }
 
 // Catalog cho module khác: danh mục nhân sự, bảng hệ số và tham số có hiệu lực theo ngày.
 func (m *Module) Catalog() port.Catalog { return m.svc }

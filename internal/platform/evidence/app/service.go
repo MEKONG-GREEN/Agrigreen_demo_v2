@@ -273,7 +273,7 @@ func (s *Service) decide(ctx context.Context, p authz.Principal, f port.File, pu
 			return decision{domain.OutcomeDeniedScope, ErrSubjectForbidden}, nil
 		}
 	}
-	if s.Consent != nil {
+	if s.Consent != nil && domain.NeedsConsent(purpose) {
 		ok, err := s.Consent.HasConsent(ctx, f.SubjectRef, purpose)
 		if err != nil {
 			return decision{}, err

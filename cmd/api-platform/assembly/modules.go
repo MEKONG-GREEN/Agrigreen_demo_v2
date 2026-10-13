@@ -305,6 +305,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	ct.UseStaff(KNContactStaff{Dir: hr.Directory()}, KNContactLabels{Units: acc.InternalUnits(), AdminUnits: md.AdminUnits()})
 	kn.UseContactNames(ct.Names())
+	wireHRMDocs(hr, ev) // W11.24: kho tài liệu nhân sự — tệp qua pf/evidence (hr_records)
 	pty.UseOrgImpact(kn.OpenPeriodsImpact())
 	pty.UseDepartmentUsage(kn.ReportUsage())
 	// W11.02 (FN-AD-04.03): đếm bản ghi theo phòng ban ở mọi module mang department_code — mẫu/gửi Chi cục, máy móc HTX,

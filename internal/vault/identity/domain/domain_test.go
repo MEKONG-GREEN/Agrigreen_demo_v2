@@ -77,7 +77,7 @@ func TestAllowedPurpose(t *testing.T) {
 	ok := [][2]string{
 		{OpLookup, "registry.dedup"}, {OpLookup, "registry.admin"}, {OpResolve, "extension.contact"},
 		{OpUnwrap, "mrv.evidence"}, {OpDisplay, "mechanization.owner"}, {OpErase, "registry.erasure"},
-		{OpCreate, "mechanization.owner"},
+		{OpCreate, "mechanization.owner"}, {OpUnwrap, "hr_records"}, // W11.24 tài liệu nhân sự
 	}
 	for _, c := range ok {
 		if !AllowedPurpose(c[0], c[1]) {
@@ -87,6 +87,7 @@ func TestAllowedPurpose(t *testing.T) {
 	bad := [][2]string{
 		{OpLookup, "extension.contact"}, {OpLookup, "mrv.evidence"}, {OpResolve, "mrv.evidence"},
 		{OpResolve, "marketing.campaign"}, {OpUnwrap, "registry.admin"}, {"khac", "registry.admin"},
+		{OpResolve, "hr_records"}, {OpDisplay, "hr_records"}, {OpCreate, "hr_records"},
 	}
 	for _, c := range bad {
 		if AllowedPurpose(c[0], c[1]) {

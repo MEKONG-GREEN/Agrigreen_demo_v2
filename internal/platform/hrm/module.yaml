@@ -7,6 +7,7 @@ kind: domain
 zones: [pf]
 version: 1.0.0
 depends:
+  pf/evidence: ">=1.0 <2"
   vault/identity: ">=1.0 <2"
 provides:
   ports: [Catalog, Directory, Units]
