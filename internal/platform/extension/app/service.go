@@ -90,6 +90,9 @@ type Service struct {
 	KNDirectory accport.KNDirectory
 	// ContactNames (tùy chọn, W11.23 pf/contact): tên cán bộ theo tài khoản từ Contact — đọc trước danh bạ trực (Q-072).
 	ContactNames partyport.ActorNames
+	// Holders (tùy chọn, W11.46): người mang cờ nhiệm vụ "theo dõi lịch" — người duyệt nhận thông báo khi phòng ban
+	// dùng quy tắc duyệt "follower". Thiếu → chỉ lãnh đạo phòng (theo cấp quản lý) nhận.
+	Holders accport.RoleHolders
 	// TablePDF (tùy chọn, pf/reports): "Xuất PDF" lịch công tác. Thiếu → 503.
 	TablePDF port.TablePDF
 	// Egress (tùy chọn, G5 ADR-0024 + quyết định A5): điểm kiểm soát xuất dùng chung (pf/metering) cho "Xuất

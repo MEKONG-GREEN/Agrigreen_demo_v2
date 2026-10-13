@@ -104,6 +104,7 @@ var ProvinceGroups = []CatalogItem{
 var Duties = []CatalogItem{
 	{Code: authz.DutyPriceAdmin, Label: "Quản trị nghiệp vụ báo giá (QTNV)"},
 	{Code: authz.DutyFormOwner, Label: "Người phụ trách biểu"},
+	{Code: authz.DutyScheduleFollower, Label: "Người theo dõi lịch công tác cán bộ xã"},
 }
 
 // Powers là quyền nghiệp vụ ủy quyền có hạn được.

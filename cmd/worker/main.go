@@ -486,6 +486,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			}
 			acc := accounts.New(accPool, clk, accounts.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Departments: pty.Departments(), Units: md.AdminUnits()})
 			kn.UseKNContext(acc.ExtensionKNContext(), acc.ExtensionKNDirectory())
+			kn.UseRoleHolders(acc.RoleHolders()) // W11.46
 			// KN v7.7 P5: khóa tuần đã kết thúc, nhắc hạn đăng ký / hạn duyệt lịch công tác.
 			js = append(js, kn.ScheduleJobs(extension.ScheduleTenants(out.pools[migrations.PF]), log)...)
 		}

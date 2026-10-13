@@ -121,6 +121,10 @@ func (m *Module) UseKNContext(c accport.KNContextResolver, d accport.KNDirectory
 	m.svc.KNContext, m.svc.KNDirectory = c, d
 }
 
+// UseRoleHolders (W11.46) nối người mang cờ nhiệm vụ của pf/accounts: người theo dõi lịch công tác (quy tắc duyệt
+// "follower" của Chăn nuôi – Thủy sản) nhận thông báo lịch gửi duyệt và nhắc duyệt.
+func (m *Module) UseRoleHolders(h accport.RoleHolders) { m.svc.Holders = h }
+
 // UseEgress (quyết định A5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho "Xuất Excel/PDF" lịch công tác —
 // xuất nội bộ: ghi egress_event, không bao giờ bị chặn kể cả AG_EGRESS_MODE=enforce.
 func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
@@ -220,7 +224,7 @@ func (m *Module) ScheduleJobs(tenants app.TenantLister, log *slog.Logger) []sche
 					outcome = "error"
 				}
 				log.Info("lịch công tác: khóa tuần, nhắc hạn", "event", "job.extension_work_schedule", "locked", r.Locked,
-					"reminders", r.Reminders, "outcome", outcome)
+					"reminders", r.Reminders, "checkin_points_purged", r.Purged, "outcome", outcome)
 			}
 			return err
 		},

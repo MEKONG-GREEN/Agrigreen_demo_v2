@@ -190,6 +190,14 @@ type ScheduleSettings struct {
 	ApproverLevels   []string
 	ProvinceApproval string
 	Provisional      bool
+	// Theo phòng ban (W11.46, Q-057).
+	Department    string
+	ApproverRule  string  // port.ApproverRuleLevels | port.ApproverRuleFollower
+	Checkin       bool    // check-in GPS (CV-07)
+	CheckinFarM   float64 // ngưỡng "xa địa điểm"
+	CheckinAccM   float64 // ngưỡng GPS yếu (cnts.gps_accuracy_m)
+	StorePoint    bool    // cờ QĐ-8: lưu tọa độ check-in (bảng có hạn lưu)
+	RetentionDays int     // hạn lưu tọa độ check-in
 }
 
 // param tra khóa có chiều tỉnh trước, rồi khóa chung; không có → ok = false.
@@ -214,7 +222,7 @@ func (s *Service) param(ctx context.Context, key, province string, at time.Time)
 	return params.ParamValue{}, false, nil
 }
 
-func (s *Service) scheduleSettings(ctx context.Context, province string, at time.Time) (ScheduleSettings, error) {
+func (s *Service) scheduleSettings(ctx context.Context, dept, province string, at time.Time) (ScheduleSettings, error) {
 	st := ScheduleSettings{ProvinceCode: province, SubmitDueOffset: defaultSubmitDueOffset, ReviewDueOffset: defaultReviewDueOffset,
 		RemindBefore: defaultRemindBefore, ApproverLevels: defaultApproverLevels, ProvinceApproval: port.ProvinceApprovalPeer, Provisional: true}
 	ints := []struct {
@@ -243,7 +251,7 @@ func (s *Service) scheduleSettings(ctx context.Context, province string, at time
 			st.ProvinceApproval, st.Provisional = t, false
 		}
 	}
-	return st, nil
+	return st, s.deptSettings(ctx, &st, dept, province, at)
 }
 
 // SubmitDue, ReviewDue của tuần theo cấu hình.
@@ -272,7 +280,7 @@ func (s *Service) GetScheduleSettings(ctx context.Context, province string) (Sch
 	if a.Role != port.KNRoleAdmin && province != a.ProvinceCode {
 		return ScheduleSettings{}, ErrOutOfScope
 	}
-	return s.scheduleSettings(ctx, province, s.now())
+	return s.scheduleSettings(ctx, a.Department, province, s.now())
 }
 
 // canReview: Cấp Tỉnh cùng phòng ban, cùng tỉnh, cấp quản lý được duyệt (Q-05), không phải người đăng ký (R-56).
@@ -284,7 +292,7 @@ func (a knActor) canReview(sc domain.Schedule, st ScheduleSettings) error {
 	if sc.OwnerRef == a.ActorRef {
 		return problem.SelfApproval.WithDetail("Không được duyệt lịch công tác của chính mình")
 	}
-	if !domain.ApproverLevelAllowed(a.MgmtLevel, st.ApproverLevels) {
+	if !a.mayApprove(st) {
 		return ErrNotScheduleApprover.With("mgmt_level", a.MgmtLevel)
 	}
 	if sc.OwnerLevel == accountsport.ScheduleLevelProvince && st.ProvinceApproval != port.ProvinceApprovalPeer {
@@ -331,8 +339,12 @@ func (s *Service) approvers(ctx context.Context, tid uuid.UUID, dept, province s
 		return nil, err
 	}
 	out := []uuid.UUID{}
+	followers, err := s.followers(ctx, tid, dept, st)
+	if err != nil {
+		return nil, err
+	}
 	for _, o := range offs {
-		if o.Level == accountsport.ScheduleLevelProvince && o.ActorRef != owner && domain.ApproverLevelAllowed(o.MgmtLevel, st.ApproverLevels) {
+		if o.Level == accountsport.ScheduleLevelProvince && o.ActorRef != owner && officerMayApprove(o, followers, st) {
 			out = append(out, o.ActorRef)
 		}
 	}
@@ -371,6 +383,9 @@ type ScheduleDetail struct {
 	Can            ScheduleCan
 	Names          map[uuid.UUID]string
 	Replayed       bool
+	// W11.46: check-in GPS (phòng ban bật check-in) — khóa theo item_id.
+	CheckinEnabled bool
+	Checkins       map[uuid.UUID]store.Checkin
 }
 
 // ScheduleWarning là cảnh báo không chặn.
@@ -435,7 +450,7 @@ func (s *Service) SaveSchedule(ctx context.Context, in ScheduleSaveInput) (Sched
 	if err := s.checkScheduleItems(ctx, a, items); err != nil {
 		return ScheduleDetail{}, err
 	}
-	st, err := s.scheduleSettings(ctx, a.ProvinceCode, now)
+	st, err := s.scheduleSettings(ctx, a.Department, a.ProvinceCode, now)
 	if err != nil {
 		return ScheduleDetail{}, err
 	}
@@ -701,7 +716,7 @@ func (s *Service) ReviewSchedule(ctx context.Context, in ReviewInput) (ScheduleD
 		return replay, err
 	}
 	now := s.now()
-	st, err := s.scheduleSettings(ctx, a.ProvinceCode, now)
+	st, err := s.scheduleSettings(ctx, a.Department, a.ProvinceCode, now)
 	if err != nil {
 		return ScheduleDetail{}, err
 	}
@@ -850,11 +865,12 @@ func (s *Service) scheduleDetail(ctx context.Context, a knActor, id uuid.UUID, v
 		return ScheduleDetail{}, ErrScheduleNotFound
 	}
 	now := s.now()
-	st, err := s.scheduleSettings(ctx, d.Schedule.ProvinceCode, now)
+	st, err := s.scheduleSettings(ctx, d.Schedule.Department, d.Schedule.ProvinceCode, now)
 	if err != nil {
 		return ScheduleDetail{}, err
 	}
 	s.decorate(ctx, a, &d, st, now)
+	s.decorateCheckins(ctx, a, &d, st, now)
 	for _, e := range events {
 		if e.Action == domain.ScheduleActDraftSaved || e.Action == domain.ScheduleActSubmitted || e.Action == domain.ScheduleActAmended {
 			d.Versions = append(d.Versions, ScheduleVersion{Version: e.Version, Action: e.Action, At: e.EventTime, ActorRef: e.ActorRef, ItemCount: e.ItemCount})
@@ -993,6 +1009,7 @@ func (s *Service) ListSchedules(ctx context.Context, q ScheduleQuery) (ScheduleP
 	}
 	var list []domain.Schedule
 	var items map[uuid.UUID][]domain.ScheduleItem
+	var checkins map[uuid.UUID]store.Checkin
 	err = tenant.WithTenantTx(ctx, s.DB, a.TenantID, func(tx pgx.Tx) error {
 		var e error
 		if list, e = store.ListSchedules(ctx, tx, f); e != nil {
@@ -1005,7 +1022,10 @@ func (s *Service) ListSchedules(ctx context.Context, q ScheduleQuery) (ScheduleP
 		for _, sc := range list {
 			idl, vers = append(idl, sc.ID), append(vers, sc.Version)
 		}
-		items, e = store.ScheduleItemsOf(ctx, tx, idl, vers)
+		if items, e = store.ScheduleItemsOf(ctx, tx, idl, vers); e != nil {
+			return e
+		}
+		checkins, e = store.CheckinsOf(ctx, tx, idl)
 		return e
 	})
 	if err != nil {
@@ -1021,15 +1041,17 @@ func (s *Service) ListSchedules(ctx context.Context, q ScheduleQuery) (ScheduleP
 	stCache := map[string]ScheduleSettings{}
 	var refs []uuid.UUID
 	for _, sc := range list {
-		st, ok := stCache[sc.ProvinceCode]
+		ck := sc.Department + ":" + sc.ProvinceCode
+		st, ok := stCache[ck]
 		if !ok {
-			if st, err = s.scheduleSettings(ctx, sc.ProvinceCode, now); err != nil {
+			if st, err = s.scheduleSettings(ctx, sc.Department, sc.ProvinceCode, now); err != nil {
 				return SchedulePage{}, err
 			}
-			stCache[sc.ProvinceCode] = st
+			stCache[ck] = st
 		}
 		d := ScheduleDetail{Schedule: sc, ViewingVersion: sc.Version, Items: items[sc.ID]}
 		s.decorate(ctx, a, &d, st, now)
+		applyCheckins(a, &d, st, now, checkins)
 		pg.Items = append(pg.Items, d)
 		refs = append(refs, sc.OwnerRef, sc.ReviewerRef)
 	}
@@ -1047,6 +1069,8 @@ type MySchedule struct {
 	Detail            *ScheduleDetail
 	PreviousWeek      time.Time
 	PreviousAvailable bool
+	// CheckinEnabled: phòng ban của người gọi dùng check-in GPS (W11.46) — Mobile hiện nút "Check-in".
+	CheckinEnabled bool
 }
 
 // GetMySchedule trả lịch tuần của người gọi (mặc định tuần kế tiếp) kèm hạn đăng ký (FN-XA-03.08 thiết kế:
@@ -1064,12 +1088,12 @@ func (s *Service) GetMySchedule(ctx context.Context, weekRaw string) (MySchedule
 		return MySchedule{}, err
 	}
 	now := s.now()
-	st, err := s.scheduleSettings(ctx, a.ProvinceCode, now)
+	st, err := s.scheduleSettings(ctx, a.Department, a.ProvinceCode, now)
 	if err != nil {
 		return MySchedule{}, err
 	}
 	m := MySchedule{Week: week, SubmitDue: st.SubmitDue(week), ReviewDue: st.ReviewDue(week),
-		Locked: domain.WeekLocked(week, now, clock.Zone()), PreviousWeek: week.AddDate(0, 0, -7)}
+		Locked: domain.WeekLocked(week, now, clock.Zone()), PreviousWeek: week.AddDate(0, 0, -7), CheckinEnabled: st.Checkin}
 	var cur, prev *domain.Schedule
 	err = tenant.WithTenantTx(ctx, s.DB, a.TenantID, func(tx pgx.Tx) error {
 		var e error
@@ -1194,11 +1218,11 @@ func (s *Service) CountSchedules(ctx context.Context, weekRaw string) (ScheduleC
 	now := s.now()
 	reviewer := false
 	if a.Role == port.KNRoleTinh {
-		st, err := s.scheduleSettings(ctx, a.ProvinceCode, now)
+		st, err := s.scheduleSettings(ctx, a.Department, a.ProvinceCode, now)
 		if err != nil {
 			return c, err
 		}
-		reviewer = domain.ApproverLevelAllowed(a.MgmtLevel, st.ApproverLevels)
+		reviewer = a.mayApprove(st)
 	}
 	err = tenant.WithTenantTx(ctx, s.DB, a.TenantID, func(tx pgx.Tx) error {
 		m, err := store.ScheduleStatusCounts(ctx, tx, a.filter(week))

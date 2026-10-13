@@ -121,6 +121,10 @@ func (m *Module) Assignments() port.Assignments { return m.svc }
 // báo của consumer worker (tenant tường minh).
 func (m *Module) RoleHolders() port.RoleHolders { return m.svc }
 
+// XaScopes (W11.46) cho lịch trực KSGM BM-03 của pf/extension: cán bộ Cấp Xã của phòng ban kèm xã phụ trách, giới hạn
+// cơ sở/hộ (tenant tường minh).
+func (m *Module) XaScopes() port.XaScopes { return m.svc }
+
 // KNPeople (W11.07) cho pf/hrm, Contact, đánh giá: phạm vi nhân sự của ngữ cảnh phiên (BR-04 HCTH, HS-37).
 func (m *Module) KNPeople() port.KNPeople { return m.svc }
 

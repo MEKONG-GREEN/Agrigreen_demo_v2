@@ -34,20 +34,29 @@ func (h Handler) registerSchedule(rg *gin.RouterGroup) {
 	g.GET("/:id/log", h.scheduleLog)
 	g.POST("/:id/approve", h.approveSchedule)
 	g.POST("/:id/request-changes", h.requestChanges)
+	g.POST("/:id/items/:item_id/checkin", h.checkin) // W11.46 (CNTS CV-07)
+}
+
+// placeReq là địa điểm công tác trên bản đồ (W11.46, CV-06).
+type placeReq struct {
+	Lat    *float64 `json:"lat"`
+	Lon    *float64 `json:"lon"`
+	Source *string  `json:"source"`
 }
 
 type scheduleItemReq struct {
-	ID             *string `json:"id"`
-	Day            string  `json:"day"`
-	Session        string  `json:"session"`
-	StartTime      *string `json:"start_time"`
-	EndTime        *string `json:"end_time"`
-	Content        string  `json:"content"`
-	CommuneCode    *string `json:"commune_code"`
-	CooperativeRef *string `json:"cooperative_ref"`
-	Location       *string `json:"location"`
-	Participants   *string `json:"participants"`
-	Note           *string `json:"note"`
+	ID             *string   `json:"id"`
+	Day            string    `json:"day"`
+	Session        string    `json:"session"`
+	StartTime      *string   `json:"start_time"`
+	EndTime        *string   `json:"end_time"`
+	Content        string    `json:"content"`
+	CommuneCode    *string   `json:"commune_code"`
+	CooperativeRef *string   `json:"cooperative_ref"`
+	Location       *string   `json:"location"`
+	Participants   *string   `json:"participants"`
+	Note           *string   `json:"note"`
+	Place          *placeReq `json:"place"`
 }
 
 type scheduleSaveReq struct {
@@ -102,6 +111,13 @@ func (r scheduleSaveReq) toInput(key string) (app.ScheduleSaveInput, error) {
 		}
 		item.Day = d
 		item.CooperativeRef, v = optRef(v, &bad, f+"cooperative_ref", it.CooperativeRef)
+		if p := it.Place; p != nil {
+			if p.Lat == nil || p.Lon == nil {
+				v, bad = v.WithField(f+"place", "cần lat và lon"), true
+			} else {
+				item.Place = &domain.GeoPoint{Lat: *p.Lat, Lon: *p.Lon, Source: deref(p.Source)}
+			}
+		}
 		in.Items = append(in.Items, item)
 	}
 	if bad {
@@ -167,6 +183,7 @@ func (h Handler) listSchedules(c *gin.Context) {
 		d.Names = pg.Names
 		m := toSchedule(d)
 		m["items"] = toItems(d.Items, d.Changed, d.Conflicts)
+		addCheckins(m, d)
 		items = append(items, m)
 	}
 	c.JSON(http.StatusOK, gin.H{"week_start": pg.Week.Format(time.DateOnly), "items": items, "next_cursor": nextUUID(pg.Next)})
@@ -187,6 +204,7 @@ func (h Handler) mySchedule(c *gin.Context) {
 		"submit_due_at": m.SubmitDue.UTC().Format(time.RFC3339), "review_due_at": m.ReviewDue.UTC().Format(time.RFC3339),
 		"locked": m.Locked, "late_now": m.LateNow, "schedule": sched,
 		"previous_week_start": m.PreviousWeek.Format(time.DateOnly), "previous_available": m.PreviousAvailable,
+		"checkin_enabled": m.CheckinEnabled,
 	})
 }
 
@@ -232,7 +250,9 @@ func (h Handler) scheduleSettings(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"province_code": st.ProvinceCode, "submit_due_offset_hours": st.SubmitDueOffset,
 		"review_due_offset_hours": st.ReviewDueOffset, "remind_before_hours": st.RemindBefore,
-		"approver_levels": st.ApproverLevels, "province_approval": st.ProvinceApproval, "provisional": st.Provisional})
+		"approver_levels": st.ApproverLevels, "province_approval": st.ProvinceApproval, "provisional": st.Provisional,
+		"department_code": st.Department, "approver_rule": st.ApproverRule, "checkin_enabled": st.Checkin,
+		"checkin_far_m": st.CheckinFarM, "checkin_store_point": st.StorePoint, "checkin_point_retention_days": st.RetentionDays})
 }
 
 func (h Handler) exportSchedules(c *gin.Context) {
@@ -419,6 +439,7 @@ func toItems(items []domain.ScheduleItem, changed, conflicts map[uuid.UUID]bool)
 			"end_time": strOrNil(it.End), "content": it.Content, "commune_code": strOrNil(it.CommuneCode),
 			"cooperative_ref": coop, "location": strOrNil(it.Location), "participants": strOrNil(it.Participants),
 			"note": strOrNil(it.Note), "changed": changed[it.ItemID], "conflict": conflicts[it.ItemID],
+			"place": placeDTO(it.Place),
 		})
 	}
 	return out
@@ -439,11 +460,13 @@ func toScheduleDetail(d app.ScheduleDetail) gin.H {
 			"actor_ref": v.ActorRef, "actor_display": nameOrNil(d.Names, v.ActorRef), "item_count": v.ItemCount})
 	}
 	approvedConf := domain.Conflicts(d.ApprovedItems)
-	return gin.H{
+	out := gin.H{
 		"schedule": toSchedule(d), "viewing_version": d.ViewingVersion,
 		"items":          toItems(d.Items, d.Changed, d.Conflicts),
 		"approved_items": toItems(d.ApprovedItems, nil, approvedConf),
 		"warnings":       warnings, "versions": versions,
 		"can": gin.H{"edit": d.Can.Edit, "submit": d.Can.Submit, "approve": d.Can.Approve, "request_changes": d.Can.RequestChanges},
 	}
+	addCheckins(out, d)
+	return out
 }

@@ -26,15 +26,20 @@ import (
 type ScheduleJobResult struct {
 	Locked    int // lịch của tuần đã kết thúc được ghi sự việc "locked"
 	Reminders int // lần nhắc đã phát (submit_due + review_overdue)
+	Purged    int // tọa độ check-in quá hạn lưu đã xóa (W11.46, QĐ-8)
 }
 
-const lockBatch = 200
+const (
+	lockBatch  = 200
+	purgeBatch = 1000
+)
 
 // RunScheduleJob là thân job "extension_work_schedule" (mỗi 15 phút, leader): với mọi tenant —
 // (1) ghi sự việc "locked" cho lịch của tuần đã kết thúc (FN-TI-02.07: "lịch tuần đã kết thúc bị khóa"; việc
 // chặn ghi không phụ thuộc job — app kiểm tuần theo đồng hồ);
 // (2) nhắc cán bộ chưa gửi lịch tuần kế tiếp khi còn ≤ remind_before giờ tới hạn đăng ký;
-// (3) nhắc người duyệt khi còn lịch chờ duyệt quá hạn duyệt (FN-TI-02.07 luồng phụ).
+// (3) nhắc người duyệt khi còn lịch chờ duyệt quá hạn duyệt (FN-TI-02.07 luồng phụ);
+// (0) xóa tọa độ check-in quá hạn lưu (W11.46).
 // Idempotent: mỗi (loại nhắc, tuần, phòng ban, tỉnh) chỉ một lần (bảng work_schedule_reminder), khóa idem
 // "lock:<lịch>" cho sự việc khóa.
 func (s *Service) RunScheduleJob(ctx context.Context, tenants TenantLister) (ScheduleJobResult, error) {
@@ -49,6 +54,7 @@ func (s *Service) RunScheduleJob(ctx context.Context, tenants TenantLister) (Sch
 		r, err := s.ScheduleJobTenant(ctx, tid, now)
 		total.Locked += r.Locked
 		total.Reminders += r.Reminders
+		total.Purged += r.Purged
 		if err != nil {
 			errs = append(errs, fmt.Errorf("tenant %s: %w", tid, err))
 		}
@@ -62,6 +68,23 @@ func (s *Service) ScheduleJobTenant(ctx context.Context, tid uuid.UUID, now time
 	var res ScheduleJobResult
 	zone := clock.Zone()
 	thisWeek := domain.WeekStartOf(now, zone)
+	// (0) W11.46: xóa tọa độ check-in quá hạn lưu (bảng work_schedule_checkin_point, không phải sổ).
+	l := now.In(zone)
+	today := time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, time.UTC)
+	for {
+		var n int
+		if err := tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+			var e error
+			n, e = store.PurgeCheckinPoints(ctx, tx, today, purgeBatch)
+			return e
+		}); err != nil {
+			return res, err
+		}
+		res.Purged += n
+		if n < purgeBatch {
+			break
+		}
+	}
 	for {
 		n, err := s.lockEnded(ctx, tid, thisWeek, now)
 		res.Locked += n
@@ -96,7 +119,7 @@ func (s *Service) ScheduleJobTenant(ctx context.Context, tid uuid.UUID, now time
 	var errs []error
 	next := thisWeek.AddDate(0, 0, 7)
 	for sc := range scopes {
-		st, err := s.scheduleSettings(ctx, sc.Province, now)
+		st, err := s.scheduleSettings(ctx, sc.Department, sc.Province, now)
 		if err != nil {
 			errs = append(errs, err)
 			continue

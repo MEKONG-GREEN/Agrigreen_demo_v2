@@ -83,6 +83,8 @@ type ScheduleItem struct {
 	Participants   string
 	Note           string
 	SupersedesID   *uuid.UUID
+	// Place: địa điểm công tác chọn trên bản đồ (CNTS CV-06, W11.46) — sổ phụ work_schedule_item_place. nil = không có.
+	Place *GeoPoint
 }
 
 // DayString là ngày dạng YYYY-MM-DD.
@@ -92,7 +94,7 @@ func (it ScheduleItem) DayString() string { return it.Day.Format(time.DateOnly) 
 func (it ScheduleItem) sameContent(o ScheduleItem) bool {
 	return it.DayString() == o.DayString() && it.Session == o.Session && it.Start == o.Start && it.End == o.End &&
 		it.Content == o.Content && it.CommuneCode == o.CommuneCode && it.CooperativeRef == o.CooperativeRef &&
-		it.Location == o.Location && it.Participants == o.Participants && it.Note == o.Note
+		it.Location == o.Location && it.Participants == o.Participants && it.Note == o.Note && it.Place.Equal(o.Place)
 }
 
 // ParseDate đọc ngày nghiệp vụ YYYY-MM-DD thành 00:00 UTC (kiểu date của DB).
@@ -212,6 +214,13 @@ func NormalizeItems(weekStart time.Time, items []ScheduleItem, allowedCommunes [
 			return nil, FieldError{Field: f("commune_code"), Err: ErrItemCommune}
 		}
 		it.Location, it.Participants, it.Note = strings.TrimSpace(it.Location), strings.TrimSpace(it.Participants), strings.TrimSpace(it.Note)
+		if it.Place != nil {
+			p, err := it.Place.Normalize()
+			if err != nil {
+				return nil, FieldError{Field: f("place"), Err: err}
+			}
+			it.Place = &p
+		}
 		for _, t := range []struct {
 			name string
 			v    string

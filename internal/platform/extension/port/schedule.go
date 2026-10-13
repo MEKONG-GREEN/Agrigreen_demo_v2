@@ -50,6 +50,31 @@ const (
 	ParamScheduleProvinceApproval = "extension.work_schedule_province_approval"
 )
 
+// Tham số theo PHÒNG BAN của lịch công tác (W11.46, Q-057 "theo phòng (tham số)"). Thứ tự tra: "<khóa>:<phòng ban>:<tỉnh>",
+// "<khóa>:<phòng ban>", "<khóa>:<tỉnh>", "<khóa>"; thiếu cả bốn → mặc định trong mã theo phòng ban (Chăn nuôi – Thủy
+// sản: duyệt "follower", check-in bật; phòng khác: "levels", không check-in — giữ hành vi Trồng trọt v7.7).
+const (
+	// ParamScheduleApproverRule (chuỗi): "levels" — cấp quản lý trong ParamScheduleApproverLevels (Trồng trọt, Q-05);
+	// "follower" — người theo dõi được phân công (cờ nhiệm vụ authz.DutyScheduleFollower) hoặc lãnh đạo phòng (CNTS
+	// FN-12 BR-04).
+	ParamScheduleApproverRule = "extension.work_schedule_approver_rule"
+	// ParamScheduleCheckin (chuỗi "on"/"off"): bật check-in GPS (CV-07).
+	ParamScheduleCheckin = "extension.work_schedule_checkin"
+	// ParamScheduleCheckinFarM: check-in cách địa điểm đã đăng ký quá số mét → cảnh báo (mặc định 500).
+	ParamScheduleCheckinFarM = "extension.work_schedule_checkin_far_m"
+	// ParamScheduleCheckinStorePoint (chuỗi "on"/"off", cờ tính năng QĐ-8): lưu tọa độ check-in vào bảng có hạn lưu
+	// work_schedule_checkin_point. "off" → chỉ lưu khoảng cách, sai số, thời điểm. Mặc định "on".
+	ParamScheduleCheckinStorePoint = "extension.work_schedule_checkin_store_point"
+	// ParamScheduleCheckinRetentionDays: số ngày giữ tọa độ check-in (mặc định 90, tối đa 400).
+	ParamScheduleCheckinRetentionDays = "extension.work_schedule_checkin_point_retention_days"
+)
+
+// Giá trị của ParamScheduleApproverRule.
+const (
+	ApproverRuleLevels   = "levels"
+	ApproverRuleFollower = "follower"
+)
+
 // Giá trị của ParamScheduleProvinceApproval.
 const (
 	ProvinceApprovalPeer = "peer"

@@ -179,20 +179,31 @@ func InsertScheduleItems(ctx context.Context, tx pgx.Tx, tid, scheduleID uuid.UU
 		if err != nil {
 			return err
 		}
+		if it.Place != nil {
+			if err := insertItemPlace(ctx, tx, tid, scheduleID, *it, actor, at, idemPrefix+":place:"+strconv.Itoa(i), newID()); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
 
 const scheduleItemCols = `i.id, i.item_id, i.version, i.position, i.day, i.session, coalesce(to_char(i.start_time, 'HH24:MI'), ''),
   coalesce(to_char(i.end_time, 'HH24:MI'), ''), i.content, coalesce(i.commune_code, ''), i.cooperative_ref, coalesce(i.location, ''),
-  coalesce(i.participants, ''), coalesce(i.note, ''), i.supersedes_id`
+  coalesce(i.participants, ''), coalesce(i.note, ''), i.supersedes_id, ST_Y(p.point), ST_X(p.point), p.place_source`
+
+// itemPlaceJoin nối địa điểm công tác (W11.46) vào dòng mục i.
+const itemPlaceJoin = ` LEFT JOIN pf_extension.work_schedule_item_place p ON p.tenant_id = i.tenant_id AND p.item_row_id = i.id`
 
 func scanScheduleItem(row pgx.Row) (domain.ScheduleItem, error) {
 	var it domain.ScheduleItem
 	var coop *uuid.UUID
+	var lat, lon *float64
+	var src *string
 	err := row.Scan(&it.RowID, &it.ItemID, &it.Version, &it.Position, &it.Day, &it.Session, &it.Start, &it.End, &it.Content,
-		&it.CommuneCode, &coop, &it.Location, &it.Participants, &it.Note, &it.SupersedesID)
+		&it.CommuneCode, &coop, &it.Location, &it.Participants, &it.Note, &it.SupersedesID, &lat, &lon, &src)
 	it.CooperativeRef = refOrNil(coop)
+	it.Place = placeOf(lat, lon, src)
 	it.Day = dateUTC(it.Day)
 	return it, err
 }
@@ -205,7 +216,8 @@ func ScheduleItemsOf(ctx context.Context, tx pgx.Tx, ids []uuid.UUID, versions [
 	}
 	rows, err := tx.Query(ctx, `SELECT i.schedule_id, `+scheduleItemCols+`
 	  FROM pf_extension.work_schedule_item i
-	  JOIN unnest($1::uuid[], $2::int[]) AS k(schedule_id, version) ON k.schedule_id = i.schedule_id AND k.version = i.version
+	  JOIN unnest($1::uuid[], $2::int[]) AS k(schedule_id, version) ON k.schedule_id = i.schedule_id AND k.version = i.version`+
+		itemPlaceJoin+`
 	  ORDER BY i.schedule_id, i.position`, uuidStrings(ids), intStrings(versions))
 	if err != nil {
 		return nil, err
@@ -215,11 +227,14 @@ func ScheduleItemsOf(ctx context.Context, tx pgx.Tx, ids []uuid.UUID, versions [
 		var sid uuid.UUID
 		var it domain.ScheduleItem
 		var coop *uuid.UUID
+		var lat, lon *float64
+		var src *string
 		if err := rows.Scan(&sid, &it.RowID, &it.ItemID, &it.Version, &it.Position, &it.Day, &it.Session, &it.Start, &it.End,
-			&it.Content, &it.CommuneCode, &coop, &it.Location, &it.Participants, &it.Note, &it.SupersedesID); err != nil {
+			&it.Content, &it.CommuneCode, &coop, &it.Location, &it.Participants, &it.Note, &it.SupersedesID, &lat, &lon, &src); err != nil {
 			return nil, err
 		}
 		it.CooperativeRef = refOrNil(coop)
+		it.Place = placeOf(lat, lon, src)
 		it.Day = dateUTC(it.Day)
 		out[sid] = append(out[sid], it)
 	}
@@ -237,7 +252,7 @@ func intStrings(n []int) []string {
 
 // ScheduleItems trả mục của một phiên bản.
 func ScheduleItems(ctx context.Context, tx pgx.Tx, id uuid.UUID, version int) ([]domain.ScheduleItem, error) {
-	rows, err := tx.Query(ctx, "SELECT "+scheduleItemCols+` FROM pf_extension.work_schedule_item i
+	rows, err := tx.Query(ctx, "SELECT "+scheduleItemCols+` FROM pf_extension.work_schedule_item i`+itemPlaceJoin+`
 	  WHERE i.schedule_id = $1 AND i.version = $2 ORDER BY i.position`, id, version)
 	if err != nil {
 		return nil, err

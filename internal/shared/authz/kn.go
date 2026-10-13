@@ -117,6 +117,9 @@ const (
 const (
 	DutyPriceAdmin = "qtnv_bao_gia"   // Quản trị nghiệp vụ báo giá (Báo giá v1.3 FN-AD-04.03…06)
 	DutyFormOwner  = "phu_trach_bieu" // được chọn làm người phụ trách biểu (CNTS UR-TINH-08)
+	// DutyScheduleFollower: người theo dõi được phân công — duyệt lịch công tác của cán bộ xã khi phòng ban dùng quy
+	// tắc duyệt "follower" (CNTS FN-12 BR-04, Q-057; W11.46).
+	DutyScheduleFollower = "theo_doi_lich"
 )
 
 // HasDuty cho biết lần gán có cờ nhiệm vụ d. Ngữ cảnh chỉ xem không mang nhiệm vụ.
