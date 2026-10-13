@@ -1,2 +1,49 @@
+# Vân tay = <commit>:<tệp>:<quy tắc>:<dòng>. Vì có commit trong đó, mỗi dòng chỉ
+# bỏ qua ĐÚNG lần xuất hiện đã được xem xét. Nếu sau này có commit mới chạm vào
+# cùng dòng ấy, gitleaks sẽ báo lại — đó là điều mong muốn, đừng "sửa" nó bằng
+# cách allowlist theo đường dẫn.
+
 # Phát hiện đã xem xét — token GIẢ trong kiểm thử FCM (fcm_test.go), đã thay bằng chuỗi không giống token thật ở commit sau.
 1a729bf279d2da663f90b2546ce63431e38c89a0:internal/platform/notify/channel/fcm_test.go:generic-api-key:44
+
+# ---------------------------------------------------------------------------
+# Rà soát 13/10/2026 — Người duyệt: ______________
+#
+# Sau khi mở rộng .gitleaks.toml, 482 phát hiện còn 10. Mười cái dưới đây đã
+# được xem từng dòng tại đúng commit. Không có thông tin xác thực thật; không
+# có gì phải xoay vòng.
+# ---------------------------------------------------------------------------
+
+# apiclientport.Caller{... KeyPrefix: "abcdefgh2345"} — TIỀN TỐ 12 ký tự của khoá,
+# không phải khoá. Cùng chuỗi giả dùng trong port_test.go. Khoá thật có dạng
+# agk_<12>_<43> (port.ParseKey, ADR-0022); ở đây chỉ có phần đầu.
+2199c2617c80c568f8254b8323a3029a40f8d46e:internal/platform/party/handler/grantlookup_integration_test.go:generic-api-key:146
+0f2a259312d17d2566651be5458b62a04516ba62:internal/platform/party/handler/grantlookup_integration_test.go:generic-api-key:241
+
+# if x.Key == "province/SB01" — mã dòng của báo cáo biểu mẫu. Quy tắc trúng vì
+# có chữ "Key" đứng cạnh một chuỗi.
+2185d543dbf1654fe62f62a51e38e46e7e63ca80:internal/platform/reports/form/form_test.go:generic-api-key:215
+
+# const SECRET = "agk_abcdefghijkl_Zm9vYmFyYmF6..." — phần sau là base64 của
+# "foobarbazquxquux...". Fixture cho hộp thoại SecretOnceDialog (bí mật hiện
+# một lần). Không phải khoá đã từng phát hành.
+da560746c2e318a62d6666baa6f1246b962f3552:apps/web-ops/src/apiclient/g5.test.tsx:generic-api-key:344
+
+# Bảng chuỗi SAI cố ý để kiểm tra port.ParseKey phải TỪ CHỐI chúng. Phần "bí mật"
+# là strings.Repeat("A", 42) + "_" — bốn mươi hai chữ A. Dòng 20 bị bắt hai lần
+# (hai chuỗi trên cùng dòng); một vân tay phủ cả hai.
+3ca36b3d720433719ac6743c113378a549ed7a31:internal/platform/apiclient/port/port_test.go:generic-api-key:19
+3ca36b3d720433719ac6743c113378a549ed7a31:internal/platform/apiclient/port/port_test.go:generic-api-key:20
+
+# g.secret = append(g.secret, ...) — xem g4_scenario_test.go:1050,1061: g.secret
+# là DANH SÁCH CHUỖI KHÔNG ĐƯỢC PHÉP XUẤT HIỆN trong phản hồi API, tức công cụ
+# chống rò rỉ chứ không phải nơi chứa bí mật. Giá trị là số tiền và mã tham
+# chiếu: "142350000.00", "4840000.00". Quy tắc trúng vì tên biến là "secret".
+f9976ecd56ac0fd983e046326b58aefd8c9318e8:tests/e2e/g4_scenario_test.go:generic-api-key:344
+f9976ecd56ac0fd983e046326b58aefd8c9318e8:tests/e2e/g4_scenario_test.go:generic-api-key:571
+
+# const KEY = "MCowBQYDK2VwAyEA..." trong dữ liệu giả lập của web-internal.
+# "MCowBQYDK2VwAyEA" là phần đầu DER của SubjectPublicKeyInfo cho Ed25519, và
+# chuỗi dài 60 ký tự base64 = đúng 44 byte: KHOÁ CÔNG KHAI Ed25519. Khoá công
+# khai không phải bí mật.
+f4c09dce1f46d6294b1cbf601d9642cdb054dc92:apps/web-internal/src/api/mock/db.ts:generic-api-key:317

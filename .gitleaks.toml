@@ -1,12 +1,74 @@
 # Cấu hình gitleaks: dùng bộ quy tắc mặc định, chỉ bỏ qua các tệp vector kiểm thử
 # chứa khóa X25519 CÔNG BỐ CÓ CHỦ Ý (docs/dev/envelope-format.md). Không thêm
 # đường dẫn khác vào đây nếu không có review bảo mật.
+#
+# -----------------------------------------------------------------------------
+# 13/10/2026 — MỞ RỘNG SAU MỘT LẦN RÀ SOÁT. Người duyệt: ______________
+#
+# Bối cảnh: lần chạy CI đầu tiên sau hai tuần Actions bị tắt báo 482 phát hiện
+# trên 279 commit, toàn bộ ở hai quy tắc:
+#
+#     480  generic-api-key
+#       2  curl-auth-user
+#
+# Phân bố: 438 nằm trong optimizer/tests/golden/case*/ (snapshot.json và
+# expected.json), 20 trong apps/web-ops/.../fixtures/eval-golden.json, 2 trong
+# deploy/compose/docker-compose.yml, phần còn lại rải rác ở tệp kiểm thử và bản
+# ghi mẫu hợp đồng.
+#
+# Đã rà soát:
+#   - optimizer/tests/golden/** : dữ liệu mô phỏng logistics (61 trường: UUID,
+#     mã hub, số tấn, bán kính km). Không có trường nào mang thông tin xác thực.
+#     generic-api-key trúng vì các trường tên season_key / snapshot_id / hub_ref
+#     mang giá trị UUID — từ khoá "key"/"id"/"ref" cạnh chuỗi entropy cao.
+#     Các tệp này ĐÃ BỊ XOÁ khỏi cây mã ở commit 411883a (thay bằng
+#     golden_bytes.json khi tách lib/optcore); chúng chỉ còn trong lịch sử, nên
+#     không sửa được bằng cách sửa tệp.
+#   - docker-compose.yml:175,180 : curl -u "agrigreen:$$AMQP_PASSWORD" — biến
+#     compose được escape, không phải chuỗi thật.
+#   - contracts/integration/examples/*.json : "cursor": "c2VxOjEw" (base64 của
+#     "seq:10") và UUID mẫu.
+#   - internal/platform/apiclient/port/port_test.go:14 : strings.Repeat("A", 42).
+#   - apps/web-ops/src/apiclient/g5.test.tsx:344 : agk_abcdefghijkl_Zm9vYmFy…
+#     (base64 của "foobarbaz…").
+#
+# Không có bí mật thật nào cần xoay vòng.
+#
+# Hai cơ chế dưới đây, cố ý tách riêng:
+#   - paths   : thư mục dữ liệu vàng / fixture đã rà soát ở trên.
+#   - regexes : khớp trên GIÁ TRỊ bắt được, không phải đường dẫn — nên nó xử lý
+#               cả những phát hiện lẻ trong tệp kiểm thử mà không phải allowlist
+#               nguyên "*_test.go" (quá rộng, sẽ che mất rò rỉ thật về sau).
+#
+# Lưu ý về regex UUID: khoá API thật của dự án có dạng agk_<12>_<43> (xem
+# port.ParseKey, ADR-0022), KHÔNG phải UUID. Vì vậy bỏ qua UUID trần là an toàn
+# ở kho này — nhưng nếu sau này có hệ thống nào phát hành bí mật dạng UUID thì
+# phải xoá dòng đó.
+#
+# KIỂM CHỨNG sau khi sửa (phải ra "leaks found: 0" hoặc không in dòng WRN):
+#   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/repo -w /repo \
+#     zricethezav/gitleaks:v8.30.1 git --redact --exit-code 1 .
+# -----------------------------------------------------------------------------
+
 [extend]
 useDefault = true
 
 [allowlist]
-description = "Vector kiểm thử phong bì mã hóa — khóa công bố, không dùng cho dữ liệu thật"
+description = "Vector kiểm thử phong bì mã hóa (khóa công bố), dữ liệu vàng của bộ tối ưu, fixture giả lập và bản ghi mẫu hợp đồng — đã rà soát 13/10/2026"
 paths = [
+  # Giữ nguyên từ bản cũ
   '''^internal/shared/envelope/testdata/vectors\.json$''',
   '''^packages/agrigreen_mobile/test/fixtures/go_nacl_vectors\.json$''',
+
+  # Thêm 13/10/2026
+  '''^optimizer/tests/golden/''',
+  '''^apps/web-ops/src/api/mock/forms/fixtures/''',
+  '''^contracts/integration/examples/''',
+]
+regexes = [
+  # UUID trần — xem lưu ý ở trên.
+  '''[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}''',
+
+  # Biến môi trường được escape trong tệp compose: $$TEN_BIEN
+  '''\$\$[A-Z0-9_]+''',
 ]
