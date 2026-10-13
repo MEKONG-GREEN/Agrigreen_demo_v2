@@ -66,6 +66,8 @@ const PERMS = [
   "sensitive.view",
   "export",
   "audit.view",
+  "docs.view", // W11.24 kho tài liệu
+  "docs.manage",
 ] as const;
 const GROUPS = ["admin", "hcth", "manager", "tinh", "xa", "tw"];
 const UNITS = [
@@ -366,7 +368,11 @@ function defaults(group: string): Matrix {
   if (group === "admin" || group === "hcth")
     PERMS.forEach((p) => (m[p] = "all"));
   if (group === "manager")
-    Object.assign(m, { "profile.view": "unit", export: "unit" });
+    Object.assign(m, {
+      "profile.view": "unit",
+      export: "unit",
+      "docs.view": "unit",
+    });
   return m;
 }
 const lastPerm = (kind: string, grantee: string) =>
@@ -374,7 +380,7 @@ const lastPerm = (kind: string, grantee: string) =>
     .reverse()
     .find((r) => r.grantee_kind === kind && r.grantee === grantee);
 
-interface Caller {
+export interface Caller {
   group: string;
   unit: string;
   ref: string;
@@ -414,6 +420,26 @@ function caller(ctx: Ctx): Caller | Response {
     readOnly: kc.role === "kn_tw" || !!kc.read_only,
     m,
   };
+}
+/** W11.24: người gọi + ma trận FN-20 cho kho tài liệu giả lập (kn-hrm-docs). */
+export function hrmCaller(ctx: Ctx): Caller | Response {
+  return caller(ctx);
+}
+/** W11.24: mã hồ sơ, tài khoản gắn, đơn vị hiện tại (kn-hrm-docs). */
+export function hrmStaffBrief(): {
+  id: string;
+  code: string;
+  label: string;
+  account_ref: string | null;
+  unit: string;
+}[] {
+  return STORE.staff.map((s) => ({
+    id: s.id,
+    code: s.code,
+    label: label(s.profile.full_name),
+    account_ref: s.account_ref,
+    unit: project(s.events, vnToday()).unit,
+  }));
 }
 function on(
   c: Caller,

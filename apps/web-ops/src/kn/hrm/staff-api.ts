@@ -66,6 +66,8 @@ export const PERM_LABEL: Record<string, string> = {
   "sensitive.view": "Thẻ Thống kê BC Sở",
   export: "Xuất danh sách",
   "audit.view": "Xem nhật ký xem/xuất",
+  "docs.view": "Xem tài liệu", // W11.24 kho tài liệu (FN-14)
+  "docs.manage": "Quản lý tài liệu",
 };
 export const SCOPE_LABEL: Record<HrmScope, string> = {
   none: "Không",
