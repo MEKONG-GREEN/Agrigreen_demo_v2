@@ -362,6 +362,8 @@ export function createKnAdminApi(opts: KnHttpOptions) {
     lock: (id: string, reason: string) => call<unknown>("POST", `/v1/accounts/users/${id}/lock`, { reason }),
     unlock: (id: string, reason: string) => call<unknown>("POST", `/v1/accounts/users/${id}/unlock`, { reason }),
     resend: (id: string) => call<unknown>("POST", `/v1/accounts/users/${id}/resend-actions`, {}),
+    // D24: đặt lại TOTP (mất/đổi điện thoại) — lý do ≥ 20 ký tự.
+    resetTotp: (id: string, reason: string) => call<unknown>("POST", `/v1/accounts/users/${id}/reset-totp`, { reason }),
     startSupport: (body: { target_assignment_id?: string; role?: "kn_tw" | "kn_tinh" | "kn_xa"; org_ref?: string; commune_codes?: string[]; department_code: string; reason: string }) =>
       call<KnSessionContext>("POST", "/v1/accounts/support-sessions", body),
     endSupport: (id: string) => call<{ support_session_id: string; ended_at: string | null }>("POST", `/v1/accounts/support-sessions/${id}/end`),

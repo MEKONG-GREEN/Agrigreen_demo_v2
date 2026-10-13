@@ -204,9 +204,13 @@ function log(a: MockKnAccount, e: Omit<AcctLog, "seq" | "at"> & { at?: string })
   LOGS.get(a.id)!.push({ ...e, seq: ++seq, at: e.at ?? now() });
 }
 
+/** D24: tài khoản KN đã được Admin đặt lại TOTP trong phiên mock (chờ đăng ký lại). */
+const KN_TOTP_RESET = new Set<string>();
+
 function userWire(a: MockKnAccount) {
   const p = profileOf(a);
   const parts = a.displayName.split(" ");
+  const totpPending = !p.activated_at || KN_TOTP_RESET.has(userId(a));
   return {
     id: userId(a),
     username: p.phone ?? p.email,
@@ -219,9 +223,11 @@ function userWire(a: MockKnAccount) {
     org_ref: a.assignments[0]?.org_ref ?? null,
     roles: ["kn_user"],
     lock_cause: p.enabled ? null : "manual",
-    required_actions: p.activated_at ? [] : ["UPDATE_PASSWORD", "VERIFY_EMAIL"],
+    required_actions: [...(p.activated_at ? [] : ["UPDATE_PASSWORD", "VERIFY_EMAIL"]), ...(totpPending ? ["CONFIGURE_TOTP"] : [])],
     created_at: p.created_at,
     tracked: true,
+    // D24: mọi cán bộ KN bắt TOTP khi đăng nhập.
+    mfa: { required: true, configured: !totpPending, enrollment_pending: totpPending },
   };
 }
 
@@ -807,6 +813,21 @@ export const knAdminRoutes: Route[] = [
         }),
     }),
   ),
+  {
+    method: "POST",
+    pattern: re("/v1/accounts/users/{id}/reset-totp"),
+    match: knAdminContext,
+    handler: (ctx) =>
+      withAccount(ctx, (a) => {
+        const r = reasonOk(ctx.body, 20);
+        if (!r) return errField("reason", "bắt buộc, ít nhất 20 ký tự");
+        const p = profileOf(a);
+        if (!p.enabled) return problem(409, "accounts.state_conflict", "Tài khoản đang bị khóa");
+        KN_TOTP_RESET.add(userId(a));
+        log(a, { event: "account.totp_reset", entity_ref: null, actor_ref: ADMIN_REF, changes: [{ field: "TOTP", old: "Đã đăng ký", new: "Chờ đăng ký lại" }], reason: r });
+        return json({ account: { user_ref: userId(a), org_ref: userWire(a).org_ref, roles: ["kn_user"], enabled: true, lock_cause: null }, seq: 1, replayed: false });
+      }),
+  },
   {
     method: "POST",
     pattern: re("/v1/accounts/users/{id}/resend-actions"),

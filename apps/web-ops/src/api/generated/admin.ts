@@ -1982,6 +1982,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/users/{id}/reset-totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** D24 — Đặt lại TOTP (mất/đổi điện thoại): xóa TOTP trong Keycloak, thêm CONFIGURE_TOTP (đăng ký lại ở lần đăng nhập sau), thu hồi mọi phiên; lý do ≥ 20 ký tự; ghi sổ totp_reset. Không tự đặt lại của chính mình (403 accounts.self_action); tài khoản đang khóa hoặc không có TOTP để đặt lại → 409 accounts.state_conflict */
+        post: operations["accountsResetTOTP"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/accounts/users/{id}/resend-actions": {
         parameters: {
             query?: never;
@@ -5420,13 +5439,26 @@ export interface components {
             org_ref: string | null;
             /** @description Vai do pf/accounts quản lý; null ở danh sách nếu tài khoản tạo ngoài nền tảng */
             roles: string[] | null;
-            /** @enum {string|null} */
-            lock_cause: "manual" | "org_deactivated" | null;
+            /**
+             * @description dormant_45d — job accounts_dormant khóa vì không hoạt động (D24)
+             * @enum {string|null}
+             */
+            lock_cause: "manual" | "org_deactivated" | "dormant_45d" | null;
             required_actions: string[];
             /** Format: date-time */
             created_at: string | null;
             /** @description Có trong pf_accounts (tạo hoặc thao tác qua nền tảng) */
             tracked: boolean;
+            mfa?: components["schemas"]["AccountsMFA"];
+        };
+        /** @description D24 — trạng thái TOTP; chỉ có ở GET /v1/accounts/users/{id} */
+        AccountsMFA: {
+            /** @description Vai của tài khoản bắt TOTP khi đăng nhập (cán bộ KN, vai [MFA]) */
+            required: boolean;
+            /** @description Đã có TOTP trong Keycloak */
+            configured: boolean;
+            /** @description Đang chờ người dùng đăng ký (required action CONFIGURE_TOTP) */
+            enrollment_pending: boolean;
         };
         AccountsAccount: {
             /** Format: uuid */
@@ -5436,12 +5468,15 @@ export interface components {
             roles: string[];
             enabled: boolean;
             /** @enum {string|null} */
-            lock_cause: "manual" | "org_deactivated" | null;
+            lock_cause: "manual" | "org_deactivated" | "dormant_45d" | null;
         };
         AccountsEvent: {
             seq: number;
-            /** @enum {string} */
-            action: "created" | "locked" | "unlocked" | "assignment_changed" | "actions_sent";
+            /**
+             * @description dormant_warned, locked/dormant_45d do job accounts_dormant (actor_ref = tác nhân hệ thống); totp_reset do quản trị viên (D24)
+             * @enum {string}
+             */
+            action: "created" | "locked" | "unlocked" | "assignment_changed" | "actions_sent" | "dormant_warned" | "totp_reset";
             /** Format: date-time */
             event_time: string;
             /** Format: date-time */
@@ -5652,7 +5687,7 @@ export interface components {
             /** @description Thứ tự trong Log hợp nhất của tài khoản */
             seq: number;
             /** @enum {string} */
-            event: "account.created" | "account.locked" | "account.unlocked" | "account.activation_sent" | "account.assignment_changed" | "account.profile_updated" | "assignment.granted" | "assignment.changed" | "assignment.revoked" | "assignment.attributes_changed";
+            event: "account.created" | "account.locked" | "account.unlocked" | "account.activation_sent" | "account.assignment_changed" | "account.profile_updated" | "account.dormant_warned" | "account.totp_reset" | "assignment.granted" | "assignment.changed" | "assignment.revoked" | "assignment.attributes_changed";
             /**
              * Format: uuid
              * @description assignment_id với sự kiện assignment.*
@@ -10787,6 +10822,27 @@ export interface operations {
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    accountsResetTOTP: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["AccountsReason"];
+        responses: {
+            200: components["responses"]["AccountsChanged"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
     accountsResendActions: {

@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { canResetTotp, MFA_STATE, mfaState } from "@/admin/accounts";
 import { unwrap } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
 import { Dialog } from "@/components/Dialog";
@@ -457,6 +458,12 @@ export function UsersScreen() {
   );
 }
 
+/** D24 — nhãn trạng thái TOTP của tài khoản. */
+function mfaLabel(user: AccountsUser): string {
+  const st = mfaState(user.mfa);
+  return st ? MFA_STATE[st].text : "—";
+}
+
 const LOG_EVENT: Record<string, string> = {
   "account.created": "Tạo tài khoản",
   "account.locked": "Khóa tài khoản",
@@ -464,6 +471,8 @@ const LOG_EVENT: Record<string, string> = {
   "account.activation_sent": "Gửi lại liên kết kích hoạt / mật khẩu",
   "account.profile_updated": "Sửa thông tin tài khoản",
   "account.assignment_changed": "Đổi đơn vị/vai",
+  "account.dormant_warned": "Báo trước khóa do không hoạt động",
+  "account.totp_reset": "Đặt lại TOTP",
   "assignment.granted": "Thêm vai trò",
   "assignment.changed": "Sửa vai trò",
   "assignment.revoked": "Xóa vai trò",
@@ -489,7 +498,7 @@ export function UserDetailScreen() {
   const [attrsDlg, setAttrsDlg] = useState<AttrsDraft | null>(null);
   const [edit, setEdit] = useState<{ full_name: string; email: string; phone: string } | null>(null);
   const [asgDlg, setAsgDlg] = useState<{ aid: string | null; draft: AsgDraft } | null>(null);
-  const [reasonDlg, setReasonDlg] = useState<{ kind: "lock" | "unlock" | "revoke" | "deleg"; aid?: string } | null>(null);
+  const [reasonDlg, setReasonDlg] = useState<{ kind: "lock" | "unlock" | "revoke" | "deleg" | "totp"; aid?: string } | null>(null);
   const [reason, setReason] = useState("");
   useBreadcrumbTail(s.data ? [{ label: fullName(s.data.user) }] : []);
   return (
@@ -511,6 +520,11 @@ export function UserDetailScreen() {
                 <button type="button" className="btn btn-o btn-sm" onClick={() => void act.run(() => knAdminApi.resend(id), "Đã gửi lại liên kết đặt mật khẩu.")}>
                   <Icon name="send" size={15} /> Gửi lại mật khẩu
                 </button>
+                {canResetTotp(user) ? (
+                  <button type="button" className="btn btn-o btn-sm" onClick={() => (setReason(""), setReasonDlg({ kind: "totp" }))}>
+                    <Icon name="lock" size={15} /> Đặt lại TOTP
+                  </button>
+                ) : null}
                 <button type="button" className="btn btn-d btn-sm" onClick={() => (setReason(""), setReasonDlg({ kind: user.enabled ? "lock" : "unlock" }))}>
                   <Icon name={user.enabled ? "lock" : "unlock"} size={15} /> {user.enabled ? "Khóa tài khoản" : "Mở khóa"}
                 </button>
@@ -633,7 +647,7 @@ export function UserDetailScreen() {
                         {
                           id: "sys",
                           label: "Thông tin hệ thống",
-                          content: <LabelValueBlock items={[{ label: "Tạo bởi", value: "admin.mekong" }, { label: "Thời điểm tạo", value: dt(user.created_at) }, { label: "Tên đăng nhập", value: user.username }, { label: "Kích hoạt", value: user.required_actions.length ? "Chưa kích hoạt" : "Đã kích hoạt" }]} />,
+                          content: <LabelValueBlock items={[{ label: "Tạo bởi", value: "admin.mekong" }, { label: "Thời điểm tạo", value: dt(user.created_at) }, { label: "Tên đăng nhập", value: user.username }, { label: "Kích hoạt", value: user.required_actions.some((a) => a !== "CONFIGURE_TOTP") ? "Chưa kích hoạt" : "Đã kích hoạt" }, { label: "Xác thực hai yếu tố (TOTP)", value: mfaLabel(user) }]} />,
                         },
                         { id: "sess", label: "Phiên đang hoạt động", content: <SessionsTab userId={user.id} view="active" /> },
                         { id: "hist", label: "Lịch sử đăng nhập", content: <SessionsTab userId={user.id} view="history" /> },
@@ -696,7 +710,7 @@ export function UserDetailScreen() {
               ) : null}
               {reasonDlg ? (
                 <Dialog
-                  title={reasonDlg.kind === "lock" ? "Khóa tài khoản" : reasonDlg.kind === "unlock" ? "Mở khóa tài khoản" : reasonDlg.kind === "deleg" ? "Thu hồi ủy quyền" : "Xóa vai trò"}
+                  title={reasonDlg.kind === "lock" ? "Khóa tài khoản" : reasonDlg.kind === "unlock" ? "Mở khóa tài khoản" : reasonDlg.kind === "deleg" ? "Thu hồi ủy quyền" : reasonDlg.kind === "totp" ? "Đặt lại TOTP" : "Xóa vai trò"}
                   onClose={() => setReasonDlg(null)}
                   actions={
                     <button
@@ -709,11 +723,15 @@ export function UserDetailScreen() {
                               ? knAdminApi.revoke(id, reasonDlg.aid!, reason)
                               : reasonDlg.kind === "deleg"
                                 ? knAdminApi.revokeDelegation(reasonDlg.aid!, reason)
-                                : reasonDlg.kind === "lock"
-                                  ? knAdminApi.lock(id, reason)
-                                  : knAdminApi.unlock(id, reason),
-                          reasonDlg.kind === "lock"
-                            ? "Đã khóa tài khoản — mọi phiên bị thu hồi."
+                                : reasonDlg.kind === "totp"
+                                  ? knAdminApi.resetTotp(id, reason)
+                                  : reasonDlg.kind === "lock"
+                                    ? knAdminApi.lock(id, reason)
+                                    : knAdminApi.unlock(id, reason),
+                          reasonDlg.kind === "totp"
+                            ? "Đã đặt lại TOTP — cán bộ đăng ký lại ở lần đăng nhập tới, mọi phiên bị thu hồi."
+                            : reasonDlg.kind === "lock"
+                              ? "Đã khóa tài khoản — mọi phiên bị thu hồi."
                             : reasonDlg.kind === "unlock"
                               ? "Đã mở khóa tài khoản."
                               : reasonDlg.kind === "deleg"
@@ -728,7 +746,10 @@ export function UserDetailScreen() {
                   }
                 >
                   <label className="field">
-                    <span>Lý do* ({reasonDlg.kind === "revoke" || reasonDlg.kind === "deleg" ? "≥ 10" : "≥ 20"} ký tự)</span>
+                    <span>
+                      Lý do* ({reasonDlg.kind === "revoke" || reasonDlg.kind === "deleg" ? "≥ 10" : "≥ 20"} ký tự)
+                      {reasonDlg.kind === "totp" ? " — mã TOTP cũ bị xóa, mọi phiên bị thu hồi, cán bộ đăng ký lại ở lần đăng nhập tới." : ""}
+                    </span>
                     <textarea className="textarea" value={reason} onChange={(e) => setReason(e.target.value)} />
                   </label>
                 </Dialog>

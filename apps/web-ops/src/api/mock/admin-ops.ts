@@ -282,6 +282,34 @@ function lockUnlock(p: MockPersona, id: string | undefined, body: unknown, lock:
   return json({ account: accountSnapshot(found.user), seq, replayed: false });
 }
 
+// D24: vai bắt TOTP khi đăng nhập (cán bộ KN + vai [MFA]) — accounts/port.LoginTOTPRoles.
+const LOGIN_TOTP_ROLES = ["kn_officer", "kn_province_admin", "kn_national_admin", "kn_user", ...MFA_ROLES, "geo_admin", "device_admin", "sync_conflict_resolver"];
+/** Tài khoản đã gỡ TOTP (đặt lại) trong phiên mock. */
+const TOTP_REMOVED = new Set<string>();
+
+function mfaOf(u: AccountsUser): NonNullable<AccountsUser["mfa"]> {
+  const required = (u.roles ?? []).some((r) => LOGIN_TOTP_ROLES.includes(r));
+  const pending = u.required_actions.includes("CONFIGURE_TOTP");
+  return { required, configured: required && !pending && !TOTP_REMOVED.has(u.id) && u.required_actions.length === 0, enrollment_pending: pending };
+}
+
+function resetTotp(p: MockPersona, id: string | undefined, body: unknown): Response {
+  const found = findAccount(p, id);
+  if (found instanceof Response) return found;
+  const reason = reasonOf(body);
+  if (reason.length < 20) return validation([{ field: "reason", reason: "Lý do tối thiểu 20 ký tự" }]);
+  if (found.user.id === p.me.actor_ref) return problem(403, "accounts.self_action", "Self action");
+  const bad = (found.user.roles ?? []).find((r) => !grantable(p).includes(r));
+  if (bad) return problem(403, "accounts.role_not_grantable", "Role not grantable");
+  if (!found.user.enabled) return problem(409, "accounts.state_conflict", "Locked");
+  const m = mfaOf(found.user);
+  if (!m.configured && !m.enrollment_pending && !m.required) return problem(409, "accounts.state_conflict", "No TOTP");
+  TOTP_REMOVED.add(found.user.id);
+  if (!found.user.required_actions.includes("CONFIGURE_TOTP")) found.user.required_actions = [...found.user.required_actions, "CONFIGURE_TOTP"];
+  const seq = pushEvent(found, "totp_reset", p.me.actor_ref, reason, { otp_removed: m.configured ? 1 : 0, sessions_revoked: true });
+  return json({ account: accountSnapshot(found.user), seq, replayed: false });
+}
+
 function resendActions(p: MockPersona, id: string | undefined, body: unknown): Response {
   const a = findAccount(p, id);
   if (a instanceof Response) return a;
@@ -536,7 +564,7 @@ export const adminOpsRoutes: Route[] = [
     pattern: /^\/v1\/accounts\/users\/([\w-]+)$/,
     handler: ({ persona, params }) => {
       const a = findAccount(persona, params[0]);
-      return a instanceof Response ? a : json(a.user);
+      return a instanceof Response ? a : json({ ...a.user, mfa: mfaOf(a.user) });
     },
   },
   {
@@ -549,6 +577,7 @@ export const adminOpsRoutes: Route[] = [
   },
   { method: "POST", pattern: /^\/v1\/accounts\/users\/([\w-]+)\/lock$/, handler: ({ persona, params, body }) => lockUnlock(persona, params[0], body, true) },
   { method: "POST", pattern: /^\/v1\/accounts\/users\/([\w-]+)\/unlock$/, handler: ({ persona, params, body }) => lockUnlock(persona, params[0], body, false) },
+  { method: "POST", pattern: /^\/v1\/accounts\/users\/([\w-]+)\/reset-totp$/, handler: ({ persona, params, body }) => resetTotp(persona, params[0], body) },
   { method: "POST", pattern: /^\/v1\/accounts\/users\/([\w-]+)\/resend-actions$/, handler: ({ persona, params, body }) => resendActions(persona, params[0], body) },
   {
     // Thao tác loạt (US-ADM-03): tối đa 100 tài khoản, kết quả theo từng tài khoản.
