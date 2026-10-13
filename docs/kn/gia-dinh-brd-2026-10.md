@@ -250,6 +250,7 @@ Chưa làm: app di động (`field-app`) chưa hiển thị `period_key`; lọc 
 | Đồng bộ thiết bị | `forms_task` / `forms_submission` (mẫu KN v7.7 P7), con trỏ `pf_forms.sync_feed`; 12 danh mục CNTS thêm vào `SyncCatalogs` (entity `catalog_item`, giá trị hiện hành) | `docs/dev/sync-contract.md` |
 
 Chưa làm trong gói này: nhập Excel BM-04; lũy kế (CN-03/05/07, TS-07/08) và "Tuần trước liền kề" (W11.44); gợi ý CN-06 từ tổng BM-01; lịch trực KSGM (KS-04, cảnh báo người nhập không trong lịch); chốt kỳ tự động theo lịch và mở lại có thời hạn cho kỳ native; check-in BM-05 (CV-06/07); "Lịch sử sửa" từng ô (H07).
+
 ## W11.22 — Hồ sơ nhân sự (pf 000150, vault 000004)
 
 | Câu hỏi / mục | Phương án đã chọn | Đổi ở đâu / nếu PO chọn khác |
