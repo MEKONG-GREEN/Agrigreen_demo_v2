@@ -26,10 +26,15 @@ import (
 // applyHTX cập nhật trạng thái xác nhận của các dòng HTX theo cổng D2 (gọi NGOÀI giao dịch đọc — cổng mở giao dịch riêng).
 func applyHTX(ctx context.Context, h port.HTXConfirmations, figs []port.ClosedFigure) error {
 	type rowT = map[string]any
-	parsed := make([][]rowT, len(figs))
+	type target struct {
+		f    *port.ClosedFigure
+		rows []rowT
+	}
+	var targets []target
 	var refs []uuid.UUID
 	seen := map[uuid.UUID]bool{}
-	for i, f := range figs {
+	for i := range figs {
+		f := &figs[i]
 		if f.Rows == nil || !strings.Contains(string(f.Rows), port.UnitKindCooperative) {
 			continue
 		}
@@ -37,7 +42,7 @@ func applyHTX(ctx context.Context, h port.HTXConfirmations, figs []port.ClosedFi
 		if err := json.Unmarshal(f.Rows, &rows); err != nil {
 			return fmt.Errorf("closedfig: rows: %w", err)
 		}
-		parsed[i] = rows
+		targets = append(targets, target{f, rows})
 		for _, r := range rows {
 			if r["unit_kind"] != port.UnitKindCooperative {
 				continue
@@ -59,12 +64,9 @@ func applyHTX(ctx context.Context, h port.HTXConfirmations, figs []port.ClosedFi
 		}
 		status = m
 	}
-	for i := range figs {
-		rows := parsed[i]
-		if rows == nil {
-			continue
-		}
-		figs[i].ConfirmationStatus = port.ConfirmationConfirmed
+	for _, tg := range targets {
+		f, rows := tg.f, tg.rows
+		f.ConfirmationStatus = port.ConfirmationConfirmed
 		var st []string
 		for _, r := range rows {
 			if r["unit_kind"] == port.UnitKindCooperative {
@@ -75,7 +77,7 @@ func applyHTX(ctx context.Context, h port.HTXConfirmations, figs []port.ClosedFi
 				r["confirmation"] = s
 			}
 			if r["confirmation"] == port.ConfirmationUnconfirmed {
-				figs[i].ConfirmationStatus = port.ConfirmationUnconfirmed
+				f.ConfirmationStatus = port.ConfirmationUnconfirmed
 			}
 			st = append(st, fmt.Sprint(r["key"])+"="+fmt.Sprint(r["confirmation"]))
 		}
@@ -85,7 +87,7 @@ func applyHTX(ctx context.Context, h port.HTXConfirmations, figs []port.ClosedFi
 		}
 		sum := sha256.Sum256([]byte(strings.Join(st, ";")))
 		hs := hex.EncodeToString(sum[:])
-		figs[i].Rows, figs[i].StatusHash = raw, &hs
+		f.Rows, f.StatusHash = raw, &hs
 	}
 	return nil
 }
