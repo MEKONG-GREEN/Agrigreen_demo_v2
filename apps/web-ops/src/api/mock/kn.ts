@@ -209,8 +209,8 @@ const GENERIC: Record<Exclude<KnRole, "admin">, Group[]> = {
 
 const soon = (key: string, label: string, route: string, icon: string): Item => ({ key, label, route, icon, soon: true });
 
-/** Nhóm "Dùng chung" cuối menu mọi đối tượng (domain.SharedGroup, HCTH FN-13). */
-const SHARED: Group = { key: "dung_chung", label: "Dùng chung", items: [soon("chung.contact", "Contact", "/kn/dung-chung/contact", "phone")] };
+/** Nhóm "Dùng chung" cuối menu mọi đối tượng (domain.SharedGroup, HCTH FN-13). W11.23: Contact (pf/contact) đã mở cho mọi vai. */
+const SHARED: Group = { key: "dung_chung", label: "Dùng chung", items: [{ key: "chung.contact", label: "Contact", route: "/kn/dung-chung/contact", icon: "phone" }] };
 /** W11.07 (Q-067): mục "Dùng chung" thêm theo đối tượng — server chỉ trả cho lãnh đạo (Needs manager); bản giả lập trả đầy đủ như ca vàng. */
 const SHARED_BY_AUDIENCE: Partial<Record<KnRole, Item[]>> = {
   // W11.22 (pf/hrm): đã mở — hồ sơ trong phạm vi "đơn vị mình".

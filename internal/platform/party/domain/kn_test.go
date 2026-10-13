@@ -221,7 +221,9 @@ func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
 		t.Fatal("KHTC và phòng generic không có Báo cáo cho KHTC")
 	}
 	sh := domain.SharedMenuGroup()
-	if sh.Key != domain.GroupDungChung || len(sh.Items) == 0 || !sh.Items[0].ComingSoon {
+	// W11.23: Contact (pf/contact, cap/directory) đã có màn — mục thường cho MỌI đối tượng, không "Sắp có".
+	if sh.Key != domain.GroupDungChung || len(sh.Items) == 0 || sh.Items[0].Key != "chung.contact" || sh.Items[0].ComingSoon ||
+		sh.Items[0].Needs != "" {
 		t.Fatalf("Dùng chung: %+v", sh)
 	}
 	// Mã tạm cũ (Q-051).

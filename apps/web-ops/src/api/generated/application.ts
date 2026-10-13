@@ -6326,6 +6326,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/contacts/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bộ trường, quyền chi tiết/cập nhật của người gọi và trạng thái nguồn cán bộ thuộc tỉnh (enabled | disabled | none) */
+        get: operations["contactAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/persons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thẻ Cán bộ theo vai (FN-13 B1–B3) — tìm theo họ tên (không dấu) hoặc SĐT; bộ full tìm thêm đơn vị, chức danh, email và lọc cấp/đơn vị/chức danh (bộ basic bỏ qua các bộ lọc này) */
+        get: operations["contactPersons"];
+        put?: never;
+        /** Thêm liên hệ ngoài tỉnh (FN-13 B4) — họ tên, SĐT vào kho định danh, email/năm sinh vào ngăn contact.card (mục đích contact.directory); Cấp Tỉnh – HCTH, Admin */
+        post: operations["contactPersonCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/persons/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết liên hệ (chỉ bộ full — Cấp TW, Cấp Xã nhận contact.detail_forbidden); liên hệ ngoài tỉnh kèm lịch sử (tên trường đã đổi) */
+        get: operations["contactPersonGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/persons/{id}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa / ngừng hiển thị (hidden=true) / hiện lại liên hệ ngoài tỉnh — trường vắng giữ nguyên; cán bộ thuộc tỉnh sửa tại hồ sơ FN-07 (contact.staff_read_only) */
+        post: operations["contactPersonRevise"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thẻ Đơn vị (FN-13 B3) — bộ basic tên, cấp, SĐT; bộ full thêm email, địa chỉ */
+        get: operations["contactUnits"];
+        put?: never;
+        /** Thêm thẻ Đơn vị (liên hệ công vụ của tổ chức) — Cấp Tỉnh – HCTH, Admin */
+        post: operations["contactUnitCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/units/{id}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa / ngừng hiển thị thẻ Đơn vị */
+        post: operations["contactUnitRevise"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/price/status": {
         parameters: {
             query?: never;
@@ -13326,6 +13430,125 @@ export interface components {
             events: components["schemas"]["FormsPeriodEvent"][];
             units: components["schemas"]["FormsUnit"][];
             snapshots: components["schemas"]["FormsSnapshot"][];
+        };
+        /**
+         * @description Cấp — tw (Trung ương), tinh, xa, khac (đơn vị khác)
+         * @enum {string}
+         */
+        ContactLevel: "tw" | "tinh" | "xa" | "khac";
+        ContactAccess: {
+            /** @enum {string} */
+            field_set: "basic" | "full";
+            /** @description cột hiển thị theo thứ tự */
+            fields: string[];
+            /** @description thêm/sửa/ngừng hiển thị liên hệ ngoài tỉnh và thẻ Đơn vị */
+            can_manage: boolean;
+            can_detail: boolean;
+            /**
+             * @description disabled = hồ sơ nhân sự chưa bật cho dữ liệu thật (AG_HRM_RECORDS) — chỉ có liên hệ ngoài tỉnh
+             * @enum {string}
+             */
+            staff_source: "enabled" | "disabled" | "none";
+        };
+        /** @description Dòng của bộ basic (Cấp TW, Cấp Xã) — KHÔNG có trường nào khác (BR-03) */
+        ContactPersonBasic: {
+            /** Format: uuid */
+            id: string;
+            full_name: string;
+            /** @description năm sinh (BR-04) — rỗng nếu chưa có */
+            birth_year: string;
+            phone: string;
+        };
+        ContactPersonFull: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description staff = cán bộ thuộc tỉnh (đồng bộ từ hồ sơ FN-07); external = liên hệ ngoài tỉnh
+             * @enum {string}
+             */
+            source: "staff" | "external";
+            full_name: string;
+            birth_year: string;
+            phone: string;
+            /** @description chức danh */
+            title: string;
+            /** @description đơn vị công tác (cán bộ xã — xã · đơn vị quản lý) hoặc cơ quan của liên hệ ngoài tỉnh */
+            unit: string;
+            unit_code?: string;
+            level: components["schemas"]["ContactLevel"];
+            level_label: string;
+            email: string;
+            hidden: boolean;
+            /** @description chủ thể đã xóa định danh */
+            erased: boolean;
+        };
+        ContactPersonList: {
+            /** @enum {string} */
+            field_set: "basic" | "full";
+            fields: string[];
+            total: number;
+            /** @enum {string} */
+            staff_source: "enabled" | "disabled" | "none";
+            items: (components["schemas"]["ContactPersonFull"] | components["schemas"]["ContactPersonBasic"])[];
+        };
+        ContactHistoryEntry: {
+            /** Format: int64 */
+            version: number;
+            /** @enum {string} */
+            change: "created" | "updated" | "hidden" | "shown";
+            /** @description TÊN trường đã đổi (không giá trị — BR-05) */
+            changed_fields: string[];
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        ContactPersonDetail: components["schemas"]["ContactPersonFull"] & {
+            organization: string;
+            can_edit: boolean;
+            history: components["schemas"]["ContactHistoryEntry"][];
+        };
+        /** @description Thêm — full_name, phone, level bắt buộc (BR-06). Sửa — trường vắng giữ nguyên. */
+        ContactPersonWrite: {
+            full_name?: string;
+            phone?: string;
+            birth_year?: string;
+            email?: string;
+            level?: components["schemas"]["ContactLevel"];
+            organization?: string;
+            title?: string;
+            hidden?: boolean;
+        };
+        ContactUnit: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            level: components["schemas"]["ContactLevel"];
+            level_label: string;
+            phone: string;
+            /** @description chỉ bộ full */
+            email?: string;
+            /** @description chỉ bộ full */
+            address?: string;
+            /** Format: uuid */
+            org_ref?: string | null;
+            hidden?: boolean;
+        };
+        ContactUnitList: {
+            /** @enum {string} */
+            field_set: "basic" | "full";
+            items: components["schemas"]["ContactUnit"][];
+        };
+        ContactUnitWrite: {
+            name: string;
+            level: components["schemas"]["ContactLevel"];
+            /** @description số máy công vụ của cơ quan (8–11 chữ số) — không nhập số di động cá nhân */
+            phone?: string;
+            email?: string;
+            address?: string;
+            /** Format: uuid */
+            org_ref?: string;
+            hidden?: boolean;
         };
         /** @enum {string} */
         HrmStaffType: "vien_chuc" | "hop_dong" | "can_bo_xa";
@@ -28774,6 +28997,250 @@ export interface operations {
             };
             /** @description forbidden | hrm.records_disabled */
             403: components["responses"]["Problem"];
+        };
+    };
+    contactAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quyền */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactAccess"];
+                };
+            };
+            /** @description unauthenticated */
+            401: components["responses"]["Problem"];
+            /** @description forbidden (vai không có quyền danh bạ) */
+            403: components["responses"]["Problem"];
+        };
+    };
+    contactPersons: {
+        parameters: {
+            query?: {
+                q?: string;
+                level?: components["schemas"]["ContactLevel"];
+                /** @description mã đơn vị nội bộ hoặc một phần tên đơn vị/cơ quan */
+                unit?: string;
+                title?: string;
+                /** @description chỉ người cập nhật được — gồm liên hệ đã ngừng hiển thị */
+                include_hidden?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang danh bạ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPersonList"];
+                };
+            };
+            /** @description unauthenticated */
+            401: components["responses"]["Problem"];
+            /** @description forbidden | node_scope_required | kho từ chối (thiếu vai vault_directory) */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    contactPersonCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactPersonWrite"];
+            };
+        };
+        responses: {
+            /** @description Đã thêm */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPersonDetail"];
+                };
+            };
+            /** @description contact.manage_forbidden | forbidden */
+            403: components["responses"]["Problem"];
+            /** @description contact.duplicate_person */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    contactPersonGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPersonDetail"];
+                };
+            };
+            /** @description contact.detail_forbidden | forbidden */
+            403: components["responses"]["Problem"];
+            /** @description contact.not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    contactPersonRevise: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactPersonWrite"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPersonDetail"];
+                };
+            };
+            /** @description contact.manage_forbidden */
+            403: components["responses"]["Problem"];
+            /** @description contact.not_found */
+            404: components["responses"]["Problem"];
+            /** @description contact.duplicate_person */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | contact.staff_read_only */
+            422: components["responses"]["Problem"];
+        };
+    };
+    contactUnits: {
+        parameters: {
+            query?: {
+                q?: string;
+                level?: components["schemas"]["ContactLevel"];
+                include_hidden?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thẻ Đơn vị */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactUnitList"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    contactUnitCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactUnitWrite"];
+            };
+        };
+        responses: {
+            /** @description Đã thêm */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactUnit"];
+                };
+            };
+            /** @description contact.manage_forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    contactUnitRevise: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactUnitWrite"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactUnit"];
+                };
+            };
+            /** @description contact.manage_forbidden */
+            403: components["responses"]["Problem"];
+            /** @description contact.not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
         };
     };
     priceStatus: {

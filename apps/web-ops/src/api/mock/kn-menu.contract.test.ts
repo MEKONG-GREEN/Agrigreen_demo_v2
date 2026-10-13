@@ -80,9 +80,10 @@ describe("fromKnMenu — trình bày Hình 3c", () => {
       ["Kế hoạch - TC", "not_open", 0],
       ["2 phòng khác", "not_open", 0],
     ]);
-    // kn.menu/v3: nhóm "Dùng chung" cuối; Contact "Sắp có" không thành liên kết.
+    // kn.menu/v3: nhóm "Dùng chung" cuối; W11.23: Contact đã mở (liên kết thường, không "Sắp có").
     const tree = fromKnMenu(admin);
-    expect(tree.groups.at(-1)).toMatchObject({ key: "dung_chung", label: "Dùng chung", items: [{ key: "chung.contact", status: "coming_soon" }] });
+    expect(tree.groups.at(-1)).toMatchObject({ key: "dung_chung", label: "Dùng chung", items: [{ key: "chung.contact", href: "/kn/dung-chung/contact" }] });
+    expect(tree.groups.at(-1)!.items[0]!.status).toBeUndefined();
     const odd: KnMenu = { ...admin, groups: [{ key: "x", label: "X", items: [{ ...admin.groups[0]!.items[0]!, icon: "khong-co" }] }] };
     expect(fromKnMenu(odd).groups[0]!.items[0]!.icon).toBe("file");
   });

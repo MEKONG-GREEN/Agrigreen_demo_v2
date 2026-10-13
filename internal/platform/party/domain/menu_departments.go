@@ -51,9 +51,10 @@ var KHTCReportItem = MenuItem{Key: "tinh.bao_cao_khtc", Label: "Báo cáo cho KH
 var KHTCReportAdminItem = MenuItem{Key: "admin.pb.bao_cao_khtc", Label: "Báo cáo cho KHTC", Route: adminDeptRoute("/bao-cao-khtc"), Icon: "send"}
 
 // SharedGroup là nhóm "Dùng chung" cuối menu của MỌI đối tượng (HCTH v3.0 FN-13, UR-GEN-01: Contact là
-// module dùng chung, cột hiển thị theo vai trò).
+// module dùng chung, cột hiển thị theo vai trò). W11.23: Contact (pf/contact `cap/directory`, enable always — không cần ánh
+// xạ menuModules) đã có màn danh sách, tìm kiếm, chi tiết — mở cho mọi vai; máy chủ lọc trường theo vai.
 var SharedGroup = MenuGroup{Key: GroupDungChung, Label: GroupDungChungLabel, Items: []MenuItem{
-	soon("chung.contact", "Contact", "/kn/dung-chung/contact", "phone"),
+	{Key: "chung.contact", Label: "Contact", Route: "/kn/dung-chung/contact", Icon: "phone"},
 }}
 
 // needs gắn điều kiện phân quyền trong vai (W11.07) cho một mục.
