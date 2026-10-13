@@ -6870,6 +6870,249 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/hrm/docs/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cây thư mục người gọi thấy (kèm quyền ở từng thư mục) và cấu hình kho (loại tài liệu, đuôi tệp, dung lượng) */
+        get: operations["hrmDocFolders"];
+        put?: never;
+        /** Tạo thư mục (FN-14 B2) — thư mục gốc chỉ Admin; thư mục con cần docs.manage toàn Trung tâm ở thư mục cha */
+        post: operations["hrmDocFolderCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cài cấu trúc thư mục gốc mặc định còn thiếu (Quyết định nâng bậc, điều động, bổ nhiệm, khen thưởng, kỷ luật, Hồ sơ đánh giá, Tài liệu khác) — Admin */
+        post: operations["hrmDocFolderDefaults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        /** Nhật ký thư mục (tạo, đổi tên, đổi quyền, ẩn/hiện) — docs.manage toàn Trung tâm */
+        get: operations["hrmDocFolderHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders/{id}/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đổi tên thư mục (FN-14 B2) */
+        post: operations["hrmDocFolderRename"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders/{id}/acl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi quyền riêng của thư mục (FN-14 gán quyền theo thư mục) — thay toàn bộ; ghi đè ma trận FN-20 cho docs.view/docs.manage ở thư mục và thư mục con */
+        post: operations["hrmDocFolderACL"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders/{id}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ẩn thư mục — chỉ khi không còn thư mục con hoặc tài liệu đang hiện; lý do bắt buộc */
+        post: operations["hrmDocFolderHide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hiện lại thư mục đã ẩn; lý do bắt buộc */
+        post: operations["hrmDocFolderRestore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tra cứu tài liệu người gọi thấy (FN-14 B4) — theo thư mục (đệ quy), tên/số quyết định/tên tệp, loại, năm, phòng ban, nhân viên (AC-01) */
+        get: operations["hrmDocList"];
+        put?: never;
+        /** Tải lên một tệp với phân loại (FN-14 B3) — pdf, jpg, png, docx, xlsx, doc, xls; tối đa 15 MB; mã hóa và lưu qua pf/evidence */
+        post: operations["hrmDocUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        /** Chi tiết tài liệu (FN-14 Hình 28) — phân loại, lịch sử (tải lên, sửa, ẩn), nhật ký xem trước/tải xuống (người quản lý) */
+        get: operations["hrmDocGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/{id}/classify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa phân loại tài liệu (thư mục, tệp không đổi); sổ ghi tên trường đã đổi */
+        post: operations["hrmDocClassify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/{id}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xóa tài liệu = ẩn (FN-14 luồng ngoại lệ) — lý do bắt buộc, lưu vết; tệp giữ nguyên ở pf/evidence */
+        post: operations["hrmDocHide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hiện lại tài liệu đã ẩn; lý do bắt buộc */
+        post: operations["hrmDocRestore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/{id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        /** Xem trước (inline) hoặc tải xuống (download=1) — ghi nhật ký trước khi mở (AC-03); giải mã qua pf/evidence mục đích hr_records */
+        get: operations["hrmDocContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/contacts/access": {
         parameters: {
             query?: never;
@@ -14105,6 +14348,8 @@ export interface components {
             "sensitive.view"?: components["schemas"]["HrmScope"];
             export?: components["schemas"]["HrmScope"];
             "audit.view"?: components["schemas"]["HrmScope"];
+            "docs.view"?: components["schemas"]["HrmScope"];
+            "docs.manage"?: components["schemas"]["HrmScope"];
         };
         HrmMyAccess: {
             /** @description false = hồ sơ chưa bật (AG_HRM_RECORDS, Q-005) */
@@ -14130,6 +14375,166 @@ export interface components {
             actor_ref: string | null;
             /** @description true = nhóm Admin (không chỉnh được) */
             locked: boolean;
+        };
+        /**
+         * @description Loại tài liệu — quyết định nâng bậc, điều động, bổ nhiệm, khen thưởng, kỷ luật, hồ sơ đánh giá, khác
+         * @enum {string}
+         */
+        HrmDocType: "nang_bac" | "dieu_dong" | "bo_nhiem" | "khen_thuong" | "ky_luat" | "danh_gia" | "khac";
+        HrmDocPerms: {
+            "docs.view"?: components["schemas"]["HrmScope"];
+            "docs.manage"?: components["schemas"]["HrmScope"];
+        };
+        /** @description Khóa role:<nhóm vai> (hcth, manager, tinh, xa, tw) hoặc user:<uuid> → nhóm quyền tài liệu → phạm vi */
+        HrmFolderACL: {
+            [key: string]: components["schemas"]["HrmDocPerms"];
+        };
+        HrmReason: {
+            reason: string;
+        };
+        HrmFolder: {
+            /** Format: uuid */
+            folder_id: string;
+            /** Format: uuid */
+            parent_id: string | null;
+            name: string;
+            path: string[];
+            /** @description Thư mục hệ thống (nghiệp vụ tự lưu tệp): nang_bac, danh_gia, … */
+            system_key: string | null;
+            doc_type: string | null;
+            sort_order: number;
+            /** @enum {string} */
+            status: "active" | "hidden";
+            /** @description Thư mục hoặc thư mục cha đã ẩn */
+            hidden: boolean;
+            /** @description Số tài liệu đang hiện người gọi thấy (trực tiếp trong thư mục) */
+            docs: number;
+            can_view: boolean;
+            /** @description Tải lên, sửa phân loại, ẩn tài liệu (trong phạm vi) */
+            can_manage: boolean;
+            /** @description Tạo thư mục con, đổi tên, quyền thư mục, ẩn thư mục */
+            can_admin: boolean;
+            acl?: components["schemas"]["HrmFolderACL"];
+            version: number;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmDocTree: {
+            /** @description Hồ sơ nhân sự bật (AG_HRM_RECORDS) — false: không gắn/thấy tài liệu theo nhân viên */
+            records_enabled: boolean;
+            /** @description Đã nối kho tệp và kho định danh */
+            ready: boolean;
+            group: string;
+            unit: string;
+            perms: components["schemas"]["HrmDocPerms"];
+            can_create_root: boolean;
+            doc_types: components["schemas"]["HrmDocType"][];
+            extensions: string[];
+            max_bytes: number;
+            items: components["schemas"]["HrmFolder"][];
+        };
+        HrmFolderWrite: {
+            /** Format: uuid */
+            folder_id: string;
+            version: number;
+        };
+        HrmFolderVersion: {
+            version: number;
+            /** @enum {string} */
+            change: "created" | "renamed" | "acl" | "hidden" | "restored";
+            name: string;
+            /** @enum {string} */
+            status: "active" | "hidden";
+            note: string | null;
+            acl: components["schemas"]["HrmFolderACL"];
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmDocInput: {
+            /**
+             * Format: uuid
+             * @description Bắt buộc khi tải lên; bỏ qua khi sửa phân loại
+             */
+            folder_id?: string;
+            title: string;
+            doc_type: components["schemas"]["HrmDocType"];
+            /** @description Vắng → năm của ngày ban hành */
+            year?: number | null;
+            /** @description Phòng ban (đơn vị nội bộ); vắng + có nhân viên → đơn vị công tác của nhân viên đầu tiên */
+            unit_code?: string;
+            staff_ids?: string[];
+            doc_no?: string;
+            /** Format: date */
+            issued_on?: string;
+            note?: string;
+        };
+        HrmDoc: {
+            /** Format: uuid */
+            doc_id: string;
+            /** Format: uuid */
+            folder_id: string;
+            folder_path: string[];
+            title: string;
+            doc_type: components["schemas"]["HrmDocType"];
+            year: number | null;
+            unit_code: string | null;
+            staff_ids: string[];
+            /** @description Mã hồ sơ (HS-01) của nhân viên gắn tài liệu */
+            staff_codes: string[];
+            doc_no: string | null;
+            /** Format: date */
+            issued_on: string | null;
+            note: string | null;
+            file_name: string;
+            content_type: string;
+            size_bytes: number;
+            /** @enum {string} */
+            status: "active" | "hidden";
+            version: number;
+            /**
+             * Format: date-time
+             * @description Lúc tải lên
+             */
+            created_at: string;
+            /** Format: uuid */
+            uploaded_by: string;
+            /** Format: date-time */
+            updated_at: string;
+            can_manage: boolean;
+        };
+        HrmDocWrite: {
+            /** Format: uuid */
+            doc_id: string;
+            version: number;
+        };
+        HrmDocDetail: {
+            doc: components["schemas"]["HrmDoc"];
+            history: {
+                version: number;
+                /** @enum {string} */
+                change: "created" | "updated" | "hidden" | "restored";
+                changed_fields: string[];
+                /** @enum {string} */
+                status: "active" | "hidden";
+                reason: string | null;
+                /** Format: uuid */
+                actor_ref: string;
+                /** Format: date-time */
+                recorded_at: string;
+            }[];
+            /** @description Nhật ký xem trước/tải xuống, mới trước — null khi người gọi không quản lý tài liệu */
+            access: {
+                /** @enum {string} */
+                action: "preview" | "download";
+                /** @enum {string} */
+                scope: "self" | "unit" | "all";
+                /** Format: uuid */
+                actor_ref: string;
+                /** Format: date-time */
+                recorded_at: string;
+            }[] | null;
         };
         HrmAccessEntry: {
             /** Format: uuid */
@@ -17472,6 +17877,8 @@ export interface components {
         HrmReportCode: "NS01" | "NS02" | "NS03" | "NS04" | "NS05" | "NS06";
         HrmStaffId: string;
         HrmEventId: string;
+        HrmFolderId: string;
+        HrmDocId: string;
         /** @description Ngày báo giá (giờ VN) */
         PriceBoardDay: string;
         /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
@@ -31294,6 +31701,517 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description validation_failed (chỉ số lạ) */
             422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolders: {
+        parameters: {
+            query?: {
+                /** @description 1 = kèm thư mục đã ẩn (người quản trị thư mục) */
+                include_hidden?: "0" | "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cây thư mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDocTree"];
+                };
+            };
+            /** @description unauthenticated */
+            401: components["responses"]["Problem"];
+            /** @description forbidden (không có ngữ cảnh phiên KN) */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    parent_id?: string | null;
+                    name: string;
+                    doc_type?: components["schemas"]["HrmDocType"];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmFolderWrite"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.folder_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderDefaults: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số thư mục đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: number;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mọi phiên bản, cũ trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmFolderVersion"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderRename: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmFolderWrite"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.folder_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderACL: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    acl: components["schemas"]["HrmFolderACL"];
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmFolderWrite"];
+                };
+            };
+            /** @description validation_failed (khóa, nhóm quyền, phạm vi sai; nhóm Admin) */
+            400: components["responses"]["Problem"];
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderHide: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmReason"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmFolderWrite"];
+                };
+            };
+            /** @description validation_failed */
+            400: components["responses"]["Problem"];
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.folder_not_empty */
+            409: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderRestore: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmReason"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmFolderWrite"];
+                };
+            };
+            /** @description validation_failed */
+            400: components["responses"]["Problem"];
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.folder_exists */
+            409: components["responses"]["Problem"];
+        };
+    };
+    hrmDocList: {
+        parameters: {
+            query?: {
+                folder?: string;
+                recursive?: "0" | "1";
+                q?: string;
+                doc_type?: components["schemas"]["HrmDocType"];
+                year?: number;
+                /** @description Phòng ban (đơn vị nội bộ) */
+                unit?: string;
+                /** @description Mã hồ sơ nhân sự (cần hồ sơ bật) */
+                staff?: string;
+                /** @description 1 = kèm tài liệu đã ẩn (người quản lý) */
+                include_hidden?: "0" | "1";
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        total: number;
+                        items: components["schemas"]["HrmDoc"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled (lọc theo nhân viên khi hồ sơ tắt) */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDocUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** @description JSON của HrmDocInput (phần văn bản) */
+                    meta: string;
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã tải lên */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDocWrite"];
+                };
+            };
+            /** @description validation_failed */
+            400: components["responses"]["Problem"];
+            /** @description forbidden | hrm.records_disabled (gắn nhân viên khi hồ sơ tắt) */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.doc_too_large */
+            413: components["responses"]["Problem"];
+            /** @description hrm.doc_format | validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description hrm.docs_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    hrmDocGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tài liệu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDocDetail"];
+                };
+            };
+            /** @description hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.doc_not_found (kể cả ngoài phạm vi) */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDocClassify: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmDocInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi (version không đổi khi không có gì đổi) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDocWrite"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.doc_not_found */
+            404: components["responses"]["Problem"];
+            /** @description conflict (tài liệu đã ẩn) */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocHide: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmReason"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDocWrite"];
+                };
+            };
+            /** @description validation_failed */
+            400: components["responses"]["Problem"];
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.doc_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDocRestore: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmReason"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDocWrite"];
+                };
+            };
+            /** @description validation_failed */
+            400: components["responses"]["Problem"];
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.doc_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDocContent: {
+        parameters: {
+            query?: {
+                download?: "0" | "1";
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nội dung tệp (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description forbidden (thiếu vai vault_evidence_viewer) | hrm.records_disabled | mfa_required */
+            403: components["responses"]["Problem"];
+            /** @description hrm.doc_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.docs_unavailable */
+            503: components["responses"]["Problem"];
         };
     };
     contactAccess: {

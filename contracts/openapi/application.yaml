@@ -9646,6 +9646,356 @@ paths:
                   items: {type: array, items: {$ref: "#/components/schemas/HrmPersonBrief"}}
         "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed (chỉ số lạ), $ref: "#/components/responses/Problem"}
+  # --- pf/hrm W11.24 (pf 20261013191234): KHO TÀI LIỆU NHÂN SỰ (BRD HCTH v3.0 FN-14, UR-HC-25, UR-ADM-10). Quyền: ma trận FN-20
+  # (docs.view, docs.manage × none/self/unit/all) ghi đè được theo thư mục (acl, kế thừa xuống thư mục con; người dùng ưu tiên
+  # hơn nhóm; Admin cố định). Tệp mã hóa phong bì ở pf/evidence (mục đích hr_records; người xem cần vai kho
+  # vault_evidence_viewer). Xóa = ẩn (lý do bắt buộc). Tài liệu gắn nhân viên cần hồ sơ bật (AG_HRM_RECORDS — Q-005).
+  /v1/hrm/docs/folders:
+    get:
+      summary: Cây thư mục người gọi thấy (kèm quyền ở từng thư mục) và cấu hình kho (loại tài liệu, đuôi tệp, dung lượng)
+      operationId: hrmDocFolders
+      tags: [hrm]
+      parameters:
+        - {name: include_hidden, in: query, required: false, description: "1 = kèm thư mục đã ẩn (người quản trị thư mục)", schema: {type: string, enum: ["0", "1"]}}
+      responses:
+        "200":
+          description: Cây thư mục
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmDocTree"}
+        "401": {description: unauthenticated, $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden (không có ngữ cảnh phiên KN), $ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo thư mục (FN-14 B2) — thư mục gốc chỉ Admin; thư mục con cần docs.manage toàn Trung tâm ở thư mục cha
+      operationId: hrmDocFolderCreate
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                parent_id: {type: [string, "null"], format: uuid}
+                name: {type: string, minLength: 1, maxLength: 120}
+                doc_type: {$ref: "#/components/schemas/HrmDocType"}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmFolderWrite"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.folder_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.folder_exists, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/hrm/docs/folders/defaults:
+    post:
+      summary: Cài cấu trúc thư mục gốc mặc định còn thiếu (Quyết định nâng bậc, điều động, bổ nhiệm, khen thưởng, kỷ luật, Hồ sơ đánh giá, Tài liệu khác) — Admin
+      operationId: hrmDocFolderDefaults
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Số thư mục đã tạo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created]
+                properties:
+                  created: {type: integer, minimum: 0}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+  /v1/hrm/docs/folders/{id}/history:
+    parameters:
+      - $ref: "#/components/parameters/HrmFolderId"
+    get:
+      summary: Nhật ký thư mục (tạo, đổi tên, đổi quyền, ẩn/hiện) — docs.manage toàn Trung tâm
+      operationId: hrmDocFolderHistory
+      tags: [hrm]
+      responses:
+        "200":
+          description: Mọi phiên bản, cũ trước
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmFolderVersion"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.folder_not_found, $ref: "#/components/responses/Problem"}
+  /v1/hrm/docs/folders/{id}/rename:
+    parameters:
+      - $ref: "#/components/parameters/HrmFolderId"
+    post:
+      summary: Đổi tên thư mục (FN-14 B2)
+      operationId: hrmDocFolderRename
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                name: {type: string, minLength: 1, maxLength: 120}
+      responses:
+        "200":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmFolderWrite"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.folder_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.folder_exists, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/hrm/docs/folders/{id}/acl:
+    parameters:
+      - $ref: "#/components/parameters/HrmFolderId"
+    post:
+      summary: Ghi quyền riêng của thư mục (FN-14 gán quyền theo thư mục) — thay toàn bộ; ghi đè ma trận FN-20 cho docs.view/docs.manage ở thư mục và thư mục con
+      operationId: hrmDocFolderACL
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [acl]
+              additionalProperties: false
+              properties:
+                acl: {$ref: "#/components/schemas/HrmFolderACL"}
+                note: {type: string, maxLength: 500}
+      responses:
+        "200":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmFolderWrite"}
+        "400": {description: "validation_failed (khóa, nhóm quyền, phạm vi sai; nhóm Admin)", $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.folder_not_found, $ref: "#/components/responses/Problem"}
+  /v1/hrm/docs/folders/{id}/hide:
+    parameters:
+      - $ref: "#/components/parameters/HrmFolderId"
+    post:
+      summary: Ẩn thư mục — chỉ khi không còn thư mục con hoặc tài liệu đang hiện; lý do bắt buộc
+      operationId: hrmDocFolderHide
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmReason"}
+      responses:
+        "200":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmFolderWrite"}
+        "400": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.folder_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.folder_not_empty, $ref: "#/components/responses/Problem"}
+  /v1/hrm/docs/folders/{id}/restore:
+    parameters:
+      - $ref: "#/components/parameters/HrmFolderId"
+    post:
+      summary: Hiện lại thư mục đã ẩn; lý do bắt buộc
+      operationId: hrmDocFolderRestore
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmReason"}
+      responses:
+        "200":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmFolderWrite"}
+        "400": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.folder_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.folder_exists, $ref: "#/components/responses/Problem"}
+  /v1/hrm/docs:
+    get:
+      summary: Tra cứu tài liệu người gọi thấy (FN-14 B4) — theo thư mục (đệ quy), tên/số quyết định/tên tệp, loại, năm, phòng ban, nhân viên (AC-01)
+      operationId: hrmDocList
+      tags: [hrm]
+      parameters:
+        - {name: folder, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: recursive, in: query, required: false, schema: {type: string, enum: ["0", "1"]}}
+        - {name: q, in: query, required: false, schema: {type: string}}
+        - {name: doc_type, in: query, required: false, schema: {$ref: "#/components/schemas/HrmDocType"}}
+        - {name: year, in: query, required: false, schema: {type: integer}}
+        - {name: unit, in: query, required: false, description: Phòng ban (đơn vị nội bộ), schema: {type: string}}
+        - {name: staff, in: query, required: false, description: "Mã hồ sơ nhân sự (cần hồ sơ bật)", schema: {type: string, format: uuid}}
+        - {name: include_hidden, in: query, required: false, description: "1 = kèm tài liệu đã ẩn (người quản lý)", schema: {type: string, enum: ["0", "1"]}}
+        - {name: offset, in: query, required: false, schema: {type: integer, minimum: 0}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, items]
+                properties:
+                  total: {type: integer, minimum: 0}
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmDoc"}}
+        "403": {description: "forbidden | hrm.records_disabled (lọc theo nhân viên khi hồ sơ tắt)", $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.folder_not_found, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Tải lên một tệp với phân loại (FN-14 B3) — pdf, jpg, png, docx, xlsx, doc, xls; tối đa 15 MB; mã hóa và lưu qua pf/evidence
+      operationId: hrmDocUpload
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [meta, file]
+              properties:
+                meta: {type: string, description: "JSON của HrmDocInput (phần văn bản)"}
+                file: {type: string, format: binary}
+      responses:
+        "201":
+          description: Đã tải lên
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmDocWrite"}
+        "400": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | hrm.records_disabled (gắn nhân viên khi hồ sơ tắt)", $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.folder_not_found, $ref: "#/components/responses/Problem"}
+        "413": {description: hrm.doc_too_large, $ref: "#/components/responses/Problem"}
+        "422": {description: hrm.doc_format | validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: hrm.docs_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/hrm/docs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/HrmDocId"
+    get:
+      summary: Chi tiết tài liệu (FN-14 Hình 28) — phân loại, lịch sử (tải lên, sửa, ẩn), nhật ký xem trước/tải xuống (người quản lý)
+      operationId: hrmDocGet
+      tags: [hrm]
+      responses:
+        "200":
+          description: Tài liệu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmDocDetail"}
+        "403": {description: hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.doc_not_found (kể cả ngoài phạm vi), $ref: "#/components/responses/Problem"}
+  /v1/hrm/docs/{id}/classify:
+    parameters:
+      - $ref: "#/components/parameters/HrmDocId"
+    post:
+      summary: Sửa phân loại tài liệu (thư mục, tệp không đổi); sổ ghi tên trường đã đổi
+      operationId: hrmDocClassify
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmDocInput"}
+      responses:
+        "200":
+          description: Đã ghi (version không đổi khi không có gì đổi)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmDocWrite"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.doc_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict (tài liệu đã ẩn), $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/hrm/docs/{id}/hide:
+    parameters:
+      - $ref: "#/components/parameters/HrmDocId"
+    post:
+      summary: Xóa tài liệu = ẩn (FN-14 luồng ngoại lệ) — lý do bắt buộc, lưu vết; tệp giữ nguyên ở pf/evidence
+      operationId: hrmDocHide
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmReason"}
+      responses:
+        "200":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmDocWrite"}
+        "400": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.doc_not_found, $ref: "#/components/responses/Problem"}
+  /v1/hrm/docs/{id}/restore:
+    parameters:
+      - $ref: "#/components/parameters/HrmDocId"
+    post:
+      summary: Hiện lại tài liệu đã ẩn; lý do bắt buộc
+      operationId: hrmDocRestore
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmReason"}
+      responses:
+        "200":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmDocWrite"}
+        "400": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.doc_not_found, $ref: "#/components/responses/Problem"}
+  /v1/hrm/docs/{id}/content:
+    parameters:
+      - $ref: "#/components/parameters/HrmDocId"
+    get:
+      summary: Xem trước (inline) hoặc tải xuống (download=1) — ghi nhật ký trước khi mở (AC-03); giải mã qua pf/evidence mục đích hr_records
+      operationId: hrmDocContent
+      tags: [hrm]
+      parameters:
+        - {name: download, in: query, required: false, schema: {type: string, enum: ["0", "1"]}}
+      responses:
+        "200":
+          description: Nội dung tệp (Cache-Control no-store)
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        "403": {description: "forbidden (thiếu vai vault_evidence_viewer) | hrm.records_disabled | mfa_required", $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.doc_not_found, $ref: "#/components/responses/Problem"}
+        "503": {description: hrm.docs_unavailable, $ref: "#/components/responses/Problem"}
   # --- hết pf/hrm ---
   # --- pf/contact (cap/directory, W11.23 — BRD HCTH v3.0 FN-13 Contact; Q-071, Q-072): danh bạ liên hệ dùng chung. Một người =
   # một bản ghi = một chủ thể kho định danh (BR-01); cán bộ thuộc tỉnh chiếu từ hồ sơ nhân sự pf/hrm (cổng AG_HRM_RECORDS), liên
@@ -11807,6 +12157,16 @@ components:
       schema: {type: string, format: uuid}
     HrmEventId:
       name: event
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    HrmFolderId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    HrmDocId:
+      name: id
       in: path
       required: true
       schema: {type: string, format: uuid}
@@ -16686,6 +17046,8 @@ components:
         sensitive.view: {$ref: "#/components/schemas/HrmScope"}
         export: {$ref: "#/components/schemas/HrmScope"}
         audit.view: {$ref: "#/components/schemas/HrmScope"}
+        docs.view: {$ref: "#/components/schemas/HrmScope"}    # W11.24 kho tài liệu
+        docs.manage: {$ref: "#/components/schemas/HrmScope"}  # W11.24
     HrmMyAccess:
       type: object
       required: [enabled, group, unit, perms]
@@ -16710,6 +17072,155 @@ components:
         recorded_at: {type: [string, "null"], format: date-time}
         actor_ref: {type: [string, "null"], format: uuid}
         locked: {type: boolean, description: "true = nhóm Admin (không chỉnh được)"}
+    # --- pf/hrm W11.24: kho tài liệu nhân sự (FN-14). ---
+    HrmDocType:
+      type: string
+      description: "Loại tài liệu — quyết định nâng bậc, điều động, bổ nhiệm, khen thưởng, kỷ luật, hồ sơ đánh giá, khác"
+      enum: [nang_bac, dieu_dong, bo_nhiem, khen_thuong, ky_luat, danh_gia, khac]
+    HrmDocPerms:
+      type: object
+      additionalProperties: false
+      properties:
+        docs.view: {$ref: "#/components/schemas/HrmScope"}
+        docs.manage: {$ref: "#/components/schemas/HrmScope"}
+    HrmFolderACL:
+      type: object
+      description: "Khóa role:<nhóm vai> (hcth, manager, tinh, xa, tw) hoặc user:<uuid> → nhóm quyền tài liệu → phạm vi"
+      additionalProperties: {$ref: "#/components/schemas/HrmDocPerms"}
+    HrmReason:
+      type: object
+      required: [reason]
+      additionalProperties: false
+      properties:
+        reason: {type: string, minLength: 10, maxLength: 500}
+    HrmFolder:
+      type: object
+      required: [folder_id, parent_id, name, path, system_key, doc_type, sort_order, status, hidden, docs, can_view, can_manage, can_admin,
+        version, recorded_at]
+      properties:
+        folder_id: {type: string, format: uuid}
+        parent_id: {type: [string, "null"], format: uuid}
+        name: {type: string}
+        path: {type: array, items: {type: string}}
+        system_key: {type: [string, "null"], description: "Thư mục hệ thống (nghiệp vụ tự lưu tệp): nang_bac, danh_gia, …"}
+        doc_type: {type: [string, "null"]}
+        sort_order: {type: integer}
+        status: {type: string, enum: [active, hidden]}
+        hidden: {type: boolean, description: Thư mục hoặc thư mục cha đã ẩn}
+        docs: {type: integer, minimum: 0, description: Số tài liệu đang hiện người gọi thấy (trực tiếp trong thư mục)}
+        can_view: {type: boolean}
+        can_manage: {type: boolean, description: "Tải lên, sửa phân loại, ẩn tài liệu (trong phạm vi)"}
+        can_admin: {type: boolean, description: "Tạo thư mục con, đổi tên, quyền thư mục, ẩn thư mục"}
+        acl: {$ref: "#/components/schemas/HrmFolderACL"}
+        version: {type: integer}
+        recorded_at: {type: string, format: date-time}
+    HrmDocTree:
+      type: object
+      required: [records_enabled, ready, group, unit, perms, can_create_root, doc_types, extensions, max_bytes, items]
+      properties:
+        records_enabled: {type: boolean, description: "Hồ sơ nhân sự bật (AG_HRM_RECORDS) — false: không gắn/thấy tài liệu theo nhân viên"}
+        ready: {type: boolean, description: Đã nối kho tệp và kho định danh}
+        group: {type: string}
+        unit: {type: string}
+        perms: {$ref: "#/components/schemas/HrmDocPerms"}
+        can_create_root: {type: boolean}
+        doc_types: {type: array, items: {$ref: "#/components/schemas/HrmDocType"}}
+        extensions: {type: array, items: {type: string}}
+        max_bytes: {type: integer}
+        items: {type: array, items: {$ref: "#/components/schemas/HrmFolder"}}
+    HrmFolderWrite:
+      type: object
+      required: [folder_id, version]
+      properties:
+        folder_id: {type: string, format: uuid}
+        version: {type: integer}
+    HrmFolderVersion:
+      type: object
+      required: [version, change, name, status, note, acl, actor_ref, recorded_at]
+      properties:
+        version: {type: integer}
+        change: {type: string, enum: [created, renamed, acl, hidden, restored]}
+        name: {type: string}
+        status: {type: string, enum: [active, hidden]}
+        note: {type: [string, "null"]}
+        acl: {$ref: "#/components/schemas/HrmFolderACL"}
+        actor_ref: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+    HrmDocInput:
+      type: object
+      required: [title, doc_type]
+      additionalProperties: false
+      properties:
+        folder_id: {type: string, format: uuid, description: "Bắt buộc khi tải lên; bỏ qua khi sửa phân loại"}
+        title: {type: string, minLength: 1, maxLength: 300}
+        doc_type: {$ref: "#/components/schemas/HrmDocType"}
+        year: {type: [integer, "null"], minimum: 1975, maximum: 2100, description: "Vắng → năm của ngày ban hành"}
+        unit_code: {type: string, description: "Phòng ban (đơn vị nội bộ); vắng + có nhân viên → đơn vị công tác của nhân viên đầu tiên"}
+        staff_ids: {type: array, maxItems: 500, items: {type: string, format: uuid}}
+        doc_no: {type: string, maxLength: 60}
+        issued_on: {type: string, format: date}
+        note: {type: string, maxLength: 1000}
+    HrmDoc:
+      type: object
+      required: [doc_id, folder_id, folder_path, title, doc_type, year, unit_code, staff_ids, staff_codes, doc_no, issued_on, note, file_name,
+        content_type, size_bytes, status, version, created_at, uploaded_by, updated_at, can_manage]
+      properties:
+        doc_id: {type: string, format: uuid}
+        folder_id: {type: string, format: uuid}
+        folder_path: {type: array, items: {type: string}}
+        title: {type: string}
+        doc_type: {$ref: "#/components/schemas/HrmDocType"}
+        year: {type: [integer, "null"]}
+        unit_code: {type: [string, "null"]}
+        staff_ids: {type: array, items: {type: string, format: uuid}}
+        staff_codes: {type: array, items: {type: string}, description: "Mã hồ sơ (HS-01) của nhân viên gắn tài liệu"}
+        doc_no: {type: [string, "null"]}
+        issued_on: {type: [string, "null"], format: date}
+        note: {type: [string, "null"]}
+        file_name: {type: string}
+        content_type: {type: string}
+        size_bytes: {type: integer}
+        status: {type: string, enum: [active, hidden]}
+        version: {type: integer}
+        created_at: {type: string, format: date-time, description: Lúc tải lên}
+        uploaded_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+        can_manage: {type: boolean}
+    HrmDocWrite:
+      type: object
+      required: [doc_id, version]
+      properties:
+        doc_id: {type: string, format: uuid}
+        version: {type: integer}
+    HrmDocDetail:
+      type: object
+      required: [doc, history, access]
+      properties:
+        doc: {$ref: "#/components/schemas/HrmDoc"}
+        history:
+          type: array
+          items:
+            type: object
+            required: [version, change, changed_fields, status, reason, actor_ref, recorded_at]
+            properties:
+              version: {type: integer}
+              change: {type: string, enum: [created, updated, hidden, restored]}
+              changed_fields: {type: array, items: {type: string}}
+              status: {type: string, enum: [active, hidden]}
+              reason: {type: [string, "null"]}
+              actor_ref: {type: string, format: uuid}
+              recorded_at: {type: string, format: date-time}
+        access:
+          description: "Nhật ký xem trước/tải xuống, mới trước — null khi người gọi không quản lý tài liệu"
+          type: [array, "null"]
+          items:
+            type: object
+            required: [action, scope, actor_ref, recorded_at]
+            properties:
+              action: {type: string, enum: [preview, download]}
+              scope: {type: string, enum: [self, unit, all]}
+              actor_ref: {type: string, format: uuid}
+              recorded_at: {type: string, format: date-time}
     HrmAccessEntry:
       type: object
       required: [id, action, item_count, scope, query, actor_ref, recorded_at]
