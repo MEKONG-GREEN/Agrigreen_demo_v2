@@ -57,6 +57,9 @@ type SourcePeriodRef struct {
 	FiguresHash        *string
 	StatusHash         *string
 	ConfirmationStatus string
+	// Cells: tổng các ô số của MỌI đơn vị của kỳ nguồn này (khóa như Sum/Last; nil = chưa có số đã chốt) — ảnh chụp
+	// "Cập nhật số liệu" giữ số từng kỳ nguồn, Mẫu 1 A.III lấy hai ngày bảng giá đã duyệt gần nhất (W11.64).
+	Cells map[string]string
 }
 
 // TargetFigure là số đã chốt của một (phòng, tỉnh, biểu) quy vào một kỳ đích.

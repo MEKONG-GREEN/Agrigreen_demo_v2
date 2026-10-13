@@ -111,6 +111,7 @@ func Convert(figs []port.ClosedFigure, t port.CrosswalkTarget) ([]port.TargetFig
 		if err != nil {
 			return nil, fmt.Errorf("closedfig: rows của %s: %w", sourceKey(f.CalendarID, f.CalendarVersion, f.PeriodKey), err)
 		}
+		g.out.Sources[len(g.out.Sources)-1].Cells = strs(cells.total())
 		g.sum.add(cells)
 		if !g.hasLast || end.After(g.lastEnd) {
 			g.last, g.lastEnd, g.hasLast, g.out.LastSourceKey = cells, end, true, sourceKey(f.CalendarID, f.CalendarVersion, f.PeriodKey)

@@ -87,7 +87,7 @@ func TestKHTCAssemble_PriceAndDepartments_PFPUB(t *testing.T) {
 	}
 	p37 := ps[0]
 	price := dept(p37, PriceDepartment)
-	if b := form(price, port.PriceFormBoard); b.Last["price_min"] != "11000" || b.Last["price_max"] != "21000" || len(b.Sources) != 2 || price.Fallback {
+	if b := form(price, port.PriceFormBoard); b.Last["MH00001/price_min"] != "11000" || b.Last["MH00001/price_max"] != "21000" || b.Sources[1].Cells["MH00001/price_min"] != "11000" || len(b.Sources) != 2 || price.Fallback {
 		t.Fatalf("bảng giá tuần 37 = ngày duyệt cuối: %+v", b)
 	}
 	if tk := form(price, port.PriceFormTickets); tk.Sum["tickets_collected"] != "7" || !tk.Closed || tk.Sources[0].SourceModule != "pf/price" {
@@ -105,7 +105,7 @@ func TestKHTCAssemble_PriceAndDepartments_PFPUB(t *testing.T) {
 	}
 	// Tuần 38: không ngày duyệt → ngày duyệt gần nhất (14/09) — Fallback; không có phiếu tuần.
 	p38 := dept(ps[1], PriceDepartment)
-	if b := form(p38, port.PriceFormBoard); !p38.Fallback || b.Last["price_min"] != "11000" || b.TargetKey != "2026-W38" || b.Sum != nil {
+	if b := form(p38, port.PriceFormBoard); !p38.Fallback || b.Last["MH00001/price_min"] != "11000" || b.TargetKey != "2026-W38" || b.Sum != nil {
 		t.Fatalf("fallback D22: %+v %+v", p38, b)
 	}
 	// View giá chưa có (trước W11.76) → Unavailable, kỳ không chốt.

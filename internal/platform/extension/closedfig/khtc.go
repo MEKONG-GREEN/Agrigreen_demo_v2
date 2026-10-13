@@ -178,7 +178,8 @@ func PriceFigures(province string, boards []PriceBoardRow, tickets []PriceTicket
 			if b.PriceAvg != nil {
 				cells["price_avg"] = *b.PriceAvg
 			}
-			rows = append(rows, map[string]any{"key": b.ItemCode, "unit": b.ItemCode, "unit_kind": "price_item", "cells": cells})
+			// indicator = mã mặt hàng: ô "<mặt hàng>/price_min" — min/max toàn tỉnh từng mặt hàng (D22), không cộng lẫn mặt hàng.
+			rows = append(rows, map[string]any{"key": b.ItemCode, "unit": b.ItemCode, "unit_kind": "price_item", "indicator": b.ItemCode, "cells": cells})
 		}
 		f.FormClosed, f.PeriodClosed, f.KeyClosed, f.KeyClosedAll = closed, closed, closed, closed
 		f.SnapshotNo, f.ClosedAt = &ver, &at
