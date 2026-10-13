@@ -13,6 +13,7 @@ import { Decimal } from "@/kn/grid/decimal";
 import { json, problem, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
 import { addDay, mockPointItems, vnToday } from "./kn-price-items";
+import { mockBoardState } from "./kn-price-boards";
 import { MOCK_XA_OFFICER, mockPointsAt } from "./kn-price-points";
 
 type S = components["schemas"];
@@ -92,6 +93,46 @@ function seedOnce(): void {
       TICKETS.push(t);
     }
   }
+}
+
+/** Ngày báo giá theo lịch giả lập (T2–T6) — bảng giá W11.76. */
+export const priceQuoteDay = quote;
+
+/** Dòng giá tính vào bảng giá ngày (W11.76 giả lập): phiếu Đã gửi / Nộp muộn, giá hiệu chỉnh nếu có, bỏ Không có hàng và
+ * dòng Đã loại; kèm tóm tắt kỳ. */
+export function mockDayBoardSource(day: string): {
+  lines: { point: string; item: ReturnType<typeof mockPointItems>[number]; min: string; max: string; mid: string }[];
+  summary: S["PriceBoardSummary"];
+} {
+  seedOnce();
+  const summary: S["PriceBoardSummary"] = { points: 0, submitted: 0, late: 0, missed: 0, price_lines: 0, excluded: 0, open_alerts: 0 };
+  const lines: ReturnType<typeof mockDayBoardSource>["lines"] = [];
+  for (const p of mockPointsAt(day)) {
+    summary.points++;
+    const t = liveTicket(p.code, day);
+    const st = t ? last(t.heads).status : "";
+    if (st === "submitted") summary.submitted++;
+    else if (st === "late") summary.late++;
+    else summary.missed++;
+    if (!t || !sent(t)) continue;
+    const items = new Map(mockPointItems(p.code, day).map((it) => [it.code, it]));
+    for (const hs of t.alerts.values()) {
+      const a = last(hs).status;
+      if (a === "excluded") summary.excluded++;
+      if (a !== "cancelled" && !["adjusted", "kept", "excluded"].includes(a)) summary.open_alerts++;
+    }
+    for (const [code, vs] of t.lines) {
+      const l = last(vs);
+      const it = items.get(code);
+      const al = t.alerts.get(code);
+      if (!it || l.no_goods || (al && last(al).status === "excluded")) continue;
+      const lo = l.adj_min ?? l.min;
+      const hi = l.adj_max ?? l.max;
+      if (!lo || !hi) continue;
+      lines.push({ point: p.code, item: it, min: lo, max: hi, mid: mid(lo, hi) });
+    }
+  }
+  return { lines, summary };
 }
 
 /** Đặt lại trạng thái giả lập (kiểm thử). */
@@ -178,6 +219,7 @@ function headDto(t: Ticket | undefined): S["PriceTicketHead"] | null {
 function view(t: Ticket | undefined, day: string): S["PriceTicketView"] {
   const s = t ? last(t.heads).status : "";
   if (s === "deleted") return "deleted";
+  if ((s === "late" || s === "submitted") && mockBoardState(day) === "approved") return "approved"; // W11.76
   if (s === "late") return "late";
   if (s === "submitted") return locked(day) ? "locked" : "submitted";
   if (locked(day)) return "missed";
@@ -357,6 +399,8 @@ function opTicket(ctx: Ctx, role: Role, op: "correct" | "redate" | "delete"): Re
   if (!(b.reason ?? "").trim()) return problem(422, "price.reason_required", "lý do");
   if (h.version !== b.version) return problem(409, "price.ticket_stale", "Phiếu đã được người khác cập nhật");
   if (!locked(h.day)) return problem(409, "price.ticket_not_locked", h.day);
+  const bs = mockBoardState(h.day); // W11.76: chỉ sửa khi Chưa duyệt / Đang mở duyệt
+  if (bs !== "open" && bs !== "reopened") return problem(409, "price.board_approved", h.day);
   const at = new Date().toISOString();
   const nh: HeadVer = { ...h, version: h.version + 1, op, reason: b.reason.trim(), actor_ref: ACTOR, at };
   if (op === "delete") nh.status = "deleted";
@@ -457,7 +501,7 @@ export const priceTicketRoutes: Route[] = [
           open_alerts: as.filter((a) => !["adjusted", "kept", "excluded"].includes(a.status)).length,
         });
       }
-      return json({ day, quote: quote(day), lock_at: quote(day) ? lockAt(day) : null, respond_by: quote(day) ? respondAt(day) : null, locked: locked(day), board: "open", now: new Date().toISOString(), rows } satisfies S["PriceTicketDay"]);
+      return json({ day, quote: quote(day), lock_at: quote(day) ? lockAt(day) : null, respond_by: quote(day) ? respondAt(day) : null, locked: locked(day), board: mockBoardState(day), now: new Date().toISOString(), rows } satisfies S["PriceTicketDay"]);
     },
   },
   {

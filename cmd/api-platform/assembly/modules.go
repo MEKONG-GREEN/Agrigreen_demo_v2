@@ -279,6 +279,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
+	// W11.76: khóa tuần (lịch kỳ hệ thống W11.03) lưu lúc duyệt bảng giá.
+	pr.UseWeeks(PriceWeeks{Calendar: kn})
 	hr, err := hrm.New(unit, clk, KNHRMAccess) // W11.21: dom/hrm (/v1/hrm/*), danh mục nhân sự — ADR-0050
 	if err != nil {
 		return Modules{}, pools, err

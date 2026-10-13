@@ -6815,6 +6815,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/price/boards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái bảng giá các ngày báo giá trong khoảng (tối đa 62 ngày; vắng → 14 ngày tới hôm nay) — mọi vai của bên dùng */
+        get: operations["priceListBoards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bảng giá một ngày ở màn Kiểm duyệt & công bố — trạng thái, tóm tắt kỳ, xem trước (CT-04), phiên bản đã duyệt, nhật ký; Cấp TW / Xã chỉ nhận trạng thái + phiên bản đã duyệt */
+        get: operations["priceGetBoard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards/{day}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt bảng giá — chuyển Đang duyệt, giữ khóa một người (10 phút) tới khi xác nhận / hủy; cần đã qua giờ khóa, hết cảnh báo chưa xử lý, có dòng giá */
+        post: operations["priceLockBoard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards/{day}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy Đang duyệt của mình — về trạng thái trước khóa */
+        post: operations["priceUnlockBoard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards/{day}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xác nhận duyệt — phiên bản mới; ảnh chụp dòng bảng giá (CT-04) + phiếu; khóa tuần lưu lúc duyệt; phát pf.price.board.published */
+        post: operations["priceApproveBoard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards/{day}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở duyệt (FN-TI-02.06) — lý do bắt buộc; ngày trong giới hạn (mặc định 30 ngày); phiên bản đã duyệt vẫn công bố kèm cờ Đang cập nhật */
+        post: operations["priceReopenBoard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards/{day}/cancel-reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy mở duyệt khi chưa sửa gì — về Đã duyệt phiên bản cũ */
+        post: operations["priceCancelReopenBoard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -13690,6 +13809,103 @@ export interface components {
         PriceWritten: {
             written: number;
         };
+        /**
+         * @description Chưa duyệt | Đang duyệt | Đã duyệt | Đang mở duyệt
+         * @enum {string}
+         */
+        PriceBoardState: "open" | "approving" | "approved" | "reopened";
+        PriceBoardOp: {
+            /** @description Phiên bản sổ bảng giá người gọi đã thấy (khóa lạc quan; 0 = chưa có) */
+            seq: number;
+            /** @description Lý do mở duyệt (bắt buộc) / hủy mở duyệt */
+            reason?: string;
+        };
+        PriceBoardLine: {
+            item_code: string;
+            item_name: string;
+            group_code: string;
+            group_name: string;
+            unit_code: string;
+            unit_name: string;
+            min: components["schemas"]["Decimal"];
+            max: components["schemas"]["Decimal"];
+            avg: components["schemas"]["Decimal"];
+            /** @description Số xã có giá */
+            points: number;
+        };
+        PriceBoardDay: {
+            /** Format: date */
+            day: string;
+            quote: boolean;
+            state: components["schemas"]["PriceBoardState"];
+            version: number;
+            /** Format: date-time */
+            approved_at: string | null;
+        };
+        PriceBoardSummary: {
+            points: number;
+            submitted: number;
+            late: number;
+            missed: number;
+            price_lines: number;
+            excluded: number;
+            open_alerts: number;
+        };
+        PriceBoardPublished: {
+            version: number;
+            /** Format: date-time */
+            approved_at: string;
+            /** @description Đang mở duyệt — số có thể đổi (nhãn Đang cập nhật) */
+            reopened: boolean;
+            week_key: string;
+            lines: components["schemas"]["PriceBoardLine"][];
+        };
+        PriceBoardLog: {
+            seq: number;
+            /** @enum {string} */
+            action: "lock" | "unlock" | "approve" | "reopen" | "cancel_reopen";
+            status: components["schemas"]["PriceBoardState"];
+            version: number;
+            reason: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_name: string | null;
+            /** Format: date-time */
+            at: string;
+        };
+        PriceBoard: {
+            /** Format: date */
+            day: string;
+            quote: boolean;
+            /** Format: date-time */
+            lock_at: string | null;
+            /** @description Đã qua giờ khóa nhập */
+            locked: boolean;
+            /** Format: date-time */
+            now: string;
+            state: components["schemas"]["PriceBoardState"];
+            seq: number;
+            /** @description Phiên bản đã duyệt hiện hành (0 = chưa duyệt) */
+            version: number;
+            /** Format: uuid */
+            locked_by: string | null;
+            locked_by_name: string | null;
+            /** Format: date-time */
+            lock_until: string | null;
+            summary: components["schemas"]["PriceBoardSummary"] | null;
+            preview: components["schemas"]["PriceBoardLine"][];
+            published: components["schemas"]["PriceBoardPublished"] | null;
+            log: components["schemas"]["PriceBoardLog"][];
+            can: {
+                approve: boolean;
+                unlock: boolean;
+                reopen: boolean;
+                cancel_reopen: boolean;
+            };
+            /** @description Lý do chưa duyệt được */
+            blockers: string[];
+            reopen_days: number;
+        };
     };
     responses: {
         /** @description Đã ghi dòng quá trình */
@@ -13817,6 +14033,8 @@ export interface components {
         HrmAt: string;
         HrmStaffId: string;
         HrmEventId: string;
+        /** @description Ngày báo giá (giờ VN) */
+        PriceBoardDay: string;
         /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
         PriceProfile: string;
         /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
@@ -27804,6 +28022,257 @@ export interface operations {
             /** @description price.alert_state | price.ticket_not_locked | price.board_approved */
             409: components["responses"]["Problem"];
             /** @description validation_failed | price.reason_required */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListBoards: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng giá theo ngày */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        boards: components["schemas"]["PriceBoardDay"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceGetBoard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path: {
+                /** @description Ngày báo giá (giờ VN) */
+                day: components["parameters"]["PriceBoardDay"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng giá */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceLockBoard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Ngày báo giá (giờ VN) */
+                day: components["parameters"]["PriceBoardDay"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceBoardOp"];
+            };
+        };
+        responses: {
+            /** @description Bảng giá Đang duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức) */
+            403: components["responses"]["Problem"];
+            /** @description price.board_busy | price.board_state | price.board_stale | price.board_not_locked | price.board_open_alerts */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.not_quote_day | price.board_empty */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceUnlockBoard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Ngày báo giá (giờ VN) */
+                day: components["parameters"]["PriceBoardDay"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceBoardOp"];
+            };
+        };
+        responses: {
+            /** @description Bảng giá */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức) */
+            403: components["responses"]["Problem"];
+            /** @description price.board_busy | price.board_state | price.board_stale */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceApproveBoard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Ngày báo giá (giờ VN) */
+                day: components["parameters"]["PriceBoardDay"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceBoardOp"];
+            };
+        };
+        responses: {
+            /** @description Bảng giá Đã duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức) */
+            403: components["responses"]["Problem"];
+            /** @description price.board_busy | price.board_state | price.board_stale | price.board_not_locked | price.board_open_alerts */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.not_quote_day | price.board_empty */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReopenBoard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Ngày báo giá (giờ VN) */
+                day: components["parameters"]["PriceBoardDay"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceBoardOp"];
+            };
+        };
+        responses: {
+            /** @description Bảng giá Đang mở duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức) */
+            403: components["responses"]["Problem"];
+            /** @description price.board_busy | price.board_state | price.board_stale */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.reason_required | price.reopen_expired */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceCancelReopenBoard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Ngày báo giá (giờ VN) */
+                day: components["parameters"]["PriceBoardDay"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceBoardOp"];
+            };
+        };
+        responses: {
+            /** @description Bảng giá Đã duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức) */
+            403: components["responses"]["Problem"];
+            /** @description price.board_busy | price.board_state | price.board_stale | price.board_changed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
             422: components["responses"]["Problem"];
         };
     };

@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient, type ApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
+import { resetPriceBoards } from "@/api/mock/kn-price-boards";
 import { resetPriceItems } from "@/api/mock/kn-price-items";
 import { resetPricePoints } from "@/api/mock/kn-price-points";
 import { resetPriceTickets } from "@/api/mock/kn-price-tickets";
@@ -84,6 +85,7 @@ describe("phiếu báo giá — backend giả lập theo hợp đồng /v1/price
     resetPriceItems();
     resetPricePoints();
     resetPriceTickets();
+    resetPriceBoards();
   });
   afterEach(() => vi.useRealTimers());
 
@@ -130,6 +132,33 @@ describe("phiếu báo giá — backend giả lập theo hợp đồng /v1/price
     expect(fixed.lines[0]!.adj_min).toBe("9000");
     expect(fixed.lines[0]!.alert?.view).toBe("adjusted");
     expect(fixed.lines[0]!.min).toBe("1");
+  });
+
+  it("W11.76 bảng giá ngày: duyệt sau giờ khóa (Admin không duyệt), Đang duyệt, phiếu Đã duyệt, mở duyệt có lý do", async () => {
+    const tinh = await clientFor("kn-binh", "asg-binh-tinh");
+    const day = "2026-10-09"; // Thứ Sáu — phiếu giả lập đã gửi, đã qua giờ khóa
+    let b = await tinh.ta.board(day);
+    expect(b.state).toBe("open");
+    expect(b.can.approve).toBe(true);
+    expect(b.preview.length).toBeGreaterThan(0);
+    const top = b.preview[0]!;
+    expect(Number(top.points)).toBeGreaterThan(0);
+    expect(await problemCode(tinh.ta.boardOp(day, "approve", { seq: 1 }))).toBe("price.board_stale");
+    b = await tinh.ta.boardOp(day, "lock", { seq: 0 });
+    expect(b.state).toBe("approving");
+    b = await tinh.ta.boardOp(day, "approve", { seq: b.seq });
+    expect(b.state).toBe("approved");
+    expect(b.published?.version).toBe(1);
+    const rows = (await tinh.ta.day({ day })).rows.filter((r) => r.ticket);
+    expect(rows.every((r) => r.view === "approved")).toBe(true);
+    expect(await problemCode(tinh.ta.boardOp(day, "reopen", { seq: b.seq }))).toBe("price.reason_required");
+    b = await tinh.ta.boardOp(day, "reopen", { seq: b.seq, reason: "Sai giá" });
+    expect(b.state).toBe("reopened");
+    expect(b.published?.reopened).toBe(true);
+    const xa = await clientFor("kn-an", "asg-an-xa");
+    const xb = await xa.ta.board(day);
+    expect(xb.preview).toHaveLength(0);
+    expect(xb.published?.version).toBe(1);
   });
 
   it("màn Nhập báo giá: xã, giờ khóa, dòng theo nhóm hàng", async () => {

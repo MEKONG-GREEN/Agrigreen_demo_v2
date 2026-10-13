@@ -2,7 +2,7 @@
 
 // Cấp Tỉnh — Kiểm duyệt & công bố (BRD Báo giá v1.3; W11.75): phiếu các xã trong ngày (Chi tiết báo giá FN-TI-02.02),
 // cảnh báo biến động + yêu cầu xác minh + chốt (FN-TI-02.03), sửa phiếu: hiệu chỉnh / sửa ngày / xóa (FN-TI-02.04), nhập
-// thay xã Không nộp (FN-TI-02.09), xuất Excel. Nút "Duyệt bảng giá" thêm ở W11.76.
+// thay xã Không nộp (FN-TI-02.09), xuất Excel; W11.76: khối bảng giá ngày — duyệt / mở duyệt (FN-TI-02.05, 02.06).
 import Link from "next/link";
 import { useState } from "react";
 import { Dialog } from "@/components/Dialog";
@@ -26,6 +26,7 @@ import {
   type PriceSheet,
   type PriceTicketRow,
 } from "./api";
+import { BoardPanel } from "./BoardPanel";
 import { countDrafts, draftsOf, fillFromRef, SheetEditor, SheetTable, usePriceTicketApi, type Drafts } from "./SheetLines";
 
 type Tab = "tickets" | "alerts";
@@ -57,7 +58,7 @@ export function ReviewScreen() {
           </button>
         }
       >
-        Phiếu báo giá của các xã, cảnh báo biến động và xác minh với Xã. Duyệt bảng giá ngày ở bước sau (khi mọi cảnh báo đã xử lý).
+        Phiếu báo giá của các xã, cảnh báo biến động và xác minh với Xã; duyệt bảng giá ngày khi đã qua giờ khóa và mọi cảnh báo đã xử lý.
       </PageHeader>
       <div className="row" style={{ marginBottom: 12 }}>
         <label htmlFor="pr-day">Ngày báo giá</label>
@@ -67,6 +68,7 @@ export function ReviewScreen() {
         </label>
       </div>
       {act.view}
+      <BoardPanel day={day} nonce={nonce} onChanged={bump} />
       <LoadState s={list}>
         {(d) => {
           const n = (v: string) => d.rows.filter((r) => r.view === v).length;

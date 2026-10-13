@@ -19,6 +19,10 @@
 // tạm tính, xác minh hai chiều, nhập thay, hiệu chỉnh, sửa ngày, xóa mềm, in phiếu; nối sẵn ItemHooks.HasPrice/HasSheets
 // và PointHooks.Submitted; điểm nối app.TicketHooks.Board cho W11.76 (SetTicketHooks).
 //
+// W11.76 (pf 000151, 000152): duyệt / mở duyệt bảng giá ngày có phiên bản — khóa "Đang duyệt", ảnh chụp dòng bảng giá
+// (CT-04) + phiếu của mỗi phiên bản, khóa tuần lưu lúc duyệt, sự kiện pf.price.board.published, port.Boards, view
+// pf_price_pub.v1_board_daily / v1_ticket_week; New nối TicketHooks.Board/Approved (giá tham chiếu chỉ từ ngày đã duyệt).
+//
 // Module khác chỉ import price/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
 package price
 
@@ -58,6 +62,7 @@ func New(b tenant.Beginner, clk clock.Clock, profiles []port.Profile) (*Module, 
 	svc.Points.Submitted = m.tickets.Submitted
 	m.items.Hooks.HasPrice = m.tickets.HasPrice
 	m.items.Hooks.HasSheets = m.tickets.Submitted
+	m.tickets.WireBoard() // W11.76: Cấp Tỉnh chỉ sửa khi Chưa duyệt / Đang mở duyệt; CT-02 chỉ từ ngày đã duyệt
 	return m, nil
 }
 
@@ -75,8 +80,16 @@ func (m *Module) SetPointHooks(h app.PointHooks) { m.svc.Points = h }
 // Tickets cho module khác (W11.76 bảng giá ngày, W11.77 tiến độ): phiếu và dòng giá đã gửi của một ngày.
 func (m *Module) Tickets() port.Tickets { return m.tickets }
 
-// SetTicketHooks nối điểm mở rộng của phiếu (W11.76: trạng thái bảng giá ngày) — gọi ở gốc lắp ráp trước khi phục vụ.
+// SetTicketHooks thay điểm mở rộng của phiếu. New đã nối Board/Approved với bảng giá ngày W11.76 — chỉ dùng để thay
+// (kiểm thử, bên dùng khác).
 func (m *Module) SetTicketHooks(h app.TicketHooks) { m.tickets.Hooks = h }
+
+// Boards cho module khác (W11.77 Bảng giá tổng hợp, dashboard, báo cáo): phiên bản bảng giá đã duyệt của một ngày.
+func (m *Module) Boards() port.Boards { return m.tickets }
+
+// UseWeeks nối lịch kỳ hệ thống (W11.03, pf/extension) cho khóa tuần lưu lúc duyệt bảng giá (W11.76). Không nối → quy
+// tắc mặc định QĐ-6.
+func (m *Module) UseWeeks(w port.Weeks) { m.tickets.Weeks = w }
 
 // UseTablePDF nối bộ dựng PDF (pf/reports) cho "Tải PDF" phiếu báo giá (FN-XA-03.02). Không nối → 503.
 func (m *Module) UseTablePDF(p port.TablePDF) { m.tickets.PDF = p }
@@ -101,6 +114,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.ItemHandler{Svc: m.items}.RegisterApp(rg)     // W11.73
 	handler.PointHandler{Svc: m.svc}.RegisterApp(rg)      // W11.72
 	handler.TicketHandler{Svc: m.tickets}.RegisterApp(rg) // W11.75
+	handler.BoardHandler{Svc: m.tickets}.RegisterApp(rg)  // W11.76
 }
 
 // RegisterAdmin: không có route Admin API.

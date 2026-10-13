@@ -5,8 +5,9 @@
 //   - Profile: cấu hình theo bên dùng (vai → cấp, vai quản trị danh mục, phòng ban chủ) ở gốc lắp ráp — không so tên ứng
 //     dụng (R-MOD-04). W11.72 thêm Profile.StewardDuty (cờ Quản trị nghiệp vụ), W11.74 thêm Profile.Schedule (giờ khóa, hạn phản hồi, nhắc, ngưỡng mặc định).
 //   - Catalog: danh mục nền (đơn vị tính, nhóm hàng) có hiệu lực theo ngày — W11.73 (mặt hàng) và KHTC (Q-082) đọc qua đây.
-//   - Series, Publish (v4.1 §26) và sự kiện price.published: W11.76 khai ở gói này khi có bảng giá ngày.
-//   - PubSchema: schema view công bố; view đầu tiên v1_board_daily (W11.76) khai bằng chỉ thị //ag:pubview.
+//   - Boards (bảng giá ngày đã duyệt — vai trò Series/Publish của v4.1 §26) và sự kiện pf.price.board.published (W11.76,
+//     port/board.go).
+//   - PubSchema: schema view công bố — v1_board_daily, v1_ticket_week (W11.76, pf 000152).
 package port
 
 import (
@@ -17,8 +18,13 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
-// PubSchema là schema view công bố của pf/price cho cap/analytics và KHTC (R-DB-10, ADR-0031 §2). Chưa có view
-// (W11.76 thêm v1_board_daily bằng //ag:pubview pf_price_pub.board_daily v1). Chỉ vai r_price_pub đọc được.
+// PubSchema là schema view công bố của pf/price cho cap/analytics và KHTC (R-DB-10, ADR-0031 §2). W11.76 (pf 000152):
+// bảng giá đã duyệt theo ngày × mặt hàng (min/max toàn tỉnh — Q-084) và số phiếu theo tuần báo cáo × xã báo giá, kèm cờ
+// tuần đã chốt. Hợp đồng cột: contracts/pubview/pf_price_pub.board_daily.v1.json, pf_price_pub.ticket_week.v1.json.
+// Chỉ vai r_price_pub (thành viên: r_metrics, r_agg) đọc được.
+//
+//ag:pubview pf_price_pub.board_daily v1
+//ag:pubview pf_price_pub.ticket_week v1
 const PubSchema = "pf_price_pub"
 
 // Profile là cấu hình cap/price của một bên dùng (KN: cmd/api-platform/assembly/price.go).
@@ -38,6 +44,8 @@ type Profile struct {
 	StewardDuty string
 	// Schedule: lịch báo giá, giờ khóa, hạn phản hồi, nhắc, ngưỡng MẶC ĐỊNH (W11.74, port/calendar.go).
 	Schedule ScheduleDefaults
+	// Board: duyệt / mở duyệt bảng giá ngày (W11.76, port/board.go).
+	Board BoardSettings
 }
 
 // Unit là một đơn vị tính đang hiệu lực (phiên bản mới nhất có valid_from ≤ ngày hỏi).

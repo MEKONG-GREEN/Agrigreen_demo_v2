@@ -68,6 +68,19 @@ func wirePrice(p *pgxpool.Pool, clk clock.Clock, officers priceport.Officers) (*
 	return m, nil
 }
 
+// PriceWeeks cài price/port.Weeks từ lịch kỳ hệ thống (W11.03, pf/extension ReportWeekOf) — W11.76.
+type PriceWeeks struct {
+	Calendar interface {
+		ReportWeekOf(ctx context.Context, day time.Time) (key string, year int, from, to time.Time)
+	}
+}
+
+// WeekOf trả tuần báo cáo chứa day.
+func (w PriceWeeks) WeekOf(ctx context.Context, day time.Time) (priceport.Week, error) {
+	key, year, from, to := w.Calendar.ReportWeekOf(ctx, day)
+	return priceport.Week{Key: key, Year: year, From: from, To: to}, nil
+}
+
 // PriceOfficers cài price/port.Officers từ pf/accounts (W11.72): cán bộ có lần gán Cấp Xã (kn_xa) / Cấp Tỉnh (kn_tinh)
 // còn hiệu lực ở phòng ban chủ dữ liệu giá của Profile (KN: Phòng TTTT), tên hiển thị từ danh bạ tài khoản.
 type PriceOfficers struct {

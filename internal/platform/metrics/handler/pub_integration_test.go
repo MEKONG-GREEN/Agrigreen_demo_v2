@@ -62,11 +62,12 @@ func TestPubViewsDeclaredAndPrivileges_W63(t *testing.T) {
 	admin := env.AdminPool(t, migrations.PF)
 	ctx := context.Background()
 	views := pubViews(t)
-	if len(views) != 4 {
+	if len(views) != 5 { // W11.76: + pf/price
 		t.Fatalf("module công bố view _pub: %v", views)
 	}
-	// W6.3: 11 view (pf 000124); W11.10: + pf_extension_pub.v1_consolidation_closed (pf 000144).
-	if n := countViews(views); n != 12 {
+	// W6.3: 11 view (pf 000124); W11.10: + pf_extension_pub.v1_consolidation_closed (pf 000144); W11.76: +
+	// pf_price_pub.v1_board_daily, v1_ticket_week (pf 000152).
+	if n := countViews(views); n != 14 {
 		t.Fatalf("số view _pub đã khai: %d", n)
 	}
 	declared := map[string]bool{}

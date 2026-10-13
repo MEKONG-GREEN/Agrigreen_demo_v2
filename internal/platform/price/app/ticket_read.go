@@ -777,88 +777,107 @@ func (s *TicketService) Day(ctx context.Context, profile string, day time.Time) 
 	if !ok {
 		return port.DaySummary{}, port.ErrProfileNotFound
 	}
-	day = domain.BusinessDay(day)
-	out := port.DaySummary{Day: day}
+	var out port.DaySummary
 	err := s.ctxTx(ctx, func(tx pgx.Tx) error {
-		ps, err := loadPointSnap(ctx, tx)
+		b, err := s.board(ctx, tx, domain.BusinessDay(day))
 		if err != nil {
 			return err
 		}
-		plan, err := s.dayPlan(ctx, tx, prof, day)
-		if err != nil {
-			return err
-		}
-		now := s.Clock.Now()
-		out.Quote, out.LockAt, out.Locked = plan.Quote, plan.LockAt, plan.Locked(now)
-		b, err := s.board(ctx, tx, day)
-		if err != nil {
-			return err
-		}
-		rows, err := s.dayRows(ctx, tx, ps, day, out.Locked, b)
-		if err != nil {
-			return err
-		}
-		var sent []uuid.UUID
-		region := map[uuid.UUID]string{}
-		late := map[uuid.UUID]bool{}
-		for _, r := range rows {
-			out.Points++
-			switch {
-			case r.Ticket != nil && r.Ticket.Status == domain.TicketSubmitted:
-				out.Submitted++
-			case r.Ticket != nil && r.Ticket.Status == domain.TicketLate:
-				out.Late++
-			default:
-				out.Missed++
-			}
-			if r.Ticket != nil && domain.Sent(r.Ticket.Status) {
-				sent = append(sent, r.Ticket.ID)
-				region[r.Ticket.ID] = r.Point.RegionCode
-				late[r.Ticket.ID] = r.Ticket.Status == domain.TicketLate
-				out.Excluded += r.Excluded
-				out.OpenAlerts += r.OpenAlerts
-			}
-		}
-		if len(sent) == 0 {
-			return nil
-		}
-		lines, err := store.LoadLines(ctx, tx, sent)
-		if err != nil {
-			return err
-		}
-		as, err := store.LoadAlerts(ctx, tx, sent)
-		if err != nil {
-			return err
-		}
-		book := bookAlerts(as)
-		cat, err := loadDayCat(ctx, tx, day)
-		if err != nil {
-			return err
-		}
-		ts, err := store.LoadTickets(ctx, tx, store.TicketFilter{IDs: sent})
-		if err != nil {
-			return err
-		}
-		pointOf := map[uuid.UUID]string{}
-		for _, t := range ts {
-			pointOf[t.ID] = t.PointCode
-		}
-		for _, l := range lines {
-			if book.excluded(l.TicketID, l.Line.ItemCode) {
-				continue
-			}
-			lo, hi, ok := domain.Effective(l.Line, l.AdjMin, l.AdjMax)
-			if !ok {
-				continue
-			}
-			it := cat.states[l.Line.ItemCode]
-			out.Lines = append(out.Lines, port.PriceLine{PointCode: pointOf[l.TicketID], RegionCode: region[l.TicketID], ItemCode: l.Line.ItemCode,
-				GroupCode: it.GroupCode, UnitCode: it.UnitCode, Min: lo, Max: hi, Mid: domain.Mid(lo, hi), Adjusted: l.AdjMin != nil,
-				Late: late[l.TicketID]})
-		}
-		return nil
+		out, _, err = s.daySummary(ctx, tx, prof, day, b)
+		return err
 	})
 	return out, err
+}
+
+// sentTicket là một phiếu Đã gửi / Nộp muộn của ngày (phiên bản tại lúc đọc) — W11.76 gắn vào phiên bản bảng giá.
+type sentTicket struct {
+	ID      uuid.UUID
+	Seq     int64
+	Point   string
+	Commune string // mã ĐVHC xã của xã báo giá tại ngày
+	Late    bool
+}
+
+// daySummary dựng tình hình phiếu + dòng giá của ngày day trong giao dịch tx (board: trạng thái bảng giá ngày) và các phiếu
+// tính vào bảng giá.
+func (s *TicketService) daySummary(ctx context.Context, tx pgx.Tx, prof port.Profile, day time.Time, board string) (port.DaySummary,
+	[]sentTicket, error) {
+	day = domain.BusinessDay(day)
+	out := port.DaySummary{Day: day}
+	ps, err := loadPointSnap(ctx, tx)
+	if err != nil {
+		return out, nil, err
+	}
+	plan, err := s.dayPlan(ctx, tx, prof, day)
+	if err != nil {
+		return out, nil, err
+	}
+	now := s.Clock.Now()
+	out.Quote, out.LockAt, out.Locked = plan.Quote, plan.LockAt, plan.Locked(now)
+	rows, err := s.dayRows(ctx, tx, ps, day, out.Locked, board)
+	if err != nil {
+		return out, nil, err
+	}
+	var (
+		sent    []uuid.UUID
+		tickets []sentTicket
+	)
+	region := map[uuid.UUID]string{}
+	late := map[uuid.UUID]bool{}
+	for _, r := range rows {
+		out.Points++
+		switch {
+		case r.Ticket != nil && r.Ticket.Status == domain.TicketSubmitted:
+			out.Submitted++
+		case r.Ticket != nil && r.Ticket.Status == domain.TicketLate:
+			out.Late++
+		default:
+			out.Missed++
+		}
+		if r.Ticket != nil && domain.Sent(r.Ticket.Status) {
+			sent = append(sent, r.Ticket.ID)
+			region[r.Ticket.ID] = r.Point.RegionCode
+			late[r.Ticket.ID] = r.Ticket.Status == domain.TicketLate
+			out.Excluded += r.Excluded
+			out.OpenAlerts += r.OpenAlerts
+			tickets = append(tickets, sentTicket{ID: r.Ticket.ID, Seq: r.Ticket.Seq, Point: r.Point.Code, Commune: r.Point.AdminUnitCode,
+				Late: r.Ticket.Status == domain.TicketLate})
+		}
+	}
+	if len(sent) == 0 {
+		return out, nil, nil
+	}
+	lines, err := store.LoadLines(ctx, tx, sent)
+	if err != nil {
+		return out, nil, err
+	}
+	as, err := store.LoadAlerts(ctx, tx, sent)
+	if err != nil {
+		return out, nil, err
+	}
+	book := bookAlerts(as)
+	cat, err := loadDayCat(ctx, tx, day)
+	if err != nil {
+		return out, nil, err
+	}
+	pointOf := map[uuid.UUID]string{}
+	for _, t := range tickets {
+		pointOf[t.ID] = t.Point
+	}
+	for _, l := range lines {
+		if book.excluded(l.TicketID, l.Line.ItemCode) {
+			continue
+		}
+		lo, hi, ok := domain.Effective(l.Line, l.AdjMin, l.AdjMax)
+		if !ok {
+			continue
+		}
+		it := cat.states[l.Line.ItemCode]
+		out.Lines = append(out.Lines, port.PriceLine{PointCode: pointOf[l.TicketID], RegionCode: region[l.TicketID], ItemCode: l.Line.ItemCode,
+			GroupCode: it.GroupCode, UnitCode: it.UnitCode, Min: lo, Max: hi, Mid: domain.Mid(lo, hi), Adjusted: l.AdjMin != nil,
+			Late: late[l.TicketID]})
+	}
+	return out, tickets, nil
 }
 
 // HasPrice (ItemHooks.HasPrice, W11.73): mặt hàng đã có giá trên một phiếu đã gửi chính thức.

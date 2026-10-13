@@ -7,8 +7,8 @@ View công bố `pf_<module>_pub.v<N>_<tên>` (R-DB-10, W6.3 — [modules.md](..
 | View | Chủ | Trạng thái | Hạt | Ghi chú |
 |---|---|---|---|---|
 | [`pf_extension_pub.v1_consolidation_closed`](pf_extension_pub.consolidation_closed.v1.json) | `pf/extension` | **published** (pf 000144) | kỳ × biểu | Số liệu đã chốt (lần tổng hợp các xã lúc chốt) theo phòng × tỉnh × khóa kỳ + cờ chốt biểu/kỳ/khóa kỳ. Trồng trọt bây giờ; CNTS vào cùng view (`department_code = chan_nuoi_thuy_san`) |
-| [`pf_price_pub.v1_board_daily`](pf_price_pub.board_daily.v1.json) | `pf/price` | **planned** — dựng ở W11.76 | ngày × mặt hàng | Bảng giá đã duyệt theo ngày, min/max toàn tỉnh (Q-084) |
-| [`pf_price_pub.v1_ticket_week`](pf_price_pub.ticket_week.v1.json) | `pf/price` | **planned** — dựng ở W11.76 | tuần báo cáo × xã báo giá | Số phiếu giá đã thu thập theo tuần báo cáo + cờ tuần đã chốt |
+| [`pf_price_pub.v1_board_daily`](pf_price_pub.board_daily.v1.json) | `pf/price` | **published** (pf 000152, W11.76) | ngày × mặt hàng | Bảng giá đã duyệt theo ngày, min/max toàn tỉnh (Q-084) |
+| [`pf_price_pub.v1_ticket_week`](pf_price_pub.ticket_week.v1.json) | `pf/price` | **published** (pf 000152, W11.76) | tuần báo cáo × xã báo giá | Số phiếu giá đã thu thập theo tuần báo cáo + cờ tuần đã chốt |
 
 ## "Nguồn đã chốt" (QĐ-6, Q-048 — đề xuất của dev, chờ PO)
 
@@ -44,6 +44,8 @@ View công bố `pf_<module>_pub.v<N>_<tên>` (R-DB-10, W6.3 — [modules.md](..
 - Đổi cột/ý nghĩa = `v<N+1>` mới (tệp mới), view cũ giữ tới khi không còn bên đọc. Đổi bảng nội bộ (vd thêm nguồn CNTS bằng `UNION ALL`) được `CREATE OR REPLACE VIEW` nếu giữ nguyên cột và ý nghĩa.
 
 ## Việc của W11.76 để dựng hai view giá
+
+Đã làm ở W11.76: bảng nguồn pf 000151 (`pf_price.board`, `board_line`, `board_ticket`), view pf 000152 (chỉ `pf_price_pub`). Chính sách RLS của bảng nguồn là `p_tenant` chuẩn (`shared.apply_ledger`) — không gọi hàm mới, không cần cấp thêm EXECUTE cho `r_agg`.
 
 `pf_price_pub` và vai `r_price_pub` (thành viên `r_metrics`, `r_agg`) đã có từ pf 000138. W11.76 cần:
 

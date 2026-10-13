@@ -37,6 +37,9 @@ type TicketHooks struct {
 	// dịch tx. nil → BoardOpen mọi ngày (chưa có duyệt): Cấp Tỉnh sửa được mọi ngày đã khóa; giá tham chiếu (CT-02) lấy
 	// từ mọi phiếu đã gửi của N ngày báo giá trước. Nối → giá tham chiếu chỉ từ ngày đã có bảng giá duyệt.
 	Board func(ctx context.Context, tx pgx.Tx, day time.Time) (string, error)
+	// Approved (W11.76): ngày day đã có bảng giá duyệt (vN ≥ 1 — kể cả đang mở duyệt / đang duyệt lại) — giá tham chiếu
+	// CT-02 chỉ lấy ngày này. nil → dùng Board ≠ Chưa duyệt.
+	Approved func(ctx context.Context, tx pgx.Tx, day time.Time) (bool, error)
 }
 
 // TicketService cài đặt phiếu báo giá, port.Tickets và các hook ItemHooks.HasPrice/HasSheets, PointHooks.Submitted.
@@ -45,6 +48,9 @@ type TicketService struct {
 	Hooks TicketHooks
 	// PDF: bộ dựng PDF (pf/reports qua gốc lắp ráp) cho "Tải PDF" phiếu. nil → 503 price.pdf_unavailable.
 	PDF port.TablePDF
+	// Weeks (W11.76): lịch kỳ hệ thống (pf/extension qua gốc lắp ráp) cho khóa tuần lưu lúc duyệt bảng giá. nil → quy tắc
+	// mặc định QĐ-6 (domain.DefaultWeekOf).
+	Weeks port.Weeks
 }
 
 var _ port.Tickets = (*TicketService)(nil)
@@ -206,7 +212,14 @@ func (s *TicketService) refPrices(ctx context.Context, tx pgx.Tx, prof port.Prof
 	allowed := map[time.Time]bool{}
 	for _, d := range days {
 		allowed[d] = true
-		if s.Hooks.Board != nil {
+		switch {
+		case s.Hooks.Approved != nil:
+			ok, err := s.Hooks.Approved(ctx, tx, d)
+			if err != nil {
+				return nil, err
+			}
+			allowed[d] = ok
+		case s.Hooks.Board != nil:
 			b, err := s.board(ctx, tx, d)
 			if err != nil {
 				return nil, err

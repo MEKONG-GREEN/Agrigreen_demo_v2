@@ -273,3 +273,21 @@ Chưa làm trong gói này: nhập Excel BM-04; lũy kế (CN-03/05/07, TS-07/08
 | Xuất Excel (FN-07 B5) | CSV UTF-8 có BOM (Excel mở được), cột không PII ngoài nhãn che bớt; tối đa 5.000 hồ sơ. Xuất họ tên đầy đủ cần đọc kho theo lô (hạn mức Resolve 600/giờ) — chưa làm | W11.28 (renderer xlsx + đọc kho theo lô) |
 | Thông tin làm việc (FN-08) | Sự kiện `work_start`/`work_end` (lý do bắt buộc, mã danh mục `leave_reason`); trạng thái chỉ "Đang công tác"/"Đã nghỉ việc" (thêm "chưa vào làm" khi chưa có ngày vào làm); không tệp QĐ (W11.24) | — |
 | Đơn vị công tác | Mã đơn vị nội bộ W11.07 (`pf_accounts.internal_unit`) qua `port.Units` — kiểm "đang dùng" khi người gọi có Nút (Admin không Nút: chỉ kiểm dạng mã) | — |
+
+## W11.76 — Duyệt / mở duyệt bảng giá (pf 000151, 000152)
+
+| Câu hỏi / mục | Lựa chọn đã dùng | Ở đâu | Đổi thế nào |
+|---|---|---|---|
+| Q-086 / Q-052 — giới hạn mở duyệt "30 ngày (cần xác nhận)" (BR-06 FN-TI-02.06) | Tạm 30 ngày tính tới hôm nay (giờ VN), ngày báo giá cũ hơn → 422 `price.reopen_expired` | `port.Profile.Board.ReopenDays` (0 → 30), `domain.ReopenWithin` | Đặt `ReopenDays` ở gốc lắp ráp khi PO chốt |
+| Admin duyệt bảng giá (BR-03, AC-04 FN-TI-02.05) | Admin KHÔNG duyệt / mở duyệt (vận hành chính thức); giai đoạn thử nghiệm bật `Profile.Board.AdminApproves` | `app.approver` | Bật cờ ở `assembly.KNPriceProfile` khi thử nghiệm |
+| "Đang duyệt — mỗi lần một người" (BR-02, AC-03) | Khóa có hạn 10 phút ghi sổ (`lock`) khi bấm "Duyệt bảng giá"; xác nhận (`approve`) / "Hủy" (`unlock`) / hết hạn → trạng thái trước khóa; người khác nhận 409 `price.board_busy` "Đang duyệt bởi …". Trong lúc Đang duyệt, Cấp Tỉnh không sửa phiếu của ngày (số đã xem trước = số công bố) | `domain.BoardLockTTL` | Đổi hằng số |
+| Ai duyệt | Mọi cán bộ Cấp Tỉnh của bên dùng, không cần cờ QTNV, kể cả xã không thuộc phân công (BR-02) | `app.approver` | — |
+| Giá "từ – đến" toàn tỉnh (Q-084) | Bảng giá CT-04 mức toàn tỉnh: min các giá thấp nhất, max các giá cao nhất, trung bình cộng P các xã (làm tròn 4 số lẻ); không tách theo nhóm vùng (báo cáo vùng W11.77 đọc lại từ phiếu) | `domain.AggregateBoard` | — |
+| Khóa tuần của bảng giá (`week_key` view `_pub`) | Lưu lúc duyệt theo lịch kỳ hệ thống W11.03 (tham số `extension.report_period_rule` có hiệu lực tại ngày, qua `pf/extension` `ReportWeekOf`); không nối → quy tắc mặc định QĐ-6 (Thứ Tư – Thứ Ba) | `port.Weeks`, `assembly.PriceWeeks` | — |
+| `days_scheduled` của `v1_ticket_week` | Số ngày báo giá theo lịch W11.74 (lịch có phiên bản + ngoại lệ; mặc định của Profile khi tenant chưa đặt lịch) của tuần, tính ở ứng dụng và LƯU lúc duyệt; view lấy giá trị của lần duyệt mới nhất trong tuần. `week_closed` = số ngày đã duyệt ≥ `days_scheduled` và không ngày nào đang mở duyệt | `ApproveBoard`, pf 000152 | — |
+| Hạt `v1_ticket_week` | Chỉ có dòng cho xã có ít nhất một phiếu thuộc bảng giá đã duyệt trong tuần (xã không nộp cả tuần không có dòng = 0 phiếu) | pf 000152 | View v2 nếu KHTC cần dòng 0 |
+| "Hủy mở duyệt khi chưa sửa gì" | "Đã sửa" = có phiên bản phiếu / dòng giá / cảnh báo của phiếu thuộc ngày ghi sau lúc mở duyệt → 409 `price.board_changed` | `store.DayChangedSince` | — |
+| Bảng giá theo bên dùng | Phiếu thuộc tenant (không theo bên dùng) → hook phiếu dùng bảng giá của bên dùng đầu tiên (KN) | `TicketService.boardProfile` | Khi có bên dùng thứ hai chạy phiếu xã |
+| Cấp TW / Cấp Xã xem bảng giá | Chỉ phiên bản đã duyệt (kèm cờ "Đang cập nhật" khi mở duyệt); không xem trước, không nhật ký. Màn Bảng giá tổng hợp là W11.77 | `GetBoard` | — |
+| Đăng website khi duyệt (BR-06, Đợt 2) | Phát sự kiện `pf.price.board.published` v1 (outbox); chưa có bên nhận (W11.81) | `contracts/events/pf.price.board.published.v1.json` | W11.81 |
+| "Mốc duyệt bảng giá dự kiến" (FN-AD-04.04 BR-03, ghi chú W11.74) | Chưa thêm tham số mốc duyệt — duyệt được bất kỳ lúc nào sau giờ khóa | — | Gói sau nếu PO cần nhắc duyệt |

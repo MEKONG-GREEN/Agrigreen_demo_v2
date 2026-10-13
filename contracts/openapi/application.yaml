@@ -9701,6 +9701,160 @@ paths:
         "409": {description: price.alert_state | price.ticket_not_locked | price.board_approved, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed | price.reason_required, $ref: "#/components/responses/Problem"}
   # --- hết pf/price W11.75 ---
+  # --- pf/price W11.76: duyệt / mở duyệt bảng giá ngày (FN-TI-02.05, 02.06) ---
+  /v1/price/boards:
+    get:
+      summary: Trạng thái bảng giá các ngày báo giá trong khoảng (tối đa 62 ngày; vắng → 14 ngày tới hôm nay) — mọi vai của bên dùng
+      operationId: priceListBoards
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Bảng giá theo ngày
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [boards]
+                properties:
+                  boards: {type: array, items: {$ref: "#/components/schemas/PriceBoardDay"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/boards/{day}:
+    get:
+      summary: Bảng giá một ngày ở màn Kiểm duyệt & công bố — trạng thái, tóm tắt kỳ, xem trước (CT-04), phiên bản đã duyệt, nhật ký; Cấp TW / Xã chỉ nhận trạng thái + phiên bản đã duyệt
+      operationId: priceGetBoard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceBoardDay"
+      responses:
+        "200":
+          description: Bảng giá
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/boards/{day}/lock:
+    post:
+      summary: Duyệt bảng giá — chuyển Đang duyệt, giữ khóa một người (10 phút) tới khi xác nhận / hủy; cần đã qua giờ khóa, hết cảnh báo chưa xử lý, có dòng giá
+      operationId: priceLockBoard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceBoardDay"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceBoardOp"}
+      responses:
+        "201":
+          description: Bảng giá Đang duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức), $ref: "#/components/responses/Problem"}
+        "409": {description: price.board_busy | price.board_state | price.board_stale | price.board_not_locked | price.board_open_alerts, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.not_quote_day | price.board_empty, $ref: "#/components/responses/Problem"}
+  /v1/price/boards/{day}/unlock:
+    post:
+      summary: Hủy Đang duyệt của mình — về trạng thái trước khóa
+      operationId: priceUnlockBoard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceBoardDay"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceBoardOp"}
+      responses:
+        "201":
+          description: Bảng giá
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức), $ref: "#/components/responses/Problem"}
+        "409": {description: price.board_busy | price.board_state | price.board_stale, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/boards/{day}/approve:
+    post:
+      summary: Xác nhận duyệt — phiên bản mới; ảnh chụp dòng bảng giá (CT-04) + phiếu; khóa tuần lưu lúc duyệt; phát pf.price.board.published
+      operationId: priceApproveBoard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceBoardDay"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceBoardOp"}
+      responses:
+        "201":
+          description: Bảng giá Đã duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức), $ref: "#/components/responses/Problem"}
+        "409": {description: price.board_busy | price.board_state | price.board_stale | price.board_not_locked | price.board_open_alerts, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.not_quote_day | price.board_empty, $ref: "#/components/responses/Problem"}
+  /v1/price/boards/{day}/reopen:
+    post:
+      summary: Mở duyệt (FN-TI-02.06) — lý do bắt buộc; ngày trong giới hạn (mặc định 30 ngày); phiên bản đã duyệt vẫn công bố kèm cờ Đang cập nhật
+      operationId: priceReopenBoard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceBoardDay"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceBoardOp"}
+      responses:
+        "201":
+          description: Bảng giá Đang mở duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức), $ref: "#/components/responses/Problem"}
+        "409": {description: price.board_busy | price.board_state | price.board_stale, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.reason_required | price.reopen_expired, $ref: "#/components/responses/Problem"}
+  /v1/price/boards/{day}/cancel-reopen:
+    post:
+      summary: Hủy mở duyệt khi chưa sửa gì — về Đã duyệt phiên bản cũ
+      operationId: priceCancelReopenBoard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceBoardDay"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceBoardOp"}
+      responses:
+        "201":
+          description: Bảng giá Đã duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức), $ref: "#/components/responses/Problem"}
+        "409": {description: price.board_busy | price.board_state | price.board_stale | price.board_changed, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  # --- hết pf/price W11.76 ---
   # --- hết pf/price ---
 components:
   securitySchemes:
@@ -9752,6 +9906,12 @@ components:
       in: path
       required: true
       schema: {type: string, format: uuid}
+    PriceBoardDay:
+      name: day
+      in: path
+      required: true
+      schema: {type: string, format: date}
+      description: Ngày báo giá (giờ VN)
     PriceProfile:
       name: profile
       in: query
@@ -15727,3 +15887,98 @@ components:
       required: [written]
       properties:
         written: {type: integer, minimum: 0}
+    # --- pf/price W11.76 ---
+    PriceBoardState:
+      type: string
+      enum: [open, approving, approved, reopened]
+      description: Chưa duyệt | Đang duyệt | Đã duyệt | Đang mở duyệt
+    PriceBoardOp:
+      type: object
+      required: [seq]
+      properties:
+        seq: {type: integer, minimum: 0, description: "Phiên bản sổ bảng giá người gọi đã thấy (khóa lạc quan; 0 = chưa có)"}
+        reason: {type: string, maxLength: 500, description: "Lý do mở duyệt (bắt buộc) / hủy mở duyệt"}
+    PriceBoardLine:
+      type: object
+      required: [item_code, item_name, group_code, group_name, unit_code, unit_name, min, max, avg, points]
+      properties:
+        item_code: {type: string}
+        item_name: {type: string}
+        group_code: {type: string}
+        group_name: {type: string}
+        unit_code: {type: string}
+        unit_name: {type: string}
+        min: {$ref: "#/components/schemas/Decimal"}
+        max: {$ref: "#/components/schemas/Decimal"}
+        avg: {$ref: "#/components/schemas/Decimal"}
+        points: {type: integer, description: Số xã có giá}
+    PriceBoardDay:
+      type: object
+      required: [day, quote, state, version, approved_at]
+      properties:
+        day: {type: string, format: date}
+        quote: {type: boolean}
+        state: {$ref: "#/components/schemas/PriceBoardState"}
+        version: {type: integer}
+        approved_at: {type: [string, "null"], format: date-time}
+    PriceBoardSummary:
+      type: object
+      required: [points, submitted, late, missed, price_lines, excluded, open_alerts]
+      properties:
+        points: {type: integer}
+        submitted: {type: integer}
+        late: {type: integer}
+        missed: {type: integer}
+        price_lines: {type: integer}
+        excluded: {type: integer}
+        open_alerts: {type: integer}
+    PriceBoardPublished:
+      type: object
+      required: [version, approved_at, reopened, week_key, lines]
+      properties:
+        version: {type: integer}
+        approved_at: {type: string, format: date-time}
+        reopened: {type: boolean, description: "Đang mở duyệt — số có thể đổi (nhãn Đang cập nhật)"}
+        week_key: {type: string}
+        lines: {type: array, items: {$ref: "#/components/schemas/PriceBoardLine"}}
+    PriceBoardLog:
+      type: object
+      required: [seq, action, status, version, reason, actor_ref, actor_name, at]
+      properties:
+        seq: {type: integer}
+        action: {type: string, enum: [lock, unlock, approve, reopen, cancel_reopen]}
+        status: {$ref: "#/components/schemas/PriceBoardState"}
+        version: {type: integer}
+        reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        actor_name: {type: [string, "null"]}
+        at: {type: string, format: date-time}
+    PriceBoard:
+      type: object
+      required: [day, quote, lock_at, locked, now, state, seq, version, locked_by, locked_by_name, lock_until, summary, preview, published, log, can, blockers, reopen_days]
+      properties:
+        day: {type: string, format: date}
+        quote: {type: boolean}
+        lock_at: {type: [string, "null"], format: date-time}
+        locked: {type: boolean, description: Đã qua giờ khóa nhập}
+        now: {type: string, format: date-time}
+        state: {$ref: "#/components/schemas/PriceBoardState"}
+        seq: {type: integer}
+        version: {type: integer, description: "Phiên bản đã duyệt hiện hành (0 = chưa duyệt)"}
+        locked_by: {type: [string, "null"], format: uuid}
+        locked_by_name: {type: [string, "null"]}
+        lock_until: {type: [string, "null"], format: date-time}
+        summary: {oneOf: [{$ref: "#/components/schemas/PriceBoardSummary"}, {type: "null"}]}
+        preview: {type: array, items: {$ref: "#/components/schemas/PriceBoardLine"}}
+        published: {oneOf: [{$ref: "#/components/schemas/PriceBoardPublished"}, {type: "null"}]}
+        log: {type: array, items: {$ref: "#/components/schemas/PriceBoardLog"}}
+        can:
+          type: object
+          required: [approve, unlock, reopen, cancel_reopen]
+          properties:
+            approve: {type: boolean}
+            unlock: {type: boolean}
+            reopen: {type: boolean}
+            cancel_reopen: {type: boolean}
+        blockers: {type: array, items: {type: string}, description: Lý do chưa duyệt được}
+        reopen_days: {type: integer}

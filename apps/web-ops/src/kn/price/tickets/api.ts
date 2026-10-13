@@ -21,6 +21,33 @@ export type PriceHistoryRow = S["PriceHistoryRow"];
 export type PriceTicketLog = S["PriceTicketLog"];
 export type PriceLineInput = S["PriceLineInput"];
 export type PriceEntryInput = S["PriceEntryInput"];
+export type PriceBoard = S["PriceBoard"];
+export type PriceBoardLine = S["PriceBoardLine"];
+export type PriceBoardState = S["PriceBoardState"];
+export type PriceBoardAction = "lock" | "unlock" | "approve" | "reopen" | "cancel-reopen";
+
+/** Trạng thái bảng giá ngày (Mục II.3.3 BRD Báo giá). */
+export const BOARD_STATE_LABEL: Record<PriceBoardState, string> = {
+  open: "Chưa duyệt",
+  approving: "Đang duyệt",
+  approved: "Đã duyệt",
+  reopened: "Đang mở duyệt",
+};
+
+export const BOARD_STATE_TONE: Record<PriceBoardState, "neutral" | "ok" | "warn" | "bad" | "info"> = {
+  open: "warn",
+  approving: "info",
+  approved: "ok",
+  reopened: "warn",
+};
+
+export const BOARD_ACTION_LABEL: Record<S["PriceBoardLog"]["action"], string> = {
+  lock: "Bắt đầu duyệt",
+  unlock: "Hủy duyệt",
+  approve: "Duyệt",
+  reopen: "Mở duyệt",
+  cancel_reopen: "Hủy mở duyệt",
+};
 
 export const TICKET_VIEW_LABEL: Record<PriceTicketView, string> = {
   not_entered: "Chưa nhập",
@@ -201,6 +228,26 @@ export function createPriceTicketApi(api: ApiClient) {
       unwrap(api.POST("/v1/price/alerts/respond", { params: { header: header() }, body })),
     decide: (body: S["PriceAlertDecision"]): Promise<S["PriceWritten"]> =>
       unwrap(api.POST("/v1/price/alerts/decide", { params: { header: header() }, body })),
+    /** Bảng giá ngày — màn Kiểm duyệt & công bố (W11.76). */
+    board: (day: string): Promise<PriceBoard> => unwrap(api.GET("/v1/price/boards/{day}", { params: { path: { day } } })),
+    boards: (q: { from?: string; to?: string }): Promise<{ boards: S["PriceBoardDay"][] }> =>
+      unwrap(api.GET("/v1/price/boards", { params: { query: q } })),
+    /** Thao tác bảng giá (khóa lạc quan theo seq): lock = "Duyệt bảng giá", approve = xác nhận, reopen = Mở duyệt. */
+    boardOp: (day: string, action: PriceBoardAction, body: S["PriceBoardOp"]): Promise<PriceBoard> => {
+      const opts = { params: { header: header(), path: { day } }, body };
+      switch (action) {
+        case "lock":
+          return unwrap(api.POST("/v1/price/boards/{day}/lock", opts));
+        case "unlock":
+          return unwrap(api.POST("/v1/price/boards/{day}/unlock", opts));
+        case "approve":
+          return unwrap(api.POST("/v1/price/boards/{day}/approve", opts));
+        case "reopen":
+          return unwrap(api.POST("/v1/price/boards/{day}/reopen", opts));
+        default:
+          return unwrap(api.POST("/v1/price/boards/{day}/cancel-reopen", opts));
+      }
+    },
     /** Excel chi tiết báo giá của ngày (Cấp Tỉnh). */
     exportDay: async (q: { day?: string; region?: string; mine?: boolean }): Promise<{ blob: Blob; name: string }> => {
       const res = await api.GET("/v1/price/tickets/export", { params: { query: q }, parseAs: "blob" });

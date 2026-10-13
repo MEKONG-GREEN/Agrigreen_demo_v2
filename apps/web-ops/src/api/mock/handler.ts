@@ -56,6 +56,7 @@ import { priceItemRoutes } from "./kn-price-items";
 import { pricePointRoutes } from "./kn-price-points";
 import { cntsCatalogAdminRoutes, cntsCatalogAppRoutes } from "./kn-cnts-catalogs";
 import { hrmRoutes } from "./kn-hrm";
+import { priceBoardRoutes } from "./kn-price-boards";
 import { priceTicketRoutes } from "./kn-price-tickets";
 import { cntsPeriodRoutes } from "./kn-cnts-periods";
 import { hrmStaffRoutes } from "./kn-hrm-staff";
@@ -147,6 +148,7 @@ const appRoutes: Route[] = [
   ...cntsPeriodRoutes, // W11.42 biểu kỳ Cấp Xã CNTS (/v1/extension/cnts/*, /v1/forms/* profile kn_cnts)
   // --- dom/hrm W11.22: hồ sơ nhân sự (/v1/hrm/access|units|staff*|permissions*) ---
   ...hrmStaffRoutes,
+  ...priceBoardRoutes, // W11.76 duyệt / mở duyệt bảng giá ngày
 
   // --- pf/extension ---
   {

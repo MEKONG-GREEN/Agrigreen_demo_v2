@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.price.board.published/v1",
+  "title": "pf.price.board.published — payload",
+  "description": "Bảng giá ngày vừa được Cấp Tỉnh duyệt — phiên bản mới (W11.76, BRD Báo giá nông sản v1.3 FN-TI-02.05 BR-06: kích hoạt đăng website Đợt 2, cập nhật Bảng giá tổng hợp / Dashboard / Báo cáo; FN-TI-02.06 duyệt lại sau mở duyệt → version tăng). Bên nhận đọc dòng giá (min/max toàn tỉnh, trung bình — CT-04) qua price/port.Boards hoặc view pf_price_pub.v1_board_daily theo (profile, board_date, version). Không dữ liệu cá nhân.",
+  "x-event-type": "pf.price.board.published",
+  "x-schema-version": 1,
+  "x-producer": "pf/price",
+  "type": "object",
+  "required": [
+    "profile",
+    "board_date",
+    "version",
+    "approved_at",
+    "week_key",
+    "week_year",
+    "items",
+    "tickets",
+    "reapproval"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "description": "Bên dùng của cap/price (KN = kn)"
+    },
+    "board_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Ngày báo giá (giờ VN)"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Phiên bản bảng giá đã duyệt"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "week_key": {
+      "type": "string",
+      "description": "Khóa tuần báo cáo (lịch kỳ hệ thống W11.03) lưu lúc duyệt, vd 2026-W45"
+    },
+    "week_year": {
+      "type": "integer"
+    },
+    "items": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Số mặt hàng của bảng giá"
+    },
+    "tickets": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Số phiếu báo giá thuộc phiên bản"
+    },
+    "reapproval": {
+      "type": "boolean",
+      "description": "Duyệt lại sau mở duyệt"
+    }
+  }
+}

@@ -1090,6 +1090,14 @@ Route `/v1/price/*` (Application API). Lỗi chung: `unauthenticated` (401), `fo
 | 409 | `price.ticket_not_locked` | W11.75: Cấp Tỉnh nhập thay / hiệu chỉnh / sửa ngày / xóa / chốt cảnh báo khi chưa qua giờ khóa của ngày |
 | 409 | `price.ticket_exists` | W11.75: nhập thay đè phiếu đã gửi (BR-01 FN-TI-02.09), sửa ngày sang ngày xã đã có phiếu (AC-04 FN-TI-02.04), Xã ghi đè phiếu nhập thay |
 | 409 | `price.board_approved` | W11.75: bảng giá của ngày đã duyệt / đang duyệt (W11.76) — mở duyệt trước khi sửa, nhập thay, xác minh |
+| 409 | `price.board_busy` | W11.76: bảng giá của ngày đang được cán bộ khác duyệt (khóa "Đang duyệt" còn hạn) — chi tiết "Đang duyệt bởi …" (FN-TI-02.05 AC-03, FN-TI-02.06) |
+| 409 | `price.board_state` | W11.76: trạng thái bảng giá không cho phép thao tác (vd duyệt bảng giá đã duyệt, mở duyệt bảng giá chưa duyệt, hủy khóa không phải Đang duyệt) |
+| 409 | `price.board_stale` | W11.76: `seq` gửi lên khác phiên bản sổ bảng giá hiện hành — tải lại rồi thao tác |
+| 409 | `price.board_not_locked` | W11.76: chưa qua giờ khóa nhập của ngày báo giá — chưa duyệt được |
+| 409 | `price.board_open_alerts` | W11.76: còn cảnh báo biến động chưa xử lý (BR-03 FN-TI-02.03, AC-01 FN-TI-02.05) — chi tiết số cảnh báo |
+| 422 | `price.board_empty` | W11.76: ngày không có dòng giá nào để công bố — không duyệt được |
+| 422 | `price.reopen_expired` | W11.76: ngày báo giá quá giới hạn mở duyệt (mặc định 30 ngày — BR-06 FN-TI-02.06, Q-086 tạm) |
+| 409 | `price.board_changed` | W11.76: "Hủy mở duyệt" khi số liệu ngày đã sửa sau lúc mở duyệt — duyệt lại thay vì hủy |
 | 404 | `price.alert_not_found` | W11.75: không có cảnh báo cho phiếu + mặt hàng |
 | 409 | `price.alert_state` | W11.75: trạng thái cảnh báo không cho phép thao tác (yêu cầu xác minh khi quá hạn / đã xử lý; phản hồi khi không ở "Đã yêu cầu xác minh"; giữ nguyên / loại khi chưa khóa hoặc đã xử lý; mở lại khi bảng giá không đang mở duyệt) |
 | 409 | `price.respond_overdue` | W11.75: Xã phản hồi sau hạn phản hồi (AC-02 FN-XA-03.05) |
