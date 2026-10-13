@@ -250,8 +250,16 @@ func (s *Service) inboxRow(ctx context.Context, p store.Period, evs []store.Even
 	}
 	u := prog.Units[i]
 	row.LastSubmittedAt, row.ReviewedAt, row.Late = u.LastSubmittedAt, u.ReviewedAt, u.Late
+	// W11.63: nháp ở máy chủ (sau lần gửi cuối, chưa gửi lần nào) → "Lưu nháp" / nút "Tiếp tục" — cùng quy tắc với my-forms.
+	draft := false
+	if s.Drafts != nil && term == "" && u.Versions == 0 {
+		if ds, err := s.Drafts(ctx, p.ID); err == nil {
+			n, ok := ds[dept]
+			draft = ok && n == u.Versions
+		}
+	}
 	row.Form = domain.FormStateOf(domain.FormFacts{Versions: u.Versions, Decision: u.Decision, Overdue: overdue, Terminal: term,
-		Max: p.MaxSubmissions})
+		Max: p.MaxSubmissions, Draft: draft})
 	if row.Form.State == domain.FormSupplement {
 		row.SupplementNote = u.ReviewNote
 	}

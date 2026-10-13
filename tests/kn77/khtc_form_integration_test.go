@@ -465,3 +465,39 @@ func TestKH_FN_PN_03_02_PriorPeriodAdjustment(t *testing.T) {
 	c, b = f.do(http.MethodPost, "/v1/kn/khtc/plans/2026/versions", authz.KNTinh, khtcDept, f.khtcUser, "", body)
 	f.fail(c, b, "extension.khtc_entry_in_use")
 }
+
+// KH-FN-PN-03.02 (W11.63, mở #4): "Gửi KHTC" niêm phong bảng rồi nộp cap/forms; nộp lỗi giữa hai giao dịch để lại bảng mồ
+// côi — bảng đó không làm hạng mục thành "đã có số liệu" (W11.61 EntryUsage) và không chặn gửi lại.
+func TestKH_FN_PN_03_02_OrphanSealedSheetIgnored(t *testing.T) {
+	f := newKHTCFormFx(t)
+	p := f.open(41, dTT)
+	// Chốt kỳ native thẳng ở cap/forms (sổ KHTC vẫn mở) → bảng niêm phong được, bài nộp bị từ chối.
+	c, b := f.do(http.MethodPost, "/v1/forms/periods/"+p.FormsPeriodID+"/close?profile=kn_khtc", authz.KNTinh, khtcDept, f.khtcUser, "", map[string]any{})
+	f.ok(c, b, nil)
+	c, b = f.send(p.ID, dTT, "submit", 0, ttSheet(f.item, "30"))
+	f.fail(c, b, "forms.period_closed")
+	if k := f.deptForm(p.ID, dTT); k.Attempt != 0 || len(k.Submissions) != 0 {
+		t.Fatalf("bảng mồ côi không phải lần gửi: %+v", k)
+	}
+	// Bảng mồ côi không tính "đã có số liệu": bỏ hạng mục khỏi kế hoạch (phiên bản 2) được.
+	body := map[string]any{"base_version": 1, "decision_no": "90/QĐ-SNN", "decision_date": "2026-11-20", "effective_from": "2026-12-01"}
+	var keep []map[string]any
+	for _, e := range f.planBody["entries"].([]map[string]any) {
+		if e["ref"] != f.item {
+			keep = append(keep, e)
+		}
+	}
+	body["entries"] = keep
+	c, b = f.do(http.MethodPost, "/v1/kn/khtc/plans/2026/versions", authz.KNTinh, khtcDept, f.khtcUser, "", body)
+	f.ok(c, b, nil)
+	// Không chặn gửi lại: mở lại kỳ native, gửi lại → lần gửi 1.
+	c, b = f.do(http.MethodPost, "/v1/forms/periods/"+p.FormsPeriodID+"/reopen?profile=kn_khtc", authz.KNTinh, khtcDept, f.khtcUser, "",
+		map[string]any{"reason": "Chốt nhầm kỳ native khi kiểm thử"})
+	f.ok(c, b, nil)
+	var k kfForm
+	c, b = f.send(p.ID, dTT, "submit", 0, ttSheet(f.item, "30"))
+	f.ok(c, b, &k)
+	if k.State != "submitted" || k.Attempt != 1 {
+		t.Fatalf("gửi lại: %+v", k)
+	}
+}

@@ -3,10 +3,9 @@
 // Màn phiếu "Báo cáo cho KHTC" (W11.63 rút gọn):
 //  - KhtcFormEntryScreen  — /kn/khtc/phieu/{period_id}: phòng nhập phiếu (FN-PN-03.02). Phòng lấy từ ngữ cảnh phiên; Admin,
 //    Phòng KHTC thêm ?department=. Hộp phiếu của phòng (W11.11) dẫn tới đây.
-//  - KhtcFormTasksScreen  — /kn/khtc/phieu: "Phiếu kỳ này / Phiếu đã gửi" của phòng (FN-PN-03.01).
+//  - "Phiếu kỳ này" (FN-PN-03.01) là màn của W11.11 (/kn/bao-cao-khtc); /kn/khtc/phieu dùng lại màn đó.
 //  - KhtcFormReviewScreen — /kn/khtc/ra-soat/{period_id}?department=: KHTC rà soát (FN-TI-02.04) — yêu cầu bổ sung (bắt
 //    buộc nội dung), xác nhận, phiếu trước / tiếp theo. "So sánh lần gửi" để sau G1.
-import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
@@ -18,7 +17,6 @@ import {
   KHTC_DEPT,
   cloneContent,
   createKhtcFormApi,
-  taskAction,
   type KhtcFormContent,
   type KhtcFormSheet,
 } from "./api";
@@ -161,88 +159,6 @@ export function KhtcFormEntryScreen() {
                 />
               </section>
             </>
-          );
-        }}
-      </LoadState>
-    </div>
-  );
-}
-
-export function KhtcFormTasksScreen() {
-  const { api } = useAuth();
-  const dept = useDept();
-  const fapi = useMemo(() => (api ? createKhtcFormApi(api) : null), [api]);
-  const tasks = useLoad(fapi && dept ? () => fapi.tasks(dept) : null, [
-    fapi,
-    dept,
-  ]);
-  const [todo, setTodo] = useState(true);
-  if (!fapi) return null;
-  if (!dept)
-    return <p className="mute">Chọn phòng (?department=) để xem phiếu.</p>;
-  return (
-    <div className="page">
-      <PageHeader title="Báo cáo cho KHTC — Phiếu kỳ này" />
-      <label>
-        <input
-          type="checkbox"
-          checked={todo}
-          onChange={(e) => setTodo(e.target.checked)}
-        />{" "}
-        Cần xử lý
-      </label>
-      <LoadState s={tasks}>
-        {(items) => {
-          const list = items
-            .filter((t) => !todo || t.actionable)
-            .sort((a, b) => a.due_at.localeCompare(b.due_at));
-          return (
-            <table className="dt" aria-label="Phiếu kỳ này">
-              <thead>
-                <tr>
-                  <th>STT</th>
-                  <th>Kỳ</th>
-                  <th>Hạn nộp</th>
-                  <th>Lần gửi</th>
-                  <th>Trạng thái</th>
-                  <th>Yêu cầu bổ sung</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((t, i) => (
-                  <tr key={t.period_id}>
-                    <td className="stt">{i + 1}</td>
-                    <td>{t.name}</td>
-                    <td>{dt(t.due_at)}</td>
-                    <td>
-                      {t.attempt}/{t.max_submissions || "∞"}
-                    </td>
-                    <td>
-                      <StatusPill tone={FORM_TONE[t.state]}>
-                        {t.state_label}
-                      </StatusPill>
-                    </td>
-                    <td>{t.request_note}</td>
-                    <td>
-                      <Link
-                        className="btn"
-                        href={`/kn/khtc/phieu/${t.period_id}${dept ? `?department=${dept}` : ""}`}
-                      >
-                        {taskAction(t.state)}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-                {list.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="mute">
-                      Không có phiếu.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
           );
         }}
       </LoadState>

@@ -138,31 +138,45 @@ func DraftAttempts(ctx context.Context, tx pgx.Tx, periodID uuid.UUID) (map[stri
 	return out, rows.Err()
 }
 
-// UsedEntries trả các dòng kế hoạch (trong refs) đã có số liệu ở bảng niêm phong của năm kế hoạch year: có ô nhập hoặc có
-// dòng điều chỉnh (W11.61 EntryUsage — "hạng mục đã có số liệu chỉ ngừng, không xóa").
-func UsedEntries(ctx context.Context, tx pgx.Tx, year int, refs []uuid.UUID) (map[uuid.UUID]bool, error) {
+// SheetUse là một bảng niêm phong có chứa số liệu của các dòng kế hoạch đang hỏi.
+type SheetUse struct {
+	SheetID        uuid.UUID
+	FormsPeriodRef uuid.UUID
+	Department     string
+	Entries        []uuid.UUID
+}
+
+// SealedUses trả các bảng niêm phong của năm kế hoạch year có ô nhập hoặc dòng điều chỉnh của dòng kế hoạch trong refs.
+// Bảng chỉ có hiệu lực khi có bài nộp cap/forms trỏ tới (bên gọi kiểm — bảng mồ côi của lần gửi lỗi không tính).
+func SealedUses(ctx context.Context, tx pgx.Tx, year int, refs []uuid.UUID) ([]SheetUse, error) {
 	keys := make([]string, 0, len(refs))
 	for _, r := range refs {
 		keys = append(keys, r.String())
 	}
-	rows, err := tx.Query(ctx, `SELECT DISTINCT k FROM (
-	    SELECT jsonb_object_keys(s.content->'cells') AS k FROM pf_extension.khtc_form_sheet s WHERE s.plan_year = $1 AND s.kind = 'sealed'
+	rows, err := tx.Query(ctx, `SELECT u.id, u.forms_period_ref, u.department, array_agg(DISTINCT u.k) FROM (
+	    SELECT s.id, s.forms_period_ref, s.department, jsonb_object_keys(s.content->'cells') AS k
+	      FROM pf_extension.khtc_form_sheet s WHERE s.plan_year = $1 AND s.kind = 'sealed'
 	    UNION ALL
-	    SELECT a->>'entry_ref' FROM pf_extension.khtc_form_sheet s, jsonb_array_elements(s.content->'adjustments') a
+	    SELECT s.id, s.forms_period_ref, s.department, a->>'entry_ref'
+	      FROM pf_extension.khtc_form_sheet s, jsonb_array_elements(s.content->'adjustments') a
 	     WHERE s.plan_year = $1 AND s.kind = 'sealed'
-	  ) u WHERE k = ANY($2::text[])`, year, keys)
+	  ) u WHERE u.k = ANY($2::text[]) GROUP BY u.id, u.forms_period_ref, u.department`, year, keys)
 	if err != nil {
 		return nil, err
 	}
-	out := map[uuid.UUID]bool{}
+	var out []SheetUse
 	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
+		var su SheetUse
+		var ks []string
+		if err := rows.Scan(&su.SheetID, &su.FormsPeriodRef, &su.Department, &ks); err != nil {
 			return nil, err
 		}
-		if id, err := uuid.Parse(k); err == nil {
-			out[id] = true
+		for _, k := range ks {
+			if id, err := uuid.Parse(k); err == nil {
+				su.Entries = append(su.Entries, id)
+			}
 		}
+		out = append(out, su)
 	}
 	return out, rows.Err()
 }

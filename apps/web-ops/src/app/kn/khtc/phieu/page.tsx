@@ -1,8 +1,8 @@
 "use client";
 
-import { KhtcFormTasksScreen } from "@/kn/khtc/forms/KhtcFormScreens";
+import { DepartmentFormsScreen } from "@/kn/khtc/inbox/DepartmentFormsScreen";
 
-/** FN-PN-03.01 Phiếu kỳ này, phiếu đã gửi — Báo cáo cho KHTC của phòng (W11.63). */
+/** /kn/khtc/phieu — cùng màn "Phiếu kỳ này" của W11.11 (FN-PN-03.01); nhập phiếu ở /kn/khtc/phieu/{period_id} (W11.63). */
 export default function Page() {
-  return <KhtcFormTasksScreen />;
+  return <DepartmentFormsScreen view="current" />;
 }

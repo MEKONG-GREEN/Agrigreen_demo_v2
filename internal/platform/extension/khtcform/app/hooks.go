@@ -17,23 +17,59 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
-// EntryUsage là móc W11.61 (khtc/app.Service.EntryUsage): dòng kế hoạch nào của năm year đã có số liệu ở phiếu đã gửi
-// (bảng niêm phong có ô nhập hoặc dòng điều chỉnh) — "đã có số liệu chỉ Ngừng theo dõi, không bỏ khỏi kế hoạch".
+// EntryUsage là móc W11.61 (khtc/app.Service.EntryUsage): dòng kế hoạch nào của năm year đã có số liệu ở phiếu đã gửi —
+// "đã có số liệu chỉ Ngừng theo dõi, không bỏ khỏi kế hoạch". Chỉ tính bảng niêm phong CÓ bài nộp cap/forms trỏ tới (mọi
+// lần gửi): bảng mồ côi của lần "Gửi KHTC" lỗi giữa hai giao dịch không làm hạng mục thành "đã có số liệu".
 func (s *Service) EntryUsage(ctx context.Context, year int, refs []uuid.UUID) (map[uuid.UUID]bool, error) {
 	p, ok := authz.FromContext(ctx)
 	if !ok {
 		return nil, problem.Unauthenticated
 	}
+	out := map[uuid.UUID]bool{}
 	if s.DB == nil || len(refs) == 0 {
-		return map[uuid.UUID]bool{}, nil
+		return out, nil
 	}
-	var out map[uuid.UUID]bool
-	err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+	var uses []store.SheetUse
+	if err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		out, e = store.UsedEntries(ctx, tx, year, refs)
+		uses, e = store.SealedUses(ctx, tx, year, refs)
 		return e
-	})
-	return out, err
+	}); err != nil {
+		return nil, err
+	}
+	if len(uses) == 0 {
+		return out, nil
+	}
+	if s.Entry == nil {
+		return nil, ErrDependency.WithDetail("chưa nối cap/forms — không xác định được phiếu đã gửi")
+	}
+	type unit struct {
+		period uuid.UUID
+		dept   string
+	}
+	referenced := map[unit]map[uuid.UUID]bool{}
+	for _, u := range uses {
+		k := unit{u.FormsPeriodRef, u.Department}
+		if _, done := referenced[k]; !done {
+			subs, err := s.Entry.Submissions(ctx, pdomain.ProfileKHTC, u.FormsPeriodRef, u.Department)
+			if err != nil {
+				return nil, err
+			}
+			set := map[uuid.UUID]bool{}
+			for _, sb := range subs {
+				if id := sheetRef(sb.Values); id != nil {
+					set[*id] = true
+				}
+			}
+			referenced[k] = set
+		}
+		if referenced[k][u.SheetID] {
+			for _, e := range u.Entries {
+				out[e] = true
+			}
+		}
+	}
+	return out, nil
 }
 
 // Drafts là móc W11.62 (khtcperiod/app.Service.Drafts): phòng có nháp ở máy chủ của kỳ KHTC, kèm số lần gửi đã thấy khi
