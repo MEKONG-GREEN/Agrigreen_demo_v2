@@ -8,19 +8,24 @@
 //	AG_TEST_PG_ADMIN_URL   tài khoản quản trị cụm, vd postgres://postgres:***@localhost:5432/postgres
 //	AG_TEST_PGBOUNCER_URL  (tùy chọn) PgBouncer transaction mode; pool vai ứng dụng đi qua đây (R-32)
 //	AG_DB_APP_PASSWORD     mật khẩu vai ứng dụng trong môi trường kiểm thử
+//	AG_TEST_PG_WAIT        (tùy chọn) số giây chờ PostgreSQL sẵn sàng, mặc định 120; 0 = không chờ (infra.go)
 //
-// Thiếu AG_TEST_PG_ADMIN_URL: bỏ qua trên máy dev, HỎNG khi CI=true.
+// Thiếu AG_TEST_PG_ADMIN_URL: bỏ qua trên máy dev, HỎNG khi CI=true. PostgreSQL không sẵn sàng (lỗi hạ tầng): gói
+// HỎNG một lần với dòng "INFRA: PostgreSQL unavailable …", không phải hàng loạt kiểm thử 0.00s (infra.go). Cụm
+// PostgreSQL tạm cho máy dev: scripts/pg-ephemeral.ps1 (docs/dev/parallel-packages.md).
 package pgtest
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -44,15 +49,33 @@ type Env struct {
 var (
 	current *Env
 	initErr error
+
+	healthMu   sync.Mutex
+	lastHealth time.Time
+	infraDown  error // khác nil: PostgreSQL sập giữa chừng và không hồi phục — kiểm thử sau bỏ qua
 )
 
 // Run dùng trong TestMain: dựng database, chạy kiểm thử, dọn dẹp.
 func Run(m *testing.M) int {
 	admin := os.Getenv("AG_TEST_PG_ADMIN_URL")
 	if admin != "" {
-		current, initErr = setup(admin)
+		current, initErr = setupWithWait(admin)
+		if IsInfra(initErr) {
+			// Một dòng rõ ràng thay cho hàng loạt HỎNG 0.00s; không chạy kiểm thử nào của gói.
+			markDown(admin, true)
+			stderrf("%v", initErr)
+			stderrf("pgtest: không chạy kiểm thử nào của gói này (lỗi hạ tầng, không phải lỗi kiểm thử)")
+			return 3
+		}
+		if initErr == nil {
+			markDown(admin, false)
+		}
 	}
 	code := m.Run()
+	if infraDown != nil {
+		markDown(admin, true)
+		stderrf("%v", infraDown)
+	}
 	if current != nil {
 		current.closePools()
 		if err := dbadmin.DropDatabases(context.Background(), admin, current.Suffix); err != nil {
@@ -62,7 +85,43 @@ func Run(m *testing.M) int {
 	return code
 }
 
-func setup(admin string) (*Env, error) {
+// setupWithWait chờ PostgreSQL sẵn sàng rồi dựng database; sập giữa lúc dựng (lỗi hạ tầng) → dọn và dựng lại với hậu
+// tố mới trong phần hạn còn lại.
+func setupWithWait(admin string) (*Env, error) {
+	ctx := context.Background()
+	budget := waitBudget()
+	if recentlyDown(admin) {
+		budget = min(budget, downRetryWait)
+	}
+	deadline := time.Now().Add(budget)
+	for attempt := 1; ; attempt++ {
+		left := max(time.Until(deadline), 0)
+		if err := waitReady(ctx, left, func(ctx context.Context) error { return probe(ctx, admin) }, time.Sleep, time.Now, stderrf); err != nil {
+			return nil, err
+		}
+		e, err := setup(admin)
+		if err == nil || !IsInfra(err) {
+			return e, err
+		}
+		if attempt >= 3 || time.Now().After(deadline) {
+			return nil, &InfraError{Waited: budget - max(time.Until(deadline), 0), Err: err}
+		}
+		stderrf("pgtest: mất PostgreSQL khi dựng database (%v) — thử lại", err)
+	}
+}
+
+// setup dựng database; hỏng giữa chừng thì xóa phần đã dựng (best effort — PostgreSQL có thể đang sập).
+func setup(admin string) (e *Env, err error) {
+	defer func() {
+		if err != nil && e != nil {
+			_ = dbadmin.DropDatabases(context.Background(), admin, e.Suffix)
+			e = nil
+		}
+	}()
+	return setupOnce(admin)
+}
+
+func setupOnce(admin string) (*Env, error) {
 	b := make([]byte, 4)
 	if _, err := rand.Read(b); err != nil {
 		return nil, err
@@ -73,11 +132,11 @@ func setup(admin string) (*Env, error) {
 	}
 	ctx := context.Background()
 	if err := dbadmin.Bootstrap(ctx, admin, e.Suffix); err != nil {
-		return nil, err
+		return e, err
 	}
 	for _, c := range migrations.Clusters {
 		if err := dbadmin.Migrate(e.DirectURL, c, e.Suffix); err != nil {
-			return nil, err
+			return e, err
 		}
 	}
 	return e, nil
@@ -95,7 +154,36 @@ func Get(t testing.TB) *Env {
 		}
 		t.Skip("pgtest: chưa đặt AG_TEST_PG_ADMIN_URL — bỏ qua kiểm thử tích hợp")
 	}
+	if err := checkHealth(current.AdminURL); err != nil {
+		if errors.Is(err, errSkipInfra) {
+			t.Skip("INFRA: PostgreSQL unavailable — bỏ qua; gói đã HỎNG ở kiểm thử gặp sự cố đầu tiên")
+		}
+		t.Fatalf("%v", err)
+	}
 	return current
+}
+
+// checkHealth thăm dò PostgreSQL (tối đa mỗi probeEvery). Sập → chờ theo AG_TEST_PG_WAIT; hồi phục → nil. Không hồi
+// phục → *InfraError cho kiểm thử đầu tiên gặp; các kiểm thử sau nhận errSkipInfra và bỏ qua — gói vẫn HỎNG nhờ
+// kiểm thử đầu.
+func checkHealth(admin string) error {
+	healthMu.Lock()
+	defer healthMu.Unlock()
+	if infraDown != nil {
+		return errSkipInfra
+	}
+	if time.Since(lastHealth) < probeEvery {
+		return nil
+	}
+	err := waitReady(context.Background(), waitBudget(), func(ctx context.Context) error { return probe(ctx, admin) }, time.Sleep, time.Now, stderrf)
+	if err == nil {
+		lastHealth = time.Now()
+		return nil
+	}
+	if IsInfra(err) {
+		infraDown = err
+	}
+	return err
 }
 
 // Pool trả pool của một vai trên một cụm. Vai ứng dụng đi qua PgBouncer nếu có;

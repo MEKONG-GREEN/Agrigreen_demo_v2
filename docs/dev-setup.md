@@ -71,6 +71,7 @@ Ghi chú:
 |---|---|
 | `AG_TEST_PG_ADMIN_URL` | Kiểm thử tích hợp: tài khoản quản trị cụm, dùng để tạo vai và database tạm |
 | `AG_TEST_PGBOUNCER_URL` | Chạy R-32 qua PgBouncer transaction mode (CI bắt buộc) |
+| `AG_TEST_PG_WAIT` | (tùy chọn) giây `pgtest` chờ PostgreSQL sẵn sàng (mặc định 120, `0` = không chờ); hết hạn → một dòng `INFRA: PostgreSQL unavailable` thay vì hàng loạt kiểm thử hỏng. Cụm tạm riêng: `scripts/pg-ephemeral.ps1` ([parallel-packages.md](dev/parallel-packages.md)) |
 | `AG_DB_APP_PASSWORD` / `AG_DB_PASSWORD_<VAI>` | Mật khẩu vai DB. Không có mặc định trong mã |
 | `AG_PG_ADMIN_URL`, `AG_DB_URL`, `AG_PF_DB_URL` | Lệnh `migrate` và `api-platform` |
 | `AG_OIDC_ISSUER`, `AG_OIDC_AUDIENCE` | Xác minh token |

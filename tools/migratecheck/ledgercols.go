@@ -8,7 +8,7 @@ import (
 
 // ledgerColumnsGrandfathered: tệp đã thêm cột vào sổ trước quy tắc CheckLedgerColumns — cột của chúng
 // được đăng ký bù trong shared 000011 (R-24: tệp đã áp không sửa). Danh sách ĐÓNG.
-var ledgerColumnsGrandfathered = map[string]map[int]bool{
+var ledgerColumnsGrandfathered = map[string]map[int64]bool{
 	"pf":  set(79),
 	"mkg": set(6),
 }

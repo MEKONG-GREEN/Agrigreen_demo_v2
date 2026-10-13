@@ -36,8 +36,13 @@ jobs:
         run: go run ./tools/modgen -check
       - name: archlint — R-02/R-03/R-04, R-10, R-12, R-14, agmodgraph (W1.2, R-MOD-05)
         run: go run ./tools/archlint ./...
-      - name: migratecheck — R-23/R-25
-        run: go run ./tools/migratecheck migrations
+      - name: migratecheck — R-23/R-25, tên tệp mốc UTC + không xếp trước nhánh đích (WH-B)
+        run: |
+          BASE=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then BASE="-base origin/${{ github.base_ref }}"; fi
+          go run ./tools/migratecheck $BASE migrations
+      - name: docscheck — số ADR, giả định/roadmap/mã lỗi theo gói (WH-B)
+        run: go run ./tools/docscheck
       - name: contractcheck — R-64, van công bố
         run: |
           BASE=""

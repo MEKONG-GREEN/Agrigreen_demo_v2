@@ -1,7 +1,12 @@
 // Lệnh migratecheck là cổng CI cho migration (R-23, R-25):
 //
-//   - tên tệp NNNNNN_ten.up.sql, số không trùng trong mỗi thư mục cụm (số được cấp
-//     trước cho từng module — docs/dev/g1-conventions.md — nên có thể có khoảng trống)
+//   - tên tệp (WH-B, docs/dev/parallel-packages.md): tệp mới YYYYMMDDHHMMSS_<cụm>_<module>_ten.up.sql (mốc UTC lúc
+//     tạo, không cần cấp số — `-new <cụm>_<module>_ten` in tên); tệp cũ NNNNNN_ten.up.sql giữ nguyên. Phiên bản không
+//     trùng trong mỗi thư mục cụm; mốc là ngày giờ hợp lệ, không ở tương lai (> 24 giờ — mốc tương lai chặn mọi tệp
+//     sau nó); tệp mốc ở thư mục cụm bắt đầu bằng <cụm>_
+//   - -base <ref> (CI: nhánh đích của PR, vd origin/dev): tệp KHÔNG có trên ref là tệp mới — phải dùng dạng mốc thời
+//     gian và có phiên bản lớn hơn phiên bản lớn nhất của thư mục trên ref (golang-migrate, bộ chạy mặc định, bỏ qua
+//     im lặng tệp số nhỏ hơn số đã áp). Tệp đã có trên ref luôn được chấp nhận (kể cả số cũ của gói song song)
 //   - không có câu lệnh UPDATE, DELETE, TRUNCATE ở mức migration (được phép
 //     bên trong thân hàm $$...$$)
 //   - không tắt cơ chế bảo vệ: DISABLE TRIGGER, DROP TRIGGER trg_immutable/trg_chain,
@@ -21,7 +26,9 @@
 //     <cụm>_<module>, suy từ schema đụng, còn lại module giả <cụm>/shared) và in kế hoạch của nó; -modules in bảng
 //     tệp theo module của mọi cụm
 //
-// Chạy: go run ./tools/migratecheck [-module pf/party | -modules] migrations
+// Chạy: go run ./tools/migratecheck [-base origin/dev] [-module pf/party | -modules] migrations
+//
+//	go run ./tools/migratecheck -new pf_price_approval   # in migrations/pf/<mốc UTC>_pf_price_approval.up.sql
 package main
 
 import (
@@ -33,17 +40,30 @@ import (
 	"regexp"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
+	"time"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/migrator"
 )
 
 func main() {
 	module := flag.String("module", "", "chỉ kiểm tệp gắn cho module này (vd pf/party, hoặc module giả shared/pf/mkg/vault/ts) và in kế hoạch của nó (W7.1)")
 	list := flag.Bool("modules", false, "in bảng tệp theo module (gắn module của bộ chạy v2, W7.1) rồi kiểm như thường")
+	base := flag.String("base", "", "ref git của nhánh tích hợp (vd origin/dev): tệp mới phải dạng mốc thời gian và lớn hơn phiên bản lớn nhất trên ref (rỗng = bỏ qua)")
+	newStem := flag.String("new", "", "in đường dẫn tệp migration mới dạng mốc UTC cho tên này (vd pf_price_approval, shared/rls_x) rồi thoát")
 	flag.Parse()
 	dir := "migrations"
 	if flag.NArg() > 0 {
 		dir = flag.Arg(0)
+	}
+	if *newStem != "" {
+		p, err := newFilePath(dir, *newStem, now())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		fmt.Println(p)
+		return
 	}
 	if *list || *module != "" {
 		if err := printModules(os.Stdout, dir, *module); err != nil {
@@ -56,6 +76,14 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
+	if *base != "" {
+		bp, err := checkBase(dir, *base)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		problems = append(problems, bp...)
+	}
 	for _, p := range problems {
 		fmt.Println(p)
 	}
@@ -64,7 +92,58 @@ func main() {
 	}
 }
 
-var nameRe = regexp.MustCompile(`^(\d{6})_[a-z0-9_]+\.up\.sql$`)
+// now là đồng hồ của kiểm mốc tương lai (kiểm thử thay được).
+var now = time.Now
+
+// futureSlack: mốc tệp được phép lệch tương lai tối đa (đồng hồ máy lệch). Mốc xa hơn chặn mọi tệp mới sau nó.
+const futureSlack = 24 * time.Hour
+
+// checkName kiểm tên tệp theo hai dạng (naming.go); trả phiên bản và vi phạm.
+func checkName(dir, f string) (int64, []string) {
+	base := filepath.Base(f)
+	nm, ok := migrator.ParseName(base)
+	if !ok {
+		return 0, []string{fmt.Sprintf("%s: tên tệp phải là YYYYMMDDHHMMSS_<cụm>_<module>_ten.up.sql (mốc UTC — go run ./tools/migratecheck -new <cụm>_<module>_ten; chỉ tiến, R-24)", f)}
+	}
+	if nm.Scheme != migrator.SchemeTimestamp {
+		return nm.Version, nil
+	}
+	var out []string
+	t, err := nm.Time()
+	switch {
+	case err != nil:
+		out = append(out, fmt.Sprintf("%s: %v", f, err))
+	case t.Year() < 2026:
+		out = append(out, fmt.Sprintf("%s: mốc %s trước 2026 — dùng thời điểm tạo tệp (UTC)", f, t.Format(time.RFC3339)))
+	case t.After(now().Add(futureSlack)):
+		out = append(out, fmt.Sprintf("%s: mốc %s ở tương lai — mọi tệp mới sau đó sẽ bị coi là ngoài thứ tự; dùng thời điểm tạo tệp (UTC)", f, t.Format(time.RFC3339)))
+	}
+	if dir != migrator.SharedDir && !strings.HasPrefix(nm.Stem, dir+"_") {
+		out = append(out, fmt.Sprintf("%s: tệp mới ở thư mục cụm %s phải đặt tên <mốc>_%s_<module>_… (gắn module như bộ chạy v2)", f, dir, dir))
+	}
+	return nm.Version, out
+}
+
+// newFilePath trả đường dẫn tệp mới cho stem ("pf_price_x" → <root>/pf/<mốc>_pf_price_x.up.sql; "shared/x" →
+// <root>/shared/<mốc>_x.up.sql).
+func newFilePath(root, stem string, at time.Time) (string, error) {
+	dir, name, ok := strings.Cut(stem, "/")
+	if !ok {
+		dir, _, _ = strings.Cut(stem, "_")
+		name = stem
+	}
+	if st, err := os.Stat(filepath.Join(root, dir)); err != nil || !st.IsDir() || dir == "" {
+		return "", fmt.Errorf("migratecheck -new: không có thư mục cụm %q trong %s (dạng: <cụm>_<module>_ten hoặc shared/ten)", dir, root)
+	}
+	p := migrator.NewFileName(at, name)
+	if _, ok := migrator.ParseName(p); !ok {
+		return "", fmt.Errorf("migratecheck -new: tên %q không hợp lệ (chỉ a-z, 0-9, _)", name)
+	}
+	if _, errs := checkName(dir, p); len(errs) > 0 {
+		return "", fmt.Errorf("migratecheck -new: %s", strings.Join(errs, "; "))
+	}
+	return filepath.ToSlash(filepath.Join(root, dir, p)), nil
+}
 
 var embedRe = regexp.MustCompile(`(?m)^//go:embed\s+(.+)$`)
 
@@ -130,15 +209,14 @@ func checkTreeModule(root, module string) ([]string, error) {
 			return nil, err
 		}
 		sort.Strings(files)
-		seen := map[int]string{}
+		seen := map[int64]string{}
 		for _, f := range files {
 			base := filepath.Base(f)
-			m := nameRe.FindStringSubmatch(base)
-			if m == nil {
-				problems = append(problems, fmt.Sprintf("%s: tên tệp phải là NNNNNN_ten.up.sql (chỉ tiến, R-24)", f))
+			n, nameProblems := checkName(e.Name(), f)
+			problems = append(problems, nameProblems...)
+			if n == 0 {
 				continue
 			}
-			n, _ := strconv.Atoi(m[1])
 			if prev, dup := seen[n]; dup {
 				problems = append(problems, fmt.Sprintf("%s: trùng số %06d với %s", f, n, prev))
 			}

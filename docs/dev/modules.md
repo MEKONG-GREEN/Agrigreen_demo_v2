@@ -568,9 +568,9 @@ ADR-0030 (mục "W4.2 — hình chính sách"), kiến trúc v4.1 §17.3, pf 000
 
 ## Migration theo module (W7.1)
 
-Bộ chạy v2 (`internal/shared/migrator`, [ADR-0038](../adr/0038-bo-chay-migration-theo-module.md)) gắn mỗi tệp `migrations/<cụm>/NNNNNN_*.up.sql` cho module bằng đúng quy tắc của `agmodgraph` ở trên (tên `<cụm>_<module>`, nếu không thì schema đụng; tệp nhiều module → module giả `<cụm>`), ghi lịch sử theo module (cột `module` của `shared.schema_migrations`; dời vào schema module là bước 2) và áp mọi tệp vắng trong sổ theo thứ tự topo `depends` — **số nhỏ hơn số đã áp vẫn được áp**. Trong kỳ chuyển (`AG_MIGRATE_RUNNER=v2` chưa là mặc định) vẫn cấp số theo thứ tự gộp như kế hoạch §1 mục 6.
+Bộ chạy v2 (`internal/shared/migrator`, [ADR-0038](../adr/0038-bo-chay-migration-theo-module.md)) gắn mỗi tệp `migrations/<cụm>/NNNNNN_*.up.sql` cho module bằng đúng quy tắc của `agmodgraph` ở trên (tên `<cụm>_<module>`, nếu không thì schema đụng; tệp nhiều module → module giả `<cụm>`), ghi lịch sử theo module (cột `module` của `shared.schema_migrations`; dời vào schema module là bước 2) và áp mọi tệp vắng trong sổ theo thứ tự topo `depends` — **số nhỏ hơn số đã áp vẫn được áp**. Từ 13/10/2026 (WH-B) tệp mới không cấp số: tên mốc UTC `YYYYMMDDHHMMSS_<cụm>_<module>_….up.sql` (`go run ./tools/migratecheck -new …`), xếp sau mọi số cũ ở cả hai bộ chạy; `migratecheck -base origin/dev` (CI) chặn tệp xếp trước phiên bản lớn nhất của nhánh gốc vì golang-migrate (mặc định) vẫn bỏ qua im lặng — [parallel-packages.md](parallel-packages.md).
 
-- Đặt tên tệp mới `<số>_<cụm>_<module>_….up.sql`, chỉ đụng schema của module đó (agmodgraph đã bắt).
+- Đặt tên tệp mới `<mốc UTC>_<cụm>_<module>_….up.sql` (`go run ./tools/migratecheck -new <cụm>_<module>_<tên>`), chỉ đụng schema của module đó (agmodgraph đã bắt).
 - `go run ./tools/migratecheck -modules migrations`: bảng module → số tệp, khoảng số, schema. `go run ./tools/migratecheck -module pf/party migrations`: thứ tự áp và kiểm riêng các tệp của module.
 - Đổi `depends` trong `module.yaml` → `go run ./tools/modgen` (danh mục sinh mang `depends` cho bộ chạy lúc chạy, `modreg.Depends`).
 - Kiểm thử cả bộ chạy v2 cho một gói: `AG_MIGRATE_RUNNER=v2 go test -count=1 -p 1 ./<gói>/` (`pgtest` dùng `dbadmin.Migrate`).

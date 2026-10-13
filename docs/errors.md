@@ -33,6 +33,8 @@ Mọi lỗi trả về `application/problem+json` theo RFC 9457. Mỗi lỗi có
 
 Mã lỗi của module có dạng `<module>.<lỗi>`.
 
+**Module mới (từ 13/10/2026):** ghi mã vào tệp riêng `docs/errors/<cụm>-<module>.md` (vd `docs/errors/pf-price.md`), không thêm mục vào tệp này — tránh xung đột gộp giữa các gói song song. Quy ước và danh sách: [errors/README.md](errors/README.md). Các mục dưới đây giữ nguyên chỗ cũ (kiểm thử web đọc chúng).
+
 | HTTP | code | Module |
 |---|---|---|
 | 404 | `party.consent_not_found` | pf/party |

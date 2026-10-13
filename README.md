@@ -82,10 +82,10 @@ Cài môi trường xem [docs/dev-setup.md](docs/dev-setup.md): Go 1.26, Postgre
 
 ```bash
 go test -count=1 ./...
-go run ./tools/modgen -check && go run ./tools/archlint ./... && go run ./tools/migratecheck migrations && go run ./tools/contractcheck
+go run ./tools/modgen -check && go run ./tools/archlint ./... && go run ./tools/migratecheck migrations && go run ./tools/contractcheck && go run ./tools/docscheck
 ```
 
-Kiểm thử tích hợp cần `AG_TEST_PG_ADMIN_URL` và `AG_DB_APP_PASSWORD`. Nếu thiếu, trên máy dev các kiểm thử này được bỏ qua; khi `CI=true` thì build hỏng.
+Kiểm thử tích hợp cần `AG_TEST_PG_ADMIN_URL` và `AG_DB_APP_PASSWORD`. Nếu thiếu, trên máy dev các kiểm thử này được bỏ qua; khi `CI=true` thì build hỏng. PostgreSQL không sẵn sàng → mỗi gói hỏng một lần với dòng `INFRA: PostgreSQL unavailable` (lỗi hạ tầng); cụm tạm riêng: `scripts/pg-ephemeral.ps1`. Gói chạy song song: [docs/dev/package-checklist.md](docs/dev/package-checklist.md).
 
 ```bash
 cd apps/web-ops && npm ci && npm run check:api && npm run lint && npm run typecheck && npm test && npm run build

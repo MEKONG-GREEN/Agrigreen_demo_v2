@@ -1,5 +1,5 @@
 # Lệnh thường dùng (Linux/macOS/CI). Trên Windows: xem docs/dev-setup.md.
-.PHONY: all fmt vet lint gates test test-unit build compose-up compose-down verify-db k8s-check docsql
+.PHONY: all fmt vet lint gates gates-base test test-unit build compose-up compose-down verify-db k8s-check docsql
 
 all: fmt vet gates test
 
@@ -18,6 +18,12 @@ gates:
 	go run ./tools/archlint ./...
 	go run ./tools/migratecheck migrations
 	go run ./tools/contractcheck
+	go run ./tools/docscheck
+
+# Trước khi gộp vào dev (WH-B): tệp migration mới phải dạng mốc UTC và xếp sau mọi tệp trên origin/dev.
+gates-base:
+	git fetch origin +refs/heads/dev:refs/remotes/origin/dev
+	go run ./tools/migratecheck -base origin/dev migrations
 
 # Cần AG_TEST_PG_ADMIN_URL và AG_DB_APP_PASSWORD; thêm AG_TEST_PGBOUNCER_URL để chạy R-32 qua PgBouncer.
 test:

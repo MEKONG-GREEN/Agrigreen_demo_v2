@@ -3,7 +3,7 @@
 // module.yaml, và một tệp là "chờ áp" khi và chỉ khi nó VẮNG trong sổ — số nhỏ hơn số đã áp không còn bị bỏ
 // qua im lặng như golang-migrate (kế hoạch v4.1 §1 mục 6).
 //
-// Bố cục tệp giữ nguyên migrations/<cụm>/NNNNNN_*.up.sql (đánh số chung mỗi cụm); mỗi tệp được GẮN cho một
+// Bố cục tệp giữ nguyên migrations/<cụm>/<phiên bản>_*.up.sql (số 6 chữ số cũ hoặc mốc UTC 14 chữ số — naming.go); mỗi tệp được GẮN cho một
 // module theo cùng quy tắc với agmodgraph (tools/archlint): tiền tố tên <cụm>_<module>, nếu không thì suy từ
 // schema nó đụng (chỉ đụng schema của MỘT module), còn lại là module giả "<cụm>" (tệp toàn cụm — nhiều module
 // hoặc không module, vd vai nhóm, view công bố). Thư mục shared/ là module giả "shared" (thư viện
@@ -19,7 +19,6 @@ import (
 	"regexp"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/modreg"
@@ -49,7 +48,7 @@ func CatalogModules() []Module {
 // File là một tệp migration đã gắn module.
 type File struct {
 	Dir     string // "shared" hoặc tên cụm
-	Name    string // NNNNNN_ten.up.sql
+	Name    string // NNNNNN_ten.up.sql (cũ) hoặc YYYYMMDDHHMMSS_ten.up.sql (naming.go)
 	Version int64
 	// Owner: module chủ (vd "pf/party"), hoặc module giả "shared" / "<cụm>" (Pseudo).
 	Owner  string
@@ -64,8 +63,6 @@ type File struct {
 
 // Key là định danh của tệp trong sổ: "<thư mục>/<tên>".
 func (f File) Key() string { return f.Dir + "/" + f.Name }
-
-var nameRe = regexp.MustCompile(`^(\d{6})_([a-z0-9_]+)\.up\.sql$`)
 
 // Checksum trả tổng kiểm của nội dung tệp (bỏ khác biệt CRLF/LF giữa máy checkout).
 func Checksum(sql string) string {
@@ -85,11 +82,11 @@ func LoadDir(fsys fs.FS, dir string, mods []Module) ([]File, error) {
 	seen := map[int64]string{}
 	for _, p := range names {
 		base := path.Base(p)
-		m := nameRe.FindStringSubmatch(base)
-		if m == nil {
-			return nil, fmt.Errorf("migrator: %s: tên tệp phải là NNNNNN_ten.up.sql", p)
+		nm, ok := ParseName(base)
+		if !ok {
+			return nil, fmt.Errorf("migrator: %s: tên tệp phải là YYYYMMDDHHMMSS_ten.up.sql (hoặc NNNNNN_ten.up.sql đã có)", p)
 		}
-		v, _ := strconv.ParseInt(m[1], 10, 64)
+		v := nm.Version
 		if prev, dup := seen[v]; dup {
 			return nil, fmt.Errorf("migrator: %s: trùng số %06d với %s", p, v, prev)
 		}
@@ -104,7 +101,7 @@ func LoadDir(fsys fs.FS, dir string, mods []Module) ([]File, error) {
 		if dir == SharedDir {
 			f.Owner, f.Pseudo = SharedDir, true
 		} else {
-			f.Owner = Attribute(dir, m[2], a.Touches, mods, owner)
+			f.Owner = Attribute(dir, nm.Stem, a.Touches, mods, owner)
 			if f.Owner == "" {
 				f.Owner, f.Pseudo = dir, true
 			}
