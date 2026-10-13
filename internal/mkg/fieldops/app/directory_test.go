@@ -380,8 +380,14 @@ func TestFetchPlotsBounded(t *testing.T) {
 		}
 	}
 	// Nhanh → có kết quả thật (ở đây nền tảng nói không có → unknown).
-	s.Harvest = slowHarvest{}
-	hs = s.fetchPlotsWithin(context.Background(), store.Order{OrderID: ids.New(), WindowFrom: clk.Now(), PlotRefs: plots}, time.Second)
+	//
+	// Service MỚI thay vì ghi đè s.Harvest: tám goroutine của lần gọi trên bị runBounded
+	// BỎ LẠI (ngân sách 100ms hết trong khi slowHarvest còn ngủ 2s — bỏ lời gọi treo là
+	// hành vi CỐ Ý của runBounded, xem directory.go). Chúng đã đọc s.Harvest trong
+	// fetchHarvest mà không có cạnh đồng bộ nào với goroutine test, nên ghi vào s.Harvest
+	// ở đây là một cuộc đua dữ liệu thật — go test -race báo đúng. Chỗ phải sửa là test.
+	s2 := &Service{Clock: clk, Harvest: slowHarvest{}}
+	hs = s2.fetchPlotsWithin(context.Background(), store.Order{OrderID: ids.New(), WindowFrom: clk.Now(), PlotRefs: plots}, time.Second)
 	for _, h := range hs {
 		if h.Check != domain.HarvestUnknown {
 			t.Fatalf("muốn unknown: %+v", h)
