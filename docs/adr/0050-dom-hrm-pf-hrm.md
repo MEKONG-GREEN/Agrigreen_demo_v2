@@ -67,3 +67,11 @@ Lý do không đặt danh mục ở `cap/masterdata`: một bên dùng (chưa đ
 
 - Port `hrm/port.Directory` (`StaffDirectory`) cho `pf/contact` ([ADR-0054](0054-cap-directory-pf-contact.md)): hồ sơ chiếu tại hôm nay, chỉ mã tham chiếu và mã danh mục (không PII); áp cổng `AG_HRM_RECORDS`, không áp ma trận FN-20. Kho định danh chiếu năm sinh/email của ngăn `hrm.profile` vào thẻ danh bạ (mục đích `contact.directory`) — `pf/contact` không đọc ngăn hồ sơ.
 - Giả định: [W11.23](../kn/gia-dinh/W11.23.md).
+
+### W11.28 báo cáo Sở NS01–NS06 + dashboard nhân sự (14/10/2026, pf 20261013230821)
+
+- `domain/reports.go`: dựng 6 biểu thuần từ phép chiếu as-of + trường kho; quy tắc V.2.0 (R1, R2 chặn; R3, R6, TK cảnh báo); dashboard FN-06.
+- Sổ `pf_hrm.report_log` (apply_ledger, RLS, `r_hrm` SELECT/INSERT): lịch sử xuất/tải + nhật ký trường nhạy cảm; KHÔNG lưu tệp — tải lại dựng lại theo thời điểm biết (bitemporal: sự kiện/danh mục/tham số ghi sau `known_at` bị bỏ qua) và so SHA-256.
+- Kho định danh: phần mở rộng tùy chọn `client.ProfileBatch` (`POST /v1/subjects/batch-read`, ≤ 200 chủ thể, một lượt hạn mức) — `module.yaml` của vault/identity cung cấp thêm port `ProfileBatch`.
+- `UseEgress`: tải tệp qua điểm kiểm soát xuất pf/metering (ADR-0024, kênh report_export, nội bộ).
+- HTTP: `/v1/hrm/reports*`, `/v1/hrm/report-exports/{id}/file`, `/v1/hrm/dashboard*`; web-ops "Dashboard nhân sự", "Biểu mẫu báo cáo Sở". Giả định: [W11.28](../kn/gia-dinh/W11.28.md).
