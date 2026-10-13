@@ -67,7 +67,7 @@ func TestPubViewsDeclaredAndPrivileges_W63(t *testing.T) {
 	}
 	// W6.3: 11 view (pf 000124); W11.10: + pf_extension_pub.v1_consolidation_closed (pf 000144); W11.76: +
 	// pf_price_pub.v1_board_daily, v1_ticket_week (pf 000152); PFPUB (ADR-0053): + họ closed_figures/v1 —
-	// pf_forms_pub.v1_closed_figures, pf_extension_pub.v1_closed_figures (pf 20261013092921, 20261013092923).
+	// pf_forms_pub.v1_closed_figures, pf_extension_pub.v1_closed_figures (pf 20261013150108, 20261013150110).
 	if n := countViews(views); n != 16 {
 		t.Fatalf("số view _pub đã khai: %d", n)
 	}

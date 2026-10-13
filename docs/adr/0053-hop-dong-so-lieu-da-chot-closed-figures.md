@@ -1,6 +1,6 @@
 # ADR-0053: Một hợp đồng `_pub` có phiên bản cho "số liệu đã chốt" — họ `closed_figures/v1`, port KHTC `KHTCSources`, bên đọc qua thành viên vai `_pub`
 
-**Trạng thái:** Đề xuất — hiện thực ở gói PFPUB (13/10/2026, pf 20261013092921, pf 20261013092923); PO (CEO) đã chốt D8 (mỗi phòng một lịch tuần, KHTC quy đổi), D17 ("đã chốt" = mọi biểu nguồn của tuần đã chốt), D18 (lũy kế của nguồn là chuẩn); người dùng chốt: Trồng trọt giữ vòng đời báo cáo riêng (W11.04 hủy), KHTC tổng hợp số của từng phòng ngay ở G1, D2 (HTX "Chưa xác nhận") · **Ngày:** 13/10/2026 · **Yêu cầu:** R-DB-10, R-DB-02, R-DB-03, R-14, kiến trúc v4.1 §13, §14, §26 · **Nguồn:** BRD KHTC v2.2 BR-DL-02…04, đối chiếu BRD KN 10/2026 Phụ lục D X6, QĐ-6, Q-047, Q-048, review đội (W11.61–W11.69) · **Thành phần:** `migrations/pf/000153_pf_forms_pub_closed_figures.up.sql`, `migrations/pf/000154_pf_extension_pub_closed_figures.up.sql`, `contracts/pubview`, `internal/shared/dbadmin` (`PubReaders`), `internal/platform/extension/port/closedfig.go`, `internal/platform/extension/closedfig`, `internal/platform/forms/port/pub.go` · **Liên quan:** [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0031](0031-vai-tong-hop-r-agg.md), [contracts/pubview](../../contracts/pubview/README.md)
+**Trạng thái:** Đề xuất — hiện thực ở gói PFPUB (13/10/2026, pf 20261013150108, pf 20261013150110); PO (CEO) đã chốt D8 (mỗi phòng một lịch tuần, KHTC quy đổi), D17 ("đã chốt" = mọi biểu nguồn của tuần đã chốt), D18 (lũy kế của nguồn là chuẩn); người dùng chốt: Trồng trọt giữ vòng đời báo cáo riêng (W11.04 hủy), KHTC tổng hợp số của từng phòng ngay ở G1, D2 (HTX "Chưa xác nhận") · **Ngày:** 13/10/2026 · **Yêu cầu:** R-DB-10, R-DB-02, R-DB-03, R-14, kiến trúc v4.1 §13, §14, §26 · **Nguồn:** BRD KHTC v2.2 BR-DL-02…04, đối chiếu BRD KN 10/2026 Phụ lục D X6, QĐ-6, Q-047, Q-048, review đội (W11.61–W11.69) · **Thành phần:** `migrations/pf/000153_pf_forms_pub_closed_figures.up.sql`, `migrations/pf/000154_pf_extension_pub_closed_figures.up.sql`, `contracts/pubview`, `internal/shared/dbadmin` (`PubReaders`), `internal/platform/extension/port/closedfig.go`, `internal/platform/extension/closedfig`, `internal/platform/forms/port/pub.go` · **Liên quan:** [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0031](0031-vai-tong-hop-r-agg.md), [contracts/pubview](../../contracts/pubview/README.md)
 
 ## Bối cảnh
 
@@ -19,8 +19,8 @@
 
 | View | Chủ | Nguồn | Migration |
 |---|---|---|---|
-| `pf_extension_pub.v1_closed_figures` | `pf/extension` | vòng đời báo cáo (Trồng trọt) — nguồn chính thức, lâu dài. Chiếu lại `v1_consolidation_closed`, nên ngữ nghĩa W11.10 chỉ nằm ở một chỗ | pf 20261013092923 |
-| `pf_forms_pub.v1_closed_figures` | `pf/forms` | kỳ native `cap/forms` (profile `kn_cnts` → `chan_nuoi_thuy_san`), lấy từ ảnh chụp đóng băng | pf 20261013092921 |
+| `pf_extension_pub.v1_closed_figures` | `pf/extension` | vòng đời báo cáo (Trồng trọt) — nguồn chính thức, lâu dài. Chiếu lại `v1_consolidation_closed`, nên ngữ nghĩa W11.10 chỉ nằm ở một chỗ | pf 20261013150110 |
+| `pf_forms_pub.v1_closed_figures` | `pf/forms` | kỳ native `cap/forms` (profile `kn_cnts` → `chan_nuoi_thuy_san`), lấy từ ảnh chụp đóng băng | pf 20261013150108 |
 
 - **Cột và thứ tự giống hệt nhau** (33 cột):
   - Khóa tra cứu: `tenant_id`, `department_code`, `province_code`, `calendar_id`, `calendar_version`, `period_type`, `period_key`, `week_year`, `period_rule`, `period_from`, `period_to`, `period_label`.
@@ -155,6 +155,10 @@
   - View giá có từ W11.76 (pf 000152). Port vẫn dò `to_regclass` mỗi lần đọc: nếu view vắng (môi trường chưa migrate) thì phòng Báo giá `Unavailable` (không lỗi) và kỳ KHTC chưa chốt.
 - Quyền: `r_extension` là thành viên `r_extension_pub`, `r_forms_pub`, `r_price_pub` (`dbadmin.PubReaders`, §4).
 - Port mức thấp `ClosedFigures` (kỳ nguồn nguyên dạng, `Converted`) giữ lại cho chẩn đoán và kiểm thử. KHTC chỉ dùng `KHTCSources`.
+- **Kỳ KHTC (W11.62):** `Module.KHTCSourceCrosswalk()` cài `port.KHTCSourceCrosswalk` bằng chính port này (`closedfig.KHTCCrosswalk`), nối ở `cmd/api-platform/assembly/forms.go` (`kn.UseKHTCSourceCrosswalk`).
+  - `Sources(kind, key, from, to, phòng)`: mọi kỳ nguồn (mỗi biểu) quy vào kỳ KHTC theo ngày cuối, tham chiếu (`calendar_id`, `calendar_version`, khóa gốc), mã nguồn `<module>:<biểu>` (vd `pf/forms:BM-04`, `pf/extension:PL01`, `pf/price:PRICE-BOARD`). Ngày duyệt giá lấy dự phòng (Fallback) không phải kỳ nguồn của kỳ.
+  - `States(refs)`: cờ chốt (biểu của kỳ nguồn đã chốt và có số) và lần chốt gần nhất, cùng thứ tự; tham chiếu không còn khớp → chưa chốt. "Đủ dữ liệu" của Kỳ KHTC dùng cờ này.
+  - Lịch KHTC = `(*reportcycle/app.Service).CalendarAt(ctx, ke_hoach_tai_chinh, ngày đầu kỳ)` (D8). Tenant lấy từ người gọi trong ctx.
 
 ### 8. Nguồn gốc, băm, trạng thái xác nhận — ảnh chụp "Cập nhật số liệu" (W11.64) và D2
 
@@ -187,7 +191,7 @@
 
 - KHTC có một nền ổn định: một port (`KHTCSources`) cho ba phòng nguồn, một họ cột. Thêm nguồn hay đổi nguồn của phòng không đụng mã KHTC.
 - Port giá phụ thuộc hợp đồng `pf_price_pub` (published ở W11.76, pf 000152). Đổi cột ở đó = `v2` (hợp đồng), và `readPrice` phải theo; `TestPubViewsDeclaredAndPrivileges_W63` bắt lệch cột giữa view thật và hợp đồng.
-- Thêm vai `r_forms_pub` (bootstrap phải chạy trước `migrate up`; pf 20261013092921 dừng nếu thiếu). `r_metrics`/`r_agg` tự là thành viên, theo mẫu W6.3/W6.4.
+- Thêm vai `r_forms_pub` (bootstrap phải chạy trước `migrate up`; pf 20261013150108 dừng nếu thiếu). `r_metrics`/`r_agg` tự là thành viên, theo mẫu W6.3/W6.4.
 - `dbadmin.PubReaders` là điểm rà soát mới. Mỗi mục là một bên đọc chéo module lâu dài và phải ghi vào `consumers` của hợp đồng.
 - `pf/extension` đọc `pf_forms_pub` mà không thêm cạnh `depends` (không import mã). Cạnh `pf/extension → pf/forms` vốn đã có.
 - `key_closed` của từng view chỉ phản ánh nguồn của nó. Bên đọc khác KHTC muốn cờ toàn phòng phải dùng port hoặc tự AND theo khóa.
@@ -196,7 +200,7 @@
 
 ### PFPUB (13/10/2026)
 
-- pf 20261013092921 `pf_forms_pub` (schema, view, GRANT `r_forms_pub`); pf 20261013092923 `pf_extension_pub.v1_closed_figures` (GRANT `r_extension_pub`).
+- pf 20261013150108 `pf_forms_pub` (schema, view, GRANT `r_forms_pub`); pf 20261013150110 `pf_extension_pub.v1_closed_figures` (GRANT `r_extension_pub`).
 - `//ag:pubview` trong `forms/port/pub.go` và `extension/port/pub.go`, `modgen` (`pf/forms` sở hữu `pf_forms_pub`).
 - Hai hợp đồng `published` cùng `family`, cùng `pubview.FamilyProblems`.
 - `dbadmin.PubReaders` (`TestPubReaders_PFPUB`), port `ClosedFigures` + `closedfig.Reader`.

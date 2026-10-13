@@ -4,7 +4,7 @@
   "owner": "pf/forms",
   "status": "published",
   "package": "PFPUB",
-  "migration": "pf 20261013092921",
+  "migration": "pf 20261013150108",
   "consumers": [
     "KHTC — port duy nhất extension/port.KHTCSources (W11.61…W11.69, ảnh chụp W11.64), vai r_extension (thành viên r_extension_pub, r_forms_pub, r_price_pub — ADR-0053 §4, §7)",
     "r_metrics, r_agg (thành viên mọi r_<module>_pub)"

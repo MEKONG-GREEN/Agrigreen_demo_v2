@@ -1,6 +1,6 @@
 -- pf_forms_pub: hợp đồng "số liệu đã chốt" thống nhất cho KHTC — nguồn kỳ native `cap/forms` (gói PFPUB, ADR-0053;
 -- BRD KN 10/2026 — D4 X6, QĐ-6, Q-047, Q-048). Họ hợp đồng closed_figures/v1: pf_forms_pub.v1_closed_figures (tệp này)
--- và pf_extension_pub.v1_closed_figures (pf 20261013092923, nguồn vòng đời báo cáo cũ) có CỘT VÀ THỨ TỰ GIỐNG HỆT —
+-- và pf_extension_pub.v1_closed_figures (pf 20261013150110, nguồn vòng đời báo cáo cũ) có CỘT VÀ THỨ TỰ GIỐNG HỆT —
 -- contracts/pubview/pf_forms_pub.closed_figures.v1.json. Chỉ đụng schema pf_forms_pub (module pf/forms).
 --
 -- Một dòng = một kỳ native có khóa kỳ đã lưu (period_spec.period_key, W11.05) của profile có phòng nguồn (kn_cnts →

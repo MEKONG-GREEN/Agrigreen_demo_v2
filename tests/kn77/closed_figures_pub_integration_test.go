@@ -111,8 +111,8 @@ func (x *cntsFx) post(who caller, p string, body any) resp {
 }
 
 // TestPFPUB_ClosedFigures (ADR-0053): KHTC đọc số liệu đã chốt của HAI nguồn qua MỘT bộ đọc (extension/port.ClosedFigures)
-// trên họ hợp đồng closed_figures/v1 — CNTS kỳ native cap/forms (pf_forms_pub, pf 20261013092921) và Trồng trọt vòng đời báo
-// cáo cũ (pf_extension_pub, pf 20261013092923): chốt → thấy; mở lại → cờ về false, số cũ giữ; chốt lại → số mới; key_closed
+// trên họ hợp đồng closed_figures/v1 — CNTS kỳ native cap/forms (pf_forms_pub, pf 20261013150108) và Trồng trọt vòng đời báo
+// cáo cũ (pf_extension_pub, pf 20261013150110): chốt → thấy; mở lại → cờ về false, số cũ giữ; chốt lại → số mới; key_closed
 // (Q-048) theo mọi biểu của khóa kỳ; cách ly tenant (RLS qua view); không dữ liệu cá nhân; vai r_extension đọc view
 // _pub mà không đọc được bảng nội bộ của pf/forms.
 func TestPFPUB_ClosedFigures(t *testing.T) {
@@ -328,6 +328,38 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 		default:
 			t.Fatalf("phòng lạ: %+v", df)
 		}
+	}
+
+	// W11.62 — Kỳ KHTC qua bộ điều hợp KHTCSourceCrosswalk: kỳ nguồn quy vào khoảng 09/09 – 15/09 của hai phòng (lịch KHTC
+	// theo D8 CalendarAt tại ngày đầu kỳ), cờ chốt từng kỳ nguồn ("Đủ dữ liệu"), mã nguồn "<module>:<biểu>".
+	cw := f.ext.KHTCSourceCrosswalk()
+	refs, err := cw.Sources(x.tinhCtx, "week", "", time.Date(2026, 9, 9, 0, 0, 0, 0, time.UTC), time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC),
+		[]string{dept, cntsDept})
+	if err != nil || len(refs) == 0 {
+		t.Fatalf("kỳ nguồn của kỳ KHTC: %+v %v", refs, err)
+	}
+	bySrc := map[string]bool{}
+	for _, r := range refs {
+		bySrc[r.Department+"|"+r.Source] = true
+		if r.CalendarID == "" || r.CalendarVersion == "" || r.NativeKey == "" {
+			t.Fatalf("tham chiếu thiếu danh tính lịch: %+v", r)
+		}
+	}
+	if !bySrc[cntsDept+"|pf/forms:BM-T1"] || !bySrc[dept+"|pf/extension:T01"] {
+		t.Fatalf("nguồn: %v", bySrc)
+	}
+	states, err := cw.States(x.tinhCtx, refs)
+	if err != nil || len(states) != len(refs) {
+		t.Fatalf("trạng thái nguồn: %+v %v", states, err)
+	}
+	// Kỳ nguồn tuần 37 của hai phòng đã chốt; kỳ 2 Trồng trọt (2026-W38, nếu lịch KHTC kéo vào khoảng) chưa chốt.
+	for i, st := range states {
+		if want := refs[i].NativeKey == "2026-W37"; st.Closed != want || (st.ClosedAt != nil) != want {
+			t.Fatalf("nguồn %+v: %+v", refs[i], st)
+		}
+	}
+	if _, err := cw.States(context.Background(), refs); err == nil {
+		t.Fatal("không có người gọi trong ctx phải lỗi")
 	}
 
 	// Không lọc phòng: cả hai nguồn trong một lần đọc; lọc biểu chỉ lọc dòng trả về.

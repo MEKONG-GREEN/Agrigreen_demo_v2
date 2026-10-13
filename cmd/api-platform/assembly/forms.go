@@ -84,7 +84,9 @@ func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extens
 	kn.UseFormsPublisher(fm.Publisher())
 	// W11.62: Kỳ KHTC — kỳ native kn_khtc (một phiếu mỗi phòng), tối đa KNKHTCProfile.MaxSubmissions lần gửi (tham số
 	// extension.khtc_max_submissions ghi đè). Kế hoạch năm (W11.61) nối trong pf/extension; bộ quy đổi kỳ nguồn (PFPUB) nối
-	// khi gói cài xong (kn.UseKHTCSourceCrosswalk).
+	// ngay dưới.
 	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), MaxSubmissions: KNKHTCProfile.MaxSubmissions})
+	// PFPUB (ADR-0053 §7): kỳ KHTC mở kèm kỳ nguồn quy đổi theo lịch D8; "Đủ dữ liệu" theo cờ chốt của nguồn.
+	kn.UseKHTCSourceCrosswalk(kn.KHTCSourceCrosswalk())
 	return fm, nil
 }

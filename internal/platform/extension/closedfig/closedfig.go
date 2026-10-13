@@ -1,6 +1,6 @@
 // Package closedfig cài port.ClosedFigures (ADR-0053, gói PFPUB): bộ đọc "số liệu đã chốt" thống nhất cho KHTC trên họ
-// hợp đồng closed_figures/v1 — hai view công bố cùng cột: pf_extension_pub.v1_closed_figures (pf 20261013092923, vòng đời báo
-// cáo cũ) và pf_forms_pub.v1_closed_figures (pf 20261013092921, kỳ native cap/forms). Giao dịch chỉ đọc của tenant trên pool
+// hợp đồng closed_figures/v1 — hai view công bố cùng cột: pf_extension_pub.v1_closed_figures (pf 20261013150110, vòng đời báo
+// cáo cũ) và pf_forms_pub.v1_closed_figures (pf 20261013150108, kỳ native cap/forms). Giao dịch chỉ đọc của tenant trên pool
 // của module (db.ForModule → SET LOCAL ROLE r_extension; quyền đọc hai view qua thành viên r_extension_pub, r_forms_pub
 // do bootstrap cấp — dbadmin.PubReaders). Không đọc bảng nội bộ của nguồn nào.
 package closedfig

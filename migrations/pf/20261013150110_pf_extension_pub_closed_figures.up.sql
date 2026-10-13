@@ -1,6 +1,6 @@
 -- pf_extension_pub: hợp đồng "số liệu đã chốt" thống nhất cho KHTC — nguồn vòng đời báo cáo extension/reportcycle
 -- (Trồng trọt — nguồn chính thức, lâu dài) (gói PFPUB, ADR-0053; BRD KN 10/2026 — D4 X6, QĐ-6, Q-047, Q-048). Họ hợp đồng
--- closed_figures/v1: CỘT VÀ THỨ TỰ GIỐNG HỆT pf_forms_pub.v1_closed_figures (pf 20261013092921, nguồn kỳ native) —
+-- closed_figures/v1: CỘT VÀ THỨ TỰ GIỐNG HỆT pf_forms_pub.v1_closed_figures (pf 20261013150108, nguồn kỳ native) —
 -- contracts/pubview/pf_extension_pub.closed_figures.v1.json. Chỉ đụng schema pf_extension_pub (module pf/extension).
 --
 -- Chiếu lại pf_extension_pub.v1_consolidation_closed (pf 000144 — ngữ nghĩa "nguồn đã chốt" giữ một chỗ): một dòng mỗi
@@ -11,7 +11,7 @@
 -- totals giữ nguyên dạng [{key, kind, region, indicator, members, cells}] (dòng Khu vực/Toàn tỉnh do nguồn tổng hợp).
 -- Lịch nguồn (D8, reportcycle/domain.CalendarOf): (calendar_id, calendar_version) từ ";cal=<phòng>:v<n>" của
 -- period_rule; tag cũ → (phòng, 1 nếu v1-tam, 2 nếu v2); period_key = khóa gốc.
--- Nguồn gốc (W11.64), trạng thái xác nhận (D2), băm số/băm trạng thái: như pf 20261013092921.
+-- Nguồn gốc (W11.64), trạng thái xác nhận (D2), băm số/băm trạng thái: như pf 20261013150108.
 -- Nguồn LÂU DÀI (quyết định 13/10/2026: Trồng trọt giữ vòng đời báo cáo riêng, không cắt sang cap/forms — W11.04 hủy).
 -- Không dữ liệu cá nhân (R-14): view gốc không công bố sources/actor_ref.
 
