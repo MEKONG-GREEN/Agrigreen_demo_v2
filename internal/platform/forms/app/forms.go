@@ -561,7 +561,7 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 			return err
 		}
 		// D8: trễ hạn theo giờ MÁY CHỦ nhận bài (now), kể cả bản offline — captured_at (giờ thiết bị) chỉ lưu để kiểm
-		// toán (submission_meta.captured_at); DB tính late cùng mốc (pf 20261013065736). Bản offline ghi trước hạn nhưng tới sau
+		// toán (submission_meta.captured_at); DB tính late cùng mốc (pf 20261013091503). Bản offline ghi trước hạn nhưng tới sau
 		// hạn cũng phải có lý do trễ: máy nhận 422 forms.late_reason_required, người nhập ghi lý do rồi gửi lại.
 		if prof.RequireLateReason && now.After(v.Period.DueAt) && in.Explanation == "" {
 			return port.ErrLateReason.WithField("explanation", "bắt buộc khi gửi sau hạn "+v.Period.DueAt.In(vnZone).Format("15:04 02/01/2006"))
