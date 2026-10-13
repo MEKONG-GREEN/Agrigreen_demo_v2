@@ -44,11 +44,12 @@ func TestPriceBoardsHTTP_W1176(t *testing.T) {
 	items.Hooks.HasPrice, items.Hooks.HasSheets = tickets.HasPrice, tickets.Submitted
 	tickets.WireBoard()
 	tid := ids.New()
-	ctvA, ctvB, tinhRef, tinh2 := ids.New(), ids.New(), ids.New(), ids.New()
+	ctvA, ctvB, tinhRef, tinh2, tinh3 := ids.New(), ids.New(), ids.New(), ids.New(), ids.New()
 	who := map[string]authz.Principal{
 		"admin": {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "admin", Scope: authz.Scope{All: true}}},
 		"tinh":  {ActorRef: tinhRef, TenantID: tid, KN: &authz.KNContext{Role: "kn_tinh", Duties: []string{authz.DutyPriceAdmin}}},
-		"tinh2": {ActorRef: tinh2, TenantID: tid, KN: &authz.KNContext{Role: "kn_tinh"}},
+		"tinh2": {ActorRef: tinh2, TenantID: tid, KN: &authz.KNContext{Role: "kn_tinh"}}, // Cấp Tỉnh không có cờ QTNV
+		"tinh3": {ActorRef: tinh3, TenantID: tid, KN: &authz.KNContext{Role: "kn_tinh", Duties: []string{authz.DutyPriceAdmin}}},
 		"xaA":   {ActorRef: ctvA, TenantID: tid, KN: &authz.KNContext{Role: "kn_xa", OrgRef: ids.New()}},
 		"xaB":   {ActorRef: ctvB, TenantID: tid, KN: &authz.KNContext{Role: "kn_xa", OrgRef: ids.New()}},
 		"tw":    {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "kn_tw"}},
@@ -174,15 +175,23 @@ func TestPriceBoardsHTTP_W1176(t *testing.T) {
 		t.Fatalf("Cấp Xã chưa xem bảng giá chưa duyệt: %v", x)
 	}
 
-	// Admin không duyệt khi vận hành chính thức (BR-03, AC-04); khóa "Đang duyệt" một người (AC-03).
+	// Admin không duyệt khi vận hành chính thức (BR-03, AC-04); D11: Cấp Tỉnh không có cờ QTNV không duyệt / mở duyệt;
+	// khóa "Đang duyệt" một người (AC-03).
 	code("admin", http.MethodPost, "/v1/price/boards/"+d1+"/lock", map[string]any{"seq": 0}, http.StatusForbidden, "forbidden")
+	if p := call("tinh2", http.MethodGet, "/v1/price/boards/"+d1, nil, http.StatusOK); p["can"].(map[string]any)["approve"] != false ||
+		p["summary"] == nil {
+		t.Fatalf("Cấp Tỉnh không cờ QTNV: xem được, không duyệt được: %v", p)
+	}
+	for _, a := range []string{"lock", "approve", "unlock", "reopen", "cancel-reopen"} {
+		opCode("tinh2", d1, a, 0, "Lý do", http.StatusForbidden, "price.board_steward_required")
+	}
 	b = op("tinh", d1, "lock", 0, "", http.StatusCreated)
 	if b["state"] != "approving" || b["locked_by"] != tinhRef.String() || b["can"].(map[string]any)["approve"] != true ||
 		b["can"].(map[string]any)["unlock"] != true || str(b["seq"]) != "1" {
 		t.Fatalf("đang duyệt: %v", b)
 	}
-	opCode("tinh2", d1, "lock", 1, "", http.StatusConflict, "price.board_busy")
-	opCode("tinh2", d1, "approve", 1, "", http.StatusConflict, "price.board_busy")
+	opCode("tinh3", d1, "lock", 1, "", http.StatusConflict, "price.board_busy")
+	opCode("tinh3", d1, "approve", 1, "", http.StatusConflict, "price.board_busy")
 	// Trong khi Đang duyệt, Cấp Tỉnh không sửa phiếu (dữ liệu cố định từ lúc xem trước tới lúc xác nhận).
 	code("tinh", http.MethodPost, "/v1/price/tickets/"+tA+"/delete", map[string]any{"version": 1, "reason": "Thử xóa"},
 		http.StatusConflict, "price.board_approved")
@@ -267,7 +276,8 @@ func TestPriceBoardsHTTP_W1176(t *testing.T) {
 	if b["state"] != "approved" || str(b["version"]) != "1" {
 		t.Fatalf("hủy mở duyệt: %v", b)
 	}
-	op("tinh2", d1, "reopen", 4, "Sai giá dưa leo", http.StatusCreated) // mọi Cấp Tỉnh (BR-02)
+	opCode("tinh2", d1, "reopen", 4, "Sai giá dưa leo", http.StatusForbidden, "price.board_steward_required")
+	op("tinh3", d1, "reopen", 4, "Sai giá dưa leo", http.StatusCreated) // QTNV khác (D11), không cần phân công xã
 	// Cấp Xã vẫn không sửa (BR-03); Cấp Tỉnh hiệu chỉnh được.
 	code("xaA", http.MethodPost, "/v1/price/tickets/sheet", map[string]any{"point": "XBG0001", "day": d1, "version": 1, "submit": true,
 		"lines": []any{ln("MH00001", "8800", "8800")}}, http.StatusConflict, "price.ticket_locked")

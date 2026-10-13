@@ -28116,7 +28116,7 @@ export interface operations {
                     "application/json": components["schemas"]["PriceBoard"];
                 };
             };
-            /** @description forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức) */
+            /** @description forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11) */
             403: components["responses"]["Problem"];
             /** @description price.board_busy | price.board_state | price.board_stale | price.board_not_locked | price.board_open_alerts */
             409: components["responses"]["Problem"];
@@ -28154,7 +28154,7 @@ export interface operations {
                     "application/json": components["schemas"]["PriceBoard"];
                 };
             };
-            /** @description forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức) */
+            /** @description forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11) */
             403: components["responses"]["Problem"];
             /** @description price.board_busy | price.board_state | price.board_stale */
             409: components["responses"]["Problem"];
@@ -28192,7 +28192,7 @@ export interface operations {
                     "application/json": components["schemas"]["PriceBoard"];
                 };
             };
-            /** @description forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức) */
+            /** @description forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11) */
             403: components["responses"]["Problem"];
             /** @description price.board_busy | price.board_state | price.board_stale | price.board_not_locked | price.board_open_alerts */
             409: components["responses"]["Problem"];
@@ -28230,7 +28230,7 @@ export interface operations {
                     "application/json": components["schemas"]["PriceBoard"];
                 };
             };
-            /** @description forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức) */
+            /** @description forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11) */
             403: components["responses"]["Problem"];
             /** @description price.board_busy | price.board_state | price.board_stale */
             409: components["responses"]["Problem"];
@@ -28268,7 +28268,7 @@ export interface operations {
                     "application/json": components["schemas"]["PriceBoard"];
                 };
             };
-            /** @description forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức) */
+            /** @description forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11) */
             403: components["responses"]["Problem"];
             /** @description price.board_busy | price.board_state | price.board_stale | price.board_changed */
             409: components["responses"]["Problem"];

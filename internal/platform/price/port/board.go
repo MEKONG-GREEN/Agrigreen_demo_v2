@@ -87,6 +87,8 @@ type BoardPublishedV1 struct {
 
 // Lỗi bảng giá ngày (docs/errors.md, mục pf/price).
 var (
+	ErrBoardStewardRequired = problem.New(http.StatusForbidden, "price.board_steward_required",
+		"Chỉ cán bộ Cấp Tỉnh có cờ Quản trị nghiệp vụ báo giá được duyệt / mở duyệt bảng giá")
 	ErrBoardBusy = problem.New(http.StatusConflict, "price.board_busy",
 		"Bảng giá của ngày đang được cán bộ khác duyệt / mở duyệt — không thao tác trùng")
 	ErrBoardState = problem.New(http.StatusConflict, "price.board_state",

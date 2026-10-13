@@ -9759,7 +9759,7 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/PriceBoard"}
-        "403": {description: forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức), $ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11)", $ref: "#/components/responses/Problem"}
         "409": {description: price.board_busy | price.board_state | price.board_stale | price.board_not_locked | price.board_open_alerts, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed | price.not_quote_day | price.board_empty, $ref: "#/components/responses/Problem"}
   /v1/price/boards/{day}/unlock:
@@ -9782,7 +9782,7 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/PriceBoard"}
-        "403": {description: forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức), $ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11)", $ref: "#/components/responses/Problem"}
         "409": {description: price.board_busy | price.board_state | price.board_stale, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   /v1/price/boards/{day}/approve:
@@ -9805,7 +9805,7 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/PriceBoard"}
-        "403": {description: forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức), $ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11)", $ref: "#/components/responses/Problem"}
         "409": {description: price.board_busy | price.board_state | price.board_stale | price.board_not_locked | price.board_open_alerts, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed | price.not_quote_day | price.board_empty, $ref: "#/components/responses/Problem"}
   /v1/price/boards/{day}/reopen:
@@ -9828,7 +9828,7 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/PriceBoard"}
-        "403": {description: forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức), $ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11)", $ref: "#/components/responses/Problem"}
         "409": {description: price.board_busy | price.board_state | price.board_stale, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed | price.reason_required | price.reopen_expired, $ref: "#/components/responses/Problem"}
   /v1/price/boards/{day}/cancel-reopen:
@@ -9851,7 +9851,7 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/PriceBoard"}
-        "403": {description: forbidden (chỉ Cấp Tỉnh; Admin không duyệt khi vận hành chính thức), $ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11)", $ref: "#/components/responses/Problem"}
         "409": {description: price.board_busy | price.board_state | price.board_stale | price.board_changed, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   # --- hết pf/price W11.76 ---

@@ -1090,6 +1090,7 @@ Route `/v1/price/*` (Application API). Lỗi chung: `unauthenticated` (401), `fo
 | 409 | `price.ticket_not_locked` | W11.75: Cấp Tỉnh nhập thay / hiệu chỉnh / sửa ngày / xóa / chốt cảnh báo khi chưa qua giờ khóa của ngày |
 | 409 | `price.ticket_exists` | W11.75: nhập thay đè phiếu đã gửi (BR-01 FN-TI-02.09), sửa ngày sang ngày xã đã có phiếu (AC-04 FN-TI-02.04), Xã ghi đè phiếu nhập thay |
 | 409 | `price.board_approved` | W11.75: bảng giá của ngày đã duyệt / đang duyệt (W11.76) — mở duyệt trước khi sửa, nhập thay, xác minh |
+| 403 | `price.board_steward_required` | W11.76 (D11 — CEO quyết): cán bộ Cấp Tỉnh không có cờ Quản trị nghiệp vụ báo giá (`qtnv_bao_gia`, `Profile.StewardDuty`) khóa / hủy khóa / duyệt / mở duyệt / hủy mở duyệt bảng giá |
 | 409 | `price.board_busy` | W11.76: bảng giá của ngày đang được cán bộ khác duyệt (khóa "Đang duyệt" còn hạn) — chi tiết "Đang duyệt bởi …" (FN-TI-02.05 AC-03, FN-TI-02.06) |
 | 409 | `price.board_state` | W11.76: trạng thái bảng giá không cho phép thao tác (vd duyệt bảng giá đã duyệt, mở duyệt bảng giá chưa duyệt, hủy khóa không phải Đang duyệt) |
 | 409 | `price.board_stale` | W11.76: `seq` gửi lên khác phiên bản sổ bảng giá hiện hành — tải lại rồi thao tác |

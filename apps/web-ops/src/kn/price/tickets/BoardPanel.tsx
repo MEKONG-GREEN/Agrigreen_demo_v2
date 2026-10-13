@@ -50,6 +50,9 @@ export function BoardPanel({ day, nonce, onChanged }: { day: string; nonce: numb
   const ta = usePriceTicketApi();
   const [own, setOwn] = useState(0);
   const board = useLoad(() => ta.board(day), [day, nonce, own]);
+  // D11 (CEO): chỉ cán bộ có cờ Quản trị nghiệp vụ báo giá duyệt / mở duyệt — người khác chỉ xem.
+  const status = useLoad(() => ta.status(), []);
+  const steward = status.data?.can_steward ?? false;
   const act = useAction();
   const [dialog, setDialog] = useState<"preview" | "confirm" | "reopen" | "log" | null>(null);
   const [reason, setReason] = useState("");
@@ -84,7 +87,9 @@ export function BoardPanel({ day, nonce, onChanged }: { day: string; nonce: numb
                   <button type="button" className="btn" disabled={!b.preview.length} onClick={() => setDialog("preview")}>
                     Xem trước bảng giá
                   </button>
-                  {b.state === "approved" ? (
+                  {!steward ? (
+                    <span>Chỉ Quản trị nghiệp vụ báo giá duyệt / mở duyệt</span>
+                  ) : b.state === "approved" ? (
                     <button type="button" className="btn" disabled={!b.can.reopen || act.busy} onClick={() => setDialog("reopen")}>
                       Mở duyệt
                     </button>
@@ -108,7 +113,7 @@ export function BoardPanel({ day, nonce, onChanged }: { day: string; nonce: numb
                       {b.summary && b.summary.open_alerts > 0 ? `Duyệt bảng giá (còn ${b.summary.open_alerts} cảnh báo)` : "Duyệt bảng giá"}
                     </button>
                   )}
-                  {b.can.cancel_reopen ? (
+                  {steward && b.can.cancel_reopen ? (
                     <button type="button" className="btn" disabled={act.busy} onClick={() => void run(b, "cancel-reopen", "Đã hủy mở duyệt.")}>
                       Hủy mở duyệt
                     </button>

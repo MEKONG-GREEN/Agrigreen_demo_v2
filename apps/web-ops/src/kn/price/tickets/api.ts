@@ -228,6 +228,8 @@ export function createPriceTicketApi(api: ApiClient) {
       unwrap(api.POST("/v1/price/alerts/respond", { params: { header: header() }, body })),
     decide: (body: S["PriceAlertDecision"]): Promise<S["PriceWritten"]> =>
       unwrap(api.POST("/v1/price/alerts/decide", { params: { header: header() }, body })),
+    /** Tình trạng module — can_steward = cờ Quản trị nghiệp vụ báo giá (D11: chỉ người có cờ duyệt / mở duyệt). */
+    status: (): Promise<S["PriceStatus"]> => unwrap(api.GET("/v1/price/status", {})),
     /** Bảng giá ngày — màn Kiểm duyệt & công bố (W11.76). */
     board: (day: string): Promise<PriceBoard> => unwrap(api.GET("/v1/price/boards/{day}", { params: { path: { day } } })),
     boards: (q: { from?: string; to?: string }): Promise<{ boards: S["PriceBoardDay"][] }> =>

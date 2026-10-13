@@ -6,7 +6,8 @@ package app
 // lúc duyệt, sự kiện pf.price.board.published), mở duyệt, hủy mở duyệt, port.Boards.
 //
 // Quyền (BR-02, BR-03 FN-TI-02.05):
-//   - Duyệt / mở duyệt / hủy: mọi cán bộ Cấp Tỉnh của bên dùng (kể cả xã không thuộc phân công); vai quản trị chỉ khi
+//   - Duyệt / mở duyệt / hủy: cán bộ Cấp Tỉnh có cờ Quản trị nghiệp vụ báo giá (Profile.StewardDuty — D11, CEO quyết),
+//     mọi xã kể cả xã không thuộc phân công; Cấp Tỉnh không có cờ → 403 price.board_steward_required; vai quản trị chỉ khi
 //     Profile.Board.AdminApproves (giai đoạn thử nghiệm). Mỗi lần một người: khóa "Đang duyệt" có hạn (domain.BoardLockTTL)
 //     + khóa cố vấn theo (tenant, bên dùng, ngày) trong giao dịch.
 //   - Xem: Cấp Tỉnh, Admin đầy đủ (xem trước, nhật ký); Cấp TW, Cấp Xã chỉ trạng thái + phiên bản đã duyệt (bảng giá chưa
@@ -61,9 +62,11 @@ func (s *TicketService) WireBoard() {
 	s.Hooks.Board, s.Hooks.Approved = s.BoardState, s.BoardApproved
 }
 
-// approver cho biết người gọi duyệt / mở duyệt được bảng giá (BR-02, BR-03 FN-TI-02.05).
+// approver cho biết người gọi duyệt / mở duyệt được bảng giá: cán bộ Cấp Tỉnh có cờ Quản trị nghiệp vụ báo giá
+// (Profile.StewardDuty — quyết định D11 của CEO, thay BR-02 "mọi cán bộ Cấp Tỉnh"); vai quản trị chỉ khi
+// Profile.Board.AdminApproves (BR-03 FN-TI-02.05).
 func approver(prof port.Profile, c caller) bool {
-	return c.level == "TINH" || (c.manage && prof.Board.AdminApproves)
+	return (c.level == "TINH" && c.steward) || (c.manage && prof.Board.AdminApproves)
 }
 
 // weekOf trả tuần báo cáo (lịch kỳ hệ thống) chứa ngày day; tenant lấy từ ctx (middleware xác thực đã gắn).
@@ -377,7 +380,10 @@ func (s *TicketService) boardOp(ctx context.Context, profile string, in BoardInp
 		if c.manage {
 			return BoardView{}, problem.Forbidden.WithDetail("Admin không duyệt bảng giá khi vận hành chính thức")
 		}
-		return BoardView{}, problem.Forbidden.WithDetail("chỉ cán bộ Cấp Tỉnh duyệt / mở duyệt bảng giá")
+		if c.level == "TINH" {
+			return BoardView{}, port.ErrBoardStewardRequired
+		}
+		return BoardView{}, problem.Forbidden.WithDetail("chỉ cán bộ Cấp Tỉnh có cờ Quản trị nghiệp vụ báo giá duyệt / mở duyệt bảng giá")
 	}
 	if in.Day.IsZero() {
 		return BoardView{}, problem.Validation.WithField("day", "bắt buộc")
