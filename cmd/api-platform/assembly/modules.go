@@ -283,6 +283,9 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
+	// W11.22: hồ sơ nhân sự — PII qua kho định danh (ngăn hồ sơ vault 000004), đơn vị nội bộ của pf/accounts (W11.07);
+	// mặc định TẮT ở production (AG_HRM_RECORDS, chờ DPIA — Q-005).
+	hr.UseRecords(ext.Vault, KNHRMUnits{Units: acc.InternalUnits()}, hrm.RecordsEnabled(os.Getenv, residency.Production(os.Getenv)))
 	pty.UseOrgImpact(kn.OpenPeriodsImpact())
 	pty.UseDepartmentUsage(kn.ReportUsage())
 	// W11.02 (FN-AD-04.03): đếm bản ghi theo phòng ban ở mọi module mang department_code — mẫu/gửi Chi cục, máy móc HTX,

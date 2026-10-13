@@ -5678,6 +5678,246 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/hrm/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quyền hồ sơ hiệu lực của người gọi (nhóm vai, đơn vị nội bộ, phạm vi theo nhóm quyền); enabled=false khi hồ sơ chưa bật */
+        get: operations["hrmMyAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đơn vị nội bộ (phòng/trạm/trại/BGĐ) của đơn vị người gọi — bộ lọc, đơn vị công tác (HS-16), đơn vị quản lý (HS-37) */
+        get: operations["hrmUnits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách hồ sơ trong phạm vi xem, chiếu tại ngày chốt (as-of); nhãn họ tên che bớt từ kho (FN-07 B1) */
+        get: operations["hrmStaffList"];
+        put?: never;
+        /** Thêm hồ sơ (FN-07 B2) — mã tự sinh VC/HD/XA-nnnnn; định danh + ngăn hồ sơ vào kho (mục đích hrm.profile), thẻ TK (hrm.sensitive); quá trình ban đầu bắt buộc đơn vị và chức vụ */
+        post: operations["hrmStaffCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất danh sách đang lọc ra CSV (UTF-8 có BOM, mở bằng Excel) trong phạm vi xuất — không có trường TK (BR-03); ghi một dòng nhật ký xuất */
+        get: operations["hrmStaffExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        /** Hồ sơ chi tiết tại ngày chốt (thẻ Thông tin chung, Công tác, Trình độ, Khen thưởng, Ngạch - Bậc, Thông tin làm việc, Lịch sử sửa) — ghi nhật ký xem; không có thẻ TK */
+        get: operations["hrmStaffGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa định danh/ngăn hồ sơ (trường vắng = không đổi) và tài khoản gắn (null = gỡ); sổ ghi TÊN trường đã đổi */
+        post: operations["hrmStaffProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/sensitive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        /** Thẻ Thống kê BC Sở (TK-01..06) — chỉ quyền sensitive.view (mặc định HCTH, Admin); viên chức và HĐLĐ; ghi nhật ký view_sensitive; kho đọc với mục đích hrm.sensitive */
+        get: operations["hrmStaffSensitive"];
+        put?: never;
+        /** Thay thẻ Thống kê BC Sở (cần sensitive.view + profile.edit); dân tộc/tôn giáo là mã danh mục đang dùng */
+        post: operations["hrmStaffSensitiveWrite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thêm một dòng quá trình có hiệu lực (đơn vị, chức vụ, tăng cường, ngạch, bậc, văn bằng, bồi dưỡng, khen thưởng, kỷ luật, vào làm/nghỉ việc — FN-07 B4/B6/B7, FN-08) */
+        post: operations["hrmStaffEventAdd"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/events/{event}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+                event: components["parameters"]["HrmEventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thay một dòng quá trình còn hiệu lực bằng dòng mới cùng loại (reason 10–500 ký tự bắt buộc); dòng cũ giữ trong lịch sử */
+        post: operations["hrmStaffEventReplace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/events/{event}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+                event: components["parameters"]["HrmEventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy một dòng quá trình còn hiệu lực (sự kiện bù có lý do 10–500 ký tự; hồ sơ không xóa — BR-01) */
+        post: operations["hrmStaffEventVoid"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/access-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        /** Nhật ký xem chi tiết, xem thẻ TK, xuất có hồ sơ này (mới trước) — quyền audit.view */
+        get: operations["hrmStaffAccessLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ma trận phân quyền hồ sơ (FN-20) — mọi nhóm vai (mặc định + đã chỉnh) và các dòng theo người dùng; chỉ Admin */
+        get: operations["hrmPermissions"];
+        put?: never;
+        /** Ghi phiên bản mới của một dòng ma trận (nhóm vai hoặc người dùng); quyền Admin cố định (hrm.permission_locked); thẻ TK chỉ cấp cho nhóm HCTH hoặc từng người */
+        post: operations["hrmPermissionSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/permissions/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký đổi quyền hồ sơ — mọi phiên bản của mọi dòng ma trận, cũ trước; chỉ Admin */
+        get: operations["hrmPermissionHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/price/status": {
         parameters: {
             query?: never;
@@ -12112,6 +12352,252 @@ export interface components {
             units: components["schemas"]["FormsUnit"][];
             snapshots: components["schemas"]["FormsSnapshot"][];
         };
+        /** @enum {string} */
+        HrmStaffType: "vien_chuc" | "hop_dong" | "can_bo_xa";
+        /** @enum {string} */
+        HrmScope: "none" | "self" | "unit" | "all";
+        /** @description Nhóm quyền → phạm vi */
+        HrmPermMatrix: {
+            "profile.view"?: components["schemas"]["HrmScope"];
+            "profile.edit"?: components["schemas"]["HrmScope"];
+            "sensitive.view"?: components["schemas"]["HrmScope"];
+            export?: components["schemas"]["HrmScope"];
+            "audit.view"?: components["schemas"]["HrmScope"];
+        };
+        HrmMyAccess: {
+            /** @description false = hồ sơ chưa bật (AG_HRM_RECORDS, Q-005) */
+            enabled: boolean;
+            /** @description admin | hcth | manager | tinh | xa | tw (rỗng khi chưa bật) */
+            group: string;
+            /** @description Đơn vị nội bộ của người gọi */
+            unit: string;
+            perms: components["schemas"]["HrmPermMatrix"];
+        };
+        HrmPermEntry: {
+            /** @enum {string} */
+            grantee_kind: "role" | "user";
+            grantee: string;
+            perms: components["schemas"]["HrmPermMatrix"];
+            default: components["schemas"]["HrmPermMatrix"] | null;
+            /** @description 0 = chưa chỉnh (mặc định) */
+            version: number;
+            note: string;
+            /** Format: date-time */
+            recorded_at: string | null;
+            /** Format: uuid */
+            actor_ref: string | null;
+            /** @description true = nhóm Admin (không chỉnh được) */
+            locked: boolean;
+        };
+        HrmAccessEntry: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            action: "view" | "view_sensitive" | "export";
+            item_count: number;
+            /** @enum {string} */
+            scope: "self" | "unit" | "all";
+            query: {
+                [key: string]: string;
+            };
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmSecondment: {
+            /** Format: uuid */
+            id: string;
+            to_org: string;
+            valid_from: string;
+            /** Format: date */
+            valid_to: string | null;
+        };
+        /** @description Phép chiếu của hồ sơ tại ngày chốt — bậc là phép chiếu của các sự kiện ngạch/bậc; hệ số tra bảng hệ số có hiệu lực (NB-05) */
+        HrmSnapshot: {
+            /**
+             * @description Đang công tác | Đã nghỉ việc | chưa vào làm (FN-08)
+             * @enum {string}
+             */
+            status: "active" | "left" | "none";
+            /** Format: date */
+            started_on: string | null;
+            /** Format: date */
+            ended_on: string | null;
+            leave_reason: string;
+            unit: string;
+            commune: string;
+            mgmt_unit: string;
+            position: string;
+            title: string;
+            allowance: string;
+            appointed_on: string;
+            grade: string;
+            step: number;
+            /** @description Số bậc của ngạch tại ngày chốt (hiển thị 6/9) */
+            steps: number;
+            /** @description Hệ số bậc (chuỗi 2 chữ số thập phân); rỗng khi chưa có bảng */
+            coefficient: string;
+            /** @description Ngày xếp bậc hiện tại (Q-069) */
+            step_since: string;
+            /** @description Hệ số bảo lưu (Q-069) */
+            reserved_coeff: string;
+            disciplined: boolean;
+            top_degree: string;
+            secondments: components["schemas"]["HrmSecondment"][];
+        };
+        HrmStaffItem: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            type: components["schemas"]["HrmStaffType"];
+            /** @description Họ tên che bớt (kho định danh); rỗng khi người gọi không có vai kho */
+            label: string;
+            masked_phone: string;
+            current: components["schemas"]["HrmSnapshot"];
+        };
+        HrmProfileInput: {
+            full_name?: string;
+            phone?: string;
+            address?: string;
+            /** @description YYYY-MM-DD | YYYY-MM | YYYY (BR-05) */
+            birth_date?: string;
+            /** @enum {string} */
+            gender?: "nam" | "nu";
+            email?: string;
+            note?: string;
+        };
+        HrmProfileUpdate: {
+            full_name?: string;
+            phone?: string;
+            address?: string;
+            birth_date?: string;
+            /** @enum {string} */
+            gender?: "nam" | "nu";
+            email?: string;
+            note?: string;
+            /**
+             * Format: uuid
+             * @description Tài khoản của chính nhân sự; null = gỡ
+             */
+            account_ref?: string | null;
+        };
+        HrmSensitiveFields: {
+            /** @description Mã danh mục dân tộc (TK-01) */
+            ethnicity?: string;
+            /** @description Mã danh mục tôn giáo (TK-02) */
+            religion?: string;
+            /** @description Ngày vào Đảng (TK-03) */
+            party_date?: string;
+            readonly party_precision?: string;
+            /** @description Quê quán (TK-04) */
+            hometown?: string;
+            /** @description Nơi sinh (TK-05) */
+            birthplace?: string;
+            /** @description Ngày TGCM (TK-06) */
+            revolution_date?: string;
+            readonly revolution_precision?: string;
+        };
+        HrmEventInput: {
+            /** @enum {string} */
+            kind: "work_start" | "work_end" | "unit" | "position" | "secondment" | "grade" | "step" | "degree" | "training" | "award" | "discipline";
+            /** @description YYYY-MM-DD | YYYY-MM | YYYY */
+            valid_from: string;
+            /** @description Chỉ tăng cường, kỷ luật */
+            valid_to?: string;
+            /** @description Trường theo loại (chuỗi). work_end: reason (lý do nghỉ), decision_no. unit: unit | commune + mgmt_unit (cán bộ xã). position: position, title, allowance, appointed_on, decision_no. secondment: to_org. grade: grade, step, step_since, reserved_coeff. step: step, step_since, reserved_coeff. degree: level, major, form, institution. training: type, code, level, cert. award: form, title, level, decision_no. discipline: form, decision_no. */
+            payload?: {
+                [key: string]: string;
+            };
+            /** @description Lý do 10–500 ký tự — bắt buộc ở replace, bỏ qua ở thêm mới */
+            reason?: string;
+        };
+        HrmStaffCreate: {
+            type: components["schemas"]["HrmStaffType"];
+            profile: components["schemas"]["HrmProfileInput"];
+            sensitive?: components["schemas"]["HrmSensitiveFields"];
+            /**
+             * Format: uuid
+             * @description Tài khoản của chính nhân sự (phạm vi bản thân)
+             */
+            account_ref?: string | null;
+            events: components["schemas"]["HrmEventInput"][];
+        };
+        HrmStaffWrite: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            version: number;
+            warnings: string[];
+        };
+        HrmStaffEvent: {
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            valid_from: string;
+            /** @enum {string} */
+            precision: "day" | "month" | "year";
+            /** Format: date */
+            valid_to: string | null;
+            payload: {
+                [key: string]: string;
+            };
+            void: boolean;
+            /** Format: uuid */
+            supersedes: string | null;
+            reason: string;
+            version: number;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** @description false = đã bị thay/hủy, hoặc là dòng hủy */
+            effective: boolean;
+        };
+        HrmStaffProfile: {
+            full_name: string;
+            phone: string;
+            address: string;
+            birth_date: string;
+            birth_precision: string;
+            gender: string;
+            email: string;
+            note: string;
+        };
+        HrmStaffHistory: {
+            version: number;
+            /** @enum {string} */
+            change: "created" | "profile" | "sensitive" | "type" | "account";
+            changed_fields: string[];
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        HrmStaffDetail: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            type: components["schemas"]["HrmStaffType"];
+            /** Format: uuid */
+            account_ref: string | null;
+            /** Format: date */
+            day: string;
+            /** @description Chủ thể đã bị xóa định danh ở kho (RB-3) */
+            erased: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Tuổi tại ngày chốt (HS-33) */
+            age: number | null;
+            profile: components["schemas"]["HrmStaffProfile"];
+            current: components["schemas"]["HrmSnapshot"];
+            events: components["schemas"]["HrmStaffEvent"][];
+            history: components["schemas"]["HrmStaffHistory"][];
+            /** @description Nhóm quyền của người gọi trên hồ sơ này */
+            can: {
+                [key: string]: boolean;
+            };
+        };
         HrmStatus: {
             /** @description true = Admin (ghi được) */
             can_manage: boolean;
@@ -13206,6 +13692,19 @@ export interface components {
         };
     };
     responses: {
+        /** @description Đã ghi dòng quá trình */
+        HrmEventWritten: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    id: string;
+                    version: number;
+                };
+            };
+        };
         /** @description RFC 9457 */
         Problem: {
             headers: {
@@ -13314,6 +13813,10 @@ export interface components {
         HrmKind: "position" | "grade" | "education_level" | "major" | "major_group" | "ethnicity" | "religion" | "political_theory" | "state_mgmt" | "foreign_language" | "language_level" | "it_level" | "award_form" | "discipline_form" | "change_type" | "leave_reason";
         /** @description Khóa tham số có phiên bản (pf/hrm) — promotion (quy tắc nâng bậc), achievement_conversion (quy đổi thành tích) */
         HrmRuleKey: "promotion" | "achievement_conversion";
+        /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+        HrmAt: string;
+        HrmStaffId: string;
+        HrmEventId: string;
         /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
         PriceProfile: string;
         /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
@@ -24710,6 +25213,502 @@ export interface operations {
             409: components["responses"]["Problem"];
             /** @description validation_failed | hrm.item_reference */
             422: components["responses"]["Problem"];
+        };
+    };
+    hrmMyAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quyền */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmMyAccess"];
+                };
+            };
+            /** @description unauthenticated */
+            401: components["responses"]["Problem"];
+            /** @description forbidden (không có ngữ cảnh phiên KN) */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmUnits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đơn vị (kể cả đã ngừng) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            code: string;
+                            name: string;
+                            kind: string;
+                            active: boolean;
+                        }[];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffList: {
+        parameters: {
+            query?: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+                type?: components["schemas"]["HrmStaffType"];
+                /** @description Đơn vị công tác hoặc đơn vị quản lý (cán bộ xã) */
+                unit?: string;
+                status?: "active" | "left" | "none";
+                position?: string;
+                grade?: string;
+                /** @description Tiền tố mã hồ sơ, hoặc SĐT (tra qua chỉ mục mù của kho) */
+                q?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        day: string;
+                        total: number;
+                        scope: components["schemas"]["HrmScope"];
+                        items: components["schemas"]["HrmStaffItem"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmStaffCreate"];
+            };
+        };
+        responses: {
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmStaffWrite"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.duplicate_person | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference | hrm.step_out_of_range | hrm.not_applicable */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffExport: {
+        parameters: {
+            query?: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+                type?: components["schemas"]["HrmStaffType"];
+                unit?: string;
+                status?: "active" | "left" | "none";
+                position?: string;
+                grade?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp CSV (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed (quá 5.000 hồ sơ) */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffGet: {
+        parameters: {
+            query?: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hồ sơ (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmStaffDetail"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled | mfa_required (kho) */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found (kể cả hồ sơ ngoài phạm vi) */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffProfile: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi (version không đổi khi không có gì đổi) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmStaffWrite"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.duplicate_person */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffSensitive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Các trường (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        fields: components["schemas"]["HrmSensitiveFields"];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled | mfa_required (kho) */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.not_applicable (cán bộ xã) */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffSensitiveWrite: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    fields: components["schemas"]["HrmSensitiveFields"];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmStaffWrite"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference | hrm.not_applicable */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffEventAdd: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmEventInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["HrmEventWritten"];
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference | hrm.step_out_of_range */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffEventReplace: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+                event: components["parameters"]["HrmEventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmEventInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["HrmEventWritten"];
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found | hrm.event_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference | hrm.step_out_of_range */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffEventVoid: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+                event: components["parameters"]["HrmEventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["HrmEventWritten"];
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found | hrm.event_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffAccessLog: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhật ký */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmAccessEntry"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmPermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ma trận */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        perms: string[];
+                        scopes: components["schemas"]["HrmScope"][];
+                        groups: string[];
+                        items: components["schemas"]["HrmPermEntry"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmPermissionSet: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    grantee_kind: "role" | "user";
+                    /** @description Nhóm vai (hcth, manager, tinh, xa, tw) hoặc mã người dùng (UUID) */
+                    grantee: string;
+                    perms: components["schemas"]["HrmPermMatrix"];
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: number;
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.permission_locked */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmPermissionHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmPermEntry"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
         };
     };
     priceStatus: {

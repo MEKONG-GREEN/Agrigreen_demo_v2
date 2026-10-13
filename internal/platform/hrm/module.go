@@ -10,7 +10,12 @@
 //   - Cấu hình quyền (port.Access) ở gốc lắp ráp; cấm float trong toàn module (agnofloat).
 //   - HTTP: /v1/hrm/* (Application API).
 //
-// Gói sau của cùng module: W11.22 hồ sơ (PII qua vault), W11.24 kho tài liệu, W11.25 nâng bậc, W11.26 đánh giá, W11.28
+// W11.22 (pf 000150, vault 000004) — HỒ SƠ NHÂN SỰ (FN-07, FN-08, FN-20): sổ hồ sơ (chủ thể vault, mã tự sinh), quá
+// trình có hiệu lực, bậc = phép chiếu sự kiện, truy vấn as-of, nhật ký xem/xuất, ma trận quyền hồ sơ. PII chỉ ở kho định
+// danh (định danh + ngăn hrm.profile; thẻ Thống kê BC Sở ở ngăn hrm.sensitive có khóa/mục đích riêng). Bật bằng
+// UseRecords + cờ AG_HRM_RECORDS (mặc định tắt ở production — Q-005).
+//
+// Gói sau của cùng module: W11.24 kho tài liệu, W11.25 nâng bậc, W11.26 đánh giá, W11.28
 // báo cáo Sở. Module khác chỉ import hrm/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
 package hrm
 
@@ -23,6 +28,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
 // DBModule: giao dịch của module chạy SET LOCAL ROLE r_hrm (ADR-0028).
@@ -38,6 +44,24 @@ func New(b tenant.Beginner, clk clock.Clock, acc port.Access) (*Module, error) {
 		return nil, err
 	}
 	return &Module{svc: svc}, nil
+}
+
+// UseRecords bật hồ sơ nhân sự (W11.22): kho định danh (cần phần mở rộng client.Profiles — vault 000004), danh mục đơn
+// vị nội bộ (nil → chỉ kiểm dạng mã), cờ bật (port.EnvRecords, RecordsEnabled). Chưa gọi → route hồ sơ trả
+// hrm.records_disabled.
+func (m *Module) UseRecords(v client.Client, u port.Units, enabled bool) {
+	m.svc.UseRecords(v, u, enabled)
+}
+
+// RecordsEnabled đọc cờ bật hồ sơ (port.EnvRecords): "1" bật, "0" tắt; vắng → tắt ở production, bật ở môi trường khác.
+func RecordsEnabled(getenv func(string) string, production bool) bool {
+	switch getenv(port.EnvRecords) {
+	case "1":
+		return true
+	case "0":
+		return false
+	}
+	return !production
 }
 
 // Catalog cho module khác: danh mục nhân sự, bảng hệ số và tham số có hiệu lực theo ngày.

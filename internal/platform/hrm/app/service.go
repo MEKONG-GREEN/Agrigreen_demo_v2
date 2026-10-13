@@ -33,6 +33,8 @@ type Service struct {
 	DB     tenant.Beginner // đã bọc db.ForModule(…, DBModule)
 	Clock  clock.Clock
 	Access port.Access
+	// Rec: hồ sơ nhân sự (W11.22) — nil cho tới UseRecords; khi nil mọi route hồ sơ trả hrm.records_disabled.
+	Rec *Records
 }
 
 var _ port.Catalog = (*Service)(nil)
@@ -344,6 +346,17 @@ func refErr(err error, what string) error {
 		return err
 	}
 	return port.ErrItemReference.WithDetail(what)
+}
+
+// jsonUnmarshal giải JSON (thuộc tính danh mục đã kiểm khi ghi); lỗi bỏ qua ở nơi gọi đọc trường tùy chọn.
+func jsonUnmarshal(raw []byte, v any) error { return json.Unmarshal(raw, v) }
+
+// stableKey: có khóa của request → khóa ổn định (gọi lặp đụng khóa trùng → 409, không ghi đôi); không có → ngẫu nhiên.
+func stableKey(idem, suffix string) string {
+	if idem == "" {
+		return "hrm:" + suffix + ":" + ids.New().String()
+	}
+	return idem + ":" + suffix
 }
 
 func idemKey(idem, suffix string) string {

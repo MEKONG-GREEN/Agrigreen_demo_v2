@@ -36,6 +36,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/hrm/grade-scales/:grade", h.addScale)
 	rg.GET("/hrm/rules/:key", h.rule)
 	rg.POST("/hrm/rules/:key", h.addRule)
+	h.registerRecords(rg) // W11.22: hồ sơ nhân sự (records.go)
 }
 
 // decode đọc thân JSON, chặn trường lạ.

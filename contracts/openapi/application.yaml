@@ -8047,6 +8047,358 @@ paths:
         "404": {description: hrm.rule_unknown, $ref: "#/components/responses/Problem"}
         "409": {description: conflict, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed | hrm.item_reference, $ref: "#/components/responses/Problem"}
+  # --- pf/hrm W11.22 (pf 000150, vault 000004): HỒ SƠ NHÂN SỰ (BRD HCTH v3.0 FN-07, FN-08, FN-20). Dữ liệu cá nhân (họ tên, SĐT,
+  # địa chỉ, ngày sinh, giới tính, email, ghi chú; thẻ Thống kê BC Sở TK-01..06) chỉ ở kho định danh — trả về trong phản hồi chi
+  # tiết/thẻ nhạy cảm (Cache-Control no-store), không lưu ở pf_hrm. Quyền theo ma trận FN-20 (nhóm vai suy từ ngữ cảnh phiên KN ×
+  # phạm vi none/self/unit/all; người dùng ưu tiên). Tắt khi AG_HRM_RECORDS chưa bật (mặc định tắt ở production — Q-005):
+  # mọi route dưới đây trừ /v1/hrm/access trả 403 hrm.records_disabled. Mỗi lần xem chi tiết, xem thẻ nhạy cảm, xuất ghi nhật ký.
+  /v1/hrm/access:
+    get:
+      summary: Quyền hồ sơ hiệu lực của người gọi (nhóm vai, đơn vị nội bộ, phạm vi theo nhóm quyền); enabled=false khi hồ sơ chưa bật
+      operationId: hrmMyAccess
+      tags: [hrm]
+      responses:
+        "200":
+          description: Quyền
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmMyAccess"}
+        "401": {description: unauthenticated, $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden (không có ngữ cảnh phiên KN), $ref: "#/components/responses/Problem"}
+  /v1/hrm/units:
+    get:
+      summary: Đơn vị nội bộ (phòng/trạm/trại/BGĐ) của đơn vị người gọi — bộ lọc, đơn vị công tác (HS-16), đơn vị quản lý (HS-37)
+      operationId: hrmUnits
+      tags: [hrm]
+      responses:
+        "200":
+          description: Đơn vị (kể cả đã ngừng)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [code, name, kind, active]
+                      properties:
+                        code: {type: string}
+                        name: {type: string}
+                        kind: {type: string}
+                        active: {type: boolean}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+  /v1/hrm/staff:
+    get:
+      summary: Danh sách hồ sơ trong phạm vi xem, chiếu tại ngày chốt (as-of); nhãn họ tên che bớt từ kho (FN-07 B1)
+      operationId: hrmStaffList
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/HrmAt"
+        - {name: type, in: query, required: false, schema: {$ref: "#/components/schemas/HrmStaffType"}}
+        - {name: unit, in: query, required: false, description: "Đơn vị công tác hoặc đơn vị quản lý (cán bộ xã)", schema: {type: string}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [active, left, none]}}
+        - {name: position, in: query, required: false, schema: {type: string}}
+        - {name: grade, in: query, required: false, schema: {type: string}}
+        - {name: q, in: query, required: false, description: "Tiền tố mã hồ sơ, hoặc SĐT (tra qua chỉ mục mù của kho)", schema: {type: string}}
+        - {name: offset, in: query, required: false, schema: {type: integer, minimum: 0}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [day, total, scope, items]
+                properties:
+                  day: {type: string, format: date}
+                  total: {type: integer, minimum: 0}
+                  scope: {$ref: "#/components/schemas/HrmScope"}
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmStaffItem"}}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Thêm hồ sơ (FN-07 B2) — mã tự sinh VC/HD/XA-nnnnn; định danh + ngăn hồ sơ vào kho (mục đích hrm.profile), thẻ TK (hrm.sensitive); quá trình ban đầu bắt buộc đơn vị và chức vụ
+      operationId: hrmStaffCreate
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmStaffCreate"}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmStaffWrite"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.duplicate_person | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | hrm.item_reference | hrm.step_out_of_range | hrm.not_applicable, $ref: "#/components/responses/Problem"}
+  /v1/hrm/staff/export:
+    get:
+      summary: Xuất danh sách đang lọc ra CSV (UTF-8 có BOM, mở bằng Excel) trong phạm vi xuất — không có trường TK (BR-03); ghi một dòng nhật ký xuất
+      operationId: hrmStaffExport
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/HrmAt"
+        - {name: type, in: query, required: false, schema: {$ref: "#/components/schemas/HrmStaffType"}}
+        - {name: unit, in: query, required: false, schema: {type: string}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [active, left, none]}}
+        - {name: position, in: query, required: false, schema: {type: string}}
+        - {name: grade, in: query, required: false, schema: {type: string}}
+        - {name: q, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Tệp CSV (Cache-Control no-store)
+          content:
+            text/csv:
+              schema: {type: string}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed (quá 5.000 hồ sơ), $ref: "#/components/responses/Problem"}
+  /v1/hrm/staff/{id}:
+    parameters:
+      - $ref: "#/components/parameters/HrmStaffId"
+    get:
+      summary: Hồ sơ chi tiết tại ngày chốt (thẻ Thông tin chung, Công tác, Trình độ, Khen thưởng, Ngạch - Bậc, Thông tin làm việc, Lịch sử sửa) — ghi nhật ký xem; không có thẻ TK
+      operationId: hrmStaffGet
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/HrmAt"
+      responses:
+        "200":
+          description: Hồ sơ (Cache-Control no-store)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmStaffDetail"}
+        "403": {description: forbidden | hrm.records_disabled | mfa_required (kho), $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.staff_not_found (kể cả hồ sơ ngoài phạm vi), $ref: "#/components/responses/Problem"}
+  /v1/hrm/staff/{id}/profile:
+    parameters:
+      - $ref: "#/components/parameters/HrmStaffId"
+    post:
+      summary: Sửa định danh/ngăn hồ sơ (trường vắng = không đổi) và tài khoản gắn (null = gỡ); sổ ghi TÊN trường đã đổi
+      operationId: hrmStaffProfile
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmProfileUpdate"}
+      responses:
+        "200":
+          description: Đã ghi (version không đổi khi không có gì đổi)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmStaffWrite"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.staff_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.duplicate_person, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/hrm/staff/{id}/sensitive:
+    parameters:
+      - $ref: "#/components/parameters/HrmStaffId"
+    get:
+      summary: Thẻ Thống kê BC Sở (TK-01..06) — chỉ quyền sensitive.view (mặc định HCTH, Admin); viên chức và HĐLĐ; ghi nhật ký view_sensitive; kho đọc với mục đích hrm.sensitive
+      operationId: hrmStaffSensitive
+      tags: [hrm]
+      responses:
+        "200":
+          description: Các trường (Cache-Control no-store)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, fields]
+                properties:
+                  id: {type: string, format: uuid}
+                  fields: {$ref: "#/components/schemas/HrmSensitiveFields"}
+        "403": {description: forbidden | hrm.records_disabled | mfa_required (kho), $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.staff_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: hrm.not_applicable (cán bộ xã), $ref: "#/components/responses/Problem"}
+    post:
+      summary: Thay thẻ Thống kê BC Sở (cần sensitive.view + profile.edit); dân tộc/tôn giáo là mã danh mục đang dùng
+      operationId: hrmStaffSensitiveWrite
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fields]
+              additionalProperties: false
+              properties:
+                fields: {$ref: "#/components/schemas/HrmSensitiveFields"}
+      responses:
+        "200":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmStaffWrite"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.staff_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | hrm.item_reference | hrm.not_applicable, $ref: "#/components/responses/Problem"}
+  /v1/hrm/staff/{id}/events:
+    parameters:
+      - $ref: "#/components/parameters/HrmStaffId"
+    post:
+      summary: Thêm một dòng quá trình có hiệu lực (đơn vị, chức vụ, tăng cường, ngạch, bậc, văn bằng, bồi dưỡng, khen thưởng, kỷ luật, vào làm/nghỉ việc — FN-07 B4/B6/B7, FN-08)
+      operationId: hrmStaffEventAdd
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmEventInput"}
+      responses:
+        "201": {$ref: "#/components/responses/HrmEventWritten"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.staff_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | hrm.item_reference | hrm.step_out_of_range, $ref: "#/components/responses/Problem"}
+  /v1/hrm/staff/{id}/events/{event}/replace:
+    parameters:
+      - $ref: "#/components/parameters/HrmStaffId"
+      - $ref: "#/components/parameters/HrmEventId"
+    post:
+      summary: Thay một dòng quá trình còn hiệu lực bằng dòng mới cùng loại (reason 10–500 ký tự bắt buộc); dòng cũ giữ trong lịch sử
+      operationId: hrmStaffEventReplace
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmEventInput"}
+      responses:
+        "201": {$ref: "#/components/responses/HrmEventWritten"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.staff_not_found | hrm.event_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | hrm.item_reference | hrm.step_out_of_range, $ref: "#/components/responses/Problem"}
+  /v1/hrm/staff/{id}/events/{event}/void:
+    parameters:
+      - $ref: "#/components/parameters/HrmStaffId"
+      - $ref: "#/components/parameters/HrmEventId"
+    post:
+      summary: Hủy một dòng quá trình còn hiệu lực (sự kiện bù có lý do 10–500 ký tự; hồ sơ không xóa — BR-01)
+      operationId: hrmStaffEventVoid
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              additionalProperties: false
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201": {$ref: "#/components/responses/HrmEventWritten"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.staff_not_found | hrm.event_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/hrm/staff/{id}/access-log:
+    parameters:
+      - $ref: "#/components/parameters/HrmStaffId"
+    get:
+      summary: Nhật ký xem chi tiết, xem thẻ TK, xuất có hồ sơ này (mới trước) — quyền audit.view
+      operationId: hrmStaffAccessLog
+      tags: [hrm]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 500, default: 200}}
+      responses:
+        "200":
+          description: Nhật ký
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmAccessEntry"}}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.staff_not_found, $ref: "#/components/responses/Problem"}
+  /v1/hrm/permissions:
+    get:
+      summary: Ma trận phân quyền hồ sơ (FN-20) — mọi nhóm vai (mặc định + đã chỉnh) và các dòng theo người dùng; chỉ Admin
+      operationId: hrmPermissions
+      tags: [hrm]
+      responses:
+        "200":
+          description: Ma trận
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [perms, scopes, groups, items]
+                properties:
+                  perms: {type: array, items: {type: string}}
+                  scopes: {type: array, items: {$ref: "#/components/schemas/HrmScope"}}
+                  groups: {type: array, items: {type: string}}
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmPermEntry"}}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Ghi phiên bản mới của một dòng ma trận (nhóm vai hoặc người dùng); quyền Admin cố định (hrm.permission_locked); thẻ TK chỉ cấp cho nhóm HCTH hoặc từng người
+      operationId: hrmPermissionSet
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grantee_kind, grantee, perms]
+              additionalProperties: false
+              properties:
+                grantee_kind: {type: string, enum: [role, user]}
+                grantee: {type: string, description: "Nhóm vai (hcth, manager, tinh, xa, tw) hoặc mã người dùng (UUID)"}
+                perms: {$ref: "#/components/schemas/HrmPermMatrix"}
+                note: {type: string, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version]
+                properties:
+                  version: {type: integer}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | hrm.permission_locked, $ref: "#/components/responses/Problem"}
+  /v1/hrm/permissions/history:
+    get:
+      summary: Nhật ký đổi quyền hồ sơ — mọi phiên bản của mọi dòng ma trận, cũ trước; chỉ Admin
+      operationId: hrmPermissionHistory
+      tags: [hrm]
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmPermEntry"}}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
   # --- hết pf/hrm ---
   # --- pf/price (cap/price, W11.71 — ADR-0049): khung module giá của Báo giá nông sản (BRD v1.3). Trạng thái module và danh mục
   # nền (đơn vị tính, nhóm hàng) có hiệu lực theo ngày; route nghiệp vụ (xã báo giá, mặt hàng, lịch, phiếu, bảng giá) thêm ở
@@ -9384,6 +9736,22 @@ components:
       required: true
       description: Khóa tham số có phiên bản (pf/hrm) — promotion (quy tắc nâng bậc), achievement_conversion (quy đổi thành tích)
       schema: {type: string, enum: [promotion, achievement_conversion]}
+    HrmAt:
+      name: at
+      in: query
+      required: false
+      description: Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of
+      schema: {type: string, format: date}
+    HrmStaffId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    HrmEventId:
+      name: event
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
     PriceProfile:
       name: profile
       in: query
@@ -9435,6 +9803,16 @@ components:
       description: Mục đích xử lý dữ liệu cá nhân (R-42)
       schema: {type: string, enum: [mrv.evidence, extension.field_support]}
   responses:
+    HrmEventWritten:
+      description: Đã ghi dòng quá trình
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [id, version]
+            properties:
+              id: {type: string, format: uuid}
+              version: {type: integer}
     Problem:
       description: RFC 9457
       content:
@@ -14098,6 +14476,229 @@ components:
         events: {type: array, items: {$ref: "#/components/schemas/FormsPeriodEvent"}}
         units: {type: array, items: {$ref: "#/components/schemas/FormsUnit"}}
         snapshots: {type: array, items: {$ref: "#/components/schemas/FormsSnapshot"}}
+    # --- pf/hrm (W11.22) ---
+    HrmStaffType:
+      type: string
+      enum: [vien_chuc, hop_dong, can_bo_xa]
+    HrmScope:
+      type: string
+      enum: [none, self, unit, all]
+    HrmPermMatrix:
+      type: object
+      description: Nhóm quyền → phạm vi
+      additionalProperties: false
+      properties:
+        profile.view: {$ref: "#/components/schemas/HrmScope"}
+        profile.edit: {$ref: "#/components/schemas/HrmScope"}
+        sensitive.view: {$ref: "#/components/schemas/HrmScope"}
+        export: {$ref: "#/components/schemas/HrmScope"}
+        audit.view: {$ref: "#/components/schemas/HrmScope"}
+    HrmMyAccess:
+      type: object
+      required: [enabled, group, unit, perms]
+      properties:
+        enabled: {type: boolean, description: "false = hồ sơ chưa bật (AG_HRM_RECORDS, Q-005)"}
+        group: {type: string, description: "admin | hcth | manager | tinh | xa | tw (rỗng khi chưa bật)"}
+        unit: {type: string, description: Đơn vị nội bộ của người gọi}
+        perms: {$ref: "#/components/schemas/HrmPermMatrix"}
+    HrmPermEntry:
+      type: object
+      required: [grantee_kind, grantee, perms, default, version, note, recorded_at, actor_ref, locked]
+      properties:
+        grantee_kind: {type: string, enum: [role, user]}
+        grantee: {type: string}
+        perms: {$ref: "#/components/schemas/HrmPermMatrix"}
+        default:
+          oneOf:
+            - {$ref: "#/components/schemas/HrmPermMatrix"}
+            - {type: "null"}
+        version: {type: integer, description: "0 = chưa chỉnh (mặc định)"}
+        note: {type: string}
+        recorded_at: {type: [string, "null"], format: date-time}
+        actor_ref: {type: [string, "null"], format: uuid}
+        locked: {type: boolean, description: "true = nhóm Admin (không chỉnh được)"}
+    HrmAccessEntry:
+      type: object
+      required: [id, action, item_count, scope, query, actor_ref, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        action: {type: string, enum: [view, view_sensitive, export]}
+        item_count: {type: integer, minimum: 0}
+        scope: {type: string, enum: [self, unit, all]}
+        query: {type: object, additionalProperties: {type: string}}
+        actor_ref: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+    HrmSecondment:
+      type: object
+      required: [id, to_org, valid_from, valid_to]
+      properties:
+        id: {type: string, format: uuid}
+        to_org: {type: string}
+        valid_from: {type: string}
+        valid_to: {type: [string, "null"], format: date}
+    HrmSnapshot:
+      type: object
+      description: Phép chiếu của hồ sơ tại ngày chốt — bậc là phép chiếu của các sự kiện ngạch/bậc; hệ số tra bảng hệ số có hiệu lực (NB-05)
+      required: [status, started_on, ended_on, leave_reason, unit, commune, mgmt_unit, position, title, allowance, appointed_on, grade, step,
+        steps, coefficient, step_since, reserved_coeff, disciplined, top_degree, secondments]
+      properties:
+        status: {type: string, enum: [active, left, none], description: "Đang công tác | Đã nghỉ việc | chưa vào làm (FN-08)"}
+        started_on: {type: [string, "null"], format: date}
+        ended_on: {type: [string, "null"], format: date}
+        leave_reason: {type: string}
+        unit: {type: string}
+        commune: {type: string}
+        mgmt_unit: {type: string}
+        position: {type: string}
+        title: {type: string}
+        allowance: {type: string}
+        appointed_on: {type: string}
+        grade: {type: string}
+        step: {type: integer, minimum: 0}
+        steps: {type: integer, minimum: 0, description: "Số bậc của ngạch tại ngày chốt (hiển thị 6/9)"}
+        coefficient: {type: string, description: "Hệ số bậc (chuỗi 2 chữ số thập phân); rỗng khi chưa có bảng"}
+        step_since: {type: string, description: "Ngày xếp bậc hiện tại (Q-069)"}
+        reserved_coeff: {type: string, description: "Hệ số bảo lưu (Q-069)"}
+        disciplined: {type: boolean}
+        top_degree: {type: string}
+        secondments: {type: array, items: {$ref: "#/components/schemas/HrmSecondment"}}
+    HrmStaffItem:
+      type: object
+      required: [id, code, type, label, masked_phone, current]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string}
+        type: {$ref: "#/components/schemas/HrmStaffType"}
+        label: {type: string, description: "Họ tên che bớt (kho định danh); rỗng khi người gọi không có vai kho"}
+        masked_phone: {type: string}
+        current: {$ref: "#/components/schemas/HrmSnapshot"}
+    HrmProfileInput:
+      type: object
+      properties:
+        full_name: {type: string, maxLength: 100}
+        phone: {type: string}
+        address: {type: string, maxLength: 500}
+        birth_date: {type: string, description: "YYYY-MM-DD | YYYY-MM | YYYY (BR-05)"}
+        gender: {type: string, enum: [nam, nu]}
+        email: {type: string}
+        note: {type: string, maxLength: 1000}
+    HrmProfileUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        full_name: {type: string, maxLength: 100}
+        phone: {type: string}
+        address: {type: string, maxLength: 500}
+        birth_date: {type: string}
+        gender: {type: string, enum: [nam, nu]}
+        email: {type: string}
+        note: {type: string, maxLength: 1000}
+        account_ref: {type: [string, "null"], format: uuid, description: "Tài khoản của chính nhân sự; null = gỡ"}
+    HrmSensitiveFields:
+      type: object
+      additionalProperties: false
+      properties:
+        ethnicity: {type: string, description: Mã danh mục dân tộc (TK-01)}
+        religion: {type: string, description: Mã danh mục tôn giáo (TK-02)}
+        party_date: {type: string, description: "Ngày vào Đảng (TK-03)"}
+        party_precision: {type: string, readOnly: true}
+        hometown: {type: string, maxLength: 300, description: Quê quán (TK-04)}
+        birthplace: {type: string, maxLength: 300, description: Nơi sinh (TK-05)}
+        revolution_date: {type: string, description: "Ngày TGCM (TK-06)"}
+        revolution_precision: {type: string, readOnly: true}
+    HrmEventInput:
+      type: object
+      required: [kind, valid_from]
+      additionalProperties: false
+      properties:
+        kind: {type: string, enum: [work_start, work_end, unit, position, secondment, grade, step, degree, training, award, discipline]}
+        valid_from: {type: string, description: "YYYY-MM-DD | YYYY-MM | YYYY"}
+        valid_to: {type: string, description: "Chỉ tăng cường, kỷ luật"}
+        payload:
+          type: object
+          additionalProperties: {type: string}
+          description: >-
+            Trường theo loại (chuỗi). work_end: reason (lý do nghỉ), decision_no. unit: unit | commune + mgmt_unit (cán bộ xã).
+            position: position, title, allowance, appointed_on, decision_no. secondment: to_org. grade: grade, step, step_since,
+            reserved_coeff. step: step, step_since, reserved_coeff. degree: level, major, form, institution. training: type, code,
+            level, cert. award: form, title, level, decision_no. discipline: form, decision_no.
+        reason: {type: string, description: "Lý do 10–500 ký tự — bắt buộc ở replace, bỏ qua ở thêm mới"}
+    HrmStaffCreate:
+      type: object
+      required: [type, profile, events]
+      additionalProperties: false
+      properties:
+        type: {$ref: "#/components/schemas/HrmStaffType"}
+        profile: {$ref: "#/components/schemas/HrmProfileInput"}
+        sensitive: {$ref: "#/components/schemas/HrmSensitiveFields"}
+        account_ref: {type: [string, "null"], format: uuid, description: "Tài khoản của chính nhân sự (phạm vi bản thân)"}
+        events: {type: array, items: {$ref: "#/components/schemas/HrmEventInput"}}
+    HrmStaffWrite:
+      type: object
+      required: [id, code, version, warnings]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string}
+        version: {type: integer}
+        warnings: {type: array, items: {type: string}}
+    HrmStaffEvent:
+      type: object
+      required: [id, kind, valid_from, precision, valid_to, payload, void, supersedes, reason, version, recorded_at, actor_ref, effective]
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string}
+        valid_from: {type: string}
+        precision: {type: string, enum: [day, month, year]}
+        valid_to: {type: [string, "null"], format: date}
+        payload: {type: object, additionalProperties: {type: string}}
+        void: {type: boolean}
+        supersedes: {type: [string, "null"], format: uuid}
+        reason: {type: string}
+        version: {type: integer}
+        recorded_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        effective: {type: boolean, description: "false = đã bị thay/hủy, hoặc là dòng hủy"}
+    HrmStaffProfile:
+      type: object
+      required: [full_name, phone, address, birth_date, birth_precision, gender, email, note]
+      properties:
+        full_name: {type: string}
+        phone: {type: string}
+        address: {type: string}
+        birth_date: {type: string}
+        birth_precision: {type: string}
+        gender: {type: string}
+        email: {type: string}
+        note: {type: string}
+    HrmStaffHistory:
+      type: object
+      required: [version, change, changed_fields, recorded_at, actor_ref]
+      properties:
+        version: {type: integer}
+        change: {type: string, enum: [created, profile, sensitive, type, account]}
+        changed_fields: {type: array, items: {type: string}}
+        recorded_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+    HrmStaffDetail:
+      type: object
+      required: [id, code, type, account_ref, day, erased, created_at, age, profile, current, events, history, can]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string}
+        type: {$ref: "#/components/schemas/HrmStaffType"}
+        account_ref: {type: [string, "null"], format: uuid}
+        day: {type: string, format: date}
+        erased: {type: boolean, description: "Chủ thể đã bị xóa định danh ở kho (RB-3)"}
+        created_at: {type: string, format: date-time}
+        age: {type: [integer, "null"], description: "Tuổi tại ngày chốt (HS-33)"}
+        profile: {$ref: "#/components/schemas/HrmStaffProfile"}
+        current: {$ref: "#/components/schemas/HrmSnapshot"}
+        events: {type: array, items: {$ref: "#/components/schemas/HrmStaffEvent"}}
+        history: {type: array, items: {$ref: "#/components/schemas/HrmStaffHistory"}}
+        can:
+          type: object
+          description: Nhóm quyền của người gọi trên hồ sơ này
+          additionalProperties: {type: boolean}
     # --- pf/hrm (W11.21) ---
     HrmStatus:
       type: object

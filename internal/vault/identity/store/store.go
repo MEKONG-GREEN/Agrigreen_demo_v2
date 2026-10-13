@@ -134,10 +134,56 @@ func GetKey(ctx context.Context, tx pgx.Tx, ref uuid.UUID) (*Key, error) {
 	return &k, nil
 }
 
+// UpdateIdentity thay bản mã họ tên, SĐT, địa chỉ (giữ CCCD) — W11.22 Amend.
+func UpdateIdentity(ctx context.Context, tx pgx.Tx, ref uuid.UUID, id Identity) error {
+	_, err := tx.Exec(ctx, `UPDATE vault.identity SET full_name_ct = $2, phone_ct = $3, address_ct = $4, updated_at = now()
+	  WHERE subject_ref = $1`, ref, id.FullNameCT, id.PhoneCT, id.AddressCT)
+	return err
+}
+
+// DeleteBlind xóa chỉ mục mù loại kind của chủ thể (đổi SĐT).
+func DeleteBlind(ctx context.Context, tx pgx.Tx, ref uuid.UUID, kind string) error {
+	_, err := tx.Exec(ctx, "DELETE FROM vault.blind_index WHERE subject_ref = $1 AND kind = $2", ref, kind)
+	return err
+}
+
+// Section là dòng vault.section (bản mã, khóa riêng của ngăn đã bọc).
+type Section struct {
+	PayloadCT  []byte
+	WrappedKey []byte
+	KEKID      string
+}
+
+// GetSection đọc ngăn của chủ thể; nil nếu chưa ghi.
+func GetSection(ctx context.Context, tx pgx.Tx, ref uuid.UUID, section string) (*Section, error) {
+	var x Section
+	err := tx.QueryRow(ctx, `SELECT payload_ct, wrapped_key, kek_id FROM vault.section WHERE subject_ref = $1 AND section = $2`,
+		ref, section).Scan(&x.PayloadCT, &x.WrappedKey, &x.KEKID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &x, nil
+}
+
+// PutSection ghi (thay) ngăn của chủ thể.
+func PutSection(ctx context.Context, tx pgx.Tx, tenantID, ref uuid.UUID, section string, x Section, by uuid.UUID) error {
+	_, err := tx.Exec(ctx, `INSERT INTO vault.section (tenant_id, subject_ref, section, payload_ct, wrapped_key, kek_id, updated_by)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7)
+	  ON CONFLICT (tenant_id, subject_ref, section) DO UPDATE
+	    SET payload_ct = EXCLUDED.payload_ct, wrapped_key = EXCLUDED.wrapped_key, kek_id = EXCLUDED.kek_id,
+	        updated_at = now(), updated_by = EXCLUDED.updated_by`,
+		tenantID, ref, section, x.PayloadCT, x.WrappedKey, x.KEKID, by)
+	return err
+}
+
 // Erase xóa định danh, khóa, chỉ mục mù và đặt dấu mộ (RB-3). Chủ thể phải đã được khóa dòng.
 func Erase(ctx context.Context, tx pgx.Tx, ref uuid.UUID, at time.Time, by uuid.UUID, reason string) error {
 	for _, q := range []string{
 		"DELETE FROM vault.blind_index WHERE subject_ref = $1",
+		"DELETE FROM vault.section WHERE subject_ref = $1", // W11.22, vault 000004
 		"DELETE FROM vault.identity WHERE subject_ref = $1",
 		"DELETE FROM vault.subject_key WHERE subject_ref = $1",
 	} {

@@ -93,7 +93,37 @@ func TestAllowedPurpose(t *testing.T) {
 			t.Errorf("%s/%s phải bị từ chối", c[0], c[1])
 		}
 	}
-	if got := AllowedPurposes(OpLookup); len(got) != 2 || got[0] != "registry.admin" {
+	if got := AllowedPurposes(OpLookup); len(got) != 3 || got[0] != PurposeHRMProfile || got[1] != "registry.admin" {
 		t.Errorf("AllowedPurposes(lookup) = %v", got)
+	}
+}
+
+// W11.22: ngăn gắn cứng mục đích; hrm.sensitive chỉ dùng cho ngăn, không đọc định danh; trường lạ/quá dài bị từ chối.
+func TestSections(t *testing.T) {
+	if p, ok := SectionPurpose(SectionHRMSensitive); !ok || p != PurposeHRMSensitive {
+		t.Fatalf("ngăn nhạy cảm: %q %v", p, ok)
+	}
+	if p, ok := SectionPurpose(SectionHRMProfile); !ok || p != PurposeHRMProfile {
+		t.Fatalf("ngăn hồ sơ: %q %v", p, ok)
+	}
+	if _, ok := SectionPurpose("hrm.salary"); ok {
+		t.Fatal("ngăn lạ")
+	}
+	for _, op := range []string{OpCreate, OpResolve, OpDisplay, OpLookup, OpAmend, OpUnwrap} {
+		if AllowedPurpose(op, PurposeHRMSensitive) {
+			t.Errorf("%s không được nhận mục đích hrm.sensitive", op)
+		}
+	}
+	if !AllowedPurpose(OpSectionRead, PurposeHRMSensitive) || AllowedPurpose(OpSectionRead, "registry.admin") {
+		t.Error("đọc ngăn: chỉ mục đích hồ sơ nhân sự")
+	}
+	if err := ValidSectionFields(SectionHRMSensitive, map[string]string{"ethnicity": "kinh", "hometown": "Xã Mỹ Hòa Hưng"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidSectionFields(SectionHRMSensitive, map[string]string{"email": "a@b.vn"}); err == nil {
+		t.Error("trường của ngăn khác phải bị từ chối")
+	}
+	if err := ValidSectionFields(SectionHRMProfile, map[string]string{"gender": "khong_ro_rang"}); err == nil {
+		t.Error("trường quá dài phải bị từ chối")
 	}
 }

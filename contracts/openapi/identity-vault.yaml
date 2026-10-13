@@ -179,6 +179,93 @@ paths:
         "403": { $ref: "#/components/responses/Problem" }
         "404": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/Problem" }
+  /v1/subjects/{ref}/amend:
+    post:
+      summary: Sửa họ tên, SĐT, địa chỉ (W11.22 — chỉ mục đích hrm.profile; CCCD giữ nguyên; SĐT trùng chủ thể khác → 409) — vai vault_registrar
+      operationId: amendSubject
+      parameters:
+        - $ref: "#/components/parameters/Ref"
+        - $ref: "#/components/parameters/Purpose"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [full_name]
+              properties:
+                purpose: { type: string }
+                full_name: { type: string, maxLength: 200 }
+                phone: { type: string }
+                address: { type: string, maxLength: 500 }
+      responses:
+        "200": { $ref: "#/components/responses/Written" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "410": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /v1/subjects/{ref}/sections/{section}:
+    post:
+      summary: Ghi (thay toàn bộ) ngăn hồ sơ có khóa riêng (W11.22, vault 000004) — mục đích phải là mục đích của ngăn (hrm.profile → hrm.profile, hrm.sensitive → hrm.sensitive); trường lạ → 422 vault.section_invalid
+      operationId: putSubjectSection
+      parameters:
+        - $ref: "#/components/parameters/Ref"
+        - $ref: "#/components/parameters/Section"
+        - $ref: "#/components/parameters/Purpose"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fields]
+              properties:
+                purpose: { type: string }
+                fields: { type: object, additionalProperties: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Written" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "410": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /v1/subjects/{ref}/sections/{section}/read:
+    post:
+      summary: Đọc ngăn hồ sơ (W11.22) — ghi sổ section_read mỗi lần; ngăn hrm.sensitive bắt buộc MFA khi bật AG_VAULT_REQUIRE_MFA; hạn mức như resolve
+      operationId: readSubjectSection
+      parameters:
+        - $ref: "#/components/parameters/Ref"
+        - $ref: "#/components/parameters/Section"
+        - $ref: "#/components/parameters/Purpose"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                purpose: { type: string }
+      responses:
+        "200":
+          description: Các trường của ngăn (chưa ghi → fields rỗng). Cache-Control no-store.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ref, section, fields]
+                properties:
+                  ref: { type: string, format: uuid }
+                  section: { type: string, enum: [hrm.profile, hrm.sensitive] }
+                  fields: { type: object, additionalProperties: { type: string } }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "410": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
   /v1/pubkeys:
     get:
       summary: Khóa công khai của chủ thể chưa xóa theo địa bàn, cho đồng bộ xuống thiết bị (cursor, R-53)
@@ -259,7 +346,21 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    Section:
+      name: section
+      in: path
+      required: true
+      schema: { type: string, enum: [hrm.profile, hrm.sensitive] }
   responses:
+    Written:
+      description: Đã ghi (phản hồi không chứa định danh)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ref]
+            properties:
+              ref: { type: string, format: uuid }
     Problem:
       description: RFC 9457
       content:

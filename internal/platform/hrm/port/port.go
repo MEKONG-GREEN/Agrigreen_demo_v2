@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -76,4 +77,36 @@ var (
 	ErrItemExists    = problem.New(http.StatusConflict, "hrm.item_exists", "Mã đã có trong danh mục")
 	ErrItemReference = problem.New(http.StatusUnprocessableEntity, "hrm.item_reference", "Tham chiếu tới mục danh mục không có hoặc đã ngừng sử dụng")
 	ErrRuleUnknown   = problem.New(http.StatusNotFound, "hrm.rule_unknown", "Không có tham số nhân sự này")
+)
+
+// --- W11.22 (pf 000150): hồ sơ nhân sự. ---
+
+// Unit là một đơn vị nội bộ (phòng/trạm/trại/BGĐ) — đơn vị công tác HS-16, đơn vị quản lý HS-37.
+type Unit struct {
+	Code   string
+	Name   string
+	Kind   string
+	Active bool
+}
+
+// Units là danh mục đơn vị nội bộ do gốc lắp ráp nối (KN: pf/accounts internal_unit, W11.07). nil → chỉ kiểm dạng mã.
+type Units interface {
+	// InternalUnits trả đơn vị nội bộ (kể cả đã ngừng) của đơn vị unitRef (Nút sở hữu phòng ban), theo thứ tự hiển thị.
+	InternalUnits(ctx context.Context, unitRef uuid.UUID) ([]Unit, error)
+}
+
+// EnvRecords bật/tắt hồ sơ nhân sự ngoài cổng module per_tenant: "1" bật, "0" tắt; vắng → TẮT ở production (chưa có
+// DPIA cho hồ sơ có dân tộc/tôn giáo/Đảng — Q-005), BẬT ở môi trường khác (dữ liệu tổng hợp). Danh mục không bị ảnh hưởng.
+const EnvRecords = "AG_HRM_RECORDS"
+
+// Lỗi hồ sơ nhân sự (docs/errors.md, mục pf/hrm).
+var (
+	ErrRecordsDisabled = problem.New(http.StatusForbidden, "hrm.records_disabled",
+		"Hồ sơ nhân sự chưa bật cho dữ liệu thật (chờ đánh giá tác động — Q-005)")
+	ErrStaffNotFound    = problem.New(http.StatusNotFound, "hrm.staff_not_found", "Không có hồ sơ nhân sự này")
+	ErrEventNotFound    = problem.New(http.StatusNotFound, "hrm.event_not_found", "Không có dòng quá trình này trong hồ sơ")
+	ErrDuplicatePerson  = problem.New(http.StatusConflict, "hrm.duplicate_person", "Số điện thoại đã thuộc một hồ sơ khác")
+	ErrStepOutOfRange   = problem.New(http.StatusUnprocessableEntity, "hrm.step_out_of_range", "Bậc vượt số bậc của ngạch hoặc ngạch chưa có bảng hệ số")
+	ErrNotApplicable    = problem.New(http.StatusUnprocessableEntity, "hrm.not_applicable", "Thẻ hoặc thao tác không áp dụng cho loại nhân sự này")
+	ErrPermissionLocked = problem.New(http.StatusUnprocessableEntity, "hrm.permission_locked", "Quyền của Admin cố định, không chỉnh được")
 )

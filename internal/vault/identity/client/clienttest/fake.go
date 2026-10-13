@@ -28,7 +28,7 @@ import (
 
 // Access là một lần truy cập đã ghi — để kiểm module gọi có truyền mục đích đúng.
 type Access struct {
-	Op      string // create | display | resolve | lookup | unwrap | erase
+	Op      string // create | display | resolve | lookup | unwrap | erase | amend | section_write | section_read
 	Purpose client.Purpose
 	Ref     uuid.UUID
 	Actor   uuid.UUID
@@ -40,6 +40,8 @@ type subject struct {
 	pub    *[32]byte
 	priv   *[32]byte
 	erased bool
+	// sections: ngăn hồ sơ (W11.22) — bản sao, không chia sẻ map với người gọi.
+	sections map[string]client.Fields
 }
 
 type blindKey struct {
@@ -58,7 +60,10 @@ type Fake struct {
 	Fail func(op string) error
 }
 
-var _ client.Client = (*Fake)(nil)
+var (
+	_ client.Client   = (*Fake)(nil)
+	_ client.Profiles = (*Fake)(nil)
+)
 
 // New tạo kho giả rỗng.
 func New() *Fake {
@@ -258,7 +263,7 @@ func (f *Fake) Erase(ctx context.Context, ref uuid.UUID, reason string) error {
 		}
 	}
 	clear(s.priv[:])
-	s.id, s.priv, s.erased = client.Identity{Kind: s.id.Kind, AreaCode: s.id.AreaCode}, nil, true
+	s.id, s.priv, s.erased, s.sections = client.Identity{Kind: s.id.Kind, AreaCode: s.id.AreaCode}, nil, true, nil
 	return nil
 }
 
@@ -309,5 +314,108 @@ func (f *Fake) PubKeys(ctx context.Context, areaCodes []string) ([]client.PubKey
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Ref.String() < out[j].Ref.String() })
+	return out, nil
+}
+
+// Amend thực hiện client.Profiles (W11.22): kiểm mục đích thuộc danh mục của thao tác như kho thật.
+func (f *Fake) Amend(ctx context.Context, purpose client.Purpose, ref uuid.UUID, id client.Identity) error {
+	tid, actor, err := f.start(ctx, domain.OpAmend, purpose, true)
+	if err != nil {
+		return err
+	}
+	if !domain.AllowedPurpose(domain.OpAmend, string(purpose)) {
+		return problem.Validation.WithField("purpose", "không thuộc danh mục của thao tác amend")
+	}
+	if id.FullName == "" {
+		return problem.Validation.WithField("full_name", "bắt buộc")
+	}
+	var phone string
+	if id.Phone != "" {
+		if phone, err = domain.NormalizePhone(id.Phone); err != nil {
+			return problem.Validation.WithField("phone", err.Error())
+		}
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s, err := f.get(tid, ref)
+	f.record(domain.OpAmend, purpose, ref, actor)
+	if err != nil {
+		return err
+	}
+	k := blindKey{tid, domain.BlindPhone, phone}
+	if phone != "" {
+		if other, ok := f.blind[k]; ok && other != ref {
+			return client.ProblemDuplicate
+		}
+	}
+	if s.id.Phone != "" {
+		delete(f.blind, blindKey{tid, domain.BlindPhone, s.id.Phone})
+	}
+	if phone != "" {
+		f.blind[k] = ref
+	}
+	s.id.FullName, s.id.Phone, s.id.Address = domain.NormalizeName(id.FullName), phone, id.Address
+	return nil
+}
+
+// sectionCheck: mục đích thuộc danh mục của op VÀ là mục đích của ngăn (như kho thật).
+func sectionCheck(op string, purpose client.Purpose, section string) error {
+	want, ok := domain.SectionPurpose(section)
+	if !domain.AllowedPurpose(op, string(purpose)) || !ok || want != string(purpose) {
+		return client.ProblemSectionInvalid
+	}
+	return nil
+}
+
+// PutSection thực hiện client.Profiles.
+func (f *Fake) PutSection(ctx context.Context, purpose client.Purpose, ref uuid.UUID, section string, fields client.Fields) error {
+	tid, actor, err := f.start(ctx, domain.OpSectionWrite, purpose, true)
+	if err != nil {
+		return err
+	}
+	if err := sectionCheck(domain.OpSectionWrite, purpose, section); err != nil {
+		return err
+	}
+	if err := domain.ValidSectionFields(section, fields); err != nil {
+		return client.ProblemSectionInvalid
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s, err := f.get(tid, ref)
+	f.record(domain.OpSectionWrite, purpose, ref, actor)
+	if err != nil {
+		return err
+	}
+	if s.sections == nil {
+		s.sections = map[string]client.Fields{}
+	}
+	cp := client.Fields{}
+	for k, v := range fields {
+		cp[k] = v
+	}
+	s.sections[section] = cp
+	return nil
+}
+
+// GetSection thực hiện client.Profiles.
+func (f *Fake) GetSection(ctx context.Context, purpose client.Purpose, ref uuid.UUID, section string) (client.Fields, error) {
+	tid, actor, err := f.start(ctx, domain.OpSectionRead, purpose, true)
+	if err != nil {
+		return nil, err
+	}
+	if err := sectionCheck(domain.OpSectionRead, purpose, section); err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s, err := f.get(tid, ref)
+	f.record(domain.OpSectionRead, purpose, ref, actor)
+	if err != nil {
+		return nil, err
+	}
+	out := client.Fields{}
+	for k, v := range s.sections[section] {
+		out[k] = v
+	}
 	return out, nil
 }

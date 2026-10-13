@@ -6,9 +6,10 @@ aka: [dom/hrm]
 kind: domain
 zones: [pf]
 version: 1.0.0
-depends: {}
+depends:
+  vault/identity: ">=1.0 <2"
 provides:
-  ports: [Catalog]
+  ports: [Catalog, Units]
   events: []
   internal_events: []
   publications: []
