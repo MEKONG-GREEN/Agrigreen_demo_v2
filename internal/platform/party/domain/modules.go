@@ -15,7 +15,8 @@ var menuModules = map[string]string{
 	"/kn/dashboard":                  "pf/extension",
 	"/kn/nhiem-vu":                   "pf/extension",
 	"/kn/bao-cao":                    "pf/extension",
-	"/kn/bao-cao/chi-cuc":            "pf/reports", // gửi báo cáo Chi cục (dispatch)
+	"/kn/bao-cao/chi-cuc":            "pf/reports",   // gửi báo cáo Chi cục (dispatch)
+	"/kn/bao-cao-khtc":               "pf/extension", // W11.11: Báo cáo cho KHTC phía phòng (khtcperiod)
 	"/kn/du-lieu/may-moc":            "pf/mechanization",
 	"/kn/du-lieu/ve-thua":            "pf/geo",
 	"/kn/du-lieu/vat-tu":             "pf/extension",
@@ -42,9 +43,10 @@ var menuDeptModules = map[string]string{
 	"/danh-muc":         "pf/masterdata",
 	"/danh-muc-cnts":    "pf/masterdata", // W11.41
 	"/mau-bao-cao":      "pf/reports",
-	"/bao-gia-lich":     "pf/price", // W11.74 lịch báo giá (W11.72 mở menu)
-	"/danh-muc-nhan-su": "pf/hrm",   // W11.21: danh mục nhân sự (FN-19)
-	"/phan-quyen-ho-so": "pf/hrm",   // W11.22: phân quyền hồ sơ (FN-20)
+	"/bao-gia-lich":     "pf/price",     // W11.74 lịch báo giá (W11.72 mở menu)
+	"/danh-muc-nhan-su": "pf/hrm",       // W11.21: danh mục nhân sự (FN-19)
+	"/phan-quyen-ho-so": "pf/hrm",       // W11.22: phân quyền hồ sơ (FN-20)
+	"/bao-cao-khtc":     "pf/extension", // W11.11: Báo cáo cho KHTC của phòng (Admin xem, nhập thay)
 }
 
 // MenuModule trả module per_tenant sở hữu màn route ("" = lõi, luôn hiện).

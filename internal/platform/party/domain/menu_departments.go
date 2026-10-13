@@ -22,6 +22,34 @@ func soon(key, label, route, icon string) MenuItem {
 	return MenuItem{Key: key, Label: label, Route: route, Icon: icon, ComingSoon: true}
 }
 
+// GroupBaoCao là khóa nhóm "Báo cáo" của khung chung.
+const GroupBaoCao = "bao_cao"
+
+// W11.11 (D4 X5, CN11, BG10 — BRD KHTC v2.2 Mục IV.3 FN-PN-03.01…03, GD-01): "Báo cáo cho KHTC" — MỘT mã dùng chung
+// (pf/extension khtcperiod, màn /kn/bao-cao-khtc đọc phòng từ ngữ cảnh phiên) hiện trong menu Cấp Tỉnh của mọi phòng chuyên
+// môn nộp phiếu KHTC: Trồng trọt, CNTS, Thông tin tuyên truyền (Báo giá), HCTH — cuối nhóm "Báo cáo". Phòng KHTC không nộp
+// phiếu cho chính mình; phòng mở bằng cấu hình (generic) chưa có trong BRD — thêm khuôn vào khtcReportProfiles khi cần.
+// Cấp Xã, Cấp TW không có menu này. Form nhập phiếu (FN-PN-03.02) là màn của W11.63, mở từ dòng phiếu.
+var khtcReportProfiles = map[string]bool{
+	port.MenuProfileTrongTrot:           true,
+	port.MenuProfileChanNuoiThuySan:     true,
+	port.MenuProfileThongTinTuyenTruyen: true,
+	port.MenuProfileHanhChinhTongHop:    true,
+}
+
+// KHTCReportItem là mục "Báo cáo cho KHTC" của Cấp Tỉnh phòng chuyên môn. Tiến độ các CT của phòng và Báo cáo KHTC đã xuất
+// (FN-PN-03.03) chờ KH5/KH6 — "Sắp có".
+var KHTCReportItem = MenuItem{Key: "tinh.bao_cao_khtc", Label: "Báo cáo cho KHTC", Icon: "send", Children: []MenuItem{
+	{Key: "tinh.bao_cao_khtc.phieu_ky_nay", Label: "Phiếu kỳ này", Route: "/kn/bao-cao-khtc", Icon: "task"},
+	{Key: "tinh.bao_cao_khtc.da_gui", Label: "Phiếu đã gửi", Route: "/kn/bao-cao-khtc/da-gui", Icon: "check"},
+	soon("tinh.bao_cao_khtc.tien_do", "Tiến độ các CT của phòng", "/kn/bao-cao-khtc/tien-do", "chart"),
+	soon("tinh.bao_cao_khtc.da_xuat", "Báo cáo KHTC đã xuất", "/kn/bao-cao-khtc/da-xuat", "report"),
+}}
+
+// KHTCReportAdminItem là mục "Báo cáo cho KHTC" của phòng ban trong nhóm "Phòng ban" của Admin (xem phiếu của phòng, nhập
+// thay khi hỗ trợ — FN-PN-03.02 ma trận quyền).
+var KHTCReportAdminItem = MenuItem{Key: "admin.pb.bao_cao_khtc", Label: "Báo cáo cho KHTC", Route: adminDeptRoute("/bao-cao-khtc"), Icon: "send"}
+
 // SharedGroup là nhóm "Dùng chung" cuối menu của MỌI đối tượng (HCTH v3.0 FN-13, UR-GEN-01: Contact là
 // module dùng chung, cột hiển thị theo vai trò).
 var SharedGroup = MenuGroup{Key: GroupDungChung, Label: GroupDungChungLabel, Items: []MenuItem{

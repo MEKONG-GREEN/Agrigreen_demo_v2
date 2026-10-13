@@ -192,6 +192,56 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.bao_cao_khtc",
+        "label": "Báo cáo cho KHTC",
+        "route": null,
+        "icon": "send",
+        "badge_source": null,
+        "enabled": true,
+        "children": [
+         {
+          "key": "tinh.bao_cao_khtc.phieu_ky_nay",
+          "label": "Phiếu kỳ này",
+          "route": "/kn/bao-cao-khtc",
+          "icon": "task",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.da_gui",
+          "label": "Phiếu đã gửi",
+          "route": "/kn/bao-cao-khtc/da-gui",
+          "icon": "check",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.tien_do",
+          "label": "Tiến độ các CT của phòng",
+          "route": "/kn/bao-cao-khtc/tien-do",
+          "icon": "chart",
+          "badge_source": null,
+          "enabled": false,
+          "status": "coming_soon",
+          "status_label": "Sắp có",
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.da_xuat",
+          "label": "Báo cáo KHTC đã xuất",
+          "route": "/kn/bao-cao-khtc/da-xuat",
+          "icon": "report",
+          "badge_source": null,
+          "enabled": false,
+          "status": "coming_soon",
+          "status_label": "Sắp có",
+          "children": []
+         }
+        ]
        }
       ]
      },
@@ -497,6 +547,56 @@
         "badge_source": "extension.report_status.ad_hoc_pending",
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.bao_cao_khtc",
+        "label": "Báo cáo cho KHTC",
+        "route": null,
+        "icon": "send",
+        "badge_source": null,
+        "enabled": true,
+        "children": [
+         {
+          "key": "tinh.bao_cao_khtc.phieu_ky_nay",
+          "label": "Phiếu kỳ này",
+          "route": "/kn/bao-cao-khtc",
+          "icon": "task",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.da_gui",
+          "label": "Phiếu đã gửi",
+          "route": "/kn/bao-cao-khtc/da-gui",
+          "icon": "check",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.tien_do",
+          "label": "Tiến độ các CT của phòng",
+          "route": "/kn/bao-cao-khtc/tien-do",
+          "icon": "chart",
+          "badge_source": null,
+          "enabled": false,
+          "status": "coming_soon",
+          "status_label": "Sắp có",
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.da_xuat",
+          "label": "Báo cáo KHTC đã xuất",
+          "route": "/kn/bao-cao-khtc/da-xuat",
+          "icon": "report",
+          "badge_source": null,
+          "enabled": false,
+          "status": "coming_soon",
+          "status_label": "Sắp có",
+          "children": []
+         }
+        ]
        }
       ]
      },
@@ -996,6 +1096,56 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.bao_cao_khtc",
+        "label": "Báo cáo cho KHTC",
+        "route": null,
+        "icon": "send",
+        "badge_source": null,
+        "enabled": true,
+        "children": [
+         {
+          "key": "tinh.bao_cao_khtc.phieu_ky_nay",
+          "label": "Phiếu kỳ này",
+          "route": "/kn/bao-cao-khtc",
+          "icon": "task",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.da_gui",
+          "label": "Phiếu đã gửi",
+          "route": "/kn/bao-cao-khtc/da-gui",
+          "icon": "check",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.tien_do",
+          "label": "Tiến độ các CT của phòng",
+          "route": "/kn/bao-cao-khtc/tien-do",
+          "icon": "chart",
+          "badge_source": null,
+          "enabled": false,
+          "status": "coming_soon",
+          "status_label": "Sắp có",
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.da_xuat",
+          "label": "Báo cáo KHTC đã xuất",
+          "route": "/kn/bao-cao-khtc/da-xuat",
+          "icon": "report",
+          "badge_source": null,
+          "enabled": false,
+          "status": "coming_soon",
+          "status_label": "Sắp có",
+          "children": []
+         }
+        ]
        }
       ]
      },
@@ -1908,6 +2058,56 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.bao_cao_khtc",
+        "label": "Báo cáo cho KHTC",
+        "route": null,
+        "icon": "send",
+        "badge_source": null,
+        "enabled": true,
+        "children": [
+         {
+          "key": "tinh.bao_cao_khtc.phieu_ky_nay",
+          "label": "Phiếu kỳ này",
+          "route": "/kn/bao-cao-khtc",
+          "icon": "task",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.da_gui",
+          "label": "Phiếu đã gửi",
+          "route": "/kn/bao-cao-khtc/da-gui",
+          "icon": "check",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.tien_do",
+          "label": "Tiến độ các CT của phòng",
+          "route": "/kn/bao-cao-khtc/tien-do",
+          "icon": "chart",
+          "badge_source": null,
+          "enabled": false,
+          "status": "coming_soon",
+          "status_label": "Sắp có",
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.da_xuat",
+          "label": "Báo cáo KHTC đã xuất",
+          "route": "/kn/bao-cao-khtc/da-xuat",
+          "icon": "report",
+          "badge_source": null,
+          "enabled": false,
+          "status": "coming_soon",
+          "status_label": "Sắp có",
+          "children": []
+         }
+        ]
        }
       ]
      },
@@ -2316,6 +2516,56 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.bao_cao_khtc",
+        "label": "Báo cáo cho KHTC",
+        "route": null,
+        "icon": "send",
+        "badge_source": null,
+        "enabled": true,
+        "children": [
+         {
+          "key": "tinh.bao_cao_khtc.phieu_ky_nay",
+          "label": "Phiếu kỳ này",
+          "route": "/kn/bao-cao-khtc",
+          "icon": "task",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.da_gui",
+          "label": "Phiếu đã gửi",
+          "route": "/kn/bao-cao-khtc/da-gui",
+          "icon": "check",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.tien_do",
+          "label": "Tiến độ các CT của phòng",
+          "route": "/kn/bao-cao-khtc/tien-do",
+          "icon": "chart",
+          "badge_source": null,
+          "enabled": false,
+          "status": "coming_soon",
+          "status_label": "Sắp có",
+          "children": []
+         },
+         {
+          "key": "tinh.bao_cao_khtc.da_xuat",
+          "label": "Báo cáo KHTC đã xuất",
+          "route": "/kn/bao-cao-khtc/da-xuat",
+          "icon": "report",
+          "badge_source": null,
+          "enabled": false,
+          "status": "coming_soon",
+          "status_label": "Sắp có",
+          "children": []
+         }
+        ]
        }
       ]
      },
@@ -2572,6 +2822,15 @@
           "badge_source": null,
           "enabled": true,
           "children": []
+         },
+         {
+          "key": "admin.pb.bao_cao_khtc",
+          "label": "Báo cáo cho KHTC",
+          "route": "/kn/phong-ban/trong_trot/bao-cao-khtc",
+          "icon": "send",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
          }
         ]
        },
@@ -2626,6 +2885,15 @@
           "label": "Mẫu báo cáo",
           "route": "/kn/phong-ban/chan_nuoi_thuy_san/mau-bao-cao",
           "icon": "table",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
+         },
+         {
+          "key": "admin.pb.bao_cao_khtc",
+          "label": "Báo cáo cho KHTC",
+          "route": "/kn/phong-ban/chan_nuoi_thuy_san/bao-cao-khtc",
+          "icon": "send",
           "badge_source": null,
           "enabled": false,
           "children": []
@@ -2781,6 +3049,15 @@
           "children": []
          },
          {
+          "key": "admin.pb.bao_cao_khtc",
+          "label": "Báo cáo cho KHTC",
+          "route": "/kn/phong-ban/thong_tin_truyen_thong/bao-cao-khtc",
+          "icon": "send",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
+         },
+         {
           "key": "admin.pb.bao_gia_xa",
           "label": "Xã báo giá",
           "route": "/kn/bao-gia/xa-bao-gia",
@@ -2862,6 +3139,15 @@
           "label": "Mẫu báo cáo",
           "route": "/kn/phong-ban/hanh_chinh_tong_hop/mau-bao-cao",
           "icon": "table",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
+         },
+         {
+          "key": "admin.pb.bao_cao_khtc",
+          "label": "Báo cáo cho KHTC",
+          "route": "/kn/phong-ban/hanh_chinh_tong_hop/bao-cao-khtc",
+          "icon": "send",
           "badge_source": null,
           "enabled": false,
           "children": []

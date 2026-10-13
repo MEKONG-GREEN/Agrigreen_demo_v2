@@ -310,10 +310,15 @@ func KnownAudience(a string) bool { return slices.Contains(port.Audiences, a) }
 // ("{department}" nếu có thì thay bằng mã), kết thúc bằng nhóm "Dùng chung" (kn.menu/v3). Bản sao sâu —
 // người gọi được lọc/sửa.
 func DepartmentMenu(profile, audience, department string) []MenuGroup {
-	groups := profiles[EffectiveMenuProfile(profile, department)][audience]
+	eff := EffectiveMenuProfile(profile, department)
+	groups := profiles[eff][audience]
 	out := make([]MenuGroup, 0, len(groups)+1)
 	for _, g := range groups {
-		out = append(out, MenuGroup{Key: g.Key, Label: g.Label, Items: bind(g.Items, department)})
+		items := g.Items
+		if g.Key == GroupBaoCao && audience == port.AudienceTinh && khtcReportProfiles[eff] {
+			items = append(slices.Clone(items), KHTCReportItem) // W11.11: "Báo cáo cho KHTC" cuối nhóm "Báo cáo"
+		}
+		out = append(out, MenuGroup{Key: g.Key, Label: g.Label, Items: bind(items, department)})
 	}
 	shared := SharedMenuGroup()
 	if extra := sharedByAudience[audience]; len(extra) > 0 {
@@ -364,8 +369,15 @@ func FilterNeeds(groups []MenuGroup, t MenuTraits) []MenuGroup {
 func AdminDepartmentItems(profile, department string) []MenuItem {
 	profile = EffectiveMenuProfile(profile, department)
 	items, ok := adminDeptItems[profile]
-	if !ok {
-		items = append(slices.Clone(adminDeptItems[port.MenuProfileGeneric]), adminDeptBusiness[profile]...)
+	switch {
+	case !ok:
+		items = slices.Clone(adminDeptItems[port.MenuProfileGeneric])
+		if khtcReportProfiles[profile] {
+			items = append(items, KHTCReportAdminItem) // W11.11: trước mục nghiệp vụ riêng của phòng
+		}
+		items = append(items, adminDeptBusiness[profile]...)
+	case khtcReportProfiles[profile]:
+		items = append(slices.Clone(items), KHTCReportAdminItem)
 	}
 	return bind(items, department)
 }

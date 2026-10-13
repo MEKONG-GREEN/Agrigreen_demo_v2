@@ -76,7 +76,8 @@ func TestMenuModulesArePerTenant(t *testing.T) {
 			t.Fatalf("%s là màn lõi, nhận %q", r, m)
 		}
 	}
-	if domain.MenuModule("/kn/bao-cao/chi-cuc") != "pf/reports" || domain.MenuModule("/kn/bao-cao/tuan") != "pf/extension" {
+	if domain.MenuModule("/kn/bao-cao/chi-cuc") != "pf/reports" || domain.MenuModule("/kn/bao-cao/tuan") != "pf/extension" ||
+		domain.MenuModule("/kn/bao-cao-khtc/da-gui") != "pf/extension" || domain.MenuModule("/kn/phong-ban/trong_trot/bao-cao-khtc") != "pf/extension" { // W11.11
 		t.Fatal("khớp tiền tố dài nhất")
 	}
 }

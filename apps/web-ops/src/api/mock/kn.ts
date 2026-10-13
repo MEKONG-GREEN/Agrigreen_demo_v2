@@ -315,11 +315,34 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, (base: string) => Item[]>> =
   ],
 };
 
+/**
+ * W11.11 (domain.KHTCReportItem, D4 X5/CN11/BG10): "Báo cáo cho KHTC" — một mã dùng chung, cuối nhóm "Báo cáo" của Cấp Tỉnh các
+ * phòng chuyên môn nộp phiếu KHTC (không có ở Phòng KHTC, Cấp Xã, Cấp TW, phòng generic). FN-PN-03.03 chờ KH5/KH6 → "Sắp có".
+ */
+const KHTC_REPORT_PROFILES: ReadonlySet<KnMenuProfile> = new Set<KnMenuProfile>(["trong_trot", "chan_nuoi_thuy_san", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]);
+const KHTC_REPORT: Item = {
+  key: "tinh.bao_cao_khtc",
+  label: "Báo cáo cho KHTC",
+  icon: "send",
+  children: [
+    { key: "tinh.bao_cao_khtc.phieu_ky_nay", label: "Phiếu kỳ này", route: "/kn/bao-cao-khtc", icon: "task" },
+    { key: "tinh.bao_cao_khtc.da_gui", label: "Phiếu đã gửi", route: "/kn/bao-cao-khtc/da-gui", icon: "check" },
+    soon("tinh.bao_cao_khtc.tien_do", "Tiến độ các CT của phòng", "/kn/bao-cao-khtc/tien-do", "chart"),
+    soon("tinh.bao_cao_khtc.da_xuat", "Báo cáo KHTC đã xuất", "/kn/bao-cao-khtc/da-xuat", "report"),
+  ],
+};
+/** domain.KHTCReportAdminItem — mục của phòng ban trong nhóm "Phòng ban" của Admin. */
+const khtcReportAdmin = (base: string): Item => ({ key: "admin.pb.bao_cao_khtc", label: "Báo cáo cho KHTC", route: `${base}/bao-cao-khtc`, icon: "send" });
+
 /** Nhóm của khuôn × đối tượng (domain.DepartmentMenu): Trồng trọt; khuôn riêng = chung + "Nghiệp vụ" sau "Điều hành". */
 function profileGroups(profile: KnMenuProfile, audience: Exclude<KnRole, "admin">): Group[] {
-  if (profile === "trong_trot") return TRONG_TROT[audience];
   const biz = BUSINESS[profile]?.[audience] ?? [];
-  return GENERIC[audience].flatMap((g) => (g.key === "dieu_hanh" && biz.length ? [g, { key: "nghiep_vu", label: "Nghiệp vụ", items: biz }] : [g]));
+  const groups =
+    profile === "trong_trot"
+      ? TRONG_TROT[audience]
+      : GENERIC[audience].flatMap((g) => (g.key === "dieu_hanh" && biz.length ? [g, { key: "nghiep_vu", label: "Nghiệp vụ", items: biz }] : [g]));
+  if (audience !== "kn_tinh" || !KHTC_REPORT_PROFILES.has(profile)) return groups;
+  return groups.map((g) => (g.key === "bao_cao" ? { ...g, items: [...g.items, KHTC_REPORT] } : g));
 }
 
 /** Mục con của phòng ban trong nhóm "Phòng ban" của Admin (domain.adminDeptItems + adminDeptBusiness). */
@@ -339,6 +362,7 @@ function adminDeptItems(code: string, profile: KnMenuProfile): Item[] {
     { key: "admin.pb.danh_muc", label: "Danh mục nông nghiệp", route: `${base}/danh-muc`, icon: "package" },
     // P3b: trình thiết kế mẫu báo cáo dạng lưới Excel (FN-AD-04.06, Hình 27).
     { key: "admin.pb.mau_bao_cao", label: "Mẫu báo cáo", route: `${base}/mau-bao-cao`, icon: "table" },
+    ...(KHTC_REPORT_PROFILES.has(profile) ? [khtcReportAdmin(base)] : []), // W11.11
     ...(ADMIN_BUSINESS[profile]?.(base) ?? []),
   ];
 }

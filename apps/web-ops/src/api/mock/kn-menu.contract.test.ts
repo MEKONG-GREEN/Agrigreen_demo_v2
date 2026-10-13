@@ -75,7 +75,7 @@ describe("fromKnMenu — trình bày Hình 3c", () => {
     const admin = cases.find((c) => c.name === "admin")!.menu;
     const pb = fromKnMenu(admin).groups.find((g) => g.key === "phong_ban")!;
     expect(pb.items.map((i) => [i.label, i.status ?? "active", i.children?.length ?? 0])).toEqual([
-      ["Phòng Trồng trọt", "active", 7],
+      ["Phòng Trồng trọt", "active", 8], // W11.11: + Báo cáo cho KHTC
       ["Chăn nuôi - TS", "not_open", 0],
       ["Kế hoạch - TC", "not_open", 0],
       ["2 phòng khác", "not_open", 0],
@@ -115,6 +115,24 @@ describe("kn.menu/v3 (W11.06): khuôn theo phòng ban + Dùng chung", () => {
     }
     // KHTC: Cấp Xã không có menu KHTC.
     expect(cases.find((c) => c.name === "kn_xa/ke_hoach_tai_chinh")!.menu.groups.map((g) => g.key)).toEqual(["dieu_hanh", "bao_cao", "dung_chung"]);
+  });
+
+  it("W11.11: Báo cáo cho KHTC cuối nhóm Báo cáo của Cấp Tỉnh 4 phòng chuyên môn; không ở KHTC, Cấp Xã", () => {
+    const khtcItem = (name: string) =>
+      cases
+        .find((c) => c.name === name)!
+        .menu.groups.flatMap((g) => g.items.map((i, idx) => ({ g: g.key, last: idx === g.items.length - 1, i })))
+        .find((x) => x.i.key === "tinh.bao_cao_khtc");
+    for (const code of ["trong_trot", "chan_nuoi_thuy_san", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) {
+      const x = khtcItem(`kn_tinh/${code}`)!;
+      expect(x).toMatchObject({ g: "bao_cao", last: true });
+      const tree = fromKnMenu(cases.find((c) => c.name === `kn_tinh/${code}`)!.menu);
+      const links = menuLinks(tree).map((l) => l.node.href);
+      expect(links).toEqual(expect.arrayContaining(["/kn/bao-cao-khtc", "/kn/bao-cao-khtc/da-gui"]));
+      expect(links).not.toContain("/kn/bao-cao-khtc/tien-do"); // FN-PN-03.03 Sắp có
+    }
+    expect(khtcItem("kn_tinh/ke_hoach_tai_chinh")).toBeUndefined();
+    expect(khtcItem("kn_xa/trong_trot")).toBeUndefined();
   });
 
   it("mã tạm phong_ban_5 → Phòng Hành chính - Tổng hợp (Admin, /modules)", async () => {

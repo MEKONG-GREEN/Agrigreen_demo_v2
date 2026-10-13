@@ -593,4 +593,122 @@ export const khtcPeriodRoutes: Route[] = [
       return json(project(s));
     },
   },
+  // W11.11 — "Báo cáo cho KHTC" phía phòng (FN-PN-03.01): phiếu của phòng theo kỳ (Cấp Tỉnh phòng của phiên, Admin ?department=).
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/khtc\/department-forms$/,
+    handler: (ctx) => departmentForms(ctx),
+  },
 ];
+
+type InboxRow = S["KHTCDepartmentForm"];
+const TYPE_LABEL: Record<InboxRow["report_type"], string> = {
+  week: "Báo cáo tuần",
+  month: "Báo cáo tháng",
+  quarter: "Báo cáo quý",
+  year: "Báo cáo năm",
+  program: "Báo cáo tiến độ các CT",
+  adhoc: "Báo cáo phát sinh",
+};
+const ACTION_LABEL: Record<InboxRow["action"], string> = {
+  enter: "Nhập",
+  continue: "Tiếp tục",
+  resubmit: "Sửa, gửi lại",
+  view: "Xem",
+};
+
+/** Bản thu gọn của khtcperiod/app.DepartmentForms. */
+function departmentForms(ctx: Ctx): Response {
+  seed();
+  const kc = knContext(ctx.request.headers.get("X-AG-Context") ?? "");
+  const q = ctx.url.searchParams;
+  const view = q.get("view") || "current";
+  if (view !== "current" && view !== "sent")
+    return validation([{ field: "view", reason: "current hoặc sent" }]);
+  const admin = !kc || kc.role === "admin";
+  let dept = q.get("department") ?? "";
+  if (admin) {
+    if (!/^[a-z][a-z0-9_]{0,39}$/.test(dept))
+      return validation([
+        { field: "department", reason: "Admin chọn phòng cần xem" },
+      ]);
+  } else if (
+    kc.role !== "kn_tinh" ||
+    !kc.department_code ||
+    (dept && dept !== kc.department_code)
+  ) {
+    return problem(403, "forbidden", "chỉ xem phiếu KHTC của phòng mình");
+  } else dept = kc.department_code;
+  const readOnly = !!kc?.read_only;
+  const items: InboxRow[] = [];
+  for (const s of STORE) {
+    if (s.terminal === "cancelled") continue;
+    const p = project(s);
+    const f = p.forms.find((x) => x.department === dept);
+    if (!f) continue;
+    const periodState: InboxRow["period_state"] =
+      s.terminal === "closed" ? "closed" : p.overdue ? "late" : "opened";
+    if (view === "current" ? periodState === "closed" : f.attempt === 0)
+      continue;
+    const needs = ["not_started", "late", "draft", "supplement"].includes(
+      f.state,
+    );
+    const action: InboxRow["action"] = readOnly
+      ? "view"
+      : f.state === "not_started" || f.state === "late"
+        ? "enter"
+        : f.state === "draft"
+          ? "continue"
+          : f.state === "supplement"
+            ? "resubmit"
+            : "view";
+    items.push({
+      period_id: p.id,
+      forms_period_id: p.forms_period_id,
+      report_type: p.report_type as InboxRow["report_type"],
+      report_type_label: TYPE_LABEL[p.report_type as InboxRow["report_type"]],
+      year: p.year,
+      name: p.name,
+      from_date: p.from_date,
+      to_date: p.to_date,
+      due_at: p.due_at,
+      period_state: periodState,
+      period_state_label: PERIOD_LABEL[periodState],
+      state: f.state as InboxRow["state"],
+      state_label: f.state_label,
+      attempt: f.attempt,
+      max_submissions: p.max_submissions,
+      limit_reached: f.limit_reached,
+      late: f.late,
+      last_submitted_at: f.last_submitted_at,
+      reviewed_at: f.reviewed_at,
+      supplement_note: f.state === "supplement" ? f.review_note : null,
+      needs_action: needs,
+      action,
+      action_label: ACTION_LABEL[action],
+      entry_route: `/kn/khtc/phieu/${p.id}${admin ? `?department=${dept}` : ""}`,
+    });
+  }
+  items.sort((a, b) =>
+    view === "current"
+      ? Number(b.needs_action) - Number(a.needs_action) ||
+        Date.parse(a.due_at) - Date.parse(b.due_at)
+      : Date.parse(b.last_submitted_at ?? "") -
+        Date.parse(a.last_submitted_at ?? ""),
+  );
+  const name = DEPTS.find((d) => d.code === dept)?.name ?? "";
+  return json({
+    department: dept,
+    department_name: name,
+    view: view as "current" | "sent",
+    read_only: readOnly,
+    counts: {
+      total: items.length,
+      needs_action: items.filter((i) => i.needs_action).length,
+      supplement: items.filter((i) => i.state === "supplement").length,
+      late: items.filter((i) => i.state === "late").length,
+      sent: items.filter((i) => i.attempt > 0).length,
+    },
+    items,
+  } satisfies S["KHTCDepartmentForms"]);
+}

@@ -5666,6 +5666,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/department-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Báo cáo cho KHTC phía phòng (W11.11, FN-PN-03.01) — phiếu KHTC giao cho phòng của phiên theo kỳ KHTC
+         * @description Một mã dùng chung cho mọi phòng chuyên môn (Trồng trọt, CNTS, Thông tin tuyên truyền, HCTH). Cấp Tỉnh chỉ thấy phiếu phòng
+         *     của phiên; Admin KN chọn phòng bằng `department`. view=current ("Phiếu kỳ này"): kỳ chưa đóng, "Cần xử lý" trước rồi hạn
+         *     gần nhất; view=sent ("Phiếu đã gửi"): phiếu đã gửi ≥ 1 lần. Kỳ đã hủy bị gỡ (BR-DL-18). Form nhập/gửi phiếu thuộc màn
+         *     `entry_route` (W11.63); gửi qua /v1/forms (profile kn_khtc).
+         */
+        get: operations["extensionKhtcDepartmentForms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/hrm/status": {
         parameters: {
             query?: never;
@@ -15117,6 +15140,78 @@ export interface components {
             reviewed_at: string | null;
             review_note: string;
             late: boolean;
+        };
+        /** @description Một phiếu KHTC của phòng trong một kỳ (W11.11, FN-PN-03.01) */
+        KHTCDepartmentForm: {
+            /**
+             * Format: uuid
+             * @description Id kỳ KHTC
+             */
+            period_id: string;
+            /**
+             * Format: uuid
+             * @description Id kỳ native cap/forms (gửi phiếu qua /v1/forms)
+             */
+            forms_period_id: string;
+            /** @enum {string} */
+            report_type: "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+            report_type_label: string;
+            year: number;
+            name: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /**
+             * Format: date-time
+             * @description Hạn nộp hiệu lực
+             */
+            due_at: string;
+            /**
+             * @description Kỳ còn nhận phiếu (opened/late) hay đã đóng
+             * @enum {string}
+             */
+            period_state: "opened" | "late" | "closed";
+            period_state_label: string;
+            /** @enum {string} */
+            state: "not_started" | "draft" | "late" | "submitted" | "supplement" | "confirmed" | "locked" | "not_sent";
+            state_label: string;
+            /** @description Lần gửi hiện hành (0 = chưa gửi) */
+            attempt: number;
+            /** @description Số lần gửi tối đa (0 = không giới hạn) */
+            max_submissions: number;
+            limit_reached: boolean;
+            /** @description Lần gửi cuối sau hạn */
+            late: boolean;
+            /** Format: date-time */
+            last_submitted_at: string | null;
+            /** Format: date-time */
+            reviewed_at: string | null;
+            /** @description Nội dung yêu cầu bổ sung mới nhất (chỉ khi state = supplement) */
+            supplement_note: string | null;
+            /** @description Thuộc bộ lọc "Cần xử lý" */
+            needs_action: boolean;
+            /** @enum {string} */
+            action: "enter" | "continue" | "resubmit" | "view";
+            action_label: string;
+            /** @description Màn nhập/xem phiếu của web-ops (W11.63): /kn/khtc/phieu/{period_id}[?department=] */
+            entry_route: string;
+        };
+        KHTCDepartmentForms: {
+            department: string;
+            department_name: string;
+            /** @enum {string} */
+            view: "current" | "sent";
+            /** @description Phiên chỉ xem — mọi nút là Xem */
+            read_only: boolean;
+            counts: {
+                total: number;
+                needs_action: number;
+                supplement: number;
+                late: number;
+                sent: number;
+            };
+            items: components["schemas"]["KHTCDepartmentForm"][];
         };
         KHTCEvent: {
             /** Format: uuid */
@@ -26671,6 +26766,39 @@ export interface operations {
             409: components["responses"]["Problem"];
             /** @description validation_failed */
             422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcDepartmentForms: {
+        parameters: {
+            query?: {
+                view?: "current" | "sent";
+                /** @description Chỉ Admin KN — mã phòng cần xem (vai khác bỏ trống hoặc = phòng của phiên) */
+                department?: string;
+                /** @description Năm kế hoạch (bỏ trống = mọi năm) */
+                year?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách phiếu của phòng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCDepartmentForms"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
         };
     };
     hrmStatus: {

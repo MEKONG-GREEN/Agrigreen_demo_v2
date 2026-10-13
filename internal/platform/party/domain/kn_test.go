@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -125,6 +126,7 @@ var implementedMenu = map[string]bool{
 	"tw.bao_gia.bang_gia": true, "tw.bao_gia.dashboard": true, "tw.bao_gia.bien_dong": true,
 	"tinh.bao_gia.tien_do": true, "tinh.bao_gia.bang_gia": true, "tinh.bao_gia.bien_dong": true, "tinh.bao_gia.dashboard": true,
 	"tinh.bao_gia.thong_ke": true, "xa.bao_gia.bang_gia": true, "xa.bao_gia.bien_dong": true,
+	"admin.pb.bao_cao_khtc": true, // W11.11
 }
 
 // W11.06 (kn.menu/v3, D3 C6, D4 X2): khuôn theo phòng ban — nhóm "Nghiệp vụ" sau "Điều hành", nhóm
@@ -175,6 +177,47 @@ func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
 	// KHTC: Cấp Xã không có menu KHTC (BRD KHTC v2.2 §VI.3).
 	if k := keys(domain.DepartmentMenu(port.MenuProfileKeHoachTaiChinh, port.AudienceXa, port.DeptKeHoachTaiChinh)); strings.Join(k, ",") != "dieu_hanh,bao_cao,dung_chung" {
 		t.Fatalf("KHTC Cấp Xã: %v", k)
+	}
+	// W11.11 (D4 X5, CN11, BG10): "Báo cáo cho KHTC" cuối nhóm "Báo cáo" của Cấp Tỉnh 4 phòng chuyên môn; không ở KHTC, Cấp
+	// Xã, Cấp TW; Admin có mục theo phòng ban.
+	khtcItem := func(gs []domain.MenuGroup) *domain.MenuItem {
+		for _, g := range gs {
+			for i, it := range g.Items {
+				if it.Key == domain.KHTCReportItem.Key {
+					if g.Key != domain.GroupBaoCao || i != len(g.Items)-1 {
+						t.Fatalf("Báo cáo cho KHTC phải cuối nhóm Báo cáo: %s[%d]", g.Key, i)
+					}
+					return &g.Items[i]
+				}
+			}
+		}
+		return nil
+	}
+	for _, code := range []string{port.DeptTrongTrot, port.DeptChanNuoiThuySan, port.DeptThongTinTruyenThong, port.DeptHanhChinhTongHop} {
+		profile := port.MenuProfileGeneric
+		if code == port.DeptTrongTrot {
+			profile = port.MenuProfileTrongTrot
+		}
+		it := khtcItem(domain.DepartmentMenu(profile, port.AudienceTinh, code))
+		if it == nil || len(it.Children) != 4 || it.Children[0].Route != "/kn/bao-cao-khtc" || it.Children[0].ComingSoon ||
+			it.Children[1].Route != "/kn/bao-cao-khtc/da-gui" || !it.Children[2].ComingSoon || !it.Children[3].ComingSoon {
+			t.Fatalf("%s: Báo cáo cho KHTC: %+v", code, it)
+		}
+		for _, aud := range []string{port.AudienceXa, port.AudienceTW} {
+			if khtcItem(domain.DepartmentMenu(profile, aud, code)) != nil {
+				t.Fatalf("%s %s không có Báo cáo cho KHTC", code, aud)
+			}
+		}
+		admin := domain.AdminDepartmentItems(profile, code)
+		if !slices.ContainsFunc(admin, func(m domain.MenuItem) bool {
+			return m.Key == "admin.pb.bao_cao_khtc" && m.Route == "/kn/phong-ban/"+code+"/bao-cao-khtc"
+		}) {
+			t.Fatalf("%s: Admin thiếu Báo cáo cho KHTC", code)
+		}
+	}
+	if khtcItem(domain.DepartmentMenu(port.MenuProfileKeHoachTaiChinh, port.AudienceTinh, port.DeptKeHoachTaiChinh)) != nil ||
+		khtcItem(domain.DepartmentMenu(port.MenuProfileGeneric, port.AudienceTinh, "phong_moi")) != nil {
+		t.Fatal("KHTC và phòng generic không có Báo cáo cho KHTC")
 	}
 	sh := domain.SharedMenuGroup()
 	if sh.Key != domain.GroupDungChung || len(sh.Items) == 0 || !sh.Items[0].ComingSoon {

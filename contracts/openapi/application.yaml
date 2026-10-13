@@ -8021,7 +8021,7 @@ paths:
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   /v1/extension/khtc/department-forms:
     get:
-      summary: "Báo cáo cho KHTC" phía phòng (W11.11, FN-PN-03.01) — phiếu KHTC giao cho phòng của phiên theo kỳ KHTC
+      summary: 'Báo cáo cho KHTC phía phòng (W11.11, FN-PN-03.01) — phiếu KHTC giao cho phòng của phiên theo kỳ KHTC'
       description: |
         Một mã dùng chung cho mọi phòng chuyên môn (Trồng trọt, CNTS, Thông tin tuyên truyền, HCTH). Cấp Tỉnh chỉ thấy phiếu phòng
         của phiên; Admin KN chọn phòng bằng `department`. view=current ("Phiếu kỳ này"): kỳ chưa đóng, "Cần xử lý" trước rồi hạn

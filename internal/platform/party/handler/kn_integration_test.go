@@ -379,8 +379,9 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	if r.status != http.StatusOK || !slices.Equal(groupKeys(r), []string{"dieu_hanh", "phong_ban", "quan_tri", "dung_chung"}) || str(r.body, "default_route") != "/kn/tong-quan" {
 		t.Fatalf("menu Admin: %v", r.body)
 	}
-	if it := adminDeptItem(t, r, "trong_trot"); it["enabled"] != true || len(it["children"].([]any)) != 7 ||
-		it["children"].([]any)[6].(map[string]any)["route"] != "/kn/phong-ban/trong_trot/mau-bao-cao" {
+	if it := adminDeptItem(t, r, "trong_trot"); it["enabled"] != true || len(it["children"].([]any)) != 8 ||
+		it["children"].([]any)[6].(map[string]any)["route"] != "/kn/phong-ban/trong_trot/mau-bao-cao" ||
+		it["children"].([]any)[7].(map[string]any)["route"] != "/kn/phong-ban/trong_trot/bao-cao-khtc" { // W11.11
 		t.Fatalf("Admin › Phòng Trồng trọt: %v", it)
 	}
 	if it := adminDeptItem(t, r, "chan_nuoi_thuy_san"); it["enabled"] != false || it["status_label"] != "Chưa mở" {
@@ -424,11 +425,12 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 		t.Fatalf("modules Cấp Tỉnh: %v", r.body)
 	}
 	r = root.appDo(http.MethodGet, "/v1/departments/thong_tin_truyen_thong/modules?audience=admin&org_ref="+tr.p89.String(), nil)
-	// W11.72: 5 mục chung + "Xã báo giá", "Kỳ báo giá & giờ khóa" (đã mở) + "Mặt hàng" (Sắp có).
-	if gs, _ := r.body["groups"].([]any); r.status != http.StatusOK || len(gs) != 1 || len(menuKeys(r)) != 8 ||
+	// W11.72: 5 mục chung + "Báo cáo cho KHTC" (W11.11) + "Xã báo giá", "Kỳ báo giá & giờ khóa" (đã mở) + "Mặt hàng" (Sắp có).
+	if gs, _ := r.body["groups"].([]any); r.status != http.StatusOK || len(gs) != 1 || len(menuKeys(r)) != 9 ||
+		!slices.Contains(menuKeys(r), "admin.pb.bao_cao_khtc") ||
 		!slices.Contains(menuKeys(r), "admin.pb.bao_gia_xa") || !slices.Contains(menuKeys(r), "admin.pb.bao_gia_lich") ||
 		!slices.Contains(menuKeys(r), "admin.pb.bao_gia_mat_hang") {
-		t.Fatalf("modules Admin (phòng ban chưa mở, khuôn Thông tin Tuyên truyền: 5 mục chung + Xã báo giá, Kỳ báo giá & giờ khóa + 1 Sắp có): %v", r.body)
+		t.Fatalf("modules Admin (phòng ban chưa mở, khuôn Thông tin Tuyên truyền: 5 mục chung + Báo cáo cho KHTC + Xã báo giá, Kỳ báo giá & giờ khóa + 1 Sắp có): %v", r.body)
 	}
 	// Admin vào menu mọi cấp (FN-AD-04.07).
 	if r := root.appDo(http.MethodGet, "/v1/menu?audience=kn_xa&department=trong_trot&org_ref="+tr.p89.String(), nil); r.status != http.StatusOK {
