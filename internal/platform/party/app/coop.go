@@ -27,6 +27,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -48,7 +49,7 @@ func (r *Registry) coopProfiles() (port.CoopProfiles, error) {
 }
 
 func toDomainProfile(p port.CoopProfile) domain.CooperativeProfile {
-	d := domain.CooperativeProfile{TaxCode: p.TaxCode, AreaHa: p.AreaHa, EstablishedOn: p.EstablishedOn, Address: p.Address}
+	d := domain.CooperativeProfile{TaxCode: p.TaxCode, AreaHa: p.AreaHa, EstablishedOn: p.EstablishedOn, Address: p.Address, Confirmed: p.Confirmed}
 	if p.Lat != nil && p.Lon != nil {
 		d.Location = &domain.Point{Lat: *p.Lat, Lon: *p.Lon}
 	}
@@ -200,9 +201,18 @@ func (r *Registry) cooperativeByRef(ctx context.Context, tid, ref uuid.UUID, wit
 
 // coopFilterRefs quy điều kiện trên hồ sơ (mã số thuế theo từ khóa q, khoảng diện tích) thành danh sách Nút:
 // qRefs (khớp q theo mã số thuế), only (nil = không lọc diện tích).
-func (r *Registry) coopFilterRefs(ctx context.Context, tid uuid.UUID, q string, areaMin, areaMax *decimal.Decimal) (qRefs, only []uuid.UUID, err error) {
+//
+// confirmation (D2 — ADR-0052): port.CoopConfirmed | port.CoopUnconfirmed | rỗng; khác rỗng → only giao với Nút có
+// trạng thái xác nhận tương ứng (HTX tạm "Chưa xác nhận" vẫn có trong danh sách mặc định — chỉ lọc khi yêu cầu).
+func (r *Registry) coopFilterRefs(ctx context.Context, tid uuid.UUID, q string, areaMin, areaMax *decimal.Decimal,
+	confirmation string) (qRefs, only []uuid.UUID, err error) {
 	q = strings.TrimSpace(q)
-	if q == "" && areaMin == nil && areaMax == nil {
+	switch confirmation {
+	case "", port.CoopConfirmed, port.CoopUnconfirmed:
+	default:
+		return nil, nil, problem.Validation.WithField("confirmation", "confirmed | unconfirmed")
+	}
+	if q == "" && areaMin == nil && areaMax == nil && confirmation == "" {
 		return nil, nil, nil
 	}
 	ps, err := r.coopProfiles()
@@ -223,6 +233,13 @@ func (r *Registry) coopFilterRefs(ctx context.Context, tid uuid.UUID, q string, 
 			only = []uuid.UUID{}
 		}
 	}
+	if confirmation != "" {
+		conf, err := ps.MatchProfiles(tctx, port.CoopProfileFilter{Confirmation: confirmation})
+		if err != nil {
+			return nil, nil, ErrDependency.WithDetail("không đọc được hồ sơ HTX").WithCause(err)
+		}
+		only = intersectRefs(only, conf)
+	}
 	return qRefs, only, nil
 }
 
@@ -237,4 +254,22 @@ func (r *Registry) activeHouseholds(ctx context.Context, tid, ref uuid.UUID) (in
 		return 0, ErrDependency.WithDetail("không đọc được nông hộ của HTX").WithCause(err)
 	}
 	return int(m[ref]), nil
+}
+
+// intersectRefs giao hai tập Nút; a nil = không giới hạn (trả b, không bao giờ nil).
+func intersectRefs(a, b []uuid.UUID) []uuid.UUID {
+	out := []uuid.UUID{}
+	if a == nil {
+		return append(out, b...)
+	}
+	in := make(map[uuid.UUID]bool, len(b))
+	for _, x := range b {
+		in[x] = true
+	}
+	for _, x := range a {
+		if in[x] {
+			out = append(out, x)
+		}
+	}
+	return out
 }

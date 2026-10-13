@@ -23,15 +23,23 @@ type Profile struct {
 	Lat, Lon      *decimal.Decimal
 	Address       string
 	UpdatedAt     time.Time
+	// Confirmed (D2, ADR-0052): Nút thuộc neo HTX đã được HTX thật nhận quyền. false = "Chưa xác nhận" (HTX tạm do
+	// KN/MKG lập, hoặc HTX có trước D2 chưa nhận quyền).
+	Confirmed bool
 }
 
-const profileCols = `org_ref, coalesce(tax_code, ''), area_ha::text, established_on::text,
-  ST_Y(location)::numeric(10,7)::text, ST_X(location)::numeric(10,7)::text, coalesce(head_office, ''), updated_at`
+// confirmedExpr: Nút c.org_ref thuộc neo đã nhận quyền (pf_coop.htx_anchor_alias + htx_anchor, pf 000155).
+const confirmedExpr = `EXISTS (SELECT 1 FROM pf_coop.htx_anchor_alias al JOIN pf_coop.htx_anchor a
+    ON a.tenant_id = al.tenant_id AND a.anchor_id = al.anchor_id
+    WHERE al.tenant_id = c.tenant_id AND al.org_ref = c.org_ref AND a.status = 'claimed')`
+
+const profileCols = `c.org_ref, coalesce(c.tax_code, ''), c.area_ha::text, c.established_on::text,
+  ST_Y(c.location)::numeric(10,7)::text, ST_X(c.location)::numeric(10,7)::text, coalesce(c.head_office, ''), c.updated_at, ` + confirmedExpr
 
 func scanProfile(row pgx.Row) (Profile, error) {
 	var p Profile
 	var area, est, lat, lon *string
-	err := row.Scan(&p.OrgRef, &p.TaxCode, &area, &est, &lat, &lon, &p.Address, &p.UpdatedAt)
+	err := row.Scan(&p.OrgRef, &p.TaxCode, &area, &est, &lat, &lon, &p.Address, &p.UpdatedAt, &p.Confirmed)
 	if err != nil {
 		return p, err
 	}
@@ -62,7 +70,7 @@ func ProfilesByRefs(ctx context.Context, tx pgx.Tx, refs []uuid.UUID) (map[uuid.
 	if len(refs) == 0 {
 		return out, nil
 	}
-	rows, err := tx.Query(ctx, "SELECT "+profileCols+" FROM pf_coop.cooperative WHERE org_ref = ANY($1::text[]::uuid[])", uuidStrings(refs))
+	rows, err := tx.Query(ctx, "SELECT "+profileCols+" FROM pf_coop.cooperative c WHERE c.org_ref = ANY($1::text[]::uuid[])", uuidStrings(refs))
 	if err != nil {
 		return nil, err
 	}
@@ -120,11 +128,15 @@ func TaxCodeOwner(ctx context.Context, tx pgx.Tx, tax string) (uuid.UUID, error)
 
 // MatchProfiles trả Nút có hồ sơ khớp bộ lọc: mã số thuế bắt đầu bằng taxPrefix (rỗng = không lọc), diện tích
 // trong [areaMin, areaMax] (nil = không lọc).
-func MatchProfiles(ctx context.Context, tx pgx.Tx, taxPrefix string, areaMin, areaMax *decimal.Decimal) ([]uuid.UUID, error) {
-	rows, err := tx.Query(ctx, `SELECT org_ref FROM pf_coop.cooperative
-	  WHERE ($1 = '' OR tax_code LIKE $1 || '%')
-	    AND ($2::numeric IS NULL OR area_ha >= $2::numeric)
-	    AND ($3::numeric IS NULL OR area_ha <= $3::numeric)`, escapeLike(strings.TrimSpace(taxPrefix)), decPtr(areaMin), decPtr(areaMax))
+//
+// confirmation (D2): "confirmed" | "unconfirmed" | rỗng = không lọc.
+func MatchProfiles(ctx context.Context, tx pgx.Tx, taxPrefix string, areaMin, areaMax *decimal.Decimal, confirmation string) ([]uuid.UUID, error) {
+	rows, err := tx.Query(ctx, `SELECT c.org_ref FROM pf_coop.cooperative c
+	  WHERE ($1 = '' OR c.tax_code LIKE $1 || '%')
+	    AND ($2::numeric IS NULL OR c.area_ha >= $2::numeric)
+	    AND ($3::numeric IS NULL OR c.area_ha <= $3::numeric)
+	    AND ($4 = '' OR (`+confirmedExpr+`) = ($4 = 'confirmed'))`,
+		escapeLike(strings.TrimSpace(taxPrefix)), decPtr(areaMin), decPtr(areaMax), confirmation)
 	if err != nil {
 		return nil, err
 	}
@@ -133,9 +145,9 @@ func MatchProfiles(ctx context.Context, tx pgx.Tx, taxPrefix string, areaMin, ar
 
 // LocationsInBBox đọc vị trí hồ sơ HTX trong khung nhìn WGS84, sắp theo org_ref (lọc trạng thái Nút ở app/).
 func LocationsInBBox(ctx context.Context, tx pgx.Tx, minLon, minLat, maxLon, maxLat float64) ([]Profile, error) {
-	rows, err := tx.Query(ctx, "SELECT "+profileCols+` FROM pf_coop.cooperative
-	  WHERE location IS NOT NULL AND location && ST_MakeEnvelope($1, $2, $3, $4, 4326)
-	  ORDER BY org_ref`, minLon, minLat, maxLon, maxLat)
+	rows, err := tx.Query(ctx, "SELECT "+profileCols+` FROM pf_coop.cooperative c
+	  WHERE c.location IS NOT NULL AND c.location && ST_MakeEnvelope($1, $2, $3, $4, 4326)
+	  ORDER BY c.org_ref`, minLon, minLat, maxLon, maxLat)
 	if err != nil {
 		return nil, err
 	}

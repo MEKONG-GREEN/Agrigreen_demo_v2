@@ -109,6 +109,17 @@ type coopDTO struct {
 	Address       *string          `json:"address"`
 	// LocationProvisional: chưa có toạ độ — bản đồ hiển thị tâm xã kèm nhãn "vị trí tạm" (CGH FN-03 AC-03).
 	LocationProvisional bool `json:"location_provisional"`
+	// D2 (ADR-0052): HTX tạm do KN/MKG lập → unconfirmed / "Chưa xác nhận" tới khi HTX thật nhận quyền theo MST.
+	ConfirmationStatus string `json:"confirmation_status"`
+	ConfirmationLabel  string `json:"confirmation_label"`
+}
+
+// confirmation đổi cờ đã xác nhận của hồ sơ HTX thành (mã, nhãn) hiển thị.
+func confirmation(confirmed bool) (string, string) {
+	if confirmed {
+		return port.CoopConfirmed, "Đã xác nhận"
+	}
+	return port.CoopUnconfirmed, "Chưa xác nhận"
 }
 
 func toCoopDTO(c app.Cooperative) coopDTO {
@@ -116,6 +127,7 @@ func toCoopDTO(c app.Cooperative) coopDTO {
 		orgDTO: toOrgDTO(c.Org), StatusReason: strPtr(c.StatusReason), TaxCode: strPtr(c.Profile.TaxCode),
 		AreaHa: c.Profile.AreaHa, LocationProvisional: c.Profile.Location == nil, Address: strPtr(c.Profile.Address),
 	}
+	d.ConfirmationStatus, d.ConfirmationLabel = confirmation(c.Profile.Confirmed)
 	if c.Profile.EstablishedOn != nil {
 		s := c.Profile.EstablishedOn.Format(time.DateOnly)
 		d.EstablishedOn = &s
@@ -274,7 +286,7 @@ func (h Registry) listCooperatives(c *gin.Context) {
 	}
 	page, err := h.Reg.ListCooperatives(c.Request.Context(), app.ListQuery{
 		Q: c.Query("q"), IncludeInactive: c.Query("include_inactive") == "true", After: after, Limit: queryLimit(c),
-		AdminUnit: c.Query("admin_unit"),
+		AdminUnit: c.Query("admin_unit"), Confirmation: c.Query("confirmation"),
 	})
 	if err != nil {
 		httpx.Fail(c, err)

@@ -22,6 +22,7 @@ provides:
     - Diary
     - FarmerHouseholds
     - FarmerIdentity
+    - HTXConfirmations
     - HouseholdIdentities
     - Households
     - MachineCounts

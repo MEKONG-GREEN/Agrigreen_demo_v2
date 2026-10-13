@@ -25,7 +25,7 @@ var _ partyport.CoopProfiles = (*Service)(nil)
 
 func toCoopProfile(p store.Profile) partyport.CoopProfile {
 	return partyport.CoopProfile{TaxCode: p.TaxCode, AreaHa: p.AreaHa, EstablishedOn: p.EstablishedOn, Lat: p.Lat, Lon: p.Lon,
-		Address: p.Address, UpdatedAt: p.UpdatedAt}
+		Address: p.Address, UpdatedAt: p.UpdatedAt, Confirmed: p.Confirmed}
 }
 
 // isTaxCodeConflict: vi phạm chỉ mục duy nhất mã số thuế của hồ sơ HTX.
@@ -88,7 +88,7 @@ func (s *Service) MatchProfiles(ctx context.Context, f partyport.CoopProfileFilt
 	var out []uuid.UUID
 	err := tenant.FromCtxTx(ctx, s.DB, func(tx pgx.Tx) error {
 		var e error
-		out, e = store.MatchProfiles(ctx, tx, f.TaxPrefix, f.AreaMin, f.AreaMax)
+		out, e = store.MatchProfiles(ctx, tx, f.TaxPrefix, f.AreaMin, f.AreaMax, f.Confirmation)
 		return e
 	})
 	return out, err

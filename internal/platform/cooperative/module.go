@@ -18,6 +18,8 @@ import (
 	"github.com/google/uuid"
 
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
+	anchorapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/anchor/app"
+	anchorhttp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/anchor/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/app"
 	bilateralapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/bilateral/app"
 	bilateralhttp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/bilateral/handler"
@@ -86,6 +88,8 @@ type Module struct {
 	bilateral   *bilateralapp.Service
 	bilateralOn bool
 	ledger      bilateralapp.Ledger
+	// D2 (ADR-0052): neo HTX theo MST, HTX tạm, nhận quyền, trạng thái xác nhận.
+	anchor *anchorapp.Service
 }
 
 // New tạo module; mọi giao dịch chạy dưới r_cooperative (db.ForModule(DBModule)).
@@ -102,6 +106,8 @@ func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 		Catalogs: deps.Catalogs, GpsLog: deps.GpsLog}
 	m.bilateral = &bilateralapp.Service{DB: db, Clock: clk}
 	m.ledger = bilateralapp.Ledger{DB: db, Clock: clk}
+	m.anchor = &anchorapp.Service{DB: db, Clock: clk}
+	m.plot.Anchors = m.anchor
 	m.svc.Store = store.Sources{
 		Cooperatives: cooperatives{m.member, m.plot},
 		Households:   households{m.member, m.plot},
@@ -168,6 +174,30 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {
 	seasonhttp.Handler{Svc: m.season}.RegisterAdmin(rg)
 	plothttp.Handler{Svc: m.plot}.RegisterAdmin(rg)
 	memberhttp.Handler{Svc: m.member}.RegisterAdmin(rg)
+	anchorhttp.Handler{Svc: m.anchor}.RegisterAdmin(rg)
+}
+
+// Anchors trả use case neo HTX (D2 — kiểm thử, gốc lắp ráp).
+func (m *Module) Anchors() *anchorapp.Service { return m.anchor }
+
+// HTXConfirmations trả cổng trạng thái xác nhận HTX (D2, ADR-0052) cho đường đọc cấp báo cáo của module khác.
+func (m *Module) HTXConfirmations() port.HTXConfirmations { return htxConfirmations{m.anchor} }
+
+type htxConfirmations struct{ a *anchorapp.Service }
+
+func (h htxConfirmations) Confirmations(ctx context.Context, coops []uuid.UUID) (map[uuid.UUID]string, error) {
+	ok, err := h.a.Confirmed(ctx, coops)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[uuid.UUID]string, len(ok))
+	for k, v := range ok {
+		out[k] = port.HTXUnconfirmed
+		if v {
+			out[k] = port.HTXConfirmed
+		}
+	}
+	return out, nil
 }
 
 // Cooperatives trả cổng hồ sơ HTX.

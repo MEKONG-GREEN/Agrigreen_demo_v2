@@ -168,6 +168,8 @@ type CooperativeProfile struct {
 	Location      *Point     // nil → hiển thị tâm xã, nhãn "vị trí tạm" (CGH AC-03)
 	// Address: địa chỉ trụ sở HTX (không phải dữ liệu cá nhân); rỗng = chưa khai (HTX US-HTX-02).
 	Address string
+	// Confirmed (D2 — ADR-0052, chỉ đọc, pf/cooperative tính từ neo HTX): false = "Chưa xác nhận" (HTX tạm).
+	Confirmed bool
 }
 
 // Validate kiểm hồ sơ so với thời điểm now.

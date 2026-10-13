@@ -66,12 +66,16 @@ type knCoopDTO struct {
 	TaxCode        *string      `json:"tax_code"`
 	HeadOffice     *string      `json:"head_office"`
 	UpdatedAt      string       `json:"updated_at"`
+	// D2 (ADR-0052): confirmed | unconfirmed + nhãn "Đã xác nhận" | "Chưa xác nhận".
+	ConfirmationStatus string `json:"confirmation_status"`
+	ConfirmationLabel  string `json:"confirmation_label"`
 }
 
 func toKNCoopDTO(c app.KNCooperative) knCoopDTO {
 	out := knCoopDTO{Ref: c.Ref.String(), Code: c.Code, Name: c.Name, CommuneCode: c.AdminUnitCode, HouseholdCount: c.HouseholdCount,
 		Active: c.Active, StatusReason: strPtr(c.StatusReason), TaxCode: strPtr(c.Profile.TaxCode), HeadOffice: strPtr(c.Profile.Address),
 		UpdatedAt: c.UpdatedAt.UTC().Format(time.RFC3339Nano)}
+	out.ConfirmationStatus, out.ConfirmationLabel = confirmation(c.Profile.Confirmed)
 	if c.Profile.AreaHa != nil {
 		s := c.Profile.AreaHa.String()
 		out.AreaHa = &s
@@ -170,7 +174,8 @@ func (h KN) knListCoops(c *gin.Context) {
 	}
 	var fe fieldErrs
 	q := app.KNCoopQuery{Commune: c.Query("commune"), Status: c.Query("status"), Q: c.Query("q"),
-		AreaMin: decimalQuery(c, &fe, "area_min"), AreaMax: decimalQuery(c, &fe, "area_max"), After: after, Limit: queryLimit(c)}
+		AreaMin: decimalQuery(c, &fe, "area_min"), AreaMax: decimalQuery(c, &fe, "area_max"), After: after, Limit: queryLimit(c),
+		Confirmation: c.Query("confirmation")}
 	if fe.fail(c) {
 		return
 	}
