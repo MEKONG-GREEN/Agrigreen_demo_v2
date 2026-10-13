@@ -47,7 +47,7 @@ describe("biểu kỳ CNTS — backend giả lập /v1/extension/cnts/*, /v1/for
     resetCntsPeriods();
   });
 
-  it("cài biểu (Admin), phát hành BM-04 tuần Thứ Tư – Thứ Ba, Xã nộp có khóa lạc quan, sao chép kỳ trước, chốt kỳ", async () => {
+  it("cài biểu (Admin), phát hành BM-04 tuần Thứ Ba – Thứ Hai (lịch CNTS D8), Xã nộp có khóa lạc quan, sao chép kỳ trước, chốt kỳ", async () => {
     const adminCtx = await contextOf("kn-admin", "asg-admin", null);
     const adm = createKnAdminApi({ baseUrl: "http://mock", getAccessToken: () => "mock.kn-admin", getContextId: () => adminCtx, fetch: mockAdminFetchNoDelay });
     const cn = (await adm.departments()).items.find((d) => d.code === "chan_nuoi_thuy_san")!;
@@ -62,12 +62,17 @@ describe("biểu kỳ CNTS — backend giả lập /v1/extension/cnts/*, /v1/for
     expect((await admin.install()).every((f) => f.template_up_to_date)).toBe(true);
 
     const pv = await tinh.preview({ code: "CNTS-BM04", from_date: "2026-10-09", to_date: "2026-10-15", units: ["91301", "91302"] });
-    expect(pv.periods.map((p) => [p.from_date, p.to_date])).toEqual([["2026-10-07", "2026-10-13"], ["2026-10-14", "2026-10-20"]]);
-    expect(pv.periods[0]!.due_at).toBe("2026-10-14T05:00:00.000Z"); // 12:00 giờ VN Thứ Tư sau
+    expect(pv.periods.map((p) => [p.from_date, p.to_date])).toEqual([["2026-10-06", "2026-10-12"], ["2026-10-13", "2026-10-19"]]);
+    expect(pv.periods.map((p) => p.key)).toEqual(["2026-W41", "2026-W42"]);
+    expect(pv.periods[0]!.due_at).toBe("2026-10-13T05:00:00.000Z"); // 12:00 giờ VN Thứ Ba ngay sau kỳ
+    expect(pv.periods[0]!.rule).toBe("kn.period_rule/v2;week_start=tue;week=year;month=week_end;cal=chan_nuoi_thuy_san:v3");
+    expect([pv.calendar_id, pv.calendar_version]).toEqual(["chan_nuoi_thuy_san", 3]);
+    const bm05 = await tinh.preview({ code: "CNTS-BM05-I", from_date: "2026-10-05", to_date: "2026-10-09", units: ["91301"] });
+    expect([bm05.calendar_id, bm05.periods[0]!.rule, bm05.periods[0]!.from_date]).toEqual([null, "cnts.work_week/v1", "2026-10-05"]); // BM-05 không đổi
     expect(pv.tasks).toBe(4);
     const bm01 = await tinh.preview({ code: "CNTS-BM01", from_date: "2026-10-01", to_date: "2026-10-03", units: ["x"] });
     expect(bm01.periods).toHaveLength(3);
-    await tinh.publish({ code: "CNTS-BM04", from_date: "2099-01-07", to_date: "2099-01-20", units: ["91301", "91302"] });
+    await tinh.publish({ code: "CNTS-BM04", from_date: "2099-01-06", to_date: "2099-01-19", units: ["91301", "91302"] });
 
     const tasks = await xa.tasks("CNTS-BM04");
     expect(tasks).toHaveLength(4);

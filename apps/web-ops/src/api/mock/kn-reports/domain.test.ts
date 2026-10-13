@@ -96,3 +96,26 @@ describe("KN v7.7 P4 — bản port giả lập khớp ca vàng Go (reportcycle/
     for (const c of g.reason) expect(reason(c.input, c.max)).toEqual([c.out, c.ok]);
   });
 });
+
+// D8 (CEO 13/10/2026) — lịch tuần theo phòng ban, như reportcycle/domain.ResolveCalendar.
+describe("lịch tuần theo phòng ban (D8)", () => {
+  it("CNTS Thứ Ba – Thứ Hai hiệu lực ngay; phòng khác theo lịch chung; tham số theo phòng đè lên", async () => {
+    const d = await import("./domain");
+    const cnts = d.calendarAt(d.DEPT_CNTS, "2026-10-01");
+    expect([cnts.calendar_id, cnts.calendar_version, cnts.calendar_source, d.ruleTag(cnts.rule)]).toEqual([
+      "chan_nuoi_thuy_san", 3, "builtin", "kn.period_rule/v2;week_start=tue;week=year;month=week_end;cal=chan_nuoi_thuy_san:v3",
+    ]);
+    const w = d.split("week", "2026-09-22", "2026-09-28", "", cnts.rule, d.defaultDeadline("week", cnts.rule), 3);
+    expect(w.map((p) => p.label)).toEqual(["Tuần 39/2026"]); // BRD CNTS: tuần 39 = 22/09–28/09/2026
+    expect(d.calendarAt("ke_hoach_tai_chinh", "2026-11-04").calendar_version).toBe(2);
+    expect(d.calendarAt("ke_hoach_tai_chinh", "2026-10-28").calendar_version).toBe(1);
+    expect(d.parseRule(d.ruleTag(cnts.rule))).toEqual(cnts.rule);
+    d.DEPT_PERIOD_RULES.set("trong_trot", "kn.period_rule/v2;week_start=thu;cal=trong_trot:v4");
+    try {
+      const tt = d.calendarAt("trong_trot", "2026-01-01");
+      expect([tt.calendar_version, tt.calendar_source, tt.rule.week_start]).toEqual([4, "department_param", 4]);
+    } finally {
+      d.DEPT_PERIOD_RULES.clear();
+    }
+  });
+});

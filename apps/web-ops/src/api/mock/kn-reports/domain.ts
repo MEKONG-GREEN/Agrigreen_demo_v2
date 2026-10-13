@@ -44,6 +44,9 @@ export interface PeriodRule {
   week_start: number; // 0 = Chủ nhật … 6 = thứ Bảy
   week_numbering: WeekNumbering;
   month_align: MonthAlign;
+  /** D8: danh tính lịch của phòng (tag ";cal=<phòng>:v<n>", chỉ v2). */
+  calendar_id?: string;
+  calendar_version?: number;
 }
 export const LEGACY_RULE: PeriodRule = { version: RULE_VERSION_V1, week_start: 1, week_numbering: "season", month_align: "calendar" };
 export const DEFAULT_RULE: PeriodRule = { version: RULE_VERSION_V2, week_start: 3, week_numbering: "year", month_align: "week_end" };
@@ -52,12 +55,61 @@ const WEEKDAY_CODE = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 /** Ngày hiệu lực phiên bản tham số extension.report_period_rule nạp sẵn (masterdata seeddata/params.json). */
 export const RULE_V2_EFFECTIVE_FROM = "2026-11-04";
 
-/** Giả lập tra tham số tại ngày đầu đợt (Service.periodRule): trước ngày hiệu lực → v1, từ đó → v2. */
+/** Giả lập tra tham số CHUNG tại ngày đầu đợt: trước ngày hiệu lực → v1, từ đó → v2. */
 export const ruleAt = (fromDate: string): PeriodRule => (fromDate >= RULE_V2_EFFECTIVE_FROM ? { ...DEFAULT_RULE } : { ...LEGACY_RULE });
+
+// Lịch tuần theo phòng ban (D8 — CEO 13/10/2026), như reportcycle/domain/calendar.go.
+export const DEPT_CNTS = "chan_nuoi_thuy_san";
+export const CALENDAR_VERSION_LEGACY = 1;
+export const CALENDAR_VERSION_DEFAULT = 2;
+export const CALENDAR_VERSION_CNTS = 3;
+/** CNTS: Thứ Ba – Thứ Hai (BRD CNTS v3.7, tuần 39 = 22/09–28/09/2026), hiệu lực ngay. */
+export const CNTS_RULE: PeriodRule = { version: RULE_VERSION_V2, week_start: 2, week_numbering: "year", month_align: "week_end", calendar_id: DEPT_CNTS, calendar_version: CALENDAR_VERSION_CNTS };
+/** Lịch nạp sẵn trong mã (domain.BuiltinCalendars). */
+export const BUILTIN_CALENDARS: Record<string, PeriodRule> = { [DEPT_CNTS]: CNTS_RULE };
+/** Giả lập tham số extension.report_period_rule:<phòng> (mã phòng → tag); trống = chưa có phiên bản. */
+export const DEPT_PERIOD_RULES = new Map<string, string>();
+
+export type CalendarSource = "department_param" | "builtin" | "global_param" | "legacy";
+export interface Calendar {
+  calendar_id: string;
+  calendar_version: number;
+  calendar_source: CalendarSource;
+  rule: PeriodRule;
+}
+
+function stampCalendar(dept: string, r: PeriodRule, source: CalendarSource): Calendar {
+  if (r.version === RULE_VERSION_V1) return { calendar_id: dept, calendar_version: CALENDAR_VERSION_LEGACY, calendar_source: source, rule: r };
+  const rule = r.calendar_id ? r : { ...r, calendar_id: dept, calendar_version: CALENDAR_VERSION_DEFAULT };
+  return { calendar_id: rule.calendar_id!, calendar_version: rule.calendar_version!, calendar_source: source, rule };
+}
+
+/** Như domain.CalendarOf: lịch của quy tắc đã ghi (tag có cal → nguyên; v1 → phiên bản 1; v2 → phiên bản 2). */
+export function calendarOf(dept: string, r: PeriodRule): Calendar {
+  return stampCalendar(dept, { ...r }, r.version === RULE_VERSION_V1 ? "legacy" : "global_param");
+}
+
+/** Như Service.CalendarAt / domain.ResolveCalendar: tham số theo phòng → lịch nạp sẵn → tham số chung → v1. */
+export function calendarAt(dept: string, fromDate: string): Calendar {
+  const own = DEPT_PERIOD_RULES.get(dept);
+  if (own) {
+    try {
+      const r = parseRule(own);
+      if (!r.calendar_id || r.calendar_id === dept) return stampCalendar(dept, r, "department_param");
+    } catch {
+      /* tham số sai dạng → bỏ qua */
+    }
+  }
+  const builtin = BUILTIN_CALENDARS[dept];
+  if (builtin) return stampCalendar(dept, { ...builtin }, "builtin");
+  const g = ruleAt(fromDate);
+  return stampCalendar(dept, g, g.version === RULE_VERSION_V1 ? "legacy" : "global_param");
+}
 
 export function ruleTag(r: PeriodRule): string {
   if (r.version === RULE_VERSION_V1) return `${r.version};week=${r.week_numbering}`;
-  return `${r.version};week_start=${WEEKDAY_CODE[r.week_start]};week=${r.week_numbering};month=${r.month_align}`;
+  const cal = r.calendar_id ? `;cal=${r.calendar_id}:v${r.calendar_version}` : "";
+  return `${r.version};week_start=${WEEKDAY_CODE[r.week_start]};week=${r.week_numbering};month=${r.month_align}${cal}`;
 }
 
 /** Như domain.ParseRule ("" → DEFAULT_RULE; không kiểm tra giá trị như Validate — chỉ dùng cho ca vàng/giả lập). */
@@ -73,6 +125,11 @@ export function parseRule(tag: string): PeriodRule {
     if (k === "week") r.week_numbering = v as WeekNumbering;
     else if (k === "month") r.month_align = v as MonthAlign;
     else if (k === "week_start" && WEEKDAY_CODE.includes(v)) r.week_start = WEEKDAY_CODE.indexOf(v);
+    else if (k === "cal" && /^[a-z][a-z0-9_]{1,39}:v[1-9][0-9]{0,3}$/.test(v) && r.version === RULE_VERSION_V2) {
+      const [id, n] = v.split(":v");
+      r.calendar_id = id;
+      r.calendar_version = Number(n);
+    }
     else throw new PeriodError("period_rule", `khóa quy tắc chia kỳ lạ: ${p}`);
   }
   return r;

@@ -2660,6 +2660,9 @@ export interface paths {
          *     W11.05b: period_type chọn kỳ ngày (day, hạn 09:00 hôm sau), tuần KSGM (ksgm_week — 4 tuần/tháng, ranh giới theo
          *     tham số extension.ksgm_week_starts:YYYY-MM, mặc định 1, 8, 15, 22) hoặc quý (quarter) — chỉ với quy tắc v2. Kỳ
          *     mang period_key; phát hành lưu khóa này (không tính lại khi tham số đổi).
+         *     D8 (CEO 13/10/2026): mỗi phòng một lịch tuần — tham số extension.report_period_rule:<mã phòng> trước, rồi lịch
+         *     nạp sẵn (CNTS Thứ Ba–Thứ Hai, hiệu lực ngay), rồi tham số chung; trả calendar_id/calendar_version và period_rule
+         *     mang ";cal=<phòng>:v<n>".
          */
         post: operations["rcPreviewBatch"];
         delete?: never;
@@ -5221,7 +5224,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Xem trước lô kỳ của một biểu (kỳ, hạn nộp, số công việc) — chưa ghi */
+        /**
+         * Xem trước lô kỳ của một biểu (kỳ, hạn nộp, số công việc) — chưa ghi
+         * @description D8 (CEO 13/10/2026): BM-01 (ngày), BM-04/BM-17 (tuần) theo lịch tuần CNTS Thứ Ba–Thứ Hai (calendar_id
+         *     chan_nuoi_thuy_san, calendar_version 3; tham số extension.report_period_rule:chan_nuoi_thuy_san đè lên); hạn mặc
+         *     định tuần 12:00 Thứ Ba ngay sau kỳ. BM-05 giữ tuần làm việc Thứ Hai–Thứ Sáu (calendar_id null).
+         */
         post: operations["extensionCntsPreviewSeries"];
         delete?: never;
         options?: never;
@@ -11488,7 +11496,17 @@ export interface components {
         RcPreview: {
             report_type: string;
             period_type: string;
+            /** @description Tag quy tắc chia kỳ ghi vào đợt; v2 mang ';cal=<phòng>:v<n>' (D8) */
             period_rule: string;
+            /** @description Lịch tuần của phòng (D8) = mã phòng ban của đợt */
+            calendar_id: string;
+            /** @description Phiên bản lịch (D8): 1 = v1-tam, 2 = v2 Thứ Tư–Thứ Ba, ≥ 3 = lịch riêng của phòng (3 = CNTS Thứ Ba–Thứ Hai) */
+            calendar_version: number;
+            /**
+             * @description Lịch lấy từ: tham số extension.report_period_rule:<phòng> | lịch nạp sẵn | tham số chung | v1 (chưa có tham số)
+             * @enum {string}
+             */
+            calendar_source: "department_param" | "builtin" | "global_param" | "legacy";
             deadline: {
                 [key: string]: unknown;
             };
@@ -13190,6 +13208,10 @@ export interface components {
         };
         CNTSSeries: {
             code: string;
+            /** @description Lịch tuần của phòng (D8) — mã phòng, vd chan_nuoi_thuy_san; null với tuần làm việc BM-05 */
+            calendar_id: string | null;
+            /** @description Phiên bản lịch (D8): 1 = v1-tam, 2 = v2 Thứ Tư–Thứ Ba, 3 = CNTS Thứ Ba–Thứ Hai; null với BM-05 */
+            calendar_version: number | null;
             unit_kind: string;
             units: string[];
             /** @description Số công việc sẽ sinh (kỳ × đơn vị) */

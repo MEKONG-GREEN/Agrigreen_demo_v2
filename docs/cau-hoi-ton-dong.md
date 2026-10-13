@@ -41,7 +41,7 @@ Cách trả lời: ghi ngay dưới mỗi câu (`→ ...`), hoặc trả lời t
 | Q-14 | "Email công vụ" là **máy chủ thư tỉnh hay Google Workspace**? Có văn bản chấp thuận dùng Google Sheets (ngoài lãnh thổ) cho số liệu tổng hợp? Chia sẻ link theo email hay "ai có liên kết"? | Gửi Chi cục; ADR-0026 |
 | Q-15 | Tự nhắc: trước hạn bao lâu, nhắc lại khi trễ bao lâu, ai nhận bản sao? (tạm 24 h / 24 h) | Nhắc nộp |
 | Q-16 | Lịch của cán bộ Cấp Tỉnh do ai duyệt; hạn đăng ký / hạn duyệt mặc định? (tạm 17:00 thứ Sáu) | Lịch công tác |
-| Q-17 | **Chia kỳ**: tuần ISO ("Tuần 36") hay tuần thứ n của vụ; tuần bắt đầu thứ Hai; báo cáo tháng nộp trước ngày 10? — *Thay bằng Q-045 (W11.03, 10/2026): lịch kỳ hệ thống là tham số có phiên bản `extension.report_period_rule`, mặc định tuần Thứ Tư–Thứ Ba từ 04/11/2026; đợt cũ giữ quy tắc v1.* | Phát hành biểu |
+| Q-17 | **Chia kỳ**: tuần ISO ("Tuần 36") hay tuần thứ n của vụ; tuần bắt đầu thứ Hai; báo cáo tháng nộp trước ngày 10? — *Thay bằng Q-045 (W11.03, 10/2026): lịch kỳ hệ thống là tham số có phiên bản `extension.report_period_rule`, mặc định tuần Thứ Tư–Thứ Ba từ 04/11/2026; đợt cũ giữ quy tắc v1. Q-045 đã quyết bởi D8 (CEO 13/10/2026): mỗi phòng một lịch tuần (`extension.report_period_rule:<phòng>`, CNTS Thứ Ba–Thứ Hai).* | Phát hành biểu |
 | Q-18 | Danh mục vụ (Đông Xuân, Hè Thu, Thu Đông, lúa mùa) và khoảng ngày mặc định | Kỳ báo cáo |
 | Q-19 | Bộ nhận diện TTKNQG: tên sản phẩm, logo, ảnh nền đăng nhập, footer (đang tạm "Khuyến nông số") | Giao diện |
 | Q-20 | Nạp **số liệu lịch sử** từ Google Sheet để so sánh cùng kỳ năm trước? | Dashboard |

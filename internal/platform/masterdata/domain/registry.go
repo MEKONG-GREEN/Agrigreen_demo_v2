@@ -99,7 +99,9 @@ var ParamRegistry = []ParamSpec{
 	{Key: "mrv.anomaly_no_record_days", Name: "Số ngày không có bản ghi mới → cảnh báo bất thường", Unit: "ngày", Kind: ParamKindDecimal, Min: "1", Max: "120"},
 	{Key: "mrv.compare_window_days", Name: "Cửa sổ ghép nhật ký HTX ↔ minh chứng cán bộ", Unit: "ngày", Kind: ParamKindDecimal, Min: "0", Max: "30"},
 	// W11.03 lịch kỳ hệ thống dùng chung (extension/port.ParamPeriodRule, ParamKSGMWeekStarts).
-	{Key: "extension.report_period_rule", Name: "Quy tắc chia kỳ báo cáo (lịch kỳ hệ thống)", Kind: ParamKindText},
+	// D8 (CEO 13/10/2026): khóa ":<mã phòng>" = lịch tuần riêng của phòng (vd extension.report_period_rule:chan_nuoi_thuy_san),
+	// đè tham số chung; Text = tag quy tắc kèm ";cal=<phòng>:v<n>".
+	{Key: "extension.report_period_rule", Name: "Quy tắc chia kỳ báo cáo (lịch tuần; \":<mã phòng>\" = lịch riêng của phòng)", Kind: ParamKindText},
 	{Key: "extension.ksgm_week_starts", Name: "Ranh giới 4 tuần KSGM của tháng (vd 1,8,15,22)", Kind: ParamKindText, Dimensional: true},
 	// W11.41 ngưỡng mặc định CNTS (BRD CNTS v3.7 Mục III.5, UR-TINH-13; seeddata/params.json).
 	{Key: port.ParamCNTSIndicatorMinPrefix, Name: "Ngưỡng dưới chỉ tiêu theo dõi CNTS", Kind: ParamKindDecimal, Dimensional: true},

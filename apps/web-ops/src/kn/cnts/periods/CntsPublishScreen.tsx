@@ -1,7 +1,7 @@
 "use client";
 
 // Biểu kỳ Cấp Xã CNTS — Cấp Tỉnh / Admin (W11.42, BRD CNTS v3.7 UR-TINH-07/08, D4 CN2): biểu BM-01/04/05/17 (cài vào
-// cap/forms — Admin), phát hành lô kỳ (kỳ ngày BM-01 cho cơ sở giết mổ; tuần Thứ Tư – Thứ Ba BM-04/BM-17; tuần làm việc
+// cap/forms — Admin), phát hành lô kỳ (kỳ ngày BM-01 cho cơ sở giết mổ; tuần Thứ Ba – Thứ Hai BM-04/BM-17 theo lịch CNTS D8; tuần làm việc
 // BM-05) với hạn riêng từng biểu, theo dõi nộp theo kỳ, chốt / mở lại / hủy kỳ.
 import { useMemo, useState } from "react";
 import { unwrap } from "@/api/client";
@@ -89,7 +89,7 @@ export function CntsPublishScreen() {
                       <td>{f.bm}</td>
                       <td>{f.title}</td>
                       <td>{f.unit_kind === "facility" ? "Cơ sở giết mổ" : "Xã/phường"}</td>
-                      <td>{f.code.startsWith("CNTS-BM05") ? "Tuần làm việc" : f.period_type === "day" ? "Ngày" : "Tuần (Thứ Tư – Thứ Ba)"}</td>
+                      <td>{f.code.startsWith("CNTS-BM05") ? "Tuần làm việc" : f.period_type === "day" ? "Ngày" : "Tuần (Thứ Ba – Thứ Hai)"}</td>
                       <td>{f.due}</td>
                       <td>{f.template_version ? <StatusPill tone={f.template_up_to_date ? "ok" : "warn"}>v{f.template_version}</StatusPill> : <StatusPill tone="bad">Chưa cài</StatusPill>}</td>
                     </tr>
@@ -175,6 +175,7 @@ export function CntsPublishScreen() {
             <>
               <p className="mute">
                 {preview.periods.length} kỳ × {preview.units.length} đơn vị = {preview.tasks} công việc
+                {preview.calendar_id ? ` — lịch tuần ${preview.calendar_id} v${preview.calendar_version}` : " — tuần làm việc Thứ Hai – Thứ Sáu"}
               </p>
               <table className="dt" aria-label="Kỳ xem trước">
                 <thead>

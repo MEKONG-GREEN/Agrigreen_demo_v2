@@ -46,7 +46,7 @@ func TestPeriodRule_TagParse(t *testing.T) {
 	if DefaultRule.WeekStart != time.Wednesday || LegacyRule.Tag() != "kn.period_rule/v1-tam;week=season" {
 		t.Fatal("mặc định QĐ-6: Thứ Tư; v1 giữ tag cũ")
 	}
-	for in, want := range map[string]PeriodRule{"": LegacyRule, "rác": LegacyRule, DefaultRule.Tag(): DefaultRule, "kn.period_rule/v1-tam;week=iso": {RuleVersionV1, time.Monday, WeekNumberingISO, MonthAlignCalendar}} {
+	for in, want := range map[string]PeriodRule{"": LegacyRule, "rác": LegacyRule, DefaultRule.Tag(): DefaultRule, "kn.period_rule/v1-tam;week=iso": {Version: RuleVersionV1, WeekStart: time.Monday, WeekNumbering: WeekNumberingISO, MonthAlign: MonthAlignCalendar}} {
 		if got := EffectiveRule(in); got != want {
 			t.Errorf("EffectiveRule(%q) = %+v", in, got)
 		}

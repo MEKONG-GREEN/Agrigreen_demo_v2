@@ -1007,7 +1007,7 @@ Route `/v1/forms/*` (Application API). Route v1 cũ của KN (`/v1/extension/rep
 | 409 | `forms.period_cancelled` | W11.05: nộp, rà soát, chốt, mở lại hoặc hủy lại kỳ đã hủy (`POST /v1/forms/periods/{id}/cancel`); kỳ đã hủy là trạng thái cuối |
 | 409 | `forms.submission_limit` | W11.05: đơn vị đã gửi đủ `max_submissions` lần của kỳ (KHTC: 3, Q-081) — nộp thêm, hoặc trả lại phiên bản cuối cho phép; DB từ chối phiên bản vượt giới hạn (SQLSTATE AGF03, `trg_submission_limit`, pf 000140) |
 | 409 | `forms.submission_conflict` | W11.42 khóa lạc quan (CNTS III.3.0 "Hai người cùng sửa"): `base_version` gửi kèm khác phiên bản bài nộp hiện tại của đơn vị — "Đã có người cập nhật lúc …", tải bản mới rồi sửa lại, không ghi đè; DB kiểm lại `base_version = seq − 1` (SQLSTATE AGF04, `trg_bind_meta`, pf 000149). Đồng bộ ngoại tuyến trả `rejected` với mã này |
-| 422 | `forms.late_reason_required` | W11.42: profile `require_late_reason` (kn_cnts) — gửi sau hạn nộp của kỳ phải có `explanation` (H09 lý do trễ) |
+| 422 | `forms.late_reason_required` | W11.42: profile `require_late_reason` (kn_cnts) — gửi sau hạn nộp của kỳ phải có `explanation` (H09 lý do trễ). D8: "sau hạn" = giờ máy chủ nhận bài, kể cả bản offline có `captured_at` trước hạn |
 | 422 | `forms.facility_invalid` | W11.42: đơn vị lá cơ sở giết mổ (BM-01) không phải `facility_ref` đang dùng của danh mục CNTS tại ngày đầu kỳ, hoặc `unit_parents` khác xã của cơ sở |
 | 409 | `conflict` | Trạng thái kỳ đổi giữa chừng (máy trạng thái ở DB, SQLSTATE AGF01); ghi song song vào mã kỳ native |
 | 422 | `forms.template_invalid` | Định nghĩa biểu sai (mã, tiêu đề, trường: khóa, kiểu `text`/`integer`/`decimal`/`date`/`choice`, lựa chọn) — `field` chỉ chỗ sai |

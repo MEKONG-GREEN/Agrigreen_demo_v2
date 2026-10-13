@@ -105,15 +105,22 @@ type cntsPeriodDTO struct {
 }
 
 type cntsSeriesDTO struct {
-	Code     string          `json:"code"`
-	UnitKind string          `json:"unit_kind"`
-	Units    []string        `json:"units"`
-	Tasks    int             `json:"tasks"`
-	Periods  []cntsPeriodDTO `json:"periods"`
+	Code string `json:"code"`
+	// Lịch tuần của phòng (D8); null với tuần làm việc BM-05.
+	CalendarID      *string         `json:"calendar_id"`
+	CalendarVersion *int            `json:"calendar_version"`
+	UnitKind        string          `json:"unit_kind"`
+	Units           []string        `json:"units"`
+	Tasks           int             `json:"tasks"`
+	Periods         []cntsPeriodDTO `json:"periods"`
 }
 
 func cntsSeriesOf(s app.CNTSSeries) cntsSeriesDTO {
 	d := cntsSeriesDTO{Code: s.Form.Code, UnitKind: s.Form.UnitKind, Units: s.Units, Tasks: s.Tasks, Periods: []cntsPeriodDTO{}}
+	if s.Calendar != nil {
+		id, v := s.Calendar.ID, s.Calendar.Version
+		d.CalendarID, d.CalendarVersion = &id, &v
+	}
 	for i, p := range s.Periods {
 		pd := cntsPeriodDTO{Kind: p.Kind, Key: p.Key, Label: p.Label, FromDate: p.From.Format(time.DateOnly), ToDate: p.To.Format(time.DateOnly),
 			DueAt: p.DueAt.UTC().Format(time.RFC3339), Rule: p.Rule}

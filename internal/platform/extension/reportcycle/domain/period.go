@@ -21,6 +21,9 @@
 // (Thứ Tư đầu tiên sau hạn chốt QĐ-6 31/10/2026); và port.ParamKSGMWeekStarts + ":YYYY-MM" (Text "1,10,16,23",
 // vắng → 1,8,15,22).
 //
+// D8 (CEO 13/10/2026): mỗi phòng ban một lịch tuần — chọn bằng ResolveCalendar (tham số port.ParamPeriodRule + ":" +
+// mã phòng → BuiltinCalendars → tham số chung), tag v2 mang ";cal=<phòng>:v<n>" (xem calendar.go).
+//
 // Mọi ngày là ngày dương lịch 00:00 UTC (Date/ParseDate), không mang giờ nên không phụ thuộc múi giờ
 // (Asia/Ho_Chi_Minh không có giờ mùa hè); giờ Việt Nam chỉ dùng khi tính hạn nộp (Deadline.DueAt). API:
 //
@@ -117,6 +120,11 @@ type PeriodRule struct {
 	WeekStart     time.Weekday // v1 luôn thứ Hai
 	WeekNumbering string
 	MonthAlign    string // v1 luôn calendar
+	// Lịch của phòng ban (D8, calendar.go): CalendarID = mã phòng, CalendarVersion ≥ 1 — ghi vào tag dạng
+	// ";cal=<phòng>:v<n>" (chỉ quy tắc v2) để kỳ đã lưu tự mang (calendar_id, calendar_version). Rỗng = tag cũ;
+	// CalendarOf suy ra phiên bản 1 (v1) / 2 (v2). Không ảnh hưởng cách chia kỳ.
+	CalendarID      string
+	CalendarVersion int
 }
 
 // LegacyRule là quy tắc v1 tạm (Q-17) — quy tắc của đợt cũ và của ngày trước phiên bản tham số đầu tiên.
@@ -133,7 +141,17 @@ func (r PeriodRule) Tag() string {
 	if r.Version == RuleVersionV1 {
 		return r.Version + ";week=" + r.WeekNumbering
 	}
-	return r.Version + ";week_start=" + weekdayCode[(int(r.WeekStart)%7+7)%7] + ";week=" + r.WeekNumbering + ";month=" + r.MonthAlign
+	tag := r.Version + ";week_start=" + weekdayCode[(int(r.WeekStart)%7+7)%7] + ";week=" + r.WeekNumbering + ";month=" + r.MonthAlign
+	if r.CalendarID != "" {
+		tag += ";cal=" + CalendarRef(r.CalendarID, r.CalendarVersion)
+	}
+	return tag
+}
+
+// Lịch tuần: các kỳ tuần/tháng/quý/năm chỉ phụ thuộc phần lịch, không phụ thuộc danh tính lịch (CalendarID/Version).
+func (r PeriodRule) withoutCalendar() PeriodRule {
+	r.CalendarID, r.CalendarVersion = "", 0
+	return r
 }
 
 // Validate kiểm tra quy tắc.
@@ -142,6 +160,9 @@ func (r PeriodRule) Validate() error {
 	case RuleVersionV1:
 		if r.WeekStart != time.Monday || r.MonthAlign != MonthAlignCalendar || (r.WeekNumbering != WeekNumberingSeason && r.WeekNumbering != WeekNumberingISO) {
 			return errors.New("quy tắc v1: tuần thứ Hai, tháng dương lịch, week=season|iso")
+		}
+		if r.CalendarID != "" || r.CalendarVersion != 0 {
+			return errors.New("quy tắc v1 không mang cal (lịch phiên bản 1 suy ra)")
 		}
 	case RuleVersionV2:
 		if r.WeekStart < time.Sunday || r.WeekStart > time.Saturday {
@@ -152,6 +173,9 @@ func (r PeriodRule) Validate() error {
 		}
 		if r.MonthAlign != MonthAlignCalendar && r.MonthAlign != MonthAlignWeekEnd {
 			return errors.New("month: calendar | week_end")
+		}
+		if (r.CalendarID != "" || r.CalendarVersion != 0) && (!validCalendarID(r.CalendarID) || r.CalendarVersion < 1 || r.CalendarVersion > 9999) {
+			return errors.New("cal: <mã phòng>:v<n> (mã [a-z][a-z0-9_]{1,39}, n 1–9999)")
 		}
 	default:
 		return errors.New("phiên bản quy tắc chia kỳ không hỗ trợ: " + r.Version)
@@ -185,6 +209,12 @@ func ParseRule(tag string) (PeriodRule, error) {
 			r.WeekNumbering = v
 		case "month":
 			r.MonthAlign = v
+		case "cal":
+			id, v, err := ParseCalendarRef(v)
+			if err != nil {
+				return PeriodRule{}, err
+			}
+			r.CalendarID, r.CalendarVersion = id, v
 		case "week_start":
 			found := false
 			for i, c := range weekdayCode {

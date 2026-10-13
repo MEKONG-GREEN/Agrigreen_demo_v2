@@ -14,7 +14,22 @@ import type { FormDefinition } from "@/kn/forms/types";
 import { FormGrid, communeRows } from "@/kn/grid";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
 import { RawFile, type RcBatchInput, type RcFormItem, type RcPreview, type RcProvincialImport, type RcStatusItem, type RcTask } from "../api";
-import { LoadState, REPORT_RULE_V2_FROM, TaskPill, dt, toLog, useAction, useCommuneNames, useCycleReadOnly, useLoad, weekStartLocal, ymdLocal } from "../common";
+import {
+  LoadState,
+  REPORT_RULE_V2_FROM,
+  TaskPill,
+  dt,
+  reportWeekStart,
+  toLog,
+  useAction,
+  useCommuneNames,
+  useCycleReadOnly,
+  useLoad,
+  weekRangeName,
+  weekStartLocal,
+  weekStartOfRule,
+  ymdLocal,
+} from "../common";
 import { PiiHint } from "@/kn/pii";
 
 
@@ -54,9 +69,9 @@ const PERIOD_CHOICES: Record<PublishReportType, { value: PeriodChoice; label: st
 
 /** FN-TI-02.02 Phát hành biểu mẫu báo cáo (Hình 7). */
 export function PublishScreen() {
-  const { cycleApi } = useAuth();
+  const { cycleApi, kn } = useAuth();
   const router = useRouter();
-  const ws = weekStartLocal();
+  const ws = weekStartLocal(new Date(), reportWeekStart(new Date(), kn.context?.department_code)); // D8: lịch tuần của phòng
   const [rt, setRt] = useState<PublishReportType>("weekly");
   const [pt, setPt] = useState<PeriodChoice>("");
   const [picked, setPicked] = useState<string[]>([]);
@@ -409,6 +424,10 @@ export function PublishScreen() {
                   <dd>{preview.commune_count}</dd>
                   <dt>Số kỳ</dt>
                   <dd>{preview.period_count}</dd>
+                  <dt>Lịch tuần</dt>
+                  <dd data-testid="calendar">
+                    {weekRangeName(weekStartOfRule(preview.period_rule))} ({preview.calendar_id} v{preview.calendar_version})
+                  </dd>
                   <dt>Công việc sẽ tạo</dt>
                   <dd data-testid="task-count">{preview.task_count.toLocaleString("vi-VN")}</dd>
                 </dl>

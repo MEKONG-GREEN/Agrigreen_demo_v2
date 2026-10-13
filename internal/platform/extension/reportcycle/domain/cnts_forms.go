@@ -172,6 +172,9 @@ func CNTSFormByCode(code string) (CNTSForm, bool) {
 // workWeek: BM-05 dùng tuần làm việc riêng (không phải tuần báo cáo W11.03).
 func (f CNTSForm) workWeek() bool { return f.Code == CNTSBM05I || f.Code == CNTSBM05II }
 
+// IsWorkWeek: biểu chia theo tuần làm việc thứ Hai–thứ Sáu (BM-05) — không theo lịch tuần của phòng (D8).
+func (f CNTSForm) IsWorkWeek() bool { return f.workWeek() }
+
 // CNTSSeriesInput là yêu cầu chia kỳ một lô của một biểu.
 type CNTSSeriesInput struct {
 	Form     CNTSForm

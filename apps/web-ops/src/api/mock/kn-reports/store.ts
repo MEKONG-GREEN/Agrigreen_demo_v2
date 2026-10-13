@@ -33,7 +33,8 @@ import {
   ratio,
   reason as checkReason,
   rfc3339,
-  ruleAt,
+  calendarAt,
+  calendarOf,
   ruleTag,
   split,
   taskDisplay,
@@ -602,6 +603,8 @@ export const runWire = (r: Run) => ({ ...r, actor_display: actorDisplay(r.actor_
 export interface BatchPlan {
   report_type: ReportType;
   rule: PeriodRule;
+  /** D8: lịch tuần của phòng (calendar_id, calendar_version, nguồn). */
+  calendar: { calendar_id: string; calendar_version: number; calendar_source: string };
   period_type: string;
   season_label: string;
   from_date: string;
@@ -631,10 +634,11 @@ const ksgmStarts = (y: number, m: number): number[] | null => {
   return v ? parseKsgmStarts(v) : null;
 };
 
-/** rule: quy tắc chia kỳ; mặc định = tham số extension.report_period_rule tại from_date (W11.03, ruleAt). */
+/** rule: quy tắc chia kỳ; mặc định = lịch tuần của phòng tại from_date (D8, calendarAt: tham số theo phòng → nạp sẵn → chung). */
 export function planBatch(c: Caller, body: unknown, ruleIn?: PeriodRule): Result<BatchPlan> {
   const b = (body ?? {}) as Record<string, unknown>;
-  const rule = ruleIn ?? ruleAt(String(b.from_date ?? ""));
+  const cal = calendarAt(c.dept ?? "", String(b.from_date ?? ""));
+  const rule = ruleIn ?? cal.rule;
   const rt = b.report_type as ReportType;
   if (!REPORT_TYPES.includes(rt)) return fieldErr("report_type", "weekly | monthly | seasonal | annual | adhoc");
   let pt: string;
@@ -726,9 +730,11 @@ export function planBatch(c: Caller, body: unknown, ruleIn?: PeriodRule): Result
       }
     }
   }
+  const used = ruleIn ? calendarOf(c.dept ?? "", ruleIn) : cal;
   return {
     report_type: rt,
-    rule,
+    rule: used.rule,
+    calendar: { calendar_id: used.calendar_id, calendar_version: used.calendar_version, calendar_source: used.calendar_source },
     period_type: pt,
     season_label: season,
     from_date: String(b.from_date),
@@ -752,6 +758,9 @@ export function previewWire(p: BatchPlan) {
     report_type: p.report_type,
     period_type: p.period_type,
     period_rule: ruleTag(p.rule),
+    calendar_id: p.calendar.calendar_id,
+    calendar_version: p.calendar.calendar_version,
+    calendar_source: p.calendar.calendar_source,
     deadline: p.deadline,
     close_after_days: p.close_after_days,
     forms: p.forms.map((f) => ({

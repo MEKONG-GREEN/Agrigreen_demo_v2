@@ -120,11 +120,20 @@ func TestFormsCNTSPeriods_W1142(t *testing.T) {
 	_, err = svc.SubmitWith(xa1b, "cnts", d4, SubmitInput{Unit: ua, Values: map[string]string{"pest": "y", "area_infected": "5"}, NilReport: true,
 		BaseVersion: &one, Explanation: "trễ"}, "")
 	f.want(err, "forms.values_invalid", "không phát sinh mà có số")
+	// D8: bản offline ghi trên máy TRƯỚC hạn (captured_at) nhưng máy chủ nhận SAU hạn → vẫn trễ: đòi lý do trễ; late
+	// tính theo giờ máy chủ, captured_at giữ để kiểm toán.
+	before := v.Period.DueAt.Add(-30 * time.Minute)
+	_, err = svc.SubmitWith(xa1b, "cnts", d4, SubmitInput{Unit: ua, Values: map[string]string{"pest": "không"}, NilReport: true,
+		BaseVersion: &one, CapturedAt: &before}, "")
+	f.want(err, "forms.late_reason_required", "bản offline ghi trước hạn, tới sau hạn")
 	s2, err := svc.SubmitWith(xa1b, "cnts", d4, SubmitInput{Unit: ua, Values: map[string]string{"pest": "không"}, NilReport: true,
-		BaseVersion: &one, Explanation: "trễ"}, "")
+		BaseVersion: &one, Explanation: "trễ", CapturedAt: &before}, "")
 	f.must(err, "báo không phát sinh")
 	if s2.Submission.Values["area_infected"] != "0" || s2.Submission.Values["area_treated"] != "0" || !s2.Meta.NilReport {
 		t.Fatalf("không phát sinh: %+v", s2.Submission.Values)
+	}
+	if !s2.Meta.Late || s2.Meta.CapturedAt == nil || !s2.Meta.CapturedAt.Equal(before) {
+		t.Fatalf("late theo giờ máy chủ, captured_at giữ: %+v", s2.Meta)
 	}
 	// DB: base_version sai → AGF04 (kể cả khi bỏ qua app).
 	err = tenant.WithTenantTx(f.ctx, f.own, f.tid, func(tx pgx.Tx) error {

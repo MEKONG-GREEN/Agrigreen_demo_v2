@@ -249,6 +249,7 @@ func previewDTO(pv app.Preview) gin.H {
 		warn = []string{}
 	}
 	return gin.H{"report_type": pv.ReportType, "period_type": pv.PeriodType, "period_rule": pv.Rule.Tag(),
+		"calendar_id": pv.Calendar.ID, "calendar_version": pv.Calendar.Version, "calendar_source": pv.Calendar.Source,
 		"deadline": gin.H{"offset_days": pv.Deadline.OffsetDays, "time": pv.Deadline.Time}, "close_after_days": pv.CloseAfterDays,
 		"forms": forms, "periods": periods, "communes": communes, "communes_without_officer": noOff, "provincial_columns": cols,
 		"form_count": len(pv.Forms), "commune_count": len(pv.Communes), "period_count": len(pv.Periods), "task_count": pv.TaskCount, "warnings": warn}

@@ -1,5 +1,5 @@
 // GIẢ LẬP biểu kỳ Cấp Xã CNTS (W11.42, BRD CNTS v3.7 UR-XA-06…09, 13) theo hợp đồng /v1/extension/cnts/* và /v1/forms/*
-// (profile kn_cnts): cài biểu, chia lô kỳ (kỳ ngày, tuần Thứ Tư – Thứ Ba W11.03 v2, tuần làm việc BM-05) với hạn riêng,
+// (profile kn_cnts): cài biểu, chia lô kỳ (kỳ ngày, tuần Thứ Ba – Thứ Hai lịch CNTS D8, tuần làm việc BM-05) với hạn riêng,
 // công việc theo kỳ × đơn vị, nộp có khóa lạc quan (base_version → 409 forms.submission_conflict), báo không phát sinh,
 // lý do trễ, sao chép kỳ trước, chốt / mở lại / hủy kỳ. Dữ liệu tổng hợp, không phải thật.
 import type { components } from "../generated/application";
@@ -7,6 +7,7 @@ import { uuidv7 } from "../idempotency";
 import { CATALOGS } from "./data";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
+import { calendarAt, DEPT_CNTS, ruleTag } from "./kn-reports/domain";
 
 type S = components["schemas"];
 type Field = S["FormsField"];
@@ -112,7 +113,10 @@ function split(f: Form, from: string, to: string, deadline?: { offset_days: numb
   const a = Date.parse(from + "T00:00:00Z");
   const b = Date.parse(to + "T00:00:00Z");
   const out: { kind: string; key: string; label: string; from_date: string; to_date: string; due_at: string; rule: string; id: null }[] = [];
-  const v2 = "kn.period_rule/v2;week_start=wed;week=year;month=week_end";
+  // D8: lịch tuần CNTS Thứ Ba – Thứ Hai (tham số extension.report_period_rule:chan_nuoi_thuy_san → nạp sẵn).
+  const cal = calendarAt(DEPT_CNTS, from);
+  const v2 = ruleTag(cal.rule);
+  const ws = cal.rule.week_start;
   if (f.code.startsWith("CNTS-BM05")) {
     for (let d = a - ((new Date(a).getUTCDay() + 6) % 7) * D; d <= b; d += 7 * D) {
       const fri = d + 4 * D;
@@ -124,11 +128,11 @@ function split(f: Form, from: string, to: string, deadline?: { offset_days: numb
   } else if (f.period_type === "day") {
     for (let d = a; d <= b; d += D) out.push({ kind: "day", key: ymd(d), label: `Ngày ${dmy(d)}`, from_date: ymd(d), to_date: ymd(d), due_at: dueOf(d, off, time), rule: v2, id: null });
   } else {
-    const wedOf = (t: number) => t - ((new Date(t).getUTCDay() + 4) % 7) * D;
-    for (let d = wedOf(a); d <= b; d += 7 * D) {
+    const startOf = (t: number) => t - ((new Date(t).getUTCDay() - ws + 7) % 7) * D;
+    for (let d = startOf(a); d <= b; d += 7 * D) {
       const end = d + 6 * D;
       const y = new Date(end).getUTCFullYear();
-      const no = Math.floor((d - wedOf(Date.UTC(y, 0, 1))) / (7 * D)) + 1;
+      const no = Math.floor((d - startOf(Date.UTC(y, 0, 1))) / (7 * D)) + 1;
       out.push({ kind: "week", key: `${y}-W${String(no).padStart(2, "0")}`, label: `Tuần ${no}/${y}`, from_date: ymd(d), to_date: ymd(end), due_at: dueOf(end, off, time),
         rule: v2, id: null });
     }
@@ -197,7 +201,10 @@ export const cntsPeriodRoutes: Route[] = [
         if (!b.units?.length) return validation([{ field: "units", reason: "chọn ít nhất một đơn vị nhận" }]);
         if (!(b.from_date <= b.to_date)) return validation([{ field: "to_date", reason: "phải không trước from_date" }]);
         const periods = split(f, b.from_date, b.to_date, b.deadline ?? undefined);
-        const series = { code: f.code, unit_kind: f.unit_kind, units: b.units, tasks: periods.length * b.units.length, periods };
+        const workWeek = f.code.startsWith("CNTS-BM05");
+        const cal = calendarAt(DEPT_CNTS, b.from_date);
+        const series = { code: f.code, calendar_id: workWeek ? null : cal.calendar_id, calendar_version: workWeek ? null : cal.calendar_version,
+          unit_kind: f.unit_kind, units: b.units, tasks: periods.length * b.units.length, periods };
         if (kind) return json(series);
         const deny = tinhOnly(who(ctx));
         if (deny) return deny;

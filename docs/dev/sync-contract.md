@@ -317,7 +317,7 @@ Nguồn: `internal/platform/forms/app/sync.go` (`SyncSource`, `SyncSink`), `stor
 Chỉ người gọi là CẤP LÁ của một profile (`kn_cnts`: vai `kn_xa` phòng CNTS) nhận/gửi; không có → Source trả 403 (pf/sync bỏ qua entity). Phạm vi = ngữ cảnh phiên (xã phụ trách; cơ sở/hộ lọc theo xã cha và giới hạn `facility_refs`/`household_refs` W11.07).
 
 - Chiều xuống `forms_task`: `id` = UUIDv5 cố định theo (kỳ, đơn vị) (`forms/app.TaskID`), `version` = `feed_seq`. `data` = `FormsTask` của OpenAPI (`/v1/forms/tasks`): kỳ, đơn vị, loại đơn vị, xã cha, biểu (mã, tên, phiên bản, `fields[]`), khóa/khoảng kỳ, `due_at`, `period_status`, `open`, `status` (kể cả `overdue`, `missed`, `awaiting_reopen`), phiên bản cuối `version` + `values`, `nil_report`, `note`, `explanation`, `late`, `return_note`, `held_at`. Kỳ hủy → tombstone. Máy tự tính lại "Trễ hạn" theo `due_at`.
-- Chiều lên `forms_submission`: chỉ `op: create`; `id` = UUIDv7 máy sinh = mã phiên bản (gửi lại cùng `id` → `duplicate`). `payload = {profile, period_id, unit, values{}, base_version, nil_report, note, explanation}`; `event_time` = `captured_at`. Đi qua `SubmitWith` của REST.
+- Chiều lên `forms_submission`: chỉ `op: create`; `id` = UUIDv7 máy sinh = mã phiên bản (gửi lại cùng `id` → `duplicate`). `payload = {profile, period_id, unit, values{}, base_version, nil_report, note, explanation}`; `event_time` = `captured_at` (giờ thiết bị — chỉ lưu để kiểm toán). Đi qua `SubmitWith` của REST. **Trễ hạn tính theo giờ MÁY CHỦ nhận bài** (D8, pf 20261013065736): bản ghi trên máy trước hạn nhưng đồng bộ sau hạn vẫn là trễ (`late = true`) và cần `explanation`; máy chỉ kiểm sớm theo đồng hồ máy để gợi ý.
 
 | Tình huống | Kết quả |
 |---|---|
@@ -325,7 +325,7 @@ Chỉ người gọi là CẤP LÁ của một profile (`kn_cnts`: vai `kn_xa` p
 | Kỳ đã chốt với đơn vị | `accepted` + `code: forms.awaiting_reopen` — bài GIỮ "Chờ mở kỳ" (`held_submission`), lượt pull sau trả `status: awaiting_reopen` |
 | `base_version` khác phiên bản hiện tại | `rejected` `forms.submission_conflict` — KHÔNG ghi đè; máy báo tải bản mới |
 | Ô sai / quy tắc chặn | `rejected` `forms.values_invalid`, `errors[{field: <khóa trường>, reason}]` |
-| Gửi sau hạn thiếu `explanation` | `rejected` `forms.late_reason_required` |
+| Máy chủ nhận sau hạn (kể cả bản ghi trên máy trước hạn) thiếu `explanation` | `rejected` `forms.late_reason_required` — người nhập ghi lý do trễ rồi gửi lại (bản mới, `id` mới) |
 | Kỳ đã hủy | `rejected` `forms.period_cancelled` |
 
 `catalog_item` (pf/masterdata) từ W11.42 gồm cả 12 danh mục CNTS `cnts_*` (giá trị hiện hành; `attrs` như `GET /v1/masterdata/catalogs/{catalog}`).

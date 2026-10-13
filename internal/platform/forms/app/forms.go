@@ -429,8 +429,9 @@ func (s *Service) SubmitOffline(ctx context.Context, profile string, periodID uu
 
 // SubmitWith là Submit đầy đủ (W11.42): khóa lạc quan theo BaseVersion (409 forms.submission_conflict, kèm thời điểm
 // cập nhật của phiên bản mới hơn), báo không phát sinh (trường số = 0), quy tắc nghiệp vụ của bên dùng (Validator),
-// lý do trễ bắt buộc khi profile đòi (RequireLateReason) và gửi sau hạn. Thông tin phiên bản ghi sổ phụ
-// submission_meta cùng giao dịch (DB kiểm lại base_version = seq − 1, tính late). in.ID đã ghi (bài nộp hoặc bài
+// lý do trễ bắt buộc khi profile đòi (RequireLateReason) và máy chủ nhận bài sau hạn (D8 — không theo captured_at của
+// thiết bị). Thông tin phiên bản ghi sổ phụ submission_meta cùng giao dịch (DB kiểm lại base_version = seq − 1, tính
+// late theo giờ máy chủ). in.ID đã ghi (bài nộp hoặc bài
 // giữ) → trả lại bản đã ghi, Replayed (đồng bộ gửi lặp).
 func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.UUID, in SubmitInput, idem string) (SubmissionView, error) {
 	prof, a, err := s.resolve(ctx, profile)
@@ -559,11 +560,10 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 		if err := check(); err != nil {
 			return err
 		}
-		sentAt := now
-		if in.CapturedAt != nil {
-			sentAt = *in.CapturedAt
-		}
-		if prof.RequireLateReason && sentAt.After(v.Period.DueAt) && in.Explanation == "" {
+		// D8: trễ hạn theo giờ MÁY CHỦ nhận bài (now), kể cả bản offline — captured_at (giờ thiết bị) chỉ lưu để kiểm
+		// toán (submission_meta.captured_at); DB tính late cùng mốc (pf 20261013065736). Bản offline ghi trước hạn nhưng tới sau
+		// hạn cũng phải có lý do trễ: máy nhận 422 forms.late_reason_required, người nhập ghi lý do rồi gửi lại.
+		if prof.RequireLateReason && now.After(v.Period.DueAt) && in.Explanation == "" {
 			return port.ErrLateReason.WithField("explanation", "bắt buộc khi gửi sau hạn "+v.Period.DueAt.In(vnZone).Format("15:04 02/01/2006"))
 		}
 		sb := store.Submission{ID: ids.New(), PeriodID: periodID, Unit: unit, Values: values, Submitter: a.ref, EventTime: now}

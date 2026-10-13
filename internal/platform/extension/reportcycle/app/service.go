@@ -199,18 +199,24 @@ func (s *Service) paramInt(ctx context.Context, key string, def int) int {
 	return int(v.Value.IntPart())
 }
 
-// periodRule trả quy tắc chia kỳ (port.ParamPeriodRule) có hiệu lực lúc 00:00 giờ VN của ngày đầu đợt from — quy
-// tắc mới chỉ áp dụng cho đợt bắt đầu từ ngày hiệu lực của phiên bản tham số; đợt đã phát hành giữ period_rule đã
-// ghi. Chưa có phiên bản hiệu lực → domain.LegacyRule (W11.03).
-func (s *Service) periodRule(ctx context.Context, from time.Time) domain.PeriodRule {
-	if s.Params == nil {
-		return domain.LegacyRule
+// CalendarAt trả lịch tuần của phòng dept (D8) có hiệu lực lúc 00:00 giờ VN của ngày from: tham số
+// port.ParamPeriodRule+":"+dept → domain.BuiltinCalendars → port.ParamPeriodRule → domain.LegacyRule
+// (domain.ResolveCalendar). Lịch mới chỉ áp dụng cho đợt/kỳ bắt đầu từ ngày hiệu lực của phiên bản tham số; kỳ đã
+// phát hành giữ period_rule đã ghi (tag mang cal=<phòng>:v<n>, đọc lại bằng domain.CalendarOf). Không kiểm quyền —
+// chỉ đọc tham số (PFPUB dùng để biết lịch hiện hành của phòng).
+func (s *Service) CalendarAt(ctx context.Context, dept string, from time.Time) domain.Calendar {
+	at := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, clock.Zone())
+	text := func(key string) string {
+		if s.Params == nil {
+			return ""
+		}
+		v, err := s.Params.At(ctx, key, at)
+		if err != nil {
+			return ""
+		}
+		return v.Text
 	}
-	v, err := s.Params.At(ctx, port.ParamPeriodRule, time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, clock.Zone()))
-	if err != nil {
-		return domain.LegacyRule
-	}
-	return domain.EffectiveRule(v.Text)
+	return domain.ResolveCalendar(dept, text(port.ParamPeriodRule+":"+dept), text(port.ParamPeriodRule))
 }
 
 // ksgmStarts đọc ranh giới tuần KSGM từng tháng (port.ParamKSGMWeekStarts:YYYY-MM) có hiệu lực tại ngày 1 của tháng.

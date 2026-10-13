@@ -3735,6 +3735,9 @@ paths:
         W11.05b: period_type chọn kỳ ngày (day, hạn 09:00 hôm sau), tuần KSGM (ksgm_week — 4 tuần/tháng, ranh giới theo
         tham số extension.ksgm_week_starts:YYYY-MM, mặc định 1, 8, 15, 22) hoặc quý (quarter) — chỉ với quy tắc v2. Kỳ
         mang period_key; phát hành lưu khóa này (không tính lại khi tham số đổi).
+        D8 (CEO 13/10/2026): mỗi phòng một lịch tuần — tham số extension.report_period_rule:<mã phòng> trước, rồi lịch
+        nạp sẵn (CNTS Thứ Ba–Thứ Hai, hiệu lực ngay), rồi tham số chung; trả calendar_id/calendar_version và period_rule
+        mang ";cal=<phòng>:v<n>".
       operationId: rcPreviewBatch
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
@@ -7406,6 +7409,10 @@ paths:
   /v1/extension/cnts/period-series/preview:
     post:
       summary: Xem trước lô kỳ của một biểu (kỳ, hạn nộp, số công việc) — chưa ghi
+      description: |
+        D8 (CEO 13/10/2026): BM-01 (ngày), BM-04/BM-17 (tuần) theo lịch tuần CNTS Thứ Ba–Thứ Hai (calendar_id
+        chan_nuoi_thuy_san, calendar_version 3; tham số extension.report_period_rule:chan_nuoi_thuy_san đè lên); hạn mặc
+        định tuần 12:00 Thứ Ba ngay sau kỳ. BM-05 giữ tuần làm việc Thứ Hai–Thứ Sáu (calendar_id null).
       operationId: extensionCntsPreviewSeries
       tags: [extension]
       requestBody:
@@ -13796,11 +13803,14 @@ components:
         copy_provincial_from_previous: {type: array, items: {type: string, format: uuid}}
     RcPreview:
       type: object
-      required: [report_type, period_type, period_rule, deadline, close_after_days, forms, periods, communes, communes_without_officer, provincial_columns, form_count, commune_count, period_count, task_count, warnings]
+      required: [report_type, period_type, period_rule, calendar_id, calendar_version, calendar_source, deadline, close_after_days, forms, periods, communes, communes_without_officer, provincial_columns, form_count, commune_count, period_count, task_count, warnings]
       properties:
         report_type: {type: string}
         period_type: {type: string}
-        period_rule: {type: string}
+        period_rule: {type: string, description: "Tag quy tắc chia kỳ ghi vào đợt; v2 mang ';cal=<phòng>:v<n>' (D8)"}
+        calendar_id: {type: string, description: "Lịch tuần của phòng (D8) = mã phòng ban của đợt"}
+        calendar_version: {type: integer, description: "Phiên bản lịch (D8): 1 = v1-tam, 2 = v2 Thứ Tư–Thứ Ba, ≥ 3 = lịch riêng của phòng (3 = CNTS Thứ Ba–Thứ Hai)"}
+        calendar_source: {type: string, enum: [department_param, builtin, global_param, legacy], description: "Lịch lấy từ: tham số extension.report_period_rule:<phòng> | lịch nạp sẵn | tham số chung | v1 (chưa có tham số)"}
         deadline: {type: object, additionalProperties: true}
         close_after_days: {type: integer}
         forms: {type: array, items: {type: object, additionalProperties: true}}
@@ -15345,9 +15355,11 @@ components:
         rule: {type: string}
     CNTSSeries:
       type: object
-      required: [code, unit_kind, units, tasks, periods]
+      required: [code, calendar_id, calendar_version, unit_kind, units, tasks, periods]
       properties:
         code: {type: string}
+        calendar_id: {type: [string, "null"], description: "Lịch tuần của phòng (D8) — mã phòng, vd chan_nuoi_thuy_san; null với tuần làm việc BM-05"}
+        calendar_version: {type: [integer, "null"], description: "Phiên bản lịch (D8): 1 = v1-tam, 2 = v2 Thứ Tư–Thứ Ba, 3 = CNTS Thứ Ba–Thứ Hai; null với BM-05"}
         unit_kind: {type: string}
         units: {type: array, items: {type: string}}
         tasks: {type: integer, description: Số công việc sẽ sinh (kỳ × đơn vị)}

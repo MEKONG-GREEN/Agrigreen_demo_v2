@@ -107,17 +107,18 @@ type CNTSSeries struct {
 	Periods   []domain.CNTSPeriod
 	Units     []string
 	Tasks     int                         // số công việc sẽ sinh = kỳ × đơn vị
+	Calendar  *domain.Calendar            // lịch tuần của phòng (D8); nil với tuần làm việc BM-05 (không theo lịch tuần)
 	Published []formsport.PublishedPeriod // sau khi phát hành
 }
 
-// cntsRule: quy tắc chia kỳ của lô CNTS. Phòng CNTS chưa có kỳ cũ nên dùng quy tắc v2 ngay (QĐ-6 — tuần Thứ Tư – Thứ
-// Ba, kỳ ngày) kể cả trước ngày hiệu lực 04/11/2026 của tham số; tham số đã có phiên bản v2 khác (vd week_start=tue)
-// thì theo tham số.
-func (s *Service) cntsRule(ctx context.Context, from time.Time) domain.PeriodRule {
-	if r := s.periodRule(ctx, from); r.Version == domain.RuleVersionV2 {
-		return r
+// cntsCalendar: lịch tuần của lô CNTS (D8 — Thứ Ba–Thứ Hai, domain.CNTSRule nạp sẵn, hiệu lực ngay; tham số
+// extension.report_period_rule:chan_nuoi_thuy_san đè lên). Tham số theo phòng là quy tắc v1 thì vẫn dùng CNTSRule
+// (lịch kỳ CNTS cần kỳ ngày/tuần v2).
+func (s *Service) cntsCalendar(ctx context.Context, from time.Time) domain.Calendar {
+	if c := s.CalendarAt(ctx, domain.DeptChanNuoiThuySan, from); c.Rule.Version == domain.RuleVersionV2 {
+		return c
 	}
-	return domain.DefaultRule
+	return domain.Calendar{ID: domain.DeptChanNuoiThuySan, Version: domain.CalendarVersionCNTS, Rule: domain.CNTSRule, Source: domain.CalendarSourceBuiltin}
 }
 
 // PreviewCNTSSeries chia kỳ cho một biểu (chưa ghi).
@@ -140,7 +141,8 @@ func (s *Service) PreviewCNTSSeries(ctx context.Context, in CNTSSeriesInput) (CN
 	if to.Sub(from) > 366*24*time.Hour {
 		return CNTSSeries{}, problem.Validation.WithField("to_date", "tối đa một năm mỗi lô")
 	}
-	ps, err := domain.SplitCNTS(domain.CNTSSeriesInput{Form: f, From: from, To: to, Rule: s.cntsRule(ctx, from), Deadline: in.Deadline, Loc: clock.Zone()})
+	cal := s.cntsCalendar(ctx, from)
+	ps, err := domain.SplitCNTS(domain.CNTSSeriesInput{Form: f, From: from, To: to, Rule: cal.Rule, Deadline: in.Deadline, Loc: clock.Zone()})
 	if err != nil {
 		var pe domain.ErrPeriod
 		if errors.As(err, &pe) {
@@ -151,7 +153,11 @@ func (s *Service) PreviewCNTSSeries(ctx context.Context, in CNTSSeriesInput) (CN
 	if len(in.Units) == 0 {
 		return CNTSSeries{}, problem.Validation.WithField("units", "chọn ít nhất một đơn vị nhận")
 	}
-	return CNTSSeries{Form: f, Periods: ps, Units: in.Units, Tasks: len(ps) * len(in.Units)}, nil
+	sr := CNTSSeries{Form: f, Periods: ps, Units: in.Units, Tasks: len(ps) * len(in.Units)}
+	if !f.IsWorkWeek() {
+		sr.Calendar = &cal
+	}
+	return sr, nil
 }
 
 // PublishCNTSSeries chia kỳ và phát hành lô kỳ native (một giao dịch cap/forms). Quyền, phạm vi đơn vị, cơ sở thuộc

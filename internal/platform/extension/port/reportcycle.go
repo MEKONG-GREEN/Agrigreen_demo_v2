@@ -46,6 +46,9 @@ const (
 	// "kn.period_rule/v2;week_start=wed;week=year;month=week_end". Tra lúc 00:00 giờ VN ngày đầu đợt/kỳ; chưa có
 	// phiên bản hiệu lực → LegacyRule (v1). Dữ liệu nền nạp DefaultRule (QĐ-6 đề xuất) hiệu lực 2026-11-04.
 	// Thay khóa tạm Q-17 "extension.report_period_week_numbering" (đã bỏ).
+	// D8 (CEO 13/10/2026): khóa có chiều ParamPeriodRule + ":" + mã phòng = lịch tuần riêng của phòng (đè khóa chung;
+	// Text mang ";cal=<phòng>:v<n>"); dữ liệu nền nạp ":chan_nuoi_thuy_san" = Thứ Ba–Thứ Hai (v3). Chọn lịch:
+	// reportcycle/domain.ResolveCalendar.
 	ParamPeriodRule = "extension.report_period_rule"
 	// ParamKSGMWeekStarts: ranh giới 4 tuần KSGM của một tháng, khóa có chiều ":YYYY-MM", Text "1,10,16,23";
 	// vắng → 1,8,15,22 (CNTS H04).

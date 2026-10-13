@@ -82,6 +82,7 @@ type Preview struct {
 	ReportType           string
 	PeriodType           string
 	Rule                 domain.PeriodRule
+	Calendar             domain.Calendar // lịch tuần của phòng (D8): calendar_id, calendar_version
 	Deadline             domain.Deadline
 	CloseAfterDays       int
 	Forms                []PreviewForm
@@ -162,7 +163,8 @@ func (s *Service) preview(ctx context.Context, a actor, in BatchInput, strict bo
 	if n := len([]rune(in.SeasonLabel)); n < 1 || n > 120 {
 		return pv, problem.Validation.WithField("season_label", "bắt buộc, tối đa 120 ký tự (vd Thu Đông 2026)")
 	}
-	pv.Rule = s.periodRule(ctx, from)
+	pv.Calendar = s.CalendarAt(ctx, a.k.Department, from) // D8: lịch tuần của phòng
+	pv.Rule = pv.Calendar.Rule
 	pv.Deadline = pv.Rule.DefaultDeadline(pt)
 	if in.Deadline != nil {
 		pv.Deadline = *in.Deadline

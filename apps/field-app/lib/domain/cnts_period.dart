@@ -128,6 +128,9 @@ class FormsTask {
     return status;
   }
 
+  /// Gợi ý "gửi sau hạn" theo đồng hồ máy. Máy chủ quyết định trễ hạn theo giờ
+  /// NHẬN bài (D8): bản ghi trước hạn nhưng đồng bộ sau hạn vẫn bị từ chối
+  /// `forms.late_reason_required` — ghi lý do trễ rồi gửi lại.
   bool isLateAt(DateTime now) => dueAt != null && now.isAfter(dueAt!);
 }
 

@@ -52,6 +52,10 @@ export interface RcPreview {
   report_type: string;
   period_type: string;
   period_rule: string;
+  /** D8: lịch tuần của phòng — mã phòng, phiên bản (1 v1, 2 Thứ Tư–Thứ Ba, 3 CNTS Thứ Ba–Thứ Hai), nguồn. */
+  calendar_id: string;
+  calendar_version: number;
+  calendar_source: "department_param" | "builtin" | "global_param" | "legacy";
   deadline: { offset_days: number; time: string };
   close_after_days: number;
   forms: { template_id: string; version_id: string; code: string; name: string; version: number; period_block: boolean; slots: number }[];

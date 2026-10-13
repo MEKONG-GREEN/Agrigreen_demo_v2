@@ -80,9 +80,11 @@ describe("vòng đời báo cáo giả lập (P4)", () => {
     expect(pv.communes_without_officer).toEqual(["91307"]);
     expect(pv.periods[0]).toMatchObject({ label: "Tuần 1", range_label: "28/09–04/10/2026", due_at: "2026-10-06T10:00:00Z" });
     expect(pv.period_rule).toBe("kn.period_rule/v1-tam;week=season");
+    expect([pv.calendar_id, pv.calendar_version, pv.calendar_source]).toEqual(["trong_trot", 1, "legacy"]); // D8
     // W11.03: đợt bắt đầu từ ngày hiệu lực tham số lịch kỳ v2 (04/11/2026) chia theo tuần báo cáo Thứ Tư–Thứ Ba.
     const v2 = await tinh.preview({ ...input, from_date: "2026-11-04", to_date: "2026-11-17" });
-    expect(v2.period_rule).toBe("kn.period_rule/v2;week_start=wed;week=year;month=week_end");
+    expect(v2.period_rule).toBe("kn.period_rule/v2;week_start=wed;week=year;month=week_end;cal=trong_trot:v2"); // D8: lịch của phòng
+    expect([v2.calendar_id, v2.calendar_version, v2.calendar_source]).toEqual(["trong_trot", 2, "global_param"]);
     expect(v2.periods.map((p) => [p.label, p.range_label, p.due_at])).toEqual([
       ["Tuần 45/2026", "04/11–10/11/2026", "2026-11-11T05:00:00Z"],
       ["Tuần 46/2026", "11/11–17/11/2026", "2026-11-18T05:00:00Z"],

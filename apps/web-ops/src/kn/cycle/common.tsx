@@ -187,13 +187,33 @@ export function ymdLocal(d: Date): string {
 /**
  * Lịch kỳ hệ thống (W11.03): tham số extension.report_period_rule nạp sẵn tuần báo cáo Thứ Tư–Thứ Ba hiệu lực từ
  * 04/11/2026; trước đó tuần thứ Hai–Chủ nhật (v1). Chỉ dùng để GỢI Ý ngày mặc định — kỳ thật do máy chủ chia
- * (Xem trước trả period_rule).
+ * (Xem trước trả period_rule, calendar_id, calendar_version).
  */
 export const REPORT_RULE_V2_FROM = "2026-11-04";
 
-/** Thứ đầu tuần báo cáo (0 = Chủ nhật … 6 = thứ Bảy) của tuần chứa ngày d theo lịch kỳ đang hiệu lực. */
-export function reportWeekStart(d = new Date()): number {
+/**
+ * D8 (CEO 13/10/2026): lịch tuần riêng của phòng, hiệu lực ngay (reportcycle/domain.BuiltinCalendars) — CNTS Thứ Ba –
+ * Thứ Hai. Phòng khác theo lịch chung. Tham số extension.report_period_rule:<phòng> chỉ máy chủ biết.
+ */
+export const DEPT_WEEK_START: Readonly<Record<string, number>> = { chan_nuoi_thuy_san: 2 };
+
+const WEEKDAY_VI = ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+
+/** Thứ đầu tuần báo cáo (0 = Chủ nhật … 6 = thứ Bảy) của tuần chứa ngày d theo lịch của phòng dept (D8). */
+export function reportWeekStart(d = new Date(), dept?: string | null): number {
+  if (dept && DEPT_WEEK_START[dept] !== undefined) return DEPT_WEEK_START[dept]!;
   return ymdLocal(d) >= REPORT_RULE_V2_FROM ? 3 : 1;
+}
+
+/** "Thứ Ba – Thứ Hai" — tên khoảng tuần bắt đầu weekStart. */
+export function weekRangeName(weekStart: number): string {
+  return `${WEEKDAY_VI[weekStart]} – ${WEEKDAY_VI[(weekStart + 6) % 7]}`;
+}
+
+/** Thứ đầu tuần đọc từ tag period_rule ("week_start=tue"); v1/không có → thứ Hai. */
+export function weekStartOfRule(tag: string): number {
+  const m = /week_start=(sun|mon|tue|wed|thu|fri|sat)/.exec(tag);
+  return m ? ["sun", "mon", "tue", "wed", "thu", "fri", "sat"].indexOf(m[1]!) : 1;
 }
 
 /** Ngày đầu tuần (weekStart: 0 = Chủ nhật … 6 = thứ Bảy) chứa d, theo giờ địa phương. */
