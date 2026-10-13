@@ -394,6 +394,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	coop.UseEgress(egress, mode, slog.Default())
 	pty.UseEgress(egress, mode, slog.Default())
 	kn.UseEgress(egress, mode, slog.Default()) // A5: xuất lịch công tác — nội bộ, observe
+	pr.UseEgress(egress, mode, slog.Default()) // W11.77: xuất báo cáo giá — nội bộ, observe
 
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
 		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Cooperative: coop, Metrics: met, ExtData: ed, Metering: meter, APIClient: apic,

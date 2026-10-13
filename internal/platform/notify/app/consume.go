@@ -49,7 +49,7 @@ var HandledEvents = []string{
 	extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed, extport.EventWorkScheduleReminded,
 	meteringport.EventEgressAnomaly, priceport.EventReminderIssued, priceport.EventAlertRaised,
 	priceport.EventVerificationRequested, priceport.EventVerificationResponded, priceport.EventVerificationDecided,
-	priceport.EventLockSummarized, priceport.EventBoardPublished, priceport.EventBoardReopened,
+	priceport.EventLockSummarized, priceport.EventBoardPublished, priceport.EventBoardReopened, priceport.EventTicketProxied,
 }
 
 // HandleEvent là inbox.Handler cho các sự kiện nguồn: dựng thông báo, xếp lần gửi
@@ -66,7 +66,7 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 		return s.deliver(ctx, tx, env, []domain.Notification{n})
 	case priceport.EventReminderIssued, priceport.EventAlertRaised, priceport.EventVerificationRequested,
 		priceport.EventVerificationResponded, priceport.EventVerificationDecided, priceport.EventLockSummarized,
-		priceport.EventBoardPublished, priceport.EventBoardReopened:
+		priceport.EventBoardPublished, priceport.EventBoardReopened, priceport.EventTicketProxied:
 		return s.onPrice(ctx, tx, env)
 	case extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed, extport.EventWorkScheduleReminded:
 		ns, err := domain.WorkScheduleNotifications(env.EventType, env.Payload, env.OccurredAt)

@@ -534,6 +534,7 @@ type Export struct {
 	Body        []byte
 	ContentType string
 	FileName    string
+	Rows        int // số dòng dữ liệu (điểm kiểm soát xuất — W11.77)
 }
 
 var ticketViewVI = map[string]string{

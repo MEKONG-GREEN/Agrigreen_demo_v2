@@ -25,6 +25,9 @@ const (
 	EventLockSummarized = "pf.price.lock.summarized"
 	// EventBoardReopened: Cấp Tỉnh mở duyệt bảng giá ngày đã duyệt (FN-TI-02.06). Bên phát: ReopenBoard của W11.76.
 	EventBoardReopened = "pf.price.board.reopened"
+	// EventTicketProxied: Cấp Tỉnh nhập thay phiếu Nộp muộn cho xã "Không nộp" (FN-TI-02.09 hậu điều kiện "cán bộ Xã nhận
+	// thông báo"; W11.77). Bên phát: SaveProxy (lần lưu chính thức đầu tiên của phiếu nhập thay).
+	EventTicketProxied = "pf.price.ticket.proxied"
 )
 
 // Quyết định trong EventVerificationDecided.
@@ -121,4 +124,20 @@ type BoardReopenedV1 struct {
 	Version    int       `json:"version"`
 	ReopenedAt string    `json:"reopened_at"`
 	ActorRef   uuid.UUID `json:"actor_ref"`
+}
+
+// TicketProxiedV1 là payload của pf.price.ticket.proxied: phiếu Nộp muộn do Cấp Tỉnh nhập thay. officer_ref = cán bộ Xã phụ
+// trách chính của xã tại ngày báo giá (null = "Chưa có cán bộ Xã" — không ai nhận). Không có lý do nộp muộn (văn bản tự
+// do — đọc trong ứng dụng).
+//
+//ag:event pf.price.ticket.proxied v1
+type TicketProxiedV1 struct {
+	Profile    string     `json:"profile"`
+	Day        string     `json:"day"`
+	PointCode  string     `json:"point_code"`
+	PointName  string     `json:"point_name"`
+	TicketID   uuid.UUID  `json:"ticket_id"`
+	Items      int        `json:"items"`
+	OfficerRef *uuid.UUID `json:"officer_ref"`
+	ActorRef   uuid.UUID  `json:"actor_ref"`
 }

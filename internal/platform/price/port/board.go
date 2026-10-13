@@ -49,6 +49,18 @@ type BoardLine struct {
 	Points    int             // số xã có giá
 }
 
+// BoardPointLine là giá một mặt hàng của một xã trong phiên bản đã duyệt (W11.77, pf 20261013133657 board_point): giá
+// sau hiệu chỉnh, nhóm vùng của xã tại ngày báo giá. Không dòng Không có hàng, Đã loại, phiếu Đã xóa (BR-03 FN-TW-01.01).
+type BoardPointLine struct {
+	PointCode  string
+	RegionCode string
+	ItemCode   string
+	Min, Max   decimal.Decimal
+	Mid        decimal.Decimal // P (CT-01)
+	Adjusted   bool
+	Late       bool
+}
+
 // PublishedBoard là phiên bản đã duyệt hiện hành của bảng giá một ngày.
 type PublishedBoard struct {
 	Day        time.Time
@@ -57,12 +69,19 @@ type PublishedBoard struct {
 	Reopened   bool // đang mở duyệt — số có thể đổi ở phiên bản sau ("Đang cập nhật", BR-04 FN-TI-02.06)
 	WeekKey    string
 	Lines      []BoardLine
+	// PointLines (W11.77): giá từng xã của CHÍNH phiên bản này — tổng hợp theo nhóm vùng / xã. Phiên bản duyệt trước
+	// pf 20261013133657 không có ảnh chụp: dựng lại từ phiếu khi ngày không mở duyệt (số liệu khóa khi Đã duyệt), rỗng
+	// khi đang mở duyệt.
+	PointLines []BoardPointLine
 }
 
 // Boards là bảng giá đã duyệt của tenant người gọi (tenant từ ctx) — Bảng giá tổng hợp, dashboard, báo cáo (W11.77).
 type Boards interface {
 	// Published trả phiên bản đã duyệt hiện hành của ngày day; ok = false nếu ngày chưa duyệt lần nào.
 	Published(ctx context.Context, profile string, day time.Time) (b PublishedBoard, ok bool, err error)
+	// PublishedBetween trả phiên bản đã duyệt hiện hành của mọi ngày đã duyệt trong [from, to], theo ngày tăng dần
+	// (W11.77 — biến động, xu hướng).
+	PublishedBetween(ctx context.Context, profile string, from, to time.Time) ([]PublishedBoard, error)
 }
 
 // EventBoardPublished: bảng giá ngày vừa duyệt (phiên bản mới) — website (W11.81), thông báo.

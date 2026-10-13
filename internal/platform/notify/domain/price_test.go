@@ -136,6 +136,23 @@ func TestPriceLifecycleRecipients_NOTIF(t *testing.T) {
 	}
 }
 
+// W11.77 (FN-TI-02.09 hậu điều kiện): Cấp Tỉnh nhập thay → cán bộ Xã phụ trách nhận chuông (không email), không gửi cho
+// người nhập thay; xã chưa có cán bộ Xã → không ai nhận.
+func TestPriceProxyEntryNotifies_W1177(t *testing.T) {
+	at := time.Date(2026, 10, 8, 5, 30, 0, 0, time.UTC)
+	officer, tinh := uuid.New(), uuid.New()
+	ns := priceNotes(t, priceport.EventTicketProxied, priceport.TicketProxiedV1{Profile: "kn", Day: "2026-10-08", PointCode: "XBG0003",
+		PointName: "Hà Tiên", TicketID: uuid.New(), Items: 38, OfficerRef: &officer, ActorRef: tinh}, at, []uuid.UUID{tinh})
+	if len(ns) != 1 || *ns[0].RecipientRef != officer || ns[0].Kind != port.KindPriceProxyEntry || ns[0].Email ||
+		ns[0].DeepLink != PriceHistoryLink || !strings.Contains(ns[0].Title, "Hà Tiên") || !strings.Contains(ns[0].Body, "Nộp muộn") {
+		t.Fatalf("nhập thay → cán bộ Xã: %+v", ns)
+	}
+	if ns = priceNotes(t, priceport.EventTicketProxied, priceport.TicketProxiedV1{Profile: "kn", Day: "2026-10-08", PointCode: "XBG0003",
+		PointName: "Hà Tiên", TicketID: uuid.New(), Items: 38, ActorRef: tinh}, at, nil); len(ns) != 0 {
+		t.Fatalf("chưa có cán bộ Xã → không ai nhận: %+v", ns)
+	}
+}
+
 // NOTIF: log chỉ ghi email đã che; email dựng từ tiêu đề/nội dung thông báo kèm liên kết web.
 func TestMaskEmailAndMessage_NOTIF(t *testing.T) {
 	for in, want := range map[string]string{

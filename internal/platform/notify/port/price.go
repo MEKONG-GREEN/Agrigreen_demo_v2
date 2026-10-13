@@ -28,6 +28,9 @@ const (
 	KindPriceBoardApproved = "price_board_approved"
 	// KindPriceBoardReopened: bảng giá ngày đang mở duyệt → Cấp Tỉnh + QTNV (FN-TI-02.06).
 	KindPriceBoardReopened = "price_board_reopened"
+	// KindPriceProxyEntry: Cấp Tỉnh nhập thay báo giá Nộp muộn → cán bộ Xã phụ trách (FN-TI-02.09; W11.77, pf
+	// 20261013133703).
+	KindPriceProxyEntry = "price_proxy_entry"
 )
 
 // PriceDesk tìm người nhận Cấp Tỉnh của Báo giá nông sản (pf/notify khai cổng; gốc lắp ráp hiện thực từ pf/accounts —

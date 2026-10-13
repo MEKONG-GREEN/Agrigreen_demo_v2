@@ -26,6 +26,7 @@ provides:
     - pf.price.board.reopened/v1
     - pf.price.lock.summarized/v1
     - pf.price.reminder.issued/v1
+    - pf.price.ticket.proxied/v1
     - pf.price.verification.decided/v1
     - pf.price.verification.requested/v1
     - pf.price.verification.responded/v1

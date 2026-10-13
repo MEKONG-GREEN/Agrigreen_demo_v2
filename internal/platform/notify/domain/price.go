@@ -23,6 +23,7 @@ const (
 	PriceReminderLink = "/kn/bao-gia/nhap"       // Nhập báo giá (FN-XA-03.04 B3)
 	PriceVerifyLink   = "/kn/bao-gia/xac-minh"   // Yêu cầu xác minh của Xã (FN-XA-03.05)
 	PriceReviewLink   = "/kn/bao-gia/kiem-duyet" // Kiểm duyệt & công bố của Cấp Tỉnh (FN-TI-02.03, 02.05)
+	PriceHistoryLink  = "/kn/bao-gia/lich-su"    // Lịch sử báo giá của Xã (FN-XA-03.03) — phiếu nhập thay (W11.77)
 )
 
 // PriceTinhRoles: vai của thông báo chủ đề Cấp Tỉnh khi không tra được người nhận cụ thể (không email).
@@ -162,6 +163,16 @@ func PriceMessages(eventType string, payload json.RawMessage, occurred time.Time
 		t := tpl(port.KindPriceBoardReopened, PriceReviewLink, nil, fmt.Sprintf("Bảng giá ngày %s đang mở duyệt", shortDay(p.BoardDate)),
 			fmt.Sprintf("Phiên bản v%d đang mở duyệt để sửa; các cấp vẫn thấy v%d (\"Đang cập nhật\") tới khi duyệt lại.", p.Version, p.Version))
 		return []PriceMessage{{Tpl: t, Profile: p.Profile, Tinh: true, Exclude: p.ActorRef}}, true, nil
+	case priceport.EventTicketProxied:
+		var p priceport.TicketProxiedV1
+		if err := dec(&p); err != nil {
+			return nil, true, err
+		}
+		t := tpl(port.KindPriceProxyEntry, PriceHistoryLink, &p.TicketID,
+			fmt.Sprintf("Cấp Tỉnh đã nhập thay báo giá — %s, %s", p.PointName, shortDay(p.Day)),
+			fmt.Sprintf("Báo giá ngày %s của xã %s (%d mặt hàng) được Cấp Tỉnh nhập thay, gắn nhãn Nộp muộn.", shortDay(p.Day),
+				p.PointName, p.Items))
+		return []PriceMessage{{Tpl: t, Profile: p.Profile, Xa: refList(p.OfficerRef), Exclude: p.ActorRef}}, true, nil
 	}
 	return nil, false, nil
 }
@@ -170,7 +181,7 @@ func PriceMessages(eventType string, payload json.RawMessage, occurred time.Time
 var PriceEvents = []string{
 	priceport.EventReminderIssued, priceport.EventAlertRaised, priceport.EventVerificationRequested,
 	priceport.EventVerificationResponded, priceport.EventVerificationDecided, priceport.EventLockSummarized,
-	priceport.EventBoardPublished, priceport.EventBoardReopened,
+	priceport.EventBoardPublished, priceport.EventBoardReopened, priceport.EventTicketProxied,
 }
 
 // priceReminder: nhắc nhập giá (W11.74): có người nhận → mỗi người một thông báo (email theo cờ của lịch); không →

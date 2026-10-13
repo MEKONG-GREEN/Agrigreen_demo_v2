@@ -125,6 +125,8 @@ type BoardView struct {
 	Blockers     []string // lý do chưa duyệt được (hiển thị cạnh nút vô hiệu)
 	ReopenDays   int
 	Full         bool // người gọi xem được xem trước / nhật ký
+	// points: dòng giá theo xã của số liệu hiện tại (W11.77 — chụp vào board_point lúc duyệt); không trả ra ngoài.
+	points []port.PriceLine
 }
 
 // boardRead gom dữ liệu màn Kiểm duyệt trong giao dịch.
@@ -169,7 +171,7 @@ func (s *TicketService) boardRead(ctx context.Context, tx pgx.Tx, prof port.Prof
 		}
 		v.PriceLines = len(v.Summary.Lines)
 		v.Preview = named(previewRows(cat, v.Summary.Lines))
-		v.Summary.Lines = nil
+		v.points, v.Summary.Lines = v.Summary.Lines, nil
 		hist, err := store.BoardHistory(ctx, tx, prof.Name, day)
 		if err != nil {
 			return v, nil, err
@@ -257,8 +259,7 @@ func (s *TicketService) published(ctx context.Context, tx pgx.Tx, profile string
 	if b.ApprovedAt != nil {
 		pb.ApprovedAt = *b.ApprovedAt
 	}
-	view := b.View(now)
-	pb.Reopened = view == domain.BoardReopened || (view == domain.BoardApproving && b.BaseStatus == domain.BoardReopened)
+	pb.Reopened = reopenedView(b, now)
 	wk, err := approveWeek(ctx, tx, profile, day, b.Version)
 	if err != nil {
 		return port.PublishedBoard{}, nil, err
@@ -267,6 +268,23 @@ func (s *TicketService) published(ctx context.Context, tx pgx.Tx, profile string
 	for _, r := range rows {
 		pb.Lines = append(pb.Lines, port.BoardLine{ItemCode: r.Item, ItemName: r.ItemName, GroupCode: r.GroupCode, UnitCode: r.UnitCode,
 			Min: r.Min, Max: r.Max, Avg: r.Avg, Points: r.Points})
+	}
+	// W11.77: giá theo xã của chính phiên bản (ảnh chụp board_point; phiên bản cũ dựng lại khi không mở duyệt).
+	pts, err := store.BoardPointsBetween(ctx, tx, profile, day, day)
+	if err != nil {
+		return port.PublishedBoard{}, nil, err
+	}
+	for _, r := range pts {
+		if r.Version == b.Version {
+			pb.PointLines = append(pb.PointLines, pointLineOf(r))
+		}
+	}
+	if len(pb.PointLines) == 0 && len(pb.Lines) > 0 {
+		if prof, ok := s.calendarProfile(profile); ok {
+			if pb.PointLines, err = s.rebuildPoints(ctx, tx, prof, day, b, now); err != nil {
+				return port.PublishedBoard{}, nil, err
+			}
+		}
 	}
 	return pb, rows, nil
 }
@@ -529,6 +547,12 @@ func (s *TicketService) ApproveBoard(ctx context.Context, profile string, in Boa
 		for _, l := range v.Preview {
 			if err := store.InsertBoardLine(ctx, tx, ids.New(), c.tenant, prof.Name, v.Day, version, l.BoardLineRow, v.Now, c.ref,
 				idemKey(idem, "bline:"+l.Item)); err != nil {
+				return err
+			}
+		}
+		for _, l := range v.points { // W11.77: giá theo xã của phiên bản (Bảng giá tổng hợp theo vùng / xã, dashboard)
+			if err := store.InsertBoardPoint(ctx, tx, ids.New(), c.tenant, prof.Name, v.Day, version, boardPointRow(l), v.Now, c.ref,
+				idemKey(idem, "bpoint:"+l.PointCode+":"+l.ItemCode)); err != nil {
 				return err
 			}
 		}

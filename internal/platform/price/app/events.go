@@ -69,6 +69,12 @@ func emitDecided(ctx context.Context, tx pgx.Tx, sc *sheetCtx, p port.Point, day
 		OfficerRef: refPtr(p.Officer), DeciderRef: sc.c.ref})
 }
 
+// emitProxied: phiếu Nộp muộn do Cấp Tỉnh nhập thay (FN-TI-02.09, W11.77) → cán bộ Xã phụ trách chính của xã tại ngày.
+func emitProxied(ctx context.Context, tx pgx.Tx, sc *sheetCtx, p port.Point, day time.Time, ticket uuid.UUID, items int) error {
+	return enqueue(ctx, tx, sc.c.tenant, sc.now, port.EventTicketProxied, port.TicketProxiedV1{Profile: sc.prof.Name, Day: dayStr(day),
+		PointCode: p.Code, PointName: p.Name, TicketID: ticket, Items: items, OfficerRef: refPtr(p.Officer), ActorRef: sc.c.ref})
+}
+
 // decisionOf đổi quyết định của API (domain.Decision*) sang giá trị của sự kiện.
 func decisionOf(d string) string {
 	switch d {

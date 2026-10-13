@@ -16,6 +16,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/price/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/price/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -51,6 +53,11 @@ type TicketService struct {
 	// Weeks (W11.76): lịch kỳ hệ thống (pf/extension qua gốc lắp ráp) cho khóa tuần lưu lúc duyệt bảng giá. nil → quy tắc
 	// mặc định QĐ-6 (domain.DefaultWeekOf).
 	Weeks port.Weeks
+	// Egress (W11.77, tùy chọn — G5 ADR-0024, quyết định A5): điểm kiểm soát xuất dùng chung (pf/metering) cho "Xuất
+	// Excel / PDF" báo cáo giá — xuất NỘI BỘ: ghi egress_event, không bao giờ chặn. nil → không ghi.
+	Egress     meter.Checkpoint
+	EgressMode meter.Mode
+	EgressLog  *slog.Logger
 }
 
 var _ port.Tickets = (*TicketService)(nil)
@@ -836,6 +843,12 @@ func (s *TicketService) writeEntry(ctx context.Context, tx pgx.Tx, sc *sheetCtx,
 		}
 		if source == domain.SourceXa { // NOTIF: Tạm tính mới → Cấp Tỉnh phụ trách (nhập thay: Cấp Tỉnh đã biết)
 			if err := emitAlertRaised(ctx, tx, sc, p, day, t.ID, raised); err != nil {
+				return store.Ticket{}, err
+			}
+		}
+		// W11.77: lần lưu chính thức đầu tiên của phiếu nhập thay → cán bộ Xã nhận thông báo (FN-TI-02.09 hậu điều kiện).
+		if source == domain.SourceProxy && (cur == nil || cur.Status != domain.TicketLate) {
+			if err := emitProxied(ctx, tx, sc, p, day, t.ID, len(items)); err != nil {
 				return store.Ticket{}, err
 			}
 		}

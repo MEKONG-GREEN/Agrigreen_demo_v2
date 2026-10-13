@@ -23,10 +23,17 @@
 // (CT-04) + phiếu của mỗi phiên bản, khóa tuần lưu lúc duyệt, sự kiện pf.price.board.published, port.Boards, view
 // pf_price_pub.v1_board_daily / v1_ticket_week; New nối TicketHooks.Board/Approved (giá tham chiếu chỉ từ ngày đã duyệt).
 //
+// W11.77 (pf 20261013133657): báo cáo giá — Tiến độ nhập giá, Bảng giá tổng hợp, Biến động giá, Dashboard theo vùng,
+// Thống kê phiếu theo cán bộ Xã + khóa tháng (Q-085); ảnh chụp giá theo xã của mỗi phiên bản đã duyệt (port.Boards
+// PointLines, PublishedBetween); sự kiện pf.price.ticket.proxied (nhập thay → cán bộ Xã); xuất qua điểm kiểm soát xuất
+// (UseEgress).
+//
 // Module khác chỉ import price/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
 package price
 
 import (
+	"log/slog"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/price/app"
@@ -34,6 +41,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/price/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -95,6 +103,12 @@ func (m *Module) UseWeeks(w port.Weeks) { m.tickets.Weeks = w }
 // UseTablePDF nối bộ dựng PDF (pf/reports) cho "Tải PDF" phiếu báo giá (FN-XA-03.02). Không nối → 503.
 func (m *Module) UseTablePDF(p port.TablePDF) { m.tickets.PDF = p }
 
+// UseEgress nối điểm kiểm soát xuất dùng chung (pf/metering, ADR-0024) cho "Xuất Excel / PDF" báo cáo giá (W11.77) —
+// xuất nội bộ, chỉ ghi nhận.
+func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
+	m.tickets.Egress, m.tickets.EgressMode, m.tickets.EgressLog = cp, mode, log
+}
+
 // Catalog cho module khác: danh mục nền (đơn vị tính, nhóm hàng) có hiệu lực theo ngày.
 func (m *Module) Catalog() port.Catalog { return m.svc }
 
@@ -116,6 +130,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.PointHandler{Svc: m.svc}.RegisterApp(rg)      // W11.72
 	handler.TicketHandler{Svc: m.tickets}.RegisterApp(rg) // W11.75
 	handler.BoardHandler{Svc: m.tickets}.RegisterApp(rg)  // W11.76
+	handler.ReportHandler{Svc: m.tickets}.RegisterApp(rg) // W11.77
 }
 
 // RegisterAdmin: không có route Admin API.
