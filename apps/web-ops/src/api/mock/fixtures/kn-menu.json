@@ -216,9 +216,7 @@
         "route": "/kn/nhan-su/cua-phong",
         "icon": "users",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -523,9 +521,7 @@
         "route": "/kn/nhan-su/cua-phong",
         "icon": "users",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -1024,9 +1020,7 @@
         "route": "/kn/nhan-su/cua-phong",
         "icon": "users",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -1496,9 +1490,7 @@
         "route": "/kn/nhan-su/cua-phong",
         "icon": "users",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -1927,9 +1919,7 @@
         "route": "/kn/nhan-su/cua-phong",
         "icon": "users",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -2258,9 +2248,7 @@
         "route": "/kn/nhan-su/ho-so",
         "icon": "users",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -2332,9 +2320,7 @@
         "route": "/kn/nhan-su/cua-phong",
         "icon": "users",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -2869,8 +2855,6 @@
           "icon": "shield",
           "badge_source": null,
           "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
           "children": []
          },
          {

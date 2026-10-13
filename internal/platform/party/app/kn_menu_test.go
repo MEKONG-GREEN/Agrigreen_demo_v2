@@ -21,7 +21,7 @@ func TestW1106_MenuViewComingSoonAndAlias(t *testing.T) {
 	if v.Version != "kn.menu/v3" || len(v.Groups) < 2 || v.Groups[1].Key != domain.GroupNghiepVu {
 		t.Fatalf("menu HCTH: %+v", v.Groups)
 	}
-	it := v.Groups[1].Items[0]
+	it := v.Groups[1].Items[1] // W11.22: Items[0] "Hồ sơ nhân sự" đã mở; "Hồ sơ dữ liệu" còn Sắp có
 	if it.Enabled || it.Status != domain.ItemComingSoon || it.StatusLabel != "Sắp có" {
 		t.Fatalf("mục Sắp có: %+v", it)
 	}

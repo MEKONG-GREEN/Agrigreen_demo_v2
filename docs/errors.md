@@ -43,6 +43,8 @@ Mã lỗi của module có dạng `<module>.<lỗi>`.
 | 410 | `vault.erased` | vault/identity: chủ thể đã bị xóa định danh (RB-3); khóa bí mật đã hủy |
 | 422 | `vault.unwrap_failed` | vault/identity: `wrapped_dek` không mở được bằng khóa của chủ thể |
 | 429 | `vault.quota_exceeded` | vault/identity: người yêu cầu vượt hạn mức Lookup/Resolve (`AG_VAULT_QUOTA_PER_HOUR`/`_BURST`); problem có `retry_after_s`. Mục đích ngoài danh mục của thao tác → 422 `validation_failed` (trường `purpose`); Resolve/Unwrap thiếu MFA khi `AG_VAULT_REQUIRE_MFA` bật → 403 `mfa_required` |
+| 422 | `vault.section_invalid` | vault/identity (W11.22, vault 000004): ngăn hồ sơ không có, mục đích không phải mục đích của ngăn (`hrm.profile` ↔ ngăn `hrm.profile`, `hrm.sensitive` ↔ ngăn `hrm.sensitive`), trường không thuộc ngăn hoặc quá dài |
+| 503 | `vault.profiles_unsupported` | client của kho: hiện thực được nối không có phần mở rộng hồ sơ (`client.Profiles`) — lỗi cấu hình |
 | 502/503 | `vault.unavailable` | client của kho: kho định danh không phản hồi hoặc lỗi hệ thống |
 | 404 | `masterdata.admin_unit_not_found` | pf/masterdata: không có đơn vị hành chính với mã đó tại thời điểm tra (hoặc đã bãi bỏ không có kế thừa) |
 | 409 | `masterdata.admin_unit_conflict` | pf/masterdata: nhập danh mục có phiên bản `(code, valid_from)` đã có với nội dung khác — chỉ được đóng hiệu lực phiên bản đang mở |
@@ -1033,6 +1035,15 @@ Route `/v1/hrm/*` (Application API). Lỗi chung: `unauthenticated` (401), `forb
 | 409 | `hrm.item_exists` | Thêm mục có mã (đã chuẩn hóa) đã có trong danh mục, kể cả mục đã ngừng sử dụng (FN-19: trùng mã → chặn) |
 | 422 | `hrm.item_reference` | Tham chiếu tới mục không có hoặc đã ngừng: nhóm chuyên ngành → trình độ, chuyên ngành → nhóm của đúng trình độ, bảng hệ số → ngạch, tham số → mã kỷ luật/khen thưởng |
 | 404 | `hrm.rule_unknown` | Khóa tham số không phải `promotion` hoặc `achievement_conversion` |
+| 403 | `hrm.records_disabled` | W11.22: hồ sơ nhân sự chưa bật cho dữ liệu thật — cờ `AG_HRM_RECORDS` vắng ở production (Q-005) hoặc `"0"`; danh mục không bị ảnh hưởng. `GET /v1/hrm/access` không lỗi mà trả `enabled=false` |
+| 404 | `hrm.staff_not_found` | W11.22: không có hồ sơ, hoặc hồ sơ ngoài phạm vi xem của người gọi (không lộ sự tồn tại) |
+| 404 | `hrm.event_not_found` | W11.22: sửa/hủy một dòng quá trình không có, đã bị thay/hủy, hoặc thuộc hồ sơ khác |
+| 409 | `hrm.duplicate_person` | W11.22: SĐT đã thuộc một chủ thể khác ở kho định danh (quy tắc V.2.0 mục 4: trùng SĐT → chặn) |
+| 422 | `hrm.step_out_of_range` | W11.22: bậc vượt số bậc của ngạch tại ngày hiệu lực, ngạch chưa có bảng hệ số, hoặc nâng bậc khi chưa có ngạch hiệu lực |
+| 422 | `hrm.not_applicable` | W11.22: thẻ Thống kê BC Sở (TK-01..06) với cán bộ khuyến nông cấp xã |
+| 422 | `hrm.permission_locked` | W11.22: sửa dòng ma trận của nhóm Admin (FN-20: chặn gỡ quyền Admin) |
+
+W11.22 lỗi chung thêm: `forbidden` (403 — ma trận FN-20 không cho nhóm quyền cần, ngoài phạm vi sửa, ngữ cảnh chỉ xem ghi, thẻ TK cấp cho nhóm khác HCTH), `validation_failed` (422 — họ tên chứa ghi chú/số, ngày sinh sau hôm nay, thiếu đơn vị/chức vụ khi tạo, chức vụ lãnh đạo thiếu ngày bổ nhiệm, cán bộ xã thiếu xã/đơn vị quản lý, đơn vị nội bộ không có/đã ngừng, ngày nghỉ việc trước ngày vào làm hoặc thiếu lý do, sửa/hủy dòng quá trình thiếu lý do 10–500 ký tự, xuất quá 5.000 hồ sơ). Lỗi của kho định danh đi thẳng qua: `mfa_required` (đọc thẻ TK hoặc định danh đầy đủ khi kho bật MFA), `vault.quota_exceeded`, `vault.unavailable`, `vault.profiles_unsupported`.
 
 ### pf/price (`cap/price` — khung giá, W11.71, ADR-0049)
 

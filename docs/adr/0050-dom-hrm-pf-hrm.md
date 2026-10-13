@@ -54,3 +54,11 @@ Lý do không đặt danh mục ở `cap/masterdata`: một bên dùng (chưa đ
 - Dữ liệu mặc định: theo BRD (mẫu ngạch có tên, nhóm tương đương, trình độ + nhóm chuyên ngành NS05, LLCT, QLNN, ngoại ngữ, tin học, Kinh/"Không"); còn lại là mẫu (chức vụ, chuyên ngành, khen thưởng, kỷ luật, biến động, lý do nghỉ, bảng hệ số NĐ 204/2004, hai tham số) — `placeholder = true`.
 - Web-ops: màn `/kn/nhan-su/danh-muc` (Cấp Tỉnh – HCTH) và `/kn/phong-ban/hanh_chinh_tong_hop/danh-muc-nhan-su` (Admin); backend giả lập `src/api/mock/kn-hrm.ts`.
 - Giả định: [gia-dinh-brd-2026-10.md](../kn/gia-dinh-brd-2026-10.md) mục W11.21.
+
+### W11.22 hồ sơ nhân sự (13/10/2026, pf 000150, vault 000004)
+
+- Sổ `pf_hrm.staff`, `staff_event`, `record_access`, `perm_rule` (apply_ledger, RLS, `r_hrm` SELECT/INSERT). Không PII: `subject_ref` trỏ kho định danh; tên trường đã đổi thay cho giá trị.
+- Kho định danh mở rộng (không đổi `client.Client`): `client.Profiles` — `Amend` (họ tên/SĐT/địa chỉ, chỉ mục mù SĐT), `PutSection`/`GetSection` cho bảng `vault.section` (khóa riêng mỗi ngăn, mục đích gắn cứng: `hrm.profile`, `hrm.sensitive`); `vault.access_log.op` thêm `amend`, `section_write`, `section_read`.
+- Ma trận quyền FN-20 ở `domain/perm.go`, chồng lên `KNContext` (nhóm vai suy ở server, đơn vị nội bộ W11.07); bậc = phép chiếu của sự kiện ngạch/bậc (`domain.Project`), truy vấn as-of.
+- Bật dữ liệu thật sau DPIA (Q-005): cờ `AG_HRM_RECORDS`, mặc định tắt ở production.
+- Giả định: [gia-dinh-brd-2026-10.md](../kn/gia-dinh-brd-2026-10.md) mục W11.22.

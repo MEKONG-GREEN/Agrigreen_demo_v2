@@ -44,6 +44,7 @@ var menuDeptModules = map[string]string{
 	"/mau-bao-cao":      "pf/reports",
 	"/bao-gia-lich":     "pf/price", // W11.74 lịch báo giá (W11.72 mở menu)
 	"/danh-muc-nhan-su": "pf/hrm",   // W11.21: danh mục nhân sự (FN-19)
+	"/phan-quyen-ho-so": "pf/hrm",   // W11.22: phân quyền hồ sơ (FN-20)
 }
 
 // MenuModule trả module per_tenant sở hữu màn route ("" = lõi, luôn hiện).

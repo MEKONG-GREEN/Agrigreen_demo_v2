@@ -96,8 +96,8 @@ describe("kn.menu/v3 (W11.06): khuôn theo phòng ban + Dùng chung", () => {
       const tree = fromKnMenu(m);
       const biz = tree.groups.find((g) => g.key === "nghiep_vu")!;
       // Mục đã có màn bấm được (W11.72 Cấu hình báo giá QTNV, W11.41 Danh mục CNTS, W11.21 Danh mục nhân sự, W11.75 Kiểm duyệt & công bố,
-      // W11.42 Biểu mẫu & cấp quyền); còn lại "Sắp có".
-      const open = new Set(["tinh.bao_gia.cau_hinh", "tinh.bao_gia.kiem_duyet", "tinh.cnts.danh_muc", "tinh.cnts.bieu_mau", "tinh.hcth.danh_muc"]);
+      // W11.42 Biểu mẫu & cấp quyền, W11.22 Hồ sơ nhân sự); còn lại "Sắp có".
+      const open = new Set(["tinh.bao_gia.cau_hinh", "tinh.bao_gia.kiem_duyet", "tinh.cnts.danh_muc", "tinh.cnts.bieu_mau", "tinh.hcth.danh_muc", "tinh.hcth.ho_so"]);
       expect(biz.items.filter((i) => !open.has(i.key)).every((i) => i.status === "coming_soon")).toBe(true);
       const links = menuLinks(tree).map((l) => l.node.key);
       expect(links).toContain("tinh.dashboard"); // khung chung vẫn chạy
@@ -107,7 +107,7 @@ describe("kn.menu/v3 (W11.06): khuôn theo phòng ban + Dùng chung", () => {
           : code === "chan_nuoi_thuy_san"
             ? ["tinh.cnts.bieu_mau", "tinh.cnts.danh_muc"]
             : code === "hanh_chinh_tong_hop"
-              ? ["tinh.hcth.danh_muc"]
+              ? ["tinh.hcth.ho_so", "tinh.hcth.danh_muc"]
               : [],
       );
     }

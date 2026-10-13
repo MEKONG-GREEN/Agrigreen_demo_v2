@@ -36,10 +36,10 @@ func needs(it MenuItem, n string) MenuItem {
 
 // sharedByAudience: mục thêm vào nhóm "Dùng chung" theo đối tượng (W11.07, Q-067 — đề xuất của dev: lãnh đạo
 // các phòng làm việc nhân sự của phòng mình ngay trong phiên phòng ban của mình, không cần gán thêm phòng ban
-// HCTH). Màn thuộc pf/hrm (W11.22) — "Sắp có".
+// HCTH). Màn thuộc pf/hrm — W11.22 đã mở: danh sách hồ sơ trong phạm vi "đơn vị mình" của ma trận FN-20.
 var sharedByAudience = map[string][]MenuItem{
 	port.AudienceTinh: {
-		needs(soon("tinh.chung.nhan_su_phong", "Nhân sự của phòng", "/kn/nhan-su/cua-phong", "users"), NeedsManager),
+		needs(MenuItem{Key: "tinh.chung.nhan_su_phong", Label: "Nhân sự của phòng", Route: "/kn/nhan-su/cua-phong", Icon: "users"}, NeedsManager),
 	},
 }
 
@@ -119,7 +119,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 	// Hành chính - Tổng hợp (BRD HCTH v3.0 §VI.3; Cấp TW chỉ có Contact ở "Dùng chung").
 	port.MenuProfileHanhChinhTongHop: {
 		port.AudienceTinh: {
-			soon("tinh.hcth.ho_so", "Hồ sơ nhân sự", "/kn/nhan-su/ho-so", "users"),
+			// W11.22 (pf/hrm, FN-07, FN-08): hồ sơ nhân sự — danh sách + chi tiết theo thẻ.
+			{Key: "tinh.hcth.ho_so", Label: "Hồ sơ nhân sự", Route: "/kn/nhan-su/ho-so", Icon: "users"},
 			soon("tinh.hcth.kho_tai_lieu", "Hồ sơ dữ liệu", "/kn/nhan-su/kho-tai-lieu", "library"),
 			soon("tinh.hcth.danh_gia", "Đánh giá", "/kn/nhan-su/danh-gia", "approve"),
 			// W11.21 (pf/hrm, FN-19): Cấp Tỉnh – HCTH xem danh mục nhân sự (Admin sửa).
@@ -150,7 +151,8 @@ var adminDeptBusiness = map[string][]MenuItem{
 	port.MenuProfileHanhChinhTongHop: {
 		// W11.21 (pf/hrm, FN-19): Admin thêm, sửa, ngừng sử dụng danh mục nhân sự.
 		{Key: "admin.pb.hcth_danh_muc", Label: "Danh mục nhân sự", Route: adminDeptRoute("/danh-muc-nhan-su"), Icon: "catalog"},
-		soon("admin.pb.hcth_phan_quyen", "Phân quyền hồ sơ", adminDeptRoute("/phan-quyen-ho-so"), "shield"),
+		// W11.22 (pf/hrm, FN-20): ma trận phân quyền hồ sơ.
+		{Key: "admin.pb.hcth_phan_quyen", Label: "Phân quyền hồ sơ", Route: adminDeptRoute("/phan-quyen-ho-so"), Icon: "shield"},
 		soon("admin.pb.hcth_thu_muc", "Thư mục tài liệu", adminDeptRoute("/thu-muc-tai-lieu"), "library"),
 	},
 }

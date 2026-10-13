@@ -213,7 +213,8 @@ const soon = (key: string, label: string, route: string, icon: string): Item => 
 const SHARED: Group = { key: "dung_chung", label: "Dùng chung", items: [soon("chung.contact", "Contact", "/kn/dung-chung/contact", "phone")] };
 /** W11.07 (Q-067): mục "Dùng chung" thêm theo đối tượng — server chỉ trả cho lãnh đạo (Needs manager); bản giả lập trả đầy đủ như ca vàng. */
 const SHARED_BY_AUDIENCE: Partial<Record<KnRole, Item[]>> = {
-  kn_tinh: [soon("tinh.chung.nhan_su_phong", "Nhân sự của phòng", "/kn/nhan-su/cua-phong", "users")],
+  // W11.22 (pf/hrm): đã mở — hồ sơ trong phạm vi "đơn vị mình".
+  kn_tinh: [{ key: "tinh.chung.nhan_su_phong", label: "Nhân sự của phòng", route: "/kn/nhan-su/cua-phong", icon: "users" }],
 };
 
 /** Nhóm "Nghiệp vụ" theo khuôn × đối tượng (domain.deptBusiness) — mục "Sắp có" trừ mục gói đã làm (W11.21). */
@@ -277,7 +278,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
   },
   hanh_chinh_tong_hop: {
     kn_tinh: [
-      soon("tinh.hcth.ho_so", "Hồ sơ nhân sự", "/kn/nhan-su/ho-so", "users"),
+      { key: "tinh.hcth.ho_so", label: "Hồ sơ nhân sự", route: "/kn/nhan-su/ho-so", icon: "users" }, // W11.22 (pf/hrm)
       soon("tinh.hcth.kho_tai_lieu", "Hồ sơ dữ liệu", "/kn/nhan-su/kho-tai-lieu", "library"),
       soon("tinh.hcth.danh_gia", "Đánh giá", "/kn/nhan-su/danh-gia", "approve"),
       { key: "tinh.hcth.danh_muc", label: "Danh mục nhân sự", route: "/kn/nhan-su/danh-muc", icon: "catalog" }, // W11.21 (pf/hrm)
@@ -301,7 +302,7 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, (base: string) => Item[]>> =
   ],
   hanh_chinh_tong_hop: (b) => [
     { key: "admin.pb.hcth_danh_muc", label: "Danh mục nhân sự", route: `${b}/danh-muc-nhan-su`, icon: "catalog" }, // W11.21 (pf/hrm)
-    soon("admin.pb.hcth_phan_quyen", "Phân quyền hồ sơ", `${b}/phan-quyen-ho-so`, "shield"),
+    { key: "admin.pb.hcth_phan_quyen", label: "Phân quyền hồ sơ", route: `${b}/phan-quyen-ho-so`, icon: "shield" }, // W11.22 (pf/hrm)
     soon("admin.pb.hcth_thu_muc", "Thư mục tài liệu", `${b}/thu-muc-tai-lieu`, "library"),
   ],
 };

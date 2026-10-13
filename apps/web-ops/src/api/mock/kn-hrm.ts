@@ -475,6 +475,16 @@ function effectiveScale(grade: string, day: string): Scale | null {
   );
 }
 
+/** W11.22 (kn-hrm-staff.ts): bảng hệ số có hiệu lực tại ngày của ngạch. */
+export function hrmScaleAt(grade: string, day: string): Scale | null {
+  return effectiveScale(grade, day);
+}
+
+/** W11.22: mục danh mục đang dùng (kind, code) — tham chiếu của hồ sơ. */
+export function hrmActiveItem(kind: string, code: string | undefined): Item | undefined {
+  return code && activeItem(kind, code) ? current(kind, code) : undefined;
+}
+
 function scaleRoutes(): Route[] {
   return [
     {
