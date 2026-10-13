@@ -114,6 +114,9 @@ services:
       <<: [*vps-env, *vps-oidc, *vps-proxy]
       AG_CORS_ORIGINS: https://app.${AG_DOMAIN}
       AG_KC_ACTIONS_REDIRECT_URI: https://app.${AG_DOMAIN}/
+      # DEMO: bỏ bắt buộc OTP ở Admin API để tạo tài khoản cán bộ ngay. Đặt AG_MFA_DISABLED=0 trong .env khi
+      # chuyển sang thật; api-platform từ chối bật cờ này khi AG_ENV=production.
+      AG_MFA_DISABLED: ${AG_MFA_DISABLED:-1}
 
   # API nội bộ MKG: KHÔNG ra internet (Caddy không định tuyến), chỉ 127.0.0.1 của VPS.
   api-internal:

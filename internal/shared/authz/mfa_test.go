@@ -40,6 +40,27 @@ func TestMFAPolicySMSExcludedForSensitiveRoles(t *testing.T) {
 	}
 }
 
+// AG_MFA_DISABLED chỉ dành cho demo: bật thì mọi phiên được tính là đã qua yếu tố thứ hai; production từ chối.
+func TestMFAPolicyDisabledDemoOnly(t *testing.T) {
+	env := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
+	if _, err := authz.MFAPolicyFromEnv(env(map[string]string{authz.EnvMFADisabled: "1", "AG_ENV": "production"})); err == nil {
+		t.Fatal("production không được bật AG_MFA_DISABLED")
+	}
+	p, err := authz.MFAPolicyFromEnv(env(map[string]string{authz.EnvMFADisabled: "1", "AG_ENV": "staging"}))
+	if err != nil || !p.Disabled {
+		t.Fatalf("staging bật được: %+v %v", p, err)
+	}
+	iss := authztest.New(t)
+	pr, err := iss.Verifier().WithMFAPolicy(p).Verify(context.Background(),
+		iss.Sign(t, authztest.Token{Subject: ids.New(), TenantID: ids.New(), Roles: []string{authz.RolePlatformAdmin}, AMR: []string{"pwd"}}))
+	if err != nil || !pr.MFA {
+		t.Fatalf("MFA = %v, %v; mong true khi tắt", pr.MFA, err)
+	}
+	if p, _ = authz.MFAPolicyFromEnv(env(nil)); p.Disabled {
+		t.Fatal("mặc định phải bật MFA")
+	}
+}
+
 func TestMFAPolicyFromEnv(t *testing.T) {
 	env := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
 	p, err := authz.MFAPolicyFromEnv(env(nil))
