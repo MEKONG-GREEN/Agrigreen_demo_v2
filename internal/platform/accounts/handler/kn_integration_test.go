@@ -651,7 +651,7 @@ func TestFN_AD_04_04_CreateAccountRules(t *testing.T) {
 	id := uuid.MustParse(str(r.body, "user", "id"))
 	u, _ := f.dir.GetUser(context.Background(), id)
 	roles, _ := f.dir.RealmRoles(context.Background(), id)
-	if u.Username != "0912000111" || u.Phone != "0912000111" || !slices.Equal(u.RequiredActions, []string{port.ActionVerifyEmail, port.ActionUpdatePassword}) ||
+	if u.Username != "0912000111" || u.Phone != "0912000111" || !slices.Equal(u.RequiredActions, []string{port.ActionVerifyEmail, port.ActionUpdatePassword, port.ActionConfigureTOTP}) || // D24
 		!slices.Equal(roles, []string{port.RoleKNUser, "vault_registrar"}) || u.OrgRef != uuid.Nil { // A1: Cán bộ xã có vai kho định danh
 		t.Fatalf("Keycloak: user=%s phone=%s actions=%v roles=%v org=%s", u.Username, u.Phone, u.RequiredActions, roles, u.OrgRef)
 	}

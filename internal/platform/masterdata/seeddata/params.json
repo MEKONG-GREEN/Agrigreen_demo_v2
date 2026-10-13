@@ -55,6 +55,8 @@
     {"key": "distance.haversine_factor:road", "value": "1.3", "unit": "lần", "effective_from": "2026-01-01", "source_doc": "BRD Supply Chain Hub Simulation v1.4 FN-01 tham số #10 — đường bộ (AS-06)"},
     {"key": "distance.haversine_factor:waterway", "value": "1.45", "unit": "lần", "effective_from": "2026-01-01", "source_doc": "BRD Supply Chain Hub Simulation v1.4 FN-01 tham số #10 — đường thủy (AS-06)"},
     {"key": "activation.grant_lifespan_hours", "value": "72", "unit": "giờ", "effective_from": "2026-01-01", "source_doc": "g2-conventions §1 — hạn liên kết/QR kích hoạt tài khoản nông dân"},
+    {"key": "accounts.dormant_warn_days", "value": "38", "unit": "ngày", "effective_from": "2026-01-01", "source_doc": "D24 (CEO 13/10/2026) — báo trước 7 ngày khi tài khoản không hoạt động sẽ bị khóa (job accounts_dormant)"},
+    {"key": "accounts.dormant_disable_days", "value": "45", "unit": "ngày", "effective_from": "2026-01-01", "source_doc": "D24 (CEO 13/10/2026), v4.3 P-4 — khóa tài khoản không hoạt động 45 ngày (job accounts_dormant, lock_cause dormant_45d)"},
     {"key": "mrv.co2.open_burning_kg_per_t", "value": "1460", "unit": "kgCO2e/t", "effective_from": "2026-01-01", "source_doc": "TẠM — chờ khách ký phương pháp (C-1). Nguyên mẫu mekong-green: hệ số đốt rơm lộ thiên, nhãn IPCC EFDB"},
     {"key": "mrv.co2.transport_road_kg_per_tkm", "value": "0.062", "unit": "kgCO2e/t·km", "effective_from": "2026-01-01", "source_doc": "TẠM — chờ khách ký phương pháp (C-1). Nguyên mẫu mekong-green: vận chuyển đường bộ"},
     {"key": "mrv.co2.transport_waterway_kg_per_tkm", "value": "0.021", "unit": "kgCO2e/t·km", "effective_from": "2026-01-01", "source_doc": "TẠM — chờ khách ký phương pháp (C-1). Nguyên mẫu mekong-green: vận chuyển đường thủy"},

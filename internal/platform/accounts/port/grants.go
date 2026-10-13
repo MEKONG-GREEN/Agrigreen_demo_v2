@@ -52,6 +52,30 @@ var MFARoles = []string{
 	RoleAccountAdmin, RoleAccountAdminProvince,
 }
 
+// RoleLoginTOTP là vai ĐÁNH DẤU của realm (D24): mọi vai trong LoginTOTPRoles là vai tổng hợp chứa vai này,
+// và luồng đăng nhập "agrigreen browser" bắt nhập TOTP khi người dùng có nó (Condition - user role). Không
+// cấp trực tiếp, không nằm trong ManagedRoles.
+const RoleLoginTOTP = "login_totp_required"
+
+// KNOfficerRoles là vai cán bộ KN phải dùng TOTP khi đăng nhập từ G1 (D24, CEO 13/10/2026 — QĐ-4 c). Khác
+// MFARoles: đó là vai [MFA] mà Admin API còn kiểm amr ở backend (httpx.RequireMFA).
+var KNOfficerRoles = []string{"kn_national_admin", "kn_province_admin", "kn_officer", RoleKNUser}
+
+// LoginTOTPRoles là vai mà realm bắt TOTP lúc đăng nhập: cán bộ KN + mọi vai [MFA]. Phải khớp đúng các vai
+// tổng hợp chứa RoleLoginTOTP trong realm (cmd/api-platform realm_test.go).
+var LoginTOTPRoles = append(slices.Clone(KNOfficerRoles), MFARoles...)
+
+// NeedsLoginTOTP cho biết người giữ roles phải đăng ký TOTP (tạo tài khoản / cấp vai gắn CONFIGURE_TOTP vào
+// liên kết kích hoạt; realm cũng tự mở đăng ký ở lần đăng nhập đầu).
+func NeedsLoginTOTP(roles []string) bool {
+	for _, r := range roles {
+		if slices.Contains(LoginTOTPRoles, r) {
+			return true
+		}
+	}
+	return false
+}
+
 // RoleOrgKinds: vai chỉ gắn được cho người thuộc tổ chức có loại tương ứng (giá trị
 // là party/port.OrgKind). Vai không có trong bảng gắn được cho mọi loại tổ chức.
 var RoleOrgKinds = map[string][]string{

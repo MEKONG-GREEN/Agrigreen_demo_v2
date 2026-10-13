@@ -31,9 +31,10 @@
         "",
         "manual",
         "org_deactivated",
-        "brute_force"
+        "brute_force",
+        "dormant_45d"
       ],
-      "description": "Nguyên nhân khóa trước đó; brute_force = Keycloak khóa do đăng nhập sai nhiều lần (GIS US-LOG-01 AC-3), Admin mở khóa"
+      "description": "Nguyên nhân khóa trước đó; brute_force = Keycloak khóa do đăng nhập sai nhiều lần (GIS US-LOG-01 AC-3), Admin mở khóa; dormant_45d = job accounts_dormant khóa vì không hoạt động 45 ngày (D24), Admin mở khóa"
     },
     "actor_ref": {
       "type": "string",

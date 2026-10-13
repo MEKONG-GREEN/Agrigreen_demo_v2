@@ -324,24 +324,23 @@ func assignmentFrom(id, user uuid.UUID, c checkedAssignment) port.Assignment {
 		MgmtLevel: in.MgmtLevel, Communes: in.Communes, ValidFrom: in.ValidFrom, ValidTo: in.ValidTo, Active: true}
 }
 
-// ensureKNUser cấp vai realm kn_user (cổng vào bề mặt KN) và TOTP cho Admin nếu chưa có.
-func (s *Service) ensureKNUser(ctx context.Context, t *knTarget, role string) error {
+// ensureKNUser cấp vai realm kn_user (cổng vào bề mặt KN) và đòi đăng ký TOTP nếu chưa có — D24: mọi cán bộ KN
+// (trước D24 chỉ vai trò Admin KN).
+func (s *Service) ensureKNUser(ctx context.Context, t *knTarget) error {
 	if !slices.Contains(t.realm, port.RoleKNUser) {
 		if err := s.Dir.AddRealmRoles(ctx, t.user.ID, []string{port.RoleKNUser}); err != nil {
 			return dirErr(err)
 		}
 		t.realm = append(t.realm, port.RoleKNUser)
 	}
-	if role == port.KNAdmin {
-		has, err := s.Dir.HasOTP(ctx, t.user.ID)
-		if err != nil {
-			return dirErr(err)
-		}
-		if !has && !slices.Contains(t.user.RequiredActions, port.ActionConfigureTOTP) {
-			return dirErr(s.Dir.AddRequiredActions(ctx, t.user.ID, []string{port.ActionConfigureTOTP}))
-		}
+	if slices.Contains(t.user.RequiredActions, port.ActionConfigureTOTP) {
+		return nil
 	}
-	return nil
+	has, err := s.Dir.HasOTP(ctx, t.user.ID)
+	if err != nil || has {
+		return dirErr(err)
+	}
+	return dirErr(s.Dir.AddRequiredActions(ctx, t.user.ID, []string{port.ActionConfigureTOTP}))
 }
 
 // GrantAssignment thêm một vai trò cho tài khoản ("Thêm vai trò" ở màn Detail).
@@ -365,7 +364,7 @@ func (s *Service) GrantAssignment(ctx context.Context, user uuid.UUID, in domain
 	if err != nil {
 		return AssignmentResult{}, err
 	}
-	if err := s.ensureKNUser(ctx, t, c.in.Role); err != nil {
+	if err := s.ensureKNUser(ctx, t); err != nil {
 		return AssignmentResult{}, err
 	}
 	vaultGranted := false
@@ -641,7 +640,8 @@ func (s *Service) CreateKNUser(ctx context.Context, in KNCreateInput) (KNCreateR
 	if err := s.checkIdentity(ctx, a.p.TenantID, prof, uuid.Nil); err != nil {
 		return KNCreateResult{}, err
 	}
-	acts := []string{port.ActionVerifyEmail, port.ActionUpdatePassword}
+	// D24: mọi tài khoản KN (kn_user) đăng ký TOTP ngay trong liên kết kích hoạt.
+	acts := domain.RequiredActions([]string{port.RoleKNUser})
 	id, err := s.Dir.CreateUser(ctx, port.NewUser{Username: prof.Username, Email: prof.Email, FirstName: prof.FirstName,
 		LastName: prof.LastName, Phone: prof.Phone, TenantID: a.p.TenantID, RequiredActions: acts})
 	if err != nil {

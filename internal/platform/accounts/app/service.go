@@ -350,6 +350,13 @@ func enqueue(ctx context.Context, tx pgx.Tx, e domain.Event) error {
 		prev, _ := e.Details["prev_cause"].(string)
 		ev.Type = port.EventUserUnlocked
 		ev.Payload = port.UserUnlockedV1{UserRef: e.Account.UserRef, OrgRef: e.Account.OrgRef, PrevCause: prev, ActorRef: e.ActorRef, EventTime: at, Seq: e.Seq}
+	case domain.ActionDormantWarned:
+		last, _ := e.Details["last_activity_at"].(string)
+		disableAt, _ := e.Details["disable_at"].(string)
+		idle, _ := e.Details["idle_days"].(int)
+		ev.Type = port.EventUserDormantWarning
+		ev.Payload = port.DormantWarningV1{UserRef: e.Account.UserRef, OrgRef: e.Account.OrgRef, LastActivityAt: last, DisableAt: disableAt,
+			IdleDays: idle, EventTime: at, Seq: e.Seq}
 	default:
 		return nil
 	}

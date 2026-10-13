@@ -93,8 +93,29 @@ type realmFile struct {
 		Realm []struct {
 			Name        string `json:"name"`
 			Description string `json:"description"`
+			Composite   bool   `json:"composite"`
+			Composites  struct {
+				Realm []string `json:"realm"`
+			} `json:"composites"`
 		} `json:"realm"`
 	} `json:"roles"`
+	// D24: luồng đăng nhập có TOTP theo vai.
+	BrowserFlow         string `json:"browserFlow"`
+	AuthenticatorConfig []struct {
+		Alias  string            `json:"alias"`
+		Config map[string]string `json:"config"`
+	} `json:"authenticatorConfig"`
+	AuthenticationFlows []struct {
+		Alias      string `json:"alias"`
+		TopLevel   bool   `json:"topLevel"`
+		Executions []struct {
+			Authenticator       string `json:"authenticator"`
+			AuthenticatorConfig string `json:"authenticatorConfig"`
+			FlowAlias           string `json:"flowAlias"`
+			Requirement         string `json:"requirement"`
+			Priority            int    `json:"priority"`
+		} `json:"authenticationExecutions"`
+	} `json:"authenticationFlows"`
 	ClientScopes []struct {
 		Name            string `json:"name"`
 		ProtocolMappers []struct {
@@ -161,13 +182,15 @@ func TestKeycloakRealmCoversRolesAndClaims(t *testing.T) {
 		!strings.Contains(string(compose), "./keycloak-themes/agrigreen:/opt/keycloak/themes/agrigreen:ro") {
 		t.Errorf("KN v7.7 X-08: docker-compose.yml chưa gắn theme agrigreen vào Keycloak (%v)", err)
 	}
-	// KN v7.7 N-09: phiên realm đủ dài cho client mobile 24 giờ, ngoại tuyến 72 giờ.
-	if realm.SSOSessionIdleTimeout < 14400 || realm.SSOSessionMaxLifespan < 86400 || !realm.OfflineMaxLifespanEnabled || realm.OfflineSessionMaxLifespan != 259200 {
+	// KN v7.7 N-09 / D9, GIỮ NGUYÊN theo D24 (CEO 13/10/2026) kèm đánh giá rủi ro
+	// docs/security/danh-gia-rui-ro-phien-4h-24h.md: realm 4 giờ không thao tác, tối đa 24 giờ; ngoại tuyến 72 giờ.
+	// Giá trị KHÓA CỨNG — đổi phải qua quyết định mới và cập nhật bản đánh giá rủi ro.
+	if realm.SSOSessionIdleTimeout != 14400 || realm.SSOSessionMaxLifespan != 86400 || !realm.OfflineMaxLifespanEnabled || realm.OfflineSessionMaxLifespan != 259200 {
 		t.Errorf("KN v7.7 N-09: ssoIdle=%d ssoMax=%d offlineMax=%d (bật=%v)", realm.SSOSessionIdleTimeout, realm.SSOSessionMaxLifespan,
 			realm.OfflineSessionMaxLifespan, realm.OfflineMaxLifespanEnabled)
 	}
 	wantClient := map[string]map[string]string{
-		"agrigreen-web-ops":   {"client.session.idle.timeout": "14400"},
+		"agrigreen-web-ops":   {"client.session.idle.timeout": "14400", "client.session.max.lifespan": "36000"},
 		"agrigreen-field-app": {"client.session.max.lifespan": "86400", "client.offline.session.max.lifespan": "259200"},
 	}
 	for _, c := range realm.Clients {

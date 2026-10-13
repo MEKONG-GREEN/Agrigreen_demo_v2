@@ -31,6 +31,10 @@ const (
 	ActionUnlocked          Action = "unlocked"
 	ActionAssignmentChanged Action = "assignment_changed"
 	ActionActionsSent       Action = "actions_sent"
+	// ActionDormantWarned: job accounts_dormant báo trước khóa vì không hoạt động (D24).
+	ActionDormantWarned Action = "dormant_warned"
+	// ActionTOTPReset: quản trị viên gỡ TOTP, người dùng đăng ký lại ở lần đăng nhập sau (D24).
+	ActionTOTPReset Action = "totp_reset"
 )
 
 // Account là trạng thái tài khoản ở pf (không có dữ liệu cá nhân).
@@ -187,10 +191,10 @@ func NormalizeRoles(roles []string) ([]string, error) {
 }
 
 // RequiredActions trả required action khi tạo tài khoản: xác minh email, tự đặt
-// mật khẩu, và cấu hình TOTP nếu có vai [MFA].
+// mật khẩu, và cấu hình TOTP nếu có vai [MFA] hoặc vai cán bộ KN (D24 — port.LoginTOTPRoles).
 func RequiredActions(roles []string) []string {
 	acts := []string{port.ActionVerifyEmail, port.ActionUpdatePassword}
-	if port.NeedsMFA(roles) {
+	if port.NeedsLoginTOTP(roles) {
 		acts = append(acts, port.ActionConfigureTOTP)
 	}
 	return acts

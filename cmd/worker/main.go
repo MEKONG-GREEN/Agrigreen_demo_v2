@@ -113,6 +113,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/healthsrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
@@ -655,9 +656,26 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		js = append(js, pm.CalendarJobs(price.CalendarTenants(out.pools[migrations.PF]), log)...)
 	}
+	if selected(jobs, accport.JobDormant) && os.Getenv("AG_KC_ADMIN_URL") != "" {
+		// D24 (W10.05): báo trước ngày 38, khóa ngày 45 tài khoản không hoạt động. Tìm tenant bằng ag_ops_jobs (cột
+		// tenant_id, enabled của pf_accounts.account), ghi bằng r_accounts; lần đăng nhập đọc ở Keycloak (AG_KC_*,
+		// view-events); ngưỡng là tham số có phiên bản của pf/masterdata (R-05). Chưa cấu hình Keycloak → không có job.
+		dir, err := accounts.DirectoryFromEnv()
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		pfPool, err := openPF(ctx, direct, &closeFn)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		acc := accounts.New(pfPool, clk, accounts.Deps{Directory: dir, Params: masterdata.New(pfPool, clk).Params()})
+		js = append(js, acc.Jobs(accounts.DormantTenants(out.pools[migrations.PF]), log)...)
+	}
 	if len(js) == 0 {
 		closeFn()
-		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " + extension.JobWorkSchedule + ", " +
+		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + accport.JobDormant + ", " + extension.JobEscalation + ", " + extension.JobWorkSchedule + ", " +
 			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot +
 			", " + mrvport.JobReviewEscalator + ", " + extension.JobReportCycle +
 			", " + apiclientport.JobKeyExpiry + ", " + apiclientport.JobFeedBuild + ", " + apiclientport.JobFeedRetention + ", " + apiclientport.JobWebhookDispatch +

@@ -2903,6 +2903,23 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/{id}/reset-totp:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: "D24 — Đặt lại TOTP (mất/đổi điện thoại): xóa TOTP trong Keycloak, thêm CONFIGURE_TOTP (đăng ký lại ở lần đăng nhập sau), thu hồi mọi phiên; lý do ≥ 20 ký tự; ghi sổ totp_reset. Không tự đặt lại của chính mình (403 accounts.self_action); tài khoản đang khóa hoặc không có TOTP để đặt lại → 409 accounts.state_conflict"
+      operationId: accountsResetTOTP
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/AccountsReason"
+      responses:
+        "200": {$ref: "#/components/responses/AccountsChanged"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/accounts/users/{id}/resend-actions:
     parameters:
       - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -7482,10 +7499,19 @@ components:
         email_verified: {type: boolean}
         org_ref: {type: [string, "null"], format: uuid}
         roles: {type: [array, "null"], items: {type: string}, description: "Vai do pf/accounts quản lý; null ở danh sách nếu tài khoản tạo ngoài nền tảng"}
-        lock_cause: {type: [string, "null"], enum: [manual, org_deactivated, null]}
+        lock_cause: {type: [string, "null"], enum: [manual, org_deactivated, dormant_45d, null], description: "dormant_45d — job accounts_dormant khóa vì không hoạt động (D24)"}
         required_actions: {type: array, items: {type: string}}
         created_at: {type: [string, "null"], format: date-time}
         tracked: {type: boolean, description: "Có trong pf_accounts (tạo hoặc thao tác qua nền tảng)"}
+        mfa: {$ref: "#/components/schemas/AccountsMFA"}
+    AccountsMFA:
+      type: object
+      description: "D24 — trạng thái TOTP; chỉ có ở GET /v1/accounts/users/{id}"
+      required: [required, configured, enrollment_pending]
+      properties:
+        required: {type: boolean, description: "Vai của tài khoản bắt TOTP khi đăng nhập (cán bộ KN, vai [MFA])"}
+        configured: {type: boolean, description: "Đã có TOTP trong Keycloak"}
+        enrollment_pending: {type: boolean, description: "Đang chờ người dùng đăng ký (required action CONFIGURE_TOTP)"}
     AccountsAccount:
       type: object
       required: [user_ref, org_ref, roles, enabled, lock_cause]
@@ -7494,13 +7520,13 @@ components:
         org_ref: {type: string, format: uuid}
         roles: {type: array, items: {type: string}}
         enabled: {type: boolean}
-        lock_cause: {type: [string, "null"], enum: [manual, org_deactivated, null]}
+        lock_cause: {type: [string, "null"], enum: [manual, org_deactivated, dormant_45d, null]}
     AccountsEvent:
       type: object
       required: [seq, action, event_time, recorded_at, actor_ref, reason, account]
       properties:
         seq: {type: integer}
-        action: {type: string, enum: [created, locked, unlocked, assignment_changed, actions_sent]}
+        action: {type: string, enum: [created, locked, unlocked, assignment_changed, actions_sent, dormant_warned, totp_reset], description: "dormant_warned, locked/dormant_45d do job accounts_dormant (actor_ref = tác nhân hệ thống); totp_reset do quản trị viên (D24)"}
         event_time: {type: string, format: date-time}
         recorded_at: {type: string, format: date-time}
         actor_ref: {type: string, format: uuid}
@@ -7665,6 +7691,7 @@ components:
         event:
           type: string
           enum: [account.created, account.locked, account.unlocked, account.activation_sent, account.assignment_changed, account.profile_updated,
+            account.dormant_warned, account.totp_reset,
             assignment.granted, assignment.changed, assignment.revoked, assignment.attributes_changed]
         entity_ref: {type: [string, "null"], format: uuid, description: "assignment_id với sự kiện assignment.*"}
         actor_ref: {type: string, format: uuid}

@@ -22,6 +22,7 @@ provides:
     - KNDirectory
     - KNPeople
     - MailDirectory
+    - OTPAdmin
     - ProfileUpdater
     - RecipientDirectory
     - RoleHolders
@@ -32,6 +33,7 @@ provides:
     - pf.accounts.assignment.granted/v1
     - pf.accounts.assignment.revoked/v1
     - pf.accounts.user.created/v1
+    - pf.accounts.user.dormant_warning/v1
     - pf.accounts.user.locked/v1
     - pf.accounts.user.unlocked/v1
   internal_events: []
@@ -39,7 +41,7 @@ provides:
   data_products: []
 consumes:
   events: [pf.party.org.deactivated/v1, pf.party.org.reactivated/v1]
-permissions: [account_admin, account_admin_province, farmer, kn_user]
+permissions: [account_admin, account_admin_province, farmer, kn_user, login_totp_required]
 shares: []
 owns_schema: [pf_accounts]
 enable: always

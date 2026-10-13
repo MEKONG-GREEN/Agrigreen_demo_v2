@@ -59,6 +59,10 @@ const (
 	ParamHaversineFactor = "distance.haversine_factor"
 	// ParamActivationGrantLifespan: hạn liên kết/QR kích hoạt tài khoản nông dân (giờ) — accounts.
 	ParamActivationGrantLifespan = "activation.grant_lifespan_hours"
+	// ParamAccountsDormantWarnDays, ParamAccountsDormantDisableDays: số ngày không hoạt động thì báo trước / khóa
+	// tài khoản (D24, CEO 13/10/2026: 38 / 45 ngày — báo trước 7 ngày) — accounts, job accounts_dormant.
+	ParamAccountsDormantWarnDays    = "accounts.dormant_warn_days"
+	ParamAccountsDormantDisableDays = "accounts.dormant_disable_days"
 )
 
 // Quy chuẩn hiển thị dùng chung của bản đồ GIS (GIS US-CFG-01/02, FN-03): tham số chuỗi mã

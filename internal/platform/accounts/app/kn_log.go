@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -50,6 +51,16 @@ func accountLog(e domain.Event) LogEntry {
 		l.Changes = []domain.FieldChange{{Field: "roles", New: sp(strings.Join(e.Account.Roles, ","))}, {Field: "enabled", New: sp("true")}}
 	case domain.ActionLocked:
 		l.Changes = []domain.FieldChange{{Field: "enabled", Old: sp("true"), New: sp("false")}}
+		if e.Account.LockCause == port.LockDormant { // D24: job accounts_dormant
+			l.Changes = append(l.Changes, domain.FieldChange{Field: "lock_cause", New: sp(string(port.LockDormant))})
+		}
+	case domain.ActionDormantWarned:
+		// D24: báo trước khóa vì không hoạt động — ngày khóa dự kiến.
+		at, _ := e.Details["disable_at"].(string)
+		l.Changes = []domain.FieldChange{{Field: "disable_at", New: sp(at)}}
+	case domain.ActionTOTPReset:
+		// D24: Admin đặt lại TOTP — người dùng đăng ký lại ở lần đăng nhập sau.
+		l.Changes = []domain.FieldChange{{Field: "totp", Old: sp("configured"), New: sp("reset")}}
 	case domain.ActionUnlocked:
 		l.Changes = []domain.FieldChange{{Field: "enabled", Old: sp("false"), New: sp("true")}}
 	case domain.ActionActionsSent:

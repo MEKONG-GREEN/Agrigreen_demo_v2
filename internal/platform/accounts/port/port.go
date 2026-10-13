@@ -8,7 +8,11 @@
 // Keycloak (execute-actions-email), không bao giờ gửi mật khẩu tạm (ADR-0010).
 package port
 
-import "github.com/google/uuid"
+import (
+	"context"
+
+	"github.com/google/uuid"
+)
 
 // Vai nghiệp vụ của module (tên vai trong Keycloak).
 const (
@@ -36,6 +40,9 @@ type LockCause string
 const (
 	LockManual         LockCause = "manual"
 	LockOrgDeactivated LockCause = "org_deactivated"
+	// LockDormant: job JobDormant khóa vì không hoạt động quá ngưỡng (mặc định 45 ngày — D24). Chỉ Admin mở
+	// (nông hộ tự kích hoạt lại bằng OTP chờ kênh SMS W10.06 — nông hộ chưa vào job).
+	LockDormant LockCause = "dormant_45d"
 )
 
 // Sự kiện module phát ra (schema trong contracts/events/).
@@ -43,7 +50,36 @@ const (
 	EventUserCreated  = "pf.accounts.user.created"
 	EventUserLocked   = "pf.accounts.user.locked"
 	EventUserUnlocked = "pf.accounts.user.unlocked"
+	// EventUserDormantWarning: báo trước khóa vì không hoạt động (D24) — pf/notify gửi cho chính tài khoản.
+	EventUserDormantWarning = "pf.accounts.user.dormant_warning"
 )
+
+// JobDormant là tên job vô hiệu tài khoản không hoạt động trong cmd/worker (-jobs): báo trước ở ngày
+// dormant_warn_days, khóa ở ngày dormant_disable_days (D24: 38/45, tham số có phiên bản của pf/masterdata).
+const JobDormant = "accounts_dormant"
+
+// SystemActorRef là actor_ref của thao tác do hệ thống tự làm (job accounts_dormant) trong sổ account_event.
+var SystemActorRef = uuid.MustParse("00000000-0000-7000-8000-00000000acc7")
+
+// DormantWarningV1 là payload của pf.accounts.user.dormant_warning. Không chứa dữ liệu cá nhân.
+//
+//ag:event pf.accounts.user.dormant_warning v1
+type DormantWarningV1 struct {
+	UserRef        uuid.UUID `json:"user_ref"`
+	OrgRef         uuid.UUID `json:"org_ref"`
+	LastActivityAt string    `json:"last_activity_at"`
+	DisableAt      string    `json:"disable_at"`
+	IdleDays       int       `json:"idle_days"`
+	EventTime      string    `json:"event_time"`
+	Seq            int64     `json:"seq"`
+}
+
+// OTPAdmin (tùy chọn, kiểm bằng type assertion) gỡ TOTP của người dùng trong Keycloak (đặt lại TOTP — D24).
+// Tách khỏi Directory như ProfileUpdater.
+type OTPAdmin interface {
+	// RemoveOTP xóa mọi thông tin xác thực loại otp; trả số đã xóa.
+	RemoveOTP(ctx context.Context, id uuid.UUID) (int, error)
+}
 
 // OrgStatusConsumer là tên consumer (hàng đợi) nhận pf.party.org.deactivated/reactivated.
 const OrgStatusConsumer = "pf.accounts.org_status"

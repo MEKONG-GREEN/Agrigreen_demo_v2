@@ -37,6 +37,7 @@ var withIDAllowed = map[string]string{
 	"internal/platform/apiclient/public/server.go":         "middleware khóa API (tenant khách hàng từ bản ghi khóa); kFor đọc tham số k của bên cấp sau GrantLookup — chờ grantlookup trả Grant (review M9)",
 	"internal/shared/inbox/inbox.go":                       "tenant của phong bì sự kiện, cùng giao dịch inbox",
 	"internal/platform/accounts/app/kn_extension.go":       "job worker: tenant truyền tường minh, không Principal",
+	"internal/platform/accounts/app/dormant.go":            "job accounts_dormant theo từng tenant (D24): tham số ngưỡng của chính tenant",
 	"internal/platform/cropcycle/app/dataproduct.go":       "tenant dữ liệu dp_* đã kiểm GrantLookup ở apiclient/public — chờ grantlookup trả Grant (review M9)",
 	"internal/platform/cropcycle/app/aggregate.go":         "W5.3: tenant đóng góp tập tổng hợp (AG_INTEGRATION_CONTRIBUTORS, tạm) — chờ cấp phép aggregate của pf/party trả Grant (ADR-0035 §1)",
 	"internal/platform/apiclient/app/feedbuild.go":         "W5.3 job dựng feed: tham số k của CHÍNH tenant đơn vị vận hành (không phải bên cấp)",

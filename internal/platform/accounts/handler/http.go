@@ -43,6 +43,7 @@ func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.POST("/accounts/users/:id/lock", h.lock)
 	rg.POST("/accounts/users/:id/unlock", h.unlock)
 	rg.POST("/accounts/users/:id/resend-actions", h.resend)
+	rg.POST("/accounts/users/:id/reset-totp", h.resetTOTP) // D24
 	rg.POST("/accounts/users/:id/assignment", h.assign)
 }
 
@@ -65,6 +66,14 @@ type userDTO struct {
 	RequiredActions []string `json:"required_actions"`
 	CreatedAt       *string  `json:"created_at"`
 	Tracked         bool     `json:"tracked"`
+	// MFA chỉ có ở GET /v1/accounts/users/{id} (D24).
+	MFA *mfaDTO `json:"mfa,omitempty"`
+}
+
+type mfaDTO struct {
+	Required          bool `json:"required"`
+	Configured        bool `json:"configured"`
+	EnrollmentPending bool `json:"enrollment_pending"`
 }
 
 func refPtr(u uuid.UUID) *string {
@@ -95,6 +104,9 @@ func toUserDTO(v app.UserView) userDTO {
 	if !u.CreatedAt.IsZero() {
 		s := u.CreatedAt.UTC().Format(time.RFC3339)
 		d.CreatedAt = &s
+	}
+	if v.MFA != nil {
+		d.MFA = &mfaDTO{Required: v.MFA.Required, Configured: v.MFA.Configured, EnrollmentPending: v.MFA.EnrollmentPending}
 	}
 	return d
 }
@@ -328,6 +340,24 @@ func (h Handler) unlock(c *gin.Context) {
 		return
 	}
 	res, err := h.Svc.Unlock(c.Request.Context(), app.LockInput{UserID: id, Reason: req.Reason, IdemKey: key(c)})
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	writeResult(c, res)
+}
+
+// resetTOTP: D24 — gỡ TOTP (mất điện thoại…), người dùng đăng ký lại ở lần đăng nhập sau; lý do ≥ 20 ký tự.
+func (h Handler) resetTOTP(c *gin.Context) {
+	id, ok := pathID(c)
+	if !ok {
+		return
+	}
+	var req reasonReq
+	if !bindJSON(c, &req) {
+		return
+	}
+	res, err := h.Svc.ResetTOTP(c.Request.Context(), app.TOTPResetInput{UserID: id, Reason: req.Reason, IdemKey: key(c)})
 	if err != nil {
 		httpx.Fail(c, err)
 		return
