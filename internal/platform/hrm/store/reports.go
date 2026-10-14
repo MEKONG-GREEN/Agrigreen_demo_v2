@@ -1,6 +1,6 @@
 package store
 
-// W11.28 (pf 20261013230821): sổ báo cáo Sở (report_log) và truy vấn theo THỜI ĐIỂM BIẾT (known) để dựng lại đúng một lần
+// W11.28 (pf 20261014000335): sổ báo cáo Sở (report_log) và truy vấn theo THỜI ĐIỂM BIẾT (known) để dựng lại đúng một lần
 // xuất — sự kiện hồ sơ, danh mục, tham số ghi sổ sau known bị bỏ qua. known nil = hiện tại.
 
 import (

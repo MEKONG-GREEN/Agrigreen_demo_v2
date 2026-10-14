@@ -1,6 +1,6 @@
 package app
 
-// W11.28 (pf 20261013230821) — BÁO CÁO SỞ NS01–NS06 (BRD HCTH v3.0 FN-12) và DASHBOARD NHÂN SỰ (FN-06). Xem
+// W11.28 (pf 20261014000335) — BÁO CÁO SỞ NS01–NS06 (BRD HCTH v3.0 FN-12) và DASHBOARD NHÂN SỰ (FN-06). Xem
 // domain/reports.go cho bố cục và quy tắc kiểm tra.
 //
 // Dữ liệu: phép chiếu as-of của hồ sơ (W11.22) tại NGÀY CHỐT + trường của kho định danh đọc THEO LÔ (client.ProfileBatch,

@@ -15,7 +15,7 @@
 // danh (định danh + ngăn hrm.profile; thẻ Thống kê BC Sở ở ngăn hrm.sensitive có khóa/mục đích riêng). Bật bằng
 // UseRecords + cờ AG_HRM_RECORDS (mặc định tắt ở production — Q-005).
 //
-// W11.28 (pf 20261013230821) — BÁO CÁO SỞ NS01–NS06 (FN-12) + DASHBOARD NHÂN SỰ (FN-06): biểu tại ngày chốt (as-of),
+// W11.28 (pf 20261014000335) — BÁO CÁO SỞ NS01–NS06 (FN-12) + DASHBOARD NHÂN SỰ (FN-06): biểu tại ngày chốt (as-of),
 // quy tắc kiểm chéo, nhấn ô xem người, sổ xuất (lịch sử + trường nhạy cảm), tệp Excel dựng lại được (SHA-256).
 //
 // Gói sau của cùng module: W11.24 kho tài liệu, W11.25 nâng bậc, W11.26 đánh giá. Module khác chỉ import hrm/port (R-02).
