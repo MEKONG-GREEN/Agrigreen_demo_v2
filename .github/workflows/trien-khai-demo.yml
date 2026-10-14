@@ -6,7 +6,12 @@
 #
 #  Cach chay:
 #    Tab Actions > "Trien khai demo" o cot trai > nut "Run workflow" >
-#    "Run workflow" lan nua. De trong o commit = lay dau nhanh main.
+#    "Run workflow" lan nua. Chon nhanh (main | dev). De trong o commit =
+#    lay dau nhanh da chon.
+#
+#    NHANH: tu 09/10/2026 nhom chi merge vao dev; main tut lai. PO chon nhanh
+#    mac dinh cho demo (docs/dev/sync-main-2026-10-13.md). ci.yml xay va day
+#    anh cho ca main lan dev, nen ca hai deu trien khai duoc.
 #
 #    Hoac bang the, cho ai thich dong lenh:
 #      git tag demo-20261015 && git push --tags
@@ -31,8 +36,14 @@ name: Trien khai demo
 on:
   workflow_dispatch:
     inputs:
+      nhanh:
+        description: "Nhanh nguon: commit phai nam tren nhanh nay."
+        required: true
+        default: main
+        type: choice
+        options: [main, dev]
       commit:
-        description: "Ma commit 40 ky tu. De TRONG = dau nhanh main."
+        description: "Ma commit 40 ky tu. De TRONG = dau nhanh da chon."
         required: false
         type: string
   push:
@@ -58,6 +69,7 @@ jobs:
     outputs:
       sha: ${{ steps.chon.outputs.sha }}
       mota: ${{ steps.chon.outputs.mota }}
+      nhanh: ${{ steps.chon.outputs.nhanh }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -65,14 +77,26 @@ jobs:
 
       - name: Chon ma commit
         id: chon
+        # Dau vao di qua env, khong noi thang bieu thuc vao script (chong chen lenh qua o nhap).
+        env:
+          VAO: ${{ inputs.commit }}
+          NHANH_VAO: ${{ inputs.nhanh }}
         run: |
           set -euo pipefail
-          vao="${{ inputs.commit }}"
+          vao="$VAO"
+          nhanh="$NHANH_VAO"
+          case "$nhanh" in main|dev|"") ;; *) echo "::error::nhanh '$nhanh' khong hop le"; exit 1 ;; esac
+          git fetch --quiet origin main dev
           if [ -z "$vao" ]; then
-            # Bam nut tu nhanh main -> github.sha la dau main.
-            # Day the demo-*   -> github.sha la commit duoc gan the.
-            sha="${{ github.sha }}"
-            echo "Khong nhap commit - dung ${{ github.ref_name }}"
+            if [ "${{ github.event_name }}" = workflow_dispatch ]; then
+              # Bam nut -> dau nhanh DA CHON (khong phu thuoc nhanh chua workflow).
+              sha=$(git rev-parse "origin/$nhanh")
+              echo "Khong nhap commit - dung dau origin/$nhanh"
+            else
+              # Day the demo-* -> github.sha la commit duoc gan the.
+              sha="${{ github.sha }}"
+              echo "Khong nhap commit - dung ${{ github.ref_name }}"
+            fi
           else
             sha="$vao"
           fi
@@ -86,20 +110,27 @@ jobs:
             exit 1
           fi
 
-          # Chi cho trien khai thu da nam tren main. Khong co buoc nay thi mot
-          # nhanh thu nghiem bat ky cung len duoc may chu demo.
-          git fetch --quiet origin main
-          if ! git merge-base --is-ancestor "$sha" origin/main; then
-            echo "::error::$sha khong phai to tien cua origin/main - tu choi trien khai"
+          # Chi cho trien khai thu da nam tren main hoac dev. Khong co buoc nay
+          # thi mot nhanh thu nghiem bat ky cung len duoc may chu demo.
+          # Bam nut: dung nhanh da chon. The demo-*: main truoc, roi dev.
+          if [ -n "$nhanh" ]; then ung="$nhanh"; else ung="main dev"; fi
+          nhanh=""
+          for b in $ung; do
+            if git merge-base --is-ancestor "$sha" "origin/$b"; then nhanh="$b"; break; fi
+          done
+          if [ -z "$nhanh" ]; then
+            echo "::error::$sha khong phai to tien cua origin/{$(echo $ung | tr ' ' ',')} - tu choi trien khai"
             exit 1
           fi
 
           mota=$(git log -1 --format='%ad  %an  %s' --date=short "$sha" | cut -c1-100)
-          echo "sha=$sha"   >> "$GITHUB_OUTPUT"
-          echo "mota=$mota" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha"     >> "$GITHUB_OUTPUT"
+          echo "mota=$mota"   >> "$GITHUB_OUTPUT"
+          echo "nhanh=$nhanh" >> "$GITHUB_OUTPUT"
           {
             echo "### Ban se trien khai"
             echo ""
+            echo "- nhanh: \`$nhanh\`"
             echo "- commit: \`$sha\`"
             echo "- $mota"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -159,15 +190,16 @@ jobs:
             cd /opt/stacks/agrigreen
 
             SHA='${{ needs.chon-ban.outputs.sha }}'
+            NHANH='${{ needs.chon-ban.outputs.nhanh }}'
             C="-f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.vps.yml -f deploy/compose/docker-compose.mkg.yml"
             E=deploy/compose/.env
 
             # Dong bo ma nguon: file compose va migration doi theo commit.
-            # Dung "checkout -B main <sha>" chu khong "pull" de khong vap xung
+            # Dung "checkout -B <nhanh> <sha>" chu khong "pull" de khong vap xung
             # dot neu may chu tung bi sua tay. docker-compose.mkg.yml la file
             # KHONG theo doi boi Git nen checkout khong dung toi no.
-            git fetch --quiet origin main
-            git checkout -q -B main "$SHA"
+            git fetch --quiet origin "$NHANH"
+            git checkout -q -B "$NHANH" "$SHA"
             git log -1 --format='Dang o: %H  %s' | cut -c1-100
 
             # Ghi lai phien ban cu de con duong quay lui
@@ -246,6 +278,20 @@ jobs:
           check "https://app.$D/login"  200
           check "https://auth.$D/realms/agrigreen/.well-known/openid-configuration" 200
 
+      - name: api dang chay dung commit (healthz)
+        run: |
+          set -eu
+          D="${{ vars.AG_DEMO_DOMAIN }}"
+          SHA='${{ needs.chon-ban.outputs.sha }}'
+          got=$(curl -fsS --max-time 10 "https://api.$D/healthz" | jq -r '.commit // empty')
+          echo "healthz commit = ${got:-<khong co>}"
+          if [ -z "$got" ]; then
+            echo "::warning::/healthz chua tra commit (anh xay truoc khi co AG_BUILD_SHA)"
+          elif [ "$got" != "$SHA" ]; then
+            echo "::error::api dang chay $got, khong phai $SHA"
+            exit 1
+          fi
+
       - name: issuer phai la https va dung ten mien
         run: |
           set -eu
@@ -273,6 +319,7 @@ jobs:
           {
             echo "### Ket qua"
             echo ""
+            echo "- nhanh: \`${{ needs.chon-ban.outputs.nhanh }}\`"
             echo "- commit da trien khai: \`${{ needs.chon-ban.outputs.sha }}\`"
             echo "- ${{ needs.chon-ban.outputs.mota }}"
             echo ""

@@ -2,6 +2,7 @@ package authz_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -40,24 +41,56 @@ func TestMFAPolicySMSExcludedForSensitiveRoles(t *testing.T) {
 	}
 }
 
-// AG_MFA_DISABLED chỉ dành cho demo: bật thì mọi phiên được tính là đã qua yếu tố thứ hai; production từ chối.
+// AG_MFA_DISABLED chỉ dành cho máy demo: bật được khi và chỉ khi AG_DEPLOY_ENV=demo và AG_ENV đặt, khác
+// production. Mọi tổ hợp khác → lỗi (tiến trình từ chối khởi động). Bật thì mọi phiên được tính là đã qua yếu tố
+// thứ hai; mặc định MFA bật.
 func TestMFAPolicyDisabledDemoOnly(t *testing.T) {
 	env := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
-	if _, err := authz.MFAPolicyFromEnv(env(map[string]string{authz.EnvMFADisabled: "1", "AG_ENV": "production"})); err == nil {
-		t.Fatal("production không được bật AG_MFA_DISABLED")
+	refused := []struct {
+		name string
+		env  map[string]string
+	}{
+		{"production dù deploy=demo", map[string]string{authz.EnvMFADisabled: "1", "AG_ENV": "production", authz.EnvDeployEnv: "demo"}},
+		{"prod viết tắt", map[string]string{authz.EnvMFADisabled: "true", "AG_ENV": "PROD", authz.EnvDeployEnv: "demo"}},
+		{"staging không đánh dấu demo", map[string]string{authz.EnvMFADisabled: "1", "AG_ENV": "staging"}},
+		{"staging deploy=staging", map[string]string{authz.EnvMFADisabled: "1", "AG_ENV": "staging", authz.EnvDeployEnv: "staging"}},
+		{"local không đánh dấu demo", map[string]string{authz.EnvMFADisabled: "1", "AG_ENV": "local"}},
+		{"thiếu AG_ENV", map[string]string{authz.EnvMFADisabled: "1", authz.EnvDeployEnv: "demo"}},
+		{"deploy gần giống demo", map[string]string{authz.EnvMFADisabled: "1", "AG_ENV": "staging", authz.EnvDeployEnv: "demo-prod"}},
+		{"giá trị cờ lạ", map[string]string{authz.EnvMFADisabled: "yes", "AG_ENV": "staging", authz.EnvDeployEnv: "demo"}},
 	}
-	p, err := authz.MFAPolicyFromEnv(env(map[string]string{authz.EnvMFADisabled: "1", "AG_ENV": "staging"}))
+	for _, c := range refused {
+		t.Run(c.name, func(t *testing.T) {
+			if _, err := authz.MFAPolicyFromEnv(env(c.env)); err == nil {
+				t.Fatal("phải từ chối")
+			}
+		})
+	}
+	if _, err := authz.MFAPolicyFromEnv(env(map[string]string{authz.EnvMFADisabled: "1", "AG_ENV": "production", authz.EnvDeployEnv: "demo"})); !errors.Is(err, authz.ErrMFABypassNotDemo) {
+		t.Fatalf("lỗi = %v, mong ErrMFABypassNotDemo", err)
+	}
+	for _, off := range []string{"", "0", "false"} {
+		p, err := authz.MFAPolicyFromEnv(env(map[string]string{authz.EnvMFADisabled: off, "AG_ENV": "production"}))
+		if err != nil || p.Disabled {
+			t.Fatalf("%q: %+v %v — cờ tắt phải giữ MFA và không chặn production", off, p, err)
+		}
+	}
+
+	p, err := authz.MFAPolicyFromEnv(env(map[string]string{authz.EnvMFADisabled: "1", "AG_ENV": "staging", authz.EnvDeployEnv: "Demo"}))
 	if err != nil || !p.Disabled {
-		t.Fatalf("staging bật được: %+v %v", p, err)
+		t.Fatalf("máy demo bật được: %+v %v", p, err)
 	}
 	iss := authztest.New(t)
-	pr, err := iss.Verifier().WithMFAPolicy(p).Verify(context.Background(),
-		iss.Sign(t, authztest.Token{Subject: ids.New(), TenantID: ids.New(), Roles: []string{authz.RolePlatformAdmin}, AMR: []string{"pwd"}}))
+	tok := iss.Sign(t, authztest.Token{Subject: ids.New(), TenantID: ids.New(), Roles: []string{authz.RolePlatformAdmin}, AMR: []string{"pwd"}})
+	pr, err := iss.Verifier().WithMFAPolicy(p).Verify(context.Background(), tok)
 	if err != nil || !pr.MFA {
 		t.Fatalf("MFA = %v, %v; mong true khi tắt", pr.MFA, err)
 	}
 	if p, _ = authz.MFAPolicyFromEnv(env(nil)); p.Disabled {
 		t.Fatal("mặc định phải bật MFA")
+	}
+	if pr, _ = iss.Verifier().WithMFAPolicy(p).Verify(context.Background(), tok); pr.MFA {
+		t.Fatal("cờ tắt: platform_admin chỉ mật khẩu không được tính là đã qua MFA")
 	}
 }
 

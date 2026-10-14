@@ -12,5 +12,9 @@ RUN test -n "$CMD" && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/app /app
+# Commit của image (CI: --build-arg AG_BUILD_SHA=${{ github.sha }}); api-platform trả ở /healthz. Đặt SAU COPY để
+# đổi commit chỉ thêm một lớp metadata.
+ARG AG_BUILD_SHA=
+ENV AG_BUILD_SHA=$AG_BUILD_SHA
 USER nonroot:nonroot
 ENTRYPOINT ["/app"]

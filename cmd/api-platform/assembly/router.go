@@ -7,6 +7,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -34,6 +35,8 @@ type Deps struct {
 	CORSOrigins []string
 	// PartnerLegacy: header ngừng dùng của /v1/partner/* (ADR-0033 §7.2; PartnerLegacyFromEnv). 0 = không Sunset.
 	PartnerLegacy PartnerLegacy
+	// BuildSHA là commit của image (AG_BUILD_SHA); /healthz trả về để biết máy đang chạy bản nào. Rỗng → bỏ trường.
+	BuildSHA string
 }
 
 // maxBody giới hạn thân request (tải tệp đi qua đường riêng có giới hạn riêng).
@@ -47,7 +50,7 @@ const (
 
 func health(d Deps) func(r *gin.Engine) {
 	return func(r *gin.Engine) {
-		r.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
+		r.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, healthBody(d.BuildSHA)) })
 		r.GET("/readyz", func(c *gin.Context) {
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 			defer cancel()
@@ -61,6 +64,18 @@ func health(d Deps) func(r *gin.Engine) {
 		})
 	}
 }
+
+// healthBody: /healthz kèm commit của image (AG_BUILD_SHA, Dockerfile) khi có — để biết máy demo đang chạy bản nào.
+// Chỉ nhận chuỗi hex 7–40 ký tự; giá trị khác (hoặc rỗng) thì bỏ trường, không phản chiếu nội dung biến môi trường.
+func healthBody(sha string) gin.H {
+	b := gin.H{"status": "ok"}
+	if shaRe.MatchString(sha) {
+		b["commit"] = sha
+	}
+	return b
+}
+
+var shaRe = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
 
 // NewRouter dựng Application API (api.<domain>). Public API tắt ở ĐTK 1 (mục 11).
 func NewRouter(d Deps) *gin.Engine {

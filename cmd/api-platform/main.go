@@ -12,6 +12,11 @@
 //	AG_OIDC_ISSUER       issuer của realm Keycloak
 //	AG_OIDC_AUDIENCE     audience bắt buộc trong token
 //	AG_OIDC_JWKS_URL     (tùy chọn) lấy khóa ký từ URL này thay vì discovery — khi issuer công khai khác địa chỉ nội bộ
+//	AG_MFA_FACTORS, AG_MFA_STRONG_FACTORS, AG_MFA_STRONG_ROLES  chính sách yếu tố thứ hai (authz.MFAPolicy)
+//	AG_MFA_DISABLED      (CHỈ máy demo) 1 = Admin API không kiểm amr. Cần AG_DEPLOY_ENV=demo và AG_ENV khác production,
+//	                     nếu không tiến trình từ chối khởi động (authz.DemoMFABypassAllowed)
+//	AG_DEPLOY_ENV        loại máy triển khai; chỉ "demo" có ý nghĩa (cho phép AG_MFA_DISABLED)
+//	AG_BUILD_SHA         (tùy chọn) commit của image — /healthz trả về trường "commit" (Dockerfile ARG, CI đặt)
 //	AG_CORS_ORIGINS      origin web được gọi chéo, phân tách bằng dấu phẩy, khớp chính xác (không có "*")
 //	AG_SYNC_CURSOR_KEY   khóa HMAC của cursor đồng bộ
 //	AG_VAULT_URL         địa chỉ identity-vault (vd https://identity-vault:8090)
@@ -70,6 +75,11 @@ func run(log *slog.Logger) error {
 	if err := residency.CheckEnv(); err != nil {
 		return err
 	}
+	// AG_MFA_DISABLED chỉ hợp lệ trên máy demo — kiểm trước mọi kết nối (docs/dev/sync-main-2026-10-13.md).
+	mfaPolicy, err := mfaPolicyFromEnv(os.Getenv, log)
+	if err != nil {
+		return err
+	}
 
 	base := os.Getenv("AG_PF_DB_URL")
 	issuer, audience := os.Getenv("AG_OIDC_ISSUER"), os.Getenv("AG_OIDC_AUDIENCE")
@@ -125,7 +135,7 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
-	verifier, err := verifierFromEnv(ctx, issuer, audience)
+	verifier, err := verifierFromEnv(ctx, issuer, audience, mfaPolicy)
 	if err != nil {
 		return err
 	}
@@ -138,7 +148,7 @@ func run(log *slog.Logger) error {
 		return err
 	}
 	d := Deps{Log: log, Verifier: verifier, Ops: ops, Modules: built.List(), Pools: pools, CORSOrigins: origins,
-		PartnerLegacy: partnerLegacy}
+		PartnerLegacy: partnerLegacy, BuildSHA: os.Getenv("AG_BUILD_SHA")}
 	servers := []*http.Server{
 		{Addr: env("AG_HTTP_ADDR", ":8080"), Handler: NewRouter(d)},
 		{Addr: env("AG_ADMIN_HTTP_ADDR", ":8082"), Handler: NewAdminRouter(d)},

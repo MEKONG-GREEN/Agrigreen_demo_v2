@@ -4,7 +4,10 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    # dev: nhánh tích hợp (từ 09/10/2026) — push vào dev cũng xây và đẩy image để trien-khai-demo.yml triển khai
+    # được commit của dev (docs/dev/sync-main-2026-10-13.md; PO chọn nhánh demo). Tốn thêm một lượt CI mỗi lần
+    # merge vào dev; bỏ "dev" ở đây nếu hạn mức phút không đủ — khi đó chạy tay (workflow_dispatch) trên dev.
+    branches: [main, dev]
   pull_request:
   # Chạy tay (ví dụ kiểm thử tích hợp app hiện trường trên emulator).
   workflow_dispatch:
@@ -43,6 +46,8 @@ jobs:
           go run ./tools/migratecheck $BASE migrations
       - name: docscheck — số ADR, giả định/roadmap/mã lỗi theo gói (WH-B)
         run: go run ./tools/docscheck
+      - name: mfaflagcheck — cờ demo tắt MFA Admin API chỉ được bật trong tệp triển khai demo
+        run: go run ./tools/mfaflagcheck
       - name: contractcheck — R-64, van công bố
         run: |
           BASE=""
@@ -469,7 +474,7 @@ jobs:
           if [ "${{ matrix.cmd }}" = optimizer ]; then
             docker build --load --build-context optcore=lib/optcore -t "$IMAGE" optimizer
           else
-            docker build --load --build-arg CMD=${{ matrix.cmd }} -t "$IMAGE" .
+            docker build --load --build-arg CMD=${{ matrix.cmd }} --build-arg AG_BUILD_SHA=${{ github.sha }} -t "$IMAGE" .
           fi
       - name: SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
@@ -484,22 +489,22 @@ jobs:
           severity: "CRITICAL,HIGH"
           exit-code: "1"
           ignore-unfixed: true
-      - name: Lưu image đã quét cho bước ký (chỉ main)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      - name: Lưu image đã quét cho bước ký (main/dev)
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request'
         run: docker save "$IMAGE" -o image.tar
-      - name: Tải lên image đã quét (chỉ main)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      - name: Tải lên image đã quét (main/dev)
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: image-${{ matrix.cmd }}
           path: image.tar
           retention-days: 1
 
-  # Push + ký keyless: job riêng, chỉ main, chỉ đẩy ĐÚNG image tar đã qua SBOM/Trivy ở job images.
+  # Push + ký keyless: job riêng, chỉ main/dev (không PR), chỉ đẩy ĐÚNG image tar đã qua SBOM/Trivy ở job images.
   images-publish:
-    name: Push và ký image (chỉ main)
+    name: Push và ký image (main/dev)
     needs: images
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -730,16 +735,16 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       # ghcr.io BAT BUOC ten kho viet thuong; ten to chuc la MEKONG-GREEN.
       - name: Ten kho chu thuong
         run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       - name: Dang nhap ghcr (chi khi se push)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: docker/login-action@v3
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -749,7 +754,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: deploy/compose/postgres
-          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          push: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request' }}
           tags: ghcr.io/${{ env.OWNER }}/agrigreen-postgres:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -781,8 +786,8 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       # Thieu bien nay thi anh web se tro ve "https://api." - hong mot cach
       # kho doan. Dung ngay tai day con hon de no len song.
@@ -798,8 +803,8 @@ jobs:
         run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       - name: Dang nhap ghcr (chi khi se push)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: docker/login-action@v3
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -809,7 +814,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: apps/web-ops
-          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          push: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request' }}
           tags: ghcr.io/${{ env.OWNER }}/agrigreen-web-ops-demo:${{ github.sha }}
           build-args: |
             NEXT_PUBLIC_DEPLOY_ENV=production
