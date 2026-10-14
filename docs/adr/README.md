@@ -46,6 +46,7 @@
 | 0052 | [Đồng sở hữu dữ liệu MKG + HTX, neo HTX theo mã số thuế, HTX tạm "Chưa xác nhận" và nhận quyền](0052-dong-so-huu-mkg-htx-neo-mst.md) | Chấp nhận — quyết định CEO D2 (13/10/2026), trả lời H-1/QĐ-2; hiện thực gói D2 (pf 20261013091454) |
 | 0053 | [Một hợp đồng `_pub` có phiên bản cho "số liệu đã chốt" — họ `closed_figures/v1`, port KHTC `KHTCSources`, bên đọc qua thành viên vai `_pub`](0053-hop-dong-so-lieu-da-chot-closed-figures.md) | Đề xuất — hiện thực ở PFPUB; D8, D17, D18, D2 đã chốt; Trồng trọt giữ vòng đời báo cáo |
 | 0054 | [`cap/directory` = module năng lực `pf/contact` — danh bạ dùng chung, một bản ghi/người ở kho định danh, lọc trường ở API](0054-cap-directory-pf-contact.md) | Đề xuất — hiện thực W11.23 (pf 20261013230912, vault 20261013165158); Q-071, Q-072 theo đề xuất của dev |
+| 0055 | [Tách hệ thống Khuyến nông — hai giai đoạn: logic trước G1 (`internal/kn/*`, port/registry, `_pub` + cấp phép, app web và client riêng), vật lý sau G1 theo hồ sơ NĐ 331](0055-tach-he-thong-khuyen-nong.md) | Đề xuất — KNSPLIT-0 (kiểm kê, cổng `tools/knboundary`, kiểm thử âm quyền dữ liệu); Q-KNS-01…06 chờ chủ sản phẩm |
 
 ADR 0006, 0007, 0009, 0010, 0011 được chủ sản phẩm chấp nhận ngày 30/09/2026 trong phiên làm việc. Bảng đối chiếu cam kết → mã → kiểm thử ở [trien-khai-g1.md](trien-khai-g1.md).
 
