@@ -19,11 +19,13 @@ gates:
 	go run ./tools/migratecheck migrations
 	go run ./tools/contractcheck
 	go run ./tools/docscheck
+	go run ./tools/knboundary
 
 # Trước khi gộp vào dev (WH-B): tệp migration mới phải dạng mốc UTC và xếp sau mọi tệp trên origin/dev.
 gates-base:
 	git fetch origin +refs/heads/dev:refs/remotes/origin/dev
 	go run ./tools/migratecheck -base origin/dev migrations
+	go run ./tools/knboundary -base origin/dev
 
 # Cần AG_TEST_PG_ADMIN_URL và AG_DB_APP_PASSWORD; thêm AG_TEST_PGBOUNCER_URL để chạy R-32 qua PgBouncer.
 test:

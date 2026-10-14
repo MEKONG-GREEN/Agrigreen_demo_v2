@@ -41,6 +41,11 @@ jobs:
           BASE=""
           if [ "${{ github.event_name }}" = "pull_request" ]; then BASE="-base origin/${{ github.base_ref }}"; fi
           go run ./tools/migratecheck $BASE migrations
+      - name: knboundary — ranh giới hệ thống Khuyến nông, baseline chỉ co lại (KNSPLIT-0, ADR-0055)
+        run: |
+          BASE=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then BASE="-base origin/${{ github.base_ref }}"; fi
+          go run ./tools/knboundary $BASE
       - name: docscheck — số ADR, giả định/roadmap/mã lỗi theo gói (WH-B)
         run: go run ./tools/docscheck
       - name: mfaflagcheck — cờ demo tắt MFA Admin API chỉ được bật trong tệp triển khai demo

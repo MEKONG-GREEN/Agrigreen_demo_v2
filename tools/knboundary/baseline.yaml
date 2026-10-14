@@ -1,0 +1,384 @@
+# Baseline của cổng knboundary (KNSPLIT-0, ADR-0055) — ghép nối KN ↔ phần còn lại ĐANG CÓ, sinh từ kiểm kê
+# (go run ./tools/knboundary -list) ngày 14/10/2026. Quy tắc: tools/knboundary/boundary.yaml; kiểm kê và cách phân loại
+# (chuyển sang KN / ở lại nền tảng / cần port): docs/kn/tach-he-thong/kiem-ke.md.
+#
+# CHỈ ĐƯỢC CO LẠI: ghép nối mới làm hỏng cổng; mục lỗi thời cũng làm hỏng cổng (xóa bằng -prune trong cùng PR đã gỡ);
+# CI chạy -base <nhánh đích> nên không thêm được mục mới. Gói gỡ: KNSPLIT-1 (không gian tên), KNSPLIT-2 (tách phần KN
+# khỏi module dùng chung), KNSPLIT-3 (app web KN riêng).
+couplings:
+  - {rule: import-into-kn, from: internal/platform/accounts/app/kn_extension_test.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/app/consume.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/app/consume.go, to: internal/platform/price/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/price.go, to: internal/platform/price/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/price_test.go, to: internal/platform/price/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/report_cycle.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/report_cycle_test.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/templates.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/work_schedule.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/work_schedule_test.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/handler/g2_integration_test.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/handler/notify_integration_test.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/handler/price_integration_test.go, to: internal/platform/price/port}
+  - {rule: import-into-kn, from: internal/platform/notify/handler/report_cycle_integration_test.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/module.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/app/dispatch.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/app/service.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/handler/coop_schedule_integration_test.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/handler/egress_integration_test.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/handler/forms_integration_test.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/handler/reports_htx_integration_test.go, to: internal/platform/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/handler/reports_integration_test.go, to: internal/platform/extension/port}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/dormant.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/internal_unit.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn.go, to: ErrKNAdminGrant}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn.go, to: KNCreateInput}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn.go, to: KNCreateResult}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn.go, to: Service.CreateKNUser}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn.go, to: Service.ensureKNUser}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn.go, to: Service.undoKNXaVault}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_attrs.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_context.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_extension.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_extension.go, to: ExtensionKN}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_extension.go, to: ExtensionKN.KNContext}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_import.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_import.go, to: KNImportResult}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_import.go, to: KNImportRow}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_import.go, to: MaxKNImportBytes}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_import.go, to: MaxKNImportRows}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_import.go, to: Service.ImportKNUsers}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_import.go, to: Service.groupKNRows}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_log.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_sessions.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_sessions.go, to: Service.KNUserSessions}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_support.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_vault.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_vault.go, to: KNXaVaultRole}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_vault.go, to: Service.grantKNXaVault}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_vault.go, to: Service.releaseKNXaVault}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/service.go, to: KNModule}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/service.go, to: Service.checkKNModule}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/internal_unit.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: CheckKNReason}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: KNOrgKinds}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: KNRoleFitsOrg}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: KNRuleVersion}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: MinKNReason}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: MsgKNAdminScope}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: MsgKNCommuneCode}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: MsgKNCommunes}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: MsgKNDeptCode}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: MsgKNDeptMissing}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: MsgKNMgmtLevel}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: MsgKNOrgKind}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: MsgKNOrgRequired}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: MsgKNReason}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: MsgKNRole}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn.go, to: MsgKNValidity}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/kn_attrs.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/handler/internal_unit.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/handler/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/handler/kn.go, to: Handler.RegisterKNAdmin}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/handler/kn.go, to: Handler.RegisterKNApp}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/handler/kn.go, to: Handler.createKNUser}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/handler/kn_attrs.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/handler/kn_import.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/handler/kn_import.go, to: Handler.importKNUsers}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/handler/kn_import.go, to: Handler.registerKNImport}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/module.go, to: Module.ExtensionKNContext}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/module.go, to: Module.ExtensionKNDirectory}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/module.go, to: Module.KNPeople}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/grants.go, to: KNOfficerRoles}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/internal_unit.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn.go, to: KNAdmin}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn.go, to: KNPeople}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn.go, to: KNPeopleScope}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn.go, to: KNRolesAll}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn.go, to: KNTW}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn.go, to: KNTinh}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn.go, to: KNXa}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn.go, to: RoleKNUser}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn_context.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn_context.go, to: KNContext}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn_context.go, to: KNContextResolver}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn_context.go, to: KNDirectory}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/port/kn_context.go, to: KNOfficer}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/store/dormant.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/store/internal_unit.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/store/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/store/kn_attrs.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/anchor/app/service.go, to: roleKNNationalAdmin}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/anchor/app/service.go, to: roleKNProvinceAdmin}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/anchor/domain/mst.go, to: CreatedByKN}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/app/kn_household.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/app/kn_household.go, to: ErrKNReadOnly}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/app/kn_household.go, to: ErrKNSupportReason}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/app/kn_household.go, to: KNCreateHouseholdInput}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/app/kn_household.go, to: KNHousehold}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/app/kn_household.go, to: KNHouseholdPage}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/app/kn_household.go, to: KNLogPage}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/app/kn_household.go, to: KNPerson}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/app/kn_household.go, to: MinKNReason}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/app/kn_household.go, to: Service.CreateKNHousehold}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/app/kn_household.go, to: Service.ListKNHouseholds}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/app/kn_household.go, to: Service.UpdateKNHousehold}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/handler/kn_household.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/handler/kn_household.go, to: Handler.registerKN}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/handler/kn_household.go, to: toKNHouseholdDTO}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/handler/kn_household.go, to: writeKNLog}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/member/store/kn_profile.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/department_usage.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: DefaultKNDepartment}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: KNCorrectInput}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: KNCreateInput}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: KNInput}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: KNLogPage}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: KNPlotPage}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: KNPlotQuery}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: KNUpdateInput}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: MaxKNExport}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: ProductKNPlotFile}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: Service.KNCorrectBoundary}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: Service.KNCreatePlot}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: Service.KNExport}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: Service.KNGetPlot}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: Service.KNListPlots}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: Service.KNPlotLog}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/app/kn.go, to: Service.KNUpdatePlot}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/domain/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/domain/plot.go, to: SourceKNFieldApp}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/domain/plot.go, to: SourceKNWeb}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/handler/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/handler/kn.go, to: Handler.registerKN}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/store/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/store/kn.go, to: KNFilter}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/store/kn.go, to: LegacyKNDepartment}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/store/kn.go, to: ListKN}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/store/kn.go, to: SetKNAttrs}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/plot/store/plot.go, to: KNAttrs}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/port/member.go, to: HouseholdSourceKNApp}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/season/app/service.go, to: accKN}
+  - {rule: kn-symbol-in-shared, from: internal/platform/cropcycle/app/service.go, to: accKN}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/app/cnts.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/app/cnts.go, to: CNTSPort}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/app/cnts.go, to: checkCNTSRefs}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/domain/cnts.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/domain/cnts.go, to: CNTSCatalogs}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/domain/cnts.go, to: normalizeCNTS}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/module.go, to: Module.CNTSCatalogs}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CNTSCatalogs}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CatalogCNTSAquacultureObject}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CatalogCNTSBreed}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CatalogCNTSChemical}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CatalogCNTSDisease}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CatalogCNTSDocumentType}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CatalogCNTSFishingGroup}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CatalogCNTSIndicator}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CatalogCNTSModelType}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CatalogCNTSSlaughterFacility}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CatalogCNTSSpecies}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CatalogCNTSVaccinationSchedule}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CatalogCNTSVaccine}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: ParamCNTSFishingChangePct}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: ParamCNTSGPSAccuracyM}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: ParamCNTSHerdChangePct}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: ParamCNTSIndicatorMaxPrefix}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: ParamCNTSIndicatorMinPrefix}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: ParamCNTSLocationDistanceM}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: ParamCNTSLogOverdueDays}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: ParamCNTSLookbackPeriods}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: ParamCNTSMortalityPctPrefix}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: ParamCNTSSlaughterSpikeFactor}
+  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: ParamCNTSSlaughterSpikeMinDays}
+  - {rule: kn-symbol-in-shared, from: internal/platform/mechanization/app/department_usage.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/mechanization/handler/machine_count.go, to: Handler.RegisterKNMachineCounts}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/domain/price.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/domain/report_cycle.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/domain/work_schedule.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn.go, to: KN}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: ErrKNReadOnly}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: ErrKNSupportReason}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KN.CreateKNCooperative}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KN.DeactivateKNCooperative}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KN.GetKNCooperative}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KN.ListKNCooperatives}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KN.ReactivateKNCooperative}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KN.UpdateKNCooperative}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KNCoopPage}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KNCoopQuery}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KNCooperative}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KNCreateCoopInput}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KNDeactivationWarnings}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KNLogPage}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KNPerson}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: KNUpdateCoopInput}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: MinKNReason}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_menu.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_region.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_tree.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/domain/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/domain/kn.go, to: ErrKNReason}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/domain/kn.go, to: MinKNReason}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/domain/menu.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/domain/menu_departments.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/domain/menu_departments.go, to: KHTCReportAdminItem}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/domain/menu_departments.go, to: KHTCReportItem}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/handler/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/handler/kn.go, to: KN}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/handler/kn_collect.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/handler/kn_collect.go, to: KN.RegisterKNCollect}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/handler/kn_collect.go, to: toKNCoopDTO}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/handler/kn_collect.go, to: writeKNLog}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/port/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/port/kn_collect.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/port/registry.go, to: RoleKNNationalAdmin}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/port/registry.go, to: RoleKNOfficer}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/port/registry.go, to: RoleKNProvinceAdmin}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/store/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/store/kn.go, to: KNEvent}
+  - {rule: kn-symbol-in-shared, from: internal/platform/party/store/kn_collect.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/reports/port/extensionsrc/extensionsrc.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: ErrNoKNContext}
+  - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: KNAdmin}
+  - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: KNContext}
+  - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: KNRoles}
+  - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: KNSupport}
+  - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: KNTW}
+  - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: KNTinh}
+  - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: KNXa}
+  - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: RequireKN}
+  - {rule: route-owner, from: "admin.yaml /v1/accounts/delegations/{id}/revoke", to: accounts}
+  - {rule: route-owner, from: admin.yaml /v1/accounts/internal-units/seed, to: accounts}
+  - {rule: route-owner, from: "admin.yaml /v1/accounts/internal-units/{id}/deactivate", to: accounts}
+  - {rule: route-owner, from: "admin.yaml /v1/accounts/internal-units/{id}/log", to: accounts}
+  - {rule: route-owner, from: "admin.yaml /v1/accounts/internal-units/{id}/reactivate", to: accounts}
+  - {rule: route-owner, from: "admin.yaml /v1/accounts/internal-units/{id}", to: accounts}
+  - {rule: route-owner, from: admin.yaml /v1/accounts/internal-units, to: accounts}
+  - {rule: route-owner, from: admin.yaml /v1/accounts/kn-users/import, to: accounts}
+  - {rule: route-owner, from: admin.yaml /v1/accounts/kn-users, to: accounts}
+  - {rule: route-owner, from: admin.yaml /v1/accounts/support-log, to: accounts}
+  - {rule: route-owner, from: "admin.yaml /v1/accounts/support-sessions/{id}/end", to: accounts}
+  - {rule: route-owner, from: admin.yaml /v1/accounts/support-sessions, to: accounts}
+  - {rule: route-owner, from: "admin.yaml /v1/accounts/users/{id}/assignments/{aid}/attributes", to: accounts}
+  - {rule: route-owner, from: "admin.yaml /v1/accounts/users/{id}/assignments/{aid}/revoke", to: accounts}
+  - {rule: route-owner, from: "admin.yaml /v1/accounts/users/{id}/assignments/{aid}", to: accounts}
+  - {rule: route-owner, from: "admin.yaml /v1/accounts/users/{id}/assignments", to: accounts}
+  - {rule: route-owner, from: "admin.yaml /v1/accounts/users/{id}/delegations", to: accounts}
+  - {rule: route-owner, from: "admin.yaml /v1/departments/{id}/log", to: party}
+  - {rule: route-owner, from: "admin.yaml /v1/departments/{id}/retire", to: party}
+  - {rule: route-owner, from: "admin.yaml /v1/departments/{id}/status", to: party}
+  - {rule: route-owner, from: "admin.yaml /v1/departments/{id}", to: party}
+  - {rule: route-owner, from: admin.yaml /v1/departments, to: party}
+  - {rule: route-owner, from: "application.yaml /v1/departments/{code}/modules", to: party}
+  - {rule: route-owner, from: application.yaml /v1/departments, to: party}
+  - {rule: route-owner, from: application.yaml /v1/internal-units, to: accounts}
+  - {rule: route-owner, from: "application.yaml /v1/kn/cooperatives/{ref}/deactivate", to: party}
+  - {rule: route-owner, from: "application.yaml /v1/kn/cooperatives/{ref}/households", to: party}
+  - {rule: route-owner, from: "application.yaml /v1/kn/cooperatives/{ref}/log", to: party}
+  - {rule: route-owner, from: "application.yaml /v1/kn/cooperatives/{ref}/reactivate", to: party}
+  - {rule: route-owner, from: "application.yaml /v1/kn/cooperatives/{ref}", to: party}
+  - {rule: route-owner, from: application.yaml /v1/kn/cooperatives, to: party}
+  - {rule: route-owner, from: "application.yaml /v1/kn/households/{ref}/log", to: party}
+  - {rule: route-owner, from: "application.yaml /v1/kn/households/{ref}", to: party}
+  - {rule: route-owner, from: "application.yaml /v1/kn/machine-counts/{ref}/log", to: mechanization}
+  - {rule: route-owner, from: "application.yaml /v1/kn/machine-counts/{ref}", to: mechanization}
+  - {rule: route-owner, from: application.yaml /v1/kn/machine-counts, to: mechanization}
+  - {rule: route-owner, from: application.yaml /v1/kn/plots/export, to: geo}
+  - {rule: route-owner, from: "application.yaml /v1/kn/plots/{ref}/boundary", to: geo}
+  - {rule: route-owner, from: "application.yaml /v1/kn/plots/{ref}/log", to: geo}
+  - {rule: route-owner, from: "application.yaml /v1/kn/plots/{ref}", to: geo}
+  - {rule: route-owner, from: application.yaml /v1/kn/plots, to: geo}
+  - {rule: route-owner, from: application.yaml /v1/me/contexts, to: accounts}
+  - {rule: route-owner, from: application.yaml /v1/me/context, to: accounts}
+  - {rule: route-owner, from: "application.yaml /v1/me/delegations/{id}/revoke", to: accounts}
+  - {rule: route-owner, from: application.yaml /v1/me/delegations, to: accounts}
+  - {rule: route-owner, from: application.yaml /v1/menu, to: party}
+  - {rule: sql-into-kn, from: internal/platform/metrics/handler/pub_integration_test.go, to: pf_extension.directive_ack}
+  - {rule: sql-into-kn, from: internal/platform/metrics/handler/pub_integration_test.go, to: pf_extension.field_report}
+  - {rule: sql-into-kn, from: internal/platform/metrics/handler/pub_integration_test.go, to: pf_extension.task_current}
+  - {rule: sql-into-kn, from: internal/platform/metrics/handler/pub_integration_test.go, to: pf_extension.task_event}
+  - {rule: sql-into-kn, from: internal/shared/opsjobs/opsjobs_integration_test.go, to: pf_extension.report_period}
+  - {rule: sql-into-kn, from: internal/shared/opsjobs/opsjobs_integration_test.go, to: pf_extension.staff}
+  - {rule: sql-into-kn, from: internal/shared/opsjobs/opsjobs_integration_test.go, to: pf_extension.task_current}
+  - {rule: sql-into-kn, from: internal/shared/opsjobs/opsjobs_integration_test.go, to: pf_extension.work_schedule_current}
+  - {rule: sql-into-kn, from: internal/shared/opsjobs/opsjobs_integration_test.go, to: pf_price.calendar_rule}
+  - {rule: sql-into-kn, from: internal/shared/opsjobs/opsjobs_integration_test.go, to: pf_price.unit}
+  - {rule: sql-into-kn, from: migrations/pf/000114_pf_ops_jobs_grants.up.sql, to: pf_extension.report_period}
+  - {rule: sql-into-kn, from: migrations/pf/000114_pf_ops_jobs_grants.up.sql, to: pf_extension.staff}
+  - {rule: sql-into-kn, from: migrations/pf/000114_pf_ops_jobs_grants.up.sql, to: pf_extension.task_current}
+  - {rule: sql-into-kn, from: migrations/pf/000114_pf_ops_jobs_grants.up.sql, to: pf_extension.work_schedule_current}
+  - {rule: sql-into-kn, from: migrations/pf/000124_pf_pub_v1.up.sql, to: pf_extension.directive}
+  - {rule: sql-into-kn, from: migrations/pf/000124_pf_pub_v1.up.sql, to: pf_extension.directive_ack}
+  - {rule: sql-into-kn, from: migrations/pf/000124_pf_pub_v1.up.sql, to: pf_extension.directive_target}
+  - {rule: sql-into-kn, from: migrations/pf/000124_pf_pub_v1.up.sql, to: pf_extension.field_report}
+  - {rule: sql-into-kn, from: migrations/pf/000124_pf_pub_v1.up.sql, to: pf_extension.task_current}
+  - {rule: sql-into-kn, from: migrations/pf/000124_pf_pub_v1.up.sql, to: pf_extension.task_event}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/compile.ts, to: kn/forms/types}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/compile.ts, to: kn/grid/decimal}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/compile.ts, to: kn/grid/letters}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/engine.test.ts, to: kn/forms/types}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/engine.test.ts, to: kn/grid/decimal}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/evaluate.ts, to: kn/forms/types}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/evaluate.ts, to: kn/grid/decimal}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/formula.ts, to: kn/grid/decimal}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/formula.ts, to: kn/grid/letters}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/layout.ts, to: kn/forms/types}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/ops.ts, to: kn/forms/types}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/ops.ts, to: kn/grid/letters}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/routes.ts, to: api/mock/kn-accounts}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/routes.ts, to: kn/forms/types}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/routes.ts, to: kn/grid/letters}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/xlsx.ts, to: kn/forms/types}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/xlsx.ts, to: kn/grid/letters}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-admin}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-catalogs}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-outbreak}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-periods}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-collect}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-contact}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-hrm}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-hrm-staff}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-khtc}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-khtc-periods}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-khtc-sources}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price-boards}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price-items}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price-points}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price-reports}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price-tickets}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-reports/routes}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-schedules}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/kn.ts, to: api/mock/kn-accounts}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/kn.ts, to: api/mock/kn-reports/store}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/kn.ts, to: api/mock/kn-schedules}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/kn.ts, to: kn/contract}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/kn.ts, to: kn/menuAdapter}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/personas.ts, to: api/mock/kn-accounts}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/app/chon-vai-tro/page.tsx, to: kn/contract}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/app/chon-vai-tro/page.tsx, to: kn/session}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/auth/AuthProvider.tsx, to: kn/client}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/auth/AuthProvider.tsx, to: kn/contextStore}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/auth/AuthProvider.tsx, to: kn/contract}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/auth/AuthProvider.tsx, to: kn/cycle/api}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/auth/AuthProvider.tsx, to: kn/session}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/components/AppShell.tsx, to: kn/SupportBanner}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/components/AppShell.tsx, to: kn/contract}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/components/AppShell.tsx, to: kn/session}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/shell/AccountMenu.tsx, to: kn/session}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/shell/RoleContextPicker.tsx, to: kn/contract}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/shell/RoleContextPicker.tsx, to: kn/session}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/shell/Sidebar.tsx, to: kn/contract}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/shell/menu.ts, to: kn/contract}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/shell/shell.test.tsx, to: api/mock/kn-accounts}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/shell/shell.test.tsx, to: kn/contract}
+  - {rule: web-kn-import-app, from: apps/web-ops/src/kn/cnts/catalog/CntsCatalogScreen.tsx, to: htx/rules}
+  - {rule: web-kn-import-app, from: apps/web-ops/src/kn/cycle/screens/AdminScreens.tsx, to: admin/accounts}

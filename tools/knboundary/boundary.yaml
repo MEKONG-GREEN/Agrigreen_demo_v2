@@ -1,0 +1,110 @@
+# Ranh giới hệ thống Khuyến nông (KN) — cấu hình của cổng `go run ./tools/knboundary` (gói KNSPLIT-0,
+# ADR-0055 "Tách hệ thống Khuyến nông", kiểm kê docs/kn/tach-he-thong/kiem-ke.md).
+#
+# Quy tắc ĐÍCH (sau KNSPLIT-1…4) mà công cụ mã hóa; mỗi ghép nối đang có ghi ở baseline.yaml (chỉ được co lại):
+#   import-into-kn      package Go ngoài KN (trừ gốc lắp ráp, tests/) không import package KN — kể cả port/ của KN
+#                       (nền tảng không biết KN; KN đăng ký vào nền tảng qua port/registry do nền tảng định nghĩa).
+#   kn-import-internal  package KN chỉ import port/ (hoặc client/ của vault) của module nền tảng/HTX, không import
+#                       store/app/domain/handler; không import internal/mkg.
+#   kn-sql-foreign      mã/migration KN không nhắc bảng của schema module khác, trừ view công bố *_pub, k_ref, shared
+#                       (KN đọc dữ liệu HTX chỉ qua _pub và cấp phép chia sẻ — CEO D2, ADR-0052).
+#   sql-into-kn         mã/migration ngoài KN không nhắc bảng trong schema của KN, trừ *_pub.
+#   kn-symbol-in-shared module dùng chung (internal/, lib/) không có tệp/khai báo mang dấu KN (KN, CNTS, KHTC trong tên)
+#                       — phần riêng KN phải tách sang module KN và đăng ký qua port/registry.
+#   route-owner         route thuộc bề mặt KN (tiền tố dưới đây) do module KN phục vụ (tag OpenAPI là module KN), và
+#                       module KN không phục vụ route ngoài bề mặt KN.
+#   web-import-into-kn  tệp web-ops ngoài vùng KN không import vùng KN (vỏ, menu, xác thực dùng chung không phụ thuộc KN).
+#   web-kn-import-app   tệp web vùng KN chỉ import vùng KN và phần dùng chung (api, auth, components, lib, shell, nav…),
+#                       không import màn của ứng dụng khác (htx, admin, cgh, mrv…).
+
+# Thư mục module KN (Go). internal/kn là không gian tên đích (KNSPLIT-1) — có sẵn để quy tắc áp ngay khi chuyển.
+kn_modules:
+  - internal/kn
+  - internal/platform/extension
+  - internal/platform/price
+  - internal/platform/hrm
+  - internal/platform/contact
+
+# Module dữ liệu HTX (bên chủ dữ liệu theo D2) — chỉ dùng cho phân loại trong báo cáo.
+htx_modules:
+  - internal/platform/cooperative
+  - internal/platform/cropcycle
+  - internal/platform/mechanization
+
+# Gốc lắp ráp được import module KN (giai đoạn logic dùng chung binary). Sau KNSPLIT-5 chỉ còn cmd/api-kn, cmd/worker-kn.
+composition_roots:
+  - cmd/api-platform
+  - cmd/worker
+  - cmd/formimport
+  - cmd/seed-synthetic
+
+# Kiểm thử đầu-cuối/chấp nhận ngoài module — miễn mọi quy tắc Go/SQL.
+test_roots:
+  - tests
+
+# Gốc quét Go (import, SQL trong chuỗi) và gốc quét dấu KN.
+go_roots: [internal, cmd, lib, tests]
+symbol_roots: [internal, lib]
+
+# Migration của KN: tên tệp khớp biểu thức này (cụm pf).
+migrations_root: migrations
+kn_migration_pattern: '_pf_(extension|price|hrm|contact)(_|\.)|_pf_pub_kn_'
+
+# Schema không thuộc module nào hoặc được mọi module đọc.
+free_schemas: [k_ref, shared, public]
+
+# Dấu KN trong tên khai báo/tệp (module dùng chung).
+symbol_marker: '(^|[a-z0-9_])(KN|Kn|CNTS|Cnts|KHTC|Khtc)([A-Z0-9_]|s?$)'
+file_marker: '(^|_)(kn|cnts|khtc)(_|\.)'
+
+# Tệp riêng KN trong module dùng chung KHÔNG mang dấu tên (kiểm kê tay, docs/kn/tach-he-thong/kiem-ke.md §1.3) — báo là
+# ghép nối kn-symbol-in-shared (to: "(kiểm kê)") cho tới khi tệp được chuyển sang module KN (KNSPLIT-2). Chỉ được co lại.
+kn_inventory_files:
+  - internal/platform/accounts/app/dormant.go
+  - internal/platform/accounts/store/dormant.go
+  - internal/platform/accounts/app/internal_unit.go
+  - internal/platform/accounts/domain/internal_unit.go
+  - internal/platform/accounts/handler/internal_unit.go
+  - internal/platform/accounts/port/internal_unit.go
+  - internal/platform/accounts/store/internal_unit.go
+  - internal/platform/party/domain/menu.go
+  - internal/platform/party/domain/menu_departments.go
+  - internal/platform/cooperative/plot/app/department_usage.go
+  - internal/platform/mechanization/app/department_usage.go
+  - internal/platform/notify/domain/price.go
+  - internal/platform/notify/domain/report_cycle.go
+  - internal/platform/notify/domain/work_schedule.go
+  - internal/platform/reports/port/extensionsrc/extensionsrc.go
+
+openapi:
+  - contracts/openapi/application.yaml
+  - contracts/openapi/admin.yaml
+kn_tags: [extension, price, hrm, contact]
+# Tiền tố route của KN (thao tác không có tag dưới các tiền tố này tính là của KN).
+kn_route_prefixes:
+  - /v1/kn/
+  - /v1/extension/
+  - /v1/price/
+  - /v1/hrm/
+  - /v1/contacts
+  - /v1/support-requests
+# Bề mặt KN đang do module dùng chung phục vụ (menu, ngữ cảnh phiên, phòng ban, đơn vị nội bộ, ủy quyền, hỗ trợ).
+# Khác kn_route_prefixes: thao tác không có tag ở đây tính là ghép nối (không suy được chủ từ tiền tố).
+kn_shared_route_prefixes:
+  - /v1/menu
+  - /v1/me/context
+  - /v1/me/delegations
+  - /v1/internal-units
+  - /v1/departments
+  - /v1/accounts/kn-users
+  - /v1/accounts/internal-units
+  - /v1/accounts/delegations
+  - /v1/accounts/support-
+  - /v1/accounts/users/{id}/assignments
+  - /v1/accounts/users/{id}/delegations
+
+web:
+  root: apps/web-ops/src
+  alias: "@/"
+  kn_paths: [kn/, app/kn/, api/mock/kn-]
+  kn_may_import: [kn/, app/kn/, api/, apiclient/, auth/, components/, lib/, shell/, nav/, config]
