@@ -28,15 +28,7 @@ import {
   type OrgForm,
 } from "./orgCreate";
 
-export function OrgCreateDialog({
-  orgs,
-  onClose,
-  onCreated,
-}: {
-  orgs: readonly Org[];
-  onClose: () => void;
-  onCreated: (org: Org) => void;
-}) {
+export function OrgCreateDialog({ orgs, onClose, onCreated }: { orgs: readonly Org[]; onClose: () => void; onCreated: (org: Org) => void }) {
   const { adminApi, api } = useAuth();
   const id = useId();
   const formId = `${id}-form`;
@@ -49,18 +41,11 @@ export function OrgCreateDialog({
   const day = useMemo(() => vnToday(), []);
 
   const rule = KIND_RULES[form.kind];
-  const parents = useMemo(
-    () => parentOptions(form.kind, orgs),
-    [form.kind, orgs],
-  );
-  const parent = form.parent_ref
-    ? (orgs.find((o) => o.ref === form.parent_ref) ?? null)
-    : null;
+  const parents = useMemo(() => parentOptions(form.kind, orgs), [form.kind, orgs]);
+  const parent = form.parent_ref ? (orgs.find((o) => o.ref === form.parent_ref) ?? null) : null;
   // ĐVHC: tỉnh → danh sách tỉnh; xã → xã thuộc tỉnh của cấp trên. Tra theo ngày hiệu lực hôm nay.
-  const unitParent =
-    rule.unit === "commune" ? (parent?.admin_unit_code ?? null) : null;
-  const needUnits =
-    rule.unit === "province" || (rule.unit === "commune" && !!unitParent);
+  const unitParent = rule.unit === "commune" ? (parent?.admin_unit_code ?? null) : null;
+  const needUnits = rule.unit === "province" || (rule.unit === "commune" && !!unitParent);
   const units = useAsync(
     () =>
       needUnits
@@ -83,10 +68,7 @@ export function OrgCreateDialog({
         : Promise.resolve([]),
     [api, needUnits, unitParent, day],
   );
-  const unitChoices = useMemo(
-    () => unitOptions(form.kind, units.data ?? [], parent, day),
-    [form.kind, units.data, parent, day],
-  );
+  const unitChoices = useMemo(() => unitOptions(form.kind, units.data ?? [], parent, day), [form.kind, units.data, parent, day]);
 
   const set = <K extends keyof OrgForm>(k: K, v: OrgForm[K]) => {
     setForm((f) => {
@@ -95,8 +77,7 @@ export function OrgCreateDialog({
         next.parent_ref = "";
         next.admin_unit_code = "";
       }
-      if (k === "parent_ref" && KIND_RULES[next.kind].unit === "commune")
-        next.admin_unit_code = "";
+      if (k === "parent_ref" && KIND_RULES[next.kind].unit === "commune") next.admin_unit_code = "";
       return next;
     });
     setErrs((e) => ({ ...e, [k]: undefined }));
@@ -144,34 +125,16 @@ export function OrgCreateDialog({
       onClose={onClose}
       actions={
         rule.redirect ? null : (
-          <button
-            type="submit"
-            form={formId}
-            className="btn btn-p btn-sm"
-            disabled={busy}
-          >
+          <button type="submit" form={formId} className="btn btn-p btn-sm" disabled={busy}>
             {busy ? "Đang tạo…" : "Tạo"}
           </button>
         )
       }
     >
-      <form
-        id={formId}
-        className="stack"
-        style={{ gap: 10 }}
-        aria-label="Tạo tổ chức"
-        noValidate
-        onSubmit={(e) => void submit(e)}
-      >
+      <form id={formId} className="stack" style={{ gap: 10 }} aria-label="Tạo tổ chức" noValidate onSubmit={(e) => void submit(e)}>
         <div className="field">
           <label htmlFor={`${id}-kind`}>Loại tổ chức</label>
-          <select
-            id={`${id}-kind`}
-            className="input"
-            value={form.kind}
-            onChange={(e) => set("kind", e.target.value as OrgKind)}
-            {...a11y("kind")}
-          >
+          <select id={`${id}-kind`} className="input" value={form.kind} onChange={(e) => set("kind", e.target.value as OrgKind)} {...a11y("kind")}>
             {CREATE_KIND_ORDER.map((k) => (
               <option key={k} value={k}>
                 {KIND_RULES[k].label}
@@ -181,21 +144,12 @@ export function OrgCreateDialog({
         </div>
 
         {rule.redirect ? (
-          <div
-            className="panel stack"
-            style={{ gap: 6 }}
-            data-testid="org-create-coop-redirect"
-          >
+          <div className="panel stack" style={{ gap: 6 }} data-testid="org-create-coop-redirect">
             <b>HTX / THT không tạo ở đây</b>
             <span className="small">
-              HTX mới đi qua luồng HTX tạm neo theo mã số thuế (ADR-0052, quyết
-              định D2) để dữ liệu đồng sở hữu MKG + HTX có neo ngay từ đầu.
+              HTX mới đi qua luồng HTX tạm neo theo mã số thuế (ADR-0052, quyết định D2) để dữ liệu đồng sở hữu MKG + HTX có neo ngay từ đầu.
             </span>
-            <Link
-              href={rule.redirect}
-              className="btn btn-o btn-sm"
-              style={{ alignSelf: "flex-start" }}
-            >
+            <Link href={rule.redirect} className="btn btn-o btn-sm" style={{ alignSelf: "flex-start" }}>
               Mở Neo HTX theo mã số thuế
             </Link>
           </div>
@@ -203,29 +157,13 @@ export function OrgCreateDialog({
           <>
             <div className="field">
               <label htmlFor={`${id}-code`}>Mã tổ chức</label>
-              <input
-                id={`${id}-code`}
-                className="input"
-                value={form.code}
-                maxLength={40}
-                onChange={(e) => set("code", e.target.value)}
-                {...a11y("code")}
-              />
-              <span className="small mute">
-                1–40 ký tự: chữ không dấu, số, dấu . _ -. Mã không tái sử dụng.
-              </span>
+              <input id={`${id}-code`} className="input" value={form.code} maxLength={40} onChange={(e) => set("code", e.target.value)} {...a11y("code")} />
+              <span className="small mute">1–40 ký tự: chữ không dấu, số, dấu . _ -. Mã không tái sử dụng.</span>
               {err("code")}
             </div>
             <div className="field">
               <label htmlFor={`${id}-name`}>Tên tổ chức</label>
-              <input
-                id={`${id}-name`}
-                className="input"
-                value={form.name}
-                maxLength={200}
-                onChange={(e) => set("name", e.target.value)}
-                {...a11y("name")}
-              />
+              <input id={`${id}-name`} className="input" value={form.name} maxLength={200} onChange={(e) => set("name", e.target.value)} {...a11y("name")} />
               {err("name")}
             </div>
             {rule.parents.length > 0 ? (
@@ -238,9 +176,7 @@ export function OrgCreateDialog({
                   onChange={(e) => set("parent_ref", e.target.value)}
                   {...a11y("parent_ref")}
                 >
-                  <option value="">
-                    {rule.root ? "— Không (đứng ở gốc) —" : "— Chọn —"}
-                  </option>
+                  <option value="">{rule.root ? "— Không (đứng ở gốc) —" : "— Chọn —"}</option>
                   {parents.map((o) => (
                     <option key={o.ref} value={o.ref}>
                       {o.name} ({o.code})
@@ -248,8 +184,7 @@ export function OrgCreateDialog({
                   ))}
                 </select>
                 <span className="small mute">
-                  Chỉ hiện tổ chức đang hoạt động thuộc loại cấp trên hợp lệ:{" "}
-                  {rule.parents.map((k) => KIND_RULES[k].label).join(", ")}.
+                  Chỉ hiện tổ chức đang hoạt động thuộc loại cấp trên hợp lệ: {rule.parents.map((k) => KIND_RULES[k].label).join(", ")}.
                 </span>
                 {err("parent_ref")}
               </div>
@@ -258,11 +193,7 @@ export function OrgCreateDialog({
             )}
             {rule.unit === "province" || rule.unit === "commune" ? (
               <div className="field">
-                <label htmlFor={`${id}-unit`}>
-                  {rule.unit === "province"
-                    ? "Tỉnh/thành (ĐVHC)"
-                    : "Xã/phường (ĐVHC)"}
-                </label>
+                <label htmlFor={`${id}-unit`}>{rule.unit === "province" ? "Tỉnh/thành (ĐVHC)" : "Xã/phường (ĐVHC)"}</label>
                 <select
                   id={`${id}-unit`}
                   className="input"
@@ -271,11 +202,7 @@ export function OrgCreateDialog({
                   onChange={(e) => set("admin_unit_code", e.target.value)}
                   {...a11y("admin_unit_code")}
                 >
-                  <option value="">
-                    {rule.unit === "commune" && !unitParent
-                      ? "— Chọn cấp trên trước —"
-                      : "— Chọn —"}
-                  </option>
+                  <option value="">{rule.unit === "commune" && !unitParent ? "— Chọn cấp trên trước —" : "— Chọn —"}</option>
                   {unitChoices.map((u) => (
                     <option key={u.code} value={u.code}>
                       {u.name} ({u.code})
@@ -286,17 +213,13 @@ export function OrgCreateDialog({
                   Chỉ đơn vị còn hiệu lực ngày {day}
                   {rule.unit === "commune" ? ", thuộc tỉnh của cấp trên" : ""}.
                 </span>
-                {units.error ? (
-                  <ProblemAlert problem={units.error} onRetry={units.reload} />
-                ) : null}
+                {units.error ? <ProblemAlert problem={units.error} onRetry={units.reload} /> : null}
                 {err("admin_unit_code")}
               </div>
             ) : null}
             {rule.unit === "any" ? (
               <div className="field">
-                <label htmlFor={`${id}-unit`}>
-                  Mã ĐVHC (tuỳ chọn, tỉnh hoặc xã)
-                </label>
+                <label htmlFor={`${id}-unit`}>Mã ĐVHC (tuỳ chọn, tỉnh hoặc xã)</label>
                 <input
                   id={`${id}-unit`}
                   className="input"

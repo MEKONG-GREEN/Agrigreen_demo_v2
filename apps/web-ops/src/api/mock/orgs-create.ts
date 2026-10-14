@@ -7,14 +7,7 @@ import { KIND_RULES, unitValidOn, vnToday } from "../../admin/orgCreate";
 import { uuidv7 } from "../idempotency";
 import type { Org, OrgKind } from "../types";
 import { ADMIN_UNITS, ORG_EVENTS, ORGS } from "./data";
-import {
-  hasRole,
-  json,
-  problem,
-  scopeUnits,
-  validation,
-  type Route,
-} from "./http";
+import { hasRole, json, problem, scopeUnits, validation, type Route } from "./http";
 import type { MockPersona } from "./personas";
 
 const KINDS = Object.keys(KIND_RULES) as OrgKind[];
@@ -28,29 +21,18 @@ function writeAllowed(p: MockPersona, unit: string): boolean {
   return s.has(unit) || (!!u?.parent_code && s.has(u.parent_code));
 }
 
-const hierarchy = (detail: string) =>
-  problem(422, "party.invalid_hierarchy", "Invalid hierarchy", { detail });
+const hierarchy = (detail: string) => problem(422, "party.invalid_hierarchy", "Invalid hierarchy", { detail });
 
 export const orgCreateRoutes: Route[] = [
   {
     method: "POST",
     pattern: /^\/v1\/orgs$/,
     handler: ({ persona, body }) => {
-      if (
-        !hasRole(
-          persona,
-          "registry_admin",
-          "kn_province_admin",
-          "platform_admin",
-        )
-      )
-        return problem(403, "forbidden", "Forbidden");
+      if (!hasRole(persona, "registry_admin", "kn_province_admin", "platform_admin")) return problem(403, "forbidden", "Forbidden");
       const b = (body ?? {}) as Record<string, unknown>;
-      const str = (k: string) =>
-        typeof b[k] === "string" ? (b[k] as string).trim() : "";
+      const str = (k: string) => (typeof b[k] === "string" ? (b[k] as string).trim() : "");
       const kind = str("kind") as OrgKind;
-      if (!KINDS.includes(kind))
-        return validation([{ field: "kind", reason: "kind không hợp lệ" }]);
+      if (!KINDS.includes(kind)) return validation([{ field: "kind", reason: "kind không hợp lệ" }]);
       const isCoop = kind === "cooperative";
       const code = str("code");
       const name = str("name");
@@ -63,15 +45,9 @@ export const orgCreateRoutes: Route[] = [
             reason: "Mã HTX do hệ thống tự sinh, không nhập tay (CGH BR-01)",
           },
         ]);
-      if (!isCoop && !CODE_RE.test(code))
-        return validation([
-          { field: "code", reason: "code bắt buộc, 1–40 ký tự [A-Za-z0-9._-]" },
-        ]);
+      if (!isCoop && !CODE_RE.test(code)) return validation([{ field: "code", reason: "code bắt buộc, 1–40 ký tự [A-Za-z0-9._-]" }]);
       const n = [...name].length;
-      if (n === 0 || n > 200)
-        return validation([
-          { field: "name", reason: "name bắt buộc, tối đa 200 ký tự" },
-        ]);
+      if (n === 0 || n > 200) return validation([{ field: "name", reason: "name bắt buộc, tối đa 200 ký tự" }]);
       const level = KIND_RULES[kind].unit;
       if (level === "none" && unit)
         return validation([
@@ -88,9 +64,7 @@ export const orgCreateRoutes: Route[] = [
           },
         ]);
       const day = vnToday();
-      const u = unit
-        ? ADMIN_UNITS.find((x) => x.code === unit && unitValidOn(x, day))
-        : undefined;
+      const u = unit ? ADMIN_UNITS.find((x) => x.code === unit && unitValidOn(x, day)) : undefined;
       if (unit && !u)
         return validation([
           {
@@ -98,11 +72,7 @@ export const orgCreateRoutes: Route[] = [
             reason: "không có đơn vị hành chính còn hiệu lực với mã này",
           },
         ]);
-      if (
-        u &&
-        (level === "province" || level === "commune") &&
-        u.level !== level
-      ) {
+      if (u && (level === "province" || level === "commune") && u.level !== level) {
         return validation([
           {
             field: "admin_unit_code",
@@ -110,34 +80,18 @@ export const orgCreateRoutes: Route[] = [
           },
         ]);
       }
-      if (!writeAllowed(persona, unit))
-        return problem(403, "party.out_of_scope", "Out of scope");
+      if (!writeAllowed(persona, unit)) return problem(403, "party.out_of_scope", "Out of scope");
 
-      const parent = parentRef
-        ? ORGS.find((o) => o.ref === parentRef)
-        : undefined;
-      if (parentRef && (!parent || !parent.active))
-        return hierarchy(
-          "tổ chức cấp trên không tồn tại hoặc đã ngừng hoạt động",
-        );
+      const parent = parentRef ? ORGS.find((o) => o.ref === parentRef) : undefined;
+      if (parentRef && (!parent || !parent.active)) return hierarchy("tổ chức cấp trên không tồn tại hoặc đã ngừng hoạt động");
       const rule = KIND_RULES[kind];
-      if (parent ? !rule.parents.includes(parent.kind) : !rule.root)
-        return hierarchy("tổ chức cấp trên không hợp lệ cho loại tổ chức này");
-      if (
-        parent?.admin_unit_code &&
-        u &&
-        u.code !== parent.admin_unit_code &&
-        u.parent_code !== parent.admin_unit_code
-      ) {
-        return hierarchy(
-          "đơn vị hành chính không thuộc địa bàn của tổ chức cấp trên",
-        );
+      if (parent ? !rule.parents.includes(parent.kind) : !rule.root) return hierarchy("tổ chức cấp trên không hợp lệ cho loại tổ chức này");
+      if (parent?.admin_unit_code && u && u.code !== parent.admin_unit_code && u.parent_code !== parent.admin_unit_code) {
+        return hierarchy("đơn vị hành chính không thuộc địa bàn của tổ chức cấp trên");
       }
       let finalCode = code;
-      if (isCoop)
-        finalCode = `HTX-${String(ORGS.filter((o) => o.kind === "cooperative").length + 1).padStart(5, "0")}`;
-      else if (ORGS.some((o) => o.code === code))
-        return problem(409, "party.org_code_taken", "Org code taken");
+      if (isCoop) finalCode = `HTX-${String(ORGS.filter((o) => o.kind === "cooperative").length + 1).padStart(5, "0")}`;
+      else if (ORGS.some((o) => o.code === code)) return problem(409, "party.org_code_taken", "Org code taken");
 
       const org: Org = {
         ref: uuidv7(),

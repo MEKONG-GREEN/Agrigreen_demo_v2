@@ -18,11 +18,7 @@ interface Body {
 }
 
 let n = 0;
-async function create(
-  body: Record<string, unknown>,
-  persona = "setter",
-  key = `orgui-test-${++n}-${Date.now()}`,
-) {
+async function create(body: Record<string, unknown>, persona = "setter", key = `orgui-test-${++n}-${Date.now()}`) {
   const res = await mockAdminFetchNoDelay(
     new Request("http://mock/v1/orgs", {
       method: "POST",
@@ -84,9 +80,7 @@ describe("POST /v1/orgs (giả lập)", () => {
 
   it("sửa mã sau 409 rồi gửi lại cùng khóa → 201 (lỗi không được lưu để phát lại)", async () => {
     const key = "orgui-retry-key-1";
-    expect(
-      (await create({ ...TEAM, code: "TTKNQG" }, "setter", key)).status,
-    ).toBe(409);
+    expect((await create({ ...TEAM, code: "TTKNQG" }, "setter", key)).status).toBe(409);
     expect((await create(TEAM, "setter", key)).status).toBe(201);
   });
 
@@ -106,9 +100,7 @@ describe("POST /v1/orgs (giả lập)", () => {
 
   it("422 validation_failed theo trường", async () => {
     const badCode = await create({ ...TEAM, code: "có dấu" });
-    expect(badCode.body.errors).toEqual([
-      { field: "code", reason: expect.stringContaining("1–40") },
-    ]);
+    expect(badCode.body.errors).toEqual([{ field: "code", reason: expect.stringContaining("1–40") }]);
     const noUnit = await create({ ...TEAM, admin_unit_code: "" });
     expect(noUnit.body.errors[0]?.field).toBe("admin_unit_code");
     const wrongLevel = await create({ ...TEAM, admin_unit_code: "82" });
@@ -131,9 +123,7 @@ describe("POST /v1/orgs (giả lập)", () => {
       name: "HTX thử",
       admin_unit_code: "82101",
     });
-    expect(r.body.errors).toEqual([
-      { field: "code", reason: expect.stringContaining("tự sinh") },
-    ]);
+    expect(r.body.errors).toEqual([{ field: "code", reason: expect.stringContaining("tự sinh") }]);
   });
 
   it("403: vai không có quyền; MFA bắt buộc", async () => {

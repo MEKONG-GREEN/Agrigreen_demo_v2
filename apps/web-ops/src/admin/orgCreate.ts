@@ -9,14 +9,9 @@ import { ROLES } from "@/auth/principal";
 export type PartyOrgInput = components["schemas"]["PartyOrgInput"];
 
 /** Vai được mở hộp thoại tạo. KN admin (kn_province_admin…) tạm chưa được tạo — quyết định nhóm (ORGUI). */
-export const ORG_CREATE_ROLES: readonly string[] = [
-  ROLES.platformAdmin,
-  ROLES.registryAdmin,
-];
+export const ORG_CREATE_ROLES: readonly string[] = [ROLES.platformAdmin, ROLES.registryAdmin];
 
-export function canCreateOrg(
-  roles: readonly string[] | undefined | null,
-): boolean {
+export function canCreateOrg(roles: readonly string[] | undefined | null): boolean {
   return !!roles && roles.some((r) => ORG_CREATE_ROLES.includes(r));
 }
 
@@ -67,15 +62,7 @@ export const KIND_RULES: Readonly<Record<OrgKind, KindRule>> = {
 };
 
 /** Thứ tự trong ô chọn loại. */
-export const CREATE_KIND_ORDER: readonly OrgKind[] = [
-  "ttkn_province",
-  "extension_team",
-  "ttkn_national",
-  "dcrd",
-  "mkg",
-  "partner",
-  "cooperative",
-];
+export const CREATE_KIND_ORDER: readonly OrgKind[] = ["ttkn_province", "extension_team", "ttkn_national", "dcrd", "mkg", "partner", "cooperative"];
 
 /** Mã tổ chức: 1–40 ký tự [A-Za-z0-9._-] (domain.codeRe). */
 export const ORG_CODE_RE = /^[A-Za-z0-9._-]{1,40}$/;
@@ -83,8 +70,7 @@ export const ORG_CODE_RE = /^[A-Za-z0-9._-]{1,40}$/;
 export function codeError(code: string): string | null {
   const c = code.trim();
   if (!c) return "Nhập mã tổ chức.";
-  if (!ORG_CODE_RE.test(c))
-    return "Mã 1–40 ký tự, chỉ gồm chữ không dấu, số và . _ -";
+  if (!ORG_CODE_RE.test(c)) return "Mã 1–40 ký tự, chỉ gồm chữ không dấu, số và . _ -";
   return null;
 }
 
@@ -101,44 +87,28 @@ export function vnToday(now: Date = new Date()): string {
 }
 
 /** ĐVHC còn hiệu lực ngày `day`: valid_from ≤ day < valid_to (valid_to không bao gồm; null = còn hiệu lực). */
-export function unitValidOn(
-  u: Pick<AdminUnit, "valid_from" | "valid_to">,
-  day: string,
-): boolean {
+export function unitValidOn(u: Pick<AdminUnit, "valid_from" | "valid_to">, day: string): boolean {
   return u.valid_from <= day && (u.valid_to === null || day < u.valid_to);
 }
 
 /** Cha hợp lệ cho loại `kind`: đang hoạt động và đúng loại cấp trên (domain.AllowedParent). */
 export function parentOptions(kind: OrgKind, orgs: readonly Org[]): Org[] {
   const rule = KIND_RULES[kind];
-  return orgs
-    .filter((o) => o.active && rule.parents.includes(o.kind))
-    .sort((a, b) => a.name.localeCompare(b.name, "vi"));
+  return orgs.filter((o) => o.active && rule.parents.includes(o.kind)).sort((a, b) => a.name.localeCompare(b.name, "vi"));
 }
 
 export function allowedParent(kind: OrgKind, parent: Org | null): boolean {
   const rule = KIND_RULES[kind];
-  return parent === null
-    ? rule.root
-    : parent.active && rule.parents.includes(parent.kind);
+  return parent === null ? rule.root : parent.active && rule.parents.includes(parent.kind);
 }
 
 /** ĐVHC chọn được: đúng cấp, còn hiệu lực hôm nay, và nằm trong địa bàn của cha (app.unitWithin). */
-export function unitOptions(
-  kind: OrgKind,
-  units: readonly AdminUnit[],
-  parent: Org | null,
-  day: string,
-): AdminUnit[] {
+export function unitOptions(kind: OrgKind, units: readonly AdminUnit[], parent: Org | null, day: string): AdminUnit[] {
   const level = KIND_RULES[kind].unit;
   if (level === "none") return [];
   const within = parent?.admin_unit_code ?? null;
   return units
-    .filter((u) =>
-      level === "any"
-        ? u.level === "province" || u.level === "commune"
-        : u.level === level,
-    )
+    .filter((u) => (level === "any" ? u.level === "province" || u.level === "commune" : u.level === level))
     .filter((u) => unitValidOn(u, day))
     .filter((u) => !within || u.code === within || u.parent_code === within)
     .sort((a, b) => a.name.localeCompare(b.name, "vi"));
@@ -160,9 +130,7 @@ export const EMPTY_FORM: OrgForm = {
   parent_ref: "",
 };
 
-export type FieldErrors = Partial<
-  Record<"kind" | "code" | "name" | "admin_unit_code" | "parent_ref", string>
->;
+export type FieldErrors = Partial<Record<"kind" | "code" | "name" | "admin_unit_code" | "parent_ref", string>>;
 
 /** Kiểm phía client trước khi gửi (server kiểm lại). */
 export function validateForm(f: OrgForm, orgs: readonly Org[]): FieldErrors {
@@ -176,20 +144,10 @@ export function validateForm(f: OrgForm, orgs: readonly Org[]): FieldErrors {
   if (c) errs.code = c;
   const n = nameError(f.name);
   if (n) errs.name = n;
-  const parent = f.parent_ref
-    ? (orgs.find((o) => o.ref === f.parent_ref) ?? null)
-    : null;
-  if (f.parent_ref && !parent)
-    errs.parent_ref = "Không tìm thấy tổ chức cấp trên.";
-  else if (!allowedParent(f.kind, parent))
-    errs.parent_ref = parent
-      ? "Tổ chức cấp trên không hợp lệ cho loại này."
-      : "Chọn tổ chức cấp trên.";
-  if (
-    (rule.unit === "province" || rule.unit === "commune") &&
-    !f.admin_unit_code.trim()
-  )
-    errs.admin_unit_code = "Chọn đơn vị hành chính.";
+  const parent = f.parent_ref ? (orgs.find((o) => o.ref === f.parent_ref) ?? null) : null;
+  if (f.parent_ref && !parent) errs.parent_ref = "Không tìm thấy tổ chức cấp trên.";
+  else if (!allowedParent(f.kind, parent)) errs.parent_ref = parent ? "Tổ chức cấp trên không hợp lệ cho loại này." : "Chọn tổ chức cấp trên.";
+  if ((rule.unit === "province" || rule.unit === "commune") && !f.admin_unit_code.trim()) errs.admin_unit_code = "Chọn đơn vị hành chính.";
   return errs;
 }
 

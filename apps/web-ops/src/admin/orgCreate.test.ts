@@ -17,13 +17,7 @@ import {
   vnToday,
 } from "./orgCreate";
 
-const org = (
-  ref: string,
-  kind: Org["kind"],
-  unit: string | null,
-  parent: string | null = null,
-  active = true,
-): Org => ({
+const org = (ref: string, kind: Org["kind"], unit: string | null, parent: string | null = null, active = true): Org => ({
   ref,
   kind,
   code: ref.toUpperCase(),
@@ -41,13 +35,7 @@ const TEAM = org("team", "extension_team", "82101", "p82");
 const COOP = org("coop", "cooperative", "82101", "team");
 const ORGS = [NAT, P82, P91, POFF, TEAM, COOP];
 
-const unit = (
-  code: string,
-  level: AdminUnit["level"],
-  parent: string | null,
-  from = "2025-07-01",
-  to: string | null = null,
-): AdminUnit => ({
+const unit = (code: string, level: AdminUnit["level"], parent: string | null, from = "2025-07-01", to: string | null = null): AdminUnit => ({
   code,
   name: `ĐV ${code}`,
   level,
@@ -89,13 +77,8 @@ describe("mã tổ chức (domain.codeRe)", () => {
 
 describe("cấp trên (domain.AllowedParent)", () => {
   it("lọc theo loại cấp trên hợp lệ và chỉ tổ chức đang hoạt động", () => {
-    expect(parentOptions("extension_team", ORGS).map((o) => o.ref)).toEqual([
-      "p82",
-      "p91",
-    ]);
-    expect(parentOptions("ttkn_province", ORGS).map((o) => o.ref)).toEqual([
-      "nat",
-    ]);
+    expect(parentOptions("extension_team", ORGS).map((o) => o.ref)).toEqual(["p82", "p91"]);
+    expect(parentOptions("ttkn_province", ORGS).map((o) => o.ref)).toEqual(["nat"]);
     expect(parentOptions("dcrd", ORGS)).toEqual([]);
   });
   it("gốc / sai loại / ngừng hoạt động", () => {
@@ -112,28 +95,16 @@ describe("cấp trên (domain.AllowedParent)", () => {
 
 describe("ĐVHC theo ngày hiệu lực", () => {
   it("valid_to không bao gồm, valid_from bao gồm", () => {
-    expect(unitValidOn(unit("x", "commune", "82", "2026-10-14"), DAY)).toBe(
-      true,
-    );
-    expect(
-      unitValidOn(unit("x", "commune", "82", "2020-01-01", "2026-10-14"), DAY),
-    ).toBe(false);
-    expect(unitValidOn(unit("x", "commune", "82", "2026-10-15"), DAY)).toBe(
-      false,
-    );
+    expect(unitValidOn(unit("x", "commune", "82", "2026-10-14"), DAY)).toBe(true);
+    expect(unitValidOn(unit("x", "commune", "82", "2020-01-01", "2026-10-14"), DAY)).toBe(false);
+    expect(unitValidOn(unit("x", "commune", "82", "2026-10-15"), DAY)).toBe(false);
   });
   it("xã: đúng cấp, còn hiệu lực, thuộc tỉnh của cấp trên", () => {
-    expect(
-      unitOptions("extension_team", UNITS, P82, DAY).map((u) => u.code),
-    ).toEqual(["82101", "82102"]);
-    expect(
-      unitOptions("extension_team", UNITS, P91, DAY).map((u) => u.code),
-    ).toEqual(["91101"]);
+    expect(unitOptions("extension_team", UNITS, P82, DAY).map((u) => u.code)).toEqual(["82101", "82102"]);
+    expect(unitOptions("extension_team", UNITS, P91, DAY).map((u) => u.code)).toEqual(["91101"]);
   });
   it("tỉnh: chỉ cấp tỉnh; loại không gắn ĐVHC → rỗng", () => {
-    expect(
-      unitOptions("ttkn_province", UNITS, NAT, DAY).map((u) => u.code),
-    ).toEqual(["82", "91"]);
+    expect(unitOptions("ttkn_province", UNITS, NAT, DAY).map((u) => u.code)).toEqual(["82", "91"]);
     expect(unitOptions("dcrd", UNITS, null, DAY)).toEqual([]);
   });
   it("ngày theo giờ Việt Nam (UTC+7)", () => {
@@ -144,20 +115,13 @@ describe("ĐVHC theo ngày hiệu lực", () => {
 
 describe("kiểm form và thân gửi", () => {
   it("trường bắt buộc theo loại", () => {
-    expect(
-      validateForm({ ...EMPTY_FORM, kind: "extension_team" }, ORGS),
-    ).toEqual({
+    expect(validateForm({ ...EMPTY_FORM, kind: "extension_team" }, ORGS)).toEqual({
       code: "Nhập mã tổ chức.",
       name: "Nhập tên tổ chức.",
       parent_ref: "Chọn tổ chức cấp trên.",
       admin_unit_code: "Chọn đơn vị hành chính.",
     });
-    expect(
-      validateForm(
-        { ...EMPTY_FORM, kind: "dcrd", code: "CUC2", name: "Cục 2" },
-        ORGS,
-      ),
-    ).toEqual({});
+    expect(validateForm({ ...EMPTY_FORM, kind: "dcrd", code: "CUC2", name: "Cục 2" }, ORGS)).toEqual({});
   });
   it("cấp trên sai loại bị chặn trước khi gửi", () => {
     const f = {
@@ -168,9 +132,7 @@ describe("kiểm form và thân gửi", () => {
       parent_ref: "nat",
       admin_unit_code: "82101",
     };
-    expect(validateForm(f, ORGS).parent_ref).toBe(
-      "Tổ chức cấp trên không hợp lệ cho loại này.",
-    );
+    expect(validateForm(f, ORGS).parent_ref).toBe("Tổ chức cấp trên không hợp lệ cho loại này.");
   });
   it("HTX không gửi từ đây (chuyển Neo HTX)", () => {
     expect(KIND_RULES.cooperative.redirect).toBe("/quan-tri/neo-htx");
@@ -207,11 +169,7 @@ describe("kiểm form và thân gửi", () => {
 });
 
 describe("lỗi server → trường", () => {
-  const p = (
-    status: number,
-    code: string,
-    extra: Record<string, unknown> = {},
-  ) =>
+  const p = (status: number, code: string, extra: Record<string, unknown> = {}) =>
     new ApiProblem({
       type: "about:blank",
       title: code,
@@ -220,9 +178,7 @@ describe("lỗi server → trường", () => {
       ...extra,
     });
   it("409 mã trùng → ô Mã", () => {
-    expect(
-      fieldErrorsFromProblem(p(409, "party.org_code_taken"))?.code,
-    ).toMatch(/đã được dùng/);
+    expect(fieldErrorsFromProblem(p(409, "party.org_code_taken"))?.code).toMatch(/đã được dùng/);
   });
   it("422 cấp bậc → ô Cấp trên, kèm detail của server", () => {
     expect(
