@@ -42,6 +42,7 @@ import { personaFromAuthHeader, type MockPersona } from "./personas";
 import { checkDisplayProposal, DISPLAY_DEFAULTS, displayConfig, isColorKey, isPercentKey, PERCENT_TITLE, RESTORE_REASON } from "./display";
 import { areaSyncRoutes } from "./areasync";
 import { htxAnchorRoutes } from "./htx-anchors";
+import { orgCreateRoutes } from "./orgs-create";
 import { syncMonitorRoutes } from "./syncmonitor";
 import { metricsRoutes } from "./metrics";
 import { mrvAdminRoutes, mrvAppRoutes } from "./mrv";
@@ -720,6 +721,7 @@ const adminRoutes: Route[] = [
     },
   },
   ...adminOpsRoutes,
+  ...orgCreateRoutes,
   ...syncMonitorRoutes,
   ...htxAnchorRoutes,
   ...gisAdminRoutes,

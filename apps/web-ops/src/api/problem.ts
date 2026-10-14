@@ -53,6 +53,8 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "party.org_not_found": "Không tìm thấy tổ chức/HTX, hoặc nằm ngoài phạm vi được phân quyền.",
   "party.org_state_conflict": "Trạng thái tổ chức không cho phép thao tác này (hoặc không có gì thay đổi).",
   "party.out_of_scope": "Thao tác nằm ngoài phạm vi TW → Tỉnh → Xã được phân quyền.",
+  "party.org_code_taken": "Mã tổ chức đã được dùng (mã không tái sử dụng). Chọn mã khác.",
+  "party.invalid_hierarchy": "Vị trí trong cây phân cấp không hợp lệ (sai loại cấp trên hoặc khác địa bàn).",
   "party.import_invalid":
     "Tệp nhập sai mẫu (thiếu cột bắt buộc, không phải CSV UTF-8/.xlsx, tệp .xls cũ, có ô công thức hoặc quá số dòng). Cả tệp bị từ chối.",
   "party.dependency_unavailable": "Dịch vụ danh bạ tổ chức/kho định danh tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
