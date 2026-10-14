@@ -50,21 +50,21 @@ func renderXLSX(t domain.Table, m xlsxMeta) ([]byte, error) {
 	}
 	n := len(t.Columns)
 	half := max(n/2, 2)
-	bold, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Family: "Times New Roman", Size: 12},
+	bold, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Family: "Times New Roman"},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true}})
-	plain, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Family: "Times New Roman", Size: 11},
+	plain, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Family: "Times New Roman"},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true}})
-	italic, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Italic: true, Family: "Times New Roman", Size: 11},
+	italic, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Italic: true, Family: "Times New Roman"},
 		Alignment: &excelize.Alignment{Horizontal: "center"}})
 	border := []excelize.Border{{Type: "left", Color: "000000", Style: 1}, {Type: "right", Color: "000000", Style: 1},
 		{Type: "top", Color: "000000", Style: 1}, {Type: "bottom", Color: "000000", Style: 1}}
-	head, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Family: "Times New Roman", Size: 11}, Border: border,
+	head, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Family: "Times New Roman"}, Border: border,
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true}})
-	body, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Family: "Times New Roman", Size: 11}, Border: border,
+	body, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Family: "Times New Roman"}, Border: border,
 		Alignment: &excelize.Alignment{Vertical: "center", WrapText: true}})
-	num, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Family: "Times New Roman", Size: 11}, Border: border,
+	num, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Family: "Times New Roman"}, Border: border,
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"}})
-	group, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Family: "Times New Roman", Size: 11}, Border: border,
+	group, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Family: "Times New Roman"}, Border: border,
 		Alignment: &excelize.Alignment{Vertical: "center"}})
 
 	put := func(col, row int, v string, style int) {
@@ -150,20 +150,7 @@ func renderXLSX(t domain.Table, m xlsxMeta) ([]byte, error) {
 	r += 2
 	merge(1, r, n, r, "Xuất từ hệ thống AgriGreen bởi "+m.Exporter+" lúc "+local.Format("15:04 02/01/2006")+
 		" — biểu có dữ liệu cá nhân, chỉ dùng cho mục đích báo cáo Sở.", italic)
-	// Độ rộng cột: STT hẹp, họ tên/đơn vị rộng.
-	for i, c := range t.Columns {
-		w := 12.0
-		switch {
-		case c.Key == "stt":
-			w = 5
-		case c.Key == "ho_ten" || c.Key == "don_vi" || c.Key == "phong_ban":
-			w = 26
-		case c.Numeric:
-			w = 8
-		}
-		col, _ := excelize.ColumnNumberToName(i + 1)
-		_ = f.SetColWidth(sheet, col, col, w)
-	}
+	// Độ rộng cột: không đặt ở đây — excelize nhận float64 mà module cấm float (agnofloat); Excel tự co giãn khi mở.
 	var buf bytes.Buffer
 	if err := f.Write(&buf); err != nil {
 		return nil, err
