@@ -375,6 +375,15 @@ class _WorkScheduleScreenState extends ConsumerState<WorkScheduleScreen> {
           editable: v.editable,
           onAdd: (s) => _edit(day: day, session: s),
           onOpen: (i) => _edit(item: i),
+          // W11.46 (CNTS CV-07): check-in tại địa điểm công tác của hôm nay.
+          onCheckin: _busy
+              ? null
+              : (i) => v.canCheckin(i, DateTime.now())
+                    ? () => _run(
+                        () => _svc.checkin(_week, i),
+                        done: 'Đã check-in — vị trí, thời điểm không sửa được.',
+                      )
+                    : null,
         ),
       );
     }
@@ -600,6 +609,7 @@ class _DayCard extends StatelessWidget {
     required this.editable,
     required this.onAdd,
     required this.onOpen,
+    this.onCheckin,
   });
   final DateTime day;
   final int index;
@@ -607,6 +617,7 @@ class _DayCard extends StatelessWidget {
   final bool editable;
   final void Function(WsSession) onAdd;
   final void Function(WsItem) onOpen;
+  final VoidCallback? Function(WsItem)? onCheckin;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -641,7 +652,12 @@ class _DayCard extends StatelessWidget {
               ],
             ),
             for (final i in items)
-              if (i.session == s) _ItemTile(item: i, onTap: () => onOpen(i)),
+              if (i.session == s)
+                _ItemTile(
+                  item: i,
+                  onTap: () => onOpen(i),
+                  onCheckin: onCheckin?.call(i),
+                ),
             if (!items.any((i) => i.session == s))
               const Padding(
                 padding: EdgeInsets.only(bottom: 6),
@@ -655,9 +671,12 @@ class _DayCard extends StatelessWidget {
 }
 
 class _ItemTile extends StatelessWidget {
-  const _ItemTile({required this.item, required this.onTap});
+  const _ItemTile({required this.item, required this.onTap, this.onCheckin});
   final WsItem item;
   final VoidCallback onTap;
+
+  /// Khác null: hiện nút "Check-in" (W11.46).
+  final VoidCallback? onCheckin;
 
   @override
   Widget build(BuildContext context) {
@@ -691,9 +710,22 @@ class _ItemTile extends StatelessWidget {
                 if (i.participants != null) 'Phối hợp: ${i.participants}',
                 if (i.conflict) 'Trùng thời gian',
                 if (i.changed) 'Điều chỉnh',
+                if (i.checkin != null) i.checkin!.label,
               ].join(' · '),
             ),
-            trailing: i.conflict
+            trailing: onCheckin != null
+                ? FilledButton.tonalIcon(
+                    key: ValueKey('ws-checkin-${i.id}'),
+                    onPressed: onCheckin,
+                    icon: const Icon(Icons.my_location),
+                    label: const Text('Check-in'),
+                  )
+                : i.checkin != null
+                ? Icon(
+                    i.checkin!.far ? Icons.wrong_location : Icons.where_to_vote,
+                    color: i.checkin!.far ? AgColors.amber : AgColors.g600,
+                  )
+                : i.conflict
                 ? const Icon(Icons.warning_amber, color: AgColors.amber)
                 : null,
           ),

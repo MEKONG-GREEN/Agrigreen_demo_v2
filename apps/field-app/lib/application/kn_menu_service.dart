@@ -23,6 +23,9 @@ abstract final class KnMenuKey {
   /// W11.42: biểu kỳ Cấp Xã CNTS (BM-01/04/05/17) — phòng Chăn nuôi – Thủy sản.
   static const cntsBaoCaoKy = 'xa.cnts.bao_cao_ky';
 
+  /// W11.46: lịch công tác CNTS (đăng ký, gửi duyệt, check-in GPS).
+  static const cntsLichCongTac = 'xa.cnts.lich_cong_tac';
+
   static const known = {
     congViec,
     lichCongTac,
@@ -36,6 +39,7 @@ abstract final class KnMenuKey {
     thua,
     vatTu,
     cntsBaoCaoKy,
+    cntsLichCongTac,
   };
 }
 

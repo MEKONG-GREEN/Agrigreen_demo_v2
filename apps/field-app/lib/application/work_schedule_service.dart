@@ -4,6 +4,7 @@ import 'package:agrigreen_mobile/core/clock.dart';
 import 'package:agrigreen_mobile/core/ids.dart';
 import 'package:agrigreen_mobile/data/actions/action_queue.dart';
 import 'package:agrigreen_mobile/data/db/local_db.dart';
+import 'package:agrigreen_mobile/data/photo/location_source.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 
 import '../domain/work_schedule.dart';
@@ -45,7 +46,21 @@ class WeekSchedule {
     this.fetchedAt,
     this.loadError,
     this.communeCodes = const [],
+    this.checkinEnabled = false,
   });
+
+  /// W11.46: phòng ban dùng check-in GPS (CNTS) — hiện nút "Check-in".
+  final bool checkinEnabled;
+
+  /// Mục được check-in lúc [now]: phòng bật, lịch đã gửi, mục ngoài cơ quan của hôm nay, chưa check-in.
+  bool canCheckin(WsItem i, DateTime now) =>
+      checkinEnabled &&
+      scheduleId != null &&
+      status != null &&
+      status != WsStatus.draft &&
+      i.fieldWork &&
+      i.checkin == null &&
+      ymd(i.day) == ymd(now);
 
   final DateTime weekStart;
   final DateTime submitDueAt;
@@ -160,6 +175,7 @@ class WorkScheduleService {
     required IdGenerator ids,
     this.deviceId,
     this.syncNow,
+    this.location,
   }) : _db = db,
        _api = api,
        _actions = actions,
@@ -173,6 +189,9 @@ class WorkScheduleService {
   final IdGenerator _ids;
   final String? deviceId;
 
+  /// Nguồn GPS cho check-in (W11.46). null → không check-in được.
+  final LocationSource? location;
+
   /// Đồng bộ ngay sau khi xếp lệnh (app: `SyncService.syncOnce(force: true)`).
   Future<void> Function()? syncNow;
 
@@ -180,6 +199,7 @@ class WorkScheduleService {
   static const weekLockedCode = 'extension.week_locked';
   static const _srvKind = 'ext_work_schedule';
   static const _draftKind = 'ext_work_schedule_draft';
+  static const _checkinKind = 'ext_work_schedule_checkin';
   static const _base = '/v1/extension/work-schedules';
 
   DateTime defaultWeek() => nextWeekStart(_clock.now());
@@ -262,7 +282,7 @@ class WorkScheduleService {
     final cached = await _get(_srvKind, week);
     final srv = cached?.$1;
     final draft = await _reconcile(week, await _draft(week), srv);
-    return _view(
+    final v = _view(
       week,
       srv,
       draft,
@@ -270,6 +290,127 @@ class WorkScheduleService {
       fetchedAt: cached?.$2,
       loadError: srv == null ? loadError : null,
     );
+    return _withCheckins(v, srv, await _get(_checkinKind, week));
+  }
+
+  // ------------------------------------------------------------ check-in (W11.46)
+
+  /// Gắn check-in máy chủ trả và check-in đang chờ đồng bộ (bấm khi mất mạng) vào mục.
+  WeekSchedule _withCheckins(
+    WeekSchedule v,
+    Map<String, Object?>? srv,
+    (Map<String, Object?>, DateTime)? pending,
+  ) {
+    final detail = _map(srv?['schedule']);
+    final enabled =
+        srv?['checkin_enabled'] == true || detail?['checkin_enabled'] == true;
+    final byItem = <String, WsCheckin>{};
+    if (pending != null) {
+      for (final e in pending.$1.entries) {
+        final at = e.value is String
+            ? DateTime.tryParse(e.value! as String)
+            : null;
+        if (at != null) {
+          byItem[e.key] = WsCheckin(capturedAt: at, pending: true);
+        }
+      }
+    }
+    if (detail?['checkins'] is List) {
+      for (final c in detail!['checkins']! as List) {
+        if (c is! Map) continue;
+        final m = c.cast<String, Object?>();
+        final ck = WsCheckin.fromJson(m);
+        if (ck != null && m['item_id'] is String) {
+          byItem[m['item_id']! as String] = ck;
+        }
+      }
+    }
+    if (!enabled && byItem.isEmpty) return v;
+    return WeekSchedule(
+      weekStart: v.weekStart,
+      submitDueAt: v.submitDueAt,
+      reviewDueAt: v.reviewDueAt,
+      locked: v.locked,
+      lateNow: v.lateNow,
+      previousAvailable: v.previousAvailable,
+      scheduleId: v.scheduleId,
+      status: v.status,
+      version: v.version,
+      approvedVersion: v.approvedVersion,
+      amendment: v.amendment,
+      late: v.late,
+      lastReason: v.lastReason,
+      reviewer: v.reviewer,
+      can: v.can,
+      items: [
+        for (final i in v.items)
+          byItem[i.id] == null ? i : i.copyWith(checkin: byItem[i.id]),
+      ],
+      approvedItems: v.approvedItems,
+      serverWarnings: v.serverWarnings,
+      hasLocalDraft: v.hasLocalDraft,
+      dirty: v.dirty,
+      pendingAction: v.pendingAction,
+      syncError: v.syncError,
+      offline: v.offline,
+      fetchedAt: v.fetchedAt,
+      loadError: v.loadError,
+      communeCodes: v.communeCodes,
+      checkinEnabled: enabled,
+    );
+  }
+
+  /// Bấm "Check-in" tại địa điểm công tác (CV-07): lấy GPS (độ chính xác, thời điểm thiết bị), xếp lệnh idempotent
+  /// [CntsActionKind.workScheduleCheckin] (phát lại khi có mạng, máy chủ nhận bản gửi muộn tối đa 7 ngày). Tọa độ chỉ
+  /// nằm trong thân lệnh chờ gửi — không lưu riêng trên máy.
+  Future<WeekSchedule> checkin(DateTime week, WsItem item) async {
+    week = mondayOf(week);
+    final v = await load(week, refresh: false);
+    final now = _clock.now();
+    if (!v.canCheckin(item, now)) {
+      throw WorkScheduleError(
+        'checkin',
+        'Chỉ check-in mục công tác ngoài cơ quan của hôm nay, sau khi đã gửi lịch.',
+      );
+    }
+    final src = location;
+    if (src == null) throw WorkScheduleError('gps', 'Thiết bị không có GPS.');
+    final r = await src.current();
+    final fix = r.fix;
+    if (fix == null) {
+      throw WorkScheduleError(
+        'gps',
+        r.status == GpsStatus.denied
+            ? 'Cần cho phép truy cập vị trí để check-in.'
+            : 'Không lấy được vị trí GPS — bật định vị rồi thử lại.',
+      );
+    }
+    await _actions.enqueue(
+      CntsActionKind.workScheduleCheckin,
+      target: '${v.scheduleId}/items/${item.id}',
+      body: {
+        'lat': fix.lat,
+        'lon': fix.lon,
+        'accuracy_m': fix.accuracyM,
+        'captured_at': now.toUtc().toIso8601String(),
+        'mock_location': false,
+        'device_id': deviceId,
+      },
+    );
+    final pending = (await _get(_checkinKind, week))?.$1 ?? <String, Object?>{};
+    await _put(_checkinKind, week, {
+      ...pending,
+      item.id: now.toUtc().toIso8601String(),
+    });
+    final sync = syncNow;
+    if (sync != null) {
+      try {
+        await sync();
+      } catch (_) {
+        // lệnh vẫn chờ
+      }
+    }
+    return load(week, refresh: sync != null);
   }
 
   static String _loadMessage(String code) => switch (code) {
@@ -740,4 +881,24 @@ class _Draft {
     error: j['error'] as String?,
     ownDone: j['own_done'] == true,
   );
+}
+
+/// Lệnh API riêng của App hiện trường KN (W11.46): check-in lịch công tác
+/// `POST /v1/extension/work-schedules/{id}/items/{item_id}/checkin` — đăng ký qua
+/// `ActionQueue(extraKinds: CntsActionKind.values)`.
+enum CntsActionKind implements ActionKind {
+  workScheduleCheckin('work_schedule_checkin');
+
+  const CntsActionKind(this.code);
+  @override
+  final String code;
+
+  @override
+  String get method => 'POST';
+
+  @override
+  String pathFor(String? target) => switch (this) {
+    CntsActionKind.workScheduleCheckin =>
+      '/v1/extension/work-schedules/$target/checkin',
+  };
 }

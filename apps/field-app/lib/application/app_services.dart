@@ -183,7 +183,12 @@ class AppServices {
       ids: pf.ids,
     );
     final refs = ReferenceRepository(db, pf.clock);
-    final actions = ActionQueue(db: db, clock: pf.clock, ids: pf.ids);
+    final actions = ActionQueue(
+      db: db,
+      clock: pf.clock,
+      ids: pf.ids,
+      extraKinds: CntsActionKind.values,
+    );
     final pushTokens = PushTokenRegistrar(db, startedAt: pf.clock.now());
     final consents = ConsentService(db: db, outbox: outbox, clock: pf.clock);
     final catalogs = CatalogCache(db, pf.clock);
@@ -228,6 +233,7 @@ class AppServices {
       clock: pf.clock,
       ids: pf.ids,
       deviceId: deviceId,
+      location: pf.location, // W11.46: check-in GPS lịch công tác
       syncNow: () async {
         await sync.syncOnce(force: true);
       },

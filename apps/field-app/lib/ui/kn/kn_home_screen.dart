@@ -31,6 +31,7 @@ IconData _iconFor(String key) => switch (key) {
   KnMenuKey.thua => Icons.map_outlined,
   KnMenuKey.vatTu => Icons.inventory_2_outlined,
   KnMenuKey.cntsBaoCaoKy => Icons.assignment_outlined,
+  KnMenuKey.cntsLichCongTac => Icons.event_available_outlined,
   _ => Icons.circle_outlined,
 };
 
@@ -38,6 +39,7 @@ IconData _iconFor(String key) => switch (key) {
 Widget? knScreenFor(KnMenuEntry e) => switch (e.key) {
   KnMenuKey.congViec => null,
   KnMenuKey.lichCongTac => const WorkScheduleScreen(),
+  KnMenuKey.cntsLichCongTac => const WorkScheduleScreen(), // W11.46
   KnMenuKey.baoCaoTuan => KnTasksScreen(
     title: e.label,
     initial: const KnTaskFilter(periodType: KnPeriodType.week, adHoc: false),

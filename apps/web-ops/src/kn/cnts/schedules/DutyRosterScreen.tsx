@@ -4,7 +4,7 @@
 // - Cấp Tỉnh (cán bộ tổng hợp), Admin: lưới tháng cơ sở × viên chức × ngày, bấm ô đổi ca N → Đ → NĐ → trống, sao chép
 //   tháng trước, lưu thành phiên bản mới (khóa lạc quan), cảnh báo không chặn, xuất CSV theo mẫu "Lịch trực ksgm".
 // - Cấp Xã: "Lịch trực của tôi" — ca của mình trong tháng và người trực cùng.
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
@@ -101,7 +101,7 @@ function MyDutiesView({ capi, month }: { capi: CntsCalApi; month: string }) {
 
 function RosterGrid({ capi, month, readOnly }: { capi: CntsCalApi; month: string; readOnly: boolean }) {
   const s = useLoad(() => capi.roster(month), [capi, month]);
-  return <LoadState s={s}>{(r) => <RosterEditor capi={capi} roster={r} readOnly={readOnly} onSaved={s.reload} />}</LoadState>;
+  return <LoadState s={s}>{(r) => <RosterEditor key={`${r.month}-${r.version}`} capi={capi} roster={r} readOnly={readOnly} onSaved={s.reload} />}</LoadState>;
 }
 
 function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; roster: DutyRoster; readOnly: boolean; onSaved: () => void }) {
@@ -115,10 +115,6 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
   const act = useAction();
   const editable = roster.can_edit && !readOnly;
   const communeName = useCommuneNames(roster.facilities.map((f) => f.commune_code));
-  useEffect(() => {
-    setGrid(toGrid(roster.cells));
-    setDirty(false);
-  }, [roster]);
   const days = Array.from({ length: roster.days_in_month }, (_, i) => i + 1);
   const rows = rowsOf(fromGrid(grid, roster.days_in_month), extra).sort(
     (a, b) => roster.facilities.findIndex((f) => f.ref === a[0]) - roster.facilities.findIndex((f) => f.ref === b[0]),
