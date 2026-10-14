@@ -122,6 +122,11 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "extension.khtc_form_not_reviewable": "Trạng thái phiếu không cho phép rà soát, kỳ đã đóng hoặc đã hết số lần gửi bổ sung.",
   "extension.khtc_form_template_outdated": "Kỳ này dùng mẫu phiếu cũ. Liên hệ cán bộ KHTC để hủy và mở lại kỳ với mẫu mới.",
   // W11.49 Báo cáo dịch bệnh BM-10, báo nghi dịch
+  "extension.cnts_alert_not_found": "Không có cảnh báo này (hoặc ngoài xã được phân công).",
+  "extension.cnts_alert_transition": "Cảnh báo đã đóng hoặc chưa được giao — tải lại để xem trạng thái mới.",
+  "extension.cnts_alert_version_conflict": "Cảnh báo đã có người cập nhật — tải bản mới rồi thao tác lại.",
+  "extension.cnts_alert_invalid": "Thao tác cảnh báo chưa hợp lệ — xem lỗi từng trường.",
+  "extension.cnts_alert_config_invalid": "Cấu hình nhắc nhở / cảnh báo chưa hợp lệ — xem lỗi từng trường.",
   "extension.cnts_outbreak_not_found": "Không có ổ dịch này (hoặc ngoài xã được phân công).",
   "extension.cnts_outbreak_invalid": "Báo cáo dịch bệnh chưa hợp lệ — xem lỗi từng trường.",
   "extension.cnts_outbreak_version_conflict": "Ổ dịch đã có người cập nhật — tải bản mới rồi nhập lại.",

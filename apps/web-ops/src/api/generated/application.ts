@@ -5181,6 +5181,163 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cảnh báo CNTS (W11.43 — FN-13, UR-TINH-13, Mục III.5) trong phạm vi người gọi — Khẩn và chưa đóng trước
+         * @description Cấp Tỉnh: cảnh báo trong phạm vi Nút; Cấp Xã: cảnh báo của các xã phụ trách và cảnh báo được giao cho mình; Admin: mọi
+         *     cảnh báo. status: open (chưa đóng), overdue (chưa đóng, quá hạn xử lý), new, assigned, in_progress, closed.
+         */
+        get: operations["extensionCntsListAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alerts/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cảnh báo CNTS kèm lịch sử vòng đời */
+        get: operations["extensionCntsGetAlert"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alerts/{ref}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh giao xử lý cảnh báo (Mới/Đã giao/Đang xử lý → Đã giao), hạn xử lý mặc định theo loại */
+        post: operations["extensionCntsAssignAlert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alerts/{ref}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Người được giao nhận xử lý (Đã giao → Đang xử lý) */
+        post: operations["extensionCntsStartAlert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alerts/{ref}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đóng cảnh báo với kết quả xử lý (≥ 10 ký tự) — người được giao, Cấp Tỉnh, Admin */
+        post: operations["extensionCntsCloseAlert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alert-assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cán bộ phòng CNTS của tỉnh được giao xử lý cảnh báo (Cấp Xã chỉ khi phụ trách xã đã chọn) */
+        get: operations["extensionCntsAlertAssignees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alert-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cấu hình nhắc nhở theo biểu (UR-TINH-08), xử lý theo loại cảnh báo, ngưỡng đang hiệu lực (tham số cnts.*) */
+        get: operations["extensionCntsAlertConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alert-config/forms/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Cấp Tỉnh lưu phiên bản mới cấu hình nhắc của biểu kỳ CNTS */
+        put: operations["extensionCntsPutFormReminder"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alert-config/kinds/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Cấp Tỉnh lưu phiên bản mới cấu hình xử lý của loại cảnh báo (hạn xử lý; mức Khẩn của môi trường nước) */
+        put: operations["extensionCntsPutAlertSetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/period-forms": {
         parameters: {
             query?: never;
@@ -14525,6 +14682,170 @@ export interface components {
             period_id: string;
             label: string;
             submission: components["schemas"]["FormsSubmission"];
+        };
+        CNTSAlertActorRef: {
+            /** Format: uuid */
+            ref: string;
+            display: string | null;
+        };
+        /** @description Cảnh báo CNTS (W11.43). detail.findings là các vi phạm theo trường (loài, nhóm), detail.summary tóm tắt. */
+        CNTSAlert: {
+            /** Format: uuid */
+            alert_ref: string;
+            kind: string;
+            kind_label: string;
+            /** @description Số dòng ở bảng Mục III.5 (0 = trễ nộp liên tiếp) */
+            kind_no: number;
+            /** @enum {string} */
+            level: "urgent" | "attention";
+            /** @enum {string} */
+            status: "new" | "assigned" | "in_progress" | "closed";
+            overdue: boolean;
+            commune_code: string | null;
+            province_code: string | null;
+            /** @enum {string} */
+            subject_kind: "commune" | "facility" | "household" | "site" | "outbreak";
+            subject_ref: string;
+            template_code: string | null;
+            period_key: string | null;
+            /** Format: uuid */
+            period_ref: string | null;
+            /** Format: uuid */
+            source_ref: string | null;
+            title: string;
+            detail: {
+                [key: string]: unknown;
+            };
+            recipient_refs: string[];
+            assignee: components["schemas"]["CNTSAlertActorRef"] | null;
+            /** Format: date-time */
+            raised_at: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            overdue_at: string | null;
+            /** Format: date-time */
+            closed_at: string | null;
+            auto_closed: boolean;
+            result: string | null;
+            /** @description Số sự việc cuối (base_seq của khóa lạc quan) */
+            seq: number;
+            /** Format: date-time */
+            updated_at: string;
+            can_assign: boolean;
+            can_start: boolean;
+            can_close: boolean;
+        };
+        CNTSAlertList: {
+            items: components["schemas"]["CNTSAlert"][];
+            counts: {
+                open: number;
+                urgent_open: number;
+                overdue: number;
+            };
+        };
+        CNTSAlertHistory: {
+            seq: number;
+            /** @enum {string} */
+            action: "raised" | "assigned" | "started" | "closed" | "auto_closed" | "overdue";
+            /** @enum {string} */
+            status_after: "new" | "assigned" | "in_progress" | "closed";
+            actor: components["schemas"]["CNTSAlertActorRef"];
+            assignee: components["schemas"]["CNTSAlertActorRef"] | null;
+            /** Format: date-time */
+            due_at: string | null;
+            note: string | null;
+            /** Format: date-time */
+            event_time: string;
+            support_reason: string | null;
+        };
+        CNTSAlertDetail: components["schemas"]["CNTSAlert"] & {
+            history: components["schemas"]["CNTSAlertHistory"][];
+        };
+        CNTSAlertAction: {
+            /** @description Số sự việc cuối đã thấy (0 = không kiểm) */
+            base_seq?: number;
+            /**
+             * Format: uuid
+             * @description assign — bắt buộc
+             */
+            assignee_ref?: string;
+            /**
+             * Format: date-time
+             * @description assign — hạn xử lý (mặc định theo loại)
+             */
+            due_at?: string;
+            note?: string;
+            /** @description close — kết quả xử lý bắt buộc */
+            result?: string;
+        };
+        CNTSAlertAssignees: {
+            items: {
+                actor: components["schemas"]["CNTSAlertActorRef"];
+                /** @enum {string} */
+                level: "commune" | "province";
+                communes: string[];
+                manager: boolean;
+            }[];
+        };
+        CNTSFormReminder: {
+            before_due_hours: number;
+            on_overdue: boolean;
+            repeat_daily: boolean;
+            /** @description HH:MM giờ Việt Nam */
+            repeat_at: string;
+            /** @description Trễ liên tiếp từ n kỳ → cảnh báo (0 = tắt) */
+            late_streak: number;
+            channels: ("in_app" | "push" | "email")[];
+            /** @description Nội dung mẫu — {bieu}, {ky}, {han} */
+            message: string;
+        };
+        CNTSAlertSetting: {
+            sla_hours: number;
+            /** @description Chỉ loại có level_configurable */
+            urgent: boolean;
+        };
+        CNTSAlertConfig: {
+            forms: {
+                code: string;
+                label: string;
+                reminder: components["schemas"]["CNTSFormReminder"];
+                custom: boolean;
+                version: number;
+                /** Format: date-time */
+                updated_at: string | null;
+                updated_by: components["schemas"]["CNTSAlertActorRef"] | null;
+                sent_today: number;
+            }[];
+            kinds: {
+                kind: {
+                    code: string;
+                    no: number;
+                    label: string;
+                    /** @enum {string} */
+                    default_level: "urgent" | "attention";
+                    level_configurable: boolean;
+                    recipients: string[];
+                    /** @enum {string} */
+                    source: "forms" | "outbreak" | "job" | "log" | "schedule";
+                };
+                sla_hours: number;
+                urgent: boolean;
+                /** @enum {string} */
+                level: "urgent" | "attention";
+                custom: boolean;
+                version: number;
+            }[];
+            thresholds: {
+                key: string;
+                label: string;
+                unit: string;
+                /** @description Số thập phân dạng chuỗi; null = chưa có giá trị đã duyệt */
+                value: string | null;
+                version: number;
+                /** Format: date */
+                effective_from: string | null;
+            }[];
         };
         CNTSPeriodForm: {
             /** @enum {string} */
@@ -27494,6 +27815,276 @@ export interface operations {
             };
             /** @description extension.material_record_not_found */
             404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsListAlerts: {
+        parameters: {
+            query?: {
+                status?: "open" | "overdue" | "new" | "assigned" | "in_progress" | "closed";
+                kind?: string;
+                level?: "urgent" | "attention";
+                template_code?: string;
+                /** @description Chỉ cảnh báo giao cho tôi */
+                mine?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertList"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGetAlert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertDetail"];
+                };
+            };
+            /** @description extension.cnts_alert_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsAssignAlert: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSAlertAction"];
+            };
+        };
+        responses: {
+            /** @description Đã giao */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertDetail"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_transition | extension.cnts_alert_version_conflict */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsStartAlert: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSAlertAction"];
+            };
+        };
+        responses: {
+            /** @description Đang xử lý */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertDetail"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_transition | extension.cnts_alert_version_conflict */
+            409: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsCloseAlert: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSAlertAction"];
+            };
+        };
+        responses: {
+            /** @description Đã đóng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertDetail"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_transition | extension.cnts_alert_version_conflict */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsAlertAssignees: {
+        parameters: {
+            query?: {
+                commune_code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertAssignees"];
+                };
+            };
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsAlertConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cấu hình */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertConfig"];
+                };
+            };
+        };
+    };
+    extensionCntsPutFormReminder: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: "CNTS-BM01" | "CNTS-BM04" | "CNTS-BM17" | "CNTS-BM05-I" | "CNTS-BM05-II";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSFormReminder"];
+            };
+        };
+        responses: {
+            /** @description Đã lưu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertConfig"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_config_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsPutAlertSetting: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSAlertSetting"];
+            };
+        };
+        responses: {
+            /** @description Đã lưu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertConfig"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_config_invalid */
+            422: components["responses"]["Problem"];
         };
     };
     extensionCntsPeriodForms: {

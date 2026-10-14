@@ -225,7 +225,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
   chan_nuoi_thuy_san: {
     kn_tw: [soon("tw.cnts.du_an_knqg", "Dự án KNQG", "/kn/cnts/du-an-knqg", "report")],
     kn_tinh: [
-      soon("tinh.cnts.canh_bao", "Cảnh báo", "/kn/cnts/canh-bao", "zap"),
+      { key: "tinh.cnts.canh_bao", label: "Cảnh báo", route: "/kn/cnts/canh-bao", icon: "zap" }, // W11.43
       soon("tinh.cnts.duyet_bao_cao", "Duyệt báo cáo", "/kn/cnts/duyet-bao-cao", "approve"),
       { key: "tinh.cnts.bieu_mau", label: "Biểu mẫu & cấp quyền", route: "/kn/cnts/bieu-mau", icon: "table" }, // W11.42
       { key: "tinh.cnts.dich_benh", label: "Báo cáo dịch bệnh", route: "/kn/cnts/dich-benh", icon: "shield" }, // W11.49
@@ -241,6 +241,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
     kn_xa: [
       { key: "xa.cnts.bao_cao_ky", label: "Báo cáo kỳ CNTS", route: "/kn/cnts/bao-cao-ky", icon: "task" }, // W11.42
       { key: "xa.cnts.dich_benh", label: "Báo cáo dịch bệnh", route: "/kn/cnts/dich-benh", icon: "shield" }, // W11.49
+      { key: "xa.cnts.canh_bao", label: "Cảnh báo", route: "/kn/cnts/canh-bao", icon: "zap" }, // W11.43
       soon("xa.cnts.lich", "Lịch trực của tôi", "/kn/cnts/lich", "calendar"),
       soon("xa.cnts.nhat_ky", "Hộ mô hình & nhật ký", "/kn/cnts/nhat-ky", "journal"),
       soon("xa.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),

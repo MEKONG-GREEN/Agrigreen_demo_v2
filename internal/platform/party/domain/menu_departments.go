@@ -82,7 +82,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			soon("tw.cnts.du_an_knqg", "Dự án KNQG", "/kn/cnts/du-an-knqg", "report"),
 		},
 		port.AudienceTinh: {
-			soon("tinh.cnts.canh_bao", "Cảnh báo", "/kn/cnts/canh-bao", "zap"),
+			// W11.43: cảnh báo (12 loại Mục III.5 + trễ liên tiếp), giao/đóng xử lý, cấu hình nhắc nhở theo biểu, ngưỡng.
+			{Key: "tinh.cnts.canh_bao", Label: "Cảnh báo", Route: "/kn/cnts/canh-bao", Icon: "zap"},
 			needs(soon("tinh.cnts.duyet_bao_cao", "Duyệt báo cáo", "/kn/cnts/duyet-bao-cao", "approve"), NeedsManager),
 			// W11.42: phát hành biểu kỳ Cấp Xã BM-01/04/05/17 (kỳ native cap/forms), theo dõi nộp, chốt/mở lại.
 			{Key: "tinh.cnts.bieu_mau", Label: "Biểu mẫu & cấp quyền", Route: "/kn/cnts/bieu-mau", Icon: "table"},
@@ -105,6 +106,8 @@ var deptBusiness = map[string]map[string][]MenuItem{
 			{Key: "xa.cnts.bao_cao_ky", Label: "Báo cáo kỳ CNTS", Route: "/kn/cnts/bao-cao-ky", Icon: "task"},
 			// W11.49: lập BM-10, cập nhật diễn biến, ghi nhận / xác nhận báo nghi dịch.
 			{Key: "xa.cnts.dich_benh", Label: "Báo cáo dịch bệnh", Route: "/kn/cnts/dich-benh", Icon: "shield"},
+			// W11.43: cảnh báo của các xã phụ trách, xử lý cảnh báo được giao (FN-13 Cấp Xã).
+			{Key: "xa.cnts.canh_bao", Label: "Cảnh báo", Route: "/kn/cnts/canh-bao", Icon: "zap"},
 			soon("xa.cnts.lich", "Lịch trực của tôi", "/kn/cnts/lich", "calendar"),
 			soon("xa.cnts.nhat_ky", "Hộ mô hình & nhật ký", "/kn/cnts/nhat-ky", "journal"),
 			soon("xa.cnts.ban_do_dich", "Bản đồ vùng dịch", "/kn/cnts/ban-do-dich", "map"),

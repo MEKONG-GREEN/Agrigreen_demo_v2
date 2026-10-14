@@ -999,9 +999,7 @@
         "route": "/kn/cnts/canh-bao",
         "icon": "zap",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -1278,6 +1276,15 @@
         "label": "Báo cáo dịch bệnh",
         "route": "/kn/cnts/dich-benh",
         "icon": "shield",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "xa.cnts.canh_bao",
+        "label": "Cảnh báo",
+        "route": "/kn/cnts/canh-bao",
+        "icon": "zap",
         "badge_source": null,
         "enabled": true,
         "children": []
