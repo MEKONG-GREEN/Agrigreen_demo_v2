@@ -59,8 +59,15 @@ Trạng thái **đạt** nghĩa là có kiểm thử tự động trên giao di�
 | TC-G6 | Sau khi tạo: cây tải lại, nút mới được chọn, các cấp trên tự mở; đổi tên được ngay | WEB-E2E (tạo → cây → đổi tên) | đạt |
 | TC-G7 | Admin chưa MFA → 403 `mfa_required` | Mock `orgs-create.test.ts` | đạt |
 
+## Backend (14/10/2026)
+
+| Mã | Tiêu chí | Kiểm thử | Trạng thái |
+|---|---|---|---|
+| TC-B1 | `POST /v1/orgs` Nút không phải HTX bởi `kn_province_admin` → 403 `forbidden` (kèm `detail`); `kn_national_admin` → 403 | Go DB `TestOrgNodeCreateOnlyPlatformAdmin`; mock `orgs-create.test.ts` | đạt |
+| TC-B2 | `registry_admin` riêng và `platform_admin` riêng tạo được Nút xã | Go DB `TestOrgNodeCreateOnlyPlatformAdmin` | đạt |
+| TC-B3 | KN tỉnh vẫn đổi tên, di chuyển Nút trong tỉnh, tạo HTX trong phạm vi | Go DB `TestOrgNodeCreateOnlyPlatformAdmin`; mock | đạt |
+| TC-B4 | Nhập cây: dòng HTX mới bị loại, lý do chỉ sang Neo HTX (`/quan-tri/neo-htx`); dòng tạo Nút bởi vai KN bị loại theo dòng | Go DB `TestOrgImportCreateRulesORGUI`, `TestOrgTreeExportImportRoundTrip` | đạt |
+
 ## Ngoài phạm vi gói
 
-- Backend vẫn cho `kn_province_admin` gọi `POST /v1/orgs` trực tiếp. Muốn chặn ở API thì cần một gói backend có kiểm thử
-  (xem giả định ORGUI).
-- `POST /v1/orgs/import` vẫn tạo HTX mới mà không có neo D2 (xem đề xuất trong giả định ORGUI).
+- `POST /v1/orgs` với `kind = cooperative` chưa bị chặn. Đây vẫn là bước tạo Nút HTX mà luồng neo D2 cần (xem giả định ORGUI).
