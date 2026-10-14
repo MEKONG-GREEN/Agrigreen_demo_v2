@@ -24,6 +24,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtcform/store"
 	pdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtcperiod/domain"
 	pstore "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtcperiod/store"
+	srcstore "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/khtcsource/store"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -305,6 +306,9 @@ func (s *Service) fillGrid(ctx context.Context, c caller, f *Form) error {
 		default:
 			f.PlanVersion = &plan
 			f.Tabs = domain.BuildTabs(plan, f.Department, f.Period.From, s.programNames(ctx))
+			if err := s.attachModule(ctx, c, f); err != nil {
+				return err
+			}
 		}
 	}
 	// Kỳ tuần đã đóng trước kỳ này: cùng năm (Lũy kế kỳ trước + điều chỉnh) và năm trước (chỉ điều chỉnh để lưu vết).
@@ -371,6 +375,50 @@ func (s *Service) fillGrid(ctx context.Context, c caller, f *Form) error {
 		}
 		for ref, v := range domain.Contribution(sh.Content.Normalize(), f.Period.Year) {
 			f.Prior[ref] = f.Prior[ref].Add(v)
+		}
+	}
+	return nil
+}
+
+// attachModule gắn số của hạng mục nguồn module từ ảnh chụp "Cập nhật số liệu" mới nhất của kỳ (W11.64 — sổ
+// pf_extension.khtc_snapshot_value, cùng module): trong kỳ vào ô F, lũy kế vào H, I; nguồn chưa chốt → "Tạm tính".
+func (s *Service) attachModule(ctx context.Context, c caller, f *Form) error {
+	var vals []srcstore.Value
+	err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+		snap, e := srcstore.LatestSnapshot(ctx, tx, f.Period.ID)
+		if e != nil || snap == nil {
+			return e
+		}
+		vals, e = srcstore.Values(ctx, tx, snap.ID)
+		return e
+	})
+	if err != nil || len(vals) == 0 {
+		return err
+	}
+	byEntry := map[uuid.UUID]*domain.ModuleValue{}
+	for _, v := range vals {
+		if v.Invalid {
+			continue
+		}
+		mv := &domain.ModuleValue{Provisional: v.V.Provisional()}
+		mv.InPeriod = v.V.Increment
+		if mv.InPeriod == nil {
+			mv.InPeriod = v.V.Sum
+		}
+		mv.Cumulative = v.V.YearToDate
+		if mv.Cumulative == nil {
+			mv.Cumulative = v.V.Cumulative
+		}
+		for _, ref := range v.EntryRefs {
+			byEntry[ref] = mv
+		}
+	}
+	for i := range f.Tabs {
+		for j := range f.Tabs[i].Rows {
+			r := &f.Tabs[i].Rows[j]
+			if r.ModuleSourced {
+				r.Module = byEntry[r.EntryRef]
+			}
 		}
 	}
 	return nil

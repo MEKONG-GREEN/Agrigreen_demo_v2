@@ -19271,6 +19271,8 @@ components:
         planned_qty: {type: [string, "null"]}
         scale_note: {type: string}
         module_sourced: {type: boolean, description: "Nguồn module (BR-DL-10) — không có ô nhập"}
+        module_filled: {type: boolean, description: "Đã có số từ Cập nhật số liệu (W11.64) — ô F, H, I của hạng mục nguồn module"}
+        module_provisional: {type: boolean, description: "Số nguồn module Tạm tính — nguồn chưa chốt (BR-DL-03)"}
         source_key: {type: string}
         cells: {type: object, additionalProperties: {type: string}, description: Ô hệ thống theo chữ cái cột}
         over_plan: {type: boolean}

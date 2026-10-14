@@ -24,6 +24,15 @@ type Row struct {
 	// ModuleSourced: hạng mục khai báo nguồn module (BR-DL-10) — ô "Thực hiện trong kỳ" do hệ thống điền, phòng không nhập.
 	ModuleSourced bool
 	SourceKey     string
+	// Module: số của hạng mục nguồn module từ ảnh chụp "Cập nhật số liệu" của kỳ (W11.64) — nil = chưa cập nhật.
+	Module *ModuleValue
+}
+
+// ModuleValue là số của hạng mục nguồn module (W11.64 khtcsource): trong kỳ, lũy kế, cờ "Tạm tính" (BR-DL-03).
+type ModuleValue struct {
+	InPeriod    *decimal.Decimal // cum/season: lũy kế − gốc; sum: tổng phát sinh
+	Cumulative  *decimal.Decimal // lũy kế năm (cum) hoặc vụ (season)
+	Provisional bool
 }
 
 // Tab là một tab chương trình / CT-DA của phiếu (BRD: "Tab chương trình = các chương trình có hạng mục do phòng phụ

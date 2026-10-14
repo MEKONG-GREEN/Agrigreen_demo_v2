@@ -16906,6 +16906,10 @@ export interface components {
             scale_note: string;
             /** @description Nguồn module (BR-DL-10) — không có ô nhập */
             module_sourced: boolean;
+            /** @description Đã có số từ Cập nhật số liệu (W11.64) — ô F, H, I của hạng mục nguồn module */
+            module_filled?: boolean;
+            /** @description Số nguồn module Tạm tính — nguồn chưa chốt (BR-DL-03) */
+            module_provisional?: boolean;
             source_key: string;
             /** @description Ô hệ thống theo chữ cái cột */
             cells: {

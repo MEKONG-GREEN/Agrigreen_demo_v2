@@ -201,3 +201,26 @@ func TestKH_FN_PN_03_02_MonthTextOnly(t *testing.T) {
 		t.Fatal("phiếu tháng có ô số phải chặn")
 	}
 }
+
+// KH-FN-PN-03.02 / BR-DL-10 (W11.64 nối): hạng mục nguồn module hiện số của "Cập nhật số liệu" ở ô F (trong kỳ), H (lũy kế),
+// I (% KH) — ô hệ thống, không nhập; chưa cập nhật thì trống.
+func TestKH_FN_PN_03_02_ModuleValuesShown(t *testing.T) {
+	f := samplePlan()
+	tabs := domain.BuildTabs(f.plan, domain.DeptTT, time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), nil)
+	rows := domain.Rows(tabs)
+	in := func() domain.Result {
+		return domain.Evaluate(domain.Input{Template: domain.TemplateFor(domain.DeptTT), Rows: rows, Grid: true, PlanYear: 2026,
+			Sheet: domain.Sheet{}.Normalize()})
+	}
+	if c := in().Rows[f.mod].Cells; c["F"] != "" || c["H"] != "" {
+		t.Fatalf("chưa cập nhật: %v", c)
+	}
+	for i := range rows {
+		if rows[i].EntryRef == f.mod {
+			rows[i].Module = &domain.ModuleValue{InPeriod: dec("135.5"), Cumulative: dec("2500"), Provisional: true}
+		}
+	}
+	if c := in().Rows[f.mod].Cells; c["F"] != "135.5" || c["H"] != "2500" || c["I"] != "50" || c["E"] != "" {
+		t.Fatalf("số nguồn module: %v", c)
+	}
+}

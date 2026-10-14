@@ -372,10 +372,27 @@ func Evaluate(in Input) Result {
 					cells[col.Letter] = r.ScaleNote
 				}
 			case ColPriorCumulative:
-				cells[col.Letter] = FormatNumber(prior)
+				if !r.ModuleSourced {
+					cells[col.Letter] = FormatNumber(prior)
+				}
+			case ColInput:
+				if col.Input == InDone && r.ModuleSourced && r.Module != nil && r.Module.InPeriod != nil {
+					cells[col.Letter] = FormatNumber(*r.Module.InPeriod) // ô hệ thống điền (BR-DL-10), không nhập
+				}
 			case ColFormula:
 				if r.ModuleSourced {
-					continue // số trong kỳ của hạng mục nguồn module do bộ đọc nguồn (W11.64) điền
+					// Số của hạng mục nguồn module lấy từ ảnh chụp "Cập nhật số liệu" (W11.64); chưa cập nhật → trống.
+					if m := r.Module; m != nil && m.Cumulative != nil {
+						switch col.Formula {
+						case FxCumulative:
+							cells[col.Letter] = FormatNumber(*m.Cumulative)
+						case FxPercent:
+							if r.PlannedQty != nil && r.PlannedQty.IsPositive() {
+								cells[col.Letter] = FormatNumber(m.Cumulative.Mul(decimal.NewFromInt(100)).Div(*r.PlannedQty).Round(1))
+							}
+						}
+					}
+					continue
 				}
 				switch col.Formula {
 				case FxAdjust:

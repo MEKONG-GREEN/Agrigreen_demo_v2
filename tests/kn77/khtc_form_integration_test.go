@@ -1,7 +1,7 @@
 package kn77_test
 
 // W11.63 rút gọn — phiếu "Báo cáo cho KHTC" trên module THẬT qua HTTP: pf/extension (Kế hoạch năm W11.61, Kỳ KHTC W11.62,
-// phiếu /v1/extension/khtc/periods/{id}/forms/{dept}/*, sổ pf 20261013230923) + pf/forms (kỳ native kn_khtc, cổng Entry,
+// phiếu /v1/extension/khtc/periods/{id}/forms/{dept}/*, sổ pf 20261014031021) + pf/forms (kỳ native kn_khtc, cổng Entry,
 // Validator kn_khtc) trên PostgreSQL. Tên kiểm thử theo dòng KH- của docs/uat/khtc-v2.2-acceptance.md.
 
 import (

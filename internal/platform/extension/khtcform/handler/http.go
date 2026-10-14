@@ -71,17 +71,20 @@ func templateOf(t domain.Template) templateDTO {
 }
 
 type rowDTO struct {
-	EntryRef      string            `json:"entry_ref"`
-	No            int               `json:"no"`
-	Code          string            `json:"code"`
-	Name          string            `json:"name"`
-	Unit          string            `json:"unit"`
-	PlannedQty    *string           `json:"planned_qty"`
-	ScaleNote     string            `json:"scale_note"`
-	ModuleSourced bool              `json:"module_sourced"`
-	SourceKey     string            `json:"source_key"`
-	Cells         map[string]string `json:"cells"`
-	OverPlan      bool              `json:"over_plan"`
+	EntryRef      string  `json:"entry_ref"`
+	No            int     `json:"no"`
+	Code          string  `json:"code"`
+	Name          string  `json:"name"`
+	Unit          string  `json:"unit"`
+	PlannedQty    *string `json:"planned_qty"`
+	ScaleNote     string  `json:"scale_note"`
+	ModuleSourced bool    `json:"module_sourced"`
+	// ModuleProvisional: số nguồn module "Tạm tính" (nguồn chưa chốt — BR-DL-03); ModuleFilled: đã có số từ "Cập nhật số liệu".
+	ModuleProvisional bool              `json:"module_provisional"`
+	ModuleFilled      bool              `json:"module_filled"`
+	SourceKey         string            `json:"source_key"`
+	Cells             map[string]string `json:"cells"`
+	OverPlan          bool              `json:"over_plan"`
 }
 
 type tabDTO struct {
@@ -181,6 +184,9 @@ func formOf(f app.Form) formDTO {
 		for _, r := range t.Rows {
 			rd := rowDTO{EntryRef: r.EntryRef.String(), No: r.No, Code: r.Code, Name: r.Name, Unit: r.Unit, ScaleNote: r.ScaleNote,
 				ModuleSourced: r.ModuleSourced, SourceKey: r.SourceKey, Cells: map[string]string{}}
+			if r.Module != nil {
+				rd.ModuleFilled, rd.ModuleProvisional = true, r.Module.Provisional
+			}
 			if r.PlannedQty != nil {
 				q := r.PlannedQty.String()
 				rd.PlannedQty = &q

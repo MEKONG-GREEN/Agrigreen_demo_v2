@@ -180,7 +180,16 @@ export function KhtcFormView({
                                   style={style}
                                   title="Lấy từ module (BR-DL-10) — không nhập"
                                 >
-                                  <span className="mute">Lấy từ module</span>
+                                  {r.module_filled && r.cells["F"] ? (
+                                    <>
+                                      {num(r.cells["F"], 6)}{" "}
+                                      {r.module_provisional ? (
+                                        <span className="mute">(Tạm tính)</span>
+                                      ) : null}
+                                    </>
+                                  ) : (
+                                    <span className="mute">Lấy từ module</span>
+                                  )}
                                 </td>
                               );
                             const v =
