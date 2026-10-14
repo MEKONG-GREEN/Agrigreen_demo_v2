@@ -9179,7 +9179,7 @@ paths:
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/HrmPermEntry"}}
         "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
-  # --- W11.28 (pf 20261014000335): BÁO CÁO SỞ NS01–NS06 (FN-12) + DASHBOARD NHÂN SỰ (FN-06). Biểu Sở: cần export = all (và
+  # --- W11.28 (pf 20261014073846): BÁO CÁO SỞ NS01–NS06 (FN-12) + DASHBOARD NHÂN SỰ (FN-06). Biểu Sở: cần export = all (và
   # sensitive.view = all với biểu có trường TK); dữ liệu tại ngày chốt (as-of); họ tên/ngày sinh/TK đọc kho theo lô. Mọi lần
   # xem trước, nhấn ô, xuất, tải ghi sổ report_log (lịch sử + tên trường nhạy cảm); tệp không lưu — tải = dựng lại + so SHA-256.
   /v1/hrm/reports:
