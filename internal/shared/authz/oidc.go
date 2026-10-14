@@ -101,10 +101,10 @@ func mfaDisabledRequested(getenv func(string) string) (bool, error) {
 // quên đặt biến.
 func DemoMFABypassAllowed(getenv func(string) string) error {
 	env := strings.ToLower(strings.TrimSpace(getenv("AG_ENV")))
-	switch {
-	case env == "production" || env == "prod":
+	switch env {
+	case "production", "prod":
 		return fmt.Errorf("%w: AG_ENV=%s", ErrMFABypassNotDemo, env)
-	case env == "":
+	case "":
 		return fmt.Errorf("%w: chưa đặt AG_ENV", ErrMFABypassNotDemo)
 	}
 	if d := strings.ToLower(strings.TrimSpace(getenv(EnvDeployEnv))); d != DeployEnvDemo {

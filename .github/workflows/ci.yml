@@ -4,10 +4,7 @@ name: ci
 
 on:
   push:
-    # dev: nhánh tích hợp (từ 09/10/2026) — push vào dev cũng xây và đẩy image để trien-khai-demo.yml triển khai
-    # được commit của dev (docs/dev/sync-main-2026-10-13.md; PO chọn nhánh demo). Tốn thêm một lượt CI mỗi lần
-    # merge vào dev; bỏ "dev" ở đây nếu hạn mức phút không đủ — khi đó chạy tay (workflow_dispatch) trên dev.
-    branches: [main, dev]
+    branches: [main]
   pull_request:
   # Chạy tay (ví dụ kiểm thử tích hợp app hiện trường trên emulator).
   workflow_dispatch:
@@ -489,22 +486,22 @@ jobs:
           severity: "CRITICAL,HIGH"
           exit-code: "1"
           ignore-unfixed: true
-      - name: Lưu image đã quét cho bước ký (main/dev)
-        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request'
+      - name: Lưu image đã quét cho bước ký (chỉ main)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: docker save "$IMAGE" -o image.tar
-      - name: Tải lên image đã quét (main/dev)
-        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request'
+      - name: Tải lên image đã quét (chỉ main)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: image-${{ matrix.cmd }}
           path: image.tar
           retention-days: 1
 
-  # Push + ký keyless: job riêng, chỉ main/dev (không PR), chỉ đẩy ĐÚNG image tar đã qua SBOM/Trivy ở job images.
+  # Push + ký keyless: job riêng, chỉ main, chỉ đẩy ĐÚNG image tar đã qua SBOM/Trivy ở job images.
   images-publish:
-    name: Push và ký image (main/dev)
+    name: Push và ký image (chỉ main)
     needs: images
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -743,7 +740,7 @@ jobs:
         run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       - name: Dang nhap ghcr (chi khi se push)
-        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
@@ -754,7 +751,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: deploy/compose/postgres
-          push: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request' }}
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
           tags: ghcr.io/${{ env.OWNER }}/agrigreen-postgres:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -803,7 +800,7 @@ jobs:
         run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       - name: Dang nhap ghcr (chi khi se push)
-        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
@@ -814,7 +811,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: apps/web-ops
-          push: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name != 'pull_request' }}
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
           tags: ghcr.io/${{ env.OWNER }}/agrigreen-web-ops-demo:${{ github.sha }}
           build-args: |
             NEXT_PUBLIC_DEPLOY_ENV=production

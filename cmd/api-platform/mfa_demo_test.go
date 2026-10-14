@@ -103,7 +103,7 @@ func TestAdminAPIMFAGate_SyncMain(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		var body struct {
 			Code string `json:"code"`
 		}
