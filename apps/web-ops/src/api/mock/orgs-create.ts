@@ -1,6 +1,6 @@
 // GIẢ LẬP Admin POST /v1/orgs (partyCreateOrg, contracts/openapi/admin.yaml) — gói ORGUI.
 // Mô phỏng quy tắc backend internal/platform/party/{domain/org.go, app/org.go}: vai (registry_admin,
-// kn_province_admin, platform_admin), phạm vi ghi, mã 1–40 ký tự, cấp ĐVHC theo loại và còn hiệu lực,
+// kn_province_admin, platform_admin; Nút không phải HTX chỉ platform_admin/registry_admin), phạm vi ghi, mã 1–40 ký tự, cấp ĐVHC theo loại và còn hiệu lực,
 // cấp trên hợp lệ (AllowedParent) và cùng địa bàn (unitWithin) → 201 / 409 party.org_code_taken / 422.
 // Idempotency-Key và phát lại do mockFetch (handler.ts) lo.
 import { KIND_RULES, unitValidOn, vnToday } from "../../admin/orgCreate";
@@ -34,6 +34,10 @@ export const orgCreateRoutes: Route[] = [
       const kind = str("kind") as OrgKind;
       if (!KINDS.includes(kind)) return validation([{ field: "kind", reason: "kind không hợp lệ" }]);
       const isCoop = kind === "cooperative";
+      // Quyết định PO 14/10/2026 (ORGUI): Nút không phải HTX chỉ Admin nền tảng tạo (app.requireNodeCreator).
+      if (!isCoop && !hasRole(persona, "registry_admin", "platform_admin")) {
+        return problem(403, "forbidden", "Forbidden", { detail: "chỉ Admin nền tảng (platform_admin, registry_admin) được tạo Nút hành chính / TTKN" });
+      }
       const code = str("code");
       const name = str("name");
       const unit = str("admin_unit_code");

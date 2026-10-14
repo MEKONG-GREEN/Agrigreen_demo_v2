@@ -2,6 +2,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { NATIONAL_REF, ORGS, provinceOrgRef } from "./data";
 import { mockAdminFetchNoDelay } from "./handler";
+import { orgCreateRoutes } from "./orgs-create";
+import { findPersona } from "./personas";
 
 const BASE = ORGS.length;
 afterEach(() => {
@@ -124,6 +126,18 @@ describe("POST /v1/orgs (giả lập)", () => {
       admin_unit_code: "82101",
     });
     expect(r.body.errors).toEqual([{ field: "code", reason: expect.stringContaining("tự sinh") }]);
+  });
+
+  it("403: KN tỉnh không tạo Nút hành chính/TTKN (quyết định PO), vẫn tạo được HTX trong phạm vi", async () => {
+    // Persona "tinh" (kn_province_admin) chưa qua MFA nên gọi thẳng handler (bỏ qua cổng MFA của mockFetch).
+    const tinh = findPersona("tinh")!;
+    const call = (body: Record<string, unknown>) =>
+      orgCreateRoutes[0]!.handler({ url: new URL("http://mock/v1/orgs"), persona: tinh, params: [], body, request: new Request("http://mock/v1/orgs") });
+    const r = call(TEAM);
+    expect(r.status).toBe(403);
+    expect(await r.json()).toMatchObject({ code: "forbidden", detail: expect.stringContaining("Admin nền tảng") });
+    const coop = call({ kind: "cooperative", name: "HTX do KN tỉnh lập", admin_unit_code: "82101", parent_ref: provinceOrgRef(0) });
+    expect(coop.status).toBe(201);
   });
 
   it("403: vai không có quyền; MFA bắt buộc", async () => {
