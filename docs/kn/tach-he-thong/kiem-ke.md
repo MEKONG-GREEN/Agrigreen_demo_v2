@@ -2,7 +2,14 @@
 
 **Gói:** KNSPLIT-0 · **Ngày:** 14/10/2026 · **Quyết định:** [ADR-0055 — Tách hệ thống Khuyến nông](../../adr/0055-tach-he-thong-khuyen-nong.md) (Đề xuất) · **Cổng:** `go run ./tools/knboundary` ([cấu hình](../../../tools/knboundary/boundary.yaml), [baseline](../../../tools/knboundary/baseline.yaml)) · **Kiểm thử dữ liệu:** [`migrations/kn_split_boundary_integration_test.go`](../../../migrations/kn_split_boundary_integration_test.go)
 
-Tài liệu liệt kê mọi chỗ hệ Khuyến nông (KN) đang dính với nền tảng và các ứng dụng khác, ở thời điểm `origin/dev` 3297466c. Gói này **không chuyển mã**. Nó chuẩn bị cho các gói KNSPLIT-1…5 ở ADR-0055.
+Tài liệu liệt kê mọi chỗ hệ Khuyến nông (KN) đang dính với nền tảng và các ứng dụng khác. Gói này **không chuyển mã**. Nó chuẩn bị cho các gói KNSPLIT-1…5 ở ADR-0055.
+
+**Trả lời của chủ sản phẩm ngày 14/10/2026** (ADR-0055, mục "Trả lời của chủ sản phẩm"):
+- KN là **hệ độc lập**. KN chỉ trao đổi dữ liệu với hệ khác qua nền tảng dữ liệu dùng chung: `_pub`, data product, lớp tích hợp. KN **không gọi trong tiến trình** module của hệ khác, kể cả port HTX.
+- NĐ 331 không đòi tách vật lý. Tách vật lý là tùy chọn, sau G1.
+- Báo giá (`pf/price`, BRD Báo giá v1.3, Phòng TTTT) và Contact (`pf/contact`, FN-13 BRD HCTH v3.0) là **của KN**.
+
+Phân loại dưới đây đã theo các trả lời đó.
 
 ## Cách đọc
 
@@ -11,10 +18,11 @@ Mỗi mục có một trong ba hướng xử lý:
 | Ký hiệu | Nghĩa |
 |---|---|
 | **→ KN** | Chuyển sang module KN (`internal/kn/*`, app web KN). Nền tảng không còn biết tới nó. |
-| **Nền tảng** | Ở lại nền tảng. KN dùng như mọi ứng dụng khác. |
+| **Nền tảng** | Ở lại nền tảng, là dịch vụ dùng chung. KN gọi qua `port/` như mọi ứng dụng khác. |
 | **Port** | Nền tảng cần một điểm mở rộng: port, registry hoặc hồ sơ cấu hình. KN đăng ký vào đó, nền tảng không import KN. |
+| **Nền tảng dữ liệu** | Dữ liệu của hệ khác (HTX, MKG). KN đọc qua view `_pub`/data product và ghi qua lớp tích hợp, không gọi trong tiến trình. |
 
-- Danh sách đầy đủ, từng tệp và từng ký hiệu, nằm ở [baseline.yaml](../../../tools/knboundary/baseline.yaml), 376 mục. Lệnh sinh lại: `go run ./tools/knboundary -list`.
+- Danh sách đầy đủ, từng tệp và từng ký hiệu, nằm ở [baseline.yaml](../../../tools/knboundary/baseline.yaml), 380 mục. Lệnh sinh lại: `go run ./tools/knboundary -list`.
 - Tài liệu này gom các mục theo cụm và ghi hướng xử lý. Khi hai nguồn lệch nhau, baseline là nguồn đúng, vì CI kiểm nó.
 - Phương pháp:
   - **Go:** `go list -f '{{.Imports}} {{.TestImports}}' ./...` lọc theo module KN; phân tích import và chuỗi SQL bằng `tools/knboundary`; `grep` ký hiệu.
@@ -28,12 +36,14 @@ Mỗi mục có một trong ba hướng xử lý:
 
 - **Module chỉ của KN:**
   - `pf/extension` (domain): nhiệm vụ, chỉ đạo, báo cáo, lịch công tác, KHTC, CNTS dịch bệnh, vật tư;
-  - `pf/price` (capability): Báo giá;
+  - `pf/price`: Báo giá. Khai `capability`, nhưng theo PO 14/10 là chức năng của KN (Phòng TTTT), không dùng chung;
   - `pf/hrm` (domain): nhân sự;
-  - `pf/contact` (capability): danh bạ.
+  - `pf/contact`: Contact FN-13 của Phòng HCTH. Khai `capability`, nhưng theo PO 14/10 là của KN, không dùng chung.
 
   Bốn module này nằm ở `internal/platform/{extension,price,hrm,contact}`, chạy chung binary `api-platform`/`worker`, cụm `pg-pf` và realm `agrigreen`.
-- **Hướng ra của KN đã sạch.** Mã KN chỉ import `port/` của module khác: `accounts`, `cooperative`, `forms`, `geo`, `masterdata`, `metrics`, `notify`, `party`, `reports`, `sync`. Mã KN không có chuỗi SQL nào tới bảng của module khác. Quy tắc `kn-import-internal` và `kn-sql-foreign` hiện có 0 vi phạm.
+- **Hướng ra của KN gần sạch.**
+  - Mã KN chỉ import `port/` của module khác. Mã KN không có chuỗi SQL nào tới bảng của module khác. Quy tắc `kn-import-internal` và `kn-sql-foreign` có 0 vi phạm.
+  - Riêng `pf/extension` gọi trong tiến trình port của hệ HTX (`cooperative`): 4 tệp, quy tắc `kn-import-htx`. Phải thay bằng đọc qua nền tảng dữ liệu (§1.2).
 - **Hướng vào KN thì chưa sạch.** Nền tảng biết KN theo bốn cách:
   - `notify` và `reports` import port của KN (22 tệp);
   - module dùng chung chứa phần riêng KN (`accounts`, `party`, `cooperative`, `masterdata`, `authz`; 212 ký hiệu và tệp);
@@ -53,28 +63,33 @@ Mỗi mục có một trong ba hướng xử lý:
 | `notify/app/consume.go`, `notify/domain/price.go` (+ test) | `price/port`: loại thông báo Báo giá | Như trên | **Port**, như trên. Gốc lắp ráp đã có `assembly.NotifyPriceDesk` (hướng đúng). |
 | `reports/app/{dispatch,service}.go` (+ 5 test handler) | `extension/port` | Báo cáo tổng hợp KN đọc dữ liệu `pf/extension` qua `reports/port/extensionsrc` | **Port.** `reports` giữ engine mẫu và xuất bản. Nguồn dữ liệu KN (`extensionsrc`) thành nguồn đăng ký (`reports/port.SourceRegistry`). Gói `reports/port/extensionsrc` → KN. |
 | `accounts/app/kn_extension_test.go` | `extension/port` | Kiểm thử chéo | **→ KN** cùng phần KN của accounts. |
-| Gốc lắp ráp: `cmd/api-platform/assembly/{contact,hrm,price,notify_price,forms,modules}.go`, `cmd/worker` (job `extension.*`, `price` calendar), `cmd/formimport` | module KN | Lắp ráp | **Nền tảng** trong giai đoạn logic. Từ KNSPLIT-5 chuyển sang `cmd/api-kn`, `cmd/worker-kn`. |
+| Gốc lắp ráp: `cmd/api-platform/assembly/{contact,hrm,price,notify_price,forms,modules}.go`, `cmd/worker` (job `extension.*`, `price` calendar), `cmd/formimport` | module KN | Lắp ráp | **Nền tảng** (binary chung là đích). Chỉ khi KNSPLIT-5 (tùy chọn, sau G1) được mở mới chuyển sang `cmd/api-kn`, `cmd/worker-kn`. |
 | `tests/acceptance`, `tests/e2e`, `tests/kn77` | `extension`, `extension/port` | Kiểm thử đầu-cuối | Giữ. `tests/kn77` → KN cùng KNSPLIT-1. |
 
-### 1.2 Module KN import nền tảng (đều qua `port/`, hợp lệ ở đích)
+### 1.2 Module KN import nền tảng và hệ khác
 
-- `pf/extension` import `port/` của 10 module.
+- `pf/extension` import `port/` của 10 module. Chín module là dịch vụ nền tảng dùng chung, hợp lệ ở đích. Module thứ mười là `cooperative`, thuộc hệ HTX và là ghép nối phải gỡ.
   - Ký hiệu dùng nhiều nhất: `syncport.*` (nguồn/đích đồng bộ), `extensionsrc.*`, `partyport.{AdminUnit,ActorNames,Dept*,Org*,Level*}`, `metricsport.*`, `formsport.{Publisher,Validator,Freezer,PeriodControl}`, `accountsport.{KNContext,KNOfficer,Schedule*}`, `geoport.Gps*`, `notifyport.StaffDirectory`.
   - Đọc HTX: `coopport.{Plots,Cooperatives,PlotStat,UnitCooperatives,CoopCentroid,HTXConfirmations}`.
 - `pf/contact` import `vault/identity/client`. `pf/price` và `pf/hrm` chỉ dùng `internal/shared`.
-- **Đọc dữ liệu HTX đi vòng `_pub`.** `extension/app/service.go` và `extension/module.go` gọi `coopport.Plots` và `coopport.Cooperatives`. `extension/port/closedfig.go` gọi `coopport.HTXConfirmations`.
+- **Đọc dữ liệu HTX trong tiến trình, đi vòng `_pub` (quy tắc `kn-import-htx`, 4 tệp trong baseline).**
+  - `extension/app/service.go` và `extension/module.go` gọi `coopport.Plots` và `coopport.Cooperatives`.
+  - `extension/port/closedfig.go` gọi `coopport.HTXConfirmations`.
+  - `extension/handler/unified_integration_test.go` (kiểm thử) cũng import port này.
   - Đây là lời gọi trong tiến trình. Module `cooperative` đọc bảng `pf_coop` dưới vai `r_cooperative`, trong ngữ cảnh của người dùng KN, chứ không đọc view `_pub`.
-  - Đúng ở đích chỉ khi tài khoản KN ở tenant riêng: khi đó RLS `p_share` giới hạn theo cấp phép. Xem §2.4.
-  - **Hướng:** giữ port. Đổi nguồn sang view `pf_coop_pub`/`pf_cropcycle_pub` (thêm vào `PubReaders`) ở chỗ chỉ cần số tổng hợp. Chỗ cần dòng chi tiết giữ port với `p_share` (KNSPLIT-4).
+  - Theo PO 14/10, cách này **không được phép ở đích**: hệ độc lập không gọi trong tiến trình vào hệ khác.
+  - **Hướng: Nền tảng dữ liệu.** KNSPLIT-2 đổi nguồn:
+    - số tổng hợp và trạng thái xác nhận HTX: view `pf_coop_pub`/`pf_cropcycle_pub` có phiên bản (thêm `pf/extension` vào `PubReaders`);
+    - dòng chi tiết (thửa, HTX theo đơn vị): data product có cấp phép (`p_share`, KNSPLIT-4).
 
 ### 1.3 Phần riêng KN trong module dùng chung (`kn-symbol-in-shared`: 212 mục)
 
 | Module | Tệp / ký hiệu chính | Nội dung | Hướng |
 |---|---|---|---|
 | `internal/shared/authz` | `kn.go`: `KNContext`, `RequireKN`, `KNRoles`, `KNTW/KNTinh/KNXa/KNAdmin`, `KNSupport`, `ErrNoKNContext` | Ngữ cảnh phiên KN (header `X-AG-Context`), dùng ở 20 tệp ngoài KN: `accounts`, `cooperative`, `forms`, `mechanization`, `notify`, `party`, `reports`, `shared/db` | **Port.** `authz` giữ khái niệm chung "ngữ cảnh ứng dụng" (vai ngữ cảnh, đơn vị, phòng ban, phạm vi). `KN*` → `internal/kn/authz`. `shared/db.RequiresNode` đọc vai gắn Nút từ `app.yaml`, không hằng KN. |
-| `pf/accounts` | `app/kn*.go` (tạo/nhập cán bộ KN, ngữ cảnh, phiên, hỗ trợ, vault xã), `domain/kn*.go` (luật vai × loại Nút), `handler/kn*.go` (`/v1/accounts/kn-users*`, `/v1/me/context*`), `port/kn*.go` (`KNContext`, `KNContextResolver`, `KNDirectory`, `KNPeople`, `KNOfficer`), `store/kn*.go`, `module.go` (`ExtensionKNContext`, `ExtensionKNDirectory`, `KNPeople`), `port/grants.go` (`KNOfficerRoles`); kiểm kê tay: `{app,domain,handler,port,store}/internal_unit.go` (đơn vị nội bộ), `{app,store}/dormant.go` (job vô hiệu 45 ngày, D24) | Tài khoản cán bộ, gán vai theo Nút/phòng ban, ủy quyền, phiên hỗ trợ | **Tách đôi.** Tài khoản, khóa, MFA, vô hiệu 45 ngày, phiên và ủy quyền chung là **Nền tảng**. Luật vai KN, nhập cán bộ KN, ngữ cảnh KN, đơn vị nội bộ là **→ KN**. Nền tảng cần **Port** "luật gán vai theo ứng dụng" (validator theo `app`) và "bộ phân giải ngữ cảnh" (thay `KNContextResolver`). |
-| `pf/party` | `app/kn*.go` (menu KN, cây, vùng, thu thập HTX), `domain/kn.go`, `handler/kn*.go` (`/v1/kn/cooperatives*`, `/v1/menu`), `port/kn*.go`, `store/kn*.go` (`KNEvent`), `port/registry.go` (`RoleKN*`); kiểm kê tay: `domain/menu.go`, `domain/menu_departments.go` (`KHTCReportItem`, …) | Menu KN, phòng ban, cây tổ chức KN, danh sách HTX cho KN | **Nút/cây/vùng, phòng ban (dữ liệu):** Nền tảng. **Menu KN, mục menu phòng ban:** → KN. Nền tảng có **Port** "registry menu theo ứng dụng"; `/v1/menu` trả hợp của các registry. **Thu thập HTX cho KN** (`/v1/kn/cooperatives*`): → KN, đọc HTX qua port `cooperative` + cấp phép. |
-| `pf/cooperative` | `member/{app,handler,store}/kn_*.go` (`/v1/kn/cooperatives/{ref}/households`, `/v1/kn/households/*`, sổ `pf_coop.kn_profile_event`), `plot/{app,domain,handler,store}/kn*.go` (`/v1/kn/plots*`, `KN*Plot`, `SourceKN*`), `port/member.go` (`HouseholdSourceKNApp`), `anchor` (`CreatedByKN`, `roleKN*`), `season/app`, `cropcycle/app` (`accKN`); kiểm kê tay: `plot/app/department_usage.go` | Màn KN đọc/ghi dữ liệu HTX (vẽ thửa, hộ) | **Port.** Route `/v1/kn/*` chuyển sang KN. KN gọi `cooperativeport` (ghi thay theo thỏa thuận, ADR-0052 §7) dưới cấp phép. Nguồn ghi `SourceKN*`, `CreatedByKN` giữ ở nền tảng như giá trị dữ liệu (nhãn nguồn, không phải logic KN). |
+| `pf/accounts` | `app/kn*.go` (tạo/nhập cán bộ KN, ngữ cảnh, phiên, hỗ trợ, vault xã), `domain/kn*.go` (luật vai × loại Nút), `handler/kn*.go` (`/v1/accounts/kn-users*`, `/v1/me/context*`), `port/kn*.go` (`KNContext`, `KNContextResolver`, `KNDirectory`, `KNPeople`, `KNOfficer`), `store/kn*.go`, `module.go` (`ExtensionKNContext`, `ExtensionKNDirectory`, `KNPeople`), `port/grants.go` (`KNOfficerRoles`); kiểm kê tay: `{app,domain,handler,port,store}/internal_unit.go` (đơn vị nội bộ), `{app,store}/dormant.go` (job vô hiệu 45 ngày, D24) | Tài khoản cán bộ, gán vai theo Nút/phòng ban, ủy quyền, phiên hỗ trợ | **Tách đôi.** Tài khoản, khóa, MFA, vô hiệu 45 ngày, phiên và ủy quyền chung là **Nền tảng** (dịch vụ dùng chung). Luật vai KN, nhập cán bộ KN, ngữ cảnh KN, đơn vị nội bộ là **→ KN**. Nền tảng cần **Port** "luật gán vai theo ứng dụng" (validator theo `app`) và "bộ phân giải ngữ cảnh" (thay `KNContextResolver`). |
+| `pf/party` | `app/kn*.go` (menu KN, cây, vùng, thu thập HTX), `domain/kn.go`, `handler/kn*.go` (`/v1/kn/cooperatives*`, `/v1/menu`), `port/kn*.go`, `store/kn*.go` (`KNEvent`), `port/registry.go` (`RoleKN*`); kiểm kê tay: `domain/menu.go`, `domain/menu_departments.go` (`KHTCReportItem`, …) | Menu KN, phòng ban, cây tổ chức KN, danh sách HTX cho KN | **Nút/cây/vùng, phòng ban (dữ liệu):** Nền tảng. **Menu KN, mục menu phòng ban:** → KN. Nền tảng có **Port** "registry menu theo ứng dụng"; `/v1/menu` trả hợp của các registry. **Thu thập HTX cho KN** (`/v1/kn/cooperatives*`): → KN, đọc HTX qua **Nền tảng dữ liệu** (data product có cấp phép), không qua port `cooperative`. |
+| `pf/cooperative` | `member/{app,handler,store}/kn_*.go` (`/v1/kn/cooperatives/{ref}/households`, `/v1/kn/households/*`, sổ `pf_coop.kn_profile_event`), `plot/{app,domain,handler,store}/kn*.go` (`/v1/kn/plots*`, `KN*Plot`, `SourceKN*`), `port/member.go` (`HouseholdSourceKNApp`), `anchor` (`CreatedByKN`, `roleKN*`), `season/app`, `cropcycle/app` (`accKN`); kiểm kê tay: `plot/app/department_usage.go` | Màn KN đọc/ghi dữ liệu HTX (vẽ thửa, hộ) | **Nền tảng dữ liệu.** Route `/v1/kn/*` chuyển sang KN. KN đọc qua data product/view `_pub` có cấp phép, ghi thay (ADR-0052 §7, nếu Q-KNS-04 giữ) qua lớp tích hợp. KN không gọi `cooperativeport` trong tiến trình. Nhãn nguồn `SourceKN*`, `CreatedByKN` giữ ở hệ HTX như giá trị dữ liệu. |
 | `pf/mechanization` | `handler/machine_count.go` (`RegisterKNMachineCounts`: `/v1/kn/machine-counts*`); kiểm kê tay: `app/department_usage.go` | Đếm máy theo HTX cho KN | Như `cooperative`: route → KN, dữ liệu ở lại. |
 | `pf/masterdata` | `{app,domain,port}/cnts.go` (`CNTSCatalogs`, 12 danh mục `CatalogCNTS*`, 12 tham số `ParamCNTS*`), `module.go` | Danh mục Chăn nuôi – Thủy sản (CNTS) | **Port.** `masterdata` giữ engine danh mục và tham số. Định nghĩa danh mục và tham số CNTS → KN, đăng ký qua registry danh mục (seed/manifest), như hồ sơ `cap/forms`. |
 | `pf/forms` | `app/service.go`, `port/port.go` dùng `authz.KN*`. Hồ sơ `kn`, `kn_cnts`, `kn_khtc` **đã** ở gốc lắp ráp (`assembly.KNProfiles`) | Vai phát hành/nộp theo vai ngữ cảnh KN | **Port**, đã gần xong: thay `authz.KN*` trong `forms` bằng vai lấy từ `Profile`. |
@@ -85,10 +100,10 @@ Mỗi mục có một trong ba hướng xử lý:
 
 | Đơn vị | Phần KN | Hướng |
 |---|---|---|
-| `cmd/api-platform` | `assembly/{contact,hrm,price,notify_price,forms}.go`, đăng ký `extension`, `price`, `hrm`, `contact` trong `modules.go` | KNSPLIT-1: gọi `internal/kn/*`. KNSPLIT-5: tách `cmd/api-kn`. |
+| `cmd/api-platform` | `assembly/{contact,hrm,price,notify_price,forms}.go`, đăng ký `extension`, `price`, `hrm`, `contact` trong `modules.go` | KNSPLIT-1: gọi `internal/kn/*`. KNSPLIT-5 (tùy chọn): tách `cmd/api-kn`. |
 | `cmd/worker` | job `extension.JobEscalation`, `JobWorkSchedule`, `JobReportCycle`, `priceport.JobCalendar`, `accport.JobDormant` (chung), `notify.go`/`reports.go` dựng `extension.New` | Như trên: `cmd/worker-kn`. |
 | `cmd/formimport` | nhập biểu mẫu KN | → KN. |
-| Vai DB đăng nhập | `extension_app` (vai cũ, thành viên `r_extension`) | Gỡ khi có `app_kn` (KNSPLIT-5). |
+| Vai DB đăng nhập | `extension_app` (vai cũ, thành viên `r_extension`) | Gỡ khi có vai đăng nhập riêng; không bắt buộc trong đích logic. |
 
 ## 2. Cơ sở dữ liệu (cụm `pg-pf`)
 
@@ -139,8 +154,8 @@ Sổ HTX mà luồng KN ghi hôm nay:
 - `pf_mechanization.coop_machine_count_event` (`/v1/kn/machine-counts*`).
 
 Ở đích:
-- **Đọc** của KN đi qua `p_share` (cấp phép `intra_platform`, `purpose_code = khuyen-nong`).
-- **Ghi thay** (nếu PO giữ) phải qua port ghi của `pf/cooperative` với kiểm cấp phép có quyền ghi. RLS `p_share` hiện chỉ cho SELECT.
+- **Đọc** của KN đi qua nền tảng dữ liệu (view `_pub`, data product). Cùng cụm thì RLS `p_share` lọc theo cấp phép `intra_platform`, `purpose_code = khuyen-nong`. Không gọi port HTX trong tiến trình (PO 14/10).
+- **Ghi thay** (nếu PO giữ) đi qua lớp tích hợp (nạp theo lô hoặc lệnh có idempotency tới hệ HTX, ADR-0033), có kiểm cấp phép có quyền ghi. RLS `p_share` hiện chỉ cho SELECT.
 - Xem câu hỏi Q-KNS-04 ở ADR-0055.
 
 ## 3. HTTP (OpenAPI)
@@ -159,9 +174,9 @@ Sổ HTX mà luồng KN ghi hôm nay:
 
 | Route | Module phục vụ | Hướng |
 |---|---|---|
-| `/v1/kn/cooperatives*`, `/v1/kn/households*` | `pf/party` + `pf/cooperative` | **→ KN** (gọi port HTX) |
-| `/v1/kn/plots*` (tag `geo`, phục vụ bởi `pf/cooperative` từ W3.3) | `pf/cooperative` | **→ KN** (gọi port HTX); sửa tag |
-| `/v1/kn/machine-counts*` | `pf/mechanization` | **→ KN** (gọi port) |
+| `/v1/kn/cooperatives*`, `/v1/kn/households*` | `pf/party` + `pf/cooperative` | **→ KN**: đọc qua nền tảng dữ liệu, ghi qua lớp tích hợp |
+| `/v1/kn/plots*` (tag `geo`, phục vụ bởi `pf/cooperative` từ W3.3) | `pf/cooperative` | **→ KN**: đọc qua nền tảng dữ liệu, ghi qua lớp tích hợp; sửa tag |
+| `/v1/kn/machine-counts*` | `pf/mechanization` | **→ KN**: như trên (không gọi port HTX trong tiến trình) |
 | `/v1/menu`, `/v1/departments*` (app + admin) | `pf/party` | **Port**: registry menu; phòng ban giữ ở nền tảng nếu ứng dụng khác dùng, còn không → KN |
 | `/v1/me/context`, `/v1/me/contexts`, `/v1/me/delegations*`, `/v1/internal-units` | `pf/accounts` | **Port**: ngữ cảnh ứng dụng chung; đơn vị nội bộ → KN |
 | Admin `/v1/accounts/kn-users*`, `/v1/accounts/internal-units*`, `/v1/accounts/users/{id}/assignments*`, `/v1/accounts/users/{id}/delegations`, `/v1/accounts/delegations/*`, `/v1/accounts/support-*` | `pf/accounts` | Nhập cán bộ KN, đơn vị nội bộ → KN. Gán vai, ủy quyền, phiên hỗ trợ giữ ở nền tảng (dùng chung) qua port luật vai |
@@ -208,9 +223,9 @@ KN dùng chung, hợp lệ: `@/api` (161 import, client sinh từ OpenAPI), `@/c
 
 ## 6. Realm, client, vai
 
-| Mục | Hiện tại | Đích (giai đoạn logic) | Đích (giai đoạn vật lý, nếu cần) |
+| Mục | Hiện tại | Đích (độc lập logic) | Tùy chọn sau G1, chỉ khi vận hành cần (NĐ 331 không đòi, PO 14/10) |
 |---|---|---|---|
-| Realm người dùng | `agrigreen`, chung cho mọi ứng dụng | Giữ `agrigreen` | Có thể `agrigreen-kn` (Q-KNS-02) |
+| Realm người dùng | `agrigreen`, chung cho mọi ứng dụng | Giữ `agrigreen` | Có thể `agrigreen-kn` |
 | Realm quản trị | `agrigreen-kn-admin` (D24/D25, client `agrigreen-kn-admin-web`) | Giữ | Giữ |
 | Client web | `agrigreen-web-ops` (KN, HTX, CGH, SIM, PF chung) | Thêm `agrigreen-web-kn` cho `apps/web-kn` | Như trái |
 | Client mobile | `agrigreen-field-app` | Giữ | Như trái |
@@ -224,6 +239,7 @@ KN dùng chung, hợp lệ: `@/api` (161 import, client sinh từ OpenAPI), `@/c
 |---|---:|---|
 | `import-into-kn` | 22 | KNSPLIT-2 (registry `notify`, `reports`) |
 | `kn-import-internal` | 0 | — (giữ 0) |
+| `kn-import-htx` | 4 | KNSPLIT-2 (đọc qua `_pub`/data product); KNSPLIT-4 (dòng chi tiết dưới tenant KN) |
 | `kn-sql-foreign` | 0 | — (giữ 0) |
 | `sql-into-kn` | 20 | KNSPLIT-2 (kiểm thử). Mục migration là vĩnh viễn |
 | `kn-symbol-in-shared` | 212 | KNSPLIT-2 |

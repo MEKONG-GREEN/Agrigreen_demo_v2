@@ -13,6 +13,7 @@ import (
 var fixture = map[string]string{
 	"go.mod": "module example.com/ag\n\ngo 1.26\n",
 	"tools/knboundary/boundary.yaml": `kn_modules: [internal/kn, internal/platform/extension]
+htx_modules: [internal/platform/cooperative]
 composition_roots: [cmd/api-platform]
 test_roots: [tests]
 go_roots: [internal, cmd, tests]
@@ -40,7 +41,7 @@ web:
 	"internal/platform/cooperative/port/port.go":   "package port\n\ntype Plots interface{}\n",
 	"internal/platform/cooperative/store/store.go": "package store\n",
 	"internal/mkg/orders/orders.go":                "package orders\n",
-	// KN: port HTX được; store HTX và mkg không; SQL bảng HTX không được, _pub/k_ref được; chú thích không tính.
+	// KN: port HTX cũng không (PO 14/10, kn-import-htx); store HTX và mkg không (kn-import-internal); SQL bảng HTX không được, _pub/k_ref được; chú thích không tính.
 	"internal/platform/extension/app/app.go": `package app
 
 import (
@@ -122,6 +123,7 @@ var wantFixture = []Coupling{
 	{RuleKNImportInternal, "internal/kn/price/price.go", "internal/platform/party/app"},
 	{RuleKNImportInternal, "internal/platform/extension/app/app.go", "internal/mkg/orders"},
 	{RuleKNImportInternal, "internal/platform/extension/app/app.go", "internal/platform/cooperative/store"},
+	{RuleKNImportHTX, "internal/platform/extension/app/app.go", "internal/platform/cooperative/port"},
 	{RuleKNSQLForeign, "internal/platform/extension/app/app.go", "pf_coop.plot"},
 	{RuleKNSQLForeign, "migrations/pf/000001_pf_extension_x.up.sql", "pf_coop.plot"},
 	{RuleSQLIntoKN, "internal/platform/notify/notify.go", "pf_extension.task_current"},

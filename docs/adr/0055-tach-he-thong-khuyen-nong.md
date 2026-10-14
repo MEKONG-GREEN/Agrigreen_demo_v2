@@ -1,13 +1,20 @@
 # ADR-0055: Tách hệ thống Khuyến nông
 
-**Trạng thái:** Đề xuất · **Ngày:** 14/10/2026 (gói KNSPLIT-0) · **Yêu cầu:** chủ sản phẩm "tách KN thành hệ thống riêng" và đồng thuận rà soát nhóm (hai giai đoạn) · **Liên quan:** CEO D2 ([ADR-0052](0052-dong-so-huu-mkg-htx-neo-mst.md)), D24/D25 ([ADR-0041](0041-mfa-theo-nhom-d24.md), realm quản trị `agrigreen-kn-admin`), v4.3 ADR-22 "hai hệ thống thông tin" (số giữ chỗ 0040, chưa viết), [ADR-0020](0020-lien-thong-platform-mkg-khac-tenant.md)/[ADR-0033](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md) (tiền lệ MKG), [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0030](0030-doc-tai-cho-co-cap-phep.md), [ADR-0053](0053-hop-dong-so-lieu-da-chot-closed-figures.md) · **Thành phần:** [kiểm kê](../kn/tach-he-thong/kiem-ke.md), `tools/knboundary`, `migrations/kn_split_boundary_integration_test.go`
+**Trạng thái:** Đề xuất. Chủ sản phẩm đã trả lời Q-KNS-01, 02, 05 ngày 14/10/2026. Q-KNS-03, 04, 06 còn mở · **Ngày:** 14/10/2026 (gói KNSPLIT-0) · **Yêu cầu:** chủ sản phẩm "tách KN thành hệ thống riêng", đồng thuận rà soát nhóm (hai giai đoạn), trả lời PO 14/10/2026 · **Thay thế một phần:** [ADR-0049](0049-cap-price-pf-price.md) (`cap/price` dùng chung → Báo giá của KN), [ADR-0054](0054-cap-directory-pf-contact.md) (`cap/directory` dùng chung → Contact của KN) · **Liên quan:**
+- CEO D2 ([ADR-0052](0052-dong-so-huu-mkg-htx-neo-mst.md));
+- D24/D25 ([ADR-0041](0041-mfa-theo-nhom-d24.md), realm quản trị `agrigreen-kn-admin`);
+- v4.3 ADR-22 "hai hệ thống thông tin" (số giữ chỗ 0040, chưa viết);
+- tiền lệ MKG: [ADR-0020](0020-lien-thong-platform-mkg-khac-tenant.md), [ADR-0033](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md);
+- [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0030](0030-doc-tai-cho-co-cap-phep.md), [ADR-0031](0031-vai-tong-hop-r-agg.md), [ADR-0035](0035-cap-phep-tong-hop-theo-xa-nguong-k.md), [ADR-0053](0053-hop-dong-so-lieu-da-chot-closed-figures.md).
+
+**Thành phần:** [kiểm kê](../kn/tach-he-thong/kiem-ke.md), `tools/knboundary`, `migrations/kn_split_boundary_integration_test.go`
 
 ## Bối cảnh
 
 Khuyến nông (KN) hiện trộn với nền tảng và các ứng dụng khác:
-- một binary `api-platform`/`worker`, một `apps/web-ops`, một realm `agrigreen`, một cụm `pg-pf`;
-- module chỉ của KN (`pf/extension`, `pf/price`, `pf/hrm`, `pf/contact`) nằm cạnh module nền tảng ở `internal/platform`;
-- phần riêng KN còn nằm trong module dùng chung:
+- **Hạ tầng chung:** một binary `api-platform`/`worker`, một `apps/web-ops`, một realm `agrigreen`, một cụm `pg-pf`.
+- **Module chỉ của KN nằm cạnh module nền tảng ở `internal/platform`:** `pf/extension`, `pf/price`, `pf/hrm`, `pf/contact`.
+- **Phần riêng KN còn nằm trong module dùng chung:**
   - `pf/accounts`: vai KN, `KNContext`, ủy quyền, đơn vị nội bộ, job vô hiệu;
   - `pf/party`: menu KN, phòng ban;
   - `pf/forms`: hồ sơ `kn_*`;
@@ -17,164 +24,193 @@ Khuyến nông (KN) hiện trộn với nền tảng và các ứng dụng khác
   - `internal/shared/authz/kn.go`.
 
 Kiểm kê KNSPLIT-0 ([kiem-ke.md](../kn/tach-he-thong/kiem-ke.md)) cho thấy:
-- **Hướng KN → nền tảng đã sạch.** KN chỉ import `port/`, không có SQL tới bảng của module khác.
-- **Hướng nền tảng → KN chưa sạch.** Có 22 import port KN, 212 ký hiệu và tệp KN trong module dùng chung, 46 thao tác route KN do module khác phục vụ, và 59 import KN trong vỏ web.
-- **Dữ liệu HTX.** Vai module KN không có quyền gì trên dữ liệu HTX. Người dùng KN thì đọc và ghi dữ liệu HTX qua route KN do module HTX phục vụ, ở tenant lưu ký, theo `p_scope`, không qua cấp phép (ADR-0052 §1, ĐTK 1).
+- **Hướng KN → nền tảng gần sạch.** KN chỉ import `port/` và không có SQL tới bảng của module khác. Riêng `pf/extension` gọi trong tiến trình port của `pf/cooperative` (`Plots`, `Cooperatives`, `HTXConfirmations`; 4 tệp).
+- **Hướng nền tảng → KN chưa sạch.**
+  - 22 import port KN.
+  - 212 ký hiệu và tệp KN trong module dùng chung.
+  - 46 thao tác route KN do module khác phục vụ, trong đó `/v1/kn/{plots,households,machine-counts}` do chính module HTX phục vụ.
+  - 59 import KN trong vỏ web.
+- **Dữ liệu HTX.**
+  - Vai module KN không có quyền gì trên dữ liệu HTX.
+  - Người dùng KN thì đọc và ghi dữ liệu HTX qua route KN do module HTX phục vụ. Họ ở tenant lưu ký, đi theo `p_scope`, không qua cấp phép (ADR-0052 §1, ĐTK 1).
 
 **MKG đã tách và là tiền lệ:**
-- mã ở `internal/mkg/*`;
-- binary riêng (`api-internal`, `worker-internal`, `ingest`, `edge-agent`);
-- cụm `pg-mkg`, frontend `apps/web-internal`, client riêng;
+- mã ở `internal/mkg/*`, binary riêng, cụm `pg-mkg`, frontend và client riêng;
 - liên thông qua cổng tích hợp như mọi đối tác (ADR-0033).
 
-MKG là một **hệ thống thông tin** riêng theo v4.3 ADR-22 (cấp độ 2), khác Nền tảng (cấp độ 3). D25 đặt realm quản trị riêng cho từng hệ; với KN là `agrigreen-kn-admin`.
+## Trả lời của chủ sản phẩm (14/10/2026)
 
-Mốc G1 là 15/12/2026. Nếu G1 có dữ liệu thật và bị coi là "đưa vào sử dụng" theo NĐ 331/2026, hồ sơ cấp độ phải xong trước mốc đó (QĐ-1, Q-001). Phạm vi hồ sơ phụ thuộc vào việc KN là một hệ riêng hay một phần của Nền tảng (QĐ-3, Q-002).
+**Q-KNS-01 — "tách riêng" nghĩa là gì: ĐÃ TRẢ LỜI.**
+- KN là **hệ thống độc lập**.
+- KN chỉ trao đổi dữ liệu với hệ khác **qua nền tảng dữ liệu dùng chung**: hợp đồng `_pub` của nền tảng, data product và lớp tích hợp.
+- **Không còn gọi trong tiến trình** vào module của hệ khác.
+
+**Q-KNS-02 — NĐ 331 có đòi ranh giới vật lý không: ĐÃ TRẢ LỜI, KHÔNG.**
+- Đích là **độc lập logic**.
+- Tách vật lý (binary, realm, cụm riêng) là tùy chọn, sau G1, chỉ khi vận hành cần.
+
+**Q-KNS-05 — Báo giá và Contact: ĐÃ TRẢ LỜI.**
+- Hệ nào có chức năng này thì **sở hữu bản riêng**. Không có năng lực dùng chung.
+- Đối chiếu BRD mới:
+  - **Báo giá** thuộc Phòng Thông tin Tuyên truyền của Trung tâm KN. BRD "Hệ thống Khuyến nông — Module: Báo giá nông sản (Phòng Thông tin Tuyên truyền)" v1.3, 07/10/2026, §I.1 và phân quyền Admin/TW/Tỉnh (Phòng TTTT)/Xã. Vậy `pf/price` là **của KN**.
+  - **Contact** là FN-13 của BRD "Nền tảng Khuyến nông số — Module 2: Hành chính - Tổng hợp" v3.0, 07/10/2026, chức năng của Phòng HCTH. Các yêu cầu liên quan: UR-GEN-01, UR-GEN-02, UR-QG-02, UR-ADM-10. Vậy `pf/contact` là **của KN**.
+- Nếu hệ khác (HTX, MKG) cần báo giá hay danh bạ, hệ đó dựng bản của mình. Nếu cần dữ liệu báo giá KN, đọc qua `pf_price_pub`.
 
 ## Quyết định
 
-### 1. Hai giai đoạn
+### 1. KN là hệ độc lập về logic
 
-| Giai đoạn | Khi nào | Gồm | Không gồm |
-|---|---|---|---|
-| **Logic** | Trước G1 (15/12/2026) | Không gian tên `internal/kn/*`. Phần riêng KN rời module dùng chung, đăng ký vào nền tảng qua port/registry. `pf/*` không import `kn/*`. KN đọc dữ liệu HTX chỉ qua `_pub` và cấp phép (D2). App web KN và client Keycloak riêng trong realm `agrigreen` | Đổi tên schema, binary, realm, cụm |
-| **Vật lý** | Sau G1, chỉ trong phạm vi hồ sơ NĐ 331 đòi (mục 7) | `cmd/api-kn`, `cmd/worker-kn`; có thể realm và cụm riêng; tài khoản KN sang tenant KN với cấp phép hàng loạt | Viết lại sổ, đổi chuỗi băm |
+- **Quy tắc ranh giới.** KN được dùng **dịch vụ nền tảng dùng chung** qua `port/`: tài khoản và xác thực, Nút/cây/đơn vị hành chính, `cap/forms`, `cap/notify`, `cap/reports`, `cap/masterdata`, `cap/sync`, `cap/geo`, `cap/metrics`, kho định danh.
+- **KN không gọi trong tiến trình** module của **hệ khác**: HTX (`pf/cooperative`, `pf/cropcycle`, `pf/mechanization`), MKG (`internal/mkg`). Cấm cả `port/` của các module đó.
+- **Dữ liệu của hệ khác** KN chỉ nhận qua **nền tảng dữ liệu**:
+  - view `_pub` có phiên bản;
+  - data product (`contracts/dataproduct`);
+  - lớp tích hợp: feed, nạp theo lô, cổng tích hợp ADR-0033.
+- **Chiều ngược lại cũng vậy.** Hệ khác đọc dữ liệu KN qua `pf_extension_pub`, `pf_price_pub` và data product của KN.
+- **Hai giai đoạn:**
 
-Giai đoạn logic tự nó có giá trị: ranh giới được kiểm bằng máy. Nó cũng là điều kiện cần của giai đoạn vật lý. Giai đoạn vật lý chỉ làm khi có lý do pháp lý hoặc vận hành (mục 7).
+| Giai đoạn | Khi nào | Gồm |
+|---|---|---|
+| **Logic (đích)** | Trước G1 (15/12/2026) và sau đó | Không gian tên `internal/kn/*`. Phần riêng KN rời module dùng chung, đăng ký qua port/registry của nền tảng. `pf/*` không import `kn/*`. KN không import module HTX/MKG. Dữ liệu HTX qua nền tảng dữ liệu (mục 4). App web KN, client Keycloak riêng trong realm `agrigreen`. Tài khoản KN ở tenant KN. Giữ tên schema vật lý, binary và cụm chung |
+| **Vật lý (tùy chọn)** | Sau G1, chỉ khi vận hành cần (mục 7) | `cmd/api-kn`, `cmd/worker-kn`; có thể realm và cụm riêng |
 
-### 2. Bố cục đích (giai đoạn logic)
+### 2. Bố cục đích
 
 ```
 internal/kn/              module KN — kind domain/capability theo ADR-0027, zones [pf]
-  extension/ price/ hrm/ contact/   (chuyển từ internal/platform, giữ name pf/<x> trong module.yaml tới KNSPLIT-5)
+  extension/ price/ hrm/ contact/   (chuyển từ internal/platform, giữ name pf/<x> trong module.yaml)
   accounts/               phần KN của pf/accounts: luật vai KN, nhập cán bộ, ngữ cảnh KN, đơn vị nội bộ
   menu/                   menu KN, mục menu phòng ban (đăng ký vào registry menu của pf/party)
-  collect/                route /v1/kn/{cooperatives,households,plots,machine-counts} — gọi port HTX
+  collect/                màn KN về HTX/hộ/thửa/máy — đọc qua nền tảng dữ liệu, ghi qua lớp tích hợp (mục 4)
   authz/                  KNContext, RequireKN, vai ngữ cảnh kn_tw/kn_tinh/kn_xa/admin
-internal/platform/*       nền tảng: không import internal/kn (cổng knboundary)
-apps/web-kn               app web KN (Next.js), client agrigreen-web-kn
+internal/platform/*       nền tảng + hệ HTX: không import internal/kn (cổng knboundary)
+apps/web-kn               app web KN, client agrigreen-web-kn
 apps/web-ops              vỏ chung + HTX/CGH/SIM/quản trị nền tảng
 apps/field-app            app hiện trường KN (đã riêng)
 packages/agrigreen_kn_mobile  client /v1/kn, /v1/extension tách khỏi agrigreen_mobile
-app/KN/app.yaml           modules trỏ module KN; frontends [apps/web-kn, apps/field-app]; clients [agrigreen-web-kn, agrigreen-field-app]
+app/KN/app.yaml           frontends [apps/web-kn, apps/field-app]; clients [agrigreen-web-kn, agrigreen-field-app]
 ```
 
-Tên module (`pf/extension`, …), tên vai DB (`r_extension`, …) và tên schema (`pf_extension`, …) giữ nguyên ở giai đoạn logic. Chuyển thư mục không đổi hợp đồng nào.
+Tên module, vai DB và schema (`pf_extension`, `pf_price`, `pf_hrm`, `pf_contact`) giữ nguyên. Lý do: chuỗi băm sổ, `ledger_idem`, cấp quyền và hợp đồng `_pub` gắn với tên.
 
 ### 3. Cái gì ở lại nền tảng, cái gì sang KN
 
-| Ở lại nền tảng (KN dùng như mọi ứng dụng) | Sang KN | Nền tảng mở điểm mở rộng (port/registry) |
+| Ở lại nền tảng (dịch vụ dùng chung) | Sang KN | Nền tảng mở điểm mở rộng |
 |---|---|---|
 | Tài khoản, MFA, khóa, vô hiệu 45 ngày, phiên, ủy quyền chung, phiên hỗ trợ | Luật vai KN × loại Nút, nhập cán bộ KN, ngữ cảnh KN, đơn vị nội bộ | `pf/accounts`: validator gán vai theo ứng dụng; bộ phân giải ngữ cảnh ứng dụng |
-| Nút, cây tổ chức, vùng, đơn vị hành chính, phòng ban (dữ liệu) | Menu KN, mục menu phòng ban, thu thập HTX cho KN | `pf/party`: registry menu theo ứng dụng |
-| `cap/forms` (engine kỳ, nộp, rà soát) | Hồ sơ `kn`, `kn_cnts`, `kn_khtc` (đã ở gốc lắp ráp) | `formsport.Profile` mang vai, bỏ `authz.KN*` trong `pf/forms` |
-| `cap/masterdata` (engine danh mục, tham số có phiên bản) | Định nghĩa danh mục và tham số CNTS | Registry danh mục (manifest/seed) |
-| `cap/notify` (kênh, gửi, RB-7) | Loại thông báo Báo giá, kỳ báo cáo, lịch công tác | Registry loại thông báo: sự kiện → mẫu → người nhận |
-| `cap/reports` (engine mẫu, xuất bản) | Nguồn `extensionsrc` | Registry nguồn báo cáo |
-| `authz` (Principal, vai realm) | `KNContext`, `RequireKN`, vai ngữ cảnh | Khái niệm chung "ngữ cảnh ứng dụng" |
-| `cooperative`, `cropcycle`, `mechanization` (dữ liệu HTX, D2) | Route `/v1/kn/*` đang ở các module này | Port đọc/ghi HTX có kiểm cấp phép |
-| Vỏ web, xác thực web, lưới biểu mẫu | `src/kn/**`, `src/app/kn/**`, mock KN | Hợp đồng phiên/menu chung ở vỏ; registry mock |
-
-`pf/contact` (`cap/directory`, ADR-0054) và `pf/price` (`cap/price`, ADR-0049) được khai là module **năng lực**, dự kiến dùng chung về sau. Đề xuất: xếp chúng vào KN tới khi có ứng dụng thứ hai dùng (quy tắc ba, R-MOD-09). Xem Q-KNS-05.
+| Nút, cây tổ chức, vùng, đơn vị hành chính, phòng ban (dữ liệu) | Menu KN, mục menu phòng ban, màn thu thập HTX cho KN | `pf/party`: registry menu theo ứng dụng |
+| `cap/forms` | Hồ sơ `kn`, `kn_cnts`, `kn_khtc` (đã ở gốc lắp ráp) | `formsport.Profile` mang vai; bỏ `authz.KN*` trong `pf/forms` |
+| `cap/masterdata` | Danh mục và tham số CNTS | Registry danh mục |
+| `cap/notify` | Loại thông báo Báo giá, kỳ báo cáo, lịch công tác | Registry loại thông báo |
+| `cap/reports` | Nguồn `extensionsrc` | Registry nguồn báo cáo |
+| `authz` (Principal, vai realm) | `KNContext`, `RequireKN`, vai ngữ cảnh | Ngữ cảnh ứng dụng chung |
+| — | **Báo giá** (`pf/price`), **Contact** (`pf/contact`), Nhân sự (`pf/hrm`), nghiệp vụ KN (`pf/extension`) | — |
+| Hệ HTX: `cooperative`, `cropcycle`, `mechanization` (không phải dịch vụ dùng chung) | Route `/v1/kn/*` đang do các module này phục vụ | View `_pub`, data product HTX; điểm nạp của lớp tích hợp |
 
 ### 4. Ranh giới dữ liệu với HTX
 
-- Dữ liệu canh tác HTX do (MKG, HTX) đồng sở hữu. Nó ở tenant lưu ký, trong schema của `pf/cooperative`, `pf/cropcycle`, `pf/mechanization` (D2, ADR-0052).
-- KN là **bên thứ ba**. KN đọc dữ liệu HTX theo hai đường:
-  1. **View `_pub`** của module HTX cho số tổng hợp. Thêm `pf/kn` vào `dbadmin.PubReaders` cho `pf/cooperative`, `pf/cropcycle` khi có view; mỗi mục là thay đổi hợp đồng.
-  2. **Port của module HTX**, dưới cấp phép `share_grant` `intra_platform`, `purpose_code = khuyen-nong`, `basis_ref` = thỏa thuận HTX. RLS `p_share` (ADR-0030) chặn ở DB.
+- **Chủ dữ liệu.** Dữ liệu canh tác HTX do (MKG, HTX) đồng sở hữu và nằm ở tenant lưu ký (D2, ADR-0052). KN là **bên thứ ba** và là **hệ khác**.
+- **Đọc số tổng hợp**: view `_pub` có phiên bản của module HTX (`pf_coop_pub`, `pf_cropcycle_pub`, `pf_mechanization_pub`).
+  - Thêm `pf/extension` (và module KN sau này) vào `dbadmin.PubReaders` cho các chủ đó. Mỗi mục là thay đổi hợp đồng, có `consumers` ở `contracts/pubview`.
+  - Số liệu theo xã chịu ngưỡng k của ADR-0031/0035 khi cần.
+- **Đọc dòng chi tiết** (thửa, hộ, hồ sơ HTX cho màn thu thập của KN): **data product** hoặc **feed của lớp tích hợp**.
+  - Lọc theo cấp phép `share_grant` (`purpose_code = khuyen-nong`, `basis_ref` = thỏa thuận HTX `htx_anchor.agreement_ref`).
+  - Ở cùng cụm, data product là view `_pub` theo cấp phép: RLS `p_share` (ADR-0030) chạy dưới vai bên đọc. Khác cụm thì đi qua cổng như MKG.
+  - Không gọi port `cooperative` trong tiến trình.
+- **Ghi thay** (KN nhập hộ, thửa, đếm máy cho HTX theo thỏa thuận, ADR-0052 §7):
+  - đi qua **lớp tích hợp**: nạp theo lô hoặc lệnh có idempotency tới hệ HTX, như đối tác (ADR-0033);
+  - có kiểm cấp phép có quyền ghi, nhãn nguồn `kn` trên dòng sổ.
 
-  Vai module KN không bao giờ có quyền trên schema nội bộ HTX. Cổng `TestNoCrossModuleSchemaPrivileges_W91` và kiểm thử KNSPLIT-0 giữ điều này.
-- **Ghi thay** (KN nhập hộ, thửa, máy cho HTX theo thỏa thuận, ADR-0052 §7):
-  - đi qua port ghi của module HTX;
-  - kiểm cấp phép có quyền ghi (mới; `p_share` hiện chỉ SELECT);
-  - dòng sổ ghi `source`/`created_by_kind = kn`.
+  Q-KNS-04 (KN còn ghi thay không) vẫn mở.
+- **Hôm nay (baseline):**
+  - `pf/extension` gọi `coopport.Plots`, `Cooperatives`, `HTXConfirmations` trong tiến trình (quy tắc `kn-import-htx`, 4 tệp);
+  - route `/v1/kn/{cooperatives,households,plots,machine-counts}` do `party`, `cooperative`, `mechanization` phục vụ, đọc và ghi bảng HTX trực tiếp dưới ngữ cảnh người dùng KN.
 
-  Nếu PO bỏ ghi thay (Q-KNS-04), port ghi chỉ còn cho HTX tạm do KN lập.
-- **Kiểm thử âm** (`migrations/kn_split_boundary_integration_test.go`) chạy ngay hôm nay:
-  - vai KN không đọc và không ghi bảng hay sổ HTX: PASS;
+  Tất cả là ghép nối phải gỡ ở KNSPLIT-2 (đổi nguồn đọc) và KNSPLIT-4 (tenant, cấp phép, ghi qua lớp tích hợp).
+- **Kiểm thử âm** (`migrations/kn_split_boundary_integration_test.go`):
+  - vai KN không đọc, không ghi bảng hay sổ HTX: PASS;
   - người dùng KN ở tenant riêng chỉ thấy phạm vi cấp phép, không ghi được, mất quyền khi thu hồi hoặc hết hạn: PASS;
   - người dùng KN ở tenant lưu ký: 5 ca **XFAIL** có lý do. Ca nào hết vi phạm thì báo XPASS và buộc đổi thành khẳng định cứng.
 
 ### 5. Tenant và di chuyển cấp phép (KNSPLIT-4)
 
-1. **Tạo tenant KN** (một tenant cho hệ KN, hoặc một tenant mỗi Trung tâm KN tỉnh: Q-KNS-03). Nút KN (TW, tỉnh, tổ xã, phòng ban) chuyển sang tenant KN bằng sự kiện `org_event` (dời Nút), không ghi lại sổ HTX.
-2. **Cấp phép hàng loạt** từ tenant lưu ký sang tenant KN: mỗi neo HTX (hoặc mỗi Nút tỉnh), `basis_ref = htx_anchor.agreement_ref`, mục đích `khuyen-nong`, các khóa `shares` cần (`pf_coop.household`, `pf_coop.plot`, `pf_coop.season`, `pf_coop.diary_entry`, `pf_mechanization.machine`). Dùng luồng hàng loạt W4.1 có duyệt bốn mắt. Chạy thử trước, báo cáo số dòng thấy được trước và sau theo từng cán bộ.
-3. **Chuyển tài khoản KN**: gán vai sang Nút ở tenant KN (`pf/accounts`, sổ gán vai), giữ `sub` Keycloak. Có giai đoạn song song: cờ theo tỉnh, tài khoản được chọn tenant lưu ký hoặc KN, đối chiếu kết quả.
-4. **Dữ liệu riêng của KN** (`pf_extension`, `pf_price`, `pf_hrm`, `pf_contact`) đang ở tenant lưu ký. Chọn một trong hai:
-   - giữ `tenant_id` cũ và khai tenant lưu ký là chủ của dữ liệu KN cũ;
-   - ghi bù qua sổ (sự kiện "chuyển chủ", không UPDATE lịch sử, RB-1).
-
-   Đề xuất: giữ, như D2 đã làm với HTX (Q-KNS-03).
-5. **Đóng:** đổi 5 ca XFAIL của kiểm thử KNSPLIT-0 thành khẳng định cứng. Bỏ nhánh "KN ở tenant lưu ký" trong tài liệu D2.
+1. **Tạo tenant KN** (Q-KNS-03: một cho cả hệ hay mỗi Trung tâm tỉnh). Dời Nút KN sang tenant KN bằng `org_event`, không ghi lại sổ HTX.
+2. **Cấp phép hàng loạt** tenant lưu ký → tenant KN, mỗi neo HTX hoặc Nút tỉnh:
+   - `basis_ref = agreement_ref`, mục đích `khuyen-nong`;
+   - khóa `shares` cần: `pf_coop.household`, `pf_coop.plot`, `pf_coop.season`, `pf_coop.diary_entry`, `pf_mechanization.machine`;
+   - dùng luồng hàng loạt W4.1 có duyệt bốn mắt;
+   - chạy thử, báo cáo số dòng thấy được trước và sau theo từng cán bộ.
+3. **Chuyển tài khoản KN** sang Nút ở tenant KN, giữ `sub` Keycloak. Có giai đoạn song song, cờ theo tỉnh, đối chiếu kết quả.
+4. **Dữ liệu riêng KN** đang ở tenant lưu ký: đề xuất giữ `tenant_id` như D2 (Q-KNS-03).
+5. **Đóng:** đổi 5 ca XFAIL thành khẳng định cứng.
 
 ### 6. Realm, client, frontend, binary, cụm
 
-| Mục | Giai đoạn logic (trước G1) | Giai đoạn vật lý (sau G1, nếu cần) |
+| Mục | Đích (logic) | Tùy chọn sau G1 (mục 7) |
 |---|---|---|
-| Realm người dùng | `agrigreen` chung | Realm `agrigreen-kn` nếu hồ sơ đòi tách lớp định danh. Không thì khai `agrigreen` là "kết nối" giữa các hệ (ADR-22) |
+| Realm người dùng | `agrigreen` chung; khai là dịch vụ định danh dùng chung | Realm `agrigreen-kn` |
 | Realm quản trị | `agrigreen-kn-admin` (D25, đã có) | Giữ |
-| Client | Thêm `agrigreen-web-kn` (public, PKCE, chỉ vai KN qua client scope); giữ `agrigreen-field-app` | Chuyển sang realm KN |
-| Frontend | `apps/web-kn` tách từ `apps/web-ops` (KNSPLIT-3); vỏ dùng chung thành gói hoặc sao chép có chủ | — |
-| Binary | `api-platform`, `worker` chung; KN lắp ráp ở `cmd/api-platform/assembly` | `cmd/api-kn`, `cmd/worker-kn` với vai đăng nhập `app_kn` (ADR-0028) |
-| Cụm DB | `pg-pf` chung; schema KN giữ tên | Có thể `pg-kn`: KN đọc HTX qua cổng tích hợp như MKG (ADR-0033), không đọc tại chỗ. Tốn kém, chỉ làm khi hồ sơ đòi không kết nối DB |
-| K8s | Namespace và chart chung | Namespace `agrigreen-kn`, NetworkPolicy riêng (ADR-0008 bảng luồng) |
+| Client | Thêm `agrigreen-web-kn` (public, PKCE, chỉ vai KN qua client scope); giữ `agrigreen-field-app` | Chuyển realm |
+| Frontend | `apps/web-kn` tách từ `apps/web-ops` | — |
+| Binary | `api-platform`, `worker` chung | `cmd/api-kn`, `cmd/worker-kn`, vai `app_kn` (ADR-0028) |
+| Cụm DB | `pg-pf` chung | `pg-kn`; KN đọc HTX qua cổng như MKG |
+| K8s | Namespace và chart chung | Namespace `agrigreen-kn`, NetworkPolicy riêng |
 
-### 7. Khi nào làm giai đoạn vật lý (gắn hồ sơ NĐ 331)
+### 7. Khi nào làm tách vật lý (tùy chọn, sau G1)
 
-Giai đoạn vật lý chỉ làm khi **ít nhất một** điều sau đúng. Mỗi điều do pháp chế hoặc đơn vị chuyên trách ANM xác nhận bằng văn bản:
+NĐ 331 **không** đòi ranh giới vật lý cho KN (trả lời PO Q-KNS-02, 14/10/2026). Vì vậy tách vật lý **không** gắn hồ sơ cấp độ.
 
-1. KN được khai là **hệ thống thông tin riêng** trong hồ sơ cấp độ (không phải một phần của "Nền tảng").
-2. Hồ sơ của hệ KN đòi **không kết nối DB** với hệ khác. Ví dụ đúng cách hiểu ADR-22 cho MKG: chỉ nói chuyện qua cổng. Khi đó cần cụm `pg-kn` và cổng tích hợp.
-3. Hồ sơ đòi **tài khoản quản trị riêng từng hệ** ở lớp ứng dụng: binary và vai đăng nhập DB riêng. Riêng ở lớp định danh thì D25 đã đáp ứng bằng `agrigreen-kn-admin`.
-4. Cấp độ của hệ KN **khác** cấp độ Nền tảng (ví dụ KN cấp 2, Nền tảng cấp 3). Biện pháp kỹ thuật khi đó không áp chung được.
-5. Bên vận hành KN (Trung tâm KN) **khác** bên vận hành Nền tảng, và hợp đồng đòi tách hạ tầng.
+KNSPLIT-5+ chỉ mở khi vận hành có nhu cầu đo được, ví dụ:
+- KN cần nhịp phát hành hoặc cửa sổ bảo trì riêng mà binary chung cản trở;
+- tải hoặc sự cố của KN ảnh hưởng hệ khác (hoặc ngược lại) vượt SLO đã chốt;
+- bên vận hành KN tách khỏi bên vận hành nền tảng theo hợp đồng.
 
-Nếu không điều nào đúng, giai đoạn logic là trạng thái cuối. Hồ sơ khai KN là phân hệ của Nền tảng, có ranh giới module được kiểm bằng máy. Bằng chứng: báo cáo `knboundary`, cổng W9.1, kiểm thử KNSPLIT-0. W10.16 đưa các báo cáo này vào gói bằng chứng hồ sơ.
+Mỗi lần mở cần quyết định của PO kèm số đo. Giai đoạn logic là trạng thái đích. Báo cáo `knboundary`, cổng W9.1 và kiểm thử KNSPLIT-0 là bằng chứng ranh giới cho hồ sơ (W10.16).
 
 ### 8. Gói việc theo thứ tự
 
 | Gói | Việc | Phụ thuộc | Xong khi |
 |---|---|---|---|
-| **KNSPLIT-0** | Kiểm kê, cổng `knboundary` (baseline 376 mục, chỉ co lại), ADR này, kiểm thử âm quyền dữ liệu | — | Gói này |
-| **KNSPLIT-1** | Chuyển `internal/platform/{extension,price,hrm,contact}` → `internal/kn/*` (đổi đường dẫn, giữ tên module/vai/schema); `tests/kn77` → KN; sửa `kn_modules` và baseline cùng PR | Sau WH-A (menu, mock web, OpenAPI theo gói) để tránh xung đột | `knboundary` xanh với đường dẫn mới; `modgen -check`, `archlint` xanh |
-| **KNSPLIT-2** | Tách phần KN khỏi module dùng chung (mục 3): `authz.KN*`, phần KN của `accounts`, menu `party`, danh mục CNTS, loại thông báo `notify`, nguồn `reports`; route `/v1/kn/*` sang KN qua port HTX. Có thể chia 2a (`notify`, `reports`, `forms`, `masterdata` — registry) và 2b (`accounts`, `party`, `authz`, route) | KNSPLIT-1 | Mục `import-into-kn`, `kn-symbol-in-shared`, `route-owner`, `sql-into-kn` (trừ mục migration vĩnh viễn) về 0 |
-| **KNSPLIT-3** | `apps/web-kn` + client `agrigreen-web-kn`; vỏ chung không import KN; `packages/agrigreen_kn_mobile` | KNSPLIT-2 (hợp đồng menu/phiên chung) | `web-import-into-kn`, `web-kn-import-app` về 0; `app/KN/app.yaml` trỏ `apps/web-kn` |
-| **KNSPLIT-4** | Tenant KN, dời Nút KN, cấp phép hàng loạt, chuyển tài khoản, port ghi thay có kiểm cấp phép (mục 5) | KNSPLIT-2; H-15 (thỏa thuận HTX mẫu); Q-KNS-03, Q-KNS-04 | 5 ca XFAIL thành khẳng định cứng |
-| **KNSPLIT-5+** | Giai đoạn vật lý (mục 6, 7): `cmd/api-kn`, `cmd/worker-kn`, `app_kn`; realm, cụm nếu cần | Sau G1; chỉ khi mục 7 đúng | Hồ sơ NĐ 331 của hệ KN được duyệt |
+| **KNSPLIT-0** | Kiểm kê, cổng `knboundary` (9 quy tắc gồm `kn-import-htx`, baseline chỉ co lại), ADR này, kiểm thử âm quyền dữ liệu | — | Gói này |
+| **KNSPLIT-1** | Chuyển `internal/platform/{extension,price,hrm,contact}` → `internal/kn/*` (giữ tên module/vai/schema); `tests/kn77` → KN; sửa `kn_modules` và baseline cùng PR | Sau WH-A | `knboundary`, `modgen -check`, `archlint` xanh |
+| **KNSPLIT-2** | Tách phần KN khỏi module dùng chung (mục 3). **Thay đọc trong tiến trình `coopport.*` của `pf/extension` bằng đọc qua nền tảng dữ liệu** (view `_pub` HTX + `PubReaders`; data product có cấp phép cho dòng chi tiết). Chuyển route `/v1/kn/*` sang KN, đọc qua nền tảng dữ liệu. Chia 2a (`notify`, `reports`, `forms`, `masterdata` registry; view/data product HTX) và 2b (`accounts`, `party`, `authz`, route) | KNSPLIT-1 | `import-into-kn`, `kn-import-htx`, `kn-symbol-in-shared`, `route-owner`, `sql-into-kn` (trừ mục migration vĩnh viễn) về 0 |
+| **KNSPLIT-3** | `apps/web-kn` + client `agrigreen-web-kn`; vỏ chung không import KN; `packages/agrigreen_kn_mobile` | KNSPLIT-2 | `web-import-into-kn`, `web-kn-import-app` về 0 |
+| **KNSPLIT-4** | Tenant KN, cấp phép hàng loạt, chuyển tài khoản (mục 5). **Ghi thay dữ liệu HTX qua lớp tích hợp** thay cho route KN ghi trực tiếp bảng HTX (nếu Q-KNS-04 giữ ghi thay). Data product dòng chi tiết chạy dưới tenant KN và `p_share` | KNSPLIT-2; H-15; Q-KNS-03, Q-KNS-04 | 5 ca XFAIL thành khẳng định cứng |
+| **KNSPLIT-5+** (tùy chọn) | Tách vật lý (mục 6) | Sau G1; chỉ khi mục 7 đúng và PO quyết | — |
 
 ## Câu hỏi cho chủ sản phẩm
 
-| # | Câu hỏi | Vì sao cần | Đề xuất của nhóm |
-|---|---|---|---|
-| **Q-KNS-01** | "Tách riêng" nghĩa là gì: (a) độc lập **logic** (mã, ranh giới, giao diện, dữ liệu qua cấp phép), (b) độc lập **vận hành** (triển khai, nâng cấp, sự cố của KN không ảnh hưởng hệ khác và ngược lại), hay (c) **hệ thống thông tin riêng** theo NĐ 331? | Từ (a) sang (c), chi phí tăng mỗi bậc khoảng một cấp số | (a) trước G1; (b) và (c) chỉ khi mục 7 đúng |
-| **Q-KNS-02** | Hồ sơ NĐ 331 có đòi **ranh giới vật lý** cho KN không (DB, realm, binary, mạng riêng)? Ai xác nhận và khi nào? Gắn với QĐ-1/Q-001 và QĐ-3/Q-002 | Quyết định có KNSPLIT-5 hay không | Hỏi pháp chế cùng Q-002 (hạn 24/10/2026) |
-| **Q-KNS-03** | Tenant KN: một cho cả hệ KN, hay một mỗi Trung tâm KN tỉnh? Dữ liệu KN cũ (`pf_extension`…) giữ ở tenant lưu ký hay chuyển chủ bằng sổ? | Số cấp phép hàng loạt, cách báo cáo liên tỉnh, công di chuyển | Một tenant cho hệ KN; Nút tỉnh là phạm vi; dữ liệu cũ giữ `tenant_id` |
-| **Q-KNS-04** | Sau tách, KN còn **ghi thay** dữ liệu HTX (vẽ thửa, hộ, đếm máy) không, hay chỉ ghi cho HTX tạm do KN lập? | Quyết định port ghi có kiểm cấp phép (mới) | Ghi thay theo thỏa thuận, qua port ghi, có nhãn nguồn `kn` |
-| **Q-KNS-05** | `pf/contact` (danh bạ) và `pf/price` (Báo giá) là của KN hay năng lực dùng chung (ADR-0054, ADR-0049)? | Chúng nằm ở KN hay nền tảng sau tách | Xếp vào KN tới khi có ứng dụng thứ hai dùng |
-| **Q-KNS-06** | Thu thập MRV ở `apps/field-app` (vai `mrv_*` trong `app/KN/app.yaml`) thuộc KN hay HTX/MKG? | MRV là dữ liệu thương mại có chữ ký số (ADR-24) | Hỏi cùng ADR-24 |
+| # | Câu hỏi | Trạng thái |
+|---|---|---|
+| Q-KNS-01 | "Tách riêng" là logic, vận hành hay hệ thống thông tin riêng? | **Đã trả lời 14/10/2026:** "KN là hệ thống độc lập, trao đổi dữ liệu với hệ khác chỉ qua nền tảng dữ liệu dùng chung (hợp đồng `_pub`, data product, lớp tích hợp); không gọi trong tiến trình vào module của hệ khác" |
+| Q-KNS-02 | NĐ 331 có đòi ranh giới vật lý? | **Đã trả lời 14/10/2026:** "Không. Đích là độc lập logic; tách vật lý (binary, realm, cụm) là tùy chọn sau G1, chỉ khi vận hành cần" |
+| Q-KNS-03 | Tenant KN: một cho cả hệ hay mỗi Trung tâm tỉnh? Dữ liệu KN cũ giữ `tenant_id` hay chuyển chủ? | Mở. Đề xuất: một tenant, giữ `tenant_id` |
+| Q-KNS-04 | Sau tách, KN còn ghi thay dữ liệu HTX không? | Mở. Đề xuất: có, qua lớp tích hợp, nhãn nguồn `kn` |
+| Q-KNS-05 | `pf/price`, `pf/contact` là của KN hay dùng chung? | **Đã trả lời 14/10/2026:** "Hệ nào có chức năng thì sở hữu bản riêng, không có năng lực dùng chung". Theo BRD: Báo giá là của KN (Phòng TTTT), Contact FN-13 là của KN (HCTH). Cả hai thuộc KN |
+| Q-KNS-06 | Thu thập MRV ở `apps/field-app` thuộc KN hay HTX/MKG? | Mở (hỏi cùng ADR-24) |
 
 ## Phương án đã cân nhắc
 
 | Phương án | Lý do không chọn |
 |---|---|
-| Tách vật lý ngay trước G1 (binary, realm, cụm) | Không kịp 15/12. Phải làm lại cấp phép, chuỗi băm, hợp đồng `_pub`, vận hành hai cụm. Chưa có căn cứ pháp lý đòi (Q-KNS-02) |
-| Chỉ chuyển thư mục, không cổng kiểm | Ghép nối mới quay lại ngay. 40 gói đang chạy song song |
-| Đổi tên schema `pf_extension` → `kn_extension` khi chuyển | Đổi chuỗi băm sổ, `ledger_idem`, cấp quyền, hợp đồng `_pub`, mà không có lợi ích kiểm chứng được |
-| KN đọc HTX qua cổng tích hợp như MKG ngay | Đúng cho cụm riêng (KNSPLIT-5). Trong cùng cụm thì đọc tại chỗ có cấp phép (ADR-0030) rẻ hơn và đã kiểm thử |
-| Coi KN là ứng dụng thuần trên nền tảng, không tách | Không đáp ứng yêu cầu của chủ sản phẩm. Phần KN trong module dùng chung làm nền tảng khó dùng cho ứng dụng khác |
+| Tách vật lý ngay trước G1 | Không kịp. NĐ 331 không đòi (Q-KNS-02) |
+| KN gọi port HTX trong tiến trình dưới cấp phép (đề xuất ban đầu của KNSPLIT-0) | Trái trả lời Q-KNS-01: hệ độc lập chỉ trao đổi qua nền tảng dữ liệu |
+| Báo giá, Contact là năng lực dùng chung (ADR-0049, ADR-0054) | Trái trả lời Q-KNS-05 và BRD: chức năng của phòng ban Trung tâm KN |
+| Chỉ chuyển thư mục, không cổng kiểm | Ghép nối mới quay lại ngay khi 40 gói chạy song song |
+| Đổi tên schema khi chuyển | Đổi chuỗi băm, cấp quyền, hợp đồng `_pub`, không có lợi ích kiểm chứng được |
 
 ## Hệ quả
 
-- **Cổng mới.** `go run ./tools/knboundary` chạy trong `make gates` và CI. CI chạy với `-base origin/<nhánh đích>` để baseline chỉ co lại.
-  - Mọi gói (không chỉ KNSPLIT) thêm phần riêng KN vào module dùng chung, hoặc thêm import KN vào nền tảng hay vỏ web, sẽ hỏng cổng.
-  - Cách sửa là đăng ký qua port/registry, không thêm vào baseline.
-- **Kiểm thử XFAIL.** Kiểm thử dữ liệu KNSPLIT-0 giữ 5 ca XFAIL tới KNSPLIT-4. Hết vi phạm thì ca báo XPASS và hỏng, để buộc cập nhật.
-- **Tên giữ nguyên ở giai đoạn logic:** module, vai DB, schema, route.
-- **Hồ sơ NĐ 331.** Báo cáo của cổng và kiểm thử là bằng chứng ranh giới cho W10.16.
+- **Cổng mới.** `go run ./tools/knboundary` chạy trong `make gates` và CI (`-base` để baseline chỉ co lại).
+  - Gói nào thêm import port HTX vào KN, phần riêng KN vào module dùng chung, hay import KN vào nền tảng hoặc vỏ web sẽ hỏng cổng.
+- **KNSPLIT-2 cần data product HTX.** Cần view `_pub` hoặc data product HTX mới, kèm hợp đồng có phiên bản và `consumers`. Việc này nằm trong phạm vi hồ sơ của hệ HTX.
+- **ADR-0049 và ADR-0054 bị thay thế một phần.**
+  - `pf/price` và `pf/contact` không còn là năng lực dùng chung.
+  - Mã, hợp đồng và quyết định dữ liệu bên trong mỗi module giữ nguyên.
+- **Kiểm thử XFAIL.** Kiểm thử dữ liệu giữ 5 ca XFAIL tới KNSPLIT-4.
 
 ## Hiện thực
 
 | Gói | Việc | Migration |
 |---|---|---|
-| KNSPLIT-0 (14/10/2026) | Kiểm kê [docs/kn/tach-he-thong/kiem-ke.md](../kn/tach-he-thong/kiem-ke.md); `tools/knboundary` (8 quy tắc, baseline 376 mục, `-list`/`-prune`/`-base`, kiểm thử trên repo mẫu và repo thật); `make gates`, `make gates-base`, CI; `migrations/kn_split_boundary_integration_test.go` (3 kiểm thử, 5 ca XFAIL) | — |
+| KNSPLIT-0 (14/10/2026) | Kiểm kê; `tools/knboundary` (9 quy tắc, `-list`/`-prune`/`-base`, kiểm thử trên repo mẫu và repo thật); `make gates`, `make gates-base`, CI; `migrations/kn_split_boundary_integration_test.go` (3 kiểm thử, 5 ca XFAIL). Sau trả lời PO 14/10: thêm quy tắc `kn-import-htx`; `pf/price` và `pf/contact` là của KN | — |

@@ -28,6 +28,10 @@ couplings:
   - {rule: import-into-kn, from: internal/platform/reports/handler/forms_integration_test.go, to: internal/platform/extension/port}
   - {rule: import-into-kn, from: internal/platform/reports/handler/reports_htx_integration_test.go, to: internal/platform/extension/port}
   - {rule: import-into-kn, from: internal/platform/reports/handler/reports_integration_test.go, to: internal/platform/extension/port}
+  - {rule: kn-import-htx, from: internal/platform/extension/app/service.go, to: internal/platform/cooperative/port}
+  - {rule: kn-import-htx, from: internal/platform/extension/handler/unified_integration_test.go, to: internal/platform/cooperative/port}
+  - {rule: kn-import-htx, from: internal/platform/extension/module.go, to: internal/platform/cooperative/port}
+  - {rule: kn-import-htx, from: internal/platform/extension/port/closedfig.go, to: internal/platform/cooperative/port}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/dormant.go, to: (kiểm kê)}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/internal_unit.go, to: (kiểm kê)}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn.go, to: (tệp)}

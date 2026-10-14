@@ -23,6 +23,7 @@ import (
 const (
 	RuleImportIntoKN     = "import-into-kn"
 	RuleKNImportInternal = "kn-import-internal"
+	RuleKNImportHTX      = "kn-import-htx"
 	RuleKNSQLForeign     = "kn-sql-foreign"
 	RuleSQLIntoKN        = "sql-into-kn"
 	RuleKNSymbolInShared = "kn-symbol-in-shared"
@@ -291,6 +292,10 @@ func (c *checker) goFile(p string) error {
 			c.add(RuleImportIntoKN, file, target)
 		case fromKN && !toKN && !allowedFromKN(target):
 			c.add(RuleKNImportInternal, file, target)
+		case fromKN && !toKN && under(target, c.cfg.HTXModules):
+			// PO 14/10/2026 (ADR-0055 §1): KN là hệ độc lập — không gọi trong tiến trình module của hệ khác, kể cả
+			// port/; dữ liệu HTX chỉ qua view _pub, data product, lớp tích hợp của nền tảng dữ liệu.
+			c.add(RuleKNImportHTX, file, target)
 		}
 	}
 	// Chuỗi (không chú thích) — nơi SQL sống.

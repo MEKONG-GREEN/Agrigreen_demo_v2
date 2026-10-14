@@ -2,6 +2,8 @@
 
 **Trạng thái:** Đề xuất — khung hiện thực ở W11.71 (10/10/2026); phạm vi G1 theo QĐ-5 mặc định (a), chờ chủ sản phẩm (Q-044) · **Ngày:** 10/10/2026 (gói W11.71) · **Yêu cầu:** kiến trúc v4.1 §26 (`cap/price`), §5.1 (ma trận KN ●, HTX ○, MKG ●, NH ●), R-CODE-01, R-MOD-04, R-MOD-09, R-DB-10, Phụ lục A (G1 cần `cap/price` tối thiểu) · **Nguồn:** BRD Báo giá nông sản v1.3 (07/10/2026), đối chiếu v4.3/MKG v1.4/BRD KN Phụ lục D mục 2.3, BG1 · **Thành phần:** `internal/platform/price`, `cmd/api-platform/assembly/price.go`, `migrations/pf/000138_pf_price.up.sql`, `tools/archlint/nofloat.go` · **Liên quan:** [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0031](0031-vai-tong-hop-r-agg.md), [ADR-0033](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md), [ADR-0035](0035-cap-phep-tong-hop-theo-xa-nguong-k.md)
 
+> **Bị thay thế một phần bởi [ADR-0055](0055-tach-he-thong-khuyen-nong.md)** (trả lời PO Q-KNS-05, 14/10/2026): Báo giá không còn là năng lực dùng chung `cap/price`. Theo BRD "Hệ thống Khuyến nông — Module: Báo giá nông sản (Phòng Thông tin Tuyên truyền)" v1.3, đây là chức năng của KN (Phòng TTTT), nên `pf/price` thuộc hệ KN. Hệ khác cần báo giá thì dựng bản riêng; muốn dùng dữ liệu báo giá KN thì đọc qua `pf_price_pub`. Phần còn lại của ADR này (mô hình dữ liệu, hồ sơ, lịch) giữ nguyên.
+
 ## Bối cảnh
 
 - v4.1 §26 định nghĩa `cap/price`: sở hữu chuỗi giá có hiệu lực và ngưỡng; port `Series`, `Publish`; sự kiện `price.published`; điểm mở rộng "Nguồn giá"; công bố là quyền riêng. ADR-0027 bảng mục 2 ghi "Chưa có module".

@@ -4,8 +4,11 @@
 # Quy tắc ĐÍCH (sau KNSPLIT-1…4) mà công cụ mã hóa; mỗi ghép nối đang có ghi ở baseline.yaml (chỉ được co lại):
 #   import-into-kn      package Go ngoài KN (trừ gốc lắp ráp, tests/) không import package KN — kể cả port/ của KN
 #                       (nền tảng không biết KN; KN đăng ký vào nền tảng qua port/registry do nền tảng định nghĩa).
-#   kn-import-internal  package KN chỉ import port/ (hoặc client/ của vault) của module nền tảng/HTX, không import
+#   kn-import-internal  package KN chỉ import port/ (hoặc client/ của vault) của module nền tảng dùng chung, không import
 #                       store/app/domain/handler; không import internal/mkg.
+#   kn-import-htx       package KN không import module của hệ khác (HTX: cooperative, cropcycle, mechanization), KỂ CẢ
+#                       port/ — PO 14/10/2026: KN là hệ độc lập, trao đổi dữ liệu chỉ qua nền tảng dữ liệu (view _pub,
+#                       data product, lớp tích hợp); không gọi trong tiến trình (ADR-0055 §1, §4).
 #   kn-sql-foreign      mã/migration KN không nhắc bảng của schema module khác, trừ view công bố *_pub, k_ref, shared
 #                       (KN đọc dữ liệu HTX chỉ qua _pub và cấp phép chia sẻ — CEO D2, ADR-0052).
 #   sql-into-kn         mã/migration ngoài KN không nhắc bảng trong schema của KN, trừ *_pub.
@@ -25,7 +28,7 @@ kn_modules:
   - internal/platform/hrm
   - internal/platform/contact
 
-# Module dữ liệu HTX (bên chủ dữ liệu theo D2) — chỉ dùng cho phân loại trong báo cáo.
+# Module của hệ khác mà KN không được gọi trong tiến trình (quy tắc kn-import-htx): dữ liệu canh tác HTX (D2).
 htx_modules:
   - internal/platform/cooperative
   - internal/platform/cropcycle
