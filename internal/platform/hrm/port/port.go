@@ -136,6 +136,7 @@ type DirectoryEntry struct {
 type Directory interface {
 	StaffDirectory(ctx context.Context) ([]DirectoryEntry, error)
 }
+
 // --- W11.28 (pf 20261014000335): báo cáo Sở NS01–NS06, dashboard nhân sự. ---
 
 // Lỗi báo cáo Sở (docs/errors/pf-hrm-reports.md).
