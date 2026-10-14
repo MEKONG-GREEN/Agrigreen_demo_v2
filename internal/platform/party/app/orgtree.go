@@ -202,6 +202,18 @@ type OrgImportResult struct {
 	Rows                                  []OrgImportRow
 }
 
+// NeoHTXPath là màn tạo HTX tạm theo mã số thuế (D2, ADR-0052).
+const NeoHTXPath = "/quan-tri/neo-htx"
+
+// CoopImportRejectReason: lý do loại dòng HTX mới (mã trống hoặc chưa có) khi nhập cây tổ chức.
+func CoopImportRejectReason(code string) string {
+	head := "HTX mới"
+	if code != "" {
+		head = "Không có HTX mã " + code
+	}
+	return head + " — nhập cây tổ chức không tạo HTX; tạo HTX qua màn Neo HTX theo mã số thuế (" + NeoHTXPath + ", D2) rồi nhập lại để di chuyển/đổi tên"
+}
+
 type orgTreeItem struct {
 	line                         int
 	code, name, unit, parentCode string
@@ -211,7 +223,8 @@ type orgTreeItem struct {
 // ImportOrgTree nhập cây tổ chức: mã chưa có → tạo (CreateOrg); mã đã có → di
 // chuyển nếu cấp trên/đơn vị khác (MoveOrg), đổi tên nếu tên khác (RenameOrg).
 // Dòng được xử lý theo thứ tự cha trước con dù tệp sắp thế nào; kết quả trả
-// theo dòng của tệp. HTX mới: để trống mã (mã do hệ thống sinh, CGH BR-01).
+// theo dòng của tệp. HTX mới bị loại (D2: tạo qua Neo HTX); HTX đã có vẫn di chuyển/đổi tên được.
+// Dòng tạo Nút không phải HTX cần vai orgNodeRoles (quyết định PO ORGUI) — vai KN chỉ di chuyển/đổi tên.
 // Tệp không vô hiệu hóa tổ chức vắng mặt; cột Trạng thái chỉ để xem.
 func (r *Registry) ImportOrgTree(ctx context.Context, in OrgImportInput) (OrgImportResult, error) {
 	p, err := authz.Require(ctx, adminRoles...)
@@ -367,8 +380,9 @@ func (r *Registry) importOrgRow(ctx context.Context, p authz.Principal, sc authz
 	}
 
 	if existing == nil {
-		if it.kind == port.OrgCooperative && it.code != "" {
-			row.Status, row.Reason = OrgRowRejected, "Không có HTX mã "+it.code+" — để trống cột Mã tổ chức để tạo HTX mới (mã do hệ thống sinh)"
+		if it.kind == port.OrgCooperative {
+			// D2 (ADR-0052): HTX mới phải có neo theo MST — tạo qua màn Neo HTX, không qua nhập cây (gói ORGUI).
+			row.Status, row.Reason = OrgRowRejected, CoopImportRejectReason(it.code)
 			return row, nil
 		}
 		out, err := r.CreateOrg(ctx, CreateOrgInput{

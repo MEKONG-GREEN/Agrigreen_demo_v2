@@ -42,6 +42,24 @@ var readerRoles = []string{
 // Vai quản trị dữ liệu chủ trên Admin API.
 var adminRoles = []string{port.RoleRegistryAdmin, port.RoleKNProvinceAdmin, authz.RolePlatformAdmin}
 
+// orgNodeRoles: vai được TẠO Nút hành chính / TTKN (mọi loại trừ HTX). Quyết định PO 14/10/2026 (gói ORGUI,
+// docs/kn/gia-dinh/ORGUI.md): xã là đơn vị hành chính, chỉ Admin nền tảng tạo trên trang "Cơ cấu tổ chức";
+// quản trị KN (kn_province_admin…) không tạo. Di chuyển/đổi tên/vô hiệu hóa Nút vẫn theo adminRoles + phạm vi.
+var orgNodeRoles = []string{port.RoleRegistryAdmin, authz.RolePlatformAdmin}
+
+// requireNodeCreator chặn vai KN tạo Nút không phải HTX (403 forbidden).
+func requireNodeCreator(p authz.Principal, kind port.OrgKind) error {
+	if kind == port.OrgCooperative {
+		return nil
+	}
+	for _, r := range orgNodeRoles {
+		if p.Has(r) {
+			return nil
+		}
+	}
+	return problem.Forbidden.WithDetail("chỉ Admin nền tảng (platform_admin, registry_admin) được tạo Nút hành chính / TTKN")
+}
+
 // Registry là use case sổ tổ chức và HTX (Nút). Nông hộ/xã viên và hồ sơ HTX ở pf/cooperative (W3.3).
 type Registry struct {
 	DB    tenant.Beginner // pool vai party_app

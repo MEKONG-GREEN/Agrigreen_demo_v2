@@ -362,7 +362,11 @@ export interface paths {
         /** G-08: liệt kê cây tổ chức cho quản trị (toàn quốc thấy mọi tổ chức; quản trị tỉnh thấy trong tỉnh) */
         get: operations["partyAdminListOrgs"];
         put?: never;
-        /** Tạo tổ chức trong cây TW → Tỉnh → Xã; kind = cooperative kèm hồ sơ HTX, Mã HTX tự sinh */
+        /**
+         * Tạo tổ chức trong cây TW → Tỉnh → Xã; kind = cooperative kèm hồ sơ HTX, Mã HTX tự sinh
+         * @description Nút không phải HTX (hành chính / TTKN, kể cả xã) chỉ platform_admin hoặc registry_admin tạo (quyết định PO 14/10/2026,
+         *     gói ORGUI); kn_province_admin chỉ tạo được HTX trong phạm vi → 403 forbidden với loại khác.
+         */
         post: operations["partyCreateOrg"];
         delete?: never;
         options?: never;
@@ -404,7 +408,9 @@ export interface paths {
          * Nhập cây tổ chức từ Excel .xlsx hoặc CSV UTF-8 (KN US-ADM-08), tối đa 500 dòng; kết quả theo từng dòng
          * @description Cùng cột với tệp xuất (tiêu đề có/không dấu; bắt buộc Mã tổ chức, Loại, Tên). Mã chưa có → tạo (CreateOrg);
          *     mã đã có → di chuyển nếu cấp trên/đơn vị khác (MoveOrg, ghi sổ với lý do `reason`), đổi tên nếu tên khác (RenameOrg).
-         *     Dòng được xử lý cha trước con bất kể thứ tự trong tệp. HTX mới: để trống Mã tổ chức (Mã HTX do hệ thống sinh, CGH BR-01).
+         *     Dòng được xử lý cha trước con bất kể thứ tự trong tệp. Dòng HTX mới (mã trống hoặc chưa có) bị loại theo dòng:
+         *     HTX tạo qua Neo HTX theo MST (D2, ADR-0052). Tạo Nút không phải HTX chỉ platform_admin/registry_admin (gói ORGUI);
+         *     vai KN chỉ di chuyển/đổi tên.
          *     Tệp không vô hiệu hóa tổ chức vắng mặt; cột Trạng thái chỉ để xem. Ô công thức, tệp .xls cũ, thiếu cột bắt buộc →
          *     từ chối cả tệp (party.import_invalid). Idem_key từng thao tác = Idempotency-Key + ":org:" + số dòng.
          */

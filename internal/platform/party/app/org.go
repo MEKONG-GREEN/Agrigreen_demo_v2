@@ -202,6 +202,9 @@ func (r *Registry) CreateOrg(ctx context.Context, in CreateOrgInput) (OrgResult,
 	if err != nil {
 		return OrgResult{}, err
 	}
+	if err := requireNodeCreator(p, in.Kind); err != nil {
+		return OrgResult{}, err
+	}
 	return r.createOrg(ctx, p, in, func(unit string) error { return r.requireWriteScope(ctx, p, unit) })
 }
 
