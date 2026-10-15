@@ -1,7 +1,7 @@
 package port
 
 // Thông báo cảnh báo và nhắc nộp biểu của phòng Chăn nuôi – Thủy sản (W11.43 — pf/extension → pf/notify, pf
-// 20261014062348).
+// 20261015074556).
 const (
 	// KindCNTSAlert: cảnh báo mới (Khẩn / Cần chú ý) → người nhận theo bảng Mục III.5 BRD CNTS.
 	KindCNTSAlert = "cnts_alert"
