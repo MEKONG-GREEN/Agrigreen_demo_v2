@@ -1,4 +1,4 @@
-// Package store: SQL của bảng số liệu phiếu KHTC (pf 20261014031021 — pf_extension.khtc_form_sheet) trên pool vai của
+// Package store: SQL của bảng số liệu phiếu KHTC (pf 20261015070628 — pf_extension.khtc_form_sheet) trên pool vai của
 // pf/extension, luôn trong giao dịch có ngữ cảnh tenant (RLS). Sổ chỉ ghi thêm (shared.apply_ledger).
 package store
 
