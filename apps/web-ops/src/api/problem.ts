@@ -115,6 +115,12 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "extension.khtc_entry_in_use": "Dòng đã có số liệu — chỉ được ngừng theo dõi, không xóa.",
   "extension.khtc_refresh_not_owner": "Chỉ cán bộ KHTC phụ trách kỳ được “Cập nhật số liệu”.",
   "extension.khtc_import_invalid": "Tệp Excel kế hoạch năm không đọc được.",
+  // W11.63: phiếu Báo cáo cho KHTC.
+  "extension.khtc_form_not_found": "Không tìm thấy phiếu của phòng trong kỳ này, hoặc kỳ đã bị hủy.",
+  "extension.khtc_form_locked": "Phiếu đang bị khóa hoặc đã gửi. Chỉ sửa khi KHTC yêu cầu bổ sung và kỳ còn mở.",
+  "extension.khtc_form_invalid": "Phiếu còn lỗi chặn gửi. Kiểm tra các ô, mục lời văn và dòng điều chỉnh được đánh dấu.",
+  "extension.khtc_form_not_reviewable": "Trạng thái phiếu không cho phép rà soát, kỳ đã đóng hoặc đã hết số lần gửi bổ sung.",
+  "extension.khtc_form_template_outdated": "Kỳ này dùng mẫu phiếu cũ. Liên hệ cán bộ KHTC để hủy và mở lại kỳ với mẫu mới.",
   // W11.49 Báo cáo dịch bệnh BM-10, báo nghi dịch
   "extension.cnts_outbreak_not_found": "Không có ổ dịch này (hoặc ngoài xã được phân công).",
   "extension.cnts_outbreak_invalid": "Báo cáo dịch bệnh chưa hợp lệ — xem lỗi từng trường.",
