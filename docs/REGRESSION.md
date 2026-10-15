@@ -150,3 +150,5 @@ Kết quả mã W11.46 cuối trước tích hợp:
 - `static-last` build0; vet1 vì Playwright dọn thư mục test-results đúng lúc Go đang duyệt đường dẫn (lỗi filesystem tạm), không dùng lượt này làm verdict xanh. Chạy lại vet và các cổng còn lại sau khi trình duyệt kết thúc; mã thoát cuối ghi bổ sung sau.
 
 Cổng tĩnh sau khi trình duyệt kết thúc: vet, modgen-check, migratecheck-base, archlint, contractcheck, docscheck, mfaflagcheck và golangci-lint đều mã thoát0, lint0issues. Build cuối trước đó mã0. Đủ cổng trước tích hợp; helper sẽ chạy lại build/vet/migrationcheck/archlint và các ca lịch/menu cùng migration gates trên commit cuối.
+
+Tích hợp W11.46: helper rebase-merge.ps1 hoàn tất mã thoát0, remote dev449faf44. Lượt tích hợp chạy lại full cntscal/handler + full party/handler PASS, cổng migration PASS162,007giây, không SKIP. Worktree/nhánh giữ nguyên; main không đổi.
