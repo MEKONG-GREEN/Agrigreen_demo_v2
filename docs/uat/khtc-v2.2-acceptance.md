@@ -170,3 +170,19 @@ Kiểm thử tích hợp KHTC (khi có) đặt tên `TestKH_…` và đọc bộ
   - Cờ HTX "Chưa xác nhận" chưa có trong `_pub`.
 - **Hạn nộp tuần.** BRD Mục II.4 đặt 10:00 Thứ Tư; W11.03 mặc định 12:00 (M7).
 - **Kỳ trước 04/11/2026.** Tuần KHTC dùng quy tắc v2 từ 04/11/2026. Đợt Trồng trọt cũ (v1) có tuần ISO; quy đổi vẫn đúng theo ngày cuối (G05B). Phải có khóa kỳ đã lưu (W11.05b/W11.10: kỳ phát hành trước pf 000143 không có `period_key`).
+
+### Kiểm tra tiếp nhận W11.63 ngày 15/10/2026
+
+Các ca `TestKH_FN_PN_03_01_TaskVisibleInEachDepartment`,
+`TestKH_FN_PN_03_02_ModuleSourcedCellsReadOnly`,
+`TestKH_FN_PN_03_02_ResubmitOnlyOnRequest`,
+`TestKH_FN_TI_02_04_ReviewRulesAndRequest`,
+`TestKH_FN_PN_03_02_PriorPeriodAdjustment` và
+`TestKH_FN_PN_03_02_OrphanSealedSheetIgnored` đã PASS trên PostgreSQL thật.
+Toàn bộ suite KN, cap/forms, kỳ/kế hoạch KHTC, assembly và cổng migration PASS,
+không có SKIP. Frontend đạt typecheck, 509 test (57 tệp, chạy 1 worker,
+giữ timeout mặc định) và build mock. Lượt chạy nhiều worker có một ca CNTS
+cũ timeout; ca đó PASS khi chạy riêng và trong toàn suite tuần tự.
+
+Phạm vi nghiệm thu vẫn là G1 rút gọn đã ghi trong bảng; không nâng các mục
+Admin sửa mẫu, nhập Excel hay so sánh lần gửi thành đã hoàn thành.
