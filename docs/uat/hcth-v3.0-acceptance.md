@@ -10,7 +10,7 @@ Nguồn giả định: [W11.28](../kn/gia-dinh/W11.28.md).
 | NS01 theo ngày chốt, NS02 phản ánh nghỉ việc trong tháng; thứ tự chức vụ/đơn vị và nhãn kỳ | `TestHRMReportsHTTP_W1128`, `TestBuildNS01OrderAndChecks`, `TestPeriodLabel` | Đạt |
 | NS05/NS06 tổng hợp và nhấn ô xem người theo phạm vi; thiếu ngày sinh chặn, dữ liệu chưa phân loại cảnh báo | `TestBuildNS05NS06Rules`, `TestHRMReportsHTTP_W1128` | Đạt |
 | Xuất Excel NS01: đọc lại nội dung tệp, người lập/ký, kỳ báo cáo; tải lại đối chiếu SHA-256 và báo drift | `TestHRMReportsHTTP_W1128` | Đạt |
-| Lịch sử xuất/tải và nhật ký trường nhạy cảm; đọc PII theo lô qua vault | `TestHRMReportsHTTP_W1128`, `TestReadBatch_W1128` | Đạt |
+| Lịch sử xuất/tải và nhật ký trường nhạy cảm; đọc PII theo lô qua vault | `TestHRMReportsHTTP_W1128`, `TestReadBatch_W1128`, `TestBatchReadHTTP_W1128` | Đạt |
 | Dashboard khớp NS01 cùng ngày, lãnh đạo phòng chỉ thấy phòng mình; khi thiếu quyền vault vẫn có số tổng hợp | `TestHRMReportsHTTP_W1128`; Vitest `src/kn/hrm/reports.test.tsx` | Đạt |
 | Dashboard dưới 5 giây với 1.000 hồ sơ | `TestHRMDashboardBenchmark_W1128` (PostgreSQL thật, vault giả trong bộ nhớ) | Đạt |
 | Menu mở dashboard/báo cáo HCTH và giữ các mục CNTS đã tích hợp | `TestWebMenuFixture`, `TestW1106_MenuV3DepartmentTemplates`; Vitest `src/api/mock/kn-menu.contract.test.ts` | Đạt |
@@ -25,3 +25,4 @@ Kiểm tra tiếp nhận Codex ngày 15/10/2026: các ca trong bảng đã PASS;
 507 test web / 56 tệp, TypeScript và build mock đạt.
 Dashboard 1.000 hồ sơ đo 82,76 ms, NS06 đo 91,97 ms (vault giả trong bộ nhớ).
 Golden menu sinh lại bằng `TestWebMenuFixture` giữ nguyên nội dung sau rebase.
+API batch-read đã kiểm qua HTTP client/router thật: tenant khác bị loại, vai chỉ hiển thị bị từ chối, mã tham chiếu sai bị chặn; phản hồi no-store và log không chứa PII.
