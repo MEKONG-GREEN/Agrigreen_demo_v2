@@ -28,6 +28,7 @@ openapi: [contracts/openapi/application.yaml]
 kn_tags: [extension]
 kn_route_prefixes: [/v1/extension/, /v1/kn/]
 kn_shared_route_prefixes: [/v1/menu]
+kn_htx_write_prefixes: [/v1/kn/plots]
 web:
   root: apps/web-ops/src
   alias: "@/"
@@ -94,6 +95,8 @@ paths:
   /v1/kn/plots:
     get:
       tags: [geo]
+    post:
+      tags: [geo]
   /v1/menu:
     get:
       summary: không tag trên bề mặt dùng chung
@@ -135,6 +138,7 @@ var wantFixture = []Coupling{
 	{RuleRouteOwner, "application.yaml /v1/hub/x", "extension"},
 	{RuleRouteOwner, "application.yaml /v1/kn/plots", "geo"},
 	{RuleRouteOwner, "application.yaml /v1/menu", "(không tag)"},
+	{RuleKNWriteHTX, "application.yaml POST /v1/kn/plots", "dữ liệu HTX"},
 	{RuleWebImportIntoKN, "apps/web-ops/src/shell/menu.ts", "app/kn/page"},
 	{RuleWebImportIntoKN, "apps/web-ops/src/shell/menu.ts", "kn/contract"},
 	{RuleWebKNImportApp, "apps/web-ops/src/kn/a.ts", "htx/rules"},

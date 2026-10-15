@@ -9,6 +9,10 @@
 #   kn-import-htx       package KN không import module của hệ khác (HTX: cooperative, cropcycle, mechanization), KỂ CẢ
 #                       port/ — PO 14/10/2026: KN là hệ độc lập, trao đổi dữ liệu chỉ qua nền tảng dữ liệu (view _pub,
 #                       data product, lớp tích hợp); không gọi trong tiến trình (ADR-0055 §1, §4).
+#   kn-write-htx        KN không có đường ghi vào dữ liệu HTX: thao tác ghi trên route KN ghi bảng/sổ HTX
+#                       (kn_htx_write_prefixes) là ghép nối — PO 14/10/2026 (Q-KNS-04): "KN chỉ tạo dữ liệu cho HTX theo
+#                       quy định trong BRD và tạo thành 1 bản ghi khác của riêng KN". Đường ghi qua SQL/import đã do
+#                       kn-sql-foreign, kn-import-htx chặn; DB do kiểm thử KNSPLIT-0 chặn.
 #   kn-sql-foreign      mã/migration KN không nhắc bảng của schema module khác, trừ view công bố *_pub, k_ref, shared
 #                       (KN đọc dữ liệu HTX chỉ qua _pub và cấp phép chia sẻ — CEO D2, ADR-0052).
 #   sql-into-kn         mã/migration ngoài KN không nhắc bảng trong schema của KN, trừ *_pub.
@@ -105,6 +109,13 @@ kn_shared_route_prefixes:
   - /v1/accounts/support-
   - /v1/accounts/users/{id}/assignments
   - /v1/accounts/users/{id}/delegations
+
+# Route KN đang GHI vào dữ liệu HTX (pf_coop, pf_party hồ sơ HTX, pf_mechanization) — quy tắc kn-write-htx.
+kn_htx_write_prefixes:
+  - /v1/kn/cooperatives
+  - /v1/kn/households
+  - /v1/kn/plots
+  - /v1/kn/machine-counts
 
 web:
   root: apps/web-ops/src

@@ -24,6 +24,7 @@ const (
 	RuleImportIntoKN     = "import-into-kn"
 	RuleKNImportInternal = "kn-import-internal"
 	RuleKNImportHTX      = "kn-import-htx"
+	RuleKNWriteHTX       = "kn-write-htx"
 	RuleKNSQLForeign     = "kn-sql-foreign"
 	RuleSQLIntoKN        = "sql-into-kn"
 	RuleKNSymbolInShared = "kn-symbol-in-shared"
@@ -50,6 +51,7 @@ type Config struct {
 	KNTags             []string `yaml:"kn_tags"`
 	KNRoutePrefixes    []string `yaml:"kn_route_prefixes"`
 	KNSharedPrefixes   []string `yaml:"kn_shared_route_prefixes"`
+	KNHTXWritePrefixes []string `yaml:"kn_htx_write_prefixes"`
 	Web                struct {
 		Root        string   `yaml:"root"`
 		Alias       string   `yaml:"alias"`
@@ -492,11 +494,12 @@ func (c *checker) scanRoutes() error {
 		if err != nil {
 			return err
 		}
-		var cur, tag string
+		var cur, tag, method string
 		inOp := false
 		flush := func() {
 			if inOp {
 				c.route(f, cur, tag)
+				c.htxWrite(f, method, cur)
 			}
 			inOp, tag = false, ""
 		}
@@ -517,9 +520,9 @@ func (c *checker) scanRoutes() error {
 			if cur == "" {
 				continue
 			}
-			if oaOpRe.MatchString(line) {
+			if m := oaOpRe.FindStringSubmatch(line); m != nil {
 				flush()
-				inOp = true
+				inOp, method = true, m[1]
 				continue
 			}
 			if m := oaTagRe.FindStringSubmatch(line); m != nil && inOp && tag == "" {
@@ -547,6 +550,16 @@ func (c *checker) route(file, p, tag string) {
 	if (owned || shared) != contains(c.cfg.KNTags, tag) {
 		c.add(RuleRouteOwner, path.Base(file)+" "+p, tag)
 	}
+}
+
+// htxWrite: thao tác ghi (POST/PUT/PATCH/DELETE) trên route KN ghi vào dữ liệu do HTX sở hữu. PO 14/10/2026
+// (Q-KNS-04, ADR-0055 §4): KN không có đường ghi vào schema hay API của HTX; dữ liệu KN tạo "cho HTX" là bản ghi riêng
+// của KN.
+func (c *checker) htxWrite(file, method, p string) {
+	if method == "get" || !hasPrefix(p, c.cfg.KNHTXWritePrefixes) {
+		return
+	}
+	c.add(RuleKNWriteHTX, path.Base(file)+" "+strings.ToUpper(method)+" "+p, "dữ liệu HTX")
 }
 
 func hasPrefix(p string, prefixes []string) bool {
