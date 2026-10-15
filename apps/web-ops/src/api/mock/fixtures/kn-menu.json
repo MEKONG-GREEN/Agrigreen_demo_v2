@@ -273,6 +273,15 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.chung.tai_lieu_phong",
+        "label": "Tài liệu của phòng",
+        "route": "/kn/nhan-su/tai-lieu-phong",
+        "icon": "library",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      }
@@ -630,6 +639,15 @@
         "label": "Dashboard nhân sự",
         "route": "/kn/nhan-su/dashboard",
         "icon": "chart",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chung.tai_lieu_phong",
+        "label": "Tài liệu của phòng",
+        "route": "/kn/nhan-su/tai-lieu-phong",
+        "icon": "library",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -1210,6 +1228,15 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.chung.tai_lieu_phong",
+        "label": "Tài liệu của phòng",
+        "route": "/kn/nhan-su/tai-lieu-phong",
+        "icon": "library",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      }
@@ -1694,6 +1721,15 @@
         "label": "Dashboard nhân sự",
         "route": "/kn/nhan-su/dashboard",
         "icon": "chart",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chung.tai_lieu_phong",
+        "label": "Tài liệu của phòng",
+        "route": "/kn/nhan-su/tai-lieu-phong",
+        "icon": "library",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -2196,6 +2232,15 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.chung.tai_lieu_phong",
+        "label": "Tài liệu của phòng",
+        "route": "/kn/nhan-su/tai-lieu-phong",
+        "icon": "library",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      }
@@ -2553,9 +2598,7 @@
         "route": "/kn/nhan-su/kho-tai-lieu",
         "icon": "library",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -2672,6 +2715,15 @@
         "label": "Dashboard nhân sự",
         "route": "/kn/nhan-su/dashboard",
         "icon": "chart",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chung.tai_lieu_phong",
+        "label": "Tài liệu của phòng",
+        "route": "/kn/nhan-su/tai-lieu-phong",
+        "icon": "library",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -3258,8 +3310,6 @@
           "icon": "library",
           "badge_source": null,
           "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
           "children": []
          }
         ]

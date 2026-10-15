@@ -9,3 +9,9 @@
 | 422 | `hrm.doc_format` | Đuôi tệp ngoài pdf, jpg, jpeg, png, docx, xlsx, doc, xls hoặc chữ ký đầu tệp không khớp đuôi |
 | 413 | `hrm.doc_too_large` | Tệp vượt 15 MB (trừ 1 KB phần phong bì) |
 | 503 | `hrm.docs_unavailable` | Chưa nối kho tệp `pf/evidence` hoặc kho định danh |
+
+Mục đích tệp (HRM-DOC-PURPOSE-001): `hr_records` được HCTH đăng ký vào registry
+của evidence tại gốc lắp ráp, chỉ cho chủ thể `pf/hrm` / `hr_folder` đã phân giải
+và được phép xem. Tệp khác module, khác loại hoặc tệp cũ không có bộ ba trả
+`403 sync.purpose_not_allowed` và ghi sổ từ chối. Không thể dùng mục đích hồ sơ
+để bỏ qua đồng ý của minh chứng MRV/hiện trường.

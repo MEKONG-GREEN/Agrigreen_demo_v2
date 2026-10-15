@@ -26,3 +26,23 @@ Kiểm tra tiếp nhận Codex ngày 15/10/2026: các ca trong bảng đã PASS;
 Dashboard 1.000 hồ sơ đo 82,76 ms, NS06 đo 91,97 ms (vault giả trong bộ nhớ).
 Golden menu sinh lại bằng `TestWebMenuFixture` giữ nguyên nội dung sau rebase.
 API batch-read đã kiểm qua HTTP client/router thật: tenant khác bị loại, vai chỉ hiển thị bị từ chối, mã tham chiếu sai bị chặn; phản hồi no-store và log không chứa PII.
+
+## W11.24 — Kho tài liệu nhân sự
+
+Nguồn: [giả định W11.24](../kn/gia-dinh/W11.24.md), BRD FN-14/UR-HC-25/UR-ADM-10.
+Kết quả chạy từng lệnh và mã thoát: [sổ hồi quy](../REGRESSION.md).
+
+| Tiêu chí | Bằng chứng | Phạm vi kiểm tra |
+|---|---|---|
+| Bảy thư mục mặc định không nhân đôi; gốc chỉ Admin; thư mục con, tên trùng và ẩn khi rỗng | `TestHRMDocsHTTP_W1124` | PostgreSQL thật, HTTP |
+| Phân loại theo nhân viên, năm, loại, đơn vị; lọc đệ quy, tìm số quyết định | `TestHRMDocsHTTP_W1124` | FN-14 AC-01 |
+| Lãnh đạo chỉ xem phòng mình; tenant khác không thấy; thư mục kế thừa quyền và ưu tiên người dùng | `TestHRMDocsHTTP_W1124`, `TestDocsDomain_W1124` | FN-14 AC-02 |
+| Tệp mã hóa, bản tải đúng nội dung, no-store, vai kho bắt buộc; nhật ký tải/xem | `TestHRMDocsHTTP_W1124` | FN-14 AC-03; evidence/vault là cổng giả ở ca HTTP HRM |
+| Evidence thật cho phép `hr_records` không cần đồng ý; MRV giữ yêu cầu đồng ý | `TestOpenHRRecordsWithoutConsent_W1124` | DB thật, kho định danh giả |
+| HRM-DOC-PURPOSE-001: không thể dùng hr_records mở tệp hiện trường, tệp cũ hoặc sai loại; mọi từ chối có sổ | `TestOpenHRRecordsWithoutConsent_W1124` | DB thật |
+| HRM-DOC-CRYPTO-001: mở khóa/giải mã đúng qua client/router/vault thật; chặn sai vai, sai tenant, sai mục đích; log không chứa bản rõ/token | `TestHRRecordsUnwrapHTTP_W1124` | PostgreSQL thật, HTTP, KMS cục bộ dành cho test |
+| Ẩn/hiện lại có lý do, lịch sử phân loại; sổ không UPDATE/DELETE | `TestHRMDocsHTTP_W1124` | G1 |
+| Cây thư mục, danh sách, chi tiết, ẩn/hiện lại và sửa quyền trên web | `src/kn/hrm/docs.test.tsx`, `docs-api.test.ts` | Giả lập API |
+
+Tự lưu quyết định nâng bậc và bản ký đánh giá thuộc W11.25/W11.26 sau G1.
+Kiểm thử KMS cục bộ không thay thế diễn tập kho khóa và kho tệp trên môi trường triển khai.

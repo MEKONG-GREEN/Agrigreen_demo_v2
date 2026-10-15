@@ -371,7 +371,7 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "masterdata.catalog_import_not_found": "Không tìm thấy lần nhập danh mục này.",
   // pf/sync — tệp minh chứng
   "sync.purpose_required": "Thiếu mục đích xử lý dữ liệu khi mở tệp minh chứng.",
-  "sync.purpose_not_allowed": "Vai của bạn không được mở tệp minh chứng với mục đích này.",
+  "sync.purpose_not_allowed": "Mục đích này không được phép mở tệp đã chọn.",
   "sync.consent_missing": "Nông hộ chưa đồng ý chia sẻ dữ liệu cho mục đích này — không mở được ảnh.",
   "sync.file_not_found": "Không tìm thấy tệp minh chứng.",
   // pf/apiclient (G5, ADR-0022) — Public API và Admin API quản trị khách hàng

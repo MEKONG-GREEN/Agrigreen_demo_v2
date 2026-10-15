@@ -12223,8 +12223,8 @@ components:
       name: X-Purpose
       in: header
       required: true
-      description: Mục đích xử lý dữ liệu cá nhân (R-42)
-      schema: {type: string, enum: [mrv.evidence, extension.field_support]}
+      description: "Mục đích xử lý (R-42); hr_records chỉ dùng cho tệp có chủ thể pf/hrm / hr_folder do module đăng ký, không áp dụng tệp cũ hoặc tệp hiện trường"
+      schema: {type: string, enum: [mrv.evidence, extension.field_support, hr_records]}
   responses:
     HrmEventWritten:
       description: Đã ghi dòng quá trình

@@ -124,7 +124,7 @@ func (f *recFixture) upload(as string, meta map[string]any, name string, content
 	return m
 }
 
-func (f *recFixture) raw(as, path string, want int) *httptest.ResponseRecorder {
+func (f *recFixture) rawDoc(as, path string, want int) *httptest.ResponseRecorder {
 	f.t.Helper()
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	req.Header.Set("X-Test-As", as)
@@ -272,16 +272,16 @@ func TestHRMDocsHTTP_W1124(t *testing.T) {
 	f.call("ld_tt", http.MethodPost, "/v1/hrm/docs/"+doc1+"/hide", map[string]any{"reason": "Lãnh đạo phòng thử ẩn"}, http.StatusForbidden)
 
 	// Xem trước/tải xuống: giải mã qua pf/evidence (hr_records) — đúng nội dung; AC-03 nhật ký.
-	rec := f.raw("ld_tt", "/v1/hrm/docs/"+doc1+"/content?download=1", http.StatusOK)
+	rec := f.rawDoc("ld_tt", "/v1/hrm/docs/"+doc1+"/content?download=1", http.StatusOK)
 	if !bytes.Equal(rec.Body.Bytes(), pdf) || rec.Header().Get("Cache-Control") != "no-store" ||
 		!strings.HasPrefix(rec.Header().Get("Content-Disposition"), "attachment; filename*=UTF-8''Q%C4%90%20123.pdf") {
 		t.Fatalf("tải xuống: %q %v", rec.Body.String(), rec.Header())
 	}
-	if rec := f.raw("hcth", "/v1/hrm/docs/"+doc2+"/content", http.StatusOK); !strings.HasPrefix(rec.Header().Get("Content-Disposition"), "inline") {
+	if rec := f.rawDoc("hcth", "/v1/hrm/docs/"+doc2+"/content", http.StatusOK); !strings.HasPrefix(rec.Header().Get("Content-Disposition"), "inline") {
 		t.Fatalf("xem trước: %v", rec.Header())
 	}
-	f.raw("norole", "/v1/hrm/docs/"+doc1+"/content", http.StatusForbidden) // thiếu vai kho vault_evidence_viewer
-	f.raw("ld_cn", "/v1/hrm/docs/"+doc1+"/content", http.StatusNotFound)
+	f.rawDoc("norole", "/v1/hrm/docs/"+doc1+"/content", http.StatusForbidden) // thiếu vai kho vault_evidence_viewer
+	f.rawDoc("ld_cn", "/v1/hrm/docs/"+doc1+"/content", http.StatusNotFound)
 	g = f.call("hcth", http.MethodGet, "/v1/hrm/docs/"+doc1, nil, http.StatusOK)
 	acc := g["access"].([]any)
 	if len(acc) != 2 || acc[1].(map[string]any)["action"] != "download" || acc[1].(map[string]any)["scope"] != "unit" {
@@ -311,7 +311,7 @@ func TestHRMDocsHTTP_W1124(t *testing.T) {
 	if l := f.call("ld_tt", http.MethodGet, "/v1/hrm/docs", nil, http.StatusOK); l["total"] != json.Number("0") {
 		t.Fatalf("thư mục chặn: %v", l)
 	}
-	f.raw("ld_tt", "/v1/hrm/docs/"+doc1+"/content", http.StatusNotFound)
+	f.rawDoc("ld_tt", "/v1/hrm/docs/"+doc1+"/content", http.StatusNotFound)
 	ldcn := f.who["ld_cn"].ActorRef.String()
 	f.call("hcth", http.MethodPost, "/v1/hrm/docs/folders/"+subID+"/acl", map[string]any{
 		"acl": map[string]any{"user:" + ldcn: map[string]any{"docs.view": "all"}}}, http.StatusOK)
