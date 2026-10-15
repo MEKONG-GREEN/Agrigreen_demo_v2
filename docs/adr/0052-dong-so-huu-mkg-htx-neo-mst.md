@@ -1,6 +1,6 @@
 # ADR-0052: Đồng sở hữu dữ liệu MKG + HTX, neo HTX theo mã số thuế, HTX tạm và nhận quyền
 
-**Trạng thái:** Chấp nhận — quyết định CEO D2 (13/10/2026); hiện thực ở gói D2 (pf 20261013091454) · **Ngày:** 13/10/2026 · **Trả lời:** H-1 ([cau-hoi-ton-dong.md](../cau-hoi-ton-dong.md)), QĐ-2 ([đối chiếu BRD KN](../kn/doi-chieu-brd-kn-2026-10.md)) · **Sửa đổi:** [ADR-0009](0009-mo-hinh-tenant.md) (ý nghĩa tenant giữ dữ liệu HTX), [ADR-0030](0030-doc-tai-cho-co-cap-phep.md) §7 (H-1 không còn mở), [docs/design/cooperative.md](../design/cooperative.md) D-10, §11 · **Thành phần:** `internal/platform/cooperative/anchor`, `internal/platform/cooperative/member/store/profile.go`, `internal/platform/cooperative/plot/app/sync.go`, `internal/platform/party/{app,handler}` (danh sách HTX), `apps/web-ops/src/app/quan-tri/neo-htx`, `migrations/pf/20261013091454_pf_coop_htx_anchor.up.sql`
+**Trạng thái:** Hiện thực — quyết định CEO D2 (13/10/2026), gói D2 (pf 20261013091454); bổ sung luồng ORGUI 15/10/2026 · **Ngày:** 13/10/2026 · **Trả lời:** H-1 ([cau-hoi-ton-dong.md](../cau-hoi-ton-dong.md)), QĐ-2 ([đối chiếu BRD KN](../kn/doi-chieu-brd-kn-2026-10.md)) · **Sửa đổi:** [ADR-0009](0009-mo-hinh-tenant.md) (ý nghĩa tenant giữ dữ liệu HTX), [ADR-0030](0030-doc-tai-cho-co-cap-phep.md) §7 (H-1 không còn mở), [docs/design/cooperative.md](../design/cooperative.md) D-10, §11 · **Thành phần:** `internal/platform/cooperative/anchor`, `internal/platform/cooperative/member/store/profile.go`, `internal/platform/cooperative/plot/app/sync.go`, `internal/platform/party/{app,handler}` (danh sách HTX), `apps/web-ops/src/app/quan-tri/neo-htx`, `migrations/pf/20261013091454_pf_coop_htx_anchor.up.sql`
 
 ## Bối cảnh
 
@@ -164,3 +164,14 @@
 - Tự kích hoạt nhận quyền khi `pf/accounts` kích hoạt tài khoản HTX. Hiện quản trị gọi API sau khi xác minh MST.
 - Gộp hai neo cùng một HTX khi cả hai đã có dữ liệu.
 - Tách tài khoản KN sang tenant KN riêng để KN đọc chỉ qua cấp phép. Cấp phép `share_grant` mỗi neo (hoặc theo Nút tỉnh) với `basis_ref` = `agreement_ref` cần luồng cấp hàng loạt (W4.1).
+
+## Bổ sung luồng tạo ORGUI (15/10/2026)
+
+`POST /v1/orgs` không tạo HTX mới; nhập cây cũng loại dòng HTX mới. Admin nền tảng
+(`platform_admin`/`registry_admin`) dùng `POST /v1/htx-anchors` với `new_cooperative`
+để tạo Nút và hồ sơ qua `party/port.CooperativeRegistrar`, rồi lập Neo. `org_ref` vẫn dùng
+cho hồ sơ đã có. MST của hồ sơ mới lấy từ MST đã chuẩn hóa của yêu cầu Neo; người đại diện
+chuyển thẳng vault. Mất phản hồi/lỗi giữa bước gửi lại cùng khóa để hoàn tất, không có giao dịch
+phân tán nguyên tử. Chứng minh: ORG-NEO-001/002/003 và [nghiệm thu tổ chức](../uat/to-chuc-acceptance.md).
+Bổ sung này thay đường HTTP tạo mới theo CODEX-G1, không thay quyết định CEO về sở hữu/nhận quyền.
+Đường KN cũ nhập HTX còn phải xử lý theo đề xuất tác động tại ADR-0055 trước khi tuyên bố KN độc lập.

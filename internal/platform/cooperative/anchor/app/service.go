@@ -25,6 +25,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/anchor/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/anchor/store"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -74,8 +75,9 @@ var (
 
 // Service là use case neo HTX.
 type Service struct {
-	DB    tenant.Beginner // đã bọc vai r_cooperative
-	Clock clock.Clock
+	Creator partyport.CooperativeRegistrar // cổng tạo Nút + hồ sơ, chỉ dùng khi new_cooperative
+	DB      tenant.Beginner                // đã bọc vai r_cooperative
+	Clock   clock.Clock
 	// failAfterWrite (chỉ kiểm thử): lỗi trả sau khi ghi xong mọi dòng của nhận quyền, trước commit.
 	failAfterWrite func() error
 }
@@ -110,11 +112,12 @@ func taken(a *store.Anchor) error {
 
 // CreateInput là đầu vào lập HTX tạm.
 type CreateInput struct {
-	OrgRef       uuid.UUID
-	CreatedBy    string // kn | mkg
-	MST          string // rỗng = chưa có MST → mã tạm
-	AgreementRef string // thỏa thuận HTX (căn cứ cấp phép KN) — tùy chọn
-	IdemKey      string
+	OrgRef         uuid.UUID
+	NewCooperative *partyport.CooperativeRegistration
+	CreatedBy      string // kn | mkg
+	MST            string // rỗng = chưa có MST → mã tạm
+	AgreementRef   string // thỏa thuận HTX (căn cứ cấp phép KN) — tùy chọn
+	IdemKey        string
 }
 
 // Create lập neo HTX tạm. Trả (neo, đã có từ trước theo IdemKey).
@@ -145,6 +148,57 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (Anchor, bool, err
 			return Anchor{}, false, problem.Validation.WithField("agreement_ref", "3–200 ký tự")
 		}
 		agreement = &a
+	}
+	if in.NewCooperative != nil {
+		if in.OrgRef != uuid.Nil {
+			return Anchor{}, false, problem.Validation.WithField("new_cooperative", "chỉ chọn org_ref hoặc new_cooperative")
+		}
+		if _, err := authz.Require(ctx, adminRoles...); err != nil {
+			return Anchor{}, false, err
+		}
+		if in.IdemKey == "" {
+			return Anchor{}, false, problem.IdempotencyRequired
+		}
+		// Đọc kết quả cũ trước khi tạo Nút. MST đã có neo cũng bị chặn trước bước tạo.
+		var existing Anchor
+		found := false
+		err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+			prev, err := store.EventByIdem(ctx, tx, "anchor-create:"+in.IdemKey)
+			if err != nil {
+				return err
+			}
+			if prev != nil {
+				found = true
+				return s.load(ctx, tx, prev.AnchorID, &existing)
+			}
+			if mst != nil {
+				prior, err := store.ByKey(ctx, tx, *mst)
+				if err != nil {
+					return err
+				}
+				if prior != nil {
+					return taken(prior)
+				}
+			}
+			return nil
+		})
+		if err != nil || found {
+			return existing, found, err
+		}
+		if s.Creator == nil {
+			return Anchor{}, false, problem.New(http.StatusServiceUnavailable, "cooperative.registrar_unavailable", "Chưa nối luồng tạo HTX cho Neo")
+		}
+		registration := *in.NewCooperative
+		registration.IdemKey = "anchor-org:" + in.IdemKey
+		registration.TaxCode = ""
+		if mst != nil {
+			registration.TaxCode = *mst
+		}
+		org, err := s.Creator.RegisterCooperative(ctx, registration)
+		if err != nil {
+			return Anchor{}, false, err
+		}
+		in.OrgRef = org
 	}
 	idem := "anchor-create:" + in.IdemKey
 	var out Anchor

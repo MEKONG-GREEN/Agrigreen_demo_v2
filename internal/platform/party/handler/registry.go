@@ -14,6 +14,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -347,8 +348,16 @@ type createOrgReq struct {
 }
 
 func (h Registry) createOrg(c *gin.Context) {
+	if _, err := authz.Require(c.Request.Context(), port.RoleRegistryAdmin, authz.RolePlatformAdmin); err != nil {
+		httpx.Fail(c, problem.Forbidden.WithDetail("chỉ Admin nền tảng (platform_admin, registry_admin) được tạo tổ chức"))
+		return
+	}
 	var req createOrgReq
 	if !bindJSON(c, &req) {
+		return
+	}
+	if port.OrgKind(req.Kind) == port.OrgCooperative {
+		httpx.Fail(c, problem.New(http.StatusUnprocessableEntity, "party.cooperative_requires_anchor", "Tạo HTX qua màn Neo HTX theo mã số thuế").With("redirect", app.NeoHTXPath))
 		return
 	}
 	var fe fieldErrs

@@ -190,6 +190,11 @@ func (g *g1) stepSeed() {
 
 func (g *g1) createOrg(body map[string]any) string {
 	g.t.Helper()
+	if body["kind"] == "cooperative" {
+		n := map[string]any{"name": body["name"], "admin_unit_code": body["admin_unit_code"], "parent_ref": body["parent_ref"]}
+		r := g.want(g.root.Do(harness.Admin, http.MethodPost, "/v1/htx-anchors", "", map[string]any{"created_by": "mkg", "new_cooperative": n}), 201, "tạo HTX qua Neo")
+		return str(r.Body, "org_ref")
+	}
 	r := g.want(g.root.Do(harness.Admin, http.MethodPost, "/v1/orgs", "", body), 201, "tạo tổ chức "+fmt.Sprint(body["name"]))
 	return str(obj(r.Body, "org"), "ref")
 }
@@ -202,15 +207,17 @@ func (g *g1) stepOrgTree() {
 	g.orgP91 = g.createOrg(map[string]any{"kind": "ttkn_province", "code": "TTKN91", "name": "TTKN An Giang", "admin_unit_code": provAG, "parent_ref": g.orgNational})
 	g.orgTeam91 = g.createOrg(map[string]any{"kind": "extension_team", "code": "TKN-LONGXUYEN", "name": "Tổ KNCĐ Long Xuyên", "admin_unit_code": communeLX, "parent_ref": g.orgP91})
 
-	r := g.want(g.root.Do(harness.Admin, http.MethodPost, "/v1/orgs", "", map[string]any{
-		"kind": "cooperative", "name": "HTX Nông nghiệp Tổng Hợp Ninh Kiều", "admin_unit_code": communeNK, "parent_ref": g.orgTeamNK,
-		"representative": map[string]any{"full_name": "Phạm Văn Đại Diện", "phone": "0999000009"},
-		"cooperative":    map[string]any{"area_ha": "180.5", "established_on": "2019-03-01", "location": map[string]any{"lat": "10.0341", "lon": "105.7702"}},
-	}), 201, "tạo HTX")
-	org := obj(r.Body, "org")
-	g.coopNK = str(org, "ref")
-	if str(org, "representative_ref") == "" {
-		g.t.Fatalf("HTX phải có representative_ref (người đại diện ở vault): %s", trim(r.Raw))
+	r := g.want(g.root.Do(harness.Admin, http.MethodPost, "/v1/htx-anchors", "", map[string]any{
+		"created_by": "mkg", "new_cooperative": map[string]any{
+			"name": "HTX Nông nghiệp Tổng Hợp Ninh Kiều", "admin_unit_code": communeNK, "parent_ref": g.orgTeamNK,
+			"representative": map[string]any{"full_name": "Phạm Văn Đại Diện", "phone": "0999000009"},
+			"profile":        map[string]any{"area_ha": "180.5", "established_on": "2019-03-01", "location": map[string]any{"lat": "10.0341", "lon": "105.7702"}},
+		},
+	}), 201, "tạo HTX qua Neo")
+	g.coopNK = str(r.Body, "org_ref")
+	coop := g.want(g.root.Do(harness.App, http.MethodGet, "/v1/cooperatives/"+g.coopNK, "", nil), 200, "đọc hồ sơ HTX mới")
+	if str(coop.Body, "representative_ref") == "" {
+		g.t.Fatalf("HTX phải có đại diện ở vault: %s", trim(coop.Raw))
 	}
 	g.coop91 = g.createOrg(map[string]any{"kind": "cooperative", "name": "HTX Tổng Hợp Long Xuyên", "admin_unit_code": communeLX, "parent_ref": g.orgTeam91})
 
@@ -834,9 +841,7 @@ func (g *g1) stepMRVExport() {
 func (g *g1) stepNoPII() {
 	ctx := context.Background()
 	admin := g.s.AdminPF()
-	rows, err := admin.Query(ctx, `SELECT table_schema, table_name, column_name FROM information_schema.columns
-	  WHERE (table_schema LIKE 'pf\_%' OR table_schema = 'shared')
-	    AND column_name ~* '(full_?name|phone|national_?id|cccd|address|dia_chi|ho_ten)'`)
+	rows, err := admin.Query(ctx, piiColumnQuery)
 	if err != nil {
 		g.t.Fatal(err)
 	}
@@ -1044,4 +1049,51 @@ func TestRB3ErasureEvidenceUnreadable(t *testing.T) {
 	verify("party_app", "pf_party.consent", "subject_ref = $1::uuid", hh, 2)
 	verify("sync_app", "pf_sync.inbound", "device_id = $1", g.deviceID, 1)
 	verify("party_app", "pf_party.org_event", "org_ref = $1::uuid", g.coopNK, 1)
+}
+
+// ADR-0054: phone/address của thẻ đơn vị là thông tin công vụ, không phải cá nhân.
+// Ngoại lệ đúng hai cột trên bảng unit và các partition thực sự của nó. Quét giá trị
+// PII vẫn bao gồm mọi bảng, kể cả unit; không miễn toàn schema hay theo tiền tố tên.
+const piiColumnQuery = `SELECT table_schema, table_name, column_name FROM information_schema.columns
+	  WHERE (table_schema LIKE 'pf\_%' OR table_schema = 'shared')
+	    AND column_name ~* '(full_?name|phone|national_?id|cccd|address|dia_chi|ho_ten)'
+      AND NOT (table_schema = 'pf_contact' AND column_name IN ('phone', 'address')
+       AND table_name IN (SELECT c.relname FROM pg_partition_tree('pf_contact.unit'::regclass) p
+        JOIN pg_class c ON c.oid = p.relid))`
+
+// ORG-PII-GUARD-001: ngoại lệ công vụ không che cột PII khác hay bảng tên gần giống.
+func TestContactPublicColumnsDoNotHidePII_ORGUI(t *testing.T) {
+	s := harness.New(t)
+	ctx := context.Background()
+	tx, err := s.AdminPF().Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `ALTER TABLE pf_contact.unit ADD COLUMN full_name text; CREATE TABLE pf_contact.unit_person_probe (phone text)`); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := tx.Query(ctx, piiColumnQuery)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var rootName, probePhone bool
+	for rows.Next() {
+		var schema, table, col string
+		if err := rows.Scan(&schema, &table, &col); err != nil {
+			t.Fatal(err)
+		}
+		rootName = rootName || (schema == "pf_contact" && table == "unit" && col == "full_name")
+		probePhone = probePhone || (schema == "pf_contact" && table == "unit_person_probe" && col == "phone")
+		if schema == "pf_contact" && table == "unit" && (col == "phone" || col == "address") {
+			t.Fatal("ngoại lệ công vụ không được nhận diện")
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !rootName || !probePhone {
+		t.Fatal("ngoại lệ đã che dữ liệu cá nhân ngoài phạm vi")
+	}
 }

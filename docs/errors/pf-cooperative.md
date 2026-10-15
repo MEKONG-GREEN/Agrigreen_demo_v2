@@ -14,3 +14,5 @@
 | 409 | `cooperative.htx_anchor_already_claimed` | Neo đã được nhận quyền bởi tài khoản / Nút khác (một lần nhận quyền mỗi neo) |
 | 409 | `cooperative.htx_anchor_claim_conflict` | Nút HTX đích đã có dữ liệu / thuộc neo khác / MST hồ sơ khác — `conflict_report` (cùng dạng báo cáo chạy thử) |
 | 422 | `cooperative.htx_anchor_created_by` | `created_by` không phải `kn` hoặc `mkg` |
+
+| 503 | `cooperative.registrar_unavailable` | Tạo Neo với HTX mới nhưng assembly chưa nối CooperativeRegistrar |

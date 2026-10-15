@@ -16,6 +16,7 @@ import {
   type HTXAnchorStatus,
   type HTXClaimReport,
 } from "@/admin/htxAnchors";
+import { NewAnchorForm } from "@/admin/NewAnchorForm";
 import { newIdempotencyKey } from "@/api/idempotency";
 import { ApiProblem } from "@/api/problem";
 import { useAuth } from "@/auth/AuthProvider";
@@ -57,6 +58,7 @@ export default function HTXAnchorsPage() {
       {list.error ? (
         <ProblemAlert problem={list.error} onRetry={list.reload} />
       ) : null}
+      <NewAnchorForm onCreated={id => { setSelected(id); load(); }} />
       <CreateForm
         onCreated={(id) => {
           setSelected(id);

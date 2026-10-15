@@ -118,17 +118,18 @@ describe("POST /v1/orgs (giả lập)", () => {
     expect(nationalWithUnit.body.errors[0]?.field).toBe("admin_unit_code");
   });
 
-  it("HTX: gửi mã → 422 (mã tự sinh)", async () => {
+  it("HTX: mọi yêu cầu tạo qua tổ chức chung phải chuyển sang Neo", async () => {
     const r = await create({
       kind: "cooperative",
       code: "HTX-X",
       name: "HTX thử",
       admin_unit_code: "82101",
     });
-    expect(r.body.errors).toEqual([{ field: "code", reason: expect.stringContaining("tự sinh") }]);
+    expect(r.status).toBe(422);
+    expect(r.body.code).toBe("party.cooperative_requires_anchor");
   });
 
-  it("403: KN tỉnh không tạo Nút hành chính/TTKN (quyết định PO), vẫn tạo được HTX trong phạm vi", async () => {
+  it("403: KN tỉnh không tạo tổ chức hoặc HTX qua endpoint chung", async () => {
     // Persona "tinh" (kn_province_admin) chưa qua MFA nên gọi thẳng handler (bỏ qua cổng MFA của mockFetch).
     const tinh = findPersona("tinh")!;
     const call = (body: Record<string, unknown>) =>
@@ -137,7 +138,7 @@ describe("POST /v1/orgs (giả lập)", () => {
     expect(r.status).toBe(403);
     expect(await r.json()).toMatchObject({ code: "forbidden", detail: expect.stringContaining("Admin nền tảng") });
     const coop = call({ kind: "cooperative", name: "HTX do KN tỉnh lập", admin_unit_code: "82101", parent_ref: provinceOrgRef(0) });
-    expect(coop.status).toBe(201);
+    expect(coop.status).toBe(403);
   });
 
   it("403: vai không có quyền; MFA bắt buộc", async () => {

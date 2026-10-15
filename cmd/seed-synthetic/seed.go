@@ -214,20 +214,29 @@ func (s *seeder) staff(ctx context.Context, st StaffPlan, unit string) error {
 }
 
 func (s *seeder) coop(ctx context.Context, plan Plan, cp CommunePlan, c CoopPlan, team string) (string, error) {
-	r, err := s.api.expect(ctx, adminAPI, http.MethodPost, "/v1/orgs", s.key("coop", c.TaxCode), map[string]any{
-		"kind": "cooperative", "name": c.Name, "admin_unit_code": cp.Code, "parent_ref": team,
-		"representative": map[string]any{"full_name": c.Rep.FullName, "phone": c.Rep.Phone},
-		"cooperative": map[string]any{"tax_code": c.TaxCode, "area_ha": c.AreaHa, "established_on": c.Established,
-			"location": map[string]any{"lat": fmt.Sprintf("%.7f", c.Location.Lat), "lon": fmt.Sprintf("%.7f", c.Location.Lon)}},
+	r, err := s.api.expect(ctx, adminAPI, http.MethodPost, "/v1/htx-anchors", s.key("coop", c.TaxCode), map[string]any{
+		"created_by": "mkg", "mst": c.TaxCode,
+		"new_cooperative": map[string]any{"name": c.Name, "admin_unit_code": cp.Code, "parent_ref": team,
+			"representative": map[string]any{"full_name": c.Rep.FullName, "phone": c.Rep.Phone},
+			"profile": map[string]any{"area_ha": c.AreaHa, "established_on": c.Established,
+				"location": map[string]any{"lat": fmt.Sprintf("%.7f", c.Location.Lat), "lon": fmt.Sprintf("%.7f", c.Location.Lon)}},
+		},
 	}, http.StatusCreated, http.StatusOK)
 	var ref string
-	if cr, ok := isConflict(err, "party.tax_code_taken"); ok {
-		ref = str(cr.body, "existing_ref")
+	if cr, ok := isConflict(err, "cooperative.htx_anchor_mst_taken"); ok {
+		ref = str(cr.body, "existing_org_ref")
+		if ref == "" && str(cr.body, "existing_anchor_id") != "" {
+			prior, readErr := s.api.expect(ctx, adminAPI, http.MethodGet, "/v1/htx-anchors/"+str(cr.body, "existing_anchor_id"), "", nil, http.StatusOK)
+			if readErr != nil {
+				return "", readErr
+			}
+			ref = str(prior.body, "org_ref")
+		}
 		s.st.add("cooperative", false)
 	} else if err != nil {
 		return "", err
 	} else {
-		ref = str(obj(r.body, "org"), "ref")
+		ref = str(r.body, "org_ref")
 		s.st.add("cooperative", r.isNew())
 	}
 	if ref == "" {

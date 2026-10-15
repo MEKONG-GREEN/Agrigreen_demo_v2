@@ -90,3 +90,22 @@ test("ORGUI: vai không có quyền (quản trị KN tỉnh) không mở đượ
   await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Tạo tổ chức" })).toHaveCount(0);
 });
+
+
+test("ORGUI: tạo HTX ngay tại Neo sau chuyển trang", async ({ page }) => {
+  const dlg = await openDialog(page);
+  await dlg.getByLabel("Loại tổ chức").selectOption("cooperative");
+  await dlg.getByRole("link", { name: "Mở Neo HTX theo mã số thuế" }).click();
+  const form = page.getByRole("form", { name: "Tạo HTX và lập neo" });
+  await expect(form).toBeVisible();
+  await form.getByLabel("Tên HTX mới").fill("HTX Neo trình duyệt thử nghiệm");
+  await form.getByLabel("Tỉnh của HTX mới").selectOption("82");
+  await form.getByLabel("Xã của HTX mới").selectOption("82101");
+  await form.getByLabel("Mã số thuế HTX mới").fill("1600-987-654");
+  await form.getByRole("button", { name: "Tạo HTX và lập neo" }).click();
+  const row = page.getByRole("region", { name: "Danh sách neo" }).getByRole("row").filter({ hasText: "1600987654" });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText("Chưa xác nhận");
+  await expect(row).toHaveAttribute("aria-selected", "true");
+  await expect(form.getByLabel("Tên HTX mới")).toHaveValue("");
+});

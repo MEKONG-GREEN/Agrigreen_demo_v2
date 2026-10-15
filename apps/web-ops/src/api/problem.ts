@@ -50,6 +50,8 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "masterdata.param_correction_required":
     "Đã có phiên bản được duyệt cùng ngày hiệu lực. Nhập “Lý do sửa” (ít nhất 10 ký tự) để ghi bản ghi bù.",
   // pf/party
+  "party.cooperative_requires_anchor": "Vui lòng tạo HTX tại màn Neo HTX theo mã số thuế.",
+  "cooperative.registrar_unavailable": "Luồng tạo HTX tạm chưa sẵn sàng. Vui lòng thử lại sau.",
   "party.org_not_found": "Không tìm thấy tổ chức/HTX, hoặc nằm ngoài phạm vi được phân quyền.",
   "party.org_state_conflict": "Trạng thái tổ chức không cho phép thao tác này (hoặc không có gì thay đổi).",
   "party.out_of_scope": "Thao tác nằm ngoài phạm vi TW → Tỉnh → Xã được phân quyền.",

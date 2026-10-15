@@ -164,7 +164,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	g := geo.New(unit, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits()})
 	// pf/cooperative (W3.3, docs/design/cooperative.md): HTX, hộ, thửa, vụ ở schema pf_coop (vai r_cooperative). Module tầng
 	// dưới (pf/party, pf/geo) khai interface của mình, gốc lắp ráp nối hiện thực của pf/cooperative (R-MOD-05).
-	coop := cooperative.New(unit, clk, cooperative.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Dir: pty.OrgDirectory(),
+	coop := cooperative.New(unit, clk, cooperative.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Dir: pty.OrgDirectory(), CooperativeRegistrar: pty.CooperativeRegistrar(),
 		Consents: pty.ConsentStates(), AdminUnits: md.AdminUnits(), AdminGeom: g.AdminGeometry(), Params: md.Params(),
 		Catalogs: md.Catalogs(), GpsLog: g.GpsLog(), Households: farmerid.Households(ext.Vault), Farmers: farmerid.New(ext.Vault)}) // HTX US-GPS-03: log GPS qua consumer outbox pf.cropcycle.gps_log
 	pty.UseCoopProfiles(coop.CoopProfiles()) // tạo HTX hai bước, màn HTX, danh bạ đối tác

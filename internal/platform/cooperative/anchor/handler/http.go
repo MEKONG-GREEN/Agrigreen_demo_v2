@@ -16,10 +16,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/anchor/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/anchor/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/anchor/store"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -153,7 +155,26 @@ func bind(c *gin.Context, v any) bool {
 
 func (h Handler) create(c *gin.Context) {
 	var req struct {
-		OrgRef       string `json:"org_ref"`
+		OrgRef         string `json:"org_ref"`
+		NewCooperative *struct {
+			Name              string `json:"name"`
+			CommuneCode       string `json:"admin_unit_code"`
+			ParentRef         string `json:"parent_ref"`
+			RepresentativeRef string `json:"representative_ref"`
+			Representative    *struct {
+				FullName string `json:"full_name" pii:"true"`
+				Phone    string `json:"phone" pii:"true"`
+			} `json:"representative"`
+			Profile *struct {
+				AreaHa        *decimal.Decimal `json:"area_ha"`
+				EstablishedOn string           `json:"established_on"`
+				Address       string           `json:"address"`
+				Location      *struct {
+					Lat decimal.Decimal `json:"lat"`
+					Lon decimal.Decimal `json:"lon"`
+				} `json:"location"`
+			} `json:"profile"`
+		} `json:"new_cooperative"`
 		CreatedBy    string `json:"created_by"`
 		MST          string `json:"mst"`
 		AgreementRef string `json:"agreement_ref"`
@@ -161,12 +182,54 @@ func (h Handler) create(c *gin.Context) {
 	if !bind(c, &req) {
 		return
 	}
-	org, err := uuid.Parse(req.OrgRef)
-	if err != nil {
-		httpx.Fail(c, problem.Validation.WithField("org_ref", "phải là UUID"))
-		return
+	org := uuid.Nil
+	if req.OrgRef != "" || req.NewCooperative == nil {
+		var err error
+		org, err = uuid.Parse(req.OrgRef)
+		if err != nil {
+			httpx.Fail(c, problem.Validation.WithField("org_ref", "phải là UUID nếu không tạo HTX mới"))
+			return
+		}
 	}
-	a, replayed, err := h.Svc.Create(c.Request.Context(), app.CreateInput{OrgRef: org, CreatedBy: req.CreatedBy, MST: req.MST,
+	var registration *partyport.CooperativeRegistration
+	if req.NewCooperative != nil {
+		registration = &partyport.CooperativeRegistration{Name: req.NewCooperative.Name, CommuneCode: req.NewCooperative.CommuneCode}
+		n := req.NewCooperative
+		if n.RepresentativeRef != "" {
+			ref, err := uuid.Parse(n.RepresentativeRef)
+			if err != nil {
+				httpx.Fail(c, problem.Validation.WithField("new_cooperative.representative_ref", "phải là UUID"))
+				return
+			}
+			registration.RepresentativeRef = ref
+		}
+		if n.Representative != nil {
+			registration.Representative = &partyport.RegistrationRepresentative{FullName: n.Representative.FullName, Phone: n.Representative.Phone}
+		}
+		if n.Profile != nil {
+			registration.AreaHa, registration.Address = n.Profile.AreaHa, n.Profile.Address
+			if n.Profile.EstablishedOn != "" {
+				day, err := time.Parse(time.DateOnly, n.Profile.EstablishedOn)
+				if err != nil {
+					httpx.Fail(c, problem.Validation.WithField("new_cooperative.profile.established_on", "phải là ngày YYYY-MM-DD"))
+					return
+				}
+				registration.EstablishedOn = &day
+			}
+			if n.Profile.Location != nil {
+				registration.Lat, registration.Lon = &n.Profile.Location.Lat, &n.Profile.Location.Lon
+			}
+		}
+		if req.NewCooperative.ParentRef != "" {
+			var err error
+			registration.ParentRef, err = uuid.Parse(req.NewCooperative.ParentRef)
+			if err != nil {
+				httpx.Fail(c, problem.Validation.WithField("new_cooperative.parent_ref", "phải là UUID"))
+				return
+			}
+		}
+	}
+	a, replayed, err := h.Svc.Create(c.Request.Context(), app.CreateInput{OrgRef: org, NewCooperative: registration, CreatedBy: req.CreatedBy, MST: req.MST,
 		AgreementRef: req.AgreementRef, IdemKey: idempotency.KeyFromContext(c.Request.Context())})
 	if err != nil {
 		httpx.Fail(c, err)

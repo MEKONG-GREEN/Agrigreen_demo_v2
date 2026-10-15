@@ -6,7 +6,9 @@ import {
   type HTXAnchor,
   type HTXClaimReport,
 } from "@/admin/htxAnchors";
-import { COOPERATIVES, hexId } from "./data";
+import { ADMIN_UNITS, COMMUNES, COOPERATIVES, ORGS, hexId } from "./data";
+import { uuidv7 } from "../idempotency";
+import { unitValidOn, vnToday } from "@/admin/orgCreate";
 import { hasRole, json, nowIso, pageSlice, problem, type Route } from "./http";
 
 type Body = Record<string, unknown>;
@@ -145,35 +147,38 @@ export const htxAnchorRoutes: Route[] = [
         );
       if (by === "mkg" ? !hasRole(persona, "platform_admin") : !reader(persona))
         return problem(403, "forbidden", "Forbidden");
-      const org = String(b.org_ref ?? "");
-      if (!COOPERATIVES.some((c) => c.api.ref === org))
-        return problem(
-          422,
-          "cooperative.htx_anchor_org_not_cooperative",
-          "Nút không phải HTX có hồ sơ",
-        );
-      if (ANCHORS.some((a) => a.aliases.includes(org)))
-        return problem(
-          409,
-          "cooperative.htx_anchor_org_anchored",
-          "Nút HTX đã thuộc một neo khác",
-        );
+      const fresh = b.new_cooperative as Record<string, unknown> | undefined;
+      if (fresh && b.org_ref) return problem(422, "validation_failed", "Chỉ chọn HTX đã có hoặc HTX mới");
+      if (fresh && !hasRole(persona, "platform_admin", "registry_admin")) return problem(403, "forbidden", "Chỉ Admin nền tảng tạo HTX mới");
       let mst: string | null = null;
       if (typeof b.mst === "string" && b.mst.trim() !== "") {
         mst = normalizeMST(b.mst);
         if (!mst) return malformed();
-        const dup = ANCHORS.find((a) => a.mst === mst);
-        if (dup)
-          return problem(
-            409,
-            "cooperative.htx_anchor_mst_taken",
-            "Mã số thuế đã có neo HTX",
-            {
-              existing_anchor_id: dup.anchor_id,
-              existing_created_by: dup.created_by,
-            },
-          );
+        const dup = ANCHORS.find(a => a.mst === mst);
+        if (dup) return problem(409, "cooperative.htx_anchor_mst_taken", "Mã số thuế đã có neo HTX", { existing_anchor_id: dup.anchor_id, existing_created_by: dup.created_by });
       }
+      const agreement = typeof b.agreement_ref === "string" ? b.agreement_ref.trim() : "";
+      if (agreement && ([...agreement].length < 3 || [...agreement].length > 200)) return problem(422, "validation_failed", "Thỏa thuận gồm 3–200 ký tự");
+      let org = String(b.org_ref ?? "");
+      if (fresh) {
+        const name = String(fresh.name ?? "").trim();
+        const unit = ADMIN_UNITS.find(u => u.code === fresh.admin_unit_code && u.level === "commune" && unitValidOn(u, vnToday()));
+        if (!name || [...name].length > 200 || !unit) return problem(422, "validation_failed", "Tên HTX và xã còn hiệu lực là bắt buộc");
+        if (ORGS.some(o => o.kind === "cooperative" && o.name.trim().toLocaleLowerCase("vi") === name.toLocaleLowerCase("vi"))) return problem(409, "party.coop_name_taken", "Tên HTX đã có");
+        const parent = fresh.parent_ref ? ORGS.find(o => o.ref === fresh.parent_ref && o.active) : undefined;
+        if (fresh.parent_ref && (!parent || !["extension_team", "ttkn_province"].includes(parent.kind) || (parent.admin_unit_code !== unit.code && parent.admin_unit_code !== unit.parent_code))) return problem(422, "party.invalid_hierarchy", "Cấp trên không thuộc địa bàn HTX");
+        const template = COOPERATIVES[0]!;
+        const provinceName = ADMIN_UNITS.find(u => u.code === unit.parent_code)?.name ?? "";
+        const center = COMMUNES.find(c => c.code === unit.code)?.center;
+        org = uuidv7();
+        const node = { ref: org, kind: "cooperative" as const, code: `HTX-NEO-${ORGS.length + 1}`, name, admin_unit_code: unit.code, parent_ref: parent?.ref ?? null, representative_ref: null, active: true };
+        ORGS.push(node);
+        COOPERATIVES.push({ ...template, province_code: unit.parent_code!, province_name: provinceName, commune_name: unit.name, lnglat: center ?? [0, 0], member_households: 0, plots: 0,
+          api: { ...template.api, ...node, tax_code: mst, area_ha: null, established_on: null, location: null, location_provisional: true,
+            confirmation_status: "unconfirmed", confirmation_label: "Chưa xác nhận", status_reason: null, member_households: 0, digitized_plots: 0, commune_name: unit.name, province_name: provinceName, province_code: unit.parent_code! } });
+      }
+      if (!COOPERATIVES.some(c => c.api.ref === org)) return problem(422, "cooperative.htx_anchor_org_not_cooperative", "Nút không phải HTX có hồ sơ");
+      if (ANCHORS.some(a => a.aliases.includes(org))) return problem(409, "cooperative.htx_anchor_org_anchored", "Nút HTX đã thuộc một neo khác");
       const id = hexId(93000 + ANCHORS.length, "a2c0");
       const a: HTXAnchor = {
         anchor_id: id,

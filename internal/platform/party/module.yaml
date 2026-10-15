@@ -23,6 +23,7 @@ provides:
     - CoopMachineCounts
     - CoopMarkers
     - CoopProfiles
+    - CooperativeRegistrar
     - DepartmentUsage
     - Departments
     - FormAvailability

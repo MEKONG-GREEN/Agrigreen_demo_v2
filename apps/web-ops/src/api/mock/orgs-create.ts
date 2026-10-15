@@ -28,12 +28,13 @@ export const orgCreateRoutes: Route[] = [
     method: "POST",
     pattern: /^\/v1\/orgs$/,
     handler: ({ persona, body }) => {
-      if (!hasRole(persona, "registry_admin", "kn_province_admin", "platform_admin")) return problem(403, "forbidden", "Forbidden");
+      if (!hasRole(persona, "registry_admin", "platform_admin")) return problem(403, "forbidden", "Forbidden", { detail: "chỉ Admin nền tảng (platform_admin, registry_admin) được tạo tổ chức" });
       const b = (body ?? {}) as Record<string, unknown>;
       const str = (k: string) => (typeof b[k] === "string" ? (b[k] as string).trim() : "");
       const kind = str("kind") as OrgKind;
       if (!KINDS.includes(kind)) return validation([{ field: "kind", reason: "kind không hợp lệ" }]);
       const isCoop = kind === "cooperative";
+      if (isCoop) return problem(422, "party.cooperative_requires_anchor", "Tạo HTX qua Neo HTX", { redirect: "/quan-tri/neo-htx" });
       // Quyết định PO 14/10/2026 (ORGUI): Nút không phải HTX chỉ Admin nền tảng tạo (app.requireNodeCreator).
       if (!isCoop && !hasRole(persona, "registry_admin", "platform_admin")) {
         return problem(403, "forbidden", "Forbidden", { detail: "chỉ Admin nền tảng (platform_admin, registry_admin) được tạo Nút hành chính / TTKN" });

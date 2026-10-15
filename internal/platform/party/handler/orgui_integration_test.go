@@ -13,7 +13,7 @@ import (
 )
 
 // ORGUI — quyết định PO 14/10/2026: Nút hành chính / TTKN (kể cả xã) chỉ Admin nền tảng tạo;
-// vai KN không tạo nhưng vẫn đổi tên / di chuyển Nút trong phạm vi và vẫn tạo được HTX.
+// vai KN không tạo nhưng vẫn đổi tên / di chuyển Nút cũ trong phạm vi.
 func TestOrgNodeCreateOnlyPlatformAdmin(t *testing.T) {
 	f := newFixture(t)
 	root := f.root()
@@ -39,19 +39,27 @@ func TestOrgNodeCreateOnlyPlatformAdmin(t *testing.T) {
 	wantStatus(t, f.as(f.tenant, tr.national, port.RoleKNNationalAdmin).adminDo(http.MethodPost, "/v1/orgs", team("TKN-QG-"+ids.New().String()[:6])),
 		http.StatusForbidden, "KN QG tạo Nút xã")
 
+	// ORG-CREATE-001: mọi vai Admin cũng phải dùng luồng Neo để tạo HTX.
+	for _, u := range []caller{root, f.as(f.tenant, tr.national, port.RoleRegistryAdmin)} {
+		r := u.adminDo(http.MethodPost, "/v1/orgs", map[string]any{"kind": "cooperative", "name": "HTX tạo vòng", "admin_unit_code": "30001"})
+		wantCode(t, r, http.StatusUnprocessableEntity, "party.cooperative_requires_anchor", "HTX phải qua Neo")
+		if str(r.body, "redirect") != "/quan-tri/neo-htx" {
+			t.Fatalf("thiếu đường chuyển: %v", r.body)
+		}
+	}
 	// Admin nền tảng: registry_admin riêng (gắn Nút TW để có phạm vi) và platform_admin riêng đều tạo được.
 	wantStatus(t, f.as(f.tenant, tr.national, port.RoleRegistryAdmin).adminDo(http.MethodPost, "/v1/orgs", team("TKN-RA-"+ids.New().String()[:6])),
 		http.StatusCreated, "registry_admin tạo Nút xã")
 	wantStatus(t, f.as(f.tenant, uuid.Nil, "platform_admin").adminDo(http.MethodPost, "/v1/orgs", team("TKN-PA-"+ids.New().String()[:6])),
 		http.StatusCreated, "platform_admin tạo Nút xã")
 
-	// Vai KN giữ các thao tác không phải tạo Nút: đổi tên, di chuyển Nút xã trong tỉnh, tạo HTX trong phạm vi.
+	// Vai KN giữ đổi tên và di chuyển Nút cũ trong tỉnh; không tạo HTX qua tổ chức chung.
 	wantStatus(t, prov.adminDo(http.MethodPost, "/v1/orgs/"+tr.t30002.String()+"/rename", map[string]any{"name": "Tổ KNCĐ Xã B (đổi tên)", "reason": "Đổi tên theo quyết định tỉnh"}),
 		http.StatusOK, "KN tỉnh đổi tên Nút xã")
 	wantStatus(t, prov.adminDo(http.MethodPost, "/v1/orgs/"+tr.c1.String()+"/move", map[string]any{"new_parent_ref": tr.t30002.String(), "new_admin_unit_code": "30002", "reason": "Sáp nhập xã theo nghị quyết"}),
 		http.StatusOK, "KN tỉnh di chuyển Nút trong tỉnh")
 	wantStatus(t, prov.adminDo(http.MethodPost, "/v1/orgs", map[string]any{"kind": "cooperative", "name": "HTX do KN tỉnh lập " + ids.New().String()[:6], "admin_unit_code": "30001", "parent_ref": tr.t30001.String()}),
-		http.StatusCreated, "KN tỉnh tạo HTX trong phạm vi")
+		http.StatusForbidden, "KN tỉnh không tạo HTX qua tổ chức chung")
 }
 
 // ORGUI — nhập cây bởi vai KN: dòng tạo Nút mới bị loại theo dòng (không 403 cả tệp), dòng có sẵn vẫn xử lý;

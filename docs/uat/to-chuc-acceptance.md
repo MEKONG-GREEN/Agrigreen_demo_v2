@@ -65,9 +65,16 @@ Trạng thái **đạt** nghĩa là có kiểm thử tự động trên giao di�
 |---|---|---|---|
 | TC-B1 | `POST /v1/orgs` Nút không phải HTX bởi `kn_province_admin` → 403 `forbidden` (kèm `detail`); `kn_national_admin` → 403 | Go DB `TestOrgNodeCreateOnlyPlatformAdmin`; mock `orgs-create.test.ts` | đạt |
 | TC-B2 | `registry_admin` riêng và `platform_admin` riêng tạo được Nút xã | Go DB `TestOrgNodeCreateOnlyPlatformAdmin` | đạt |
-| TC-B3 | KN tỉnh vẫn đổi tên, di chuyển Nút trong tỉnh, tạo HTX trong phạm vi | Go DB `TestOrgNodeCreateOnlyPlatformAdmin`; mock | đạt |
+| TC-B3 | KN tỉnh vẫn đổi tên, di chuyển Nút cũ trong tỉnh; tạo HTX qua tổ chức chung bị chặn 403 | Go DB `TestOrgNodeCreateOnlyPlatformAdmin`; mock | đạt |
 | TC-B4 | Nhập cây: dòng HTX mới bị loại, lý do chỉ sang Neo HTX (`/quan-tri/neo-htx`); dòng tạo Nút bởi vai KN bị loại theo dòng | Go DB `TestOrgImportCreateRulesORGUI`, `TestOrgTreeExportImportRoundTrip` | đạt |
 
-## Ngoài phạm vi gói
+## Chuyển luồng HTX (CODEX-G1, 15/10/2026)
 
-- `POST /v1/orgs` với `kind = cooperative` chưa bị chặn. Đây vẫn là bước tạo Nút HTX mà luồng neo D2 cần (xem giả định ORGUI).
+| Mã | Tiêu chí | Bằng chứng | Trạng thái |
+|---|---|---|---|
+| ORG-CREATE-001 | Mọi Admin tạo HTX qua `/v1/orgs` nhận 422 + redirect; vai KN nhận 403 với mọi loại | Go `TestOrgNodeCreateOnlyPlatformAdmin`, mock orgs-create | chờ cổng cuối |
+| ORG-NEO-001 | Tạo Nút lỗi giữa các bước, gửi lại cùng khóa hoàn tất đúng một Nút/Neo | `TestCreateWithNewCooperative_ORGUI` PostgreSQL thật | chờ cổng cuối |
+| ORG-NEO-002 | Mất phản hồi sau khi ghi, web khóa sửa trường, thử lại không trùng | `NewAnchorForm.test.tsx` | đạt |
+| ORG-NEO-003 | Neo HTTP tạo đủ Nút/hồ sơ/đại diện, phát lại, MST chuẩn, nhãn chưa xác nhận; sai vai/MFA/tenant bị chặn, không log PII/token | `tests/e2e/TestCreateAnchoredCooperativeORGUI` | chờ cổng cuối |
+
+D2 về sở hữu và nhận quyền giữ theo ADR-0052; đề xuất tách KN thuộc ADR-0055.

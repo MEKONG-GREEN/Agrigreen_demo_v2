@@ -363,9 +363,10 @@ export interface paths {
         get: operations["partyAdminListOrgs"];
         put?: never;
         /**
-         * Tạo tổ chức trong cây TW → Tỉnh → Xã; kind = cooperative kèm hồ sơ HTX, Mã HTX tự sinh
-         * @description Nút không phải HTX (hành chính / TTKN, kể cả xã) chỉ platform_admin hoặc registry_admin tạo (quyết định PO 14/10/2026,
-         *     gói ORGUI); kn_province_admin chỉ tạo được HTX trong phạm vi → 403 forbidden với loại khác.
+         * Tạo tổ chức trong cây TW → Tỉnh → Xã (HTX tạo qua Neo)
+         * @description Chỉ platform_admin hoặc registry_admin tạo tổ chức. Vai KN nhận 403 với mọi loại.
+         *     kind=cooperative nhận 422 party.cooperative_requires_anchor và redirect=/quan-tri/neo-htx;
+         *     dùng POST /v1/htx-anchors với new_cooperative để tạo Nút, hồ sơ và Neo.
          */
         post: operations["partyCreateOrg"];
         delete?: never;
@@ -8083,7 +8084,36 @@ export interface operations {
                      * Format: uuid
                      * @description Nút HTX (kind=cooperative, đã có hồ sơ)
                      */
-                    org_ref: string;
+                    org_ref?: string;
+                    /** @description Tạo Nút + hồ sơ ngay trong luồng Neo; chỉ platform_admin/registry_admin. Gửi lại cùng Idempotency-Key hoàn tất các bước còn thiếu, không tạo Nút thứ hai. MST lấy từ trường mst bên ngoài. */
+                    new_cooperative?: {
+                        name: string;
+                        /** @description Mã xã còn hiệu lực */
+                        admin_unit_code: string;
+                        /**
+                         * Format: uuid
+                         * @description Nút xã cấp trên (tùy chọn)
+                         */
+                        parent_ref?: string;
+                        /** Format: uuid */
+                        representative_ref?: string;
+                        /** @description Chuyển thẳng vào kho định danh, không lưu trong sổ Neo */
+                        representative?: {
+                            full_name: string;
+                            phone: string;
+                        };
+                        profile?: {
+                            /** @description Decimal dạng chuỗi */
+                            area_ha?: string;
+                            /** Format: date */
+                            established_on?: string;
+                            address?: string;
+                            location?: {
+                                lat: string;
+                                lon: string;
+                            };
+                        };
+                    };
                     /**
                      * @description mkg cần platform_admin
                      * @enum {string}
@@ -8093,7 +8123,7 @@ export interface operations {
                     mst?: string;
                     /** @description Thỏa thuận HTX — basis_ref của share_grant cho Khuyến nông */
                     agreement_ref?: string;
-                };
+                } & (unknown | unknown);
             };
         };
         responses: {

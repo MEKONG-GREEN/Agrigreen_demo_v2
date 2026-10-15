@@ -54,7 +54,8 @@ type Sources = store.Sources
 // (như trước W3.3 ở module chủ cũ).
 type Deps struct {
 	// Scope: phạm vi TW → Tỉnh → Xã của người gọi (pf/party, ADR-0009).
-	Scope partyport.ScopeResolver
+	Scope                partyport.ScopeResolver
+	CooperativeRegistrar partyport.CooperativeRegistrar // ORGUI: tạo HTX ngay trong luồng Neo
 	// Orgs: Nút tổ chức (HTX = Nút kind=cooperative); nếu cũng là partyport.OrgCodes thì nhập tệp theo Mã HTX được.
 	Orgs partyport.Orgs
 	// Dir: đọc Nút theo lô (danh bạ, thống kê, marker HTX — hồ sơ ở pf_coop, Nút ở pf_party).
@@ -106,7 +107,7 @@ func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 		Catalogs: deps.Catalogs, GpsLog: deps.GpsLog}
 	m.bilateral = &bilateralapp.Service{DB: db, Clock: clk}
 	m.ledger = bilateralapp.Ledger{DB: db, Clock: clk}
-	m.anchor = &anchorapp.Service{DB: db, Clock: clk}
+	m.anchor = &anchorapp.Service{DB: db, Clock: clk, Creator: deps.CooperativeRegistrar}
 	m.plot.Anchors = m.anchor
 	m.svc.Store = store.Sources{
 		Cooperatives: cooperatives{m.member, m.plot},

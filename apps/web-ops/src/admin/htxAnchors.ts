@@ -51,12 +51,10 @@ export function getAnchor(admin: AdminApiClient, id: string) {
 
 export function createProvisional(
   admin: AdminApiClient,
-  body: {
-    org_ref: string;
-    created_by: "kn" | "mkg";
-    mst?: string;
-    agreement_ref?: string;
-  },
+  body: { created_by: "kn" | "mkg"; mst?: string; agreement_ref?: string } & (
+    | { org_ref: string; new_cooperative?: never }
+    | { org_ref?: never; new_cooperative: { name: string; admin_unit_code: string; parent_ref?: string } }
+  ),
   idemKey: string,
 ) {
   return unwrap(

@@ -1,71 +1,41 @@
-## ORGUI — Hộp thoại "Tạo tổ chức" trên web-ops (không migration)
+## ORGUI — tạo tổ chức và chuyển tạo HTX sang Neo D2
 
-Bối cảnh: backend `POST /v1/orgs` (`partyCreateOrg`, Admin API, MFA) đã có và đã kiểm thử, nhưng web-ops chưa gọi.
-Trang `/quan-tri/to-chuc` ("Cơ cấu tổ chức") chỉ có cây, đổi tên, xuất/nhập tệp. Gói này thêm hộp thoại tạo. Không đổi
-OpenAPI, không đổi hành vi backend. Mặc định dưới đây do nhóm rà soát chốt. Dòng "Ai tạo được" là **quyết định PO
-(14/10/2026)**, không còn là giả định; các dòng khác vẫn là mặc định chờ PO.
+Phạm vi CODEX-G1 §4.1, quyết định PO 14/10/2026: tạo tổ chức trên web, chỉ Admin nền tảng
+(`platform_admin`, `registry_admin`). Quản trị KN không tạo tổ chức. Không có migration.
 
-| Câu hỏi | Phương án đã chọn | Ở đâu | Đổi thế nào nếu PO chọn khác |
-|---|---|---|---|
-| Đặt hộp thoại ở đâu | Trang quản trị nền tảng `/quan-tri/to-chuc`, không đặt trong màn KN, vì KN đang tách riêng | `apps/web-ops/src/app/quan-tri/to-chuc/page.tsx`, `src/admin/OrgCreateDialog.tsx` | Gắn `OrgCreateDialog` vào màn KN; logic nằm ở `src/admin/orgCreate.ts`, dùng lại được |
-| Ai tạo được — **QUYẾT ĐỊNH PO 14/10/2026** | Xã (và các Nút hành chính / TTKN khác) là đơn vị hành chính. **Chỉ Admin nền tảng tạo**, trên trang quản trị nền tảng "Cơ cấu tổ chức" `/quan-tri/to-chuc`. Vai được tạo: `platform_admin`, `registry_admin`. **KN admin (`kn_national_admin`, `kn_province_admin`, …) không có quyền tạo.** Từ 14/10/2026 backend cũng chặn: `CreateOrg` gọi `requireNodeCreator`, Nút không phải HTX cần `orgNodeRoles` (`registry_admin`, `platform_admin`), vai khác → 403 `forbidden` kèm `detail` | `ORG_CREATE_ROLES` (`orgCreate.ts`); `app.orgNodeRoles`, `requireNodeCreator` (`internal/platform/party/app/registry.go`); `TestOrgNodeCreateOnlyPlatformAdmin` | Đã chốt và đã áp ở API |
-| Loại nào tạo được | Mọi loại trong `PartyOrgInput` trừ HTX: `ttkn_province`, `extension_team`, `ttkn_national`, `dcrd`, `mkg`, `partner`. Trường hiển thị theo loại (`KIND_RULES`): TTKN tỉnh chọn tỉnh; Tổ KN xã chọn xã thuộc tỉnh của cấp trên; TTKN QG/Cục KTHT/MKG không gắn ĐVHC, không cấp trên; Đối tác nhập tay mã ĐVHC (tuỳ chọn) | `KIND_RULES`, `CREATE_KIND_ORDER` | Bớt loại khỏi `CREATE_KIND_ORDER`, ví dụ khi `mkg` chỉ có một bản ghi mỗi tenant |
-| HTX (`cooperative`) | Không tạo trong hộp thoại. Chọn loại HTX thì hiện liên kết sang `/quan-tri/neo-htx` (luồng HTX tạm theo MST, ADR-0052 / D2) | `KIND_RULES.cooperative.redirect` | Bỏ `redirect` và thêm trường hồ sơ HTX (MST, địa chỉ, diện tích); backend đã nhận `cooperative` |
-| Quy tắc cấp trên | Theo `domain.AllowedParent`: TTKN tỉnh dưới TTKN QG hoặc ở gốc; Tổ KN xã bắt buộc dưới TTKN tỉnh; các loại còn lại chỉ ở gốc. Ô chọn chỉ liệt kê tổ chức **đang hoạt động** đúng loại. Server trả `party.invalid_hierarchy` (422) thì lỗi hiện trên ô Cấp trên, kèm `detail` | `parentOptions`, `allowedParent`, `fieldErrorsFromProblem` | Sửa `KIND_RULES[*].parents/root` cùng lúc với `domain.AllowedParent` |
-| ĐVHC và ngày hiệu lực | Danh sách tra `GET /v1/masterdata/admin-units?at=<hôm nay giờ VN>`, sau đó lọc lại ở client: `valid_from ≤ hôm nay < valid_to` (`valid_to` không bao gồm) và nằm trong địa bàn cấp trên (`app.unitWithin`). Mã sai hoặc hết hiệu lực mà server trả 422 `validation_failed` thì lỗi hiện trên ô ĐVHC | `unitOptions`, `unitValidOn`, `vnToday` | Đổi `vnToday()` nếu cần cho chọn ngày hiệu lực trong quá khứ (tạo bù) |
-| Kiểm mã ở client | `^[A-Za-z0-9._-]{1,40}$` (giống `domain.codeRe`), tên 1–200 ký tự. 409 `party.org_code_taken` hiện trên ô Mã | `codeError`, `nameError` | — |
-| Idempotency-Key | Sinh **một lần mỗi lần mở hộp thoại**. Khóa được dùng lại khi gửi lại, kể cả sau khi sửa mã vì 409 hoặc sửa ĐVHC vì 422. An toàn vì backend chỉ lưu khóa khi đã ghi sổ (`org_event.idem_key`); lỗi nghiệp vụ không chiếm khóa. Lỗi mạng sau khi server đã ghi thì gửi lại sẽ nhận bản cũ, không tạo trùng | `OrgCreateDialog` (`useState(newIdempotencyKey)`) | Nếu sau này có kho idempotency HTTP chung lưu cả phản hồi lỗi và so dấu thân, phải sinh khóa mới mỗi khi thân đổi |
-| Sau khi tạo | Đóng hộp thoại, tải lại cây, chọn nút mới, mở mọi cấp trên của nút để nút hiện ra. Khung chi tiết cho đổi tên ngay | `onCreated` trong `page.tsx` | — |
-| Giả lập | `src/api/mock/orgs-create.ts`: 201 kèm `Location`; 409 `party.org_code_taken`; 422 `validation_failed` (theo trường), `party.invalid_hierarchy`; 403 `forbidden` / `party.out_of_scope` / `mfa_required`. Vai giả lập giống backend: Nút không phải HTX chỉ `registry_admin`/`platform_admin`; `kn_province_admin` chỉ tạo HTX. Phát lại khóa do `mockFetch` lo | `orgs-create.ts`, `orgs-create.test.ts` | — |
+| Nội dung | Hành vi bàn giao | Điểm hiện thực |
+|---|---|---|
+| Cơ cấu tổ chức | `/quan-tri/to-chuc`, hộp thoại theo loại, mã/tên, cấp trên đúng loại đang hoạt động, địa bàn còn hiệu lực theo ngày VN | `OrgCreateDialog.tsx`, `orgCreate.ts` |
+| Quyền tạo | `POST /v1/orgs` yêu cầu platform_admin hoặc registry_admin cho mọi loại; KN nhận 403 trước khi ghi | `party/handler/registry.go`, `TestOrgNodeCreateOnlyPlatformAdmin` |
+| HTX trong tổ chức chung | Tất cả Admin nhận 422 `party.cooperative_requires_anchor`, `redirect=/quan-tri/neo-htx` | HTTP + mock + OpenAPI |
+| HTX trong nhập cây | Dòng HTX mới bị loại theo dòng, kể cả mã trống/chưa tồn tại; lý do chỉ sang Neo. HTX cũ vẫn di chuyển/đổi tên | `importOrgRow`, `TestOrgImportCreateRulesORGUI`, `TestOrgTreeExportImportRoundTrip` |
+| Tạo HTX trong Neo | `POST /v1/htx-anchors` chọn đúng một trong `org_ref` đã có hoặc `new_cooperative`. Nhánh mới chỉ platform_admin/registry_admin | `anchor/app.Service.Create`, `party/port.CooperativeRegistrar`, assembly |
+| Dữ liệu HTX mới | Tên, xã, cấp trên tùy chọn; MST chuẩn hóa lấy từ `mst` bên ngoài. Có thể kèm hồ sơ diện tích/ngày thành lập/trụ sở/tọa độ và người đại diện. Người đại diện đi thẳng kho định danh; không nằm trong sổ Neo | `party.RegisterCooperative`, quy tắc hồ sơ hiện hữu |
+| Web Neo | Form chọn tỉnh/xã hiệu lực, tên, MST tùy chọn và căn cứ thỏa thuận. Chỉ Admin nền tảng thấy form; sau thành công chọn neo mới | `NewAnchorForm.tsx`, `/quan-tri/neo-htx` |
+| Chống trùng | MST có neo bị chặn trước khi tạo Nút; tên HTX mới không trùng tên hiện hữu trong tenant; profile MST và neo cùng MST | dịch vụ Neo + Registry |
+| Thử lại | Khóa tạo Nút `anchor-org:<key>`, khóa Neo `anchor-create:<key>` ổn định. Gửi lại hoàn tất phần thiếu; không tạo Nút thứ hai. Mất phản hồi/lỗi máy chủ thì web giữ nguyên dữ liệu và khóa, khóa sửa trường tới khi hoàn tất | ORG-NEO-001/002/003 |
+| Sau tạo tổ chức | Tải lại cây, chọn Nút mới và mở các cấp trên; lỗi mã/cấp trên/địa bàn hiển thị tại trường tương ứng | OrgCreateDialog + Playwright |
 
-### Phạm vi của quyết định PO với các thao tác khác (backend, 14/10/2026)
+### Ranh giới và phục hồi
 
-| Thao tác | Trước | Sau | Lý do |
-|---|---|---|---|
-| `POST /v1/orgs` (Nút không phải HTX) | `registry_admin`, `kn_province_admin`, `platform_admin` | Chỉ `registry_admin`, `platform_admin`; vai KN → 403 `forbidden` | Đúng quyết định PO: tạo Nút hành chính / TTKN là việc của Admin nền tảng |
-| `POST /v1/orgs` (`cooperative`) | như trên | Không đổi: `kn_province_admin` vẫn tạo HTX trong phạm vi | HTX không phải Nút hành chính; quyết định PO không nói tới HTX |
-| `POST /v1/orgs/{ref}/rename` | `adminRoles` + phạm vi | **Không đổi** | Đổi tên không tạo Nút; KN tỉnh cần sửa tên tổ/xã sau sáp nhập |
-| `POST /v1/orgs/{ref}/move` | `adminRoles` + phạm vi | **Không đổi** | Luồng "di chuyển Nút xã" của KN admin (sáp nhập, US-ADM-07/08) giữ nguyên; di chuyển không tạo Nút. Quyết định PO chỉ nói về tạo |
-| `POST /v1/orgs/import` | Dòng mới gọi `CreateOrg` với vai người nhập | Dòng tạo Nút mới bởi vai KN bị loại **theo dòng** (lý do "chỉ Admin nền tảng…"); dòng có sẵn vẫn di chuyển/đổi tên | Kế thừa quy tắc của `CreateOrg`; tệp vẫn nhập được cho phần không phải tạo |
-| `POST /v1/orgs/{ref}/communes/ensure` (KN) | `knAdminRoles` = `platform_admin`, `registry_admin` | Không đổi | Đã chỉ Admin nền tảng |
+Tạo Nút, hồ sơ và Neo là các bước qua module, **không phải một giao dịch phân tán nguyên tử**.
+Nếu lỗi sau bước tạo Nút hoặc hồ sơ, gửi lại cùng yêu cầu và Idempotency-Key để hoàn tất.
+Nếu một yêu cầu khác thắng cuộc đua MST, lỗi 409 chỉ neo đã có; không tự gộp dữ liệu, không tự xóa Nút.
+Quản trị có thể chọn Nút cũ để lập neo hoặc đối chiếu neo thắng cuộc. Không sửa sổ chỉ ghi thêm.
 
-Kiểm thử DB: `TestOrgNodeCreateOnlyPlatformAdmin` (403 cho KN tỉnh với xã/TTKN tỉnh/đối tác, 403 cho KN QG; 201 cho
-`registry_admin` riêng và `platform_admin` riêng; KN tỉnh vẫn đổi tên, di chuyển Nút trong tỉnh và tạo HTX),
-`TestOrgImportCreateRulesORGUI` (nhập bởi KN tỉnh: dòng xã mới và dòng HTX mới bị loại theo dòng; Admin nền tảng: xã tạo được,
-HTX mới vẫn bị loại).
+D2 về đồng sở hữu MKG/HTX, nhận quyền MST, nhãn “Chưa xác nhận”, bí danh và kiểm toán giữ theo ADR-0052.
+Phần KN tạo/nhập dữ liệu HTX trong mô hình cũ phải đối chiếu ở ADR-0055 khi tách KN; ORGUI không tự quyết thay CEO D2.
+Các thao tác đổi tên/di chuyển Nút cũ giữ quyền và phạm vi hiện hữu. Các đường nhập hồ sơ HTX chuyên dụng không thuộc
+phạm vi chặn `/v1/orgs` và `/v1/orgs/import`; sẽ được rà soát cùng ranh giới KN.
 
-### Rà soát `POST /v1/orgs/import` với HTX (D2)
+### Kiểm thử và mặc định
 
-**Phát hiện.** Dòng có `kind = cooperative` và Mã tổ chức để trống sẽ gọi thẳng `CreateOrg`
-(`internal/platform/party/app/orgtree.go`, `importOrgRow`). Kết quả là một Nút HTX:
+- ORG-CREATE-001: Admin bị chặn tạo HTX qua tổ chức chung; KN bị chặn mọi loại.
+- ORG-NEO-001: PostgreSQL thật, giả lập lỗi sau tạo Nút, cùng khóa chỉ một Nút và một Neo.
+- ORG-NEO-002: giao diện + HTTP client/mock thật; mất phản hồi sau ghi, thử lại cùng khóa không trùng.
+- ORG-NEO-003: assembly + HTTP + PostgreSQL + vault thật; profile đầy đủ, phát lại, MST trùng, quyền/MFA/tenant/PII.
+- Các kịch bản G1, acceptance và bộ sinh dữ liệu tổng hợp tạo HTX qua Neo; các fixture lõi Registry ghi rõ là setup nội bộ,
+  không giả phản hồi HTTP thành công cho API đã bị đóng. Sổ hồi quy: [REGRESSION](../../REGRESSION.md).
 
-- không có hồ sơ (không MST);
-- không có neo `pf_coop.htx_anchor`, không ghi `created_by_kind`/`created_by`;
-- không kiểm trùng tên (`UniqueName = false`).
-
-Đây là đường tạo HTX vòng qua luồng D2 (ADR-0052 §3), cũng như `POST /v1/orgs` với `kind = cooperative` khi không có bước
-`POST /v1/htx-anchors` theo sau. Nút vẫn hiện "Chưa xác nhận" (§5: không có neo nghĩa là chưa xác nhận). Nó chỉ vào mô hình
-neo khi chạy `POST /v1/htx-anchors/backfill`, và khi đó bị gắn nhãn `legacy_backfilled`, `created_by = kn`, tức là sai nguồn
-gốc. Kiểm thử `TestOrgTreeExportImportRoundTrip` (`internal/platform/party/handler/tabular_integration_test.go`, dòng
-`"HTX Xã C Mới"`) đang **khẳng định** hành vi này. Vì vậy gói này không sửa backend.
-
-**Đã làm (14/10/2026), cách A.** Nhập cây không tạo HTX mới: dòng `cooperative` có mã trống hoặc mã chưa có bị loại theo dòng
-với lý do "… tạo HTX qua màn Neo HTX theo mã số thuế (/quan-tri/neo-htx, D2) …" (`app.CoopImportRejectReason`,
-`importOrgRow`). Dòng HTX đã có vẫn di chuyển/đổi tên. `TestOrgTreeExportImportRoundTrip` đổi kỳ vọng dòng "HTX Xã C Mới" thành
-`rejected` (tổng: 1 tạo, 5 loại; xuất lại 8 dòng). Lý do loại là văn bản theo dòng, không phải mã lỗi mới, nên không thêm
-`docs/errors/…`. OpenAPI chỉ sửa mô tả (`gen:api` đã chạy).
-
-**Chưa làm: chặn `POST /v1/orgs` với `kind = cooperative`** (422 `party.cooperative_requires_anchor`). Quyết định có điều kiện của
-điều phối: "luồng neo D2 vẫn phải tạo được Nút HTX nó cần". Kết quả kiểm tra:
-
-- `POST /v1/htx-anchors` (`internal/platform/cooperative/anchor/app/service.go`) **không** tạo Nút. Nó nhận `org_ref` của một Nút HTX
-  đã có hồ sơ; ADR-0052 §3 ghi "tạo bằng luồng tạo HTX hiện có". Với Admin nền tảng, luồng tạo một HTX đơn lẻ có hồ sơ (MST) chính là
-  `POST /v1/orgs` `kind = cooperative`. Chặn nó thì màn Neo HTX mất bước tạo Nút cho MKG; chỉ còn nhập hàng loạt
-  `/v1/cooperatives/import`, sao chép hồ sơ, hoặc luồng KN `/v1/kn/cooperatives`.
-- 15 tệp kiểm thử ngoài gói (mkg/hub, cooperative/member, party, tests/acceptance, tests/e2e G1, cmd/api-internal) tạo HTX qua
-  `POST /v1/orgs`; `seedTree` của party dùng nó cho mọi kiểm thử handler.
-
-Đề xuất gói sau (cần sửa OpenAPI, cổng giữa module, web Neo HTX): `POST /v1/htx-anchors` nhận thêm `new_cooperative`
-(tên, xã, cấp trên, MST, …), tạo Nút qua đường nội bộ `Registry.createOrg` và neo trong cùng thao tác. Khi đó mới chặn
-`POST /v1/orgs` `kind = cooperative` bằng 422 `party.cooperative_requires_anchor` (ghi vào `docs/errors/…`), và chuyển các kiểm thử
-trên sang đường mới hoặc sang đường nội bộ.
+Mặc định còn giữ: vị trí hộp thoại ở trang quản trị nền tảng; mọi loại tổ chức đã hỗ trợ trừ HTX dùng hộp thoại đó;
+chọn ngày hiệu lực là hôm nay tại Việt Nam; không mở luồng tạo trên mobile.
