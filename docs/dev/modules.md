@@ -591,3 +591,8 @@ Bộ chạy v2 (`internal/shared/migrator`, [ADR-0038](../adr/0038-bo-chay-migra
 - Đổi `depends` trong `module.yaml` → `go run ./tools/modgen` (danh mục sinh mang `depends` cho bộ chạy lúc chạy, `modreg.Depends`).
 - Kiểm thử cả bộ chạy v2 cho một gói: `AG_MIGRATE_RUNNER=v2 go test -count=1 -p 1 ./<gói>/` (`pgtest` dùng `dbadmin.Migrate`).
 - Vai `own_<module>` (NOLOGIN) đã dựng; chạy migration bằng nó và thư mục `migrations/<cụm>/<module>/` là bước 2.
+
+## Hồi quy liên module G1
+
+Xem [sổ hồi quy](../REGRESSION.md) để tái lập đồ thị tiêu thụ và các lệnh chấp nhận
+khi đổi port, sự kiện, namespace hoặc phần lắp ráp liên module.
