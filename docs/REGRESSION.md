@@ -166,3 +166,5 @@ Baseline ban đầu414 ghép nối sinh trên dev `988febd9` theo CODEX-G1, khô
 Kết quả PostgreSQL KNSPLIT-0: mã thoát 0 (68,755 giây), không SKIP. `TestKNRolesNoHTXInternalAccess_KNSPLIT0` và `TestKNRolesCannotWriteHTXLedgers_KNSPLIT0` PASS. `TestKNPrincipalHTXDataAccess_KNSPLIT0/dich_tenant_KN_rieng` PASS. Nhánh tenant lưu ký tái hiện đúng 5 XFAIL: đọc bảng ngoài công bố/cấp phép, đọc ngoài phạm vi cấp phép, ghi sổ HTX, thu hồi và hết hạn không cắt quyền. Đây là bằng chứng nợ để gỡ ở KNSPLIT-4b; không được tính là 5 tiêu chí ranh giới đã đạt.
 
 Cổng build/vet/modgen-check/migratecheck-base/archlint/contractcheck/docscheck/mfaflagcheck/golangci-lint: mã thoát 0, lint 0 issues. Tool suite cuối và knboundary -base origin/dev mã thoát 0, 414 ghép nối. Helper tích hợp được bổ sung chạy knboundary sau rebase và lấy tên nhánh thực để hỗ trợ prefix codex/; vẫn từ chối main và chỉ đẩy refs/heads/dev.
+
+KNSPLIT-0 đã tích hợp bằng helper: mã thoát 0, dev f2a9afec; chạy lại 3 ca DB (giữ 5 XFAIL đúng lý do) và cổng migration 219,226 giây. knboundary sau rebase khớp 414; build/vet/modgen/migrate/archlint đều 0. Không có migration mới, không sửa main; giữ worktree.
