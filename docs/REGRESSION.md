@@ -34,6 +34,7 @@ kn77 và web: `npm run gen:api`, `npm run typecheck`, `npm test -- --maxWorkers=
 Downstream consumers: assembly và worker nối consumer/job; đồng bộ hộp thư hiện trường
 qua hợp đồng notify hiện hữu. W11.43 thêm loại thông báo, giữ nguyên hình dạng inbox.
 Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/notify/... ./cmd/api-platform/assembly ./cmd/worker`.
+Regression acceptance command (G5): `go test -v -count=1 -p 1 -timeout 55m -run '^TestG5ThirdPartyToStatement$' ./tests/e2e`.
 Propagation rule: đổi payload inbox hoặc port → bổ sung kiểm thử client/mobile;
 thêm template sự kiện nhưng giữ inbox/port → kiểm cả template cũ trong notify và gốc lắp ráp.
 

@@ -108,7 +108,7 @@ func (c caller) admin() bool { return c.k.Role == authz.KNAdmin }
 func (c caller) tinh() bool  { return c.k.Role == authz.KNTinh }
 
 // sees cho biết người gọi thấy cảnh báo a: Admin; Cấp Tỉnh trong phạm vi Nút (cảnh báo không gắn xã — mọi Cấp Tỉnh của
-// phòng); Cấp Xã: cảnh báo của các xã phụ trách hoặc được giao cho mình.
+// phòng và đúng tỉnh); Cấp Xã: cảnh báo của các xã phụ trách hoặc được giao cho mình.
 func (c caller) sees(a store.Alert) bool {
 	switch {
 	case c.admin():
@@ -116,7 +116,7 @@ func (c caller) sees(a store.Alert) bool {
 	case a.AssigneeRef != nil && *a.AssigneeRef == c.p.ActorRef:
 		return true
 	case a.CommuneCode == "":
-		return c.tinh()
+		return c.tinh() && a.ProvinceCode != "" && c.k.Scope.Allows(a.ProvinceCode)
 	case c.tinh():
 		return c.k.Scope.Allows(a.CommuneCode)
 	}
