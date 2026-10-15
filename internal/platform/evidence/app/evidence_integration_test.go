@@ -435,6 +435,16 @@ func TestStorageInvariants_W65(t *testing.T) {
 	}
 }
 
+// Kiểm thực thi bộ kiểm quyền từng tệp do module chủ cung cấp.
+type fileCheckedResolver struct {
+	*fakeResolver
+	allow bool
+}
+
+func (r *fileCheckedResolver) AuthorizeFile(context.Context, port.File) (bool, error) {
+	return r.allow, nil
+}
+
 // W11.24: mục đích hr_records (tài liệu nhân sự pf/hrm) được phép mở, KHÔNG kiểm đồng ý của chủ thể (chủ thể là khóa kho
 // tài liệu, cơ sở là nghĩa vụ quản lý hồ sơ); mrv.evidence vẫn kiểm đồng ý.
 func TestOpenHRRecordsWithoutConsent_W1124(t *testing.T) {
@@ -455,6 +465,15 @@ func TestOpenHRRecordsWithoutConsent_W1124(t *testing.T) {
 	}
 	if _, err := f.svc.Open(viewer, file.Ref, string(client.PurposeMRVEvidence)); code(err) != ErrConsentMissing.Code {
 		t.Fatalf("mrv.evidence vẫn kiểm đồng ý: %v", err)
+	}
+	checker := &fileCheckedResolver{fakeResolver: f.res}
+	f.svc.Resolvers["pf/hrm"] = checker
+	if _, _, err := f.svc.OpenContent(viewer, file.Ref, string(client.PurposeHRRecords)); code(err) != ErrSubjectForbidden.Code {
+		t.Fatalf("module chủ từ chối tệp phải chặn: %v", err)
+	}
+	checker.allow = true
+	if _, _, err := f.svc.OpenContent(viewer, file.Ref, string(client.PurposeHRRecords)); err != nil {
+		t.Fatal(err)
 	}
 	// HRM-DOC-PURPOSE-001: đổi mục đích không được vượt kiểm đồng ý của tệp
 	// hiện trường, tệp cũ chưa có bộ ba, hoặc loại thực thể khác của HRM.

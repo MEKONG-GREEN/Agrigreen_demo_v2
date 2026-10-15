@@ -68,3 +68,5 @@ Sau phát hiện dùng sai mục đích, chạy lại evidence + assembly và th
 Related test points: HRM-DOC-PURPOSE-001 (`TestOpenHRRecordsWithoutConsent_W1124`), HRM-DOC-CRYPTO-001 (`TestHRRecordsUnwrapHTTP_W1124`), FN-14 AC-01/02/03 (`TestHRMDocsHTTP_W1124`).
 
 Kết quả: đang chạy. Web lượt đầu có 511/519 test PASS, tám ca menu thất bại vì nạp fixture cũ trước khi Go sinh golden xong; chạy lại hợp đồng menu sau khi sinh. Lượt đầu phát hiện trùng trợ giúp `recFixture.raw` giữa báo cáo Sở và kho tài liệu, khiến HRM handler không biên dịch. Đã đổi tên trợ giúp tài liệu thành `rawDoc`; phải chạy lại HRM handler và kho định danh trước khi kết luận đạt. Không đổi ca kiểm tra hay ngưỡng.
+
+Bổ sung HRM-DOC-FILE-001: resolver của module chủ hiện thực port.FileAuthorizer (tùy chọn cho chủ thể vùng chứa); evidence gọi trước khi cấp URL/nội dung. HRM kiểm đúng tài liệu hiện hành theo file_ref thay vì chỉ quyền thư mục. Chạy lại TestHRMDocsHTTP_W1124 và suite mở tệp evidence; lượt trước của hai suite không được dùng để chứng minh bản sửa này.

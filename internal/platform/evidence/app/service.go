@@ -278,6 +278,15 @@ func (s *Service) decide(ctx context.Context, p authz.Principal, f port.File, pu
 		if err != nil {
 			return decision{}, err
 		}
+		if checker, ok := s.Resolvers[f.Subject.Module].(port.FileAuthorizer); ok {
+			allowed, err := checker.AuthorizeFile(ctx, f)
+			if err != nil {
+				return decision{}, err
+			}
+			if !allowed {
+				return decision{domain.OutcomeDeniedScope, ErrSubjectForbidden}, nil
+			}
+		}
 		if !domain.Visible(sc, res) {
 			return decision{domain.OutcomeDeniedScope, ErrSubjectForbidden}, nil
 		}

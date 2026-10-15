@@ -1243,3 +1243,45 @@ func (r FileResolver) Resolve(ctx context.Context, subjectType string, id uuid.U
 	})
 	return out, err
 }
+
+// AuthorizeFile kiểm lại tài liệu cụ thể khi gọi evidence trực tiếp bằng
+// file_ref: quyền xem thư mục không tự cấp quyền mọi tài liệu trong thư mục.
+func (r FileResolver) AuthorizeFile(ctx context.Context, file evport.File) (bool, error) {
+	if r.S == nil || r.S.DB == nil {
+		return false, evport.ErrResolverUnavailable
+	}
+	if file.Subject == nil || file.Subject.Module != port.SubjectModule || file.Subject.Type != port.SubjectTypeFolder {
+		return false, nil
+	}
+	allowed := false
+	err := r.S.docTx(ctx, func(tx pgx.Tx) error {
+		id, err := store.DocIDForFile(ctx, tx, file.Ref)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		_, cur, err := docHead(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if cur.FileRef != file.Ref || cur.FolderID != file.Subject.ID {
+			return nil
+		}
+		c, err := r.S.docCaller(ctx, tx)
+		if err != nil {
+			return nil
+		} // không có ngữ cảnh nghiệp vụ hợp lệ: từ chối
+		tree, err := loadTree(ctx, tx)
+		if err != nil {
+			return err
+		}
+		_, err = c.visibleDoc(tree, cur)
+		allowed = err == nil
+		return nil
+	})
+	return allowed, err
+}
+
+var _ evport.FileAuthorizer = FileResolver{}

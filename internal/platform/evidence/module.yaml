@@ -9,7 +9,7 @@ version: 1.0.0
 depends:
   vault/identity: ">=1.0 <2"
 provides:
-  ports: [Files, Resolver]
+  ports: [FileAuthorizer, Files, Resolver]
   events: []
   internal_events: []
   publications: []

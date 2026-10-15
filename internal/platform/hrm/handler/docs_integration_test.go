@@ -74,6 +74,15 @@ func (x *fakeFiles) OpenContent(ctx context.Context, ref uuid.UUID, purpose stri
 	if err != nil || !r.ViaShareGrant {
 		return "", nil, problem.Forbidden
 	}
+	if checker, ok := x.res.(evport.FileAuthorizer); ok {
+		allowed, err := checker.AuthorizeFile(ctx, f)
+		if err != nil {
+			return "", nil, err
+		}
+		if !allowed {
+			return "", nil, problem.Forbidden
+		}
+	}
 	dek, err := x.vault.Unwrap(ctx, client.Purpose(purpose), f.SubjectRef, f.WrappedDEK)
 	if err != nil {
 		return "", nil, err
@@ -291,6 +300,26 @@ func TestHRMDocsHTTP_W1124(t *testing.T) {
 		t.Fatalf("lãnh đạo phòng không xem nhật ký: %v", g)
 	}
 
+	// HRM-DOC-FILE-001: biết file_ref và thấy thư mục vẫn không vượt được
+	// quyền theo đơn vị của tài liệu khi gọi cổng tệp trực tiếp.
+	var docFile evport.File
+	for _, file := range ff.files {
+		if file.Subject.ID.String() == subID {
+			docFile = file
+		}
+	}
+	for _, tc := range []struct {
+		who     string
+		allowed bool
+	}{
+		{"ld_tt", true}, {"ld_cn", false}, {"other", false}, {"xa", false},
+	} {
+		ctx := authz.WithPrincipal(context.Background(), f.who[tc.who])
+		_, _, err := ff.OpenContent(ctx, docFile.Ref, string(client.PurposeHRRecords))
+		if (err == nil) != tc.allowed {
+			t.Fatalf("cổng tệp trực tiếp %s: %v", tc.who, err)
+		}
+	}
 	// Sửa phân loại: lưu vết trường đã đổi.
 	f.call("hcth", http.MethodPost, "/v1/hrm/docs/"+doc1+"/classify", map[string]any{"title": "QĐ nâng bậc lương 7/2026",
 		"doc_type": "nang_bac", "staff_ids": []string{id1}, "doc_no": "123/QĐ-TTKN", "issued_on": "2026-07-15", "unit_code": "trong_trot"},

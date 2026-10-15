@@ -17894,8 +17894,8 @@ export interface components {
         Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest" | "vessel_class" | "crop" | "material" | "production_model" | "report_type" | "cnts_species" | "cnts_breed" | "cnts_vaccine" | "cnts_vaccination_schedule" | "cnts_disease" | "cnts_chemical" | "cnts_slaughter_facility" | "cnts_aquaculture_object" | "cnts_fishing_group" | "cnts_indicator" | "cnts_model_type" | "cnts_document_type";
         /** @description Mã thiết bị đã đăng ký bởi chính người gọi (pf/sync) */
         DeviceID: string;
-        /** @description Mục đích xử lý dữ liệu cá nhân (R-42) */
-        Purpose: "mrv.evidence" | "extension.field_support";
+        /** @description Mục đích xử lý (R-42); hr_records chỉ dùng cho tệp có chủ thể pf/hrm / hr_folder do module đăng ký, không áp dụng tệp cũ hoặc tệp hiện trường */
+        Purpose: "mrv.evidence" | "extension.field_support" | "hr_records";
     };
     requestBodies: never;
     headers: never;
@@ -19234,7 +19234,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Mục đích xử lý dữ liệu cá nhân (R-42) */
+                /** @description Mục đích xử lý (R-42); hr_records chỉ dùng cho tệp có chủ thể pf/hrm / hr_folder do module đăng ký, không áp dụng tệp cũ hoặc tệp hiện trường */
                 "X-Purpose": components["parameters"]["Purpose"];
             };
             path: {
@@ -19271,7 +19271,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Mục đích xử lý dữ liệu cá nhân (R-42) */
+                /** @description Mục đích xử lý (R-42); hr_records chỉ dùng cho tệp có chủ thể pf/hrm / hr_folder do module đăng ký, không áp dụng tệp cũ hoặc tệp hiện trường */
                 "X-Purpose": components["parameters"]["Purpose"];
             };
             path: {

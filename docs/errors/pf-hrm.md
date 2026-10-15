@@ -15,3 +15,5 @@ của evidence tại gốc lắp ráp, chỉ cho chủ thể `pf/hrm` / `hr_fold
 và được phép xem. Tệp khác module, khác loại hoặc tệp cũ không có bộ ba trả
 `403 sync.purpose_not_allowed` và ghi sổ từ chối. Không thể dùng mục đích hồ sơ
 để bỏ qua đồng ý của minh chứng MRV/hiện trường.
+
+HRM-DOC-FILE-001: resolver thư mục cung cấp FileAuthorizer. Đường mở tệp chung kiểm lại phiên bản tài liệu hiện hành, đúng thư mục, quyền theo đơn vị/bản thân, trạng thái ẩn và cờ hồ sơ. Thấy thư mục không cấp quyền tất cả tệp. Từ chối trả 403 evidence.subject_forbidden và ghi sổ denied_scope; không trả URL/bản rõ.

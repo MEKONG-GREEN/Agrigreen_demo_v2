@@ -39,6 +39,7 @@ Kết quả chạy từng lệnh và mã thoát: [sổ hồi quy](../REGRESSION.
 | Lãnh đạo chỉ xem phòng mình; tenant khác không thấy; thư mục kế thừa quyền và ưu tiên người dùng | `TestHRMDocsHTTP_W1124`, `TestDocsDomain_W1124` | FN-14 AC-02 |
 | Tệp mã hóa, bản tải đúng nội dung, no-store, vai kho bắt buộc; nhật ký tải/xem | `TestHRMDocsHTTP_W1124` | FN-14 AC-03; evidence/vault là cổng giả ở ca HTTP HRM |
 | Evidence thật cho phép `hr_records` không cần đồng ý; MRV giữ yêu cầu đồng ý | `TestOpenHRRecordsWithoutConsent_W1124` | DB thật, kho định danh giả |
+| HRM-DOC-FILE-001: biết mã tệp và thấy thư mục vẫn không được mở tài liệu ngoài phòng/tenant; evidence bắt buộc gọi bộ kiểm từng tệp của chủ | `TestHRMDocsHTTP_W1124`, `TestOpenHRRecordsWithoutConsent_W1124` | DB thật |
 | HRM-DOC-PURPOSE-001: không thể dùng hr_records mở tệp hiện trường, tệp cũ hoặc sai loại; mọi từ chối có sổ | `TestOpenHRRecordsWithoutConsent_W1124` | DB thật |
 | HRM-DOC-CRYPTO-001: mở khóa/giải mã đúng qua client/router/vault thật; chặn sai vai, sai tenant, sai mục đích; log không chứa bản rõ/token | `TestHRRecordsUnwrapHTTP_W1124` | PostgreSQL thật, HTTP, KMS cục bộ dành cho test |
 | Ẩn/hiện lại có lý do, lịch sử phân loại; sổ không UPDATE/DELETE | `TestHRMDocsHTTP_W1124` | G1 |

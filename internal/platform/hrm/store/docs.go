@@ -200,3 +200,11 @@ func DocAccessOf(ctx context.Context, tx pgx.Tx, docID uuid.UUID, limit int) ([]
 		return a, err
 	})
 }
+
+// DocIDForFile tìm tài liệu đã nhận tệp; người gọi phải đọc lại phiên bản
+// hiện hành và kiểm quyền, không dùng bản ghi cũ để cấp tệp đã thay thế.
+func DocIDForFile(ctx context.Context, tx pgx.Tx, fileRef uuid.UUID) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := tx.QueryRow(ctx, `SELECT doc_id FROM pf_hrm.doc WHERE file_ref = $1 ORDER BY seq DESC LIMIT 1`, fileRef).Scan(&id)
+	return id, err
+}
