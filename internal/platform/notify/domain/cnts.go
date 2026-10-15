@@ -3,6 +3,7 @@ package domain
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"slices"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 // (loại, biểu, kỳ, đơn vị) — không số liệu cá nhân; Redact che thêm. Đẩy FCM chỉ dữ liệu (ADR-0015).
 
 // CNTSEvents là sự kiện consumer pf.notify.cnts xử lý.
-var CNTSEvents = []string{extport.EventCNTSAlertChanged, extport.EventCNTSFormReminded}
+var CNTSEvents = []string{extport.EventCNTSAlertChanged, extport.EventCNTSFormReminded, extport.EventCNTSDutyChanged}
 
 // Đường dẫn màn của thông báo CNTS (web-ops).
 const (
@@ -27,6 +28,27 @@ const (
 // với cảnh báo; cán bộ của xã với nhắc nộp), không email.
 func CNTSNotifications(eventType string, payload json.RawMessage, occurred time.Time) ([]Notification, error) {
 	switch eventType {
+	case extport.EventCNTSDutyChanged:
+		var p extport.CNTSDutyChangedV1
+		if err := json.Unmarshal(payload, &p); err != nil {
+			return nil, fmt.Errorf("notify: payload %s: %w", eventType, err)
+		}
+		if p.RosterID == uuid.Nil || p.Version < 1 {
+			return nil, fmt.Errorf("notify: lịch trực thiếu mã hoặc phiên bản")
+		}
+		month, err := time.Parse("2006-01", p.Month)
+		if err != nil {
+			return nil, fmt.Errorf("notify: tháng lịch trực: %w", err)
+		}
+		tpl := Template{Kind: port.KindCNTSDutyChanged, Severity: port.SeverityNormal, Title: "Lịch trực KSGM đã thay đổi",
+			Body:     fmt.Sprintf("Lịch trực tháng %s đã cập nhật phiên bản %d. Mở lịch để xem ca của bạn.", month.Format("01/2006"), p.Version),
+			DeepLink: "/kn/cnts/lich-truc", SubjectRef: ref(p.RosterID), CreatedAt: ParseTime(p.EventTime, occurred)}
+		out := make([]Notification, 0, len(p.OfficerRefs))
+		for _, r := range DedupRefs(p.OfficerRefs) {
+			out = append(out, tpl.For(r))
+		}
+		return out, nil
+
 	case extport.EventCNTSAlertChanged:
 		var p extport.CNTSAlertChangedV1
 		if err := json.Unmarshal(payload, &p); err != nil {

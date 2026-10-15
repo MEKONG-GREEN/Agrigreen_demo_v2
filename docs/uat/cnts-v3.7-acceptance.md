@@ -1,6 +1,6 @@
-# Nghiệm thu CNTS v3.7 — W11.43
+# Nghiệm thu CNTS v3.7 — W11.43 / W11.46
 
-Phạm vi G1: cảnh báo liên biểu, vòng đời xử lý và nhắc nộp biểu CNTS.
+Phạm vi G1: cảnh báo liên biểu, vòng đời xử lý, nhắc nộp biểu CNTS và lịch trực/tiêm/công tác + check-in.
 Nguồn và các giới hạn: [giả định W11.43](../kn/gia-dinh/W11.43.md).
 Các kiểm thử tích hợp dùng PostgreSQL thật; nguồn bài nộp/danh bạ trong kiểm thử
 cảnh báo là cổng giả. `TestFormsSubmissionFeed_W1143` kiểm chứng cổng nguồn thật
@@ -25,3 +25,18 @@ Nhịp worker/sự kiện cần được kiểm trên môi trường triển kha
 một phút; kiểm thử hàm xử lý không tự chứng minh thời gian giao nhận thực tế.
 
 Kết quả tiếp nhận ngày 15/10/2026 được ghi ở [sổ hồi quy](../REGRESSION.md).
+
+## Lịch CNTS W11.46
+
+| Tiêu chí | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| Lưới BM-03, sao chép, phiên bản lạc quan, cảnh báo trùng ca/chưa có người/chưa cấp cơ sở; Cấp Xã xem ca mình | `TestDutyRoster`, `TestNormalizeCellsAndWarnings`; schedules Vitest | G1 |
+| Tách tỉnh cùng tenant: cơ sở/cán bộ, ô/ghi chú/lịch sử và số phiên bản; chặn chọn tỉnh/cán bộ/cơ sở ngoài phạm vi | `TestDutyRosterProvinceIsolation_W1146` (CNTS-ROSTER-SCOPE-001) | G1 |
+| Admin phải chọn tỉnh; lịch chung cũ chỉ đọc, hash giữ nguyên | `TestDutyRosterAdminAndLegacy_W1146`, `DutyRosterScreen.test.tsx` (CNTS-ROSTER-SCOPE-002) | G1 |
+| Đổi ca → hộp thư/đẩy đúng người bị ảnh hưởng, giao lại không trùng, không gửi ra tenant khác | `TestCNTSDutyChanged_W1146` (CNTS-DUTY-NOTIFY-001) | G1 |
+| BM-07 chọn quy trình theo ngày nhận giống, ngày tuổi, sửa dự kiến, ghi thực tế/hủy, phạm vi xã | `TestVaccinationBatch`, `TestGenerateDosesAC03`, `TestDoseStatusAndUpdates` | G1 |
+| Lịch công tác theo phòng, người theo dõi duyệt, check-in một lần, ngày/ngoại tuyến, khoảng cách; tọa độ ở bảng có hạn lưu, purge | `TestWorkScheduleCheckin`; domain schedule/check-in; field-app `work_schedule_screen_test.dart`, kiểm thử hàng đợi ngoại tuyến | G1 |
+
+Xuất lịch trực hiện là CSV; nạp/xuất XLSX đúng mẫu còn thiếu. Chưa tự tạo lịch công tác từ bài nộp BM-05-II.
+Cờ vị trí giả lập chưa lấy từ thiết bị; thời hạn giữ tọa độ theo tham số mặc định 90 ngày còn chờ xác nhận căn cứ/thời hạn.
+SLA giao thông báo một phút và GPS trên thiết bị thật cần diễn tập triển khai; test handler không chứng minh SLA.

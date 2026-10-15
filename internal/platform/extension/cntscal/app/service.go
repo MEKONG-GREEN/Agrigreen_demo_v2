@@ -84,8 +84,10 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 }
 
 type caller struct {
-	p authz.Principal
-	k authz.KNContext
+	province     string // lịch trực tách theo tỉnh, suy từ Scope ở server
+	legacyRoster bool   // chỉ Admin đọc lịch chung cũ
+	p            authz.Principal
+	k            authz.KNContext
 }
 
 func (c caller) admin() bool { return c.k.Role == authz.KNAdmin }

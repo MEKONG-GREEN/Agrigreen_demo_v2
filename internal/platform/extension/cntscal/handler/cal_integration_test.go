@@ -55,7 +55,9 @@ func (units) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUn
 	switch code {
 	case "30001", "30002":
 		return partyport.AdminUnit{Code: code, Name: "Xã " + code, Level: partyport.LevelCommune, ParentCode: "89"}, nil
-	case "89":
+	case "31001":
+		return partyport.AdminUnit{Code: code, Name: "Xã tỉnh khác", Level: partyport.LevelCommune, ParentCode: "92"}, nil
+	case "89", "92":
 		return partyport.AdminUnit{Code: code, Name: "Tỉnh", Level: partyport.LevelProvince}, nil
 	}
 	return partyport.AdminUnit{}, partyport.ErrUnitNotFound
@@ -63,7 +65,10 @@ func (units) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUn
 func (units) Descendants(context.Context, string, time.Time) ([]string, error) { return nil, nil }
 func (units) Current(context.Context, string, time.Time) ([]string, error)     { return nil, nil }
 
-type catalogs struct{ mdport.CNTSCatalogs }
+type catalogs struct {
+	mdport.CNTSCatalogs
+	multiProvince bool
+}
 
 var items = map[string]mdport.CatalogItem{
 	"cnts_model_type:GA_TP": {Catalog: "cnts_model_type", Code: "GA_TP", Name: "Gà thương phẩm", Active: true},
@@ -89,11 +94,15 @@ func (catalogs) ListAt(_ context.Context, catalog string, _ time.Time) ([]mdport
 	return out, nil
 }
 
-func (catalogs) FacilitiesAt(context.Context, time.Time, []string) ([]mdport.SlaughterFacility, error) {
-	return []mdport.SlaughterFacility{
+func (c catalogs) FacilitiesAt(context.Context, time.Time, []string) ([]mdport.SlaughterFacility, error) {
+	out := []mdport.SlaughterFacility{
 		{Ref: fac1, Code: "CS1", Name: "Lò mổ 1", CommuneCode: "30001", Kind: mdport.FacilityConcentrated, Active: true},
 		{Ref: fac2, Code: "CS2", Name: "Lò mổ 2", CommuneCode: "30002", Kind: mdport.FacilitySmall, Active: true},
-	}, nil
+	}
+	if c.multiProvince {
+		out = append(out, mdport.SlaughterFacility{Ref: facProvince92, Code: "CS92", Name: "Cơ sở tỉnh khác", CommuneCode: "31001", Kind: mdport.FacilitySmall, Active: true})
+	}
+	return out, nil
 }
 
 func (catalogs) ScheduleAt(_ context.Context, code string, _ time.Time) (mdport.VaccinationSchedule, error) {
@@ -139,13 +148,15 @@ type fix struct {
 	xa     *xaScopes
 }
 
-func newFix(t *testing.T) *fix {
+func newFix(t *testing.T, multi ...bool) *fix {
 	env := pgtest.Get(t)
 	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}}
 	f.pool = env.AdminPool(t, migrations.PF)
 	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), extension.Deps{Units: units{}})
-	mod.UseCNTSCatalogs(catalogs{})
-	mod.UseXaScopes(f.xa)
+	mod.UseCNTSCatalogs(catalogs{multiProvince: len(multi) > 0 && multi[0]})
+	if len(multi) < 2 || multi[1] {
+		mod.UseXaScopes(f.xa)
+	}
 	mod.UseKNContext(knResolver{}, nil)
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 4<<20)
@@ -168,7 +179,9 @@ func (f *fix) knMiddleware() gin.HandlerFunc {
 		}
 		cp := *kc
 		p.KN = &cp
-		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
+		scope, _ := json.Marshal(cp)
+		ctx := idempotency.WithAuthorizationScope(c.Request.Context(), scope)
+		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, p))
 		c.Next()
 	}
 }

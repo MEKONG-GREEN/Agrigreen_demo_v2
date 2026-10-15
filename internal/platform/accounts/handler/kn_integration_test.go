@@ -758,3 +758,30 @@ func TestA1_KNXaDefaultVaultRegistrar(t *testing.T) {
 		t.Fatalf("thu kn_xa cuối: %d %v", r.status, r.body)
 	}
 }
+
+// IDEM-SCOPE-002: dùng middleware accounts thật; cache không vượt qua lần đổi vai/phòng trong cùng tài khoản.
+func TestIdempotencyContextBinding_W1146(t *testing.T) {
+	f := newKNFixture(t)
+	_, an, cr := f.createKN("Nguyễn Văn An", asg(port.KNXa, f.p91, []string{deptTT}, "30292"), asg(port.KNTinh, f.p91, []string{deptTT}))
+	a := asgIDs(cr)
+	xa := f.ctxID(an, a[port.KNXa], deptTT)
+	tinh := f.ctxID(an, a[port.KNTinh], deptTT)
+	k := key()
+	call := func(path, ctx string) resp {
+		return f.req(f.app, an, http.MethodPost, path, map[string]any{"note": "Nội dung"}, map[string]string{authz.ContextHeader: ctx, "Idempotency-Key": k})
+	}
+	if r := call("/v1/probe/a/write", xa); r.status != 200 {
+		t.Fatalf("lần đầu: %+v", r)
+	}
+	if r := call("/v1/probe/a/write", xa); r.status != 200 || r.hdr.Get("Idempotent-Replayed") != "true" {
+		t.Fatalf("gửi lại hợp lệ: %+v", r)
+	}
+	for _, r := range []resp{call("/v1/probe/b/write", xa), call("/v1/probe/a/write", tinh), call("/v1/probe/a/write?mode=other", xa)} {
+		if r.status != 422 || r.body["code"] != "idempotency_key_reused" {
+			t.Fatalf("khác tài nguyên/ngữ cảnh/truy vấn phải xung đột: %+v", r)
+		}
+	}
+	if len(f.probe) != 1 {
+		t.Fatalf("đã chạy handler ngoài lần đầu: %d", len(f.probe))
+	}
+}

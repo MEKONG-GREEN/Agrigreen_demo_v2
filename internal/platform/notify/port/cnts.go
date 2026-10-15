@@ -3,6 +3,8 @@ package port
 // Thông báo cảnh báo và nhắc nộp biểu của phòng Chăn nuôi – Thủy sản (W11.43 — pf/extension → pf/notify, pf
 // 20261015074556).
 const (
+	// KindCNTSDutyChanged: ca trực KSGM đổi, chỉ gửi đúng cán bộ bị ảnh hưởng.
+	KindCNTSDutyChanged = "cnts_duty_changed"
 	// KindCNTSAlert: cảnh báo mới (Khẩn / Cần chú ý) → người nhận theo bảng Mục III.5 BRD CNTS.
 	KindCNTSAlert = "cnts_alert"
 	// KindCNTSAlertAssigned: Cấp Tỉnh giao xử lý cảnh báo → người được giao.

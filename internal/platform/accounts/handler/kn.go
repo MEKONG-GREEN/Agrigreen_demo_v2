@@ -28,6 +28,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -119,6 +120,13 @@ func (h Handler) Middleware() gin.HandlerFunc {
 			kc.Support.Reason = strings.TrimSpace(reason)
 		}
 		p.KN = kc
+		// Dấu quyền lấy từ ngữ cảnh vừa giải ở server, gồm cả thuộc tính/ủy quyền/phạm vi mới nhất.
+		scope, err := json.Marshal(kc)
+		if err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		ctx = idempotency.WithAuthorizationScope(ctx, scope)
 		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, p))
 		if !audited {
 			c.Next()

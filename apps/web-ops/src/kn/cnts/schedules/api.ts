@@ -117,10 +117,10 @@ const idem = () => ({ header: { "Idempotency-Key": newIdempotencyKey() } });
 
 export function createCntsCalApi(api: ApiClient) {
   return {
-    roster: (month: string): Promise<DutyRoster> => unwrap(api.GET("/v1/extension/cnts/duty-rosters/{month}", { params: { path: { month } } })),
+    roster: (month: string, province_code?: string): Promise<DutyRoster> => unwrap(api.GET("/v1/extension/cnts/duty-rosters/{month}", { params: { path: { month }, query: { province_code } } })),
     saveRoster: (month: string, body: S["CNTSDutyRosterSave"]): Promise<DutyRoster> =>
       unwrap(api.POST("/v1/extension/cnts/duty-rosters/{month}", { params: { path: { month }, ...idem() }, body })),
-    myDuties: (month: string): Promise<MyDuties> => unwrap(api.GET("/v1/extension/cnts/my-duties", { params: { query: { month } } })),
+    myDuties: (month: string, province_code?: string): Promise<MyDuties> => unwrap(api.GET("/v1/extension/cnts/my-duties", { params: { query: { month, province_code } } })),
     batches: async (q: { status?: BatchStatus; commune_code?: string } = {}): Promise<VaccinationBatch[]> =>
       (await unwrap(api.GET("/v1/extension/cnts/vaccination-batches", { params: { query: q } }))).items,
     batch: (ref: string): Promise<VaccinationBatchDetail> =>

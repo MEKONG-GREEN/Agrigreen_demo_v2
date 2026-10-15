@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -47,20 +48,22 @@ func optText(s string) *string {
 // Roster là một phiên bản lịch trực của tháng.
 type Roster struct {
 	Meta
-	Month  time.Time
-	Source string
-	Cells  []domain.Cell
-	Note   string
+	Month     time.Time
+	Province  string
+	StreamKey string
+	Source    string
+	Cells     []domain.Cell
+	Note      string
 }
 
 const rosterCols = `id, seq, month, source, cells, coalesce(note, ''), event_time, recorded_at, actor_ref, on_behalf_of,
-  support_reason, idem_key`
+  support_reason, idem_key, stream_key`
 
 func scanRoster(row pgx.Row) (*Roster, error) {
 	var r Roster
 	var raw []byte
 	err := row.Scan(&r.ID, &r.Seq, &r.Month, &r.Source, &raw, &r.Note, &r.EventTime, &r.RecordedAt, &r.ActorRef, &r.OnBehalfOf,
-		&r.SupportReason, &r.IdemKey)
+		&r.SupportReason, &r.IdemKey, &r.StreamKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -68,6 +71,10 @@ func scanRoster(row pgx.Row) (*Roster, error) {
 		return nil, err
 	}
 	r.Month = time.Date(r.Month.Year(), r.Month.Month(), 1, 0, 0, 0, 0, time.UTC)
+	parts := strings.Split(r.StreamKey, ":")
+	if len(parts) == 3 {
+		r.Province = parts[1]
+	}
 	if err := json.Unmarshal(raw, &r.Cells); err != nil {
 		return nil, err
 	}
@@ -75,9 +82,9 @@ func scanRoster(row pgx.Row) (*Roster, error) {
 }
 
 // LatestRoster trả phiên bản mới nhất của tháng (nil = chưa lập).
-func LatestRoster(ctx context.Context, tx pgx.Tx, month time.Time) (*Roster, error) {
+func LatestRoster(ctx context.Context, tx pgx.Tx, month time.Time, province string) (*Roster, error) {
 	return scanRoster(tx.QueryRow(ctx, "SELECT "+rosterCols+` FROM pf_extension.cnts_duty_roster
-	  WHERE month = $1::date ORDER BY seq DESC LIMIT 1`, month.Format(time.DateOnly)))
+	  WHERE stream_key = $1 ORDER BY seq DESC LIMIT 1`, RosterStream(month, province)))
 }
 
 // RosterByIdem trả phiên bản đã ghi với khóa idem (gọi lặp).
@@ -96,9 +103,9 @@ type RosterVersion struct {
 }
 
 // RosterVersions trả lịch sử lưu của tháng (mới nhất trước).
-func RosterVersions(ctx context.Context, tx pgx.Tx, month time.Time, limit int) ([]RosterVersion, error) {
+func RosterVersions(ctx context.Context, tx pgx.Tx, month time.Time, province string, limit int) ([]RosterVersion, error) {
 	rows, err := tx.Query(ctx, `SELECT seq, source, cell_count, coalesce(note, ''), event_time, actor_ref
-	  FROM pf_extension.cnts_duty_roster WHERE month = $1::date ORDER BY seq DESC LIMIT $2`, month.Format(time.DateOnly), limit)
+	  FROM pf_extension.cnts_duty_roster WHERE stream_key = $1 ORDER BY seq DESC LIMIT $2`, RosterStream(month, province), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +131,7 @@ func InsertRoster(ctx context.Context, tx pgx.Tx, tid uuid.UUID, r *Roster) erro
 	     idem_key, rule_version)
 	  VALUES ($1, $2, $3, $4::date, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14)
 	  RETURNING seq, recorded_at`,
-		r.ID, tid, "duty:"+domain.MonthKey(r.Month), r.Month.Format(time.DateOnly), r.Source, string(raw), len(cells), optText(r.Note),
+		r.ID, tid, RosterStream(r.Month, r.Province), r.Month.Format(time.DateOnly), r.Source, string(raw), len(cells), optText(r.Note),
 		r.EventTime.UTC(), r.ActorRef, r.OnBehalfOf, r.SupportReason, r.IdemKey, domain.RuleVersion).Scan(&r.Seq, &r.RecordedAt)
 }
 
@@ -306,4 +313,12 @@ func ListBatches(ctx context.Context, tx pgx.Tx, f BatchFilter) ([]Batch, error)
 		out = append(out, b)
 	}
 	return out, rows.Err()
+}
+
+// RosterStream giữ nguyên khóa legacy; khóa mới tách luồng và số phiên bản theo tỉnh.
+func RosterStream(month time.Time, province string) string {
+	if province == "" {
+		return "duty:" + domain.MonthKey(month)
+	}
+	return "duty:" + province + ":" + domain.MonthKey(month)
 }

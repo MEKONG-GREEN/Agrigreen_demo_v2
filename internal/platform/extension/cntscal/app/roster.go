@@ -45,6 +45,8 @@ type OfficerView struct {
 // RosterView là lịch trực của tháng cho API.
 type RosterView struct {
 	Month      time.Time
+	Province   string
+	Legacy     bool
 	Version    int64 // 0 = chưa lập
 	Source     string
 	Note       string
@@ -63,7 +65,7 @@ type RosterView struct {
 }
 
 // facilities trả cơ sở hoạt động trong tháng (đang dùng ngày đầu hoặc ngày cuối tháng).
-func (s *Service) facilities(ctx context.Context, m time.Time) ([]FacilityView, error) {
+func (s *Service) facilities(ctx context.Context, c caller, m time.Time) ([]FacilityView, error) {
 	seen := map[uuid.UUID]bool{}
 	var out []FacilityView
 	for _, d := range []time.Time{m, m.AddDate(0, 1, -1)} {
@@ -72,7 +74,11 @@ func (s *Service) facilities(ctx context.Context, m time.Time) ([]FacilityView, 
 			return nil, err
 		}
 		for _, f := range list {
-			if f.Active && !seen[f.Ref] {
+			allowed, err := s.rosterCommune(ctx, c, f.CommuneCode, d)
+			if err != nil {
+				return nil, err
+			}
+			if f.Active && allowed && !seen[f.Ref] {
 				seen[f.Ref] = true
 				out = append(out, FacilityView{Ref: f.Ref, Code: f.Code, Name: f.Name, CommuneCode: f.CommuneCode, Kind: f.Kind})
 			}
@@ -88,19 +94,43 @@ func (s *Service) facilities(ctx context.Context, m time.Time) ([]FacilityView, 
 }
 
 // officers trả cán bộ Cấp Xã CNTS (nil nếu chưa nối danh bạ).
-func (s *Service) officers(ctx context.Context, tid uuid.UUID) ([]OfficerView, map[uuid.UUID]accport.XaScope, error) {
+func (s *Service) officers(ctx context.Context, c caller, facilities []FacilityView) ([]OfficerView, map[uuid.UUID]accport.XaScope, error) {
 	if s.Officers == nil {
 		return nil, nil, nil
 	}
-	list, err := s.Officers.XaScopes(ctx, tid, DeptCNTS)
+	list, err := s.Officers.XaScopes(ctx, c.p.TenantID, DeptCNTS)
 	if err != nil {
 		return nil, nil, err
 	}
 	out := make([]OfficerView, 0, len(list))
 	idx := map[uuid.UUID]accport.XaScope{}
+	allowedFacilities := map[uuid.UUID]bool{}
+	for _, f := range facilities {
+		allowedFacilities[f.Ref] = true
+	}
 	for _, x := range list {
+		original := x
+		x.Communes = nil
+		x.Facilities = nil
+		for _, code := range original.Communes {
+			allowed, err := s.rosterCommune(ctx, c, code, s.today())
+			if err != nil {
+				return nil, nil, err
+			}
+			if allowed {
+				x.Communes = append(x.Communes, code)
+			}
+		}
+		for _, ref := range original.Facilities {
+			if allowedFacilities[ref] {
+				x.Facilities = append(x.Facilities, ref)
+			}
+		}
+		if !c.legacyRoster && len(x.Communes) == 0 && len(x.Facilities) == 0 {
+			continue
+		}
 		out = append(out, OfficerView{Ref: x.ActorRef, Communes: x.Communes, Scope: x})
-		idx[x.ActorRef] = x
+		idx[x.ActorRef] = original // không biến giới hạn rỗng sau lọc thành quyền toàn xã
 	}
 	return out, idx, nil
 }
@@ -158,8 +188,12 @@ func (c caller) canPlanRoster() bool {
 }
 
 // GetRoster đọc lịch trực tháng (lưới, cơ sở, viên chức, cảnh báo, lịch sử lưu).
-func (s *Service) GetRoster(ctx context.Context, monthRaw string) (RosterView, error) {
+func (s *Service) GetRoster(ctx context.Context, monthRaw string, province ...string) (RosterView, error) {
 	c, err := s.rosterReader(ctx)
+	if err != nil {
+		return RosterView{}, err
+	}
+	c, err = s.rosterScope(ctx, c, requestedProvince(province), false)
 	if err != nil {
 		return RosterView{}, err
 	}
@@ -167,16 +201,16 @@ func (s *Service) GetRoster(ctx context.Context, monthRaw string) (RosterView, e
 	if err != nil {
 		return RosterView{}, err
 	}
-	v := RosterView{Month: m, Cells: []domain.Cell{}, CanEdit: c.canPlanRoster()}
+	v := RosterView{Month: m, Province: c.province, Legacy: c.legacyRoster, Cells: []domain.Cell{}, CanEdit: !c.legacyRoster && c.canPlanRoster()}
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
-		r, err := store.LatestRoster(ctx, tx, m)
+		r, err := store.LatestRoster(ctx, tx, m, c.province)
 		if err != nil {
 			return err
 		}
 		if r != nil {
 			fillRoster(&v, r)
 		}
-		v.Versions, err = store.RosterVersions(ctx, tx, m, 20)
+		v.Versions, err = store.RosterVersions(ctx, tx, m, c.province, 20)
 		return err
 	})
 	if err != nil {
@@ -195,10 +229,10 @@ func fillRoster(v *RosterView, r *store.Roster) {
 
 func (s *Service) decorateRoster(ctx context.Context, c caller, v *RosterView) error {
 	var err error
-	if v.Facilities, err = s.facilities(ctx, v.Month); err != nil {
+	if v.Facilities, err = s.facilities(ctx, c, v.Month); err != nil {
 		return err
 	}
-	offs, idx, err := s.officers(ctx, c.p.TenantID)
+	offs, idx, err := s.officers(ctx, c, v.Facilities)
 	if err != nil {
 		return err
 	}
@@ -235,12 +269,13 @@ func uniq(refs []uuid.UUID) []uuid.UUID {
 
 // SaveRosterInput là thân "Lưu" lịch trực tháng.
 type SaveRosterInput struct {
-	Month       string
-	BaseVersion *int64 // phiên bản người lập đã thấy (0 = chưa có lịch)
-	Cells       []domain.Cell
-	Source      string
-	Note        string
-	IdemKey     string
+	ProvinceCode string
+	Month        string
+	BaseVersion  *int64 // phiên bản người lập đã thấy (0 = chưa có lịch)
+	Cells        []domain.Cell
+	Source       string
+	Note         string
+	IdemKey      string
 }
 
 func idemRoster(k string) string { return "duty:" + k }
@@ -250,6 +285,10 @@ func idemRoster(k string) string { return "duty:" + k }
 // Viên chức có ca thay đổi nhận sự kiện pf.extension.cnts_duty.changed (thông báo).
 func (s *Service) SaveRoster(ctx context.Context, in SaveRosterInput) (RosterView, error) {
 	c, err := s.planner(ctx, "chỉ cán bộ tổng hợp Cấp Tỉnh (hoặc Admin) lập lịch trực KSGM", accport.GroupTongHop)
+	if err != nil {
+		return RosterView{}, err
+	}
+	c, err = s.rosterScope(ctx, c, in.ProvinceCode, true)
 	if err != nil {
 		return RosterView{}, err
 	}
@@ -281,7 +320,14 @@ func (s *Service) SaveRoster(ctx context.Context, in SaveRosterInput) (RosterVie
 	if len(es) > 0 {
 		return RosterView{}, fieldsProblem(ErrRosterInvalid, es)
 	}
-	facs, err := s.facilities(ctx, m)
+	facs, err := s.facilities(ctx, c, m)
+	if err != nil {
+		return RosterView{}, err
+	}
+	if len(cells) > 0 && s.Officers == nil {
+		return RosterView{}, ErrDependency.WithDetail("Chưa nối danh bạ cán bộ Cấp Xã để kiểm phạm vi phân ca")
+	}
+	_, officers, err := s.officers(ctx, c, facs)
 	if err != nil {
 		return RosterView{}, err
 	}
@@ -290,24 +336,32 @@ func (s *Service) SaveRoster(ctx context.Context, in SaveRosterInput) (RosterVie
 		active[f.Ref] = true
 	}
 	for i, x := range cells {
+		if s.Officers != nil {
+			if _, ok := officers[x.Officer]; !ok {
+				return RosterView{}, ErrRosterInvalid.WithField("cells", "cán bộ không thuộc tỉnh lập lịch")
+			}
+		}
 		if !active[x.Facility] {
 			return RosterView{}, ErrRosterInvalid.WithField("cells", "ô thứ "+strconv.Itoa(i+1)+": cơ sở giết mổ không hoạt động trong tháng")
 		}
 	}
 	now := s.now()
-	v := RosterView{Month: m, CanEdit: true}
+	v := RosterView{Month: m, Province: c.province, CanEdit: true}
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if r, err := store.RosterByIdem(ctx, tx, idemRoster(in.IdemKey)); err != nil || r != nil {
 			if r != nil {
+				if r.StreamKey != store.RosterStream(m, c.province) {
+					return ErrOutOfScope
+				}
 				fillRoster(&v, r)
 				v.Replayed = true
 			}
 			return err
 		}
-		if err := store.Lock(ctx, tx, "duty:"+domain.MonthKey(m)); err != nil {
+		if err := store.Lock(ctx, tx, c.p.TenantID.String()+":"+store.RosterStream(m, c.province)); err != nil {
 			return err
 		}
-		prev, err := store.LatestRoster(ctx, tx, m)
+		prev, err := store.LatestRoster(ctx, tx, m, c.province)
 		if err != nil {
 			return err
 		}
@@ -319,7 +373,7 @@ func (s *Service) SaveRoster(ctx context.Context, in SaveRosterInput) (RosterVie
 		if *in.BaseVersion != cur {
 			return ErrRosterConflict.With("current_version", cur)
 		}
-		r := &store.Roster{Meta: c.meta(now, idemRoster(in.IdemKey)), Month: m, Source: in.Source, Cells: cells, Note: in.Note}
+		r := &store.Roster{Meta: c.meta(now, idemRoster(in.IdemKey)), Month: m, Province: c.province, Source: in.Source, Cells: cells, Note: in.Note}
 		if err := store.InsertRoster(ctx, tx, c.p.TenantID, r); err != nil {
 			return err
 		}
@@ -343,7 +397,7 @@ func (s *Service) SaveRoster(ctx context.Context, in SaveRosterInput) (RosterVie
 	}
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		v.Versions, e = store.RosterVersions(ctx, tx, m, 20)
+		v.Versions, e = store.RosterVersions(ctx, tx, m, c.province, 20)
 		return e
 	})
 	if err != nil {
@@ -369,8 +423,12 @@ type MyDuties struct {
 }
 
 // GetMyDuties trả ca trực của người gọi (Cấp Xã, Cấp Tỉnh CNTS).
-func (s *Service) GetMyDuties(ctx context.Context, monthRaw string) (MyDuties, error) {
+func (s *Service) GetMyDuties(ctx context.Context, monthRaw string, province ...string) (MyDuties, error) {
 	c, err := s.reader(ctx)
+	if err != nil {
+		return MyDuties{}, err
+	}
+	c, err = s.rosterScope(ctx, c, requestedProvince(province), false)
 	if err != nil {
 		return MyDuties{}, err
 	}
@@ -385,13 +443,17 @@ func (s *Service) GetMyDuties(ctx context.Context, monthRaw string) (MyDuties, e
 	var r *store.Roster
 	if err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		r, e = store.LatestRoster(ctx, tx, m)
+		r, e = store.LatestRoster(ctx, tx, m, c.province)
 		return e
 	}); err != nil || r == nil {
 		return out, err
 	}
 	out.Version = r.Seq
-	facs, err := s.facilities(ctx, m)
+	// Lịch đã giao cho chính người gọi cho phép đọc tên cơ sở của ca trong tỉnh;
+	// không mở quyền nhập liệu hay trả lưới/cán bộ của ca khác.
+	labelsCaller := c
+	labelsCaller.k.Scope = authz.Scope{All: true}
+	facs, err := s.facilities(ctx, labelsCaller, m)
 	if err != nil {
 		return MyDuties{}, err
 	}

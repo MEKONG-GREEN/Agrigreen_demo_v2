@@ -131,14 +131,14 @@ func rosterOut(v app.RosterView) gin.H {
 	if v.UpdatedBy != nil {
 		by = *v.UpdatedBy
 	}
-	return gin.H{"month": domain.MonthKey(v.Month), "days_in_month": domain.DaysIn(v.Month), "version": v.Version,
+	return gin.H{"month": domain.MonthKey(v.Month), "province_code": optStr(v.Province), "legacy": v.Legacy, "days_in_month": domain.DaysIn(v.Month), "version": v.Version,
 		"source": optStr(v.Source), "note": optStr(v.Note), "cells": cellsOut(v.Cells), "facilities": facs, "officers": offs,
 		"warnings": warns, "updated_at": optTS(v.UpdatedAt), "updated_by": by, "versions": vers, "can_edit": v.CanEdit,
 		"notified_officer_refs": notified}
 }
 
 func (h Handler) getRoster(c *gin.Context) {
-	v, err := h.Svc.GetRoster(c.Request.Context(), c.Param("month"))
+	v, err := h.Svc.GetRoster(c.Request.Context(), c.Param("month"), c.Query("province_code"))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -154,10 +154,11 @@ type cellReq struct {
 }
 
 type rosterReq struct {
-	BaseVersion *int64    `json:"base_version"`
-	Cells       []cellReq `json:"cells"`
-	Source      string    `json:"source"`
-	Note        string    `json:"note"`
+	ProvinceCode string    `json:"province_code"`
+	BaseVersion  *int64    `json:"base_version"`
+	Cells        []cellReq `json:"cells"`
+	Source       string    `json:"source"`
+	Note         string    `json:"note"`
 }
 
 func (h Handler) saveRoster(c *gin.Context) {
@@ -181,7 +182,7 @@ func (h Handler) saveRoster(c *gin.Context) {
 		httpx.Fail(c, v)
 		return
 	}
-	out, err := h.Svc.SaveRoster(c.Request.Context(), app.SaveRosterInput{Month: c.Param("month"), BaseVersion: req.BaseVersion,
+	out, err := h.Svc.SaveRoster(c.Request.Context(), app.SaveRosterInput{Month: c.Param("month"), ProvinceCode: req.ProvinceCode, BaseVersion: req.BaseVersion,
 		Cells: cells, Source: req.Source, Note: req.Note, IdemKey: idem(c)})
 	if err != nil {
 		httpx.Fail(c, err)
@@ -195,7 +196,7 @@ func (h Handler) saveRoster(c *gin.Context) {
 }
 
 func (h Handler) myDuties(c *gin.Context) {
-	m, err := h.Svc.GetMyDuties(c.Request.Context(), c.Query("month"))
+	m, err := h.Svc.GetMyDuties(c.Request.Context(), c.Query("month"), c.Query("province_code"))
 	if err != nil {
 		httpx.Fail(c, err)
 		return

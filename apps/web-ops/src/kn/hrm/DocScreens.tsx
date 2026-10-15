@@ -1027,10 +1027,7 @@ function ACLEditor({
       rows.filter((r) => r.key.includes(":")).map((r) => [r.key, r.perms]),
     );
     void act
-      .run(
-        () => da.setACL(folder.folder_id, acl, note || undefined),
-        "Đã lưu quyền thư mục.",
-      )
+      .run(() => da.setACL(folder.folder_id, acl, note || undefined))
       .then((r) => r !== null && onDone());
   };
   return (
@@ -1286,7 +1283,11 @@ export function HrmDocFoldersScreen() {
                       key={`${cur.folder_id}-${cur.version}`}
                       da={da}
                       folder={cur}
-                      onDone={reload}
+                      onDone={() => {
+                        // Editor đổi key sau tải cây; thông báo thuộc màn cha để vẫn còn sau remount.
+                        act.setNote("Đã lưu quyền thư mục.");
+                        reload();
+                      }}
                     />
                   ) : null}
                   {hist.data ? (

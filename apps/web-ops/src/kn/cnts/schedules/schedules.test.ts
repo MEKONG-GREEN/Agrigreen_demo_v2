@@ -74,16 +74,32 @@ describe("lịch tiêm BM-07 và địa điểm công tác (W11.46)", () => {
 
 describe("giả lập lịch trực, lịch tiêm", () => {
   beforeEach(() => resetCntsCal());
-  const capi = createCntsCalApi(createApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.tinh", getContextId: () => null, fetch: mockFetchNoDelay }));
+  const capi = createCntsCalApi(createApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.setter", getContextId: () => null, fetch: mockFetchNoDelay }));
+
+  it("CNTS-ROSTER-SCOPE-001: mỗi tỉnh một lịch, vai tỉnh không chọn tỉnh khác, legacy chỉ Admin đọc", async () => {
+    const peer = createCntsCalApi(createApiClient({baseUrl:"http://mock",getAccessToken:()=>"mock.tinh",fetch:mockFetchNoDelay}));
+    await capi.saveRoster("2027-10", {province_code:"91",base_version:0,cells:[],note:"Riêng tỉnh A"});
+    const mine = await peer.roster("2027-10");
+    expect(mine.province_code).toBe("82");
+    expect(mine.version).toBe(0);
+    expect(mine.note).toBeNull();
+    await expect(peer.roster("2027-10","91")).rejects.toThrow();
+    await peer.saveRoster("2027-10",{province_code:"82",base_version:0,cells:[],note:"Riêng tỉnh B"});
+    expect((await capi.roster("2027-10","91")).note).toBe("Riêng tỉnh A");
+    expect((await capi.roster("2027-10","91")).version).toBe(1);
+    expect((await capi.roster("2027-10","legacy")).can_edit).toBe(false);
+    await expect(capi.saveRoster("2027-10",{province_code:"legacy",base_version:0,cells:[]})).rejects.toThrow();
+  });
 
   it("lưu lịch trực có khóa lạc quan; tạo lịch tiêm theo quy trình rồi ghi ngày tiêm", async () => {
-    const r = await capi.roster("2027-10");
+    const r = await capi.roster("2027-10", "91");
     expect(r.version).toBe(0);
     const f = r.facilities[0]!.ref;
-    const saved = await capi.saveRoster("2027-10", { base_version: 0, cells: [{ facility_ref: f, officer_ref: O1, day: 1, shift: "N" }] });
+    const officer = r.officers[0]!.ref;
+    const saved = await capi.saveRoster("2027-10", { province_code: "91", base_version: 0, cells: [{ facility_ref: f, officer_ref: officer, day: 1, shift: "N" }] });
     expect(saved.version).toBe(1);
-    expect(saved.notified_officer_refs).toEqual([O1]);
-    await expect(capi.saveRoster("2027-10", { base_version: 0, cells: [] })).rejects.toThrow();
+    expect(saved.notified_officer_refs).toEqual([officer]);
+    await expect(capi.saveRoster("2027-10", { province_code: "91", base_version: 0, cells: [] })).rejects.toThrow();
 
     const b = await capi.createBatch({ commune_code: "30292", model_type_code: "GA_THUONG_PHAM", locality: "Ấp 1", received_date: "2027-10-01", age_at_receipt: 1 });
     expect(b.doses.map((d) => d.expected_date)).toEqual(["2027-10-03", "2027-10-17", "2027-11-09"]);

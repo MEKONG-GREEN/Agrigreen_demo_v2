@@ -11131,6 +11131,8 @@ export interface components {
             shift: "N" | "D" | "ND";
         };
         CNTSDutyRosterSave: {
+            /** @description Tỉnh suy từ phạm vi phiên; Admin không có tỉnh phải chọn, không ghi legacy */
+            province_code?: string;
             /** @description Phiên bản đã thấy (0 = chưa có lịch) — khóa lạc quan */
             base_version: number;
             cells: components["schemas"]["CNTSDutyCell"][];
@@ -11176,6 +11178,10 @@ export interface components {
             actor_display: string | null;
         };
         CNTSDutyRoster: {
+            /** @description Tỉnh của luồng lịch; null với lịch chung cũ */
+            province_code: string | null;
+            /** @description Lịch chung cũ chỉ Admin đọc, không sửa */
+            legacy: boolean;
             month: string;
             days_in_month: number;
             /** @description 0 = chưa lập */
@@ -29046,7 +29052,10 @@ export interface operations {
     };
     extensionCntsGetDutyRoster: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Tỉnh suy từ phạm vi phiên; Admin chọn tỉnh. legacy chỉ Admin đọc lịch chung cũ, không ghi */
+                province_code?: string;
+            };
             header?: never;
             path: {
                 /** @description Tháng YYYY-MM */
@@ -29119,6 +29128,8 @@ export interface operations {
     extensionCntsMyDuties: {
         parameters: {
             query: {
+                /** @description Tỉnh của lịch, mặc định suy từ xã phụ trách */
+                province_code?: string;
                 month: string;
             };
             header?: never;

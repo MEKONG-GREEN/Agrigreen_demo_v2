@@ -5,6 +5,9 @@
 //   tháng trước, lưu thành phiên bản mới (khóa lạc quan), cảnh báo không chặn, xuất CSV theo mẫu "Lịch trực ksgm".
 // - Cấp Xã: "Lịch trực của tôi" — ca của mình trong tháng và người trực cùng.
 import { useMemo, useState } from "react";
+import { unwrap } from "@/api/client";
+import { collectPages } from "@/api/pagination";
+import { ProblemAlert } from "@/components/ProblemAlert";
 import { useAuth } from "@/auth/AuthProvider";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
@@ -31,6 +34,8 @@ export function DutyRosterScreen() {
   const capi = useMemo(() => (api ? createCntsCalApi(api) : null), [api]);
   const role = kn.context?.role;
   const [month, setMonth] = useState(currentMonth());
+  const [province, setProvince] = useState("");
+  const provinces = useLoad(api && role === "admin" ? () => collectPages(cursor => unwrap(api.GET("/v1/masterdata/admin-units", { params: { query: { cursor, limit: 200 } } }))) : null, [api, role]);
   if (!capi) return null;
   return (
     <div className="page">
@@ -38,6 +43,7 @@ export function DutyRosterScreen() {
         title={role === "kn_xa" ? "Lịch trực KSGM của tôi" : "Lịch trực KSGM"}
         actions={
           <div className="row">
+            {role === "admin" && <label className="field"><span>Tỉnh của lịch trực</span><select aria-label="Tỉnh của lịch trực" value={province} onChange={e => setProvince(e.target.value)}><option value="">Chọn tỉnh</option>{(provinces.data ?? []).filter(p => p.level === "province").map(p => <option key={p.code} value={p.code}>{p.name}</option>)}<option value="legacy">Lịch chung cũ (chỉ xem)</option></select></label>}
             <button className="btn btn-sm" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Tháng trước">
               ‹
             </button>
@@ -54,7 +60,8 @@ export function DutyRosterScreen() {
             : "N: ca ngày, Đ: ca đêm (qua nửa đêm thuộc ngày bắt đầu ca), NĐ: cả ngày đêm, ô trống: nghỉ. Bấm ô để đổi ca."}
         </p>
       </PageHeader>
-      {role === "kn_xa" ? <MyDutiesView capi={capi} month={month} /> : <RosterGrid key={month} capi={capi} month={month} readOnly={!!kn.context?.read_only} />}
+      {role === "admin" && provinces.problem && <ProblemAlert problem={provinces.problem} onRetry={provinces.reload} />}
+      {role === "admin" && !province ? <p className="muted">Chọn tỉnh để xem hoặc lập lịch trực.</p> : role === "kn_xa" ? <MyDutiesView capi={capi} month={month} /> : <RosterGrid key={`${month}:${province}`} capi={capi} month={month} province={province || undefined} readOnly={!!kn.context?.read_only || province === "legacy"} />}
     </div>
   );
 }
@@ -99,8 +106,8 @@ function MyDutiesView({ capi, month }: { capi: CntsCalApi; month: string }) {
   );
 }
 
-function RosterGrid({ capi, month, readOnly }: { capi: CntsCalApi; month: string; readOnly: boolean }) {
-  const s = useLoad(() => capi.roster(month), [capi, month]);
+function RosterGrid({ capi, month, province, readOnly }: { capi: CntsCalApi; month: string; province?: string; readOnly: boolean }) {
+  const s = useLoad(() => capi.roster(month, province), [capi, month, province]);
   return <LoadState s={s}>{(r) => <RosterEditor key={`${r.month}-${r.version}`} capi={capi} roster={r} readOnly={readOnly} onSaved={s.reload} />}</LoadState>;
 }
 
@@ -138,7 +145,7 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
     setDirty(true);
   };
   const copyPrevious = async () => {
-    const prev = await act.run(() => capi.roster(shiftMonth(roster.month, -1)));
+    const prev = await act.run(() => capi.roster(shiftMonth(roster.month, -1), roster.province_code ?? "legacy"));
     if (!prev) return;
     setGrid(toGrid(prev.cells.filter((c) => c.day <= roster.days_in_month)));
     setSource("copy");
@@ -147,7 +154,7 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
   };
   const save = async () => {
     const r = await act.run(
-      () => capi.saveRoster(roster.month, { base_version: roster.version, cells: fromGrid(grid, roster.days_in_month), source, ...(note.trim() ? { note: note.trim() } : {}) }),
+      () => capi.saveRoster(roster.month, { province_code: roster.province_code ?? undefined, base_version: roster.version, cells: fromGrid(grid, roster.days_in_month), source, ...(note.trim() ? { note: note.trim() } : {}) }),
       (x) => `Đã lưu phiên bản ${x.version}${x.notified_officer_refs.length ? ` — đã thông báo ${x.notified_officer_refs.length} viên chức có ca thay đổi` : ""}.`,
     );
     if (r) {

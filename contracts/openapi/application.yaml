@@ -7665,6 +7665,7 @@ paths:
       tags: [extension]
       parameters:
         - {name: month, in: path, required: true, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}, description: Tháng YYYY-MM}
+        - {name: province_code, in: query, schema: {type: string}, description: "Tỉnh suy từ phạm vi phiên; Admin chọn tỉnh. legacy chỉ Admin đọc lịch chung cũ, không ghi"}
       responses:
         "200":
           description: Lịch trực (version 0 = chưa lập)
@@ -7706,6 +7707,7 @@ paths:
       operationId: extensionCntsMyDuties
       tags: [extension]
       parameters:
+        - {name: province_code, in: query, schema: {type: string}, description: "Tỉnh của lịch, mặc định suy từ xã phụ trách"}
         - {name: month, in: query, required: true, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
       responses:
         "200":
@@ -14395,6 +14397,7 @@ components:
       type: object
       required: [base_version, cells]
       properties:
+        province_code: {type: string, description: "Tỉnh suy từ phạm vi phiên; Admin không có tỉnh phải chọn, không ghi legacy"}
         base_version: {type: integer, minimum: 0, description: "Phiên bản đã thấy (0 = chưa có lịch) — khóa lạc quan"}
         cells: {type: array, maxItems: 20000, items: {$ref: "#/components/schemas/CNTSDutyCell"}}
         source: {type: string, enum: [grid, copy, excel]}
@@ -14438,8 +14441,10 @@ components:
         actor_display: {type: [string, "null"]}
     CNTSDutyRoster:
       type: object
-      required: [month, days_in_month, version, source, note, cells, facilities, officers, warnings, updated_at, updated_by, versions, can_edit, notified_officer_refs]
+      required: [province_code, legacy, month, days_in_month, version, source, note, cells, facilities, officers, warnings, updated_at, updated_by, versions, can_edit, notified_officer_refs]
       properties:
+        province_code: {type: [string, "null"], description: "Tỉnh của luồng lịch; null với lịch chung cũ"}
+        legacy: {type: boolean, description: "Lịch chung cũ chỉ Admin đọc, không sửa"}
         month: {type: string}
         days_in_month: {type: integer}
         version: {type: integer, description: "0 = chưa lập"}

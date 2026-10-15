@@ -4,9 +4,10 @@
 // ngày nhận + ngày tuổi − tuổi lúc nhận). Dữ liệu tổng hợp, không phải thật.
 import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
-import { CATALOGS } from "./data";
-import { json, problem, type Ctx, type Route } from "./http";
-import { knContext } from "./kn";
+import { ADMIN_UNITS, CATALOGS } from "./data";
+import { json, problem, validation, type Ctx, type Route } from "./http";
+import { knContext, personaForContext } from "./kn";
+import { AG_COMMUNES } from "./kn-reports/store";
 
 type S = components["schemas"];
 type Roster = S["CNTSDutyRoster"];
@@ -24,19 +25,34 @@ export function resetCntsCal() {
 
 const OFFICER = "0190f1c4-7d3e-7000-8000-00000000a0c1";
 
-function who(ctx: Ctx) {
-  const kc = knContext(ctx.request.headers.get("X-AG-Context") ?? "");
-  const role = kc?.role ?? (ctx.persona.me.roles.includes("platform_admin") ? "admin" : "kn_tinh");
-  return { role, communes: role === "kn_xa" ? (kc?.communes ?? []).map((c) => c.code) : null, actor: ctx.persona.me.actor_ref, readOnly: !!kc?.read_only };
+// Xã của mẫu CNTS BRD nạp sẵn nằm ngoài bộ xã địa lý mô phỏng.
+const BRD_COMMUNE_PROVINCE: Readonly<Record<string, string>> = { "30292": "91" };
+function provinceOf(code: string): string | undefined {
+  const u = ADMIN_UNITS.find(u => u.code === code);
+  return u?.level === "province" ? u.code : u?.parent_code ?? (AG_COMMUNES.some(c => c.code === code) ? "91" : BRD_COMMUNE_PROVINCE[code]);
 }
-
-const facilities = () =>
-  CATALOGS.cnts_slaughter_facility.map((f) => ({
-    ref: f.attrs.facility_ref!,
-    code: f.code,
-    name: f.name,
-    commune_code: f.attrs.commune_code ?? "",
-    kind: f.attrs.facility_kind ?? null,
+function who(ctx: Ctx) {
+  const id = ctx.request.headers.get("X-AG-Context");
+  const kc = knContext(id ?? "");
+  const p = personaForContext(ctx.persona, id);
+  const role = kc?.role ?? (p.me.roles.includes("platform_admin") ? "admin" : p.me.roles.includes("kn_national_admin") ? "kn_tw" : p.me.scope.level === "commune" ? "kn_xa" : "kn_tinh");
+  const communes = role === "kn_xa" ? (kc?.communes.map(c => c.code) ?? p.me.scope.units.filter(c => ADMIN_UNITS.find(u => u.code === c)?.level === "commune")) : null;
+  const provinces = new Set([...p.me.scope.units, ...(communes ?? []), p.me.org?.admin_unit_code ?? ""].map(provinceOf).filter((p): p is string => !!p));
+  return { role, provinces, communes, actor: p.me.actor_ref, readOnly: !!kc?.read_only, department: kc?.department_code };
+}
+function rosterProvince(ctx: Ctx, requested?: string, write = false): string | Response {
+  const w = who(ctx);
+  if (w.role === "kn_tw" || (w.role !== "admin" && w.department && w.department !== "chan_nuoi_thuy_san")) return problem(403, "forbidden", "Lịch trực thuộc phòng Chăn nuôi – Thủy sản");
+  if (requested === "legacy") return w.role === "admin" && !write ? "legacy" : problem(403,"extension.out_of_scope","Lịch chung cũ chỉ Admin xem");
+  const province = requested || (w.provinces.size === 1 ? [...w.provinces][0] : undefined);
+  if (!province) return validation([{field:"province_code",reason:"Chọn tỉnh để xem hoặc lập lịch trực"}]);
+  if (!ADMIN_UNITS.some(u => u.code === province && u.level === "province")) return validation([{field:"province_code",reason:"phải là tỉnh còn hiệu lực"}]);
+  return w.role === "admin" || w.provinces.has(province) ? province : problem(403,"extension.out_of_scope","Ngoài phạm vi phụ trách");
+}
+const rosterKey = (month: string, province: string) => `${province}|${month}`;
+const facilities = (province: string) =>
+  CATALOGS.cnts_slaughter_facility.filter(f => f.active && (province === "legacy" || provinceOf(f.attrs.commune_code ?? "") === province)).map(f => ({
+    ref: f.attrs.facility_ref!, code: f.code, name: f.name, commune_code: f.attrs.commune_code ?? "", kind: f.attrs.facility_kind ?? null,
   }));
 
 const daysIn = (month: string) => {
@@ -50,11 +66,12 @@ const addDays = (d: string, n: number) => {
   return x.toISOString().slice(0, 10);
 };
 
-function emptyRoster(month: string): Roster {
+function emptyRoster(month: string, province: string): Roster {
+  const fs = facilities(province);
   return {
-    month, days_in_month: daysIn(month), version: 0, source: null, note: null, cells: [], facilities: facilities(),
-    officers: [{ ref: OFFICER, display: "Viên chức KSGM (giả lập)", commune_codes: ["30292"], facility_refs: [] }],
-    warnings: [], updated_at: null, updated_by: null, versions: [], can_edit: true, notified_officer_refs: [],
+    province_code: province === "legacy" ? null : province, legacy: province === "legacy", month, days_in_month: daysIn(month), version: 0, source: null, note: null, cells: [], facilities: fs,
+    officers: fs.length ? [{ ref: province === "91" ? OFFICER : `0190f1c4-7d3e-7000-8000-${province.padStart(12,"0")}`, display: "Viên chức KSGM (giả lập)", commune_codes: fs.map(f => f.commune_code), facility_refs: [] }] : [],
+    warnings: [], updated_at: null, updated_by: null, versions: [], can_edit: province !== "legacy", notified_officer_refs: [],
   };
 }
 
@@ -66,7 +83,7 @@ function warnings(r: Roster): Roster["warnings"] {
   });
 }
 
-const latestRoster = (month: string) => ROSTERS.get(month)?.at(-1) ?? emptyRoster(month);
+const latestRoster = (month: string, province: string) => ROSTERS.get(rosterKey(month,province))?.at(-1) ?? emptyRoster(month,province);
 
 function batchView(b: Batch): S["CNTSVaccinationBatch"] {
   const t = today();
@@ -86,8 +103,10 @@ export const cntsCalRoutes: Route[] = [
     pattern: /^\/v1\/extension\/cnts\/duty-rosters\/(\d{4}-\d{2})$/,
     handler: (ctx) => {
       if (who(ctx).role === "kn_xa") return problem(403, "forbidden", "Cấp Xã xem lịch trực của mình (Lịch trực của tôi)");
-      const r = latestRoster(ctx.params[0]!);
-      return json({ ...r, versions: [...(ROSTERS.get(r.month) ?? [])].reverse().map((v) => ({ version: v.version, source: v.source ?? "grid", cell_count: v.cells.length, note: v.note, at: v.updated_at!, actor_ref: v.updated_by!, actor_display: null })) });
+      const province = rosterProvince(ctx, ctx.url.searchParams.get("province_code") ?? undefined);
+      if (province instanceof Response) return province;
+      const r = latestRoster(ctx.params[0]!, province);
+      return json({ ...r, versions: [...(ROSTERS.get(rosterKey(r.month,province)) ?? [])].reverse().map((v) => ({ version: v.version, source: v.source ?? "grid", cell_count: v.cells.length, note: v.note, at: v.updated_at!, actor_ref: v.updated_by!, actor_display: null })) });
     },
   },
   {
@@ -98,15 +117,18 @@ export const cntsCalRoutes: Route[] = [
       if (w.role === "kn_xa" || w.readOnly) return problem(403, "forbidden", "chỉ cán bộ tổng hợp Cấp Tỉnh (hoặc Admin) lập lịch trực KSGM");
       const month = ctx.params[0]!;
       const b = (ctx.body ?? {}) as S["CNTSDutyRosterSave"];
-      const cur = latestRoster(month);
+      const province = rosterProvince(ctx, b.province_code, true);
+      if (province instanceof Response) return province;
+      const cur = latestRoster(month, province);
       if (b.base_version !== cur.version) return problem(409, "extension.cnts_roster_version_conflict", "Lịch trực đã có người cập nhật — tải lại bản mới");
       const cells: Cell[] = (b.cells ?? []).filter((c) => c.day >= 1 && c.day <= cur.days_in_month);
+      if (cells.some(c => !cur.facilities.some(f => f.ref === c.facility_ref) || !cur.officers.some(o => o.ref === c.officer_ref))) return problem(422,"extension.cnts_roster_invalid","Cơ sở hoặc cán bộ không thuộc tỉnh lập lịch");
       const old = new Set(cur.cells.map((c) => `${c.facility_ref}|${c.officer_ref}|${c.day}|${c.shift}`));
       const now = new Set(cells.map((c) => `${c.facility_ref}|${c.officer_ref}|${c.day}|${c.shift}`));
       const changed = [...new Set([...cur.cells.filter((c) => !now.has(`${c.facility_ref}|${c.officer_ref}|${c.day}|${c.shift}`)), ...cells.filter((c) => !old.has(`${c.facility_ref}|${c.officer_ref}|${c.day}|${c.shift}`))].map((c) => c.officer_ref))];
       const next: Roster = { ...cur, version: cur.version + 1, cells, source: b.source ?? "grid", note: b.note ?? null, updated_at: new Date().toISOString(), updated_by: w.actor, notified_officer_refs: changed };
       next.warnings = warnings(next);
-      ROSTERS.set(month, [...(ROSTERS.get(month) ?? []), next]);
+      ROSTERS.set(rosterKey(month,province), [...(ROSTERS.get(rosterKey(month,province)) ?? []), next]);
       return json(next, 201);
     },
   },
@@ -115,10 +137,12 @@ export const cntsCalRoutes: Route[] = [
     pattern: /^\/v1\/extension\/cnts\/my-duties$/,
     handler: (ctx) => {
       const month = ctx.url.searchParams.get("month") ?? today().slice(0, 7);
-      const r = latestRoster(month);
+      const province = rosterProvince(ctx, ctx.url.searchParams.get("province_code") ?? undefined);
+      if (province instanceof Response) return province;
+      const r = latestRoster(month, province);
       const me = who(ctx).actor;
       const items = r.cells
-        .filter((c) => c.officer_ref === me || c.officer_ref === OFFICER)
+        .filter((c) => c.officer_ref === me || r.officers.some(o => o.ref === c.officer_ref))
         .map((c) => {
           const f = r.facilities.find((x) => x.ref === c.facility_ref);
           return { date: `${month}-${String(c.day).padStart(2, "0")}`, shift: c.shift, facility: { ref: c.facility_ref, code: f?.code ?? null, name: f?.name ?? null, commune_code: f?.commune_code ?? null }, colleagues: [] };

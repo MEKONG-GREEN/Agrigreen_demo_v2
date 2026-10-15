@@ -126,6 +126,19 @@ Future<void> settle(WidgetTester t, {int rounds = 12}) async {
   }
 }
 
+// SQLite FFI/HTTP chạy ngoài đồng hồ giả của tester. Chờ kết quả quan sát được,
+// thay vì giả định I/O xong sau số vòng cố định khi cả bộ test chạy song song.
+Future<void> waitForWidget(WidgetTester t, Finder finder) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (finder.evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 15)),
+    );
+    await t.pump(const Duration(milliseconds: 50));
+  }
+  expect(finder, findsWidgets);
+}
+
 Future<void> _finish(WidgetTester t, _Env env) async {
   await t.pumpWidget(const SizedBox());
   await t.pump(const Duration(seconds: 5));
@@ -376,6 +389,10 @@ void main() {
       ),
     );
     await settle(tester);
+    await waitForWidget(
+      tester,
+      find.byKey(const ValueKey('kn-task-action-$taskA2')),
+    );
     expect(find.text('Công việc cần làm'), findsOneWidget);
     expect(
       find.descendant(
@@ -433,6 +450,7 @@ void main() {
       ),
     );
     await settle(tester);
+    await waitForWidget(tester, find.text('HTX Mỹ Hòa'));
     expect(find.text('HTX Mỹ Hòa'), findsOneWidget);
     expect(find.textContaining('0912•••123'), findsOneWidget);
     expect(find.textContaining('0912345'), findsNothing);

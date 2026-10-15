@@ -127,5 +127,7 @@ describe("màn Kho tài liệu nhân sự", () => {
     await userEvent.click(screen.getByRole("button", { name: "Lưu quyền" }));
     expect(await screen.findByText("Đã lưu quyền thư mục.")).toBeTruthy();
     expect(await screen.findByText("Đổi quyền thư mục")).toBeTruthy();
+    // HRM-DOC-STATUS-001: thông báo còn sau khi cây/quyền/lịch sử đã tải lại.
+    expect(screen.getByText("Đã lưu quyền thư mục.")).toBeTruthy();
   });
 });
