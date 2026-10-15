@@ -18,6 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -76,6 +77,14 @@ func run(w io.Writer, root, cfgFile, baseFile, base string, list, prune bool) in
 		if old != nil {
 			problems = append(problems, Growth(old, bl)...)
 		}
+		oldConfig, err := configAt(root, base, cfgFile)
+		if err != nil {
+			say(w, "%v\n", err)
+			return 2
+		}
+		if oldConfig != nil && !maps.Equal(oldConfig.CanonicalPaths, cfg.CanonicalPaths) {
+			problems = append(problems, "canonical_paths đã đổi so với nhánh đích — không được thêm/sửa alias để che tăng baseline")
+		}
 	}
 	for _, p := range problems {
 		say(w, "%v\n", p)
@@ -120,15 +129,45 @@ func parseBaseline(b []byte, name string) ([]Coupling, error) {
 	return doc.Couplings, nil
 }
 
-func baselineAt(root, ref, file string) ([]Coupling, error) {
-	cmd := exec.Command("git", "show", ref+":"+filepath.ToSlash(file))
+// readAtRef chỉ coi tệp chưa có là lần khởi tạo. Ref sai/không fetch được phải lỗi,
+// không được âm thầm bỏ cổng chỉ giảm baseline.
+func readAtRef(root, ref, file string) ([]byte, error) {
+	cmd := exec.Command("git", "ls-tree", "--name-only", ref, "--", filepath.ToSlash(file))
+	cmd.Dir = root
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("không đọc được nhánh đích %s: %w", ref, err)
+	}
+	if strings.TrimSpace(string(out)) == "" {
+		return nil, nil
+	}
+	cmd = exec.Command("git", "show", ref+":"+filepath.ToSlash(file))
 	cmd.Dir = root
 	b, err := cmd.Output()
 	if err != nil {
-		// Tệp chưa có ở ref (gói đầu tiên thêm cổng) → không so.
-		return nil, nil //nolint:nilerr // vắng ở ref là hợp lệ
+		return nil, fmt.Errorf("không đọc được %s:%s: %w", ref, file, err)
+	}
+	return b, nil
+}
+
+func baselineAt(root, ref, file string) ([]Coupling, error) {
+	b, err := readAtRef(root, ref, file)
+	if err != nil || b == nil {
+		return nil, err
 	}
 	return parseBaseline(b, ref+":"+file)
+}
+
+func configAt(root, ref, file string) (*Config, error) {
+	b, err := readAtRef(root, ref, file)
+	if err != nil || b == nil {
+		return nil, err
+	}
+	var cfg Config
+	if err := yaml.Unmarshal(b, &cfg); err != nil {
+		return nil, fmt.Errorf("%s:%s: %w", ref, file, err)
+	}
+	return &cfg, nil
 }
 
 // Compare: ghép nối mới (không có trong baseline) và mục baseline lỗi thời.
@@ -185,7 +224,7 @@ func Prune(baseline, cur []Coupling) []Coupling {
 }
 
 const baselineHeader = `# Baseline của cổng knboundary (KNSPLIT-0, ADR-0055) — ghép nối KN ↔ phần còn lại ĐANG CÓ, sinh từ kiểm kê
-# (go run ./tools/knboundary -list) ngày 14/10/2026. Quy tắc: tools/knboundary/boundary.yaml; kiểm kê và cách phân loại
+# (go run ./tools/knboundary -list) tại thời điểm quét. Quy tắc: tools/knboundary/boundary.yaml; kiểm kê và cách phân loại
 # (chuyển sang KN / ở lại nền tảng / cần port): docs/kn/tach-he-thong/kiem-ke.md.
 #
 # CHỈ ĐƯỢC CO LẠI: ghép nối mới làm hỏng cổng; mục lỗi thời cũng làm hỏng cổng (xóa bằng -prune trong cùng PR đã gỡ);

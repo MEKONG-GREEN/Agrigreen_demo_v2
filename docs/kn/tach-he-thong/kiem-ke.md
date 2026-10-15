@@ -11,6 +11,8 @@ Tài liệu liệt kê mọi chỗ hệ Khuyến nông (KN) đang dính với n�
 
 Phân loại dưới đây đã theo các trả lời đó.
 
+> Các chi tiết/số đếm mục 1–7 là kiểm kê ban đầu14/10. Mục 8 và ADR-0055 là cập nhật16/10 trên dev `988febd9`; quyết định PO mới có ưu tiên. Không dùng đề xuất cũ để cấp quyền ghi HTX hoặc giữ tenant KN trong lưu ký.
+
 ## Cách đọc
 
 Mỗi mục có một trong ba hướng xử lý:
@@ -51,7 +53,7 @@ Mỗi mục có một trong ba hướng xử lý:
   - vỏ web dùng chung import `src/kn` (59 import).
 - **Dữ liệu HTX.** Vai module KN không có quyền gì trên schema nội bộ HTX. Kiểm thử `TestKNRolesNoHTXInternalAccess_KNSPLIT0` và `TestKNRolesCannotWriteHTXLedgers_KNSPLIT0` đều PASS.
   - Người dùng KN vẫn đọc và ghi dữ liệu HTX qua route KN do module HTX phục vụ (vai `r_cooperative`). Họ ở **tenant lưu ký**, nên đọc theo `p_tenant` + `p_scope`, không qua cấp phép. Thu hồi cấp phép không cắt được quyền này.
-  - Kiểm thử `TestKNPrincipalHTXDataAccess_KNSPLIT0/hien_tai_tenant_luu_ky` đánh dấu 5 ca XFAIL. Gói gỡ là KNSPLIT-4.
+  - Kiểm thử `TestKNPrincipalHTXDataAccess_KNSPLIT0/hien_tai_tenant_luu_ky` đánh dấu 5 ca XFAIL. Gói gỡ là KNSPLIT-4b.
 
 ## 1. Go
 
@@ -80,7 +82,7 @@ Mỗi mục có một trong ba hướng xử lý:
   - Theo PO 14/10, cách này **không được phép ở đích**: hệ độc lập không gọi trong tiến trình vào hệ khác.
   - **Hướng: Nền tảng dữ liệu.** KNSPLIT-2 đổi nguồn:
     - số tổng hợp và trạng thái xác nhận HTX: view `pf_coop_pub`/`pf_cropcycle_pub` có phiên bản (thêm `pf/extension` vào `PubReaders`);
-    - dòng chi tiết (thửa, HTX theo đơn vị): data product có cấp phép (`p_share`, KNSPLIT-4).
+    - dòng chi tiết (thửa, HTX theo đơn vị): data product có cấp phép (`p_share`, KNSPLIT-4b).
 
 ### 1.3 Phần riêng KN trong module dùng chung (`kn-symbol-in-shared`: 212 mục)
 
@@ -140,7 +142,7 @@ Tên schema vật lý giữ nguyên ở cả hai giai đoạn: chuỗi băm sổ
 
 ### 2.4 Dữ liệu HTX: đường đọc/ghi của người dùng KN
 
-| Đường | Hiện tại (ĐTK 1, tenant lưu ký) | Đích (KNSPLIT-4) | Kiểm thử |
+| Đường | Hiện tại (ĐTK 1, tenant lưu ký) | Đích (KNSPLIT-4b) | Kiểm thử |
 |---|---|---|---|
 | Đọc bảng HTX không khai `shares` (`pf_coop.cooperative`) | Thấy cả cây (p_scope) | 0 dòng | XFAIL / PASS |
 | Đọc thửa, hộ ngoài phạm vi cấp phép | Thấy | Chỉ phạm vi cấp phép | XFAIL / PASS |
@@ -155,8 +157,8 @@ Sổ HTX mà luồng KN ghi hôm nay:
 
 Ở đích:
 - **Đọc** của KN đi qua nền tảng dữ liệu (view `_pub`, data product). Cùng cụm thì RLS `p_share` lọc theo cấp phép `intra_platform`, `purpose_code = khuyen-nong`. Không gọi port HTX trong tiến trình (PO 14/10).
-- **Ghi thay** (nếu PO giữ) đi qua lớp tích hợp (nạp theo lô hoặc lệnh có idempotency tới hệ HTX, ADR-0033), có kiểm cấp phép có quyền ghi. RLS `p_share` hiện chỉ cho SELECT.
-- Xem câu hỏi Q-KNS-04 ở ADR-0055.
+- **Ghi**: KN chỉ tạo bản riêng KN và chia sẻ qua nền tảng dữ liệu, không ghi HTX kể cả qua lệnh tích hợp. D2-KN-01 chờ PO chốt bên tiếp nhận/tạo HTX tạm. RLS `p_share` chỉ cho SELECT.
+- Q-KNS-04 đã chốt; chỉ đề xuất đối chiếu D2 tại mục Ảnh hưởng ADR-0055 còn chờ PO.
 
 ## 3. HTTP (OpenAPI)
 
@@ -193,7 +195,7 @@ Route nền tảng KN dùng như ứng dụng khác (**Nền tảng**):
 - `src/app/kn/**`: 74 trang.
 - Mock `src/api/mock/kn-*.ts` và `src/api/mock/kn-reports/**`.
 
-Toàn bộ là **→ KN**: app web KN riêng `apps/web-kn`, KNSPLIT-3.
+Các màn nghiệp vụ là **→ KN**. G1 giữ apps/web-ops với client kn-web; apps/web-kn riêng sau G1.
 
 ### 4.2 Vỏ dùng chung import KN (`web-import-into-kn`: 59 mục)
 
@@ -218,7 +220,7 @@ KN dùng chung, hợp lệ: `@/api` (161 import, client sinh từ OpenAPI), `@/c
 
 | Thành phần | KN | Hướng |
 |---|---|---|
-| `apps/field-app` (client `agrigreen-field-app`) | App hiện trường KN. Gọi `/v1/kn/{cooperatives,plots,materials,machine-counts}`, `/v1/extension/{roster,work-schedules,report-tasks,report-badges,commune-reports,directives}`, `/v1/menu`, `/v1/me/context*`, cộng MRV (`/v1/mrv/catalog`), thư viện, `/v1/masterdata/catalogs` | **→ KN** (đã là app riêng). Thu thập MRV ở app này cần PO xác nhận là của KN hay HTX (Q-KNS-06). |
+| `apps/field-app` (client `agrigreen-field-app`) | App hiện trường KN. Gọi `/v1/kn/{cooperatives,plots,materials,machine-counts}`, `/v1/extension/{roster,work-schedules,report-tasks,report-badges,commune-reports,directives}`, `/v1/menu`, `/v1/me/context*`, cộng MRV (`/v1/mrv/catalog`), thư viện, `/v1/masterdata/catalogs` | **→ KN** (đã là app riêng). PO đã chốt thu thập MRV thuộc HTX/MKG (Q-KNS-06), không chuyển dữ liệu/quyền MRV vào KN. |
 | `packages/agrigreen_mobile` (dùng chung với `htx-app`, `mkg-field-app`) | Chứa client `/v1/kn/{cooperatives,households,plots,materials,machine-counts}`, `/v1/extension/{work-schedules,directives}` | **Port**: tách thư viện KN (`packages/agrigreen_kn_mobile`); gói chung chỉ giữ đồng bộ, thiết bị, tệp, thông báo. |
 
 ## 6. Realm, client, vai
@@ -227,9 +229,9 @@ KN dùng chung, hợp lệ: `@/api` (161 import, client sinh từ OpenAPI), `@/c
 |---|---|---|---|
 | Realm người dùng | `agrigreen`, chung cho mọi ứng dụng | Giữ `agrigreen` | Có thể `agrigreen-kn` |
 | Realm quản trị | `agrigreen-kn-admin` (D24/D25, client `agrigreen-kn-admin-web`) | Giữ | Giữ |
-| Client web | `agrigreen-web-ops` (KN, HTX, CGH, SIM, PF chung) | Thêm `agrigreen-web-kn` cho `apps/web-kn` | Như trái |
+| Client web | `agrigreen-web-ops` (KN, HTX, CGH, SIM, PF chung) | Thêm `kn-web` cho `apps/web-kn` | Như trái |
 | Client mobile | `agrigreen-field-app` | Giữ | Như trái |
-| Vai realm của KN | `kn_national_admin`, `kn_province_admin`, `kn_officer`, `kn_user`, `content_editor_national`, `content_editor_province`, `content_reviewer`, `mrv_collector`, `mrv_reviewer`, `mrv_viewer`, `mrv_exporter` (`app/KN/app.yaml`) | Giữ tên. Client `agrigreen-web-kn` chỉ nhận vai KN (client scope) | Chuyển sang realm KN |
+| Vai realm của KN | `kn_national_admin`, `kn_province_admin`, `kn_officer`, `kn_user`, `content_editor_national`, `content_editor_province`, `content_reviewer`, `mrv_collector`, `mrv_reviewer`, `mrv_viewer`, `mrv_exporter` (`app/KN/app.yaml`) | Giữ tên. Client `kn-web` chỉ nhận vai KN (client scope) | Chuyển sang realm KN |
 | Vai ngữ cảnh | `kn_tw`, `kn_tinh`, `kn_xa`, `admin` (`authz/kn.go`, header `X-AG-Context`) | → `internal/kn/authz` | — |
 | Vai dùng chung với ứng dụng khác | `platform_admin`, `account_admin(_province)`, `registry_admin`, `reports_admin`, `masterdata_admin` | Nền tảng | Tài khoản quản trị riêng từng hệ (ADR-22) |
 
@@ -249,9 +251,31 @@ KN dùng chung, hợp lệ: `@/api` (161 import, client sinh từ OpenAPI), `@/c
 
 - **Khi gỡ một ghép nối:** chạy `go run ./tools/knboundary -prune` trong cùng PR. Mục lỗi thời làm hỏng cổng.
 - **Khi lỡ thêm ghép nối:** cổng hỏng với dòng `MỚI …`. Không thêm vào baseline: CI chạy `-base origin/<nhánh đích>` và chặn baseline lớn lên.
-- **Khi đổi `kn_modules`:** KNSPLIT-1 chuyển `internal/platform/{extension,price,hrm,contact}` → `internal/kn/*`. Cấu hình đã có sẵn `internal/kn`. Gói đó sửa đường dẫn trong `kn_modules` và trong baseline cùng lúc (đổi tên, không thêm mục).
+- **Khi đổi `kn_modules`:** KNSPLIT-1 chuyển `internal/platform/{extension,price,hrm,contact}` → `internal/kn/*`. Cấu hình đã có sẵn `internal/kn`. Baseline dùng canonical_paths cố định từ gói 0, nên ID ghép nối không đổi khi chuyển namespace; không sửa alias hoặc thêm mục baseline.
 
 **Giới hạn của cổng:**
 - Ký hiệu riêng KN không mang chữ KN/CNTS/KHTC (ví dụ hằng phòng ban `DeptTrongTrot`) chỉ bị bắt khi tệp có trong `kn_inventory_files`.
 - Route không có tag chỉ được xét ở tiền tố bề mặt dùng chung.
 - Mobile và realm không được cổng kiểm. Chúng nằm trong danh sách việc của KNSPLIT-3/4.
+
+
+## 8. Cập nhật tiếp nhận 16/10/2026
+
+Mốc dev `988febd9` sau W11.46. Baseline cổng ban đầu được sinh lại theo CODEX-G1; các số trong phần kiểm kê14/10ở trên là lịch sử. Sau tích hợp KNSPLIT-0 chỉ được giảm baseline.
+
+| Quy tắc | Ghép nối hiện hành |
+|---|---:|
+| `import-into-kn` | 25 |
+| `kn-import-htx` | 4 |
+| `kn-sql-foreign` | 1 |
+| `kn-symbol-in-shared` | 241 |
+| `kn-write-htx` | 10 |
+| `route-owner` | 46 |
+| `sql-into-kn` | 20 |
+| `web-import-into-kn` | 65 |
+| `web-kn-import-app` | 2 |
+| Tổng | 414 |
+
+PO đã chốt tenant riêng mỗi Trung tâm tỉnh và chuyển dữ liệu KN cũ trong G1, KN không ghi HTX (chỉ tạo bản riêng), MRV thuộc HTX/MKG. Client G1 là kn-web trong realm agrigreen; web-kn/mobile KN riêng sau G1. Đối chiếu D2-KN-01 tại ADR-0055 là đề xuất chờ PO, chưa sửa ADR-0052.
+
+KNSPLIT-GATE-001/002/003: chuyển thư mục và import cơ học giữ cùng baseline; import mới vẫn làm cổng đỏ. canonical_paths đóng băng khi so nhánh đích. Ref đích không tồn tại/fetch thiếu gây lỗi, chỉ tệp baseline/config chưa từng tồn tại ở ref hợp lệ mới là khởi tạo. Alias không miễn bất kỳ quy tắc nào.

@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -288,5 +290,105 @@ func TestRepoMatchesBaseline(t *testing.T) {
 	var out bytes.Buffer
 	if rc := run(&out, root, "tools/knboundary/boundary.yaml", "tools/knboundary/baseline.yaml", "", false, false); rc != 0 {
 		t.Fatalf("rc=%d\n%s", rc, out.String())
+	}
+}
+
+// KNSPLIT-GATE-001: chuyển namespace không thêm nợ giả; import mới vẫn bị bắt.
+func TestCanonicalModuleMove(t *testing.T) {
+	root := writeFixture(t)
+	cfgPath := filepath.Join(root, "tools/knboundary/boundary.yaml")
+	cfg, err := LoadConfig(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.CanonicalPaths = map[string]string{"internal/platform/extension": "internal/kn/extension"}
+	before, err := Scan(root, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, target := filepath.Join(root, "internal/platform/extension"), filepath.Join(root, "internal/kn/extension")
+	for _, p := range []string{source, target} {
+		rel, err := filepath.Rel(root, p)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			t.Fatal("đường chuyển không thuộc repo test")
+		}
+	}
+	if err := os.Rename(source, target); err != nil {
+		t.Fatal(err)
+	}
+	if err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Ext(p) != ".go" {
+			return nil
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(p, bytes.ReplaceAll(b, []byte("internal/platform/extension"), []byte("internal/kn/extension")), 0o644)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	after, err := Scan(root, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(before, after) || len(Growth(before, after)) != 0 {
+		t.Fatalf("chuyển cơ học làm đổi baseline: %v", Compare(before, after))
+	}
+	p := filepath.Join(root, "internal/platform/notify/new.go")
+	if err := os.WriteFile(p, []byte("package notify\nimport _ \"example.com/ag/internal/kn/extension/port\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	after, err = Scan(root, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(Growth(before, after)) == 0 {
+		t.Fatal("alias đã che import mới")
+	}
+}
+
+// KNSPLIT-GATE-002: không thêm alias để che ghép nối mới, kể cả alias chưa khớp tệp nào.
+func TestCanonicalAliasesFrozenByBase(t *testing.T) {
+	root := writeFixture(t)
+	cfgFile, baseFile := "tools/knboundary/boundary.yaml", "tools/knboundary/baseline.yaml"
+	b, err := os.ReadFile(filepath.Join(root, cfgFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b = append(b, []byte("\ncanonical_paths: {internal/platform/extension: internal/kn/extension}\n")...)
+	if err := os.WriteFile(filepath.Join(root, cfgFile), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, baseFile), FormatBaseline(scanFixture(t, root)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", args...)
+		c.Dir = root
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	git("add", ".")
+	git("-c", "user.name=Boundary test", "-c", "user.email=test@example.invalid", "commit", "-qm", "baseline")
+	// KNSPLIT-GATE-003: thiếu ref đích không được biến thành lần khởi tạo.
+	var missing bytes.Buffer
+	if rc := run(&missing, root, cfgFile, baseFile, "missing-branch-reference", false, false); rc != 2 || !strings.Contains(missing.String(), "không đọc được nhánh đích") {
+		t.Fatalf("ref sai đã bỏ cổng: %d %s", rc, missing.String())
+	}
+
+	b = bytes.Replace(b, []byte("internal/kn/extension}"), []byte("internal/kn/extension, internal/platform/unused: internal/kn/unused}"), 1)
+	if err := os.WriteFile(filepath.Join(root, cfgFile), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if rc := run(&out, root, cfgFile, baseFile, "HEAD", false, false); rc != 1 || !strings.Contains(out.String(), "canonical_paths đã đổi") {
+		t.Fatalf("đã cho sửa alias: rc=%d %s", rc, out.String())
 	}
 }

@@ -1,20 +1,19 @@
-## KNSPLIT-0 — Kiểm kê, cổng ranh giới và ADR tách hệ Khuyến nông (không migration)
+## KNSPLIT-0 — Kiểm kê, cổng ranh giới và ADR tách hệ Khuyến nông (không migration mới)
 
-Gói chuẩn bị tách KN ([ADR-0055](../../adr/0055-tach-he-thong-khuyen-nong.md), [kiểm kê](../tach-he-thong/kiem-ke.md)). Không chuyển mã. Chủ sản phẩm đã trả lời Q-KNS-01, 02, 05 ngày 14/10/2026 (ghi ở ba dòng đầu bảng). Q-KNS-03, 04, 06 còn mở; các lựa chọn khác do nhóm phát triển đặt.
+Nguồn: CODEX-G1 mục 5–6 và trả lời PO 14–15/10/2026; [ADR-0055](../../adr/0055-tach-he-thong-khuyen-nong.md), [kiểm kê](../tach-he-thong/kiem-ke.md). Gói này chưa chuyển mã nghiệp vụ/tenant và chưa đóng G1.
 
-| Câu hỏi / mục | Lựa chọn đã dùng | Ở đâu | Đổi thế nào |
-|---|---|---|---|
-| Q-KNS-01 — "tách riêng" | **PO trả lời 14/10/2026:** "KN là hệ thống độc lập, trao đổi dữ liệu với hệ khác chỉ qua nền tảng dữ liệu dùng chung (hợp đồng `_pub`, data product, lớp tích hợp); không gọi trong tiến trình vào module của hệ khác". Quy tắc mới `kn-import-htx` cấm KN import module HTX, kể cả `port/`. 4 tệp `pf/extension` gọi `coopport.*` vào baseline; route `/v1/kn/*` do module HTX phục vụ cũng vậy | `tools/knboundary`, ADR-0055 §1, §4 | — |
-| Q-KNS-02 — NĐ 331 và ranh giới vật lý | **PO trả lời 14/10/2026:** "Không. Đích là độc lập logic; tách vật lý (binary, realm, cụm) là tùy chọn sau G1, chỉ khi vận hành cần". Đã bỏ tiêu chí tách vật lý gắn NĐ 331 | ADR-0055 §7 | — |
-| Q-KNS-05 — Báo giá, Contact | **PO trả lời 14/10/2026:** "Hệ nào có chức năng thì sở hữu bản riêng, không có năng lực dùng chung". Đối chiếu BRD: Báo giá là của KN, Phòng TTTT (BRD Báo giá nông sản v1.3, 07/10/2026, §I.1); Contact FN-13 là của KN, Phòng HCTH (BRD HCTH v3.0, UR-GEN-01/02, UR-QG-02, UR-ADM-10). `pf/price`, `pf/contact` giữ trong `kn_modules`. ADR-0049 và ADR-0054 bị thay thế một phần | `boundary.yaml`, ADR-0049, ADR-0054, ADR-0055 | — |
-| "Hệ khác" mà KN không được gọi trong tiến trình | HTX: `pf/cooperative`, `pf/cropcycle`, `pf/mechanization`; MKG: `internal/mkg`. Dịch vụ nền tảng dùng chung (`accounts`, `party`, `forms`, `notify`, `reports`, `masterdata`, `sync`, `geo`, `metrics`, kho định danh) vẫn gọi qua `port/` | `htx_modules`, `allowedFromKN` | Thêm module khi PO xếp thêm hệ |
-| Module nào là "của KN" | `pf/extension`, `pf/price`, `pf/hrm`, `pf/contact` (PO 14/10, Q-KNS-05), cộng không gian tên đích `internal/kn` | `tools/knboundary/boundary.yaml` `kn_modules`; `knModules` trong kiểm thử | — |
-| Module nào là "dữ liệu HTX" | `pf/cooperative`, `pf/cropcycle`, `pf/mechanization` (D2: dữ liệu canh tác, máy) | `htx_modules`; `htxModules` trong kiểm thử | Thêm module khi có dữ liệu HTX mới |
-| Gốc lắp ráp được import KN | `cmd/api-platform`, `cmd/worker`, `cmd/formimport`, `cmd/seed-synthetic` (giai đoạn logic dùng chung binary) | `composition_roots` | Binary chung là đích (PO 14/10). Chỉ đổi nếu KNSPLIT-5 tùy chọn được mở |
-| Phạm vi quét dấu KN | Tên tệp hoặc khai báo cấp gói có `KN`/`CNTS`/`KHTC` trong `internal/`, `lib/` (không gồm kiểm thử), cộng danh sách tay `kn_inventory_files` (15 tệp không mang dấu tên: menu, phòng ban, đơn vị nội bộ, vô hiệu, loại thông báo, `extensionsrc`) | `symbol_marker`, `file_marker`, `kn_inventory_files` | Thêm tệp vào danh sách tay khi phát hiện; danh sách chỉ co lại cùng baseline |
-| Route bề mặt KN | Tiền tố `/v1/kn/`, `/v1/extension/`, `/v1/price/`, `/v1/hrm/`, `/v1/contacts`, `/v1/support-requests` (thao tác không tag tính là của KN); bề mặt dùng chung: menu, ngữ cảnh phiên, ủy quyền, đơn vị nội bộ, phòng ban, cán bộ KN, phiên hỗ trợ | `kn_route_prefixes`, `kn_shared_route_prefixes` | Đổi khi PO xác định phòng ban, ủy quyền là của nền tảng |
-| Vùng web KN | `src/kn/`, `src/app/kn/`, mock `src/api/mock/kn-*`; KN được dùng `api`, `apiclient`, `auth`, `components`, `lib`, `shell`, `nav`, `config` | `web` | KNSPLIT-3 đổi sang `apps/web-kn` |
-| Mục baseline từ migration cũ | Giữ (vĩnh viễn: migration không sửa được) — 000114 (`ag_ops_jobs` đọc cột `pf_extension`), 000124 (dựng view `pf_extension_pub`) | `baseline.yaml` | — |
-| "Chủ thể KN" ở mức DB | (1) vai nhóm module KN; (2) phiên người dùng KN trên route KN do module HTX phục vụ (`r_cooperative`, Nút KN, mục đích `khuyen-nong`) | `migrations/kn_split_boundary_integration_test.go` | Thêm vai `r_kn_*` khi KNSPLIT-2 tạo module mới |
-| Ca hỏng vì tenant lưu ký | Đánh dấu XFAIL (vẫn chạy, ghi lý do và gói gỡ KNSPLIT-4; hết vi phạm → XPASS làm hỏng kiểm thử) — 5 ca: đọc bảng HTX ngoài cấp phép, đọc ngoài phạm vi cấp phép, ghi sổ HTX, thu hồi không cắt, hết hạn không cắt | như trên | KNSPLIT-4 đổi thành khẳng định cứng |
-| Số ADR | 0055 (số trống lớn nhất + 1; 0040 "hai hệ thống thông tin" vẫn giữ chỗ cho v4.3 ADR-22) | `docs/adr/README.md` | Đổi số nếu gói song song lấy 0055 trước (`docscheck`) |
+| Mục | Quyết định / cách triển khai | Bằng chứng / gói tiếp |
+|---|---|---|
+| Q-KNS-01/02 | Hệ KN độc lập logic; trao đổi hệ khác chỉ qua nền tảng dữ liệu, không import port HTX/MKG; vật lý sau G1 | kn-import-htx, ADR-0055 |
+| Q-KNS-03 | Mỗi Trung tâm tỉnh một tenant; chuyển dữ liệu KN cũ forward-only trong G1, có IDmap/bút toán/chạy thử/đối chiếu/rollback | KNSPLIT-4b |
+| Q-KNS-04 | KN không ghi HTX; dữ liệu KN tạo về HTX là bản riêng KN. Không cấp đường ghi gián tiếp | kn-write-htx; D2-KN-01 trong ADR là đề xuất riêng chờ PO, chưa sửa D2 |
+| Q-KNS-05 | extension, price, hrm, contact thuộc KN; giữ tên module/vai/schema vật lý | namespace KNSPLIT-1, ADR-0049/0054 |
+| Q-KNS-06 | MRV thuộc HTX/MKG, không chuyển vào tenant KN | Phân loại chuyển 4b, client/role gói 3 |
+| Client và frontend | G1 client kn-web ở realm agrigreen + runbook import. Web riêng/mobile KN riêng sau G1 | KNSPLIT-3 tối thiểu |
+| Baseline ban đầu | Sinh từ dev `988febd9` sau W11.46:414 ghép nối,10 quy tắc (một quy tắc hiện0). Sau tích hợp chỉ giảm | tools/knboundary/baseline.yaml, CI -base |
+| Đổi namespace cơ học | Bốn alias canonical_paths cố định giữ ID ghép nối trước/sau chuyển thư mục; không thay phân loại quyền/import, không làm mất import mới. Alias không đổi được so với nhánh đích; ref đích sai làm cổng lỗi | KNSPLIT-GATE-001/002/003 |
+| Ba tệp dở khi tiếp nhận | Đã lưu patch và commit nguyên vẹn trước rebase; giữ quy tắc kn-write-htx | boundary.yaml/check.go/knboundary_test.go |
+| Năm vi phạm tenant lưu ký | XFAIL vẫn chạy thật, ghi rõ vi phạm;4b phải chuyển thành PASS và fail-on-skip, không bỏ test | migrations/kn_split_boundary_integration_test.go |
+| Ghép nối SQL mới phát hiện | cntsalert/app/lifecycle.go nhắc pf_forms.period trong tìm tenant job; phải chuyển sang cổng chung/gốc lắp ráp, không mở thêm quyền KN | kn-sql-foreign=1, KNSPLIT-2 |
+
+Mẫu phiếu KHTC nạp sẵn đủ G1 (KH-UR-AD-02), M1–M7 đã chốt; không hỏi lại. Đề xuất D2 đã có bước KN đề nghị, MKG duyệt và tạo, tác động và phương án thay thế tại mục Ảnh hưởng ADR-0055; chưa triển khai phần phụ thuộc khi chưa có trả lời PO. Kết quả kiểm thử/cổng ghi tại [sổ hồi quy](../../REGRESSION.md).

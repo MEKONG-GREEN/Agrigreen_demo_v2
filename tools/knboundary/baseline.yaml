@@ -1,37 +1,42 @@
+# Baseline ban đầu trên dev988febd9 ngày16/10/2026. Định danh module dùng canonical_paths cố định; sau tích hợp chỉ được giảm.
 # Baseline của cổng knboundary (KNSPLIT-0, ADR-0055) — ghép nối KN ↔ phần còn lại ĐANG CÓ, sinh từ kiểm kê
-# (go run ./tools/knboundary -list) ngày 14/10/2026. Quy tắc: tools/knboundary/boundary.yaml; kiểm kê và cách phân loại
+# (go run ./tools/knboundary -list) tại thời điểm quét. Quy tắc: tools/knboundary/boundary.yaml; kiểm kê và cách phân loại
 # (chuyển sang KN / ở lại nền tảng / cần port): docs/kn/tach-he-thong/kiem-ke.md.
 #
 # CHỈ ĐƯỢC CO LẠI: ghép nối mới làm hỏng cổng; mục lỗi thời cũng làm hỏng cổng (xóa bằng -prune trong cùng PR đã gỡ);
 # CI chạy -base <nhánh đích> nên không thêm được mục mới. Gói gỡ: KNSPLIT-1 (không gian tên), KNSPLIT-2 (tách phần KN
 # khỏi module dùng chung), KNSPLIT-3 (app web KN riêng).
 couplings:
-  - {rule: import-into-kn, from: internal/platform/accounts/app/kn_extension_test.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/notify/app/consume.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/notify/app/consume.go, to: internal/platform/price/port}
-  - {rule: import-into-kn, from: internal/platform/notify/domain/price.go, to: internal/platform/price/port}
-  - {rule: import-into-kn, from: internal/platform/notify/domain/price_test.go, to: internal/platform/price/port}
-  - {rule: import-into-kn, from: internal/platform/notify/domain/report_cycle.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/notify/domain/report_cycle_test.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/notify/domain/templates.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/notify/domain/work_schedule.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/notify/domain/work_schedule_test.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/notify/handler/g2_integration_test.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/notify/handler/notify_integration_test.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/notify/handler/price_integration_test.go, to: internal/platform/price/port}
-  - {rule: import-into-kn, from: internal/platform/notify/handler/report_cycle_integration_test.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/notify/module.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/reports/app/dispatch.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/reports/app/service.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/reports/handler/coop_schedule_integration_test.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/reports/handler/egress_integration_test.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/reports/handler/forms_integration_test.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/reports/handler/reports_htx_integration_test.go, to: internal/platform/extension/port}
-  - {rule: import-into-kn, from: internal/platform/reports/handler/reports_integration_test.go, to: internal/platform/extension/port}
-  - {rule: kn-import-htx, from: internal/platform/extension/app/service.go, to: internal/platform/cooperative/port}
-  - {rule: kn-import-htx, from: internal/platform/extension/handler/unified_integration_test.go, to: internal/platform/cooperative/port}
-  - {rule: kn-import-htx, from: internal/platform/extension/module.go, to: internal/platform/cooperative/port}
-  - {rule: kn-import-htx, from: internal/platform/extension/port/closedfig.go, to: internal/platform/cooperative/port}
+  - {rule: import-into-kn, from: internal/platform/accounts/app/kn_extension_test.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/app/consume.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/app/consume.go, to: internal/kn/price/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/cnts.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/cnts_test.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/price.go, to: internal/kn/price/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/price_test.go, to: internal/kn/price/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/report_cycle.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/report_cycle_test.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/templates.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/work_schedule.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/domain/work_schedule_test.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/handler/cnts_duty_integration_test.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/handler/g2_integration_test.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/handler/notify_integration_test.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/handler/price_integration_test.go, to: internal/kn/price/port}
+  - {rule: import-into-kn, from: internal/platform/notify/handler/report_cycle_integration_test.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/notify/module.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/app/dispatch.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/app/service.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/handler/coop_schedule_integration_test.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/handler/egress_integration_test.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/handler/forms_integration_test.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/handler/reports_htx_integration_test.go, to: internal/kn/extension/port}
+  - {rule: import-into-kn, from: internal/platform/reports/handler/reports_integration_test.go, to: internal/kn/extension/port}
+  - {rule: kn-import-htx, from: internal/kn/extension/app/service.go, to: internal/platform/cooperative/port}
+  - {rule: kn-import-htx, from: internal/kn/extension/handler/unified_integration_test.go, to: internal/platform/cooperative/port}
+  - {rule: kn-import-htx, from: internal/kn/extension/module.go, to: internal/platform/cooperative/port}
+  - {rule: kn-import-htx, from: internal/kn/extension/port/closedfig.go, to: internal/platform/cooperative/port}
+  - {rule: kn-sql-foreign, from: internal/kn/extension/cntsalert/app/lifecycle.go, to: pf_forms.period}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/dormant.go, to: (kiểm kê)}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/internal_unit.go, to: (kiểm kê)}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn.go, to: (tệp)}
@@ -61,6 +66,7 @@ couplings:
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_vault.go, to: KNXaVaultRole}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_vault.go, to: Service.grantKNXaVault}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_vault.go, to: Service.releaseKNXaVault}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/kn_xascope.go, to: (tệp)}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/service.go, to: KNModule}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/service.go, to: Service.checkKNModule}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/domain/internal_unit.go, to: (kiểm kê)}
@@ -114,6 +120,7 @@ couplings:
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/store/internal_unit.go, to: (kiểm kê)}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/store/kn.go, to: (tệp)}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/store/kn_attrs.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/accounts/store/kn_xascope.go, to: (tệp)}
   - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/anchor/app/service.go, to: roleKNNationalAdmin}
   - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/anchor/app/service.go, to: roleKNProvinceAdmin}
   - {rule: kn-symbol-in-shared, from: internal/platform/cooperative/anchor/domain/mst.go, to: CreatedByKN}
@@ -201,9 +208,21 @@ couplings:
   - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: ParamCNTSSlaughterSpikeMinDays}
   - {rule: kn-symbol-in-shared, from: internal/platform/mechanization/app/department_usage.go, to: (kiểm kê)}
   - {rule: kn-symbol-in-shared, from: internal/platform/mechanization/handler/machine_count.go, to: Handler.RegisterKNMachineCounts}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/domain/cnts.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/domain/cnts.go, to: CNTSAlertLink}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/domain/cnts.go, to: CNTSEvents}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/domain/cnts.go, to: CNTSNotifications}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/domain/cnts.go, to: CNTSPeriodsLink}
   - {rule: kn-symbol-in-shared, from: internal/platform/notify/domain/price.go, to: (kiểm kê)}
   - {rule: kn-symbol-in-shared, from: internal/platform/notify/domain/report_cycle.go, to: (kiểm kê)}
   - {rule: kn-symbol-in-shared, from: internal/platform/notify/domain/work_schedule.go, to: (kiểm kê)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/port/cnts.go, to: (tệp)}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/port/cnts.go, to: ConsumerCNTS}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/port/cnts.go, to: KindCNTSAlert}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/port/cnts.go, to: KindCNTSAlertAssigned}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/port/cnts.go, to: KindCNTSAlertOverdue}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/port/cnts.go, to: KindCNTSDutyChanged}
+  - {rule: kn-symbol-in-shared, from: internal/platform/notify/port/cnts.go, to: KindCNTSFormReminder}
   - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn.go, to: (tệp)}
   - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn.go, to: KN}
   - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: (tệp)}
@@ -259,6 +278,16 @@ couplings:
   - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: KNTinh}
   - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: KNXa}
   - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: RequireKN}
+  - {rule: kn-write-htx, from: "application.yaml POST /v1/kn/cooperatives/{ref}/deactivate", to: dữ liệu HTX}
+  - {rule: kn-write-htx, from: "application.yaml POST /v1/kn/cooperatives/{ref}/households", to: dữ liệu HTX}
+  - {rule: kn-write-htx, from: "application.yaml POST /v1/kn/cooperatives/{ref}/reactivate", to: dữ liệu HTX}
+  - {rule: kn-write-htx, from: application.yaml POST /v1/kn/cooperatives, to: dữ liệu HTX}
+  - {rule: kn-write-htx, from: "application.yaml POST /v1/kn/plots/{ref}/boundary", to: dữ liệu HTX}
+  - {rule: kn-write-htx, from: application.yaml POST /v1/kn/plots, to: dữ liệu HTX}
+  - {rule: kn-write-htx, from: "application.yaml PUT /v1/kn/cooperatives/{ref}", to: dữ liệu HTX}
+  - {rule: kn-write-htx, from: "application.yaml PUT /v1/kn/households/{ref}", to: dữ liệu HTX}
+  - {rule: kn-write-htx, from: "application.yaml PUT /v1/kn/machine-counts/{ref}", to: dữ liệu HTX}
+  - {rule: kn-write-htx, from: "application.yaml PUT /v1/kn/plots/{ref}", to: dữ liệu HTX}
   - {rule: route-owner, from: "admin.yaml /v1/accounts/delegations/{id}/revoke", to: accounts}
   - {rule: route-owner, from: admin.yaml /v1/accounts/internal-units/seed, to: accounts}
   - {rule: route-owner, from: "admin.yaml /v1/accounts/internal-units/{id}/deactivate", to: accounts}
@@ -343,14 +372,20 @@ couplings:
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/xlsx.ts, to: kn/forms/types}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/xlsx.ts, to: kn/grid/letters}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-admin}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-aggregate}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-alert}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-cal}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-catalogs}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-outbreak}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-periods}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-collect}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-contact}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-hrm}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-hrm-docs}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-hrm-reports}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-hrm-staff}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-khtc}
+  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-khtc-forms}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-khtc-periods}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-khtc-sources}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price}

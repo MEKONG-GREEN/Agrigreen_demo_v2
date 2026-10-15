@@ -122,3 +122,11 @@ web:
   alias: "@/"
   kn_paths: [kn/, app/kn/, api/mock/kn-]
   kn_may_import: [kn/, app/kn/, api/, apiclient/, auth/, components/, lib/, shell/, nav/, config]
+
+# Định danh module ổn định trước/sau chuyển thư mục KNSPLIT-1. Đây không phải miễn quy tắc.
+# Alias được đóng băng sau tích hợp đầu; -base chặn mọi thay đổi alias kể cả baseline chưa đổi.
+canonical_paths:
+  internal/platform/extension: internal/kn/extension
+  internal/platform/price: internal/kn/price
+  internal/platform/hrm: internal/kn/hrm
+  internal/platform/contact: internal/kn/contact

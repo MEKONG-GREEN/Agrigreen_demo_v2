@@ -35,23 +35,24 @@ const (
 
 // Config là boundary.yaml.
 type Config struct {
-	KNModules          []string `yaml:"kn_modules"`
-	HTXModules         []string `yaml:"htx_modules"`
-	CompositionRoots   []string `yaml:"composition_roots"`
-	TestRoots          []string `yaml:"test_roots"`
-	GoRoots            []string `yaml:"go_roots"`
-	SymbolRoots        []string `yaml:"symbol_roots"`
-	MigrationsRoot     string   `yaml:"migrations_root"`
-	KNMigrationPattern string   `yaml:"kn_migration_pattern"`
-	FreeSchemas        []string `yaml:"free_schemas"`
-	SymbolMarker       string   `yaml:"symbol_marker"`
-	FileMarker         string   `yaml:"file_marker"`
-	KNInventoryFiles   []string `yaml:"kn_inventory_files"`
-	OpenAPI            []string `yaml:"openapi"`
-	KNTags             []string `yaml:"kn_tags"`
-	KNRoutePrefixes    []string `yaml:"kn_route_prefixes"`
-	KNSharedPrefixes   []string `yaml:"kn_shared_route_prefixes"`
-	KNHTXWritePrefixes []string `yaml:"kn_htx_write_prefixes"`
+	CanonicalPaths     map[string]string `yaml:"canonical_paths"`
+	KNModules          []string          `yaml:"kn_modules"`
+	HTXModules         []string          `yaml:"htx_modules"`
+	CompositionRoots   []string          `yaml:"composition_roots"`
+	TestRoots          []string          `yaml:"test_roots"`
+	GoRoots            []string          `yaml:"go_roots"`
+	SymbolRoots        []string          `yaml:"symbol_roots"`
+	MigrationsRoot     string            `yaml:"migrations_root"`
+	KNMigrationPattern string            `yaml:"kn_migration_pattern"`
+	FreeSchemas        []string          `yaml:"free_schemas"`
+	SymbolMarker       string            `yaml:"symbol_marker"`
+	FileMarker         string            `yaml:"file_marker"`
+	KNInventoryFiles   []string          `yaml:"kn_inventory_files"`
+	OpenAPI            []string          `yaml:"openapi"`
+	KNTags             []string          `yaml:"kn_tags"`
+	KNRoutePrefixes    []string          `yaml:"kn_route_prefixes"`
+	KNSharedPrefixes   []string          `yaml:"kn_shared_route_prefixes"`
+	KNHTXWritePrefixes []string          `yaml:"kn_htx_write_prefixes"`
 	Web                struct {
 		Root        string   `yaml:"root"`
 		Alias       string   `yaml:"alias"`
@@ -135,8 +136,22 @@ func sortCouplings(cs []Coupling) {
 }
 
 func (c *checker) add(rule, from, to string) {
-	k := Coupling{Rule: rule, From: from, To: to}
+	k := Coupling{Rule: rule, From: c.canonical(from), To: c.canonical(to)}
 	c.out[k.key()] = k
+}
+
+// canonical giữ định danh ghép nối khi chuyển namespace cơ học; không thay cách phân loại quyền/import.
+func (c *checker) canonical(p string) string {
+	best, target := "", ""
+	for from, to := range c.cfg.CanonicalPaths {
+		if (p == from || strings.HasPrefix(p, from+"/")) && len(from) > len(best) {
+			best, target = from, to
+		}
+	}
+	if best != "" {
+		return target + strings.TrimPrefix(p, best)
+	}
+	return p
 }
 
 func modulePath(root string) (string, error) {

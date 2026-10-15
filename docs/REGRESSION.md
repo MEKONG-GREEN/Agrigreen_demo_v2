@@ -152,3 +152,17 @@ Kết quả mã W11.46 cuối trước tích hợp:
 Cổng tĩnh sau khi trình duyệt kết thúc: vet, modgen-check, migratecheck-base, archlint, contractcheck, docscheck, mfaflagcheck và golangci-lint đều mã thoát0, lint0issues. Build cuối trước đó mã0. Đủ cổng trước tích hợp; helper sẽ chạy lại build/vet/migrationcheck/archlint và các ca lịch/menu cùng migration gates trên commit cuối.
 
 Tích hợp W11.46: helper rebase-merge.ps1 hoàn tất mã thoát0, remote dev449faf44. Lượt tích hợp chạy lại full cntscal/handler + full party/handler PASS, cổng migration PASS162,007giây, không SKIP. Worktree/nhánh giữ nguyên; main không đổi.
+
+## tools/knboundary — KNSPLIT-0 (mốc dev `988febd9`)
+
+Dependency evidence: `rg -n 'knboundary' Makefile .github/workflows/ci.yml docs/dev` và đường gọi run/Scan/Compare/Growth trong tools/knboundary. Không đổi API/web/schema/runtime nghiệp vụ so với dev.
+Downstream consumers: make gates/gates-base, CI pull request; kiểm kê namespace/route/schema và các gói KN kế tiếp. Kiểm thử dữ liệu mới tiêu thụ danh sách module/vai/schema hiện hành.
+Regression acceptance command: `go test -v -count=1 ./tools/knboundary`; `go run ./tools/knboundary -base origin/dev`; `go test -v -count=1 -p 1 -timeout 55m ./migrations -run KNSPLIT0` trên PostgreSQL tạm. Cổng build/vet/modgen/migrate/archlint/contract/docs/mfaflag/lint vẫn bắt buộc.
+Propagation rule: đổi quy tắc/alias hoặc baseline → chạy đầy đủ scanner fixture+repo+chống tăng/đổi alias/ref sai; đổi ranh giới DB → chạy các ca quyền thật và cổng migration. Không chạy lại web/mobile vì không có thay đổi source/hợp đồng ở hai ứng dụng trong gói này; W11.46 đã kiểm bản nền.
+Related test points: KNSPLIT-GATE-001/002/003; các ca quyền dữ liệu trong migrations/kn_split_boundary_integration_test.go (tên và kết quả được ghi sau lượt DB).
+
+Baseline ban đầu414 ghép nối sinh trên dev `988febd9` theo CODEX-G1, không phải tăng baseline sau áp cổng. Canonical aliases giữ ID khi chuyển namespace, đóng băng bằng -base; các ca thêm import mới/đổi alias/ref sai đều bắt lỗi. Tool suite mã thoát0. Bộ DB đang chạy:5 ca XFAIL được ghi là nợ bắt buộc 4b, không phải đã đạt ranh giới G1. D2-KN-01 đang chờ PO, không thay quyết định CEO.
+
+Kết quả PostgreSQL KNSPLIT-0: mã thoát 0 (68,755 giây), không SKIP. `TestKNRolesNoHTXInternalAccess_KNSPLIT0` và `TestKNRolesCannotWriteHTXLedgers_KNSPLIT0` PASS. `TestKNPrincipalHTXDataAccess_KNSPLIT0/dich_tenant_KN_rieng` PASS. Nhánh tenant lưu ký tái hiện đúng 5 XFAIL: đọc bảng ngoài công bố/cấp phép, đọc ngoài phạm vi cấp phép, ghi sổ HTX, thu hồi và hết hạn không cắt quyền. Đây là bằng chứng nợ để gỡ ở KNSPLIT-4b; không được tính là 5 tiêu chí ranh giới đã đạt.
+
+Cổng build/vet/modgen-check/migratecheck-base/archlint/contractcheck/docscheck/mfaflagcheck/golangci-lint: mã thoát 0, lint 0 issues. Tool suite cuối và knboundary -base origin/dev mã thoát 0, 414 ghép nối. Helper tích hợp được bổ sung chạy knboundary sau rebase và lấy tên nhánh thực để hỗ trợ prefix codex/; vẫn từ chối main và chỉ đẩy refs/heads/dev.
