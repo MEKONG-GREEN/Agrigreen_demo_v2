@@ -72,9 +72,9 @@ Trạng thái **đạt** nghĩa là có kiểm thử tự động trên giao di�
 
 | Mã | Tiêu chí | Bằng chứng | Trạng thái |
 |---|---|---|---|
-| ORG-CREATE-001 | Mọi Admin tạo HTX qua `/v1/orgs` nhận 422 + redirect; vai KN nhận 403 với mọi loại | Go `TestOrgNodeCreateOnlyPlatformAdmin`, mock orgs-create | chờ cổng cuối |
-| ORG-NEO-001 | Tạo Nút lỗi giữa các bước, gửi lại cùng khóa hoàn tất đúng một Nút/Neo | `TestCreateWithNewCooperative_ORGUI` PostgreSQL thật | chờ cổng cuối |
+| ORG-CREATE-001 | Mọi Admin tạo HTX qua `/v1/orgs` nhận 422 + redirect; vai KN nhận 403 với mọi loại | Go `TestOrgNodeCreateOnlyPlatformAdmin`, mock orgs-create | đạt |
+| ORG-NEO-001 | Tạo Nút lỗi giữa các bước, gửi lại cùng khóa hoàn tất đúng một Nút/Neo | `TestCreateWithNewCooperative_ORGUI` PostgreSQL thật | đạt |
 | ORG-NEO-002 | Mất phản hồi sau khi ghi, web khóa sửa trường, thử lại không trùng | `NewAnchorForm.test.tsx` | đạt |
-| ORG-NEO-003 | Neo HTTP tạo đủ Nút/hồ sơ/đại diện, phát lại, MST chuẩn, nhãn chưa xác nhận; sai vai/MFA/tenant bị chặn, không log PII/token | `tests/e2e/TestCreateAnchoredCooperativeORGUI` | chờ cổng cuối |
+| ORG-NEO-003 | Neo HTTP tạo đủ Nút/hồ sơ/đại diện, phát lại, MST chuẩn, nhãn chưa xác nhận; sai vai/MFA/tenant bị chặn, không log PII/token | `tests/e2e/TestCreateAnchoredCooperativeORGUI` | đạt |
 
 D2 về sở hữu và nhận quyền giữ theo ADR-0052; đề xuất tách KN thuộc ADR-0055.
