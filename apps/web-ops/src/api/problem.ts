@@ -136,6 +136,11 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "extension.no_directive_targets": "Vùng đã chọn chưa có cán bộ nào trong danh bạ — không ban hành chỉ đạo rỗng.",
   "extension.task_not_found": "Không tìm thấy nhiệm vụ, hoặc nhiệm vụ nằm ngoài phạm vi.",
   "content.library_item_not_found": "Tài liệu chưa có trong danh mục cá nhân.",
+  // W11.28: báo cáo Sở và dashboard nhân sự.
+  "hrm.report_unknown": "Không có biểu báo cáo Sở này. Chọn một biểu từ NS01 đến NS06.",
+  "hrm.report_blocked": "Số liệu chưa đạt quy tắc kiểm tra bắt buộc. Sửa các lỗi trước khi xuất báo cáo.",
+  "hrm.export_not_found": "Không tìm thấy lần xuất báo cáo này.",
+  "vault.batch_unsupported": "Chưa thể đọc hồ sơ nhân sự. Vui lòng liên hệ bộ phận hỗ trợ.",
   // pf/notify
   "notify.notification_not_found": "Thông báo không còn (đã quá 90 ngày hoặc ngoài phạm vi).",
   "notify.out_of_scope": "Đơn vị đã chọn nằm ngoài phạm vi phụ trách.",
@@ -449,7 +454,7 @@ export function parseRetryAfter(value: string | null | undefined, now: number = 
 }
 
 /** Thông báo cho người dùng: ưu tiên bảng mã; mã lạ thì dùng detail/title của server. */
-const PREFER_DETAIL: ReadonlySet<string> = new Set(["party.out_of_scope", "party.import_invalid"]);
+const PREFER_DETAIL: ReadonlySet<string> = new Set(["party.out_of_scope", "party.import_invalid", "hrm.report_blocked"]);
 
 export function problemMessage(p: Pick<ProblemDetails, "code" | "status" | "detail" | "title">): string {
   // Thông báo nghiệp vụ của 422 (vd "Vui lòng nhập đầy đủ Tên tuyến và Phân loại." — docs/errors.md) nằm ở `detail`.
