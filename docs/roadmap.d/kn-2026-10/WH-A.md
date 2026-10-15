@@ -1,1 +1,1 @@
-- [ ] WH-A (16/10/2026, không migration): registry menu/mock/OpenAPI theo module; đang kiểm hồi quy cuối trước tích hợp. [Quy ước](../../dev/module-registrations.md), [giả định](../../kn/gia-dinh/WH-A.md).
+- [x] WH-A (16/10/2026, không migration): registry menu/mock/OpenAPI theo module; đã kiểm toàn bộ party, KN77, migration, web562ca/build và cổng tĩnh. Chờ helper gộp dev. [Quy ước](../../dev/module-registrations.md), [giả định](../../kn/gia-dinh/WH-A.md).

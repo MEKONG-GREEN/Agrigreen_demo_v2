@@ -183,3 +183,12 @@ Lượt menu-db/session44329 mã thoát0: full party và KN77 trên PG riêng; K
 Cổng ranh giới lúc gom qua kn.ts bắt coupling mới; đã bỏ cách đó và giữ nguyên cấu hình/scanner. Quét lại0MỚI,24LỖI THỜI; sau xét duyệt lại có bằng chứng, prune chỉ bỏ24mục đã gỡ, baseline414→390 và -baseorigin/dev mã0. Không thêm/sửa alias, không nới quy tắc. Các kiểm tra cuối đang chạy; chưa tích hợp.
 
 Lượt web-final trên menu mock cùng nguồn: gen/check/lint/typecheck đạt, full562ca/66tệpPASS117,40s; build đang chạy. Lượt static đầu các cổng trước lint đạt, lint bắt3helper cũ không còn dùng (adminDeptRoute/soon/needs); đã gỡ dead code, chạy lại toàn bộ static session44419 cùng log (có lịch sử lượt đỏ). FullPG cuối session74971 đã qua party, đang KN77 rồi migration. Chưa tích hợp.
+
+
+Kết quả WH-A cuối trên commit e1ed8b3c:
+
+- `web-final` mã0: gen:api/check:api, ESLint, TypeScript,562ca/66tệp PASS (117,40s), build:mock thành công trên Next16.3.8.
+- `db-final` mã0, PostgreSQL riêng,0FAIL/SKIP: full party (handler160,555s), KN77(207,184s), migration gates(213,465s); RLS474bảng/0bỏqua/0ngoạilệ. Golden TestWebMenuFixture PASS.
+- `static` lượt cuối mã0: build/vet/modgen/migratecheck-base/archlint/contract/docs/mfaflag/knboundary/tooltests và golangci-lint0issues. Lượt đầu đỏ3helper không dùng được ghi nguyên trong log; lượt sau đã xóa dead code và chạy lại đủ lệnh.
+- Đối chiếu cả5SHA256 với b5906660: golden menu,2OpenAPI,2generatedTS đều giữ nguyên. Migration tree không đổi; gofmt và diff-check đạt. Thêm `# @ag-end` ở2fragment để giữ blank YAML gốc và tránh blank-EOF ở nguồn mới; parser bỏ marker, bộ ghép và Node5ca được kiểm lại sau thay đổi này. Không đổi đầu ra hay hành vi.
+- Chuẩn bị tích hợp bằng helper vào dev; ca KN77 đã chạy đầy đủ trên mã cuối, helper chạy lại party và các cổng migration trên cây sau rebase. Chưa có thay đổi Go nghiệp vụ sau các kết quả này.
