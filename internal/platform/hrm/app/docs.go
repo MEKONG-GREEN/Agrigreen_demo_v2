@@ -1271,8 +1271,8 @@ func (r FileResolver) AuthorizeFile(ctx context.Context, file evport.File) (bool
 		}
 		c, err := r.S.docCaller(ctx, tx)
 		if err != nil {
-			return nil
-		} // không có ngữ cảnh nghiệp vụ hợp lệ: từ chối
+			return nil //nolint:nilerr // ngữ cảnh không hợp lệ: từ chối tệp
+		}
 		tree, err := loadTree(ctx, tx)
 		if err != nil {
 			return err
