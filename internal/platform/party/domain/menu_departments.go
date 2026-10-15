@@ -197,6 +197,8 @@ var adminDeptBusiness = map[string][]MenuItem{
 	port.MenuProfileChanNuoiThuySan: {
 		{Key: "admin.pb.cnts_danh_muc", Label: "Danh mục CNTS", Route: adminDeptRoute("/danh-muc-cnts"), Icon: "catalog"}, // W11.41
 		{Key: "admin.pb.cnts_bieu_ky", Label: "Biểu kỳ Cấp Xã", Route: adminDeptRoute("/bieu-ky-cnts"), Icon: "table"},    // W11.42
+		{Key: "admin.pb.cnts_lich_truc", Label: "Lịch trực KSGM", Route: adminDeptRoute("/lich-truc"), Icon: "calendar"},
+		{Key: "admin.pb.cnts_lich_tiem", Label: "Lịch tiêm phòng", Route: adminDeptRoute("/lich-tiem"), Icon: "check"},
 	},
 	port.MenuProfileKeHoachTaiChinh: {
 		// W11.61 (pf/extension): Kế hoạch năm (FN-TI-02.02) và Danh mục KHTC (FN-AD-04.01).

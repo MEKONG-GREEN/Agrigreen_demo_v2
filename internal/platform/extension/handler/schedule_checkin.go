@@ -3,6 +3,7 @@ package handler
 // W11.46 (D4 CN6, BRD CNTS FN-12 CV-06/CV-07) — địa điểm công tác và check-in GPS của lịch công tác.
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -103,5 +105,14 @@ func (h Handler) checkin(c *gin.Context) {
 	if res.Replayed {
 		status = http.StatusOK
 	}
+	// QĐ-8: cache chỉ giữ metadata, không tạo bản sao vị trí ngoài bảng có hạn lưu.
+	metadata := res.Checkin
+	metadata.Point = nil
+	cached, err := json.Marshal(gin.H{"checkin": checkinDTO(metadata), "warnings": warnings})
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	idempotency.SetStoredBody(c, cached)
 	c.JSON(status, gin.H{"checkin": checkinDTO(res.Checkin), "warnings": warnings})
 }

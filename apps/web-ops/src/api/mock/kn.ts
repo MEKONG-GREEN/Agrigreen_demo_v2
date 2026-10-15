@@ -312,6 +312,8 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, (base: string) => Item[]>> =
   chan_nuoi_thuy_san: (b) => [
     { key: "admin.pb.cnts_danh_muc", label: "Danh mục CNTS", route: `${b}/danh-muc-cnts`, icon: "catalog" }, // W11.41
     { key: "admin.pb.cnts_bieu_ky", label: "Biểu kỳ Cấp Xã", route: `${b}/bieu-ky-cnts`, icon: "table" }, // W11.42
+    {key:"admin.pb.cnts_lich_truc",label:"Lịch trực KSGM",route:`${b}/lich-truc`,icon:"calendar"},
+    {key:"admin.pb.cnts_lich_tiem",label:"Lịch tiêm phòng",route:`${b}/lich-tiem`,icon:"check"},
   ],
   ke_hoach_tai_chinh: (b) => [
     { key: "admin.pb.khtc_ke_hoach", label: "Kế hoạch năm", route: `${b}/ke-hoach-nam`, icon: "calendar" }, // W11.61

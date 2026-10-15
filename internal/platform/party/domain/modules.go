@@ -12,6 +12,7 @@ const ModuleEnablementRuleVersion = "pf.party.module_enablement/v1"
 // NHẤT; đường dẫn không khớp thuộc module lõi (pf/party, pf/accounts — luôn hiện). Màn Admin theo phòng
 // ban (/kn/phong-ban/<mã>/<màn>) tra ở menuDeptModules theo phần <màn>.
 var menuModules = map[string]string{
+	"/kn/cnts":                       "pf/extension",
 	"/kn/dashboard":                  "pf/extension",
 	"/kn/nhiem-vu":                   "pf/extension",
 	"/kn/bao-cao":                    "pf/extension",
@@ -36,6 +37,7 @@ var menuModules = map[string]string{
 
 // menuDeptModules: màn Admin theo phòng ban (/kn/phong-ban/{department}/<màn>) → module.
 var menuDeptModules = map[string]string{
+	"/lich-truc": "pf/extension", "/lich-tiem": "pf/extension",
 	"/theo-doi-nop":     "pf/extension",
 	"/tong-hop":         "pf/extension",
 	"/du-lieu-bao-cao":  "pf/extension",

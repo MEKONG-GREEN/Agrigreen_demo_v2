@@ -3080,6 +3080,24 @@
           "badge_source": null,
           "enabled": false,
           "children": []
+         },
+         {
+          "key": "admin.pb.cnts_lich_truc",
+          "label": "Lịch trực KSGM",
+          "route": "/kn/phong-ban/chan_nuoi_thuy_san/lich-truc",
+          "icon": "calendar",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
+         },
+         {
+          "key": "admin.pb.cnts_lich_tiem",
+          "label": "Lịch tiêm phòng",
+          "route": "/kn/phong-ban/chan_nuoi_thuy_san/lich-tiem",
+          "icon": "check",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
          }
         ]
        },

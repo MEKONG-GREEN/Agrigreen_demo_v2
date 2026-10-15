@@ -3,6 +3,8 @@ package handler
 // KN v7.7 P5 — lịch công tác tuần (contracts/openapi/application.yaml, "/v1/extension/work-schedules*").
 
 import (
+	"encoding/json"
+	"maps"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -15,6 +17,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -150,6 +153,21 @@ func (h Handler) writeDetail(c *gin.Context, d app.ScheduleDetail, err error, cr
 		status = http.StatusOK
 	}
 	c.Header("Location", "/v1/extension/work-schedules/"+d.Schedule.ID.String())
+	if len(d.Checkins) > 0 {
+		// Duyệt/lưu lại lịch sau check-in cũng không giữ tọa độ trong cache 48 giờ.
+		metadata := d
+		metadata.Checkins = maps.Clone(d.Checkins)
+		for id, ch := range metadata.Checkins {
+			ch.Point = nil
+			metadata.Checkins[id] = ch
+		}
+		cached, err := json.Marshal(toScheduleDetail(metadata))
+		if err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		idempotency.SetStoredBody(c, cached)
+	}
 	c.JSON(status, toScheduleDetail(d))
 }
 

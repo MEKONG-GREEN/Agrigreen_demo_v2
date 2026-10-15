@@ -11108,7 +11108,7 @@ export interface components {
             mock_location: boolean;
             /** @description Có lưu tọa độ (cờ extension.work_schedule_checkin_store_point) */
             point_stored: boolean;
-            /** @description Tọa độ — chỉ người đăng ký và người duyệt thấy; null khi không lưu hoặc đã quá hạn lưu */
+            /** @description Tọa độ — chỉ người đăng ký và người duyệt thấy; null khi không lưu, đã quá hạn lưu hoặc là phản hồi gửi lại từ cache. GET lịch trả vị trí hiện còn sau kiểm quyền. */
             location: null | {
                 lat: number;
                 lon: number;

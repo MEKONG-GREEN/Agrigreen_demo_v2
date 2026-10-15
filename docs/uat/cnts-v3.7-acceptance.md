@@ -40,3 +40,7 @@ Kết quả tiếp nhận ngày 15/10/2026 được ghi ở [sổ hồi quy](../
 Xuất lịch trực hiện là CSV; nạp/xuất XLSX đúng mẫu còn thiếu. Chưa tự tạo lịch công tác từ bài nộp BM-05-II.
 Cờ vị trí giả lập chưa lấy từ thiết bị; thời hạn giữ tọa độ theo tham số mặc định 90 ngày còn chờ xác nhận căn cứ/thời hạn.
 SLA giao thông báo một phút và GPS trên thiết bị thật cần diễn tập triển khai; test handler không chứng minh SLA.
+
+CNTS-CHECKIN-PRIVACY-001: `TestWorkScheduleCheckin` kiểm phản hồi đầu có vị trí cho người có quyền, cache check-in/duyệt chỉ metadata; xóa tọa độ sau hạn dưới r_extension không chạm tenant khác, giữ nguyên metadata/hash sổ. Lượt tái hiện trước sửa đã FAIL vì cache chứa location. CNTS-ROSTER-UI-001 kiểm đường vào Admin qua menu phòng đã bật, phân ca/lưu, chuyển tỉnh không lộ lịch, CSV và lịch cũ chỉ đọc. Kết quả cuối xem sổ hồi quy.
+
+Kết quả tiếp nhận W11.46 ngày16/10/2026: các ca tự động trong bảng lịch trên đạt trên PostgreSQL thật; web560ca/65tệp, build theo lockfile và luồng trình duyệt Admin lịch trực +2luồng lịch công tác đạt. Mobile119ca/analyze đạt. Giới hạn triển khai và các mục chưa làm ở trên giữ nguyên, không coi tự động kiểm thử là đã nghiệm thu thiết bị/SLA thực tế. Chi tiết mã thoát và các lượt bổ sung tại [sổ hồi quy](../REGRESSION.md).

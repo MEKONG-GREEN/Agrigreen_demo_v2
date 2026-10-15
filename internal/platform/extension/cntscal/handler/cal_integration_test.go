@@ -19,21 +19,25 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
+	scheduleStore "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/store"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -400,7 +404,12 @@ func TestWorkScheduleCheckin(t *testing.T) {
 	if ck["far"] != false || obj(ck, "location") == nil || ck["point_stored"] != true {
 		t.Fatalf("check-in gần: %s", c)
 	}
-	want(t, officer.postK(path, k, near), 201, "", "gọi lặp (middleware trả lại phản hồi đầu)")
+	replayed := want(t, officer.postK(path, k, near), 201, "", "gọi lặp (metadata giữ nguyên, vị trí không nằm trong cache)")
+	// CNTS-CHECKIN-PRIVACY-001: không tạo bản sao tọa độ trong cache 48 giờ, ngoài bảng có hạn lưu.
+	if obj(obj(replayed, "checkin"), "location") != nil {
+		t.Fatal("cache chống trùng đang giữ tọa độ cá nhân ngoài bảng có hạn lưu")
+	}
+
 	want(t, officer.post(path, near), 409, "extension.checkin_exists", "check-in không sửa được")
 	far := map[string]any{"lat": 10.01, "lon": 105.0, "accuracy_m": 80, "captured_at": "2027-10-13T09:58:00+07:00", "mock_location": true}
 	fp := fmt.Sprintf("/v1/extension/work-schedules/%s/items/%s/checkin", sid, itemFar)
@@ -415,10 +424,78 @@ func TestWorkScheduleCheckin(t *testing.T) {
 	if m["checkin_enabled"] != true || num(sc, "checkin_count") != "2" || num(sc, "missed_checkin_count") != "1" {
 		t.Fatalf("lịch của tôi: %s", m)
 	}
+	// Cả phản hồi duyệt lịch sau check-in cũng chỉ cache metadata.
+	lead := tinh("lanh_dao_phong")
+	lead.Manager = true
+	lead.MgmtLevel = "truong_phong"
+	reviewer := f.user(lead)
+	approvePath := "/v1/extension/work-schedules/" + sid.String() + "/approve"
+	approveKey := key()
+	approved := want(t, reviewer.postK(approvePath, approveKey, map[string]any{"version": 2}), 200, "", "duyệt sau check-in")
+	if len(list(approved, "checkins")) != 2 || obj(list(approved, "checkins")[0].(map[string]any), "location") == nil {
+		t.Fatal("phản hồi đầu của người có quyền phải còn vị trí")
+	}
+	approved = want(t, reviewer.postK(approvePath, approveKey, map[string]any{"version": 2}), 200, "", "gửi lại duyệt")
+	for _, v := range list(approved, "checkins") {
+		if obj(v.(map[string]any), "location") != nil {
+			t.Fatal("cache duyệt giữ tọa độ cá nhân")
+		}
+	}
 	// Tọa độ ở bảng có hạn lưu (90 ngày), sổ không có tọa độ.
 	var n int
 	var purge time.Time
 	if err := f.pool.QueryRow(context.Background(), `SELECT count(*), max(purge_after) FROM pf_extension.work_schedule_checkin_point WHERE tenant_id = $1`, f.tenant).Scan(&n, &purge); err != nil || n != 2 || purge.Format(time.DateOnly) != "2028-01-11" {
 		t.Fatalf("bảng tọa độ: %d %s %v", n, purge, err)
+	}
+	ctx := context.Background()
+	var cachedPoints int
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM shared.idempotency_key WHERE tenant_id=$1 AND response_body IS NOT NULL
+      AND jsonb_path_exists(convert_from(response_body,'UTF8')::jsonb,'$.**.location.lat')`, f.tenant).Scan(&cachedPoints); err != nil || cachedPoints != 0 {
+		t.Fatalf("cache giữ tọa độ: %d %v", cachedPoints, err)
+	}
+	var before, after string
+	const hashes = `SELECT string_agg(encode(row_hash,'hex'),',' ORDER BY id) FROM pf_extension.work_schedule_checkin WHERE tenant_id=$1`
+	if err := f.pool.QueryRow(ctx, hashes, f.tenant).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	otherTenant := ids.New()
+	if _, err := f.pool.Exec(ctx, `INSERT INTO pf_extension.work_schedule_checkin_point (tenant_id,checkin_id,point,captured_at,purge_after)
+      VALUES ($1,$2,ST_SetSRID(ST_MakePoint(105,10),4326),$3,$4)`, otherTenant, ids.New(), t0, purge); err != nil {
+		t.Fatal(err)
+	}
+	appDB := db.ForModule(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), extension.DBModule)
+	runPurge := func(at time.Time) int {
+		t.Helper()
+		n := 0
+		err := tenant.WithTenantTx(ctx, appDB, f.tenant, func(tx pgx.Tx) error {
+			var err error
+			n, err = scheduleStore.PurgeCheckinPoints(ctx, tx, at, 1000)
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if n := runPurge(purge); n != 0 {
+		t.Fatalf("xóa trước hết hạn: %d", n)
+	}
+	if n := runPurge(purge.AddDate(0, 0, 1)); n != 2 {
+		t.Fatalf("phải xóa đúng2tọa độ tenant hiện tại: %d", n)
+	}
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM pf_extension.work_schedule_checkin_point WHERE tenant_id=$1`, otherTenant).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("purge chạm tenant khác: %d %v", n, err)
+	}
+	if err := f.pool.QueryRow(ctx, hashes, f.tenant).Scan(&after); err != nil || before == "" || before != after {
+		t.Fatalf("purge thay đổi bằng chứng check-in: %v", err)
+	}
+	detail := want(t, officer.get("/v1/extension/work-schedules/"+sid.String()), 200, "", "đọc sau purge")
+	if len(list(detail, "checkins")) != 2 {
+		t.Fatal("purge làm mất metadata check-in")
+	}
+	for _, v := range list(detail, "checkins") {
+		if obj(v.(map[string]any), "location") != nil {
+			t.Fatal("tọa độ còn sau purge")
+		}
 	}
 }

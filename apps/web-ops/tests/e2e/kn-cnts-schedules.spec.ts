@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { sidebar } from "./helpers";
+import { sidebar, logout } from "./helpers";
 
 // CNTS-ROSTER-UI-001: chọn tỉnh → phân ca/lưu → chuyển tỉnh không lộ lịch → xem lại; lịch cũ chỉ đọc.
 test("W11.46 Admin lập lịch trực riêng theo tỉnh và xem lịch cũ", async ({ page }) => {
@@ -8,7 +8,16 @@ test("W11.46 Admin lập lịch trực riêng theo tỉnh và xem lịch cũ", a
   await page.getByLabel("Mật khẩu", { exact: true }).fill("KhuyenNong@2026");
   await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
   await expect(sidebar(page)).toBeVisible();
-  await page.goto("/kn/cnts/lich-truc");
+  await sidebar(page).getByRole("link",{name:"Phòng ban",exact:true}).click();
+  await page.getByLabel("Trạng thái Phòng Chăn nuôi - Thủy sản",{exact:true}).selectOption("active");
+  await expect(page.getByRole("status").filter({hasText:"Đã đổi"})).toContainText("Đang áp dụng");
+  // Đăng nhập lại trong SPA để lấy menu mới, giữ trạng thái mô phỏng của tab.
+  await logout(page);
+  await page.getByLabel("Email hoặc số điện thoại").fill("admin.mekong@mekonggreen.vn");
+  await page.getByLabel("Mật khẩu",{exact:true}).fill("KhuyenNong@2026");
+  await page.getByRole("button",{name:"Đăng nhập",exact:true}).click();
+  await sidebar(page).getByRole("button",{name:"Phòng Chăn nuôi - Thủy sản",exact:true}).click();
+  await sidebar(page).getByRole("link",{name:"Lịch trực KSGM",exact:true}).click();
   await expect(page.getByRole("heading",{level:1,name:"Lịch trực KSGM",exact:true})).toBeVisible();
   const province=page.getByLabel("Tỉnh của lịch trực");
   await expect(province).toHaveValue("");
