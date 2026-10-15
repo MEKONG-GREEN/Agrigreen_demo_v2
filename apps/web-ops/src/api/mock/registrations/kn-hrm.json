@@ -1,0 +1,11 @@
+{
+  "id": "kn-hrm",
+  "source": "./kn-hrm",
+  "app": [
+    {
+      "export": "hrmRoutes",
+      "order": 11
+    }
+  ],
+  "admin": []
+}

@@ -1,0 +1,11 @@
+{
+  "id": "kn-cnts-alert",
+  "source": "./kn-cnts-alert",
+  "app": [
+    {
+      "export": "cntsAlertRoutes",
+      "order": 21
+    }
+  ],
+  "admin": []
+}

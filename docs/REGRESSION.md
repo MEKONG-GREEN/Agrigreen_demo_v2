@@ -168,3 +168,18 @@ Kết quả PostgreSQL KNSPLIT-0: mã thoát 0 (68,755 giây), không SKIP. `Tes
 Cổng build/vet/modgen-check/migratecheck-base/archlint/contractcheck/docscheck/mfaflagcheck/golangci-lint: mã thoát 0, lint 0 issues. Tool suite cuối và knboundary -base origin/dev mã thoát 0, 414 ghép nối. Helper tích hợp được bổ sung chạy knboundary sau rebase và lấy tên nhánh thực để hỗ trợ prefix codex/; vẫn từ chối main và chỉ đẩy refs/heads/dev.
 
 KNSPLIT-0 đã tích hợp bằng helper: mã thoát 0, dev f2a9afec; chạy lại 3 ca DB (giữ 5 XFAIL đúng lý do) và cổng migration 219,226 giây. knboundary sau rebase khớp 414; build/vet/modgen/migrate/archlint đều 0. Không có migration mới, không sửa main; giữ worktree.
+
+
+## WH-A — Registry menu/mock/OpenAPI (mốc dev b5906660)
+
+Dependency evidence: `rg -n 'DepartmentMenu|AdminDepartmentItems|MenuModule' internal/platform/party`; `rg -n 'mockFetch|mockAdminFetch' apps/web-ops/src`; `rg -n 'generated/application|generated/admin' apps/web-ops/src`; `rg -n 'check:api' .github/workflows/ci.yml`. Nguồn mới module/menus và contracts/openapi/modules được bộ ghép quét tự động; scanner knboundary vẫn đọc YAML đầu ra nguyên cấu trúc.
+Downstream consumers: party domain/app/handler, KN77, menu mock/khung web, mọi client API đã sinh và toàn bộ màn mock. Không đổi mobile/API runtime/schema/migration; mobile đã xanh trên nền W11.46 và không cần chạy lại cho gói này.
+Regression acceptance command: `node --test scripts/module-registries.test.mjs`; `npm run check:api`, `npm run typecheck`, `npm test -- --maxWorkers=1`, `npm run build:mock` tại apps/web-ops; Go/PG thật `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/party/... ./tests/kn77`, cổng migration và toàn bộ cổng tĩnh theo CODEX-G1. Đối chiếu SHA256 với bản nền cho golden,2OpenAPI,2generatedTS và kiểm git diff migrations rỗng.
+Propagation rule: mọi thay đổi bộ ghép/menu/mock → chạy các consumers trên; chặn tích hợp nếu bất kỳ ca thật/byte đối chiếu/cổng ranh giới đỏ. Các ca menu khẳng định khóa và đường dẫn, không khóa tổng số mục khiến module thêm mới phải sửa test cũ.
+Related test points: WH-A-MENU-001/002/003, WH-A-MOCK-001/002, WH-A-OAS-001; TestWebMenuFixture và kn-menu.contract.test.ts.
+
+Lượt menu-db/session44329 mã thoát0: full party và KN77 trên PG riêng; KN77 181,172s, không FAIL/SKIP; golden byte giữ nguyên. Node5ca registry PASS sau sửa ca thay phần tửarray0 (trước đó trả lỗi vì coi0làfalse). GenAPI/typecheck đầu và full web560/65PASS trước chuyển bảng menu mock sang nguồn chung; chưa dùng làm kết luận cuối cho phần sửa đó. Registry mock giữ ưu tiên từng batch cũ và trạng thái module; kiểm file/exports, trùng ưu tiên, route có trang thật, duplicate/stale replacement đều bắt lỗi.
+
+Cổng ranh giới lúc gom qua kn.ts bắt coupling mới; đã bỏ cách đó và giữ nguyên cấu hình/scanner. Quét lại0MỚI,24LỖI THỜI; sau xét duyệt lại có bằng chứng, prune chỉ bỏ24mục đã gỡ, baseline414→390 và -baseorigin/dev mã0. Không thêm/sửa alias, không nới quy tắc. Các kiểm tra cuối đang chạy; chưa tích hợp.
+
+Lượt web-final trên menu mock cùng nguồn: gen/check/lint/typecheck đạt, full562ca/66tệpPASS117,40s; build đang chạy. Lượt static đầu các cổng trước lint đạt, lint bắt3helper cũ không còn dùng (adminDeptRoute/soon/needs); đã gỡ dead code, chạy lại toàn bộ static session44419 cùng log (có lịch sử lượt đỏ). FullPG cuối session74971 đã qua party, đang KN77 rồi migration. Chưa tích hợp.

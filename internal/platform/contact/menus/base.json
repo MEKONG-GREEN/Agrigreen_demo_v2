@@ -1,0 +1,23 @@
+{
+  "id": "contact-menus",
+  "order": 3,
+  "tables": {
+    "SharedGroup": {
+      "Key": "dung_chung",
+      "Label": "Dùng chung",
+      "Items": [
+        {
+          "Key": "chung.contact",
+          "Label": "Contact",
+          "Route": "/kn/dung-chung/contact",
+          "Icon": "phone",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "kn-cnts-aggregate",
+  "source": "./kn-cnts-aggregate",
+  "app": [
+    {
+      "export": "cntsAggregateRoutes",
+      "order": 15
+    }
+  ],
+  "admin": []
+}

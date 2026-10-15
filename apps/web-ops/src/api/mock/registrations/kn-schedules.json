@@ -1,0 +1,11 @@
+{
+  "id": "kn-schedules",
+  "source": "./kn-schedules",
+  "app": [
+    {
+      "export": "workScheduleAppRoutes",
+      "order": 4
+    }
+  ],
+  "admin": []
+}

@@ -1,0 +1,16 @@
+{
+  "id": "waterway",
+  "source": "./waterway",
+  "app": [
+    {
+      "export": "waterwayAppRoutes",
+      "order": 51
+    }
+  ],
+  "admin": [
+    {
+      "export": "waterwayAdminRoutes",
+      "order": 18
+    }
+  ]
+}

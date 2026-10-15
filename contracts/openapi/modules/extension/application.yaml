@@ -1,0 +1,3637 @@
+paths:
+# @ag-order: 85
+  /v1/extension/support-requests:
+    get:
+      summary: Yêu cầu hỗ trợ của nông dân cho cán bộ (HTX US-SUPPORT-01, KN US-TASK-01/03) — kèm nhiệm vụ tự sinh hiện hành
+      description: |
+        Vai coop_manager (chỉ HTX của mình = org_ref; hỏi HTX khác → 403 extension.out_of_scope), kn_officer /
+        kn_province_admin / kn_national_admin (xã/tỉnh trong phạm vi, cộng nhiệm vụ được giao cho mình), platform_admin (mọi nơi).
+        Mới nhất trước; cursor là next_cursor của trang trước. Không trả toạ độ — chỉ trạng thái GPS; ảnh là mã tệp (pf/files).
+      operationId: extListSupportRequests
+      tags: [extension]
+      parameters:
+        - {name: task_status, in: query, schema: {type: string, enum: [new, assigned, accepted, in_progress, resolved]}, description: "Trạng thái nhiệm vụ tự sinh"}
+        - {name: category, in: query, schema: {type: string, enum: [dich_hai, benh_lua, thoi_tiet, ky_thuat, may_moc, khac]}}
+        - {name: urgency, in: query, schema: {type: string, enum: [binh_thuong, khan]}}
+        - {name: commune_code, in: query, schema: {type: string}}
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: gps_missing, in: query, schema: {type: boolean}, description: "true = chỉ yêu cầu thiếu vị trí GPS"}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang, mới nhất trước
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/SupportRequestStaff"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {description: "forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 97
+  /v1/extension/program-reports:
+    post:
+      summary: FR-03 báo cáo tiến độ Đề án 1 triệu ha của một HTX × vụ (gửi lại = phiên bản mới, phải duyệt lại)
+      operationId: submitProgramReport
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [commune_code, cooperative_ref, season_code, season_year, registered_area_ha, deploying_area_ha, completed_area_ha]
+              properties:
+                id: {type: string, format: uuid}
+                commune_code: {type: string}
+                cooperative_ref: {type: string, format: uuid}
+                season_code: {type: string}
+                season_year: {type: integer}
+                registered_area_ha: {type: string, description: "decimal (ha)"}
+                deploying_area_ha: {type: string, description: "decimal; đang triển khai + hoàn thành ≤ đăng ký"}
+                completed_area_ha: {type: string}
+                note: {type: string, maxLength: 2000}
+                event_time: {type: string, format: date-time}
+      responses:
+        "201": {description: Đã ghi phiên bản}
+        "200": {description: Gọi lặp cùng Idempotency-Key}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 98
+  /v1/extension/program-reports/{id}/approve:
+    post:
+      summary: Admin tỉnh duyệt phiên bản hiện hành (không duyệt báo cáo do chính mình gửi — R-56)
+      operationId: approveProgramReport
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: {type: string, maxLength: 500}
+      responses:
+        "200": {description: Đã duyệt}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+# @ag-order: 99
+  /v1/extension/program-progress:
+    get:
+      summary: Tiến độ Đề án theo HTX × vụ trong phạm vi, kèm mục tiêu tỉnh (tham số extension.program_target_ha:<tỉnh>)
+      operationId: getProgramProgress
+      tags: [extension]
+      parameters:
+        - {name: unit, in: query, schema: {type: string}}
+        - {name: season_code, in: query, schema: {type: string}}
+        - {name: season_year, in: query, schema: {type: integer}}
+      responses:
+        "200":
+          description: Tiến độ
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, targets, unapproved, provisional]
+                properties:
+                  items: {type: array, items: {type: object}}
+                  targets: {type: object, additionalProperties: {type: [string, "null"]}}
+                  unapproved: {type: integer}
+                  provisional: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 207
+  /v1/support-requests:
+    get:
+      summary: Yêu cầu hỗ trợ của (các) nông hộ của nông dân, kèm trạng thái nhiệm vụ (HTX US-SUPPORT-01)
+      operationId: listMySupportRequests
+      tags: [extension]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Mới nhất trước
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/SupportRequest"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {description: "forbidden | extension.farmer_household_required", $ref: "#/components/responses/Problem"}
+    post:
+      summary: Nông dân gửi yêu cầu hỗ trợ (HTX US-SUPPORT-01) — cùng giao dịch tự sinh nhiệm vụ cho cán bộ khuyến nông (KN US-TASK-01)
+      description: |
+        Vai farmer. Người nhận: cán bộ xã đang trực → cán bộ tỉnh đang trực → cán bộ tỉnh → để trống (admin_queue, báo quản trị tỉnh).
+        Thiếu vị trí GPS vẫn nhận (nhãn "Thiếu vị trí GPS"). Ngoại tuyến: gửi qua pf/sync entity support_request (cùng payload).
+      operationId: submitSupportRequest
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/SupportRequestInput"}
+      responses:
+        "201":
+          description: Đã nhận, nhiệm vụ đã sinh
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  support_request: {$ref: "#/components/schemas/SupportRequest"}
+                  replayed: {type: boolean}
+        "403": {description: "forbidden | extension.farmer_household_required", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.id_reused", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (\"Vui lòng nhập mô tả và chọn loại sự cố trước khi gửi.\", tối đa 5 ảnh) | extension.household_invalid", $ref: "#/components/responses/Problem"}
+        "503": {description: "extension.dependency_unavailable", $ref: "#/components/responses/Problem"}
+  # --- hết G2 ---
+
+  # --- pf/simulation ---
+# @ag-order: 279
+  /v1/kn/materials:
+    get:
+      summary: "FN-XA-03.06: bản ghi vật tư hiện hành (không bị bản bù thay)"
+      operationId: knListMaterials
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+        - {name: material_code, in: query, schema: {type: string}}
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin (vắng = mọi phòng ban)"}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
+      responses:
+        "200":
+          description: Trang bản ghi
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MaterialRecord"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {description: extension.out_of_scope, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "FN-XA-03.06: ghi nhận vật tư của xã (Cấp Xã, Admin), 1–200 dòng"
+      operationId: knRecordMaterials
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin: phòng ban ghi (mặc định trong_trot)"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [commune_code, recorded_on, lines]
+              properties:
+                commune_code: {type: string}
+                recorded_on: {type: string, format: date, description: "Không ở tương lai (giờ VN)"}
+                lines:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items:
+                    type: object
+                    required: [material_code, quantity]
+                    properties:
+                      material_code: {type: string, description: "Danh mục masterdata material (đang dùng); ĐVT = attrs.unit"}
+                      quantity: {type: string, description: "decimal ≥ 0, ≤ 1e9; ĐVT đếm được → số nguyên; còn lại ≤ 4 chữ số lẻ"}
+                      note: {type: string, maxLength: 1000}
+      responses:
+        "201":
+          description: Bản ghi đã tạo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MaterialRecord"}}
+        "403": {description: "extension.read_only | forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.material_unknown | extension.material_quantity_invalid | extension.support_reason_required", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 280
+  /v1/kn/materials/summary:
+    get:
+      summary: "FN-XA-03.06 AC: tổng hợp vật tư hiện hành theo xã × vật tư (Cấp Tỉnh: các xã trong tỉnh)"
+      operationId: knMaterialSummary
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Tổng hợp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [commune_code, material_code, material_name, unit, quantity, records]
+                      properties:
+                        commune_code: {type: string}
+                        material_code: {type: string}
+                        material_name: {type: string}
+                        unit: {type: string}
+                        quantity: {type: string}
+                        records: {type: integer}
+        "403": {description: extension.out_of_scope, $ref: "#/components/responses/Problem"}
+# @ag-order: 281
+  /v1/kn/materials/{id}/correct:
+    post:
+      summary: "FN-XA-03.06: sửa = bản ghi bù (bản cũ hết hiện hành)"
+      operationId: knCorrectMaterial
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity, reason]
+              properties:
+                quantity: {type: string}
+                note: {type: [string, "null"], maxLength: 1000}
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Bản ghi bù
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MaterialRecord"}
+        "403": {description: "extension.read_only | forbidden", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.material_record_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.material_superseded, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.material_quantity_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 282
+  /v1/kn/materials/{id}/log:
+    get:
+      summary: "FN-XA-03.06: lịch sử chuỗi sửa của bản ghi (recorded → corrected…), mới nhất trước"
+      operationId: knMaterialLog
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Log
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRecordLogPage"}
+        "404": {description: extension.material_record_not_found, $ref: "#/components/responses/Problem"}
+  # --- pf/extension CNTS: biểu kỳ Cấp Xã BM-01/04/05/17 (W11.42) — cài biểu vào cap/forms (profile kn_cnts), chia lịch kỳ
+  # (kỳ ngày, tuần W11.03 v2, tuần làm việc BM-05) với hạn riêng, phát hành lô kỳ native. Nộp, chốt, sao chép kỳ trước: /v1/forms. ---
+# @ag-order: 283
+  /v1/extension/cnts/alerts:
+    get:
+      summary: Cảnh báo CNTS (W11.43 — FN-13, UR-TINH-13, Mục III.5) trong phạm vi người gọi — Khẩn và chưa đóng trước
+      description: |
+        Cấp Tỉnh: cảnh báo trong phạm vi Nút; Cấp Xã: cảnh báo của các xã phụ trách và cảnh báo được giao cho mình; Admin: mọi
+        cảnh báo. status: open (chưa đóng), overdue (chưa đóng, quá hạn xử lý), new, assigned, in_progress, closed.
+      operationId: extensionCntsListAlerts
+      tags: [extension]
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string, enum: [open, overdue, new, assigned, in_progress, closed]}}
+        - {name: kind, in: query, required: false, schema: {type: string}}
+        - {name: level, in: query, required: false, schema: {type: string, enum: [urgent, attention]}}
+        - {name: template_code, in: query, required: false, schema: {type: string}}
+        - {name: mine, in: query, required: false, schema: {type: boolean}, description: Chỉ cảnh báo giao cho tôi}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 500}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertList"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 284
+  /v1/extension/cnts/alerts/{ref}:
+    get:
+      summary: Cảnh báo CNTS kèm lịch sử vòng đời
+      operationId: extensionCntsGetAlert
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertDetail"}
+        "404": {description: extension.cnts_alert_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 285
+  /v1/extension/cnts/alerts/{ref}/assign:
+    post:
+      summary: Cấp Tỉnh giao xử lý cảnh báo (Mới/Đã giao/Đang xử lý → Đã giao), hạn xử lý mặc định theo loại
+      operationId: extensionCntsAssignAlert
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSAlertAction"}
+      responses:
+        "200":
+          description: Đã giao
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertDetail"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_alert_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_alert_transition | extension.cnts_alert_version_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_alert_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 286
+  /v1/extension/cnts/alerts/{ref}/start:
+    post:
+      summary: Người được giao nhận xử lý (Đã giao → Đang xử lý)
+      operationId: extensionCntsStartAlert
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSAlertAction"}
+      responses:
+        "200":
+          description: Đang xử lý
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertDetail"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_alert_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_alert_transition | extension.cnts_alert_version_conflict", $ref: "#/components/responses/Problem"}
+# @ag-order: 287
+  /v1/extension/cnts/alerts/{ref}/close:
+    post:
+      summary: Đóng cảnh báo với kết quả xử lý (≥ 10 ký tự) — người được giao, Cấp Tỉnh, Admin
+      operationId: extensionCntsCloseAlert
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSAlertAction"}
+      responses:
+        "200":
+          description: Đã đóng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertDetail"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_alert_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_alert_transition | extension.cnts_alert_version_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_alert_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 288
+  /v1/extension/cnts/alert-assignees:
+    get:
+      summary: Cán bộ phòng CNTS của tỉnh được giao xử lý cảnh báo (Cấp Xã chỉ khi phụ trách xã đã chọn)
+      operationId: extensionCntsAlertAssignees
+      tags: [extension]
+      parameters:
+        - {name: commune_code, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertAssignees"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 289
+  /v1/extension/cnts/alert-config:
+    get:
+      summary: Cấu hình nhắc nhở theo biểu (UR-TINH-08), xử lý theo loại cảnh báo, ngưỡng đang hiệu lực (tham số cnts.*)
+      operationId: extensionCntsAlertConfig
+      tags: [extension]
+      responses:
+        "200":
+          description: Cấu hình
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertConfig"}
+# @ag-order: 290
+  /v1/extension/cnts/alert-config/forms/{code}:
+    put:
+      summary: Cấp Tỉnh lưu phiên bản mới cấu hình nhắc của biểu kỳ CNTS
+      operationId: extensionCntsPutFormReminder
+      tags: [extension]
+      parameters:
+        - {name: code, in: path, required: true, schema: {type: string, enum: [CNTS-BM01, CNTS-BM04, CNTS-BM17, CNTS-BM05-I, CNTS-BM05-II]}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSFormReminder"}
+      responses:
+        "200":
+          description: Đã lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertConfig"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_alert_config_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 291
+  /v1/extension/cnts/alert-config/kinds/{kind}:
+    put:
+      summary: Cấp Tỉnh lưu phiên bản mới cấu hình xử lý của loại cảnh báo (hạn xử lý; mức Khẩn của môi trường nước)
+      operationId: extensionCntsPutAlertSetting
+      tags: [extension]
+      parameters:
+        - {name: kind, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSAlertSetting"}
+      responses:
+        "200":
+          description: Đã lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSAlertConfig"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_alert_config_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 292
+  /v1/extension/cnts/period-forms:
+    get:
+      summary: Biểu kỳ Cấp Xã CNTS và phiên bản đã cài ở cap/forms
+      operationId: extensionCntsPeriodForms
+      tags: [extension]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSPeriodForm"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 293
+  /v1/extension/cnts/period-forms/install:
+    post:
+      summary: Cài (phiên bản mới) biểu chưa có hoặc khác định nghĩa chuẩn — Admin KN / reports_admin
+      operationId: extensionCntsInstallPeriodForms
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Danh sách sau khi cài
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSPeriodForm"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 294
+  /v1/extension/cnts/period-series/preview:
+    post:
+      summary: Xem trước lô kỳ của một biểu (kỳ, hạn nộp, số công việc) — chưa ghi
+      description: |
+        D8 (CEO 13/10/2026): BM-01 (ngày), BM-04/BM-17 (tuần) theo lịch tuần CNTS Thứ Ba–Thứ Hai (calendar_id
+        chan_nuoi_thuy_san, calendar_version 3; tham số extension.report_period_rule:chan_nuoi_thuy_san đè lên); hạn mặc
+        định tuần 12:00 Thứ Ba ngay sau kỳ. BM-05 giữ tuần làm việc Thứ Hai–Thứ Sáu (calendar_id null).
+      operationId: extensionCntsPreviewSeries
+      tags: [extension]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSSeriesInput"}
+      responses:
+        "200":
+          description: Lô kỳ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSeries"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 295
+  /v1/extension/cnts/period-series:
+    post:
+      summary: Phát hành lô kỳ native cap/forms của một biểu (một giao dịch; Cấp Tỉnh phòng CNTS; cơ sở phải thuộc xã)
+      operationId: extensionCntsPublishSeries
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSSeriesInput"}
+      responses:
+        "201":
+          description: Lô kỳ đã phát hành (periods[].id)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSeries"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.template_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | forms.facility_invalid", $ref: "#/components/responses/Problem"}
+  # --- pf/extension W11.49 (D4 CN9, BRD CNTS v3.7 FN-11, UR-XA-10): Báo cáo dịch bệnh BM-10 (ổ dịch có phiên bản diễn biến)
+  # và báo nghi dịch. Phòng Chăn nuôi – Thủy sản: Cấp Xã lập/cập nhật, Cấp Tỉnh xem + kết thúc/mở lại, Cấp TW không có.
+# @ag-order: 296
+  /v1/extension/cnts/duty-rosters/{month}:
+    get:
+      summary: Lịch trực KSGM của tháng (BM-03, W11.46) — lưới cơ sở × viên chức × ngày, cảnh báo, lịch sử lưu (Cấp Tỉnh, Admin)
+      operationId: extensionCntsGetDutyRoster
+      tags: [extension]
+      parameters:
+        - {name: month, in: path, required: true, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}, description: Tháng YYYY-MM}
+        - {name: province_code, in: query, schema: {type: string}, description: "Tỉnh suy từ phạm vi phiên; Admin chọn tỉnh. legacy chỉ Admin đọc lịch chung cũ, không ghi"}
+      responses:
+        "200":
+          description: Lịch trực (version 0 = chưa lập)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDutyRoster"}
+        "403": {description: "forbidden (Cấp Xã dùng /my-duties)", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Lưu lịch trực tháng thành phiên bản mới (cán bộ tổng hợp Cấp Tỉnh, Admin); cảnh báo không chặn; đổi ca phát pf.extension.cnts_duty.changed
+      operationId: extensionCntsSaveDutyRoster
+      tags: [extension]
+      parameters:
+        - {name: month, in: path, required: true, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSDutyRosterSave"}
+      responses:
+        "201":
+          description: Đã lưu phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDutyRoster"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDutyRoster"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "409": {description: extension.cnts_roster_version_conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_roster_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 297
+  /v1/extension/cnts/my-duties:
+    get:
+      summary: Lịch trực KSGM của tôi (UR-XA-03) — ca của người gọi trong tháng, người trực cùng
+      operationId: extensionCntsMyDuties
+      tags: [extension]
+      parameters:
+        - {name: province_code, in: query, schema: {type: string}, description: "Tỉnh của lịch, mặc định suy từ xã phụ trách"}
+        - {name: month, in: query, required: true, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+      responses:
+        "200":
+          description: Ca trực
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSMyDuties"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 298
+  /v1/extension/cnts/vaccination-batches:
+    get:
+      summary: Lịch tiêm phòng các lứa (BM-07, W11.46) trong phạm vi — bản hiện hành, trạng thái suy diễn (quá hạn = nhãn đỏ)
+      operationId: extensionCntsListVaccinationBatches
+      tags: [extension]
+      parameters:
+        - {name: commune_code, in: query, required: false, schema: {type: string}}
+        - {name: household_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [open, overdue, done, cancelled]}}
+        - {name: received_from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: received_to, in: query, required: false, schema: {type: string, format: date}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 500}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSVaccinationBatch"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo lịch tiêm theo quy trình của mô hình (FN-15 B4) — chủ nhiệm Cấp Tỉnh, Admin
+      operationId: extensionCntsCreateVaccinationBatch
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSVaccinationBatchCreate"}
+      responses:
+        "201":
+          description: Đã lập
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSVaccinationBatchDetail"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSVaccinationBatchDetail"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_vaccination_invalid | extension.cnts_vaccination_no_procedure", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 299
+  /v1/extension/cnts/vaccination-batches/{ref}:
+    get:
+      summary: Chi tiết lịch tiêm của lứa kèm các phiên bản
+      operationId: extensionCntsGetVaccinationBatch
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSVaccinationBatchDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_vaccination_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 300
+  /v1/extension/cnts/vaccination-batches/{ref}/doses:
+    post:
+      summary: Cập nhật mũi tiêm — Cấp Xã ghi ngày tiêm thực tế, ghi chú; chủ nhiệm Cấp Tỉnh còn sửa ngày dự kiến từng hộ
+      operationId: extensionCntsUpdateVaccinationDoses
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSVaccinationDosesUpdate"}
+      responses:
+        "200":
+          description: Đã ghi phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSVaccinationBatchDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_vaccination_version_conflict | extension.cnts_vaccination_cancelled", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_vaccination_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 301
+  /v1/extension/cnts/vaccination-batches/{ref}/cancel:
+    post:
+      summary: Hủy lịch tiêm của lứa (bắt buộc lý do) — chủ nhiệm Cấp Tỉnh, Admin
+      operationId: extensionCntsCancelVaccinationBatch
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [base_version, reason]
+              properties:
+                base_version: {type: integer, minimum: 1}
+                reason: {type: string, minLength: 5, maxLength: 1000}
+      responses:
+        "200":
+          description: Đã hủy
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSVaccinationBatchDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 302
+  /v1/extension/cnts/outbreaks:
+    get:
+      summary: Ổ dịch (bản hiện hành) trong phạm vi + thống kê theo trạng thái, bệnh
+      operationId: extensionCntsListOutbreaks
+      tags: [extension]
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string, enum: [reported, monitoring, closed]}}
+        - {name: commune, in: query, required: false, schema: {type: string}}
+        - {name: disease, in: query, required: false, schema: {type: string}, description: Mã bệnh (danh mục cnts_disease)}
+        - {name: from, in: query, required: false, schema: {type: string, format: date}, description: Ngày tiếp nhận (DB-02) từ}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}, description: Ngày tiếp nhận (DB-02) đến}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreakList"}
+        "403": {description: "forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Cấp Xã lập báo cáo dịch bệnh BM-10 và gửi Cấp Tỉnh (phiên bản 1; phát pf.extension.outbreak.reported)
+      operationId: extensionCntsReportOutbreak
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSOutbreakInput"}
+      responses:
+        "201":
+          description: Đã gửi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "403": {description: "forbidden | extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_outbreak_invalid | extension.support_reason_required", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 303
+  /v1/extension/cnts/outbreak-points:
+    get:
+      summary: Lớp ổ dịch cho bản đồ (GeoJSON FeatureCollection, WGS84) — mặc định bỏ ổ dịch đã kết thúc
+      operationId: extensionCntsOutbreakPoints
+      tags: [extension]
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string, enum: [reported, monitoring, closed]}}
+        - {name: commune, in: query, required: false, schema: {type: string}}
+        - {name: disease, in: query, required: false, schema: {type: string}}
+        - {name: from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}}
+        - {name: include_closed, in: query, required: false, schema: {type: boolean}}
+      responses:
+        "200":
+          description: GeoJSON
+          content:
+            application/geo+json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreakPoints"}
+        "403": {description: "forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+# @ag-order: 304
+  /v1/extension/cnts/outbreaks/{ref}:
+    get:
+      summary: Ổ dịch — bản hiện hành và mọi phiên bản diễn biến (mới nhất trước)
+      operationId: extensionCntsGetOutbreak
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreakDetail"}
+        "404": {description: extension.cnts_outbreak_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 305
+  /v1/extension/cnts/outbreaks/{ref}/progress:
+    post:
+      summary: Cấp Xã cập nhật diễn biến (phiên bản mới đủ trường; khóa lạc quan base_version)
+      operationId: extensionCntsUpdateOutbreak
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSOutbreakInput"}
+      responses:
+        "201":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_outbreak_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_outbreak_version_conflict | extension.cnts_outbreak_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_outbreak_invalid", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 306
+  /v1/extension/cnts/outbreaks/{ref}/close:
+    post:
+      summary: Cấp Tỉnh xác nhận kết thúc ổ dịch (có lý do)
+      operationId: extensionCntsCloseOutbreak
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSStatusInput"}
+      responses:
+        "201":
+          description: Đã kết thúc
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_outbreak_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_outbreak_version_conflict | extension.cnts_outbreak_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_outbreak_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 307
+  /v1/extension/cnts/outbreaks/{ref}/reopen:
+    post:
+      summary: Cấp Tỉnh mở lại ổ dịch đã kết thúc (có lý do)
+      operationId: extensionCntsReopenOutbreak
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSStatusInput"}
+      responses:
+        "201":
+          description: Đã mở lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_outbreak_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_outbreak_version_conflict | extension.cnts_outbreak_not_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_outbreak_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 308
+  /v1/extension/cnts/suspects:
+    get:
+      summary: Tin báo nghi dịch (bản hiện hành) trong phạm vi
+      operationId: extensionCntsListSuspects
+      tags: [extension]
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string, enum: [reported, confirmed, dismissed]}}
+        - {name: commune, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSSuspect"}}
+        "403": {description: "forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Cấp Xã ghi nhận tin báo nghi dịch (vị trí không bắt buộc)
+      operationId: extensionCntsReportSuspect
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSSuspectInput"}
+      responses:
+        "201":
+          description: Đã ghi nhận
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSuspect"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSuspect"}
+        "403": {description: "forbidden | extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_suspect_invalid, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 309
+  /v1/extension/cnts/suspects/{ref}:
+    get:
+      summary: Tin báo nghi dịch — mọi phiên bản (mới nhất trước)
+      operationId: extensionCntsGetSuspect
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSuspectDetail"}
+        "404": {description: extension.cnts_suspect_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 310
+  /v1/extension/cnts/suspects/{ref}/confirm:
+    post:
+      summary: Cấp Xã xác nhận tin báo → tạo ổ dịch (một giao dịch; vị trí trống lấy vị trí của tin báo)
+      operationId: extensionCntsConfirmSuspect
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSOutbreakInput"}
+      responses:
+        "201":
+          description: Ổ dịch đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreak"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_suspect_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_suspect_version_conflict | extension.cnts_suspect_resolved", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_outbreak_invalid", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 311
+  /v1/extension/cnts/suspects/{ref}/dismiss:
+    post:
+      summary: Cấp Xã bác bỏ tin báo nghi dịch (có lý do)
+      operationId: extensionCntsDismissSuspect
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSStatusInput"}
+      responses:
+        "201":
+          description: Đã bác bỏ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSuspect"}
+        "200":
+          description: Cùng Idempotency-Key — bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSSuspect"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_suspect_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_suspect_version_conflict | extension.cnts_suspect_resolved", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_suspect_invalid", $ref: "#/components/responses/Problem"}
+  # --- W11.44: tổng hợp CNTS Cấp Tỉnh — BM-02 KSGM tuần/tháng (+ dòng điều chỉnh chỉ ghi thêm), BM-18 Phụ lục 2 (khai
+  # thác BM-17 + nuôi trồng, lũy kế quý/năm), chốt/mở lại bảng tổng hợp (số công bố pf_extension_pub.v1_closed_figures (nhánh cnts_aggregate)
+  # cho KHTC — D17, D18), phiên bản tệp chia sẻ Chi cục (Excel). Cấp Tỉnh CNTS ghi; Cấp Quốc gia/Admin xem (truyền province). ---
+# @ag-order: 312
+  /v1/extension/cnts/bm02:
+    get:
+      summary: BM-02 — KSGM theo cơ sở của một tuần KSGM (YYYY-MM-Kn) hoặc tháng (YYYY-MM) = tổng BM-01 + dòng điều chỉnh
+      operationId: extensionCntsBM02
+      tags: [extension]
+      parameters:
+        - {name: province, in: query, schema: {type: string}, description: "Mã tỉnh (chỉ Cấp Quốc gia/Admin)"}
+        - {name: period_type, in: query, schema: {type: string, enum: [ksgm_week, month]}}
+        - {name: key, in: query, schema: {type: string}, description: "2026-10-K2 | 2026-10; rỗng = tuần KSGM/tháng hiện tại"}
+        - {name: basis, in: query, schema: {type: string, enum: [submitted, closed]}, description: "Số đã gửi (mặc định) hoặc số đã chốt (ảnh chụp nguồn)"}
+      responses:
+        "200":
+          description: Bảng BM-02
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsBM02"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 313
+  /v1/extension/cnts/bm02/adjustments:
+    post:
+      summary: Thêm dòng điều chỉnh BM-02 cho một cơ sở × một tuần KSGM (cộng/trừ, lý do 10–500 ký tự; chỉ ghi thêm)
+      operationId: extensionCntsBM02Adjust
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [week_key, facility_ref, deltas, reason]
+              properties:
+                week_key: {type: string, description: "Tuần KSGM YYYY-MM-Kn"}
+                facility_ref: {type: string, format: uuid}
+                deltas: {type: object, additionalProperties: {type: string}, description: "Loài (trau_bo, heo, gia_cam, de) → số thập phân, có thể âm"}
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Dòng điều chỉnh đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsAdjustment"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "409": {description: extension.cnts_aggregate_closed, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 314
+  /v1/extension/cnts/bm18:
+    get:
+      summary: BM-18 Phụ lục 2 phần III — khai thác (tự cộng BM-17 theo xã) + nuôi trồng theo đối tượng; Tuần trước liền kề, Trong kỳ, Lũy kế quý, Lũy kế năm
+      operationId: extensionCntsBM18
+      tags: [extension]
+      parameters:
+        - {name: province, in: query, schema: {type: string}, description: "Mã tỉnh (chỉ Cấp Quốc gia/Admin)"}
+        - {name: week, in: query, schema: {type: string}, description: "Tuần CNTS YYYY-Www (Thứ Ba – Thứ Hai, D8); rỗng = tuần hiện tại"}
+        - {name: basis, in: query, schema: {type: string, enum: [submitted, closed]}}
+      responses:
+        "200":
+          description: Phụ lục 2
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsBM18"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 315
+  /v1/extension/cnts/bm18/aquaculture:
+    post:
+      summary: Ghi số nuôi trồng của tuần theo đối tượng (dòng mới thay dòng trước; tuần BM-18 đã chốt → 409)
+      operationId: extensionCntsBM18Aquaculture
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [week, entries]
+              properties:
+                week: {type: string}
+                entries:
+                  type: array
+                  items:
+                    type: object
+                    required: [object]
+                    properties:
+                      object: {type: string, description: "Mã đối tượng (danh sách cnts.bm18_objects/v1)"}
+                      area: {type: [string, "null"], description: "Diện tích (ha) hoặc số lồng trong tuần"}
+                      output: {type: [string, "null"], description: "Sản lượng (tấn; ngọc trai: 1.000 viên) trong tuần"}
+                      note: {type: string}
+      responses:
+        "200":
+          description: Phụ lục 2 sau khi ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsBM18"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "409": {description: extension.cnts_aggregate_closed, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 316
+  /v1/extension/cnts/aggregates/close:
+    post:
+      summary: Chốt bảng tổng hợp của một tuần (BM-02 tuần KSGM, BM-18 tuần CNTS) — mọi kỳ nguồn của tuần phải đã chốt (D17); số công bố đóng băng
+      operationId: extensionCntsAggregateClose
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CntsAggregateAction"}
+      responses:
+        "200":
+          description: Trạng thái chốt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsAggregateState"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_aggregate_sources_open | extension.cnts_aggregate_state", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 317
+  /v1/extension/cnts/aggregates/reopen:
+    post:
+      summary: Mở lại bảng tổng hợp đã chốt (lý do 10–500 ký tự) — số đã công bố giữ tới lần chốt lại
+      operationId: extensionCntsAggregateReopen
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CntsAggregateAction"}
+      responses:
+        "200":
+          description: Trạng thái chốt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsAggregateState"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "409": {description: extension.cnts_aggregate_state, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 318
+  /v1/extension/cnts/shares:
+    get:
+      summary: Phiên bản tệp chia sẻ Chi cục của một bảng
+      operationId: extensionCntsShares
+      tags: [extension]
+      parameters:
+        - {name: province, in: query, schema: {type: string}}
+        - {name: form, in: query, required: true, schema: {type: string, enum: [CNTS-BM02, CNTS-BM18]}}
+        - {name: period_type, in: query, required: true, schema: {type: string, enum: [ksgm_week, month, week]}}
+        - {name: key, in: query, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách (cũ trước)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CntsShare"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo phiên bản tệp chia sẻ Chi cục (số không đổi so với phiên bản cuối → trả phiên bản cuối, 200)
+      operationId: extensionCntsShareCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [form, period_type, period_key]
+              properties:
+                form: {type: string, enum: [CNTS-BM02, CNTS-BM18]}
+                period_type: {type: string, enum: [ksgm_week, month, week]}
+                period_key: {type: string}
+      responses:
+        "201":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsShareResult"}
+        "200":
+          description: Số không đổi — phiên bản cuối
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CntsShareResult"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 319
+  /v1/extension/cnts/shares/{id}/xlsx:
+    get:
+      summary: Tải tệp Excel của một phiên bản (dựng lại từ nội dung đã lưu; BM-18 gồm sheet TỔNG = Phụ lục 2 và 4 sheet khai thác theo xã × tuần)
+      operationId: extensionCntsShareFile
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_share_not_found, $ref: "#/components/responses/Problem"}
+  # --- pf/forms (cap/forms, W6.2): biểu thu thập theo kỳ — phát hành, nộp, rà soát bốn mắt, chốt kèm ảnh chụp đóng băng, mở lại.
+  # Bên dùng chọn bằng query `profile` (KN: kn). Route v1 cũ của KN (/v1/extension/report-*) chạy song song và ghi song song
+  # chốt/mở lại kỳ + ảnh chụp sang pf_forms (origin = mirror). Ngữ cảnh KN: header X-AG-Context như các route KN khác.
+  # 14 biểu thật (Q-01) chưa có: chỉ có biểu mẫu thử (fixture); profile kn không phát hành kỳ trên biểu fixture. ---
+# @ag-order: 335
+  /v1/extension/khtc/weeks:
+    get:
+      summary: Tuần báo cáo KHTC (Thứ Tư – Thứ Ba) của một năm — ô chọn "Tuần" kèm ngày
+      operationId: extensionKhtcWeeks
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      responses:
+        "200":
+          description: 52 hoặc 53 tuần
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [year, items]
+                properties:
+                  year: {type: integer}
+                  items: {type: array, items: {$ref: "#/components/schemas/KHTCWeek"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 336
+  /v1/extension/khtc/form-template:
+    get:
+      summary: Phiếu cơ sở "Báo cáo cho KHTC" đã cài ở cap/forms (profile kn_khtc)
+      operationId: extensionKhtcFormTemplate
+      tags: [extension]
+      responses:
+        "200":
+          description: Phiên bản (0 = chưa cài)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormTemplate"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 337
+  /v1/extension/khtc/form-template/install:
+    post:
+      summary: Cài phiếu cơ sở (Admin KN / reports_admin); đã cài thì giữ nguyên
+      operationId: extensionKhtcInstallFormTemplate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Phiếu cơ sở
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormTemplate"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 338
+  /v1/extension/khtc/periods:
+    get:
+      summary: Danh sách kỳ KHTC (mới trước) kèm trạng thái và tiến độ nộp
+      operationId: extensionKhtcPeriods
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, schema: {type: integer}, description: Năm kế hoạch (bỏ trống = mọi năm)}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KHTCPeriod"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Mở kỳ và giao phiếu (một phiếu mỗi phòng, gắn kỳ nguồn) — Cấp Tỉnh Phòng KHTC
+      operationId: extensionKhtcOpenPeriod
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KHTCOpenInput"}
+      responses:
+        "201":
+          description: Kỳ đã mở
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCPeriod"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.template_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_period_duplicate, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 339
+  /v1/extension/khtc/periods/preview:
+    post:
+      summary: Kỳ "Nháp" của popup Mở kỳ — tên kỳ, khoảng thời gian, hạn, phiếu giao các phòng, nguồn module (chưa ghi)
+      operationId: extensionKhtcPreviewPeriod
+      tags: [extension]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KHTCOpenInput"}
+      responses:
+        "200":
+          description: Nháp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCDraft"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 340
+  /v1/extension/khtc/periods/{id}:
+    get:
+      summary: Chi tiết kỳ — 4 thẻ đếm, tiến độ phiếu các phòng và nguồn module, log
+      operationId: extensionKhtcPeriod
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kỳ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCPeriod"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 341
+  /v1/extension/khtc/periods/{id}/deadline:
+    post:
+      summary: Sửa hạn nộp / hạn xuất (kỳ chưa đóng, chưa hủy)
+      operationId: extensionKhtcPeriodDeadline
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [due_at]
+              properties:
+                due_at: {type: string, format: date-time}
+                export_due_at: {type: string, format: date-time}
+                reason: {type: string}
+      responses:
+        "200":
+          description: Kỳ sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCPeriod"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_period_terminal, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 342
+  /v1/extension/khtc/periods/{id}/close:
+    post:
+      summary: Đóng kỳ — Đủ dữ liệu, hoặc Trễ hạn quá hạn ≥ N ngày kèm lý do (BR-DL-15)
+      operationId: extensionKhtcClosePeriod
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KHTCReason"}
+      responses:
+        "200":
+          description: Kỳ đã đóng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCPeriod"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_period_not_closable | extension.khtc_period_terminal", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 343
+  /v1/extension/khtc/periods/{id}/cancel:
+    post:
+      summary: Hủy kỳ mở nhầm — lý do bắt buộc (BR-DL-18); phiếu gỡ khỏi module các phòng
+      operationId: extensionKhtcCancelPeriod
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KHTCReason"}
+      responses:
+        "200":
+          description: Kỳ đã hủy
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCPeriod"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_period_not_cancellable | extension.khtc_period_terminal", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 344
+  /v1/extension/khtc/department-forms:
+    get:
+      summary: 'Báo cáo cho KHTC phía phòng (W11.11, FN-PN-03.01) — phiếu KHTC giao cho phòng của phiên theo kỳ KHTC'
+      description: |
+        Một mã dùng chung cho mọi phòng chuyên môn (Trồng trọt, CNTS, Thông tin tuyên truyền, HCTH). Cấp Tỉnh chỉ thấy phiếu phòng
+        của phiên; Admin KN chọn phòng bằng `department`. view=current ("Phiếu kỳ này"): kỳ chưa đóng, "Cần xử lý" trước rồi hạn
+        gần nhất; view=sent ("Phiếu đã gửi"): phiếu đã gửi ≥ 1 lần. Kỳ đã hủy bị gỡ (BR-DL-18). Form nhập/gửi phiếu thuộc màn
+        `entry_route` (W11.63); gửi qua /v1/forms (profile kn_khtc).
+      operationId: extensionKhtcDepartmentForms
+      tags: [extension]
+      parameters:
+        - {name: view, in: query, schema: {type: string, enum: [current, sent], default: current}}
+        - {name: department, in: query, schema: {type: string}, description: Chỉ Admin KN — mã phòng cần xem (vai khác bỏ trống hoặc = phòng của phiên)}
+        - {name: year, in: query, schema: {type: integer}, description: Năm kế hoạch (bỏ trống = mọi năm)}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        "200":
+          description: Danh sách phiếu của phòng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCDepartmentForms"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  # --- pf/extension: bộ đọc nguồn module của Kỳ KHTC (W11.64 — BRD KHTC v2.2 BR-DL-02…04; ADR-0053 §8). "Cập nhật số liệu" chụp
+  # bất biến port KHTCSources (chỉ cán bộ KHTC phụ trách kỳ — người mở kỳ, ⚑3); "Nguồn đã thay đổi" so figures_hash (không so
+  # status_hash), chỉ cảnh báo. Số thập phân là chuỗi.
+# @ag-order: 345
+  /v1/extension/khtc/periods/{id}/sources:
+    get:
+      summary: Trạng thái nguồn của kỳ — mốc dữ liệu từng nguồn, số đã chụp của hạng mục nguồn module, "Nguồn đã thay đổi"
+      operationId: extensionKhtcPeriodSources
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Trạng thái nguồn
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCSourceStatus"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 346
+  /v1/extension/khtc/periods/{id}/sources/refresh:
+    post:
+      summary: Cập nhật số liệu — ảnh chụp mới của số liệu nguồn đã chốt; lịch sử cũ → mới so với ảnh chụp trước
+      operationId: extensionKhtcPeriodSourcesRefresh
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Trạng thái nguồn sau khi chụp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCSourceStatus"}
+        "403": {description: "forbidden | extension.khtc_refresh_not_owner", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_period_terminal, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 347
+  /v1/extension/khtc/periods/{id}/sources/history:
+    get:
+      summary: Lịch sử Cập nhật số liệu — người bấm, thời điểm, giá trị cũ → mới (mới trước)
+      operationId: extensionKhtcPeriodSourcesHistory
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KHTCSourceHistoryItem"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_period_not_found, $ref: "#/components/responses/Problem"}
+  # --- pf/extension phiếu Báo cáo cho KHTC (W11.63 rút gọn — FN-PN-03.01, FN-PN-03.02, FN-TI-02.04, FN-AD-04.02) ---
+# @ag-order: 348
+  /v1/extension/khtc/form-templates:
+    get:
+      summary: Mẫu phiếu số liệu KHTC nạp sẵn (4 phòng + mẫu chung) — loại cột Cố định / Từ Kế hoạch năm / Lũy kế kỳ trước / Nhập / Công thức
+      operationId: extensionKhtcFormTemplates
+      tags: [extension]
+      responses:
+        "200":
+          description: Mẫu phiếu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [column_kinds, items]
+                properties:
+                  column_kinds: {type: array, items: {type: string}}
+                  items: {type: array, items: {$ref: "#/components/schemas/KHTCFormSheetTemplate"}}
+# @ag-order: 349
+  /v1/extension/khtc/my-forms:
+    get:
+      summary: Phiếu kỳ này / phiếu đã gửi của một phòng (Cấp Tỉnh của phòng; Phòng KHTC, Admin xem phòng bất kỳ)
+      operationId: extensionKhtcMyForms
+      tags: [extension]
+      parameters:
+        - {name: department, in: query, required: true, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        "200":
+          description: Phiếu (kỳ mới trước; kỳ đã hủy bị gỡ)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KHTCFormTask"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 350
+  /v1/extension/khtc/periods/{id}/forms/{dept}:
+    get:
+      summary: Phiếu của phòng trong kỳ KHTC — lưới hạng mục theo Kế hoạch năm, lời văn, kết quả kiểm tra, lịch sử gửi
+      operationId: extensionKhtcForm
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: Kỳ KHTC (sổ W11.62)}
+        - {name: dept, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Phiếu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormSheet"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_form_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 351
+  /v1/extension/khtc/periods/{id}/forms/{dept}/draft:
+    post:
+      summary: Lưu nháp ở máy chủ (không giới hạn; không kiểm bắt buộc)
+      operationId: extensionKhtcFormDraft
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: dept, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KHTCFormSaveInput"}
+      responses:
+        "200":
+          description: Phiếu sau khi lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormSheet"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_form_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_form_locked | forms.submission_conflict", $ref: "#/components/responses/Problem"}
+# @ag-order: 352
+  /v1/extension/khtc/periods/{id}/forms/{dept}/submit:
+    post:
+      summary: Gửi KHTC — kiểm 3 quy tắc, niêm phong bảng số liệu, nộp lần n ở cap/forms (tối đa 3 lần, lần 3 tự khóa)
+      operationId: extensionKhtcFormSubmit
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: dept, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KHTCFormSaveInput"}
+      responses:
+        "200":
+          description: Phiếu đã gửi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormSheet"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_form_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_form_locked | forms.submission_conflict | forms.submission_limit | extension.khtc_form_template_outdated", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.khtc_form_invalid (trường issues: kết quả kiểm tra)", $ref: "#/components/responses/Problem"}
+# @ag-order: 353
+  /v1/extension/khtc/periods/{id}/forms/{dept}/review:
+    post:
+      summary: Rà soát — Yêu cầu bổ sung (returned, bắt buộc nội dung) hoặc Xác nhận (accepted); Cấp Tỉnh Phòng KHTC, bốn mắt
+      operationId: extensionKhtcFormReview
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: dept, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: {type: string, enum: [returned, accepted]}
+                note: {type: string}
+      responses:
+        "200":
+          description: Phiếu sau rà soát
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormSheet"}
+        "403": {description: "forbidden | self_approval", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_form_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_form_not_reviewable, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  # --- pf/hrm (dom/hrm, W11.21 — ADR-0050): danh mục nhân sự Phòng HCTH (BRD HCTH v3.0 FN-19, UR-ADM-08). Đọc: Admin và Cấp Tỉnh
+  # của Phòng Hành chính – Tổng hợp (port.Access ở gốc lắp ráp); ghi: Admin. Mọi bản ghi là phiên bản (sổ chỉ ghi thêm); ngừng sử
+  # dụng = phiên bản active=false (BR-01). Số thập phân (hệ số, PCCV, %) là chuỗi. Không dữ liệu cá nhân.
+# @ag-order: 475
+  /v1/kn/khtc/catalogs:
+    get:
+      summary: "FN-AD-04.01: Danh mục KHTC — mục hiện hành của một loại + số lượng mọi loại (Admin, Cấp Tỉnh)"
+      operationId: knKhtcListCatalog
+      tags: [extension]
+      parameters:
+        - {name: kind, in: query, schema: {$ref: "#/components/schemas/KhtcCatalogKind"}, description: "Vắng = mọi loại"}
+        - {name: include_retired, in: query, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Danh mục
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [counts, items]
+                properties:
+                  counts:
+                    type: array
+                    items:
+                      type: object
+                      required: [kind, label, active, total]
+                      properties:
+                        kind: {$ref: "#/components/schemas/KhtcCatalogKind"}
+                        label: {type: string}
+                        active: {type: integer}
+                        total: {type: integer}
+                  items: {type: array, items: {$ref: "#/components/schemas/KhtcCatalogItem"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+# @ag-order: 476
+  /v1/kn/khtc/catalogs/{kind}:
+    post:
+      summary: "FN-AD-04.01: thêm mục danh mục (Admin). Trùng mã → 409"
+      operationId: knKhtcCreateCatalog
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: kind, in: path, required: true, schema: {$ref: "#/components/schemas/KhtcCatalogKind"}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KhtcCatalogInput"}
+      responses:
+        "201": {description: Phiên bản 1, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcCatalogItem"}}}}
+        "200": {description: Gửi lặp cùng khóa, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcCatalogItem"}}}}
+        "409": {description: "extension.khtc_catalog_exists | extension.khtc_default_conflict", $ref: "#/components/responses/Problem"}
+# @ag-order: 477
+  /v1/kn/khtc/catalogs/{kind}/{code}/revise:
+    post:
+      summary: "FN-AD-04.01: sửa / ngừng dùng (active=false) / dùng lại — phiên bản mới (Admin)"
+      operationId: knKhtcReviseCatalog
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: kind, in: path, required: true, schema: {$ref: "#/components/schemas/KhtcCatalogKind"}}
+        - {name: code, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KhtcCatalogInput"}
+      responses:
+        "201": {description: Phiên bản mới, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcCatalogItem"}}}}
+        "200": {description: Gửi lặp cùng khóa, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcCatalogItem"}}}}
+        "404": {description: extension.khtc_catalog_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_default_conflict, $ref: "#/components/responses/Problem"}
+# @ag-order: 478
+  /v1/kn/khtc/catalogs/{kind}/{code}/history:
+    get:
+      summary: "FN-AD-04.01: mọi phiên bản của một mục, mới nhất trước"
+      operationId: knKhtcCatalogHistory
+      tags: [extension]
+      parameters:
+        - {name: kind, in: path, required: true, schema: {$ref: "#/components/schemas/KhtcCatalogKind"}}
+        - {name: code, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/KhtcCatalogItem"}}}}
+        "404": {description: extension.khtc_catalog_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 479
+  /v1/kn/khtc/programs:
+    get:
+      summary: "D20: danh sách CT/DA chủ của KHTC (bản hiện hành)"
+      operationId: knKhtcListPrograms
+      tags: [extension]
+      parameters:
+        - {name: kind, in: query, schema: {$ref: "#/components/schemas/KhtcProgramKind"}}
+        - {name: include_retired, in: query, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/KhtcProgram"}}}}
+    post:
+      summary: "FN-TI-02.02 B7: thêm CT/DA (Admin, Cấp Tỉnh phòng KHTC)"
+      operationId: knKhtcCreateProgram
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KhtcProgramInput"}
+      responses:
+        "201": {description: Phiên bản 1, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcProgram"}}}}
+        "200": {description: Gửi lặp cùng khóa, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcProgram"}}}}
+        "409": {description: extension.khtc_program_exists, $ref: "#/components/responses/Problem"}
+# @ag-order: 480
+  /v1/kn/khtc/programs/{ref}/revise:
+    post:
+      summary: "Sửa / ngừng (active=false) CT/DA — phiên bản mới"
+      operationId: knKhtcReviseProgram
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KhtcProgramInput"}
+      responses:
+        "201": {description: Phiên bản mới, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcProgram"}}}}
+        "200": {description: Gửi lặp cùng khóa, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcProgram"}}}}
+        "404": {description: extension.khtc_program_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_program_exists, $ref: "#/components/responses/Problem"}
+# @ag-order: 481
+  /v1/kn/khtc/programs/{ref}/history:
+    get:
+      summary: Mọi phiên bản của CT/DA, mới nhất trước
+      operationId: knKhtcProgramHistory
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/KhtcProgram"}}}}
+        "404": {description: extension.khtc_program_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 482
+  /v1/kn/khtc/plans/{year}:
+    get:
+      summary: "FN-TI-02.02: một phiên bản Kế hoạch năm (6 tab) — ?version=n, ?at=ngày (BR-DL-13), mặc định mới nhất"
+      operationId: knKhtcGetPlan
+      tags: [extension]
+      parameters:
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: version, in: query, schema: {type: integer, minimum: 1}}
+        - {name: at, in: query, schema: {type: string, format: date}}
+      responses:
+        "200": {description: Kế hoạch, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcPlan"}}}}
+        "404": {description: extension.khtc_plan_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 483
+  /v1/kn/khtc/plans/{year}/versions:
+    get:
+      summary: Lịch sử phiên bản kế hoạch năm (cũ trước)
+      operationId: knKhtcPlanVersions
+      tags: [extension]
+      parameters:
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/KhtcPlanVersion"}}}}
+    post:
+      summary: "Lưu kế hoạch năm: phiên bản 1 (lập) hoặc Điều chỉnh theo QĐ (≥ 2, bắt buộc số, ngày QĐ, ngày hiệu lực) — cả cây"
+      operationId: knKhtcSavePlan
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KhtcPlanSave"}
+      responses:
+        "201": {description: Phiên bản mới, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcPlan"}}}}
+        "200": {description: Gửi lặp cùng khóa, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcPlan"}}}}
+        "409": {description: "extension.khtc_plan_version_conflict | extension.khtc_entry_in_use", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.khtc_plan_invalid | extension.khtc_effective_date_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 484
+  /v1/kn/khtc/plans/{year}/copy-draft:
+    get:
+      summary: "Sao chép từ năm trước: bản nháp (không ghi) từ phiên bản mới nhất năm N−1, chỉ nội dung còn theo dõi"
+      operationId: knKhtcCopyDraft
+      tags: [extension]
+      parameters:
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      responses:
+        "200": {description: Bản nháp, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcPlanDraft"}}}}
+        "404": {description: extension.khtc_plan_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 485
+  /v1/kn/khtc/plans/{year}/export:
+    get:
+      summary: "Xuất Excel một phiên bản kế hoạch năm (cả 6 tab; bố cục nhập lại được)"
+      operationId: knKhtcExportPlan
+      tags: [extension]
+      parameters:
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: version, in: query, schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+        "404": {description: extension.khtc_plan_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 486
+  /v1/kn/khtc/plans/{year}/import-draft:
+    post:
+      summary: "Nhập Excel/CSV (bố cục của tệp xuất) thành bản nháp — không ghi; lỗi theo dòng"
+      operationId: knKhtcImportDraft
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      requestBody:
+        required: true
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+          text/csv: {schema: {type: string, format: binary}}
+      responses:
+        "200": {description: Bản nháp, content: {application/json: {schema: {$ref: "#/components/schemas/KhtcPlanDraft"}}}}
+        "422": {description: extension.khtc_import_invalid, $ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 648
+    CNTSDutyCell:
+      type: object
+      required: [facility_ref, officer_ref, day, shift]
+      properties:
+        facility_ref: {type: string, format: uuid}
+        officer_ref: {type: string, format: uuid}
+        day: {type: integer, minimum: 1, maximum: 31}
+        shift: {type: string, enum: [N, D, ND], description: "N ngày, D (Đ) đêm, ND (NĐ) cả ngày đêm; ca đêm qua nửa đêm thuộc ngày bắt đầu ca"}
+# @ag-order: 649
+    CNTSDutyRosterSave:
+      type: object
+      required: [base_version, cells]
+      properties:
+        province_code: {type: string, description: "Tỉnh suy từ phạm vi phiên; Admin không có tỉnh phải chọn, không ghi legacy"}
+        base_version: {type: integer, minimum: 0, description: "Phiên bản đã thấy (0 = chưa có lịch) — khóa lạc quan"}
+        cells: {type: array, maxItems: 20000, items: {$ref: "#/components/schemas/CNTSDutyCell"}}
+        source: {type: string, enum: [grid, copy, excel]}
+        note: {type: string, maxLength: 1000}
+# @ag-order: 650
+    CNTSDutyFacility:
+      type: object
+      required: [ref, code, name, commune_code, kind]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        commune_code: {type: string}
+        kind: {type: [string, "null"]}
+# @ag-order: 651
+    CNTSDutyOfficer:
+      type: object
+      required: [ref, display, commune_codes, facility_refs]
+      properties:
+        ref: {type: string, format: uuid}
+        display: {type: [string, "null"]}
+        commune_codes: {type: array, items: {type: string}}
+        facility_refs: {type: array, items: {type: string, format: uuid}, description: "Giới hạn cơ sở (rỗng = cả xã phụ trách)"}
+# @ag-order: 652
+    CNTSDutyWarning:
+      type: object
+      required: [code, message, facility_ref, officer_ref, days]
+      properties:
+        code: {type: string, enum: [facility_uncovered, double_shift, officer_not_granted]}
+        message: {type: string}
+        facility_ref: {type: [string, "null"], format: uuid}
+        officer_ref: {type: [string, "null"], format: uuid}
+        days: {type: array, items: {type: integer}}
+# @ag-order: 653
+    CNTSDutyVersion:
+      type: object
+      required: [version, source, cell_count, note, at, actor_ref, actor_display]
+      properties:
+        version: {type: integer}
+        source: {type: string}
+        cell_count: {type: integer}
+        note: {type: [string, "null"]}
+        at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: [string, "null"]}
+# @ag-order: 654
+    CNTSDutyRoster:
+      type: object
+      required: [province_code, legacy, month, days_in_month, version, source, note, cells, facilities, officers, warnings, updated_at, updated_by, versions, can_edit, notified_officer_refs]
+      properties:
+        province_code: {type: [string, "null"], description: "Tỉnh của luồng lịch; null với lịch chung cũ"}
+        legacy: {type: boolean, description: "Lịch chung cũ chỉ Admin đọc, không sửa"}
+        month: {type: string}
+        days_in_month: {type: integer}
+        version: {type: integer, description: "0 = chưa lập"}
+        source: {type: [string, "null"]}
+        note: {type: [string, "null"]}
+        cells: {type: array, items: {$ref: "#/components/schemas/CNTSDutyCell"}}
+        facilities: {type: array, items: {$ref: "#/components/schemas/CNTSDutyFacility"}}
+        officers: {type: array, items: {$ref: "#/components/schemas/CNTSDutyOfficer"}}
+        warnings: {type: array, items: {$ref: "#/components/schemas/CNTSDutyWarning"}}
+        updated_at: {type: [string, "null"], format: date-time}
+        updated_by: {type: [string, "null"], format: uuid}
+        versions: {type: array, items: {$ref: "#/components/schemas/CNTSDutyVersion"}}
+        can_edit: {type: boolean}
+        notified_officer_refs: {type: array, items: {type: string, format: uuid}, description: "Viên chức có ca thay đổi ở lần lưu này"}
+# @ag-order: 655
+    CNTSMyDuty:
+      type: object
+      required: [date, shift, facility, colleagues]
+      properties:
+        date: {type: string, format: date}
+        shift: {type: string, enum: [N, D, ND]}
+        facility:
+          type: object
+          required: [ref, code, name, commune_code]
+          properties:
+            ref: {type: string, format: uuid}
+            code: {type: [string, "null"]}
+            name: {type: [string, "null"]}
+            commune_code: {type: [string, "null"]}
+        colleagues:
+          type: array
+          items:
+            type: object
+            required: [ref, display]
+            properties:
+              ref: {type: string, format: uuid}
+              display: {type: [string, "null"]}
+# @ag-order: 656
+    CNTSMyDuties:
+      type: object
+      required: [month, version, items]
+      properties:
+        month: {type: string}
+        version: {type: integer}
+        items: {type: array, items: {$ref: "#/components/schemas/CNTSMyDuty"}}
+# @ag-order: 657
+    CNTSVaccinationDose:
+      type: object
+      required: [vaccine_code, vaccine_name, shot, age_days, expected_date, actual_date, note, overdue]
+      properties:
+        vaccine_code: {type: string}
+        vaccine_name: {type: [string, "null"]}
+        shot: {type: integer}
+        age_days: {type: integer}
+        expected_date: {type: string, format: date, description: "Ngày nhận + ngày tuổi − tuổi lúc nhận (sửa được từng hộ)"}
+        actual_date: {type: [string, "null"], format: date}
+        note: {type: [string, "null"]}
+        overdue: {type: boolean, description: "Quá ngày dự kiến chưa tiêm (nhãn đỏ)"}
+# @ag-order: 658
+    CNTSVaccinationBatchCore:
+      type: object
+      required: [ref, version, event, commune_code, model_type_code, model_type_name, breed_code, breed_name, schedule_code, schedule_name,
+        schedule_valid_from, household_ref, locality, received_date, age_at_receipt, head_count, doses, note, status_reason, updated_at, updated_by]
+      properties:
+        ref: {type: string, format: uuid}
+        version: {type: integer}
+        event: {type: string, enum: [created, updated, dose_recorded, cancelled]}
+        commune_code: {type: string}
+        model_type_code: {type: string}
+        model_type_name: {type: [string, "null"]}
+        breed_code: {type: [string, "null"]}
+        breed_name: {type: [string, "null"]}
+        schedule_code: {type: string}
+        schedule_name: {type: [string, "null"]}
+        schedule_valid_from: {type: string, format: date}
+        household_ref: {type: [string, "null"], format: uuid}
+        locality: {type: [string, "null"]}
+        received_date: {type: string, format: date}
+        age_at_receipt: {type: integer}
+        head_count: {type: [integer, "null"]}
+        doses: {type: array, items: {$ref: "#/components/schemas/CNTSVaccinationDose"}}
+        note: {type: [string, "null"]}
+        status_reason: {type: [string, "null"]}
+        updated_at: {type: string, format: date-time}
+        updated_by: {type: string, format: uuid}
+        actor_display: {type: [string, "null"]}
+# @ag-order: 659
+    CNTSVaccinationBatch:
+      allOf:
+        - $ref: "#/components/schemas/CNTSVaccinationBatchCore"
+        - type: object
+          required: [status, overdue_count, can_plan, can_record, next_dose]
+          properties:
+            status: {type: string, enum: [open, overdue, done, cancelled]}
+            overdue_count: {type: integer}
+            can_plan: {type: boolean}
+            can_record: {type: boolean}
+            next_dose: {oneOf: [{$ref: "#/components/schemas/CNTSVaccinationDose"}, {type: "null"}]}
+# @ag-order: 660
+    CNTSVaccinationBatchDetail:
+      allOf:
+        - $ref: "#/components/schemas/CNTSVaccinationBatch"
+        - type: object
+          required: [versions]
+          properties:
+            versions: {type: array, items: {$ref: "#/components/schemas/CNTSVaccinationBatchCore"}, description: "Mới nhất trước"}
+# @ag-order: 661
+    CNTSVaccinationBatchCreate:
+      type: object
+      required: [commune_code, model_type_code, received_date, age_at_receipt]
+      properties:
+        id: {type: [string, "null"], format: uuid, description: UUIDv7 máy khách sinh (tùy chọn)}
+        commune_code: {type: string}
+        model_type_code: {type: string}
+        breed_code: {type: [string, "null"]}
+        schedule_code: {type: [string, "null"], description: "Rỗng → chọn quy trình theo giống/loại mô hình tại ngày nhận giống"}
+        household_ref: {type: [string, "null"], format: uuid, description: "Hộ mô hình — hoặc ghi địa bàn (không lưu họ tên tự do)"}
+        locality: {type: [string, "null"], maxLength: 300}
+        received_date: {type: string, format: date}
+        age_at_receipt: {type: integer, minimum: 0, maximum: 3650}
+        head_count: {type: [integer, "null"], minimum: 1}
+        note: {type: [string, "null"], maxLength: 1000}
+# @ag-order: 662
+    CNTSVaccinationDosesUpdate:
+      type: object
+      required: [base_version, doses]
+      properties:
+        base_version: {type: integer, minimum: 1}
+        captured_at: {type: [string, "null"], format: date-time}
+        doses:
+          type: array
+          minItems: 1
+          maxItems: 60
+          items:
+            type: object
+            required: [vaccine_code, shot]
+            properties:
+              vaccine_code: {type: string}
+              shot: {type: integer}
+              expected_date: {type: [string, "null"], format: date}
+              actual_date: {type: [string, "null"], format: date}
+              clear_actual: {type: boolean}
+              note: {type: [string, "null"], maxLength: 300}
+# @ag-order: 730
+    SupportRequestInput:
+      type: object
+      required: [category, description]
+      properties:
+        id: {type: string, format: uuid, description: "UUIDv7 sinh trên máy (tùy chọn)"}
+        household_ref: {type: [string, "null"], format: uuid, description: "Bỏ trống khi tài khoản chỉ có một nông hộ"}
+        plot_ref: {type: [string, "null"], format: uuid}
+        category: {type: string, enum: [dich_hai, benh_lua, thoi_tiet, ky_thuat, may_moc, khac]}
+        urgency: {type: string, enum: [binh_thuong, khan], default: binh_thuong}
+        description: {type: string, minLength: 10, maxLength: 2000, description: "Không chứa SĐT/CCCD"}
+        photo_refs: {type: array, maxItems: 5, items: {type: string, format: uuid}}
+        location:
+          type: [object, "null"]
+          properties:
+            lat: {type: [string, number]}
+            lon: {type: [string, number]}
+        gps_accuracy_m: {type: [string, number, "null"]}
+# @ag-order: 731
+    SupportRequest:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        household_ref: {type: string, format: uuid}
+        plot_ref: {type: [string, "null"], format: uuid}
+        category: {type: string}
+        urgency: {type: string}
+        description: {type: string}
+        photo_refs: {type: array, items: {type: string, format: uuid}}
+        gps_missing: {type: boolean}
+        labels: {type: array, items: {type: string}, description: "vd \"Thiếu vị trí GPS\""}
+        event_time: {type: string, format: date-time}
+        received_at: {type: string, format: date-time}
+        task_id: {type: string, format: uuid}
+        task_status: {type: string, enum: [new, assigned, accepted, in_progress, resolved]}
+        assigned: {type: boolean}
+        last_note: {type: string}
+        task_created_at: {type: string, format: date-time}
+# @ag-order: 732
+    SupportRequestStaff:
+      type: object
+      description: Yêu cầu hỗ trợ trong danh sách của cán bộ (không có toạ độ, không PII).
+      required: [id, household_ref, plot_ref, cooperative_ref, commune_code, province_code, category, urgency, description,
+        photo_refs, photo_count, gps_missing, gps_accuracy_m, labels, event_time, received_at, assignment_rule, task]
+      properties:
+        id: {type: string, format: uuid}
+        household_ref: {type: string, format: uuid}
+        plot_ref: {type: [string, "null"], format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        province_code: {type: string}
+        category: {type: string, enum: [dich_hai, benh_lua, thoi_tiet, ky_thuat, may_moc, khac]}
+        urgency: {type: string, enum: [binh_thuong, khan]}
+        description: {type: string}
+        photo_refs: {type: array, maxItems: 5, items: {type: string, format: uuid}, description: "Mã tệp ảnh (tải qua pf/files)"}
+        photo_count: {type: integer, minimum: 0, maximum: 5}
+        gps_missing: {type: boolean}
+        gps_accuracy_m: {type: [string, "null"], description: "Độ chính xác GPS (m, decimal)"}
+        labels: {type: array, items: {type: string}, description: "vd \"Thiếu vị trí GPS\""}
+        event_time: {type: string, format: date-time, description: "Lúc bấm Gửi trên máy"}
+        received_at: {type: string, format: date-time, description: "Lúc máy chủ nhận (mốc SLA 1 phút)"}
+        assignment_rule: {type: string, enum: [commune_on_duty, province_on_duty, province_officer, admin_queue]}
+        task: {$ref: "#/components/schemas/ExtTask"}
+    # --- pf/simulation ---
+
+# @ag-order: 850
+    MaterialRecord:
+      type: object
+      required: [id, commune_code, recorded_on, material_code, material_name, quantity, unit, note, actor_ref, actor_display, recorded_at, supersedes_id]
+      properties:
+        id: {type: string, format: uuid}
+        commune_code: {type: string}
+        recorded_on: {type: string, format: date}
+        material_code: {type: string}
+        material_name: {type: string}
+        quantity: {type: string}
+        unit: {type: string}
+        note: {type: [string, "null"]}
+        department_code: {type: string}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: [string, "null"]}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+    # --- pf/forms (W6.2) ---
+# @ag-order: 935
+    CNTSAlertActorRef:
+      type: object
+      required: [ref, display]
+      properties:
+        ref: {type: string, format: uuid}
+        display: {type: [string, "null"]}
+# @ag-order: 936
+    CNTSAlert:
+      type: object
+      description: Cảnh báo CNTS (W11.43). detail.findings là các vi phạm theo trường (loài, nhóm), detail.summary tóm tắt.
+      required: [alert_ref, kind, kind_label, kind_no, level, status, overdue, commune_code, province_code, subject_kind, subject_ref,
+        template_code, period_key, period_ref, source_ref, title, detail, recipient_refs, assignee, raised_at, due_at, overdue_at, closed_at,
+        auto_closed, result, seq, updated_at, can_assign, can_start, can_close]
+      properties:
+        alert_ref: {type: string, format: uuid}
+        kind: {type: string}
+        kind_label: {type: string}
+        kind_no: {type: integer, description: Số dòng ở bảng Mục III.5 (0 = trễ nộp liên tiếp)}
+        level: {type: string, enum: [urgent, attention]}
+        status: {type: string, enum: [new, assigned, in_progress, closed]}
+        overdue: {type: boolean}
+        commune_code: {type: [string, "null"]}
+        province_code: {type: [string, "null"]}
+        subject_kind: {type: string, enum: [commune, facility, household, site, outbreak]}
+        subject_ref: {type: string}
+        template_code: {type: [string, "null"]}
+        period_key: {type: [string, "null"]}
+        period_ref: {type: [string, "null"], format: uuid}
+        source_ref: {type: [string, "null"], format: uuid}
+        title: {type: string}
+        detail: {type: object, additionalProperties: true}
+        recipient_refs: {type: array, items: {type: string, format: uuid}}
+        assignee:
+          oneOf:
+            - {$ref: "#/components/schemas/CNTSAlertActorRef"}
+            - {type: "null"}
+        raised_at: {type: string, format: date-time}
+        due_at: {type: string, format: date-time}
+        overdue_at: {type: [string, "null"], format: date-time}
+        closed_at: {type: [string, "null"], format: date-time}
+        auto_closed: {type: boolean}
+        result: {type: [string, "null"]}
+        seq: {type: integer, description: Số sự việc cuối (base_seq của khóa lạc quan)}
+        updated_at: {type: string, format: date-time}
+        can_assign: {type: boolean}
+        can_start: {type: boolean}
+        can_close: {type: boolean}
+# @ag-order: 937
+    CNTSAlertList:
+      type: object
+      required: [items, counts]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/CNTSAlert"}}
+        counts:
+          type: object
+          required: [open, urgent_open, overdue]
+          properties:
+            open: {type: integer}
+            urgent_open: {type: integer}
+            overdue: {type: integer}
+# @ag-order: 938
+    CNTSAlertHistory:
+      type: object
+      required: [seq, action, status_after, actor, assignee, due_at, note, event_time, support_reason]
+      properties:
+        seq: {type: integer}
+        action: {type: string, enum: [raised, assigned, started, closed, auto_closed, overdue]}
+        status_after: {type: string, enum: [new, assigned, in_progress, closed]}
+        actor: {$ref: "#/components/schemas/CNTSAlertActorRef"}
+        assignee:
+          oneOf:
+            - {$ref: "#/components/schemas/CNTSAlertActorRef"}
+            - {type: "null"}
+        due_at: {type: [string, "null"], format: date-time}
+        note: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+        support_reason: {type: [string, "null"]}
+# @ag-order: 939
+    CNTSAlertDetail:
+      allOf:
+        - {$ref: "#/components/schemas/CNTSAlert"}
+        - type: object
+          required: [history]
+          properties:
+            history: {type: array, items: {$ref: "#/components/schemas/CNTSAlertHistory"}}
+# @ag-order: 940
+    CNTSAlertAction:
+      type: object
+      properties:
+        base_seq: {type: integer, description: Số sự việc cuối đã thấy (0 = không kiểm)}
+        assignee_ref: {type: string, format: uuid, description: assign — bắt buộc}
+        due_at: {type: string, format: date-time, description: assign — hạn xử lý (mặc định theo loại)}
+        note: {type: string, maxLength: 1000}
+        result: {type: string, minLength: 10, maxLength: 2000, description: close — kết quả xử lý bắt buộc}
+# @ag-order: 941
+    CNTSAlertAssignees:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [actor, level, communes, manager]
+            properties:
+              actor: {$ref: "#/components/schemas/CNTSAlertActorRef"}
+              level: {type: string, enum: [commune, province]}
+              communes: {type: array, items: {type: string}}
+              manager: {type: boolean}
+# @ag-order: 942
+    CNTSFormReminder:
+      type: object
+      required: [before_due_hours, on_overdue, repeat_daily, repeat_at, late_streak, channels, message]
+      properties:
+        before_due_hours: {type: integer, minimum: 0, maximum: 168}
+        on_overdue: {type: boolean}
+        repeat_daily: {type: boolean}
+        repeat_at: {type: string, description: "HH:MM giờ Việt Nam"}
+        late_streak: {type: integer, minimum: 0, maximum: 12, description: Trễ liên tiếp từ n kỳ → cảnh báo (0 = tắt)}
+        channels: {type: array, items: {type: string, enum: [in_app, push, email]}}
+        message: {type: string, maxLength: 500, description: "Nội dung mẫu — {bieu}, {ky}, {han}"}
+# @ag-order: 943
+    CNTSAlertSetting:
+      type: object
+      required: [sla_hours, urgent]
+      properties:
+        sla_hours: {type: integer, minimum: 1, maximum: 720}
+        urgent: {type: boolean, description: Chỉ loại có level_configurable}
+# @ag-order: 944
+    CNTSAlertConfig:
+      type: object
+      required: [forms, kinds, thresholds]
+      properties:
+        forms:
+          type: array
+          items:
+            type: object
+            required: [code, label, reminder, custom, version, updated_at, updated_by, sent_today]
+            properties:
+              code: {type: string}
+              label: {type: string}
+              reminder: {$ref: "#/components/schemas/CNTSFormReminder"}
+              custom: {type: boolean}
+              version: {type: integer}
+              updated_at: {type: [string, "null"], format: date-time}
+              updated_by:
+                oneOf:
+                  - {$ref: "#/components/schemas/CNTSAlertActorRef"}
+                  - {type: "null"}
+              sent_today: {type: integer}
+        kinds:
+          type: array
+          items:
+            type: object
+            required: [kind, sla_hours, urgent, level, custom, version]
+            properties:
+              kind:
+                type: object
+                required: [code, no, label, default_level, level_configurable, recipients, source]
+                properties:
+                  code: {type: string}
+                  no: {type: integer}
+                  label: {type: string}
+                  default_level: {type: string, enum: [urgent, attention]}
+                  level_configurable: {type: boolean}
+                  recipients: {type: array, items: {type: string}}
+                  source: {type: string, enum: [forms, outbreak, job, log, schedule]}
+              sla_hours: {type: integer}
+              urgent: {type: boolean}
+              level: {type: string, enum: [urgent, attention]}
+              custom: {type: boolean}
+              version: {type: integer}
+        thresholds:
+          type: array
+          items:
+            type: object
+            required: [key, label, unit, value, version, effective_from]
+            properties:
+              key: {type: string}
+              label: {type: string}
+              unit: {type: string}
+              value: {type: [string, "null"], description: Số thập phân dạng chuỗi; null = chưa có giá trị đã duyệt}
+              version: {type: integer}
+              effective_from: {type: [string, "null"], format: date}
+# @ag-order: 945
+    CNTSPeriodForm:
+      type: object
+      required: [code, bm, title, unit_kind, period_type, deadline_offset_days, deadline_time, due, nil_label, fields, template_id,
+        template_version, template_up_to_date]
+      properties:
+        code: {type: string, enum: [CNTS-BM01, CNTS-BM04, CNTS-BM17, CNTS-BM05-I, CNTS-BM05-II]}
+        bm: {type: string}
+        title: {type: string}
+        unit_kind: {type: string, enum: [commune, facility]}
+        period_type: {type: string, enum: [day, week]}
+        deadline_offset_days: {type: integer}
+        deadline_time: {type: string}
+        due: {type: string, description: Mô tả hạn mặc định}
+        nil_label: {type: [string, "null"], description: "Nhãn Báo không phát sinh (null = biểu không có)"}
+        fields: {type: array, items: {$ref: "#/components/schemas/FormsField"}}
+        template_id: {type: [string, "null"], format: uuid, description: "Phiên bản đã cài ở cap/forms (null = chưa cài)"}
+        template_version: {type: [integer, "null"]}
+        template_up_to_date: {type: boolean}
+# @ag-order: 946
+    CNTSSeriesInput:
+      type: object
+      required: [code, from_date, to_date, units]
+      properties:
+        code: {type: string}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        units: {type: array, minItems: 1, items: {type: string}, description: "Mã xã (BM-04/05/17) hoặc facility_ref cơ sở giết mổ (BM-01)"}
+        deadline:
+          type: object
+          required: [offset_days, time]
+          description: "Hạn khác mặc định: ngày cuối kỳ + offset_days lúc time (BM-05 Phần II: offset âm tính từ Thứ Hai)"
+          properties:
+            offset_days: {type: integer}
+            time: {type: string, pattern: "^[0-2][0-9]:[0-5][0-9]$"}
+# @ag-order: 947
+    CNTSSeriesPeriod:
+      type: object
+      required: [id, kind, key, label, from_date, to_date, due_at, rule]
+      properties:
+        id: {type: [string, "null"], format: uuid, description: "Mã kỳ cap/forms (sau phát hành)"}
+        kind: {type: string}
+        key: {type: string}
+        label: {type: string}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        due_at: {type: string, format: date-time}
+        rule: {type: string}
+# @ag-order: 948
+    CNTSSeries:
+      type: object
+      required: [code, calendar_id, calendar_version, unit_kind, units, tasks, periods]
+      properties:
+        code: {type: string}
+        calendar_id: {type: [string, "null"], description: "Lịch tuần của phòng (D8) — mã phòng, vd chan_nuoi_thuy_san; null với tuần làm việc BM-05"}
+        calendar_version: {type: [integer, "null"], description: "Phiên bản lịch (D8): 1 = v1-tam, 2 = v2 Thứ Tư–Thứ Ba, 3 = CNTS Thứ Ba–Thứ Hai; null với BM-05"}
+        unit_kind: {type: string}
+        units: {type: array, items: {type: string}}
+        tasks: {type: integer, description: Số công việc sẽ sinh (kỳ × đơn vị)}
+        periods: {type: array, items: {$ref: "#/components/schemas/CNTSSeriesPeriod"}}
+    # --- pf/extension W11.49: Báo cáo dịch bệnh BM-10, báo nghi dịch ---
+# @ag-order: 949
+    CNTSLocation:
+      type: object
+      required: [lat, lon]
+      description: Tọa độ WGS84 (độ thập phân, chuỗi) — DB-05; trong lãnh thổ Việt Nam (vĩ độ 8–24, kinh độ 102–118)
+      properties:
+        lat: {type: string, examples: ["10.2534100"]}
+        lon: {type: string, examples: ["105.9721000"]}
+        accuracy_m: {type: [string, "null"], description: Sai số GPS (m)}
+        source: {type: [string, "null"], enum: [gps, map, null], description: GPS thiết bị hoặc chọn trên bản đồ}
+# @ag-order: 950
+    CNTSOutbreakInput:
+      type: object
+      description: >-
+        Nội dung BM-10 (DB-01…DB-13). Lập mới: mọi trường bắt buộc; cập nhật diễn biến / xác nhận tin báo: gửi lại đủ trường
+        (mỗi lần là một phiên bản). Xác nhận tin báo: commune_code, location, source, received_at trống lấy theo tin báo.
+      properties:
+        base_version: {type: integer, description: Phiên bản người nhập đã thấy (bắt buộc khi cập nhật, xác nhận tin báo)}
+        commune_code: {type: string}
+        disease_code: {type: string, description: DB-01 mã danh mục cnts_disease}
+        species_code: {type: string, description: Mã danh mục cnts_species}
+        received_at: {type: string, format: date-time, description: DB-02}
+        source: {type: string, enum: [ubnd_xa, nong_ho, can_bo], description: DB-03}
+        household_ref: {type: [string, "null"], format: uuid, description: DB-04 hộ (pf/cooperative)}
+        locality: {type: string, description: DB-04 địa bàn (ấp, khu vực) — không ghi họ tên, số điện thoại; bắt buộc khi không có household_ref}
+        location: {oneOf: [{$ref: "#/components/schemas/CNTSLocation"}, {type: "null"}]}
+        herd_size: {type: integer, minimum: 1, description: DB-06}
+        herd_age_days: {type: [integer, "null"]}
+        dead: {type: integer, minimum: 0, description: DB-07 lũy kế; ≤ herd_size}
+        symptoms: {type: string, description: DB-08}
+        sample_date: {type: string, format: date, description: DB-09}
+        lab_name: {type: string}
+        lab_result: {type: string}
+        culled_head: {type: [integer, "null"], description: DB-10 lũy kế; ≤ herd_size}
+        culled_kg: {type: [string, "null"]}
+        chemical_liters: {type: [string, "null"]}
+        buffer_note: {type: string, description: DB-11 (vẽ vùng ở bản đồ — GĐ2)}
+        prevention_note: {type: string, description: DB-12}
+        attachment_refs: {type: array, maxItems: 10, items: {type: string, format: uuid}, description: DB-13 mã tệp pf_files}
+        as_of: {type: string, format: date, description: Ngày diễn biến (mặc định ngày tiếp nhận ở bản 1, hôm nay ở bản sau); không lùi}
+        progress_note: {type: string, description: Diễn biến của lần cập nhật}
+        captured_at: {type: string, format: date-time, description: Giờ thiết bị của bản ngoại tuyến}
+# @ag-order: 951
+    CNTSOutbreak:
+      type: object
+      required: [ref, version, version_id, event, status, commune_code, disease_code, disease_name, species_code, species_name,
+        received_at, source, suspect_ref, household_ref, locality, location, herd_size, herd_age_days, dead, symptoms, sample_date,
+        lab_name, lab_result, culled_head, culled_kg, chemical_liters, buffer_note, prevention_note, attachment_refs, as_of,
+        progress_note, status_reason, captured_at, recorded_at, actor]
+      properties:
+        ref: {type: string, format: uuid}
+        version: {type: integer}
+        version_id: {type: string, format: uuid}
+        event: {type: string, enum: [reported, updated, closed, reopened]}
+        status: {type: string, enum: [reported, monitoring, closed], description: Đã gửi / Đang theo dõi / Đã kết thúc}
+        commune_code: {type: string}
+        disease_code: {type: string}
+        disease_name: {type: string}
+        species_code: {type: string}
+        species_name: {type: string}
+        received_at: {type: string, format: date-time}
+        source: {type: string, enum: [ubnd_xa, nong_ho, can_bo]}
+        suspect_ref: {type: [string, "null"], format: uuid}
+        household_ref: {type: [string, "null"], format: uuid}
+        locality: {type: [string, "null"]}
+        location: {oneOf: [{$ref: "#/components/schemas/CNTSLocation"}, {type: "null"}]}
+        herd_size: {type: integer}
+        herd_age_days: {type: [integer, "null"]}
+        dead: {type: integer}
+        symptoms: {type: string}
+        sample_date: {type: [string, "null"], format: date}
+        lab_name: {type: [string, "null"]}
+        lab_result: {type: [string, "null"]}
+        culled_head: {type: [integer, "null"]}
+        culled_kg: {type: [string, "null"]}
+        chemical_liters: {type: [string, "null"]}
+        buffer_note: {type: [string, "null"]}
+        prevention_note: {type: [string, "null"]}
+        attachment_refs: {type: array, items: {type: string, format: uuid}}
+        as_of: {type: string, format: date}
+        progress_note: {type: [string, "null"]}
+        status_reason: {type: [string, "null"]}
+        captured_at: {type: [string, "null"], format: date-time}
+        recorded_at: {type: string, format: date-time}
+        actor: {$ref: "#/components/schemas/KhtcActor"}
+# @ag-order: 952
+    CNTSCount:
+      type: object
+      required: [key, label, count]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        count: {type: integer}
+# @ag-order: 953
+    CNTSOutbreakList:
+      type: object
+      required: [items, by_status, by_disease]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/CNTSOutbreak"}}
+        by_status: {type: array, items: {$ref: "#/components/schemas/CNTSCount"}}
+        by_disease: {type: array, items: {$ref: "#/components/schemas/CNTSCount"}}
+# @ag-order: 954
+    CNTSOutbreakDetail:
+      type: object
+      required: [current, versions]
+      properties:
+        current: {$ref: "#/components/schemas/CNTSOutbreak"}
+        versions: {type: array, items: {$ref: "#/components/schemas/CNTSOutbreak"}}
+# @ag-order: 955
+    CNTSOutbreakPoints:
+      type: object
+      required: [type, features]
+      properties:
+        type: {type: string, enum: [FeatureCollection]}
+        features:
+          type: array
+          items:
+            type: object
+            required: [type, id, geometry, properties]
+            properties:
+              type: {type: string, enum: [Feature]}
+              id: {type: string, format: uuid}
+              geometry:
+                type: object
+                required: [type, coordinates]
+                properties:
+                  type: {type: string, enum: [Point]}
+                  coordinates: {type: array, items: {type: number}, minItems: 2, maxItems: 2, description: "[kinh độ, vĩ độ]"}
+              properties: {type: object, additionalProperties: true}
+# @ag-order: 956
+    CNTSStatusInput:
+      type: object
+      required: [base_version, reason]
+      properties:
+        base_version: {type: integer}
+        reason: {type: string, maxLength: 1000}
+# @ag-order: 957
+    CNTSSuspectInput:
+      type: object
+      required: [commune_code, reporter_kind, observed_at, description]
+      properties:
+        commune_code: {type: string}
+        reporter_kind: {type: string, enum: [nong_ho, ubnd_xa, can_bo]}
+        observed_at: {type: string, format: date-time}
+        species_code: {type: string}
+        disease_code: {type: string, description: Bệnh nghi ngờ (tùy chọn)}
+        household_ref: {type: [string, "null"], format: uuid}
+        locality: {type: string}
+        location: {oneOf: [{$ref: "#/components/schemas/CNTSLocation"}, {type: "null"}]}
+        affected: {type: [integer, "null"]}
+        dead: {type: [integer, "null"]}
+        description: {type: string, maxLength: 2000}
+        attachment_refs: {type: array, maxItems: 10, items: {type: string, format: uuid}}
+        captured_at: {type: string, format: date-time}
+# @ag-order: 958
+    CNTSSuspect:
+      type: object
+      required: [ref, version, version_id, status, commune_code, reporter_kind, observed_at, species_code, disease_code, household_ref,
+        locality, location, affected, dead, description, attachment_refs, outbreak_ref, status_reason, captured_at, recorded_at, actor]
+      properties:
+        ref: {type: string, format: uuid}
+        version: {type: integer}
+        version_id: {type: string, format: uuid}
+        status: {type: string, enum: [reported, confirmed, dismissed]}
+        commune_code: {type: string}
+        reporter_kind: {type: string, enum: [nong_ho, ubnd_xa, can_bo]}
+        observed_at: {type: string, format: date-time}
+        species_code: {type: [string, "null"]}
+        disease_code: {type: [string, "null"]}
+        household_ref: {type: [string, "null"], format: uuid}
+        locality: {type: [string, "null"]}
+        location: {oneOf: [{$ref: "#/components/schemas/CNTSLocation"}, {type: "null"}]}
+        affected: {type: [integer, "null"]}
+        dead: {type: [integer, "null"]}
+        description: {type: string}
+        attachment_refs: {type: array, items: {type: string, format: uuid}}
+        outbreak_ref: {type: [string, "null"], format: uuid}
+        status_reason: {type: [string, "null"]}
+        captured_at: {type: [string, "null"], format: date-time}
+        recorded_at: {type: string, format: date-time}
+        actor: {$ref: "#/components/schemas/KhtcActor"}
+# @ag-order: 959
+    CNTSSuspectDetail:
+      type: object
+      required: [current, versions]
+      properties:
+        current: {$ref: "#/components/schemas/CNTSSuspect"}
+        versions: {type: array, items: {$ref: "#/components/schemas/CNTSSuspect"}}
+    # --- W11.44: tổng hợp CNTS Cấp Tỉnh ---
+# @ag-order: 960
+    CntsKeySpan:
+      type: object
+      required: [key, label, from, to]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+# @ag-order: 961
+    CntsKeyLabel:
+      type: object
+      required: [key, label]
+      properties:
+        key: {type: string}
+        label: {type: string}
+# @ag-order: 962
+    CntsDecMap:
+      type: object
+      additionalProperties: {type: string}
+      description: Khóa → số thập phân (chuỗi)
+# @ag-order: 963
+    CntsSources:
+      type: object
+      required: [count, closed, all_closed]
+      properties:
+        count: {type: integer}
+        closed: {type: integer}
+        all_closed: {type: boolean, description: "Mọi kỳ nguồn của tuần đã chốt (D17) — điều kiện chốt bảng"}
+# @ag-order: 964
+    CntsAggregateAction:
+      type: object
+      required: [form, period_key]
+      properties:
+        form: {type: string, enum: [CNTS-BM02, CNTS-BM18]}
+        period_key: {type: string, description: "BM-02: tuần KSGM YYYY-MM-Kn; BM-18: tuần CNTS YYYY-Www"}
+        reason: {type: string, description: "Bắt buộc khi mở lại (10–500 ký tự)"}
+# @ag-order: 965
+    CntsAggregateState:
+      type: object
+      required: [key, state, close_count, last_at, figures_hash, changed]
+      properties:
+        key: {type: string}
+        state: {type: string, enum: [none, closed, reopened]}
+        close_count: {type: integer}
+        last_at: {type: [string, "null"], format: date-time}
+        figures_hash: {type: [string, "null"]}
+        changed: {type: boolean, description: "Số tính lại từ ảnh chụp nguồn khác số đã chốt — Nguồn đã thay đổi"}
+# @ag-order: 966
+    CntsShare:
+      type: object
+      required: [id, version, at, basis, recipient, channel, note, content_hash, actor_name]
+      properties:
+        id: {type: string, format: uuid}
+        version: {type: integer}
+        at: {type: string, format: date-time}
+        basis: {type: string, enum: [submitted, closed]}
+        recipient: {type: string}
+        channel: {type: string}
+        note: {type: string, description: "Thay đổi so với bản đã gửi ngày … (phiên bản n)"}
+        content_hash: {type: string}
+        actor_name: {type: string}
+# @ag-order: 967
+    CntsShareResult:
+      type: object
+      required: [share, replayed]
+      properties:
+        share: {$ref: "#/components/schemas/CntsShare"}
+        replayed: {type: boolean}
+# @ag-order: 968
+    CntsAdjustment:
+      type: object
+      required: [id, week_key, facility_ref, facility_name, commune_code, deltas, reason, actor_name, at, stale]
+      properties:
+        id: {type: string, format: uuid}
+        week_key: {type: string}
+        facility_ref: {type: string}
+        facility_name: {type: string}
+        commune_code: {type: string}
+        deltas: {$ref: "#/components/schemas/CntsDecMap"}
+        reason: {type: string}
+        actor_name: {type: string}
+        at: {type: string, format: date-time}
+        stale: {type: boolean, description: "BM-01 của tuần đổi sau khi điều chỉnh — cần xem lại"}
+# @ag-order: 969
+    CntsBM02Row:
+      type: object
+      required: [facility_ref, facility_code, facility_name, facility_kind, stamps_gs, stamps_gc, commune_code, commune_name, auto, adjust, total,
+        days_expected, days_reported, missing_days, stale]
+      properties:
+        facility_ref: {type: string}
+        facility_code: {type: string}
+        facility_name: {type: string}
+        facility_kind: {type: string}
+        stamps_gs: {type: array, items: {type: string}}
+        stamps_gc: {type: array, items: {type: string}}
+        commune_code: {type: string}
+        commune_name: {type: string}
+        auto: {$ref: "#/components/schemas/CntsDecMap"}
+        adjust: {$ref: "#/components/schemas/CntsDecMap"}
+        total: {$ref: "#/components/schemas/CntsDecMap"}
+        days_expected: {type: integer}
+        days_reported: {type: integer}
+        missing_days: {type: integer}
+        stale: {type: boolean}
+# @ag-order: 970
+    CntsBM02Commune:
+      type: object
+      required: [commune_code, commune_name, total, facilities]
+      properties:
+        commune_code: {type: string}
+        commune_name: {type: string}
+        total: {$ref: "#/components/schemas/CntsDecMap"}
+        facilities: {type: integer}
+# @ag-order: 971
+    CntsBM02:
+      type: object
+      required: [province, period_type, period_key, label, from, to, prev_key, next_key, basis, weeks, species, rows, communes, auto, adjust, total,
+        sources, units_total, units_reported, adjustments, aggregates, shares]
+      properties:
+        province: {type: string}
+        period_type: {type: string, enum: [ksgm_week, month]}
+        period_key: {type: string}
+        label: {type: string}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        prev_key: {type: string}
+        next_key: {type: string}
+        basis: {type: string, enum: [submitted, closed]}
+        weeks: {type: array, items: {$ref: "#/components/schemas/CntsKeySpan"}}
+        species: {type: array, items: {$ref: "#/components/schemas/CntsKeyLabel"}}
+        rows: {type: array, items: {$ref: "#/components/schemas/CntsBM02Row"}}
+        communes: {type: array, items: {$ref: "#/components/schemas/CntsBM02Commune"}}
+        auto: {$ref: "#/components/schemas/CntsDecMap"}
+        adjust: {$ref: "#/components/schemas/CntsDecMap"}
+        total: {$ref: "#/components/schemas/CntsDecMap"}
+        sources: {$ref: "#/components/schemas/CntsSources"}
+        units_total: {type: integer}
+        units_reported: {type: integer}
+        adjustments: {type: array, items: {$ref: "#/components/schemas/CntsAdjustment"}}
+        aggregates: {type: array, items: {$ref: "#/components/schemas/CntsAggregateState"}}
+        shares: {type: array, items: {$ref: "#/components/schemas/CntsShare"}}
+# @ag-order: 972
+    CntsCols:
+      type: object
+      required: [prev, cur, qtd, ytd]
+      properties:
+        prev: {type: string, description: Tuần trước liền kề}
+        cur: {type: string, description: Trong kỳ báo cáo}
+        qtd: {type: string, description: Lũy kế từ đầu quý (theo ngày cuối tuần)}
+        ytd: {type: string, description: Lũy kế từ đầu năm (theo ngày cuối tuần)}
+# @ag-order: 973
+    CntsColsMap:
+      type: object
+      additionalProperties: {$ref: "#/components/schemas/CntsCols"}
+# @ag-order: 974
+    CntsBM18Commune:
+      type: object
+      required: [commune_code, commune_name, region_code, region_name, cells, expected, reported, nil_report, missing_weeks, by_week]
+      properties:
+        commune_code: {type: string}
+        commune_name: {type: string}
+        region_code: {type: string}
+        region_name: {type: string}
+        cells: {$ref: "#/components/schemas/CntsColsMap"}
+        expected: {type: boolean}
+        reported: {type: boolean}
+        nil_report: {type: boolean}
+        missing_weeks: {type: array, items: {type: string}, description: "Thiếu kỳ (tuần trong năm có kỳ mà xã không nộp — tính 0)"}
+        by_week: {type: object, additionalProperties: {$ref: "#/components/schemas/CntsDecMap"}}
+# @ag-order: 975
+    CntsBM18Region:
+      type: object
+      required: [region_code, region_name, sort, cells]
+      properties:
+        region_code: {type: string}
+        region_name: {type: string}
+        sort: {type: integer}
+        cells: {$ref: "#/components/schemas/CntsColsMap"}
+# @ag-order: 976
+    CntsBM18Aqua:
+      type: object
+      required: [code, label, group, area_unit, output_unit, in_total, area, output, entered_area, entered_output, note]
+      properties:
+        code: {type: string}
+        label: {type: string}
+        group: {type: string}
+        area_unit: {type: string}
+        output_unit: {type: string}
+        in_total: {type: boolean}
+        area: {$ref: "#/components/schemas/CntsCols"}
+        output: {$ref: "#/components/schemas/CntsCols"}
+        entered_area: {type: [string, "null"]}
+        entered_output: {type: [string, "null"]}
+        note: {type: string}
+# @ag-order: 977
+    CntsBM18:
+      type: object
+      required: [province, week, prev, prev_key, next_key, calendar, basis, groups, aqua_groups, weeks, communes, regions, catch, aqua, aqua_area,
+        aqua_output, total, sources, units_total, units_reported, missing_units, aggregate, shares]
+      properties:
+        province: {type: string}
+        week: {$ref: "#/components/schemas/CntsKeySpan"}
+        prev: {oneOf: [{$ref: "#/components/schemas/CntsKeySpan"}, {type: "null"}]}
+        prev_key: {type: string}
+        next_key: {type: string}
+        calendar: {type: string, description: "Lịch tuần (D8), vd chan_nuoi_thuy_san:v3"}
+        basis: {type: string, enum: [submitted, closed]}
+        groups: {type: array, items: {$ref: "#/components/schemas/CntsKeyLabel"}}
+        aqua_groups: {type: array, items: {$ref: "#/components/schemas/CntsKeyLabel"}}
+        weeks: {type: array, items: {$ref: "#/components/schemas/CntsKeySpan"}}
+        communes: {type: array, items: {$ref: "#/components/schemas/CntsBM18Commune"}}
+        regions: {type: array, items: {$ref: "#/components/schemas/CntsBM18Region"}}
+        catch: {$ref: "#/components/schemas/CntsColsMap"}
+        aqua: {type: array, items: {$ref: "#/components/schemas/CntsBM18Aqua"}}
+        aqua_area: {$ref: "#/components/schemas/CntsCols"}
+        aqua_output: {$ref: "#/components/schemas/CntsCols"}
+        total: {$ref: "#/components/schemas/CntsCols"}
+        sources: {$ref: "#/components/schemas/CntsSources"}
+        units_total: {type: integer}
+        units_reported: {type: integer}
+        missing_units: {type: array, items: {type: string}}
+        aggregate: {$ref: "#/components/schemas/CntsAggregateState"}
+        shares: {type: array, items: {$ref: "#/components/schemas/CntsShare"}}
+    # --- pf/price (W11.71) ---
+# @ag-order: 1066
+    KhtcCatalogKind: {type: string, enum: [report_type, unit, field, funding_source, signer, recipient, basis], description: "Mặt hàng giá cả ở cap/price (Q-082)"}
+# @ag-order: 1067
+    KhtcActor:
+      type: object
+      required: [ref, display]
+      properties:
+        ref: {type: string, format: uuid}
+        display: {type: [string, "null"]}
+# @ag-order: 1068
+    KhtcCatalogInput:
+      type: object
+      required: [name]
+      properties:
+        code: {type: string, description: "Chỉ khi thêm; a-z, 0-9, dấu chấm, gạch dưới, gạch ngang (đưa về chữ thường)"}
+        name: {type: string}
+        sort_order: {type: integer, minimum: 0}
+        active: {type: boolean, description: "false = ngừng dùng"}
+        default_for: {type: array, items: {type: string}, description: "mau_1…mau_5 — chỉ người ký, nơi nhận, căn cứ"}
+        attrs: {type: object, additionalProperties: {type: string}, description: "signer: title, authority; unit: symbol; basis: document_no, date; recipient: address"}
+# @ag-order: 1069
+    KhtcCatalogItem:
+      type: object
+      required: [kind, code, name, sort_order, active, default_for, attrs, version, version_id, recorded_at, actor]
+      properties:
+        kind: {$ref: "#/components/schemas/KhtcCatalogKind"}
+        code: {type: string}
+        name: {type: string}
+        sort_order: {type: integer}
+        active: {type: boolean}
+        default_for: {type: array, items: {type: string}}
+        attrs: {type: object, additionalProperties: {type: string}}
+        version: {type: integer}
+        version_id: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+        actor: {$ref: "#/components/schemas/KhtcActor"}
+# @ag-order: 1070
+    KhtcProgramKind: {type: string, enum: [program, project, central_project, cooperation, research, advisory]}
+# @ag-order: 1071
+    KhtcProgramInput:
+      type: object
+      required: [code, name, kind]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        kind: {$ref: "#/components/schemas/KhtcProgramKind"}
+        field_code: {type: string}
+        owner_department: {type: string}
+        start_year: {type: integer}
+        end_year: {type: integer}
+        active: {type: boolean}
+        note: {type: string}
+# @ag-order: 1072
+    KhtcProgram:
+      type: object
+      required: [ref, code, name, kind, field_code, owner_department, start_year, end_year, active, note, version, recorded_at, actor]
+      properties:
+        ref: {type: string, format: uuid, description: "Định danh bền (module khác tham chiếu — D20)"}
+        code: {type: string}
+        name: {type: string}
+        kind: {$ref: "#/components/schemas/KhtcProgramKind"}
+        field_code: {type: [string, "null"]}
+        owner_department: {type: [string, "null"]}
+        start_year: {type: [integer, "null"]}
+        end_year: {type: [integer, "null"]}
+        active: {type: boolean}
+        note: {type: [string, "null"]}
+        version: {type: integer}
+        recorded_at: {type: string, format: date-time}
+        actor: {$ref: "#/components/schemas/KhtcActor"}
+# @ag-order: 1073
+    KhtcPlanTab: {type: string, enum: [programs, prev_year, central_project, cooperation, research, advisory]}
+# @ag-order: 1074
+    KhtcPlanEntryInput:
+      type: object
+      required: [ref, tab, kind]
+      properties:
+        ref: {type: string, format: uuid}
+        tab: {$ref: "#/components/schemas/KhtcPlanTab"}
+        kind: {type: string, enum: [program, group, item]}
+        parent_ref: {type: [string, "null"], format: uuid}
+        program_ref: {type: [string, "null"], format: uuid}
+        sort_order: {type: integer}
+        code: {type: string}
+        name: {type: string, description: "Dòng CT/DA để trống → tên trong danh sách chủ"}
+        unit_code: {type: string}
+        planned_qty: {type: [string, "null"], description: "Thập phân dạng chuỗi, ≤ 4 chữ số lẻ"}
+        scale_note: {type: string}
+        budget: {type: [string, "null"], description: "Kinh phí KH (đồng), ≤ 2 chữ số lẻ"}
+        funding_code: {type: string}
+        field_code: {type: string}
+        department_code: {type: string, description: "Hạng mục: bắt buộc, đúng một phòng phụ trách"}
+        communes: {type: array, items: {type: string}}
+        points_count: {type: [integer, "null"]}
+        data_source: {type: string, enum: ["", form, module]}
+        source_key: {type: string}
+        tracking: {type: string, enum: ["", tracking, stopped]}
+        stopped_from: {type: [string, "null"], format: date}
+        stop_decision: {type: string}
+        note: {type: string}
+# @ag-order: 1075
+    KhtcPlanEntry:
+      type: object
+      required: [ref, tab, kind, parent_ref, program_ref, program_code, program_name, roman, sort_order, code, name, unit_code, planned_qty, scale_note, budget, funding_code, field_code, department_code, communes, points_count, data_source, source_key, tracking, stopped_from, stop_decision, note]
+      properties:
+        ref: {type: string, format: uuid}
+        tab: {$ref: "#/components/schemas/KhtcPlanTab"}
+        kind: {type: string, enum: [program, group, item]}
+        parent_ref: {type: [string, "null"], format: uuid}
+        program_ref: {type: [string, "null"], format: uuid}
+        program_code: {type: [string, "null"]}
+        program_name: {type: [string, "null"]}
+        roman: {type: [string, "null"], description: "Số La Mã của CT ở tab Các chương trình (BR-DL-21)"}
+        sort_order: {type: integer}
+        code: {type: [string, "null"]}
+        name: {type: string}
+        unit_code: {type: [string, "null"]}
+        planned_qty: {type: [string, "null"]}
+        scale_note: {type: [string, "null"]}
+        budget: {type: [string, "null"]}
+        funding_code: {type: [string, "null"]}
+        field_code: {type: [string, "null"]}
+        department_code: {type: [string, "null"]}
+        communes: {type: array, items: {type: string}}
+        points_count: {type: [integer, "null"]}
+        data_source: {type: [string, "null"], enum: [form, module, null]}
+        source_key: {type: [string, "null"]}
+        tracking: {type: string, enum: [tracking, stopped]}
+        stopped_from: {type: [string, "null"], format: date}
+        stop_decision: {type: [string, "null"]}
+        note: {type: [string, "null"]}
+# @ag-order: 1076
+    KhtcPlanVersion:
+      type: object
+      required: [id, year, version, basis, decision_no, decision_date, effective_from, copied_from_year, note, entries_count, recorded_at, actor]
+      properties:
+        id: {type: string, format: uuid}
+        year: {type: integer}
+        version: {type: integer}
+        basis: {type: string, enum: [initial, adjust]}
+        decision_no: {type: [string, "null"]}
+        decision_date: {type: [string, "null"], format: date}
+        effective_from: {type: string, format: date}
+        copied_from_year: {type: [integer, "null"]}
+        note: {type: [string, "null"]}
+        entries_count: {type: integer}
+        recorded_at: {type: string, format: date-time}
+        actor: {$ref: "#/components/schemas/KhtcActor"}
+# @ag-order: 1077
+    KhtcPlan:
+      type: object
+      required: [year, version, latest_version, entries]
+      properties:
+        year: {type: integer}
+        version: {$ref: "#/components/schemas/KhtcPlanVersion"}
+        latest_version: {type: integer}
+        entries: {type: array, items: {$ref: "#/components/schemas/KhtcPlanEntry"}}
+# @ag-order: 1078
+    KhtcPlanSave:
+      type: object
+      required: [base_version, entries]
+      properties:
+        base_version: {type: integer, minimum: 0, description: "Phiên bản mới nhất đang sửa (0 = chưa có) — khóa lạc quan"}
+        decision_no: {type: string}
+        decision_date: {type: string, format: date}
+        effective_from: {type: string, format: date, description: "Vắng ở phiên bản 1 = 01/01"}
+        copied_from_year: {type: integer}
+        note: {type: string}
+        entries: {type: array, items: {$ref: "#/components/schemas/KhtcPlanEntryInput"}}
+# @ag-order: 1079
+    KhtcPlanDraft:
+      type: object
+      required: [from_year, from_version, entries, problems]
+      properties:
+        from_year: {type: [integer, "null"]}
+        from_version: {type: [integer, "null"]}
+        entries: {type: array, items: {$ref: "#/components/schemas/KhtcPlanEntry"}}
+        problems:
+          type: array
+          items:
+            type: object
+            required: [row, field, reason]
+            properties:
+              row: {type: [integer, "null"]}
+              field: {type: string}
+              reason: {type: string}
+    # --- pf/extension Kỳ KHTC (W11.62) ---
+# @ag-order: 1080
+    KHTCWeek:
+      type: object
+      required: ["no", from_date, to_date]
+      properties:
+        "no": {type: integer}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+# @ag-order: 1081
+    KHTCFormTemplate:
+      type: object
+      required: [code, version, title, installed]
+      properties:
+        code: {type: string}
+        version: {type: integer}
+        title: {type: string}
+        installed: {type: boolean}
+# @ag-order: 1082
+    KHTCReason:
+      type: object
+      properties:
+        reason: {type: string, description: "10–500 ký tự; bắt buộc khi hủy kỳ và khi đóng kỳ còn thiếu dữ liệu"}
+# @ag-order: 1083
+    KHTCSourceSnapshot:
+      type: object
+      description: Một lần "Cập nhật số liệu" (W11.64) — bất biến.
+      required: [id, no, taken_at, actor_ref, closed, target_calendar, crosswalk_version, plan_version_id, figures_hash, status_hash, row_count, value_count, change_count]
+      properties:
+        id: {type: string, format: uuid}
+        no: {type: integer, format: int64, description: Số thứ tự ảnh chụp của kỳ}
+        taken_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        actor_name: {type: string}
+        closed: {type: boolean, description: Mọi phòng nguồn đã chốt cho mọi tuần của kỳ (D17)}
+        target_calendar: {type: string, description: "Lịch KHTC (D8), vd ke_hoach_tai_chinh:v2"}
+        crosswalk_version: {type: string}
+        plan_version_id: {type: string, format: uuid, nullable: true}
+        figures_hash: {type: string}
+        status_hash: {type: string}
+        row_count: {type: integer}
+        value_count: {type: integer}
+        change_count: {type: integer}
+# @ag-order: 1084
+    KHTCSourceAsOf:
+      type: object
+      description: Mốc dữ liệu của một nguồn (phòng × biểu).
+      required: [department, source_module, form_code, native_keys, closed_at, snapshot_no, closed, missing, unavailable, fallback, confirmation]
+      properties:
+        department: {type: string}
+        source_module: {type: string}
+        form_code: {type: string, nullable: true, description: "null: phòng không có số (Missing) hoặc nguồn chưa công bố"}
+        native_keys: {type: array, items: {type: string}, description: Khóa kỳ nguồn theo lịch của nguồn}
+        closed_at: {type: string, format: date-time, nullable: true}
+        snapshot_no: {type: integer, format: int64, nullable: true}
+        closed: {type: boolean}
+        missing: {type: boolean}
+        unavailable: {type: boolean}
+        fallback: {type: boolean, description: "Giá: ngày đã duyệt gần nhất trước kỳ (D22)"}
+        confirmation: {type: string, enum: [confirmed, unconfirmed]}
+# @ag-order: 1085
+    KHTCSourceEntry:
+      type: object
+      required: [ref, code, name]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+# @ag-order: 1086
+    KHTCSourceValue:
+      type: object
+      description: Số của một khóa nguồn module (hạng mục Kế hoạch năm) trong ảnh chụp — lũy kế của nguồn (D18), giá min/max toàn tỉnh (D22).
+      required: [source_key, entries, mode, invalid, cumulative, base, increment, year_to_date, sum, price_min, price_max, price_day, price_days, unconfirmed, closed, provisional, no_source, frozen, source_changed, fallback, unavailable, source_keys]
+      properties:
+        source_key: {type: string}
+        entries: {type: array, items: {$ref: "#/components/schemas/KHTCSourceEntry"}}
+        mode: {type: string, description: "cum | season | sum | price (rỗng khi khóa sai dạng)"}
+        invalid: {type: boolean, description: Khóa nguồn sai dạng — hạng mục không có số}
+        cumulative: {type: string, nullable: true}
+        base: {type: string, nullable: true}
+        base_ref: {type: string, description: "frozen:<tuần> | current:<tuần> | reset | start"}
+        increment: {type: string, nullable: true}
+        year_to_date: {type: string, nullable: true}
+        sum: {type: string, nullable: true}
+        price_min: {type: string, nullable: true}
+        price_max: {type: string, nullable: true}
+        price_day: {type: string, format: date, nullable: true}
+        price_days:
+          type: array
+          items:
+            type: object
+            required: [day, min, max]
+            properties:
+              day: {type: string, format: date}
+              min: {type: string}
+              max: {type: string}
+        unconfirmed: {type: string, nullable: true, description: "Phần Chưa xác nhận (D2), đã tính trong tổng"}
+        closed: {type: boolean}
+        provisional: {type: boolean, description: Tạm tính (BR-DL-03)}
+        no_source: {type: boolean}
+        frozen: {type: boolean}
+        source_changed: {type: boolean}
+        fallback: {type: boolean}
+        unavailable: {type: boolean}
+        source_keys: {type: array, items: {type: string}}
+# @ag-order: 1087
+    KHTCSourceChange:
+      type: object
+      description: Kỳ nguồn khác ảnh chụp ("Nguồn đã thay đổi" — chỉ cảnh báo).
+      required: [kind, target_key, department, source_module, form_code, native_key, closed_at, was_closed_at]
+      properties:
+        kind: {type: string, enum: [added, removed, figures]}
+        target_key: {type: string}
+        department: {type: string}
+        source_module: {type: string}
+        form_code: {type: string}
+        native_key: {type: string}
+        closed_at: {type: string, format: date-time, nullable: true}
+        was_closed_at: {type: string, format: date-time, nullable: true}
+# @ag-order: 1088
+    KHTCSourceStatus:
+      type: object
+      required: [period_id, owner_ref, terminal, can_refresh, source_changed, live, snapshot, as_of, values, changes]
+      properties:
+        period_id: {type: string, format: uuid}
+        owner_ref: {type: string, format: uuid, description: Cán bộ KHTC phụ trách kỳ (người mở kỳ — ⚑3)}
+        owner_name: {type: string}
+        terminal: {type: string, nullable: true, description: "closed | cancelled; null khi kỳ chưa đóng/hủy"}
+        can_refresh: {type: boolean}
+        source_changed: {type: boolean}
+        live: {type: boolean, description: Mốc dữ liệu đọc từ port (chưa có ảnh chụp)}
+        live_error: {type: string}
+        snapshot: {allOf: [{$ref: "#/components/schemas/KHTCSourceSnapshot"}], nullable: true}
+        as_of: {type: array, items: {$ref: "#/components/schemas/KHTCSourceAsOf"}}
+        values: {type: array, items: {$ref: "#/components/schemas/KHTCSourceValue"}}
+        changes: {type: array, items: {$ref: "#/components/schemas/KHTCSourceChange"}}
+# @ag-order: 1089
+    KHTCSourceHistoryItem:
+      type: object
+      required: [snapshot, changes]
+      properties:
+        snapshot: {$ref: "#/components/schemas/KHTCSourceSnapshot"}
+        changes:
+          type: array
+          items:
+            type: object
+            required: [source_key, entries, field, old, new]
+            properties:
+              source_key: {type: string}
+              entries: {type: array, items: {$ref: "#/components/schemas/KHTCSourceEntry"}}
+              field: {type: string, enum: [cumulative, increment, sum, price_min, price_max]}
+              old: {type: string, nullable: true}
+              new: {type: string, nullable: true}
+# @ag-order: 1090
+    KHTCOpenInput:
+      type: object
+      required: [report_type]
+      properties:
+        report_type: {type: string, enum: [week, month, quarter, year, program, adhoc]}
+        year: {type: integer, description: Năm (năm kế hoạch với program)}
+        "no": {type: integer, description: "Tuần 1–52/53, tháng 1–12, quý 1–4"}
+        scope: {type: string, enum: [quarter, half, nine_months], description: "Phạm vi báo cáo quý (6 tháng: quý II; 9 tháng: quý III)"}
+        as_of_date: {type: string, format: date, description: "program (Mẫu 5): Đến ngày"}
+        name: {type: string, description: "adhoc: tên báo cáo"}
+        from_date: {type: string, format: date, description: "adhoc: từ ngày"}
+        to_date: {type: string, format: date, description: "adhoc: đến ngày"}
+        cutoff_date: {type: string, format: date, description: Ngày chốt (bỏ trống = mặc định)}
+        due_at: {type: string, format: date-time, description: "Hạn nộp phiếu (bỏ trống = mặc định; bắt buộc với program, adhoc)"}
+        export_due_at: {type: string, format: date-time}
+        departments: {type: array, items: {type: string}, description: "Phòng tham gia (bỏ trống = theo Kế hoạch năm, hoặc mọi phòng đang áp dụng trừ KHTC)"}
+# @ag-order: 1091
+    KHTCDept:
+      type: object
+      required: [code, name]
+      properties:
+        code: {type: string}
+        name: {type: string}
+# @ag-order: 1092
+    KHTCSource:
+      type: object
+      required: [department, source, calendar_id, calendar_version, native_key, label, known, closed, closed_at]
+      properties:
+        department: {type: string}
+        source: {type: string}
+        calendar_id: {type: string}
+        calendar_version: {type: string}
+        native_key: {type: string, description: Khóa kỳ theo lịch của nguồn}
+        label: {type: string}
+        known: {type: boolean, description: Đọc được trạng thái chốt}
+        closed: {type: boolean}
+        closed_at: {type: [string, "null"], format: date-time}
+# @ag-order: 1093
+    KHTCDraft:
+      type: object
+      required: [report_type, year, "no", scope, period_key, name, from_date, to_date, cutoff_date, due_at, export_due_at, max_submissions,
+        departments, due_required, plan_departments, departments_loaded, sources, sources_linked, duplicate, template_version]
+      properties:
+        report_type: {type: string}
+        year: {type: integer}
+        "no": {type: [integer, "null"]}
+        scope: {type: [string, "null"]}
+        period_key: {type: [string, "null"]}
+        name: {type: string}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        cutoff_date: {type: string, format: date}
+        due_at: {type: string, format: date-time}
+        export_due_at: {type: string, format: date-time}
+        max_submissions: {type: integer, description: "Số lần gửi tối đa (Q-081: 3, chỉ đọc)"}
+        departments: {type: array, items: {$ref: "#/components/schemas/KHTCDept"}}
+        due_required: {type: boolean}
+        plan_departments: {type: boolean}
+        departments_loaded: {type: boolean}
+        sources: {type: array, items: {$ref: "#/components/schemas/KHTCSource"}}
+        sources_linked: {type: boolean, description: Bộ quy đổi kỳ nguồn đã nối}
+        duplicate:
+          oneOf:
+            - {type: "null"}
+            - type: object
+              required: [id, name]
+              properties:
+                id: {type: string, format: uuid}
+                name: {type: string}
+        template_version: {type: integer, description: "0 = phiếu cơ sở chưa cài"}
+# @ag-order: 1094
+    KHTCForm:
+      type: object
+      required: [department, department_name, state, state_label, attempt, limit_reached, can_request_supplement, can_confirm,
+        last_submitted_at, reviewed_at, review_note, late]
+      properties:
+        department: {type: string}
+        department_name: {type: string}
+        state: {type: string, enum: [not_started, draft, late, submitted, supplement, confirmed, locked, not_sent, withdrawn, not_available]}
+        state_label: {type: string}
+        attempt: {type: integer}
+        limit_reached: {type: boolean}
+        can_request_supplement: {type: boolean}
+        can_confirm: {type: boolean}
+        last_submitted_at: {type: [string, "null"], format: date-time}
+        reviewed_at: {type: [string, "null"], format: date-time}
+        review_note: {type: string}
+        late: {type: boolean}
+# @ag-order: 1095
+    KHTCDepartmentForm:
+      type: object
+      description: Một phiếu KHTC của phòng trong một kỳ (W11.11, FN-PN-03.01)
+      required: [period_id, forms_period_id, report_type, report_type_label, year, name, from_date, to_date, due_at, period_state,
+        period_state_label, state, state_label, attempt, max_submissions, limit_reached, late, last_submitted_at, reviewed_at,
+        supplement_note, needs_action, action, action_label, entry_route]
+      properties:
+        period_id: {type: string, format: uuid, description: Id kỳ KHTC}
+        forms_period_id: {type: string, format: uuid, description: Id kỳ native cap/forms (gửi phiếu qua /v1/forms)}
+        report_type: {type: string, enum: [week, month, quarter, year, program, adhoc]}
+        report_type_label: {type: string}
+        year: {type: integer}
+        name: {type: string}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        due_at: {type: string, format: date-time, description: Hạn nộp hiệu lực}
+        period_state: {type: string, enum: [opened, late, closed], description: "Kỳ còn nhận phiếu (opened/late) hay đã đóng"}
+        period_state_label: {type: string}
+        state: {type: string, enum: [not_started, draft, late, submitted, supplement, confirmed, locked, not_sent]}
+        state_label: {type: string}
+        attempt: {type: integer, description: Lần gửi hiện hành (0 = chưa gửi)}
+        max_submissions: {type: integer, description: Số lần gửi tối đa (0 = không giới hạn)}
+        limit_reached: {type: boolean}
+        late: {type: boolean, description: Lần gửi cuối sau hạn}
+        last_submitted_at: {type: [string, "null"], format: date-time}
+        reviewed_at: {type: [string, "null"], format: date-time}
+        supplement_note: {type: [string, "null"], description: Nội dung yêu cầu bổ sung mới nhất (chỉ khi state = supplement)}
+        needs_action: {type: boolean, description: "Thuộc bộ lọc \"Cần xử lý\""}
+        action: {type: string, enum: [enter, continue, resubmit, view]}
+        action_label: {type: string}
+        entry_route: {type: string, description: "Màn nhập/xem phiếu của web-ops (W11.63): /kn/khtc/phieu/{period_id}[?department=]"}
+# @ag-order: 1096
+    KHTCDepartmentForms:
+      type: object
+      required: [department, department_name, view, read_only, counts, items]
+      properties:
+        department: {type: string}
+        department_name: {type: string}
+        view: {type: string, enum: [current, sent]}
+        read_only: {type: boolean, description: Phiên chỉ xem — mọi nút là Xem}
+        counts:
+          type: object
+          required: [total, needs_action, supplement, late, sent]
+          properties:
+            total: {type: integer}
+            needs_action: {type: integer}
+            supplement: {type: integer}
+            late: {type: integer}
+            sent: {type: integer}
+        items: {type: array, items: {$ref: "#/components/schemas/KHTCDepartmentForm"}}
+# @ag-order: 1097
+    KHTCEvent:
+      type: object
+      required: [id, action, forced, reason, due_at, export_due_at, state, actor_ref, at]
+      properties:
+        id: {type: string, format: uuid}
+        action: {type: string, enum: [deadline_changed, closed, cancelled]}
+        forced: {type: boolean}
+        reason: {type: [string, "null"]}
+        due_at: {type: [string, "null"], format: date-time}
+        export_due_at: {type: [string, "null"], format: date-time}
+        state: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        at: {type: string, format: date-time}
+# @ag-order: 1098
+    KHTCPeriod:
+      type: object
+      required: [id, report_type, year, "no", scope, period_key, name, from_date, to_date, cutoff_date, due_at, export_due_at, max_submissions,
+        departments, forms_period_id, forms_status, template_code, period_rule, state, state_label, overdue, counts, forms, sources, events,
+        can_close, close_forced, can_cancel, close_late_days, opened_at, opened_by]
+      properties:
+        id: {type: string, format: uuid}
+        report_type: {type: string}
+        year: {type: integer}
+        "no": {type: [integer, "null"]}
+        scope: {type: [string, "null"]}
+        period_key: {type: [string, "null"]}
+        name: {type: string}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        cutoff_date: {type: string, format: date}
+        due_at: {type: string, format: date-time, description: Hạn nộp hiệu lực (sau Sửa hạn nộp)}
+        export_due_at: {type: string, format: date-time}
+        max_submissions: {type: integer}
+        departments: {type: array, items: {$ref: "#/components/schemas/KHTCDept"}}
+        forms_period_id: {type: string, format: uuid, description: Kỳ native cap/forms (profile kn_khtc)}
+        forms_status: {type: string}
+        template_code: {type: string}
+        period_rule: {type: string}
+        state: {type: string, enum: [draft, opened, collecting, late, complete, closed, cancelled]}
+        state_label: {type: string}
+        overdue: {type: boolean}
+        counts:
+          type: object
+          required: [forms, forms_sent, sources, sources_closed]
+          properties:
+            forms: {type: integer}
+            forms_sent: {type: integer}
+            sources: {type: integer}
+            sources_closed: {type: integer}
+        forms: {type: array, items: {$ref: "#/components/schemas/KHTCForm"}}
+        sources: {type: array, items: {$ref: "#/components/schemas/KHTCSource"}}
+        events: {type: array, items: {$ref: "#/components/schemas/KHTCEvent"}}
+        can_close: {type: boolean}
+        close_forced: {type: boolean, description: Đóng ngoại lệ (cần lý do)}
+        can_cancel: {type: boolean}
+        close_late_days: {type: integer}
+        opened_at: {type: string, format: date-time}
+        opened_by: {type: string, format: uuid}
+    # --- pf/extension phiếu Báo cáo cho KHTC (W11.63) ---
+# @ag-order: 1099
+    KHTCFormColumn:
+      type: object
+      required: [letter, title, kind, dtype]
+      properties:
+        letter: {type: string}
+        title: {type: string}
+        kind: {type: string, enum: [fixed, from_plan, prior_cumulative, input, formula]}
+        dtype: {type: string, enum: [number, integer, text]}
+        unit: {type: string}
+        source: {type: string}
+        input: {type: string, enum: [done, status, content, people, budget]}
+        formula: {type: string, enum: [adjust, cumulative, percent]}
+        required: {type: boolean}
+        non_negative: {type: boolean}
+        note: {type: string}
+# @ag-order: 1100
+    KHTCFormSection:
+      type: object
+      required: [key, title]
+      properties:
+        key: {type: string}
+        title: {type: string}
+        required: {type: boolean}
+# @ag-order: 1101
+    KHTCFormSheetTemplate:
+      type: object
+      required: [code, version, department, title, requirements, columns, sections]
+      properties:
+        code: {type: string}
+        version: {type: integer}
+        department: {type: string}
+        title: {type: string}
+        requirements: {type: string}
+        columns: {type: array, items: {$ref: "#/components/schemas/KHTCFormColumn"}}
+        sections: {type: array, items: {$ref: "#/components/schemas/KHTCFormSection"}}
+# @ag-order: 1102
+    KHTCFormCell:
+      type: object
+      properties:
+        done: {type: string, description: Thực hiện trong kỳ (số thập phân, không âm)}
+        status: {type: string}
+        content: {type: string}
+        people: {type: string}
+        budget: {type: string}
+# @ag-order: 1103
+    KHTCFormAdjustment:
+      type: object
+      required: [entry_ref, period_id, amount, reason]
+      properties:
+        entry_ref: {type: string}
+        period_id: {type: string, description: Kỳ KHTC tuần đã khóa được điều chỉnh}
+        period_year: {type: integer}
+        period_name: {type: string}
+        amount: {type: string, description: "Dương: phần chưa báo cáo; âm: phần ghi thừa"}
+        reason: {type: string}
+# @ag-order: 1104
+    KHTCFormContent:
+      type: object
+      required: [cells, adjustments, texts]
+      properties:
+        cells: {type: object, additionalProperties: {$ref: "#/components/schemas/KHTCFormCell"}}
+        adjustments: {type: array, items: {$ref: "#/components/schemas/KHTCFormAdjustment"}}
+        texts: {type: object, additionalProperties: {type: string}}
+# @ag-order: 1105
+    KHTCFormSaveInput:
+      type: object
+      required: [sheet, base_attempt]
+      properties:
+        sheet: {$ref: "#/components/schemas/KHTCFormContent"}
+        base_attempt: {type: integer, description: Số lần đã gửi người nhập thấy khi mở phiếu (khóa lạc quan)}
+# @ag-order: 1106
+    KHTCFormIssue:
+      type: object
+      required: [rule, severity, adjustment, message]
+      properties:
+        rule: {type: string, enum: [template, negative_reason, over_plan]}
+        severity: {type: string, enum: [error, warning]}
+        entry_ref: {type: string}
+        letter: {type: string}
+        adjustment: {type: integer, description: "Chỉ số dòng điều chỉnh; -1 = không"}
+        section: {type: string}
+        message: {type: string}
+# @ag-order: 1107
+    KHTCFormRow:
+      type: object
+      required: [entry_ref, "no", code, name, unit, planned_qty, scale_note, module_sourced, source_key, cells, over_plan]
+      properties:
+        entry_ref: {type: string}
+        "no": {type: integer}
+        code: {type: string}
+        name: {type: string}
+        unit: {type: string}
+        planned_qty: {type: [string, "null"]}
+        scale_note: {type: string}
+        module_sourced: {type: boolean, description: "Nguồn module (BR-DL-10) — không có ô nhập"}
+        module_filled: {type: boolean, description: "Đã có số từ Cập nhật số liệu (W11.64) — ô F, H, I của hạng mục nguồn module"}
+        module_provisional: {type: boolean, description: "Số nguồn module Tạm tính — nguồn chưa chốt (BR-DL-03)"}
+        source_key: {type: string}
+        cells: {type: object, additionalProperties: {type: string}, description: Ô hệ thống theo chữ cái cột}
+        over_plan: {type: boolean}
+# @ag-order: 1108
+    KHTCFormTab:
+      type: object
+      required: [key, label, plan, rows]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        plan: {type: string}
+        rows: {type: array, items: {$ref: "#/components/schemas/KHTCFormRow"}}
+# @ag-order: 1109
+    KHTCFormSheet:
+      type: object
+      required: [period, department, department_name, state, state_label, attempt, limit_reached, can_request_supplement, can_confirm,
+        can_review, editable, overdue, request_note, template, grid, plan_missing, plan, tabs, content, content_source, draft_at, valid,
+        issues, adj_periods, submissions]
+      properties:
+        period:
+          type: object
+          required: [id, name, report_type, year, from_date, to_date, cutoff_date, due_at, max_submissions, terminal]
+          properties:
+            id: {type: string, format: uuid}
+            name: {type: string}
+            report_type: {type: string}
+            year: {type: integer}
+            from_date: {type: string, format: date}
+            to_date: {type: string, format: date}
+            cutoff_date: {type: string, format: date}
+            due_at: {type: string, format: date-time}
+            max_submissions: {type: integer}
+            terminal: {type: string, description: "rỗng | closed | cancelled"}
+        department: {type: string}
+        department_name: {type: string}
+        state: {type: string, enum: [not_started, draft, late, submitted, supplement, confirmed, locked, not_sent, withdrawn, not_available]}
+        state_label: {type: string}
+        attempt: {type: integer}
+        limit_reached: {type: boolean}
+        can_request_supplement: {type: boolean}
+        can_confirm: {type: boolean}
+        can_review: {type: boolean}
+        editable: {type: boolean}
+        overdue: {type: boolean}
+        request_note: {type: string}
+        template: {$ref: "#/components/schemas/KHTCFormSheetTemplate"}
+        grid: {type: boolean, description: "Phiếu tuần có lưới hạng mục (tháng/quý/năm chỉ lời văn — BR-DL-06)"}
+        plan_missing: {type: boolean}
+        plan:
+          oneOf:
+            - {type: "null"}
+            - type: object
+              required: [version, decision_no, effective_from, version_id, decision_date]
+              properties:
+                version: {type: integer}
+                decision_no: {type: string}
+                effective_from: {type: string, format: date}
+                version_id: {type: string, format: uuid}
+                decision_date: {type: [string, "null"], format: date}
+        tabs: {type: array, items: {$ref: "#/components/schemas/KHTCFormTab"}}
+        content: {$ref: "#/components/schemas/KHTCFormContent"}
+        content_source: {type: string, enum: [draft, submitted, empty]}
+        draft_at: {type: [string, "null"], format: date-time}
+        valid: {type: boolean}
+        issues: {type: array, items: {$ref: "#/components/schemas/KHTCFormIssue"}}
+        adj_periods:
+          type: array
+          items:
+            type: object
+            required: [id, name, year]
+            properties:
+              id: {type: string, format: uuid}
+              name: {type: string}
+              year: {type: integer}
+        submissions:
+          type: array
+          items:
+            type: object
+            required: [id, attempt, submitted_at, late, decision, review_note, reviewed_at]
+            properties:
+              id: {type: string, format: uuid}
+              attempt: {type: integer}
+              submitted_at: {type: string, format: date-time}
+              late: {type: boolean}
+              decision: {type: string}
+              review_note: {type: string}
+              reviewed_at: {type: [string, "null"], format: date-time}
+# @ag-order: 1110
+    KHTCFormTask:
+      type: object
+      required: [period_id, name, report_type, year, from_date, to_date, due_at, overdue, state, state_label, attempt, max_submissions,
+        limit_reached, request_note, last_submitted_at, late, actionable]
+      properties:
+        period_id: {type: string, format: uuid}
+        name: {type: string}
+        report_type: {type: string}
+        year: {type: integer}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        due_at: {type: string, format: date-time}
+        overdue: {type: boolean}
+        state: {type: string, enum: [not_started, draft, late, submitted, supplement, confirmed, locked, not_sent, withdrawn, not_available]}
+        state_label: {type: string}
+        attempt: {type: integer}
+        max_submissions: {type: integer}
+        limit_reached: {type: boolean}
+        request_note: {type: string}
+        last_submitted_at: {type: [string, "null"], format: date-time}
+        late: {type: boolean}
+        actionable: {type: boolean, description: "Cần xử lý: Chưa nhập, Lưu nháp (nút Tiếp tục), Trễ hạn, Yêu cầu bổ sung"}

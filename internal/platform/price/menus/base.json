@@ -1,0 +1,12 @@
+{
+  "id": "price-menus",
+  "order": 2,
+  "tables": {
+    "menuDeptModules": {
+      "/bao-gia-lich": "pf/price"
+    },
+    "menuModules": {
+      "/kn/bao-gia": "pf/price"
+    }
+  }
+}

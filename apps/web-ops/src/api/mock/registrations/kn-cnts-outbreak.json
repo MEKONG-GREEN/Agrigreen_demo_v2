@@ -1,0 +1,11 @@
+{
+  "id": "kn-cnts-outbreak",
+  "source": "./kn-cnts-outbreak",
+  "app": [
+    {
+      "export": "cntsOutbreakRoutes",
+      "order": 18
+    }
+  ],
+  "admin": []
+}

@@ -1,0 +1,11 @@
+{
+  "id": "roster",
+  "source": "./roster",
+  "app": [
+    {
+      "export": "rosterRoutes",
+      "order": 49
+    }
+  ],
+  "admin": []
+}

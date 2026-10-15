@@ -379,9 +379,10 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	if r.status != http.StatusOK || !slices.Equal(groupKeys(r), []string{"dieu_hanh", "phong_ban", "quan_tri", "dung_chung"}) || str(r.body, "default_route") != "/kn/tong-quan" {
 		t.Fatalf("menu Admin: %v", r.body)
 	}
-	if it := adminDeptItem(t, r, "trong_trot"); it["enabled"] != true || len(it["children"].([]any)) != 8 ||
-		it["children"].([]any)[6].(map[string]any)["route"] != "/kn/phong-ban/trong_trot/mau-bao-cao" ||
-		it["children"].([]any)[7].(map[string]any)["route"] != "/kn/phong-ban/trong_trot/bao-cao-khtc" { // W11.11
+	if it := adminDeptItem(t, r, "trong_trot"); it["enabled"] != true ||
+		!hasMenuChildren(it, []string{"admin.pb.theo_doi_nop", "admin.pb.tong_hop", "admin.pb.du_lieu_bao_cao", "admin.pb.thu_thap", "admin.pb.lich_cong_tac", "admin.pb.danh_muc", "admin.pb.mau_bao_cao", "admin.pb.bao_cao_khtc"}) ||
+		!hasMenuChild(it, "admin.pb.mau_bao_cao", "/kn/phong-ban/trong_trot/mau-bao-cao") ||
+		!hasMenuChild(it, "admin.pb.bao_cao_khtc", "/kn/phong-ban/trong_trot/bao-cao-khtc") { // W11.11
 		t.Fatalf("Admin › Phòng Trồng trọt: %v", it)
 	}
 	if it := adminDeptItem(t, r, "chan_nuoi_thuy_san"); it["enabled"] != false || it["status_label"] != "Chưa mở" {
@@ -426,7 +427,7 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	}
 	r = root.appDo(http.MethodGet, "/v1/departments/thong_tin_truyen_thong/modules?audience=admin&org_ref="+tr.p89.String(), nil)
 	// W11.72: 5 mục chung + "Báo cáo cho KHTC" (W11.11) + "Xã báo giá", "Kỳ báo giá & giờ khóa" (đã mở) + "Mặt hàng" (Sắp có).
-	if gs, _ := r.body["groups"].([]any); r.status != http.StatusOK || len(gs) != 1 || len(menuKeys(r)) != 9 ||
+	if gs, _ := r.body["groups"].([]any); r.status != http.StatusOK || len(gs) != 1 ||
 		!slices.Contains(menuKeys(r), "admin.pb.bao_cao_khtc") ||
 		!slices.Contains(menuKeys(r), "admin.pb.bao_gia_xa") || !slices.Contains(menuKeys(r), "admin.pb.bao_gia_lich") ||
 		!slices.Contains(menuKeys(r), "admin.pb.bao_gia_mat_hang") {
@@ -775,4 +776,34 @@ func TestFN_AD_04_02_ImpactAndTreeScope(t *testing.T) {
 		t.Fatalf("tenant khác thấy cây: %v", roots)
 	}
 	wantCode(t, other.adminDo(http.MethodGet, "/v1/orgs/"+tr.p89.String()+"/impact", nil), http.StatusNotFound, "party.org_not_found", "tenant khác xem ảnh hưởng")
+}
+
+// hasMenuChild checks the route contract by identity, independent of new module registrations.
+func hasMenuChild(parent map[string]any, key, route string) bool {
+	children, _ := parent["children"].([]any)
+	for _, raw := range children {
+		child, ok := raw.(map[string]any)
+		if ok && child["key"] == key && child["route"] == route {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMenuChildren(parent map[string]any, keys []string) bool {
+	children, _ := parent["children"].([]any)
+	for _, key := range keys {
+		found := false
+		for _, raw := range children {
+			child, ok := raw.(map[string]any)
+			if ok && child["key"] == key {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }

@@ -1,0 +1,11 @@
+{
+  "id": "syncmonitor",
+  "source": "./syncmonitor",
+  "app": [],
+  "admin": [
+    {
+      "export": "syncMonitorRoutes",
+      "order": 15
+    }
+  ]
+}

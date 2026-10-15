@@ -1,0 +1,11 @@
+{
+  "id": "ops",
+  "source": "./ops",
+  "app": [
+    {
+      "export": "opsRoutes",
+      "order": 48
+    }
+  ],
+  "admin": []
+}

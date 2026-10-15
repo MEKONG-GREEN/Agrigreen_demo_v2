@@ -1,0 +1,16 @@
+{
+  "id": "cropcycle",
+  "source": "./cropcycle",
+  "app": [
+    {
+      "export": "cropcycleAppRoutes",
+      "order": 53
+    }
+  ],
+  "admin": [
+    {
+      "export": "cropcycleAdminRoutes",
+      "order": 19
+    }
+  ]
+}

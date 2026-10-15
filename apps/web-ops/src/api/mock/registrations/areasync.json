@@ -1,0 +1,11 @@
+{
+  "id": "areasync",
+  "source": "./areasync",
+  "app": [
+    {
+      "export": "areaSyncRoutes",
+      "order": 47
+    }
+  ],
+  "admin": []
+}

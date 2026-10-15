@@ -1,0 +1,11 @@
+{
+  "id": "metrics",
+  "source": "./metrics",
+  "app": [
+    {
+      "export": "metricsRoutes",
+      "order": 55
+    }
+  ],
+  "admin": []
+}

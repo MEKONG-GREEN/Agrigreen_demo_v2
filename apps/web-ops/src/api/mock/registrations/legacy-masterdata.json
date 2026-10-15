@@ -1,0 +1,48 @@
+{
+  "id": "legacy-masterdata",
+  "source": "./legacy-masterdata",
+  "app": [
+    {
+      "export": "appRoutes30",
+      "order": 30
+    },
+    {
+      "export": "appRoutes31",
+      "order": 31
+    },
+    {
+      "export": "appRoutes32",
+      "order": 32
+    },
+    {
+      "export": "appRoutes33",
+      "order": 33
+    }
+  ],
+  "admin": [
+    {
+      "export": "adminRoutes4",
+      "order": 4
+    },
+    {
+      "export": "adminRoutes5",
+      "order": 5
+    },
+    {
+      "export": "adminRoutes6",
+      "order": 6
+    },
+    {
+      "export": "adminRoutes7",
+      "order": 7
+    },
+    {
+      "export": "adminRoutes8",
+      "order": 8
+    },
+    {
+      "export": "adminRoutes9",
+      "order": 9
+    }
+  ]
+}

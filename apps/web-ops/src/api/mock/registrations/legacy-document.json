@@ -1,0 +1,11 @@
+{
+  "id": "legacy-document",
+  "source": "./legacy-document",
+  "app": [
+    {
+      "export": "appRoutes41",
+      "order": 41
+    }
+  ],
+  "admin": []
+}

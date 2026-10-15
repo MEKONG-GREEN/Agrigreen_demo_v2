@@ -114,29 +114,10 @@ func TestFN_AD_04_03_NormalizeDepartment(t *testing.T) {
 }
 
 // implementedMenu: mục nghiệp vụ của khuôn phòng ban đã có màn (gói đã bỏ ComingSoon).
-var implementedMenu = map[string]bool{
-	"tinh.cnts.danh_muc": true, "admin.pb.cnts_danh_muc": true, // W11.41
-	"tinh.hcth.danh_muc": true, "admin.pb.hcth_danh_muc": true, // W11.21
-	"tinh.bao_gia.kiem_duyet": true,                                                            // W11.75 Kiểm duyệt & công bố (phiếu, xác minh, hiệu chỉnh)
-	"tinh.cnts.bieu_mau":      true, "xa.cnts.bao_cao_ky": true, "admin.pb.cnts_bieu_ky": true, // W11.42
-	"tinh.hcth.ho_so": true, "admin.pb.hcth_phan_quyen": true, // W11.22
-	"tinh.cnts.dich_benh": true, "xa.cnts.dich_benh": true, // W11.49
-	"tinh.cnts.canh_bao": true, "xa.cnts.canh_bao": true, // W11.43
-	"tinh.hcth.kho_tai_lieu": true, "admin.pb.hcth_thu_muc": true, // W11.24
-	"tinh.khtc.ke_hoach_nam": true, "admin.pb.khtc_ke_hoach": true, "admin.pb.khtc_danh_muc": true, // W11.61
-	"tinh.khtc.ky_bao_cao": true, // W11.62
-	// W11.77 báo cáo giá
-	"tw.bao_gia.bang_gia": true, "tw.bao_gia.dashboard": true, "tw.bao_gia.bien_dong": true,
-	"tinh.bao_gia.tien_do": true, "tinh.bao_gia.bang_gia": true, "tinh.bao_gia.bien_dong": true, "tinh.bao_gia.dashboard": true,
-	"tinh.bao_gia.thong_ke": true, "xa.bao_gia.bang_gia": true, "xa.bao_gia.bien_dong": true,
-	"admin.pb.bao_cao_khtc": true,                              // W11.11
-	"tinh.cnts.ksgm":        true, "tinh.cnts.phu_luc_2": true, // W11.44
-	"tinh.hcth.dashboard": true, "tinh.hcth.bao_cao_so": true, // W11.28
-	// W11.46 lịch trực KSGM, lịch tiêm, lịch công tác CNTS
-	"admin.pb.cnts_lich_truc": true, "admin.pb.cnts_lich_tiem": true,
-	"tinh.cnts.lich": true, "tinh.cnts.lich_tiem": true, "tinh.cnts.lich_cong_tac": true,
-	"xa.cnts.lich": true, "xa.cnts.lich_tiem": true, "xa.cnts.lich_cong_tac": true,
-}
+// BEGIN GENERATED IMPLEMENTED MENU
+var implementedMenu = map[string]bool{"admin.pb.bao_cao_khtc": true, "admin.pb.bao_gia_lich": true, "admin.pb.bao_gia_xa": true, "admin.pb.cnts_bieu_ky": true, "admin.pb.cnts_danh_muc": true, "admin.pb.cnts_lich_tiem": true, "admin.pb.cnts_lich_truc": true, "admin.pb.hcth_danh_muc": true, "admin.pb.hcth_phan_quyen": true, "admin.pb.hcth_thu_muc": true, "admin.pb.khtc_danh_muc": true, "admin.pb.khtc_ke_hoach": true, "tinh.bao_cao_khtc": true, "tinh.bao_cao_khtc.da_gui": true, "tinh.bao_cao_khtc.phieu_ky_nay": true, "tinh.bao_gia.bang_gia": true, "tinh.bao_gia.bien_dong": true, "tinh.bao_gia.cau_hinh": true, "tinh.bao_gia.dashboard": true, "tinh.bao_gia.kiem_duyet": true, "tinh.bao_gia.thong_ke": true, "tinh.bao_gia.tien_do": true, "tinh.cnts.bieu_mau": true, "tinh.cnts.canh_bao": true, "tinh.cnts.danh_muc": true, "tinh.cnts.dich_benh": true, "tinh.cnts.ksgm": true, "tinh.cnts.lich": true, "tinh.cnts.lich_cong_tac": true, "tinh.cnts.lich_tiem": true, "tinh.cnts.phu_luc_2": true, "tinh.hcth.bao_cao_so": true, "tinh.hcth.danh_muc": true, "tinh.hcth.dashboard": true, "tinh.hcth.ho_so": true, "tinh.hcth.kho_tai_lieu": true, "tinh.khtc.ke_hoach_nam": true, "tinh.khtc.ky_bao_cao": true, "tw.bao_gia.bang_gia": true, "tw.bao_gia.bien_dong": true, "tw.bao_gia.dashboard": true, "xa.bao_gia.bang_gia": true, "xa.bao_gia.bien_dong": true, "xa.bao_gia.lich_su": true, "xa.bao_gia.nhap": true, "xa.bao_gia.xac_minh": true, "xa.cnts.bao_cao_ky": true, "xa.cnts.canh_bao": true, "xa.cnts.dich_benh": true, "xa.cnts.lich": true, "xa.cnts.lich_cong_tac": true, "xa.cnts.lich_tiem": true}
+
+// END GENERATED IMPLEMENTED MENU
 
 // W11.06 (kn.menu/v3, D3 C6, D4 X2): khuôn theo phòng ban — nhóm "Nghiệp vụ" sau "Điều hành", nhóm
 // "Dùng chung" (Contact) cuối mọi đối tượng; mục module chưa có là "Sắp có"; bộ Trồng trọt giữ nguyên các
@@ -165,7 +146,7 @@ func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
 			t.Fatalf("%s Cấp Tỉnh: %v", code, k)
 		}
 		for _, it := range gs[1].Items {
-			if !it.ComingSoon && it.Key != "tinh.bao_gia.cau_hinh" && !implementedMenu[it.Key] { // W11.72 cấu hình báo giá, W11.41
+			if !it.ComingSoon && !implementedMenu[it.Key] { // W11.72 cấu hình báo giá, W11.41
 				t.Fatalf("%s: mục nghiệp vụ chưa có module phải Sắp có: %s", code, it.Key)
 			}
 		}

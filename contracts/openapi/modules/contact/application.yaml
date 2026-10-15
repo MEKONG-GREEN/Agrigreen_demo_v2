@@ -1,0 +1,291 @@
+paths:
+# @ag-order: 397
+  /v1/contacts/access:
+    get:
+      summary: Bộ trường, quyền chi tiết/cập nhật của người gọi và trạng thái nguồn cán bộ thuộc tỉnh (enabled | disabled | none)
+      operationId: contactAccess
+      tags: [contact]
+      responses:
+        "200":
+          description: Quyền
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ContactAccess"}
+        "401": {description: unauthenticated, $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden (vai không có quyền danh bạ), $ref: "#/components/responses/Problem"}
+# @ag-order: 398
+  /v1/contacts/persons:
+    get:
+      summary: Thẻ Cán bộ theo vai (FN-13 B1–B3) — tìm theo họ tên (không dấu) hoặc SĐT; bộ full tìm thêm đơn vị, chức danh, email và lọc cấp/đơn vị/chức danh (bộ basic bỏ qua các bộ lọc này)
+      operationId: contactPersons
+      tags: [contact]
+      parameters:
+        - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
+        - {name: level, in: query, required: false, schema: {$ref: "#/components/schemas/ContactLevel"}}
+        - {name: unit, in: query, required: false, schema: {type: string}, description: mã đơn vị nội bộ hoặc một phần tên đơn vị/cơ quan}
+        - {name: title, in: query, required: false, schema: {type: string}}
+        - {name: include_hidden, in: query, required: false, schema: {type: boolean}, description: chỉ người cập nhật được — gồm liên hệ đã ngừng hiển thị}
+        - {name: offset, in: query, required: false, schema: {type: integer, minimum: 0}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200}}
+      responses:
+        "200":
+          description: Một trang danh bạ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ContactPersonList"}
+        "401": {description: unauthenticated, $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden | node_scope_required | kho từ chối (thiếu vai vault_directory), $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Thêm liên hệ ngoài tỉnh (FN-13 B4) — họ tên, SĐT vào kho định danh, email/năm sinh vào ngăn contact.card (mục đích contact.directory); Cấp Tỉnh – HCTH, Admin
+      operationId: contactPersonCreate
+      tags: [contact]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ContactPersonWrite"}
+      responses:
+        "201":
+          description: Đã thêm
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ContactPersonDetail"}
+        "403": {description: contact.manage_forbidden | forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: contact.duplicate_person, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 399
+  /v1/contacts/persons/{id}:
+    get:
+      summary: Chi tiết liên hệ (chỉ bộ full — Cấp TW, Cấp Xã nhận contact.detail_forbidden); liên hệ ngoài tỉnh kèm lịch sử (tên trường đã đổi)
+      operationId: contactPersonGet
+      tags: [contact]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ContactPersonDetail"}
+        "403": {description: contact.detail_forbidden | forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: contact.not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 400
+  /v1/contacts/persons/{id}/revise:
+    post:
+      summary: Sửa / ngừng hiển thị (hidden=true) / hiện lại liên hệ ngoài tỉnh — trường vắng giữ nguyên; cán bộ thuộc tỉnh sửa tại hồ sơ FN-07 (contact.staff_read_only)
+      operationId: contactPersonRevise
+      tags: [contact]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ContactPersonWrite"}
+      responses:
+        "200":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ContactPersonDetail"}
+        "403": {description: contact.manage_forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: contact.not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: contact.duplicate_person, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | contact.staff_read_only, $ref: "#/components/responses/Problem"}
+# @ag-order: 401
+  /v1/contacts/units:
+    get:
+      summary: Thẻ Đơn vị (FN-13 B3) — bộ basic tên, cấp, SĐT; bộ full thêm email, địa chỉ
+      operationId: contactUnits
+      tags: [contact]
+      parameters:
+        - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
+        - {name: level, in: query, required: false, schema: {$ref: "#/components/schemas/ContactLevel"}}
+        - {name: include_hidden, in: query, required: false, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Thẻ Đơn vị
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ContactUnitList"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Thêm thẻ Đơn vị (liên hệ công vụ của tổ chức) — Cấp Tỉnh – HCTH, Admin
+      operationId: contactUnitCreate
+      tags: [contact]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ContactUnitWrite"}
+      responses:
+        "201":
+          description: Đã thêm
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ContactUnit"}
+        "403": {description: contact.manage_forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 402
+  /v1/contacts/units/{id}/revise:
+    post:
+      summary: Sửa / ngừng hiển thị thẻ Đơn vị
+      operationId: contactUnitRevise
+      tags: [contact]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ContactUnitWrite"}
+      responses:
+        "200":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ContactUnit"}
+        "403": {description: contact.manage_forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: contact.not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  # --- hết pf/contact ---
+  # --- pf/price (cap/price, W11.71 — ADR-0049): khung module giá của Báo giá nông sản (BRD v1.3). Trạng thái module và danh mục
+  # nền (đơn vị tính, nhóm hàng) có hiệu lực theo ngày; route nghiệp vụ (xã báo giá, mặt hàng, lịch, phiếu, bảng giá) thêm ở
+  # W11.72–W11.76. Bên dùng chọn bằng query `profile` (vắng → profile đầu tiên; KN = kn). Ngữ cảnh KN: header X-AG-Context. ---
+components:
+  schemas:
+# @ag-order: 870
+    ContactLevel:
+      type: string
+      enum: [tw, tinh, xa, khac]
+      description: Cấp — tw (Trung ương), tinh, xa, khac (đơn vị khác)
+# @ag-order: 871
+    ContactAccess:
+      type: object
+      required: [field_set, fields, can_manage, can_detail, staff_source]
+      properties:
+        field_set: {type: string, enum: [basic, full]}
+        fields: {type: array, items: {type: string}, description: cột hiển thị theo thứ tự}
+        can_manage: {type: boolean, description: thêm/sửa/ngừng hiển thị liên hệ ngoài tỉnh và thẻ Đơn vị}
+        can_detail: {type: boolean}
+        staff_source: {type: string, enum: [enabled, disabled, none], description: "disabled = hồ sơ nhân sự chưa bật cho dữ liệu thật (AG_HRM_RECORDS) — chỉ có liên hệ ngoài tỉnh"}
+# @ag-order: 872
+    ContactPersonBasic:
+      type: object
+      description: Dòng của bộ basic (Cấp TW, Cấp Xã) — KHÔNG có trường nào khác (BR-03)
+      additionalProperties: false
+      required: [id, full_name, birth_year, phone]
+      properties:
+        id: {type: string, format: uuid}
+        full_name: {type: string}
+        birth_year: {type: string, description: năm sinh (BR-04) — rỗng nếu chưa có}
+        phone: {type: string}
+# @ag-order: 873
+    ContactPersonFull:
+      type: object
+      required: [id, source, full_name, birth_year, phone, title, unit, level, level_label, email, hidden, erased]
+      properties:
+        id: {type: string, format: uuid}
+        source: {type: string, enum: [staff, external], description: "staff = cán bộ thuộc tỉnh (đồng bộ từ hồ sơ FN-07); external = liên hệ ngoài tỉnh"}
+        full_name: {type: string}
+        birth_year: {type: string}
+        phone: {type: string}
+        title: {type: string, description: chức danh}
+        unit: {type: string, description: đơn vị công tác (cán bộ xã — xã · đơn vị quản lý) hoặc cơ quan của liên hệ ngoài tỉnh}
+        unit_code: {type: string}
+        level: {$ref: "#/components/schemas/ContactLevel"}
+        level_label: {type: string}
+        email: {type: string}
+        hidden: {type: boolean}
+        erased: {type: boolean, description: chủ thể đã xóa định danh}
+# @ag-order: 874
+    ContactPersonList:
+      type: object
+      required: [field_set, fields, total, staff_source, items]
+      properties:
+        field_set: {type: string, enum: [basic, full]}
+        fields: {type: array, items: {type: string}}
+        total: {type: integer}
+        staff_source: {type: string, enum: [enabled, disabled, none]}
+        items:
+          type: array
+          items:
+            oneOf:
+              - {$ref: "#/components/schemas/ContactPersonFull"}
+              - {$ref: "#/components/schemas/ContactPersonBasic"}
+# @ag-order: 875
+    ContactHistoryEntry:
+      type: object
+      required: [version, change, changed_fields, at, actor_ref]
+      properties:
+        version: {type: integer, format: int64}
+        change: {type: string, enum: [created, updated, hidden, shown]}
+        changed_fields: {type: array, items: {type: string}, description: TÊN trường đã đổi (không giá trị — BR-05)}
+        at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+# @ag-order: 876
+    ContactPersonDetail:
+      allOf:
+        - {$ref: "#/components/schemas/ContactPersonFull"}
+        - type: object
+          required: [organization, can_edit, history]
+          properties:
+            organization: {type: string}
+            can_edit: {type: boolean}
+            history: {type: array, items: {$ref: "#/components/schemas/ContactHistoryEntry"}}
+# @ag-order: 877
+    ContactPersonWrite:
+      type: object
+      additionalProperties: false
+      description: "Thêm — full_name, phone, level bắt buộc (BR-06). Sửa — trường vắng giữ nguyên."
+      properties:
+        full_name: {type: string, maxLength: 200}
+        phone: {type: string}
+        birth_year: {type: string, pattern: "^((19|20)[0-9]{2})?$"}
+        email: {type: string, maxLength: 254}
+        level: {$ref: "#/components/schemas/ContactLevel"}
+        organization: {type: string, maxLength: 200}
+        title: {type: string, maxLength: 200}
+        hidden: {type: boolean}
+# @ag-order: 878
+    ContactUnit:
+      type: object
+      required: [id, name, level, level_label, phone]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        level: {$ref: "#/components/schemas/ContactLevel"}
+        level_label: {type: string}
+        phone: {type: string}
+        email: {type: string, description: chỉ bộ full}
+        address: {type: string, description: chỉ bộ full}
+        org_ref: {type: string, format: uuid, nullable: true}
+        hidden: {type: boolean}
+# @ag-order: 879
+    ContactUnitList:
+      type: object
+      required: [field_set, items]
+      properties:
+        field_set: {type: string, enum: [basic, full]}
+        items: {type: array, items: {$ref: "#/components/schemas/ContactUnit"}}
+# @ag-order: 880
+    ContactUnitWrite:
+      type: object
+      additionalProperties: false
+      required: [name, level]
+      properties:
+        name: {type: string, maxLength: 200}
+        level: {$ref: "#/components/schemas/ContactLevel"}
+        phone: {type: string, description: số máy công vụ của cơ quan (8–11 chữ số) — không nhập số di động cá nhân}
+        email: {type: string}
+        address: {type: string, maxLength: 300}
+        org_ref: {type: string, format: uuid}
+        hidden: {type: boolean}
+    # --- pf/hrm (W11.22) ---

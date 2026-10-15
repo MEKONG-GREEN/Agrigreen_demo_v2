@@ -1,0 +1,16 @@
+{
+  "id": "forms-routes",
+  "source": "./forms/routes",
+  "app": [
+    {
+      "export": "formsAppRoutes",
+      "order": 3
+    }
+  ],
+  "admin": [
+    {
+      "export": "formsAdminRoutes",
+      "order": 3
+    }
+  ]
+}

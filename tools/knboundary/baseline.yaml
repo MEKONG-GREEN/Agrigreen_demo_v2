@@ -1,4 +1,3 @@
-# Baseline ban đầu trên dev988febd9 ngày16/10/2026. Định danh module dùng canonical_paths cố định; sau tích hợp chỉ được giảm.
 # Baseline của cổng knboundary (KNSPLIT-0, ADR-0055) — ghép nối KN ↔ phần còn lại ĐANG CÓ, sinh từ kiểm kê
 # (go run ./tools/knboundary -list) tại thời điểm quét. Quy tắc: tools/knboundary/boundary.yaml; kiểm kê và cách phân loại
 # (chuyển sang KN / ở lại nền tảng / cần port): docs/kn/tach-he-thong/kiem-ke.md.
@@ -372,30 +371,6 @@ couplings:
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/xlsx.ts, to: kn/forms/types}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/forms/xlsx.ts, to: kn/grid/letters}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-admin}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-aggregate}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-alert}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-cal}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-catalogs}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-outbreak}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-cnts-periods}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-collect}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-contact}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-hrm}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-hrm-docs}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-hrm-reports}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-hrm-staff}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-khtc}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-khtc-forms}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-khtc-periods}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-khtc-sources}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price-boards}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price-items}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price-points}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price-reports}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-price-tickets}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-reports/routes}
-  - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/handler.ts, to: api/mock/kn-schedules}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/kn.ts, to: api/mock/kn-accounts}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/kn.ts, to: api/mock/kn-reports/store}
   - {rule: web-import-into-kn, from: apps/web-ops/src/api/mock/kn.ts, to: api/mock/kn-schedules}

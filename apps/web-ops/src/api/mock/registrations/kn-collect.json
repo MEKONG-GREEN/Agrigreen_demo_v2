@@ -1,0 +1,11 @@
+{
+  "id": "kn-collect",
+  "source": "./kn-collect",
+  "app": [
+    {
+      "export": "knCollectRoutes",
+      "order": 7
+    }
+  ],
+  "admin": []
+}

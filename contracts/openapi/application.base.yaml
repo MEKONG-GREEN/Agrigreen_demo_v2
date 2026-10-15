@@ -1,0 +1,12 @@
+openapi: 3.1.0
+info:
+  title: AgriGreen Application API
+  version: "1"
+  description: |
+    Bề mặt Application (api.<domain>) — OIDC + JWT (mục 11).
+    Mọi POST bắt buộc Idempotency-Key (R-51). Lỗi theo RFC 9457 (docs/errors.md).
+    Tenant lấy từ token, không bao giờ từ path/query/body (R-16).
+servers:
+  - url: https://api.agrigreen.vn
+security:
+  - oidc: []

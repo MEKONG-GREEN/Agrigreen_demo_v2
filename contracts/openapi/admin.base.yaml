@@ -1,0 +1,19 @@
+openapi: 3.1.0
+info:
+  title: AgriGreen Admin API
+  version: "1"
+  description: |
+    Bề mặt Admin (admin.<domain>) — OIDC + JWT + **MFA bắt buộc** cho mọi route (mục 11).
+    Dữ liệu chủ, tham số, phê duyệt, nhật ký. Mọi POST bắt buộc Idempotency-Key (R-51).
+    Lỗi theo RFC 9457 (docs/errors.md). Tenant lấy từ token, không bao giờ từ path/query/body (R-16).
+    Thay đổi có phê duyệt dùng hai vai param_setter và param_approver; người duyệt không được là người đặt (R-56).
+
+    Bề mặt Admin (admin.<domain>) — OIDC + MFA bắt buộc cho mọi route (mục 11).
+    Dữ liệu chủ, tham số, phê duyệt, nhật ký. Mọi POST bắt buộc Idempotency-Key (R-51).
+    Lỗi theo RFC 9457 (docs/errors.md). Tenant lấy từ token (R-16).
+
+    Mỗi module giữ một phần riêng có đánh dấu "# --- <module> ---" để gộp dễ.
+servers:
+  - url: https://admin.agrigreen.vn
+security:
+  - oidc: []

@@ -1,0 +1,16 @@
+{
+  "id": "mrv",
+  "source": "./mrv",
+  "app": [
+    {
+      "export": "mrvAppRoutes",
+      "order": 56
+    }
+  ],
+  "admin": [
+    {
+      "export": "mrvAdminRoutes",
+      "order": 21
+    }
+  ]
+}

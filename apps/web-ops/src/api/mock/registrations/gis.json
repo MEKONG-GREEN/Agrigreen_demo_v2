@@ -1,0 +1,16 @@
+{
+  "id": "gis",
+  "source": "./gis",
+  "app": [
+    {
+      "export": "gisAppRoutes",
+      "order": 50
+    }
+  ],
+  "admin": [
+    {
+      "export": "gisAdminRoutes",
+      "order": 17
+    }
+  ]
+}

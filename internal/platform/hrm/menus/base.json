@@ -1,0 +1,179 @@
+{
+  "id": "hrm-menus",
+  "order": 1,
+  "tables": {
+    "adminDeptBusiness": {
+      "hanh_chinh_tong_hop": [
+        {
+          "Key": "admin.pb.hcth_danh_muc",
+          "Label": "Danh mục nhân sự",
+          "Route": "/kn/phong-ban/{department}/danh-muc-nhan-su",
+          "Icon": "catalog",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "admin.pb.hcth_phan_quyen",
+          "Label": "Phân quyền hồ sơ",
+          "Route": "/kn/phong-ban/{department}/phan-quyen-ho-so",
+          "Icon": "shield",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "admin.pb.hcth_thu_muc",
+          "Label": "Thư mục tài liệu",
+          "Route": "/kn/phong-ban/{department}/thu-muc-tai-lieu",
+          "Icon": "library",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        }
+      ]
+    },
+    "deptBusiness": {
+      "hanh_chinh_tong_hop": {
+        "kn_tinh": [
+          {
+            "Key": "tinh.hcth.dashboard",
+            "Label": "Dashboard nhân sự",
+            "Route": "/kn/nhan-su/dashboard",
+            "Icon": "chart",
+            "BadgeSource": "",
+            "Requires": null,
+            "ComingSoon": false,
+            "Needs": "",
+            "Children": null
+          },
+          {
+            "Key": "tinh.hcth.ho_so",
+            "Label": "Hồ sơ nhân sự",
+            "Route": "/kn/nhan-su/ho-so",
+            "Icon": "users",
+            "BadgeSource": "",
+            "Requires": null,
+            "ComingSoon": false,
+            "Needs": "",
+            "Children": null
+          },
+          {
+            "Key": "tinh.hcth.bao_cao_so",
+            "Label": "Biểu mẫu báo cáo Sở",
+            "Route": "/kn/nhan-su/bao-cao-so",
+            "Icon": "report",
+            "BadgeSource": "",
+            "Requires": null,
+            "ComingSoon": false,
+            "Needs": "",
+            "Children": null
+          },
+          {
+            "Key": "tinh.hcth.kho_tai_lieu",
+            "Label": "Hồ sơ dữ liệu",
+            "Route": "/kn/nhan-su/kho-tai-lieu",
+            "Icon": "library",
+            "BadgeSource": "",
+            "Requires": null,
+            "ComingSoon": false,
+            "Needs": "",
+            "Children": null
+          },
+          {
+            "Key": "tinh.hcth.danh_gia",
+            "Label": "Đánh giá",
+            "Route": "/kn/nhan-su/danh-gia",
+            "Icon": "approve",
+            "BadgeSource": "",
+            "Requires": null,
+            "ComingSoon": true,
+            "Needs": "",
+            "Children": null
+          },
+          {
+            "Key": "tinh.hcth.danh_muc",
+            "Label": "Danh mục nhân sự",
+            "Route": "/kn/nhan-su/danh-muc",
+            "Icon": "catalog",
+            "BadgeSource": "",
+            "Requires": null,
+            "ComingSoon": false,
+            "Needs": "",
+            "Children": null
+          }
+        ],
+        "kn_xa": [
+          {
+            "Key": "xa.hcth.danh_gia",
+            "Label": "Đánh giá của tôi",
+            "Route": "/kn/nhan-su/danh-gia-cua-toi",
+            "Icon": "approve",
+            "BadgeSource": "",
+            "Requires": null,
+            "ComingSoon": true,
+            "Needs": "",
+            "Children": null
+          }
+        ]
+      }
+    },
+    "deptProfileByCode": {
+      "hanh_chinh_tong_hop": "hanh_chinh_tong_hop"
+    },
+    "khtcReportProfiles": {
+      "hanh_chinh_tong_hop": true
+    },
+    "menuDeptModules": {
+      "/danh-muc-nhan-su": "pf/hrm",
+      "/phan-quyen-ho-so": "pf/hrm",
+      "/thu-muc-tai-lieu": "pf/hrm"
+    },
+    "menuModules": {
+      "/kn/nhan-su": "pf/hrm"
+    },
+    "sharedByAudience": {
+      "kn_tinh": [
+        {
+          "Key": "tinh.chung.nhan_su_phong",
+          "Label": "Nhân sự của phòng",
+          "Route": "/kn/nhan-su/cua-phong",
+          "Icon": "users",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "manager",
+          "Children": null
+        },
+        {
+          "Key": "tinh.chung.dashboard_nhan_su",
+          "Label": "Dashboard nhân sự",
+          "Route": "/kn/nhan-su/dashboard",
+          "Icon": "chart",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "manager",
+          "Children": null
+        },
+        {
+          "Key": "tinh.chung.tai_lieu_phong",
+          "Label": "Tài liệu của phòng",
+          "Route": "/kn/nhan-su/tai-lieu-phong",
+          "Icon": "library",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "manager",
+          "Children": null
+        }
+      ]
+    }
+  }
+}

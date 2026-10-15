@@ -1,0 +1,3078 @@
+paths:
+# @ag-order: 403
+  /v1/price/status:
+    get:
+      summary: Trạng thái khung cap/price của tenant người gọi — cấu hình bên dùng, cấp của người gọi, số mục danh mục đang hiệu lực
+      operationId: priceStatus
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+      responses:
+        "200":
+          description: Trạng thái
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceStatus"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 404
+  /v1/price/catalog:
+    get:
+      summary: Danh mục nền đang hiệu lực tại một ngày (đơn vị tính, nhóm hàng) — phiên bản mới nhất có valid_from ≤ ngày, bỏ mã đã ngưng
+      operationId: priceCatalog
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: at, in: query, required: false, description: "Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN)", schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Danh mục
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceCatalog"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 405
+  /v1/price/catalog/defaults:
+    post:
+      summary: Ghi danh mục mặc định (5 nhóm hàng BRD, đơn vị tính thường gặp, 2 nhóm vùng An Giang / Kiên Giang) hiệu lực từ hôm nay — chỉ mã chưa có; vai quản trị danh mục
+      operationId: priceInstallDefaults
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Số phiên bản đã ghi (0 khi mọi mã đã có)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [written]
+                properties:
+                  written: {type: integer, minimum: 0}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict, $ref: "#/components/responses/Problem"}
+  # W11.74 — lịch báo giá, giờ khóa, hạn phản hồi, nhắc nhập giá, ngưỡng cảnh báo (BRD FN-AD-04.04…06, FN-XA-03.04). Đọc: mọi cấp
+  # của Profile; ghi: Quản trị nghiệp vụ báo giá (vai quản trị hoặc Cấp Tỉnh có cờ qtnv_bao_gia — W11.72; can_manage ở phản hồi). Số % là chuỗi Decimal. Mọi bản ghi là phiên bản (sổ chỉ ghi thêm).
+# @ag-order: 406
+  /v1/price/calendar:
+    get:
+      summary: Lịch báo giá đang hiệu lực, phiên bản đã lên lịch, lịch khóa nhập các ngày tới (mặc định 30), ngoại lệ, lịch sử thay đổi
+      operationId: priceCalendar
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+      responses:
+        "200":
+          description: Lịch
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceCalendar"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 407
+  /v1/price/calendar/schedule:
+    post:
+      summary: Ghi phiên bản lịch mới (ngày báo giá trong tuần, giờ khóa, hạn phản hồi, giờ nhắc, kênh, nội dung mẫu) có hiệu lực từ valid_from
+      description: |
+        valid_from không trong quá khứ; hôm nay là ngày báo giá → sớm nhất ngày mai (422 price.valid_from). Nhắc 1 < nhắc 2 < giờ khóa
+        (422 price.remind_order) < hạn phản hồi (422 price.respond_before_lock). Biến mẫu chỉ {ngày}, {xã}, {giờ khóa} (422 price.template_var).
+      operationId: priceSaveSchedule
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceScheduleInput"}
+      responses:
+        "201":
+          description: Phiên bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSchedule"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | price.valid_from | price.remind_order | price.respond_before_lock | price.template_var", $ref: "#/components/responses/Problem"}
+# @ag-order: 408
+  /v1/price/calendar/exceptions:
+    post:
+      summary: Thêm ngày nghỉ (holiday — ngày báo giá theo lịch) hoặc ngày báo giá bổ sung (extra — ngày ngoài lịch) kèm lý do; chỉ ngày từ ngày mai
+      operationId: priceAddException
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [day, kind, reason]
+              properties:
+                day: {type: string, format: date}
+                kind: {type: string, enum: [holiday, extra]}
+                reason: {type: string, minLength: 1, maxLength: 300}
+      responses:
+        "201":
+          description: Ngoại lệ đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceCalendarException"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: price.exception_exists, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | price.valid_from | price.exception_mismatch", $ref: "#/components/responses/Problem"}
+# @ag-order: 409
+  /v1/price/calendar/exceptions/{day}/retire:
+    post:
+      summary: Xóa ngoại lệ của một ngày (ghi phiên bản retired); chỉ ngày từ ngày mai
+      operationId: priceRetireException
+      tags: [price]
+      parameters:
+        - {name: day, in: path, required: true, schema: {type: string, format: date}}
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204": {description: Đã xóa}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.exception_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: price.valid_from, $ref: "#/components/responses/Problem"}
+# @ag-order: 410
+  /v1/price/calendar/runs:
+    get:
+      summary: Nhật ký job price_calendar — mốc khóa thực tế (độ trễ so với giờ khóa) và lịch sử gửi nhắc lần 1/2
+      operationId: priceCalendarRuns
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: from, in: query, required: false, description: "Vắng → 30 ngày trước", schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, description: "Vắng → hôm nay (giờ VN); tối đa 92 ngày", schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Nhật ký
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [from, to, items]
+                properties:
+                  from: {type: string, format: date}
+                  to: {type: string, format: date}
+                  items: {type: array, items: {$ref: "#/components/schemas/PriceCalendarRun"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 411
+  /v1/price/calendar/reminder-test:
+    post:
+      summary: Gửi thử nhắc nhập giá (mẫu của lịch hiện hành) tới tài khoản đang đăng nhập — FN-AD-04.05 AC-02
+      operationId: priceReminderTest
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: Đã xếp hàng thông báo (pf/notify)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [body]
+                properties:
+                  body: {type: string, description: Nội dung đã thay biến}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+# @ag-order: 412
+  /v1/price/thresholds:
+    get:
+      summary: Ngưỡng cảnh báo giá cao / thấp bất thường đang hiệu lực (mặc định + tham số chung, nhóm hàng, mặt hàng) và lịch sử thay đổi
+      operationId: priceThresholds
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+      responses:
+        "200":
+          description: Ngưỡng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceThresholds"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Ghi ngưỡng (phiên bản mới) — default kèm lookback_days, flat_pct, survey_pct; group/item chỉ pct. 0 < % ≤ 100
+      operationId: priceSaveThreshold
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceThresholdInput"}
+      responses:
+        "201":
+          description: Phiên bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceThreshold"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 413
+  /v1/price/thresholds/{scope}/{code}/retire:
+    post:
+      summary: Xóa ngưỡng nhóm hàng / mặt hàng (phiên bản retired); ngưỡng mặc định không xóa được
+      operationId: priceRetireThreshold
+      tags: [price]
+      parameters:
+        - {name: scope, in: path, required: true, schema: {type: string, enum: [default, group, item]}}
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204": {description: Đã xóa}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.threshold_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: price.default_threshold, $ref: "#/components/responses/Problem"}
+  # --- pf/price W11.73 (pf 000141, BRD Báo giá v1.3 FN-AD-04.03, FN-XA-03.01): mặt hàng theo thời kỳ — mặt hàng có phiên bản +
+  # valid_from, nhóm hàng, gán mặt hàng Địa phương cho xã, đề xuất từ xã, bộ theo vụ, "thay thế cho". Ngày hiệu lực vắng →
+  # ngày báo giá kế tiếp (BR-02). point_code = mã xã báo giá (mặc định mã ĐVHC xã; liên kết lỏng tới xã báo giá W11.72). ---
+# @ag-order: 414
+  /v1/price/items:
+    get:
+      summary: Danh mục mặt hàng nhìn từ một ngày — mọi trạng thái (Hoạt động / Chờ hiệu lực / Ngưng), sắp theo nhóm, thứ tự, mã
+      operationId: priceListItems
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+        - {name: group, in: query, required: false, schema: {type: string}}
+        - {name: kind, in: query, required: false, schema: {type: string, enum: [basic, local]}}
+        - {name: state, in: query, required: false, schema: {type: string, enum: [active, pending, retired]}}
+        - {name: q, in: query, required: false, description: "Tìm theo mã, tên, giống/phẩm cấp", schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceItemList"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.profile_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Thêm mặt hàng — mã tự sinh MH#####; Cơ bản áp dụng mọi xã, Địa phương gán cho points; "thay thế cho" ngưng mặt hàng cũ từ ngày hiệu lực
+      operationId: priceCreateItem
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceItemInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "400": {description: bad_request, $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden (chỉ Cấp Tỉnh, vai quản trị), $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found (mặt hàng được thay thế), $ref: "#/components/responses/Problem"}
+        "409": {description: price.item_duplicate | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid | price.item_basic_not_assignable, $ref: "#/components/responses/Problem"}
+# @ag-order: 415
+  /v1/price/items/{code}:
+    get:
+      summary: Một mặt hàng tại ngày — trạng thái, lịch sử phiên bản (lịch sử thay đổi, tên cũ), mặt hàng thay thế nó
+      operationId: priceGetItem
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceItemCode"
+        - $ref: "#/components/parameters/PriceAt"
+      responses:
+        "200":
+          description: Mặt hàng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceItemDetail"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 416
+  /v1/price/items/{code}/revise:
+    post:
+      summary: Sửa mặt hàng — phiên bản mới từ valid_from; đã có giá thì chỉ sửa tên, nơi bán (BR-04) và chỉ Quản trị nghiệp vụ
+      operationId: priceReviseItem
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceItemCode"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceItemInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.item_locked | price.item_retired | price.item_duplicate, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 417
+  /v1/price/items/{code}/retire:
+    post:
+      summary: Ngưng mặt hàng — hiệu lực đến valid_to (vắng → hết ngày trước ngày báo giá kế tiếp), có lý do; không xóa
+      operationId: priceRetireItem
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceItemCode"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                valid_to: {type: string, format: date}
+                reason: {type: string, minLength: 1, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.item_retired, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 418
+  /v1/price/items/{code}/move:
+    post:
+      summary: Đổi thứ tự hiển thị trong nhóm (lên / xuống) từ ngày báo giá kế tiếp
+      operationId: priceMoveItem
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceItemCode"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [direction]
+              properties:
+                direction: {type: string, enum: [up, down]}
+      responses:
+        "201":
+          description: Đã ghi (written = 0 khi đã ở đầu/cuối nhóm)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.item_retired, $ref: "#/components/responses/Problem"}
+# @ag-order: 419
+  /v1/price/groups:
+    get:
+      summary: Nhóm hàng đang hiệu lực tại ngày, kèm số mặt hàng đang hiệu lực
+      operationId: priceListGroups
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+      responses:
+        "200":
+          description: Nhóm hàng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [groups]
+                properties:
+                  groups: {type: array, items: {$ref: "#/components/schemas/PriceGroup"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Thêm nhóm hàng (hiệu lực từ hôm nay; mã vắng → nhom_<n>)
+      operationId: priceCreateGroup
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceGroupInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict (mã đã có), $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 420
+  /v1/price/groups/{code}/revise:
+    post:
+      summary: Sửa tên / thứ tự nhóm hàng (hiệu lực từ hôm nay)
+      operationId: priceReviseGroup
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceGroupInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.group_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 421
+  /v1/price/groups/{code}/retire:
+    post:
+      summary: Xóa nhóm hàng (phiên bản ngưng) — chặn khi nhóm còn mặt hàng đang hoặc sắp hiệu lực
+      operationId: priceRetireGroup
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.group_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.group_not_empty, $ref: "#/components/responses/Problem"}
+# @ag-order: 422
+  /v1/price/assignments:
+    get:
+      summary: Gán mặt hàng Địa phương cho xã đang hiệu lực tại ngày (lọc theo xã)
+      operationId: priceListAssignments
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+        - {name: point, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Gán
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assignments]
+                properties:
+                  assignments: {type: array, items: {$ref: "#/components/schemas/PriceAssignment"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Gán mặt hàng Địa phương cho xã từ valid_from (gán đã có bỏ qua); mặt hàng Cơ bản không gán riêng
+      operationId: priceAssignItems
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceAssignInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.item_retired, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid | price.item_basic_not_assignable, $ref: "#/components/responses/Problem"}
+# @ag-order: 423
+  /v1/price/assignments/remove:
+    post:
+      summary: Bỏ gán mặt hàng khỏi xã từ valid_from; hôm nay xã đã có phiếu → áp dụng từ ngày báo giá kế tiếp
+      operationId: priceUnassignItems
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceAssignInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid | price.item_basic_not_assignable, $ref: "#/components/responses/Problem"}
+# @ag-order: 424
+  /v1/price/point-items:
+    get:
+      summary: Mặt hàng xã báo giá phải báo giá tại ngày — Cơ bản ∪ Địa phương đã gán, lọc bộ theo vụ, đúng thứ tự (AC-04)
+      operationId: pricePointItems
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+        - {name: point, in: query, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Mặt hàng của xã
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [day, point_code, items]
+                properties:
+                  day: {type: string, format: date}
+                  point_code: {type: string}
+                  items: {type: array, items: {$ref: "#/components/schemas/PriceItem"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 425
+  /v1/price/item-sets:
+    get:
+      summary: Bộ mặt hàng theo vụ nhìn từ một ngày (có hiệu lực hoặc sắp hiệu lực)
+      operationId: priceListItemSets
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+      responses:
+        "200":
+          description: Bộ mặt hàng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sets]
+                properties:
+                  sets: {type: array, items: {$ref: "#/components/schemas/PriceItemSet"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo bộ mặt hàng theo vụ — mặt hàng thuộc bộ chỉ xuất hiện ở xã khi có bộ chứa nó đang bật (BR-08)
+      operationId: priceCreateItemSet
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceItemSetInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.item_set_exists, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 426
+  /v1/price/item-sets/{code}/revise:
+    post:
+      summary: Sửa bộ (tên, vụ, danh sách, bật/tắt, retire = ngưng bộ) — phiên bản mới từ valid_from
+      operationId: priceReviseItemSet
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceItemSetInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.item_set_not_found | price.item_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 427
+  /v1/price/proposals:
+    get:
+      summary: Đề xuất mặt hàng từ xã (mới nhất trước); Cấp Xã chỉ thấy đề xuất của mình
+      operationId: priceListProposals
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: status, in: query, required: false, schema: {type: string, enum: [pending, approved, rejected]}}
+      responses:
+        "200":
+          description: Đề xuất
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [proposals]
+                properties:
+                  proposals: {type: array, items: {$ref: "#/components/schemas/PriceProposal"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Đề xuất mặt hàng mới (Cấp Xã, Cấp Tỉnh) — chỉ xuất hiện ở màn Nhập báo giá khi được duyệt và gán cho xã
+      operationId: priceCreateProposal
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceProposalInput"}
+      responses:
+        "201":
+          description: Đã ghi (code = mã đề xuất)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 428
+  /v1/price/proposals/{id}/approve:
+    post:
+      summary: Duyệt đề xuất — tạo mặt hàng (nội dung gửi kèm, mặc định Địa phương) và gán cho xã đề xuất từ ngày hiệu lực (AC-05)
+      operationId: priceApproveProposal
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceItemInput"}
+      responses:
+        "201":
+          description: Đã ghi (code = mã mặt hàng mới)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.proposal_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.proposal_decided | price.item_duplicate, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.item_date_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 429
+  /v1/price/proposals/{id}/reject:
+    post:
+      summary: Từ chối đề xuất kèm lý do
+      operationId: priceRejectProposal
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note: {type: string, minLength: 1, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.proposal_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.proposal_decided, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  # --- hết pf/price W11.73 ---
+  # --- pf/price W11.72 — xã báo giá + phân công (BRD FN-AD-04.02, FN-AD-04.01; nhóm vùng mục II). Đọc: mọi cấp của Profile; ghi:
+  # vai quản trị (Admin). Thay đổi xã/phân công có ngày hiệu lực (vắng → ngày báo giá kế tiếp; không trong quá khứ). ---
+# @ag-order: 430
+  /v1/price/regions:
+    get:
+      summary: Nhóm vùng tại ngày (mọi trạng thái), kèm số xã báo giá đang hoạt động
+      operationId: priceListRegions
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+      responses:
+        "200":
+          description: Nhóm vùng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [regions]
+                properties:
+                  regions: {type: array, items: {$ref: "#/components/schemas/PriceRegion"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Thêm nhóm vùng (hiệu lực từ hôm nay; mã vắng → vung_<n>) — vai quản trị
+      operationId: priceCreateRegion
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceRegionInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict (mã đã có), $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 431
+  /v1/price/regions/{code}/revise:
+    post:
+      summary: Sửa tên / thứ tự nhóm vùng (hiệu lực từ hôm nay)
+      operationId: priceReviseRegion
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceRegionInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.region_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 432
+  /v1/price/regions/{code}/retire:
+    post:
+      summary: Ngưng nhóm vùng từ hôm nay — chặn khi còn xã báo giá đang hoặc sắp hoạt động thuộc nhóm
+      operationId: priceRetireRegion
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: price.region_in_use, $ref: "#/components/responses/Problem"}
+        "422": {description: price.region_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 433
+  /v1/price/points:
+    get:
+      summary: Danh mục xã báo giá tại ngày (B1) — mã, tên, mã ĐVHC, nhóm vùng, cán bộ Xã phụ trách, cán bộ Tỉnh, số mặt hàng, trạng thái
+      operationId: priceListPoints
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: state, in: query, required: false, schema: {type: string, enum: [active, pending, retired]}}
+        - {name: mine, in: query, required: false, description: "true: Cấp Xã — xã mình phụ trách chính; Cấp Tỉnh — xã được phân công cho mình", schema: {type: boolean}}
+      responses:
+        "200":
+          description: Xã báo giá (sắp theo nhóm vùng, mã)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [points]
+                properties:
+                  points: {type: array, items: {$ref: "#/components/schemas/PricePoint"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Thêm xã báo giá (B2) — ĐVHC cấp xã có hiệu lực (tên theo ĐVHC), nhóm vùng, ngày bắt đầu báo giá; mã XBG#### hệ thống sinh
+      operationId: priceCreatePoint
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PricePointInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: price.admin_unit_taken, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.admin_unit_invalid | price.region_not_found | price.valid_from, $ref: "#/components/responses/Problem"}
+# @ag-order: 434
+  /v1/price/points/{code}:
+    get:
+      summary: Một xã báo giá tại ngày kèm lịch sử thay đổi và lịch sử phân công (AC-02)
+      operationId: priceGetPoint
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/PriceAt"
+      responses:
+        "200":
+          description: Xã báo giá
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PricePointDetail"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.point_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 435
+  /v1/price/points/{code}/revise:
+    post:
+      summary: Sửa xã báo giá từ ngày hiệu lực — đổi nhóm vùng, chuyển sang mã ĐVHC mới khi sắp xếp ĐVHC (giữ mã xã, lịch sử)
+      operationId: priceRevisePoint
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PricePointInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.point_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.admin_unit_taken, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.admin_unit_invalid | price.region_not_found | price.point_inactive | price.valid_from, $ref: "#/components/responses/Problem"}
+# @ag-order: 436
+  /v1/price/points/{code}/retire:
+    post:
+      summary: Ngưng xã báo giá từ ngày hiệu lực, lý do bắt buộc (B3); hôm nay xã đã gửi phiếu → áp dụng từ ngày báo giá kế tiếp
+      operationId: priceRetirePoint
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PricePointInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.point_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.point_inactive | price.valid_from, $ref: "#/components/responses/Problem"}
+# @ag-order: 437
+  /v1/price/points/{code}/officers:
+    post:
+      summary: Phân công người phụ trách xã từ ngày hiệu lực — role xa (cán bộ Xã phụ trách chính, thay người cũ) | tinh (cán bộ Cấp Tỉnh); officer_ref null = bỏ phân công
+      operationId: priceAssignPointOfficer
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceOfficerInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWriteResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.point_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.officer_invalid | price.point_inactive | price.valid_from, $ref: "#/components/responses/Problem"}
+# @ag-order: 438
+  /v1/price/admin-units:
+    get:
+      summary: ĐVHC cấp xã có hiệu lực tại ngày (danh mục ĐVHC dùng chung, ADR-0032) để chọn khi thêm/sửa xã báo giá, kèm xã báo giá đang gắn
+      operationId: priceListAdminUnits
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceAt"
+      responses:
+        "200":
+          description: ĐVHC
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [admin_units]
+                properties:
+                  admin_units: {type: array, items: {$ref: "#/components/schemas/PriceAdminUnit"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+# @ag-order: 439
+  /v1/price/officers:
+    get:
+      summary: Danh bạ cán bộ để phân công (cán bộ Cấp Xã / Cấp Tỉnh của phòng ban báo giá) — vai quản trị, Cấp Tỉnh
+      operationId: priceListOfficers
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: level, in: query, required: true, schema: {type: string, enum: [XA, TINH]}}
+      responses:
+        "200":
+          description: Cán bộ (directory = false khi gốc lắp ráp chưa nối danh bạ)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [officers, directory]
+                properties:
+                  officers: {type: array, items: {$ref: "#/components/schemas/PriceOfficer"}}
+                  directory: {type: boolean}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  # --- hết pf/price W11.72 ---
+  # --- pf/price W11.75 — phiếu báo giá + xác minh (pf 000148; BRD FN-XA-03.01…03, 03.05, FN-TI-02.02…04, 02.09). Cấp Xã:
+  # phiếu của xã mình phụ trách tại ngày, nhập ngày báo giá hôm nay trước giờ khóa (chặn đúng giờ khóa — 409
+  # price.ticket_locked); Cấp Tỉnh: xem mọi xã, sửa / nhập thay / xóa / xác minh xã được phân công hoặc chưa phân công; Admin như
+  # Cấp Tỉnh mọi xã; Cấp TW không đọc phiếu. Giá, % là chuỗi Decimal. version = phiên bản đầu phiếu (khóa lạc quan, 409
+  # price.ticket_stale). ---
+# @ag-order: 440
+  /v1/price/tickets:
+    get:
+      summary: Phiếu của các xã báo giá trong một ngày (Chi tiết báo giá FN-TI-02.02; Cấp Xã chỉ xã mình) — trạng thái nhìn theo giờ khóa
+      operationId: priceListDayTickets
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}, description: "Ngày báo giá (vắng → hôm nay)"}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: mine, in: query, required: false, schema: {type: boolean}, description: "Cấp Tỉnh: chỉ xã được phân công"}
+      responses:
+        "200":
+          description: Phiếu trong ngày
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceTicketDay"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 441
+  /v1/price/tickets/sheet:
+    get:
+      summary: Phiếu báo giá của một xã một ngày (màn Nhập báo giá FN-XA-03.01; Sửa phiếu / Nhập thay FN-TI-02.04, 02.09) — mặt hàng của xã, giá tham chiếu (CT-02), ngưỡng, cảnh báo
+      operationId: priceGetSheet
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: point, in: query, required: false, schema: {type: string}, description: "Mã xã báo giá; Cấp Xã phụ trách đúng một xã có thể bỏ trống"}
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Phiếu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSheet"}
+        "403": {description: forbidden | price.point_not_assigned, $ref: "#/components/responses/Problem"}
+        "404": {description: price.point_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Cán bộ Xã lưu nháp (submit = false) hoặc gửi / gửi lại (submit = true) phiếu ngày báo giá hôm nay, trước giờ khóa — gửi sinh / cập nhật / tự hủy cảnh báo Tạm tính
+      operationId: priceSaveSheet
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceEntryInput"}
+      responses:
+        "201":
+          description: Phiếu sau khi lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSheet"}
+        "403": {description: forbidden | price.point_not_assigned, $ref: "#/components/responses/Problem"}
+        "404": {description: price.point_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.ticket_locked | price.ticket_stale | price.ticket_exists | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.price_invalid | price.ticket_incomplete | price.not_quote_day | price.point_inactive, $ref: "#/components/responses/Problem"}
+# @ag-order: 442
+  /v1/price/tickets/proxy:
+    post:
+      summary: Cấp Tỉnh nhập thay phiếu của xã Không nộp (FN-TI-02.09) — sau giờ khóa, lý do bắt buộc; submit = true → Nộp muộn
+      operationId: priceSaveProxy
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceEntryInput"}
+      responses:
+        "201":
+          description: Phiếu sau khi lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSheet"}
+        "403": {description: forbidden | price.point_not_handled, $ref: "#/components/responses/Problem"}
+        "404": {description: price.point_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.ticket_not_locked | price.ticket_exists | price.ticket_stale | price.board_approved, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.reason_required | price.price_invalid | price.ticket_incomplete | price.not_quote_day, $ref: "#/components/responses/Problem"}
+# @ag-order: 443
+  /v1/price/tickets/history:
+    get:
+      summary: Lịch sử báo giá của một xã (FN-XA-03.03) — mỗi ngày báo giá một dòng (Không nộp khi không có phiếu) và phiếu Đã xóa; khoảng ≤ 12 tháng
+      operationId: priceTicketHistory
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: point, in: query, required: false, schema: {type: string}}
+        - {name: from, in: query, required: false, schema: {type: string, format: date}, description: "Vắng → 30 ngày trước to"}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}, description: "Vắng → hôm nay"}
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rows]
+                properties:
+                  rows: {type: array, items: {$ref: "#/components/schemas/PriceHistoryRow"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 444
+  /v1/price/tickets/export:
+    get:
+      summary: Xuất Excel chi tiết báo giá của một ngày theo bộ lọc (FN-TI-02.02 luồng phụ) — Cấp Tỉnh, Admin
+      operationId: priceExportTickets
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: mine, in: query, required: false, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+# @ag-order: 445
+  /v1/price/tickets/print:
+    get:
+      summary: In một hoặc nhiều phiếu (gộp một tệp) theo bố cục File 2 dạng bảng (FN-XA-03.02) — PDF hoặc Excel; giá in là giá Xã gửi kèm chú thích hiệu chỉnh / loại
+      operationId: pricePrintTickets
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: ticket, in: query, required: true, schema: {type: array, items: {type: string, format: uuid}}, style: form, explode: true}
+        - {name: format, in: query, required: false, schema: {type: string, enum: [pdf, xlsx]}}
+      responses:
+        "200":
+          description: Tệp PDF hoặc .xlsx
+          content:
+            application/pdf:
+              schema: {type: string, format: binary}
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden | price.point_not_assigned, $ref: "#/components/responses/Problem"}
+        "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict (phiếu Không nộp / Đã xóa không in được), $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: price.pdf_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 446
+  /v1/price/tickets/{id}:
+    get:
+      summary: Một phiếu theo mã (kể cả phiếu Đã xóa) — chi tiết phiếu, lịch sử hiệu chỉnh, trao đổi xác minh
+      operationId: priceGetTicket
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Phiếu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSheet"}
+        "403": {description: forbidden | price.point_not_assigned, $ref: "#/components/responses/Problem"}
+        "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 447
+  /v1/price/tickets/{id}/log:
+    get:
+      summary: Nhật ký phiếu — mọi phiên bản đầu phiếu, dòng giá, cảnh báo (người, thời điểm, giá trị, lý do)
+      operationId: priceTicketLog
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Nhật ký
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceTicketLog"}
+        "403": {description: forbidden | price.point_not_assigned, $ref: "#/components/responses/Problem"}
+        "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 448
+  /v1/price/tickets/{id}/correct:
+    post:
+      summary: Cấp Tỉnh hiệu chỉnh giá thấp nhất / cao nhất của các dòng (FN-TI-02.04) — lý do bắt buộc; giữ giá Xã gửi; cảnh báo của dòng → Đã hiệu chỉnh
+      operationId: priceCorrectTicket
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceCorrectInput"}
+      responses:
+        "201":
+          description: Phiếu sau khi hiệu chỉnh
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSheet"}
+        "403": {description: forbidden | price.point_not_handled, $ref: "#/components/responses/Problem"}
+        "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.ticket_not_locked | price.ticket_stale | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.reason_required | price.price_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 449
+  /v1/price/tickets/{id}/redate:
+    post:
+      summary: Cấp Tỉnh sửa ngày phiếu nhập nhầm ngày (FN-TI-02.04 B3) — chặn ngày xã đã có phiếu, ngày đã duyệt, ngày không phải ngày báo giá / chưa qua giờ khóa
+      operationId: priceRedateTicket
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceRedateInput"}
+      responses:
+        "201":
+          description: Phiếu sau khi sửa ngày
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSheet"}
+        "403": {description: forbidden | price.point_not_handled, $ref: "#/components/responses/Problem"}
+        "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.ticket_exists | price.ticket_not_locked | price.ticket_stale | price.board_approved, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.reason_required | price.not_quote_day | price.point_inactive, $ref: "#/components/responses/Problem"}
+# @ag-order: 450
+  /v1/price/tickets/{id}/delete:
+    post:
+      summary: Cấp Tỉnh xóa mềm phiếu sai / trùng (FN-TI-02.04) — lý do bắt buộc; phiếu Đã xóa không tính vào bảng giá, thống kê
+      operationId: priceDeleteTicket
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceDeleteInput"}
+      responses:
+        "201":
+          description: Phiếu sau khi xóa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSheet"}
+        "403": {description: forbidden | price.point_not_handled, $ref: "#/components/responses/Problem"}
+        "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.ticket_not_locked | price.ticket_stale | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.reason_required, $ref: "#/components/responses/Problem"}
+# @ag-order: 451
+  /v1/price/alerts:
+    get:
+      summary: Cảnh báo biến động (FN-TI-02.03 B2) / Yêu cầu xác minh của Xã (FN-XA-03.05) trong khoảng ngày — trạng thái nhìn (pending, overdue) theo giờ khóa / hạn phản hồi
+      operationId: priceListAlerts
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+        - {name: mine, in: query, required: false, schema: {type: boolean}}
+        - {name: view, in: query, required: false, schema: {$ref: "#/components/schemas/PriceAlertView"}}
+      responses:
+        "200":
+          description: Cảnh báo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [alerts]
+                properties:
+                  alerts: {type: array, items: {$ref: "#/components/schemas/PriceAlertRow"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 452
+  /v1/price/alerts/request:
+    post:
+      summary: Cấp Tỉnh gửi yêu cầu xác minh cho một hoặc nhiều cảnh báo (trước hoặc sau giờ khóa) — nội dung bắt buộc; hạn phản hồi theo lịch
+      operationId: priceRequestVerification
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceVerificationRequest"}
+      responses:
+        "201":
+          description: Số cảnh báo đã gửi yêu cầu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWritten"}
+        "403": {description: forbidden | price.point_not_handled, $ref: "#/components/responses/Problem"}
+        "404": {description: price.alert_not_found | price.ticket_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.alert_state | price.board_approved, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.reason_required, $ref: "#/components/responses/Problem"}
+# @ag-order: 453
+  /v1/price/alerts/respond:
+    post:
+      summary: Cán bộ Xã phản hồi yêu cầu xác minh của xã mình (FN-XA-03.05) — giữ giá / đề xuất giá đúng, giải trình bắt buộc; trước hạn phản hồi; không đổi giá trên phiếu
+      operationId: priceRespondVerification
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceVerificationResponse"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWritten"}
+        "403": {description: forbidden | price.point_not_assigned, $ref: "#/components/responses/Problem"}
+        "404": {description: price.alert_not_found | price.ticket_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.alert_state | price.respond_overdue | price.board_approved, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.reason_required | price.price_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 454
+  /v1/price/alerts/decide:
+    post:
+      summary: Cấp Tỉnh chốt cảnh báo sau giờ khóa (FN-TI-02.03 B6) — keep (Giữ nguyên, ghi chú) | exclude (Loại khỏi bảng giá, lý do) | reopen (khi bảng giá đang mở duyệt); hiệu chỉnh dùng /tickets/{id}/correct
+      operationId: priceDecideAlert
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceAlertDecision"}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceWritten"}
+        "403": {description: forbidden | price.point_not_handled, $ref: "#/components/responses/Problem"}
+        "404": {description: price.alert_not_found | price.ticket_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.alert_state | price.ticket_not_locked | price.board_approved, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.reason_required, $ref: "#/components/responses/Problem"}
+  # --- hết pf/price W11.75 ---
+  # --- pf/price W11.76: duyệt / mở duyệt bảng giá ngày (FN-TI-02.05, 02.06) ---
+# @ag-order: 455
+  /v1/price/boards:
+    get:
+      summary: Trạng thái bảng giá các ngày báo giá trong khoảng (tối đa 62 ngày; vắng → 14 ngày tới hôm nay) — mọi vai của bên dùng
+      operationId: priceListBoards
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Bảng giá theo ngày
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [boards]
+                properties:
+                  boards: {type: array, items: {$ref: "#/components/schemas/PriceBoardDay"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 456
+  /v1/price/boards/{day}:
+    get:
+      summary: Bảng giá một ngày ở màn Kiểm duyệt & công bố — trạng thái, tóm tắt kỳ, xem trước (CT-04), phiên bản đã duyệt, nhật ký; Cấp TW / Xã chỉ nhận trạng thái + phiên bản đã duyệt
+      operationId: priceGetBoard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceBoardDay"
+      responses:
+        "200":
+          description: Bảng giá
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 457
+  /v1/price/boards/{day}/lock:
+    post:
+      summary: Duyệt bảng giá — chuyển Đang duyệt, giữ khóa một người (10 phút) tới khi xác nhận / hủy; cần đã qua giờ khóa, hết cảnh báo chưa xử lý, có dòng giá
+      operationId: priceLockBoard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceBoardDay"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceBoardOp"}
+      responses:
+        "201":
+          description: Bảng giá Đang duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: "forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11)", $ref: "#/components/responses/Problem"}
+        "409": {description: price.board_busy | price.board_state | price.board_stale | price.board_not_locked | price.board_open_alerts, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.not_quote_day | price.board_empty, $ref: "#/components/responses/Problem"}
+# @ag-order: 458
+  /v1/price/boards/{day}/unlock:
+    post:
+      summary: Hủy Đang duyệt của mình — về trạng thái trước khóa
+      operationId: priceUnlockBoard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceBoardDay"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceBoardOp"}
+      responses:
+        "201":
+          description: Bảng giá
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: "forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11)", $ref: "#/components/responses/Problem"}
+        "409": {description: price.board_busy | price.board_state | price.board_stale, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 459
+  /v1/price/boards/{day}/approve:
+    post:
+      summary: Xác nhận duyệt — phiên bản mới; ảnh chụp dòng bảng giá (CT-04) + phiếu; khóa tuần lưu lúc duyệt; phát pf.price.board.published
+      operationId: priceApproveBoard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceBoardDay"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceBoardOp"}
+      responses:
+        "201":
+          description: Bảng giá Đã duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: "forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11)", $ref: "#/components/responses/Problem"}
+        "409": {description: price.board_busy | price.board_state | price.board_stale | price.board_not_locked | price.board_open_alerts, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.not_quote_day | price.board_empty, $ref: "#/components/responses/Problem"}
+# @ag-order: 460
+  /v1/price/boards/{day}/reopen:
+    post:
+      summary: Mở duyệt (FN-TI-02.06) — lý do bắt buộc; ngày trong giới hạn (mặc định 30 ngày); phiên bản đã duyệt vẫn công bố kèm cờ Đang cập nhật
+      operationId: priceReopenBoard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceBoardDay"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceBoardOp"}
+      responses:
+        "201":
+          description: Bảng giá Đang mở duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: "forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11)", $ref: "#/components/responses/Problem"}
+        "409": {description: price.board_busy | price.board_state | price.board_stale, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.reason_required | price.reopen_expired, $ref: "#/components/responses/Problem"}
+# @ag-order: 461
+  /v1/price/boards/{day}/cancel-reopen:
+    post:
+      summary: Hủy mở duyệt khi chưa sửa gì — về Đã duyệt phiên bản cũ
+      operationId: priceCancelReopenBoard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/PriceBoardDay"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceBoardOp"}
+      responses:
+        "201":
+          description: Bảng giá Đã duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: "forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11)", $ref: "#/components/responses/Problem"}
+        "409": {description: price.board_busy | price.board_state | price.board_stale | price.board_changed, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  # --- hết pf/price W11.76 ---
+  # --- pf/price W11.77: báo cáo giá (FN-TI-02.01, FN-TI-02.08, FN-TW-01.01…03) ---
+# @ag-order: 462
+  /v1/price/reports/progress:
+    get:
+      summary: "FN-TI-02.01 Tiến độ nhập giá — xã đang hoạt động trong ngày báo giá, trạng thái phiếu tại lúc đọc, số mặt hàng ▲/▼, lần hệ thống đã nhắc; thẻ đếm trên bảng đã lọc. Ngày không phải ngày báo giá → ngày báo giá gần nhất trước đó (no_quote). Cấp Tỉnh, Admin"
+      operationId: priceReportProgress
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: status, in: query, required: false, schema: {type: string}, description: "Mã trạng thái phiếu (not_entered, draft, submitted, locked, missed, late, approved) hoặc incomplete | unassigned | no_officer"}
+        - {name: point, in: query, required: false, schema: {type: string}}
+        - {name: mine, in: query, required: false, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Tiến độ nhập giá
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceProgress"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 463
+  /v1/price/reports/progress/export:
+    get:
+      summary: Xuất Excel Tiến độ nhập giá theo bộ lọc (luồng phụ FN-TI-02.01)
+      operationId: priceReportProgressExport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: status, in: query, required: false, schema: {type: string}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+        - {name: mine, in: query, required: false, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+# @ag-order: 464
+  /v1/price/reports/summary:
+    get:
+      summary: "FN-TW-01.01 Bảng giá tổng hợp — phiên bản đã duyệt mới nhất của ngày (vắng → ngày công bố gần nhất), CT-04 theo nhóm vùng, tăng/giảm so bảng giá công bố liền trước; ngày đang mở duyệt → phiên bản cũ (updating). Mọi vai, chỉ xem"
+      operationId: priceReportSummary
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: group, in: query, required: false, schema: {type: string}}
+        - {name: view, in: query, required: false, schema: {type: string, enum: [item, point]}}
+        - {name: item, in: query, required: false, schema: {type: string}, description: Giá từng xã của một mặt hàng}
+      responses:
+        "200":
+          description: Bảng giá tổng hợp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSummary"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 465
+  /v1/price/reports/summary/export:
+    get:
+      summary: Xuất Excel Bảng giá tổng hợp theo bộ lọc (B3 FN-TW-01.01)
+      operationId: priceReportSummaryExport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: group, in: query, required: false, schema: {type: string}}
+        - {name: view, in: query, required: false, schema: {type: string, enum: [item, point]}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.report_empty, $ref: "#/components/responses/Problem"}
+# @ag-order: 466
+  /v1/price/reports/movement:
+    get:
+      summary: "FN-TW-01.02 Báo cáo tăng giảm, biến động giá — kỳ ngày / tuần / tháng chứa ngày chọn so kỳ liền trước (giá kỳ = trung bình Giá trung bình các ngày công bố), thẻ tăng/giảm/đi ngang/số lần vượt ngưỡng, xu hướng 8 kỳ, chi tiết theo xã. Mọi vai, chỉ xem"
+      operationId: priceReportMovement
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: period, in: query, required: false, schema: {type: string, enum: [day, week, month]}}
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+        - {name: group, in: query, required: false, schema: {type: string}}
+        - {name: item, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Biến động giá
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceMovement"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 467
+  /v1/price/reports/movement/export:
+    get:
+      summary: Xuất Báo cáo biến động đúng bộ lọc — Excel hoặc PDF; chỉ Cấp Tỉnh, Admin (BR-04, AC-03 FN-TW-01.02)
+      operationId: priceReportMovementExport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: format, in: query, required: false, schema: {type: string, enum: [xlsx, pdf]}}
+        - {name: period, in: query, required: false, schema: {type: string, enum: [day, week, month]}}
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+        - {name: group, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Tệp .xlsx / .pdf
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+            application/pdf:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.report_empty, $ref: "#/components/responses/Problem"}
+        "503": {description: price.pdf_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 468
+  /v1/price/reports/dashboard:
+    get:
+      summary: "FN-TW-01.03 Dashboard tổng hợp giá theo vùng — ngày công bố gần nhất, thẻ chỉ số, giá trung bình mặt hàng Cơ bản theo nhóm vùng (all=true: mọi mặt hàng), biến động theo nhóm hàng, xu hướng 30 ngày công bố, bấm vùng → giá từng xã. Cấp TW, Cấp Tỉnh, Admin"
+      operationId: priceReportDashboard
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: group, in: query, required: false, schema: {type: string}}
+        - {name: item, in: query, required: false, schema: {type: string}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: all, in: query, required: false, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Dashboard
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceDashboard"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 469
+  /v1/price/reports/dashboard/export:
+    get:
+      summary: Xuất Excel số liệu Dashboard theo vùng (luồng phụ FN-TW-01.03)
+      operationId: priceReportDashboardExport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: query, required: false, schema: {type: string, format: date}}
+        - {name: group, in: query, required: false, schema: {type: string}}
+        - {name: all, in: query, required: false, schema: {type: boolean}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.report_empty, $ref: "#/components/responses/Problem"}
+# @ag-order: 470
+  /v1/price/reports/stats:
+    get:
+      summary: "FN-TI-02.08 Thống kê phiếu báo giá theo cán bộ Xã — tháng (month) hoặc khoảng ngày; phải nộp = ngày báo giá đã qua giờ khóa mà xã hoạt động và có cán bộ Xã; nhập thay ở cột Nộp muộn của cán bộ phụ trách; tháng đã khóa (Q-085) đọc ảnh chụp. Cấp Tỉnh, Admin"
+      operationId: priceReportStats
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: month, in: query, required: false, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - {name: from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Thống kê phiếu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceStats"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 471
+  /v1/price/reports/stats/export:
+    get:
+      summary: Xuất Excel Thống kê phiếu báo giá (B3 FN-TI-02.08)
+      operationId: priceReportStatsExport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: month, in: query, required: false, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - {name: from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 472
+  /v1/price/reports/stats/detail:
+    get:
+      summary: Danh sách ngày phải nộp của một cán bộ Xã theo ngày và trạng thái (luồng phụ FN-TI-02.08; số liệu hiện tại)
+      operationId: priceReportStatsDetail
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: officer, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: month, in: query, required: false, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - {name: from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}}
+        - {name: point, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Ngày phải nộp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [days]
+                properties:
+                  days: {type: array, items: {$ref: "#/components/schemas/PriceStatDay"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 473
+  /v1/price/reports/stats/close:
+    post:
+      summary: Khóa thống kê phiếu của một tháng đã kết thúc (Q-085) — chụp số liệu theo cán bộ Xã; chỉ Quản trị nghiệp vụ báo giá (D11)
+      operationId: priceReportStatsClose
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceStatMonthOp"}
+      responses:
+        "201":
+          description: Thống kê tháng sau khi khóa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceStats"}
+        "403": {description: forbidden | price.board_steward_required, $ref: "#/components/responses/Problem"}
+        "409": {description: price.stat_month_open | price.stat_month_state | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 474
+  /v1/price/reports/stats/reopen:
+    post:
+      summary: Mở lại thống kê tháng đã khóa (lý do bắt buộc) — tính lại từ phiếu tới lần khóa sau; chỉ Quản trị nghiệp vụ báo giá (D11)
+      operationId: priceReportStatsReopen
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceStatMonthOp"}
+      responses:
+        "201":
+          description: Thống kê tháng sau khi mở lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceStats"}
+        "403": {description: forbidden | price.board_steward_required, $ref: "#/components/responses/Problem"}
+        "409": {description: price.stat_month_state | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.reason_required, $ref: "#/components/responses/Problem"}
+  # --- hết pf/price W11.77 ---
+  # --- hết pf/price ---
+  # --- W11.61 (D4 KH1, BRD KHTC v2.2 FN-AD-04.01, FN-TI-02.02): Danh mục KHTC, danh sách CT/DA chủ (D20), Kế hoạch năm. Mọi route cần header X-AG-Context (client tự gắn) ---
+components:
+  parameters:
+# @ag-order: 498
+    PriceBoardDay:
+      name: day
+      in: path
+      required: true
+      schema: {type: string, format: date}
+      description: Ngày báo giá (giờ VN)
+# @ag-order: 499
+    PriceProfile:
+      name: profile
+      in: query
+      required: false
+      description: Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên.
+      schema: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$"}
+# @ag-order: 500
+    PriceAt:
+      name: at
+      in: query
+      required: false
+      description: Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN)
+      schema: {type: string, format: date}
+# @ag-order: 501
+    PriceItemCode:
+      name: code
+      in: path
+      required: true
+      description: Mã mặt hàng (MH + 5 chữ số)
+      schema: {type: string, pattern: "^MH[0-9]{5}$"}
+  schemas:
+# @ag-order: 978
+    PriceStatus:
+      type: object
+      required: [profile, department, level, can_manage, can_steward, rule_version, day, units, groups]
+      properties:
+        profile: {type: string}
+        department: {type: string, description: "Mã phòng ban chủ dữ liệu giá của bên dùng (KN: Phòng TTTT)"}
+        level: {type: string, description: "Cấp của người gọi trong bên dùng (TW | TINH | XA); rỗng nếu chỉ có vai quản trị"}
+        can_manage: {type: boolean, description: "Vai quản trị (Admin): danh mục nền, xã báo giá, phân công"}
+        can_steward: {type: boolean, description: "W11.72: Quản trị nghiệp vụ báo giá — vai quản trị hoặc Cấp Tỉnh có cờ qtnv_bao_gia (lịch, ngưỡng, mặt hàng)"}
+        rule_version: {type: string}
+        day: {type: string, format: date}
+        units: {type: integer, minimum: 0}
+        groups: {type: integer, minimum: 0}
+# @ag-order: 979
+    PriceCatalogEntry:
+      type: object
+      required: [code, name, sort_order, version, valid_from]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        sort_order: {type: integer}
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date}
+# @ag-order: 980
+    PriceCatalog:
+      type: object
+      required: [day, units, groups, regions]
+      properties:
+        day: {type: string, format: date}
+        units: {type: array, items: {$ref: "#/components/schemas/PriceCatalogEntry"}}
+        groups: {type: array, items: {$ref: "#/components/schemas/PriceCatalogEntry"}}
+        regions: {type: array, items: {$ref: "#/components/schemas/PriceCatalogEntry"}, description: "W11.72 nhóm vùng"}
+    # --- pf/price W11.73 (mặt hàng theo thời kỳ) ---
+# @ag-order: 981
+    PriceWriteResult:
+      type: object
+      required: [code, version, valid_from, written]
+      properties:
+        code: {type: string, description: "Mã mặt hàng / nhóm / bộ / xã; mã đề xuất (uuid) khi tạo hoặc từ chối đề xuất"}
+        version: {type: integer, minimum: 0}
+        valid_from: {type: string, format: date}
+        written: {type: integer, minimum: 0, description: Số dòng sổ đã ghi}
+# @ag-order: 982
+    PriceItem:
+      type: object
+      required: [code, name, variety, group_code, unit_code, spec, sale_place, kind, sort_order, version, valid_from, valid_to, since, state,
+        replaces_code, note, point_count, has_price, new_price, gated, proposal_id]
+      properties:
+        code: {type: string, pattern: "^MH[0-9]{5}$"}
+        name: {type: string}
+        variety: {type: string, description: Giống / phẩm cấp}
+        group_code: {type: string}
+        unit_code: {type: string}
+        spec: {type: [string, "null"], description: Quy cách}
+        sale_place: {type: [string, "null"], description: Nơi bán}
+        kind: {type: string, enum: [basic, local]}
+        sort_order: {type: integer}
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date, description: Ngày hiệu lực của phiên bản hiển thị}
+        valid_to: {type: [string, "null"], format: date, description: Hiệu lực đến (null = không thời hạn)}
+        since: {type: [string, "null"], format: date, description: Ngày mặt hàng bắt đầu hiệu lực}
+        state: {type: string, enum: [active, pending, retired]}
+        replaces_code: {type: [string, "null"], description: "Thay thế cho"}
+        note: {type: [string, "null"], description: Lý do ngưng}
+        point_count: {type: [integer, "null"], description: "Số xã đang gán (Địa phương); null với mặt hàng Cơ bản (mọi xã)"}
+        has_price: {type: boolean}
+        new_price: {type: boolean, description: Nhãn "Giá mới" — mặt hàng thay thế chưa có giá}
+        gated: {type: boolean, description: Thuộc bộ theo vụ đang tắt tại ngày}
+        proposal_id: {type: [string, "null"], format: uuid}
+# @ag-order: 983
+    PriceItemList:
+      type: object
+      required: [day, items, pending_proposals, can_edit, can_steward]
+      properties:
+        day: {type: string, format: date}
+        items: {type: array, items: {$ref: "#/components/schemas/PriceItem"}}
+        pending_proposals: {type: integer, minimum: 0}
+        can_edit: {type: boolean, description: Thêm mặt hàng, sửa mặt hàng chưa có giá}
+        can_steward: {type: boolean, description: Quản trị nghiệp vụ — ngưng, thứ tự, nhóm, gán xã, bộ theo vụ, đề xuất}
+# @ag-order: 984
+    PriceItemVersion:
+      type: object
+      required: [version, status, valid_from, name, variety, group_code, unit_code, spec, sale_place, kind, sort_order, note, event_time,
+        actor_ref, proposal_id]
+      properties:
+        version: {type: integer, minimum: 1}
+        status: {type: string, enum: [active, retired]}
+        valid_from: {type: string, format: date}
+        name: {type: string}
+        variety: {type: string}
+        group_code: {type: string}
+        unit_code: {type: string}
+        spec: {type: [string, "null"]}
+        sale_place: {type: [string, "null"]}
+        kind: {type: string, enum: [basic, local]}
+        sort_order: {type: integer}
+        note: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        proposal_id: {type: [string, "null"], format: uuid}
+# @ag-order: 985
+    PriceItemDetail:
+      allOf:
+        - $ref: "#/components/schemas/PriceItem"
+        - type: object
+          required: [history, replaced_by]
+          properties:
+            history: {type: array, items: {$ref: "#/components/schemas/PriceItemVersion"}}
+            replaced_by: {type: array, items: {type: string}}
+# @ag-order: 986
+    PriceItemInput:
+      type: object
+      required: [name, variety, group_code, unit_code]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100, description: Tên loại}
+        variety: {type: string, minLength: 1, maxLength: 100, description: Giống / phẩm cấp (bắt buộc — BR-07)}
+        group_code: {type: string}
+        unit_code: {type: string}
+        spec: {type: string, maxLength: 100}
+        sale_place: {type: string, maxLength: 200}
+        kind: {type: string, enum: [basic, local], description: "Bắt buộc khi thêm; duyệt đề xuất mặc định local"}
+        valid_from: {type: string, format: date, description: Vắng → ngày báo giá kế tiếp}
+        valid_to: {type: string, format: date, description: Chỉ khi thêm}
+        replaces_code: {type: string, description: "Thay thế cho — chỉ khi thêm"}
+        points: {type: array, items: {type: string}, description: "Xã áp dụng mặt hàng Địa phương — chỉ khi thêm/duyệt"}
+# @ag-order: 987
+    PriceGroup:
+      type: object
+      required: [code, name, sort_order, version, valid_from, items]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        sort_order: {type: integer}
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date}
+        items: {type: integer, minimum: 0}
+# @ag-order: 988
+    PriceGroupInput:
+      type: object
+      required: [name]
+      properties:
+        code: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$", description: Chỉ khi thêm; vắng → nhom_<n>}
+        name: {type: string, minLength: 1, maxLength: 100}
+        sort_order: {type: integer, minimum: 0, description: 0 → cuối danh sách (thêm) / giữ nguyên (sửa)}
+# @ag-order: 989
+    PriceAssignment:
+      type: object
+      required: [point_code, item_code, version, valid_from]
+      properties:
+        point_code: {type: string}
+        item_code: {type: string}
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date}
+# @ag-order: 990
+    PriceAssignInput:
+      type: object
+      required: [point_code, item_codes]
+      properties:
+        point_code: {type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"}
+        item_codes: {type: array, minItems: 1, maxItems: 500, items: {type: string}}
+        valid_from: {type: string, format: date}
+# @ag-order: 991
+    PriceItemSet:
+      type: object
+      required: [code, name, season, item_codes, enabled, version, valid_from, state]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        season: {type: string}
+        item_codes: {type: array, items: {type: string}}
+        enabled: {type: boolean}
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date}
+        state: {type: string, enum: [active, pending, retired]}
+# @ag-order: 992
+    PriceItemSetInput:
+      type: object
+      required: [name, season, item_codes, enabled]
+      properties:
+        code: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$", description: Bắt buộc khi tạo}
+        name: {type: string, minLength: 1, maxLength: 100}
+        season: {type: string, minLength: 1, maxLength: 50}
+        item_codes: {type: array, minItems: 1, maxItems: 500, items: {type: string}}
+        enabled: {type: boolean}
+        valid_from: {type: string, format: date}
+        retire: {type: boolean, description: Ngưng bộ (chỉ khi sửa)}
+# @ag-order: 993
+    PriceProposal:
+      type: object
+      required: [id, version, point_code, name, variety, group_code, unit_code, spec, reason, status, item_code, decision_note, proposer_ref,
+        created_at, decided_at]
+      properties:
+        id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        point_code: {type: string}
+        name: {type: string}
+        variety: {type: string}
+        group_code: {type: string}
+        unit_code: {type: string}
+        spec: {type: [string, "null"]}
+        reason: {type: string}
+        status: {type: string, enum: [pending, approved, rejected]}
+        item_code: {type: [string, "null"]}
+        decision_note: {type: [string, "null"]}
+        proposer_ref: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+        decided_at: {type: [string, "null"], format: date-time}
+# @ag-order: 994
+    PriceProposalInput:
+      type: object
+      required: [name, variety, group_code, unit_code, reason]
+      properties:
+        point_code:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+          description: "Mã xã báo giá (W11.72). Cấp Xã: xã mình phụ trách chính hôm nay — vắng khi phụ trách đúng một xã; Cấp Tỉnh: bắt buộc"
+        name: {type: string, minLength: 1, maxLength: 100}
+        variety: {type: string, minLength: 1, maxLength: 100}
+        group_code: {type: string}
+        unit_code: {type: string}
+        spec: {type: string, maxLength: 100}
+        reason: {type: string, minLength: 1, maxLength: 500}
+    # --- pf/price (W11.72) ---
+# @ag-order: 995
+    PriceRegion:
+      type: object
+      required: [code, name, sort_order, version, valid_from, status, points]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        sort_order: {type: integer}
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date}
+        status: {type: string, enum: [active, retired]}
+        points: {type: integer, minimum: 0, description: Số xã báo giá đang hoạt động thuộc nhóm tại ngày}
+# @ag-order: 996
+    PriceRegionInput:
+      type: object
+      required: [name]
+      properties:
+        code: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$", description: "Chỉ khi thêm; vắng → vung_<n>"}
+        name: {type: string, minLength: 1, maxLength: 100}
+        sort_order: {type: integer, minimum: 0}
+# @ag-order: 997
+    PricePoint:
+      type: object
+      required: [code, name, admin_unit_code, admin_unit_name, admin_unit_valid, successor_codes, region_code, region_name, state, version,
+        valid_from, since, valid_to, note, officer_ref, officer_name, officer_since, owner_ref, owner_name, owner_since, item_count]
+      properties:
+        code: {type: string, pattern: "^XBG[0-9]{4}$"}
+        name: {type: string, description: Tên xã theo ĐVHC tại ngày hiệu lực của phiên bản}
+        admin_unit_code: {type: string}
+        admin_unit_name: {type: string}
+        admin_unit_valid: {type: boolean, description: "ĐVHC còn hiệu lực tại ngày — false: cần chuyển sang mã ĐVHC kế thừa"}
+        successor_codes: {type: array, items: {type: string}}
+        region_code: {type: string}
+        region_name: {type: string}
+        state: {type: string, enum: [active, pending, retired]}
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date}
+        since: {type: string, format: date, nullable: true, description: Ngày bắt đầu báo giá}
+        valid_to: {type: string, format: date, nullable: true}
+        note: {type: string, nullable: true}
+        officer_ref: {type: string, format: uuid, nullable: true, description: "Cán bộ Xã phụ trách chính tại ngày (null = Chưa có cán bộ Xã)"}
+        officer_name: {type: string, nullable: true, description: Chỉ vai quản trị và Cấp Tỉnh}
+        officer_since: {type: string, format: date, nullable: true}
+        owner_ref: {type: string, format: uuid, nullable: true, description: "Cán bộ Cấp Tỉnh được phân công (null = Chưa phân công)"}
+        owner_name: {type: string, nullable: true}
+        owner_since: {type: string, format: date, nullable: true}
+        item_count: {type: integer, minimum: 0}
+# @ag-order: 998
+    PricePointVersion:
+      type: object
+      required: [version, valid_from, status, admin_unit_code, name, region_code, note, event_time, actor_ref]
+      properties:
+        version: {type: integer, minimum: 1}
+        valid_from: {type: string, format: date}
+        status: {type: string, enum: [active, retired]}
+        admin_unit_code: {type: string}
+        name: {type: string}
+        region_code: {type: string}
+        note: {type: string, nullable: true}
+        event_time: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+# @ag-order: 999
+    PricePointOfficerVersion:
+      type: object
+      required: [role, officer_ref, name, valid_from, version, event_time, actor_ref]
+      properties:
+        role: {type: string, enum: [xa, tinh]}
+        officer_ref: {type: string, format: uuid, nullable: true}
+        name: {type: string, nullable: true}
+        valid_from: {type: string, format: date}
+        version: {type: integer, minimum: 1}
+        event_time: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+# @ag-order: 1000
+    PricePointDetail:
+      type: object
+      required: [point, versions, officers]
+      properties:
+        point: {$ref: "#/components/schemas/PricePoint"}
+        versions: {type: array, items: {$ref: "#/components/schemas/PricePointVersion"}}
+        officers: {type: array, items: {$ref: "#/components/schemas/PricePointOfficerVersion"}}
+# @ag-order: 1001
+    PricePointInput:
+      type: object
+      properties:
+        admin_unit_code: {type: string, description: "Thêm: bắt buộc; sửa: vắng = giữ"}
+        region_code: {type: string, description: "Thêm: bắt buộc; sửa: vắng = giữ"}
+        valid_from: {type: string, format: date, description: "Vắng → ngày báo giá kế tiếp"}
+        note: {type: string, maxLength: 500}
+        reason: {type: string, maxLength: 500, description: "Ngưng: lý do (bắt buộc — hoặc gửi trong note)"}
+# @ag-order: 1002
+    PriceOfficerInput:
+      type: object
+      required: [role]
+      properties:
+        role: {type: string, enum: [xa, tinh]}
+        officer_ref: {type: string, format: uuid, nullable: true}
+        valid_from: {type: string, format: date}
+# @ag-order: 1003
+    PriceAdminUnit:
+      type: object
+      required: [code, name, parent_code, valid_from, valid_to, taken_by]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        parent_code: {type: string, nullable: true}
+        valid_from: {type: string, format: date}
+        valid_to: {type: string, format: date, nullable: true}
+        taken_by: {type: string, nullable: true, description: Mã xã báo giá đang gắn ĐVHC tại ngày}
+# @ag-order: 1004
+    PriceOfficer:
+      type: object
+      required: [ref, name, level, communes]
+      properties:
+        ref: {type: string, format: uuid}
+        name: {type: string}
+        level: {type: string, enum: [XA, TINH]}
+        communes: {type: array, items: {type: string}}
+    # --- pf/price (W11.74) ---
+# @ag-order: 1005
+    PriceSchedule:
+      type: object
+      required: [weekdays, lock_at, respond_by, remind1_at, remind2_at, channels, template, valid_from, version]
+      properties:
+        weekdays: {type: array, items: {type: string, enum: [mon, tue, wed, thu, fri, sat, sun]}}
+        lock_at: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", description: "Giờ khóa nhập (giờ VN), mặc định 12:00"}
+        respond_by: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", description: "Hạn phản hồi xác minh, mặc định 13:30"}
+        remind1_at: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        remind2_at: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        channels: {type: array, items: {type: string, enum: [in_app, email]}}
+        template: {type: string}
+        valid_from: {type: ["string", "null"], format: date, description: "null = mặc định của bên dùng (chưa có phiên bản)"}
+        version: {type: integer, minimum: 0}
+# @ag-order: 1006
+    PriceScheduleInput:
+      type: object
+      required: [weekdays, lock_at, respond_by, remind1_at, remind2_at, channels, template, valid_from]
+      properties:
+        weekdays: {type: array, minItems: 1, items: {type: string, enum: [mon, tue, wed, thu, fri, sat, sun]}}
+        lock_at: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        respond_by: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        remind1_at: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        remind2_at: {type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        channels: {type: array, minItems: 1, items: {type: string, enum: [in_app, email]}}
+        template: {type: string, minLength: 1, maxLength: 500, description: "Biến {ngày}, {xã}, {giờ khóa}"}
+        valid_from: {type: string, format: date}
+# @ag-order: 1007
+    PriceCalendarDay:
+      type: object
+      required: [day, weekday, kind, quote, reason, lock_at, respond_by, remind1_at, remind2_at]
+      properties:
+        day: {type: string, format: date}
+        weekday: {type: string, enum: [mon, tue, wed, thu, fri, sat, sun]}
+        kind: {type: string, enum: [regular, extra, holiday, off]}
+        quote: {type: boolean, description: "Là kỳ báo giá"}
+        reason: {type: string}
+        lock_at: {type: ["string", "null"], format: date-time}
+        respond_by: {type: ["string", "null"], format: date-time}
+        remind1_at: {type: ["string", "null"], format: date-time}
+        remind2_at: {type: ["string", "null"], format: date-time}
+# @ag-order: 1008
+    PriceCalendarException:
+      type: object
+      required: [day, kind, reason, version]
+      properties:
+        day: {type: string, format: date}
+        kind: {type: string, enum: [holiday, extra]}
+        reason: {type: string}
+        version: {type: integer, minimum: 1}
+# @ag-order: 1009
+    PriceScheduleHistory:
+      allOf:
+        - $ref: "#/components/schemas/PriceSchedule"
+        - type: object
+          required: [actor_ref, recorded_at]
+          properties:
+            actor_ref: {type: string, format: uuid}
+            recorded_at: {type: string, format: date-time}
+# @ag-order: 1010
+    PriceCalendar:
+      type: object
+      required: [profile, now, can_manage, today, locked, current, upcoming, earliest_valid_from, days, exceptions, history]
+      properties:
+        profile: {type: string}
+        now: {type: string, format: date-time}
+        can_manage: {type: boolean}
+        today: {$ref: "#/components/schemas/PriceCalendarDay"}
+        locked: {type: boolean, description: "Kỳ hôm nay đã khóa (Xã chỉ xem)"}
+        current: {$ref: "#/components/schemas/PriceSchedule"}
+        upcoming: {type: array, items: {$ref: "#/components/schemas/PriceSchedule"}}
+        earliest_valid_from: {type: string, format: date}
+        days: {type: array, items: {$ref: "#/components/schemas/PriceCalendarDay"}}
+        exceptions: {type: array, items: {$ref: "#/components/schemas/PriceCalendarException"}}
+        history: {type: array, items: {$ref: "#/components/schemas/PriceScheduleHistory"}}
+# @ag-order: 1011
+    PriceCalendarRun:
+      type: object
+      required: [day, kind, scheduled_at, ran_at, lag_seconds, recipients, targets, note]
+      properties:
+        day: {type: string, format: date}
+        kind: {type: string, enum: [lock, remind1, remind2]}
+        scheduled_at: {type: string, format: date-time}
+        ran_at: {type: string, format: date-time}
+        lag_seconds: {type: integer}
+        recipients: {type: integer, minimum: 0}
+        targets: {type: integer, minimum: 0, description: "Số xã (0 = thông báo chủ đề toàn tenant)"}
+        note: {type: string}
+# @ag-order: 1012
+    PriceThreshold:
+      type: object
+      required: [scope, code, pct, version]
+      properties:
+        scope: {type: string, enum: [default, group, item]}
+        code: {type: string}
+        pct: {$ref: "#/components/schemas/Decimal"}
+        lookback_days: {type: integer, minimum: 1, maximum: 60}
+        flat_pct: {$ref: "#/components/schemas/Decimal"}
+        survey_pct: {$ref: "#/components/schemas/Decimal"}
+        version: {type: integer, minimum: 0}
+        status: {type: string, enum: [active, retired]}
+        actor_ref: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+# @ag-order: 1013
+    PriceThresholdInput:
+      type: object
+      required: [scope, code, pct]
+      properties:
+        scope: {type: string, enum: [default, group, item]}
+        code: {type: string, description: "Rỗng với default; mã nhóm hàng / mặt hàng"}
+        pct: {$ref: "#/components/schemas/Decimal"}
+        lookback_days: {type: integer, minimum: 1, maximum: 60}
+        flat_pct: {$ref: "#/components/schemas/Decimal"}
+        survey_pct: {$ref: "#/components/schemas/Decimal"}
+# @ag-order: 1014
+    PriceThresholds:
+      type: object
+      required: [profile, can_manage, default, default_stored, items, history]
+      properties:
+        profile: {type: string}
+        can_manage: {type: boolean}
+        default: {$ref: "#/components/schemas/PriceThreshold"}
+        default_stored: {type: boolean, description: "false = mặc định của bên dùng (chưa ghi phiên bản)"}
+        items: {type: array, items: {$ref: "#/components/schemas/PriceThreshold"}}
+        history: {type: array, items: {$ref: "#/components/schemas/PriceThreshold"}}
+    # --- pf/price (W11.75) — phiếu báo giá + xác minh ---
+# @ag-order: 1015
+    PriceDecimalNull:
+      type: [string, "null"]
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+      description: Số thập phân dạng chuỗi hoặc null (không float)
+# @ag-order: 1016
+    PriceTicketView:
+      type: string
+      enum: [not_entered, draft, submitted, locked, missed, late, approved, deleted]
+      description: "Trạng thái phiếu nhìn tại lúc đọc (Mục II.3.1): Chưa nhập, Bản nháp, Đã gửi, Đã khóa, Không nộp, Nộp muộn, Đã duyệt, Đã xóa"
+# @ag-order: 1017
+    PriceAlertView:
+      type: string
+      enum: [provisional, pending, requested, responded, overdue, adjusted, kept, excluded, cancelled, reopened]
+      description: "Trạng thái cảnh báo (Mục II.3.2): Tạm tính, Chờ rà soát, Đã yêu cầu xác minh, Xã đã phản hồi, Quá hạn phản hồi, Đã hiệu chỉnh, Giữ nguyên, Đã loại, Tự hủy"
+# @ag-order: 1018
+    PriceTicketPoint:
+      type: object
+      required: [code, name, region_code, region_name, active, officer_ref, officer_name, owner_ref, owner_name]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        region_code: {type: string}
+        region_name: {type: string}
+        active: {type: boolean}
+        officer_ref: {type: [string, "null"], format: uuid, description: Cán bộ Xã phụ trách chính tại ngày}
+        officer_name: {type: [string, "null"], description: Tên (chỉ Cấp Tỉnh, Admin)}
+        owner_ref: {type: [string, "null"], format: uuid, description: "Cán bộ Cấp Tỉnh được phân công (null = Chưa phân công)"}
+        owner_name: {type: [string, "null"]}
+# @ag-order: 1019
+    PriceTicketHead:
+      type: object
+      required: [id, version, day, point_code, status, source, op, reason, submitted_at, officer_ref, actor_ref, actor_name, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1, description: Phiên bản đầu phiếu — gửi lại ở lần ghi kế tiếp}
+        day: {type: string, format: date}
+        point_code: {type: string}
+        status: {type: string, enum: [draft, submitted, late, deleted]}
+        source: {type: string, enum: [xa, proxy]}
+        op: {type: string, enum: [save, submit, proxy_save, proxy_submit, correct, redate, delete]}
+        reason: {type: [string, "null"]}
+        submitted_at: {type: [string, "null"], format: date-time}
+        officer_ref: {type: [string, "null"], format: uuid}
+        actor_ref: {type: string, format: uuid}
+        actor_name: {type: [string, "null"]}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 1020
+    PriceAlertVersion:
+      type: object
+      required: [version, status, direction, ref_price, price, change_pct, threshold_pct, message, respond_by, response, proposed_min,
+        proposed_max, explanation, actor_ref, at]
+      properties:
+        version: {type: integer, minimum: 1}
+        status: {type: string, enum: [provisional, cancelled, requested, responded, adjusted, kept, excluded, reopened]}
+        direction: {type: string, enum: [high, low]}
+        ref_price: {$ref: "#/components/schemas/Decimal"}
+        price: {$ref: "#/components/schemas/Decimal"}
+        change_pct: {$ref: "#/components/schemas/Decimal"}
+        threshold_pct: {$ref: "#/components/schemas/Decimal"}
+        message: {type: [string, "null"], description: Nội dung yêu cầu xác minh / ghi chú giữ nguyên / lý do loại / lý do hiệu chỉnh}
+        respond_by: {type: [string, "null"], format: date-time}
+        response: {type: [string, "null"], enum: [keep, propose, null]}
+        proposed_min: {$ref: "#/components/schemas/PriceDecimalNull"}
+        proposed_max: {$ref: "#/components/schemas/PriceDecimalNull"}
+        explanation: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        at: {type: string, format: date-time}
+# @ag-order: 1021
+    PriceAlert:
+      allOf:
+        - $ref: "#/components/schemas/PriceAlertVersion"
+        - type: object
+          required: [ticket_id, item_code, view, request, reply, history]
+          properties:
+            ticket_id: {type: string, format: uuid}
+            item_code: {type: string}
+            view: {$ref: "#/components/schemas/PriceAlertView"}
+            request: {oneOf: [{$ref: "#/components/schemas/PriceAlertVersion"}, {type: "null"}], description: Yêu cầu xác minh gần nhất}
+            reply: {oneOf: [{$ref: "#/components/schemas/PriceAlertVersion"}, {type: "null"}], description: Phản hồi gần nhất của Xã}
+            history: {type: array, items: {$ref: "#/components/schemas/PriceAlertVersion"}, description: Trao đổi xác minh (mọi phiên bản)}
+# @ag-order: 1022
+    PriceSheetLine:
+      type: object
+      required: [item_code, name, variety, group_code, group_name, unit_code, unit_name, kind, ref, threshold_pct, min, max, no_goods, note,
+        entered, adj_min, adj_max, adj_reason, eval, alert]
+      properties:
+        item_code: {type: string}
+        name: {type: string}
+        variety: {type: string}
+        group_code: {type: string}
+        group_name: {type: string}
+        unit_code: {type: string}
+        unit_name: {type: string}
+        kind: {type: string, description: "basic (Cơ bản) | local (Địa phương)"}
+        ref:
+          oneOf:
+            - type: object
+              required: [min, max, mid, day]
+              properties:
+                min: {$ref: "#/components/schemas/Decimal"}
+                max: {$ref: "#/components/schemas/Decimal"}
+                mid: {$ref: "#/components/schemas/Decimal"}
+                day: {type: string, format: date}
+            - type: "null"
+          description: "Giá tham chiếu (CT-02); null = Giá mới"
+        threshold_pct: {$ref: "#/components/schemas/Decimal"}
+        min: {$ref: "#/components/schemas/PriceDecimalNull"}
+        max: {$ref: "#/components/schemas/PriceDecimalNull"}
+        no_goods: {type: boolean}
+        note: {type: [string, "null"]}
+        entered: {type: boolean}
+        adj_min: {$ref: "#/components/schemas/PriceDecimalNull"}
+        adj_max: {$ref: "#/components/schemas/PriceDecimalNull"}
+        adj_reason: {type: [string, "null"]}
+        eval:
+          oneOf:
+            - type: object
+              required: [direction, change_pct]
+              properties:
+                direction: {type: string, enum: ["", high, low]}
+                change_pct: {$ref: "#/components/schemas/Decimal"}
+            - type: "null"
+          description: So giá đang ghi với giá tham chiếu (▲ / ▼, Δ%)
+        alert: {oneOf: [{$ref: "#/components/schemas/PriceAlert"}, {type: "null"}]}
+# @ag-order: 1023
+    PriceSheet:
+      type: object
+      required: [point, day, quote, lock_at, respond_by, locked, board, now, view, ticket, can, lines]
+      properties:
+        point: {$ref: "#/components/schemas/PriceTicketPoint"}
+        day: {type: string, format: date}
+        quote: {type: boolean, description: Là ngày báo giá}
+        lock_at: {type: [string, "null"], format: date-time}
+        respond_by: {type: [string, "null"], format: date-time}
+        locked: {type: boolean}
+        board: {type: string, enum: [open, approving, approved, reopened], description: "Bảng giá ngày (W11.76); open = Chưa duyệt"}
+        now: {type: string, format: date-time}
+        view: {$ref: "#/components/schemas/PriceTicketView"}
+        ticket: {oneOf: [{$ref: "#/components/schemas/PriceTicketHead"}, {type: "null"}]}
+        can:
+          type: object
+          required: [enter, proxy, correct, redate, delete, review, respond]
+          properties:
+            enter: {type: boolean}
+            proxy: {type: boolean}
+            correct: {type: boolean}
+            redate: {type: boolean}
+            delete: {type: boolean}
+            review: {type: boolean}
+            respond: {type: boolean}
+        lines: {type: array, items: {$ref: "#/components/schemas/PriceSheetLine"}}
+# @ag-order: 1024
+    PriceTicketRow:
+      type: object
+      required: [point, mine, view, ticket, items, priced, no_goods, adjusted, excluded, high, low, open_alerts]
+      properties:
+        point: {$ref: "#/components/schemas/PriceTicketPoint"}
+        mine: {type: boolean}
+        view: {$ref: "#/components/schemas/PriceTicketView"}
+        ticket: {oneOf: [{$ref: "#/components/schemas/PriceTicketHead"}, {type: "null"}]}
+        items: {type: integer, minimum: 0}
+        priced: {type: integer, minimum: 0}
+        no_goods: {type: integer, minimum: 0}
+        adjusted: {type: integer, minimum: 0}
+        excluded: {type: integer, minimum: 0}
+        high: {type: integer, minimum: 0}
+        low: {type: integer, minimum: 0}
+        open_alerts: {type: integer, minimum: 0}
+# @ag-order: 1025
+    PriceTicketDay:
+      type: object
+      required: [day, quote, lock_at, respond_by, locked, board, now, rows]
+      properties:
+        day: {type: string, format: date}
+        quote: {type: boolean}
+        lock_at: {type: [string, "null"], format: date-time}
+        respond_by: {type: [string, "null"], format: date-time}
+        locked: {type: boolean}
+        board: {type: string, enum: [open, approving, approved, reopened]}
+        now: {type: string, format: date-time}
+        rows: {type: array, items: {$ref: "#/components/schemas/PriceTicketRow"}}
+# @ag-order: 1026
+    PriceHistoryRow:
+      type: object
+      required: [day, view, ticket, point, priced, no_goods, adjusted, excluded, high, low]
+      properties:
+        day: {type: string, format: date}
+        view: {$ref: "#/components/schemas/PriceTicketView"}
+        ticket: {oneOf: [{$ref: "#/components/schemas/PriceTicketHead"}, {type: "null"}]}
+        point: {$ref: "#/components/schemas/PriceTicketPoint"}
+        priced: {type: integer}
+        no_goods: {type: integer}
+        adjusted: {type: integer}
+        excluded: {type: integer}
+        high: {type: integer}
+        low: {type: integer}
+# @ag-order: 1027
+    PriceTicketLog:
+      type: object
+      required: [ticket, lines, alerts]
+      properties:
+        ticket:
+          type: array
+          items:
+            type: object
+            required: [version, day, status, source, op, reason, submitted_at, actor_ref, actor_name, at]
+            properties:
+              version: {type: integer}
+              day: {type: string, format: date}
+              status: {type: string}
+              source: {type: string}
+              op: {type: string}
+              reason: {type: [string, "null"]}
+              submitted_at: {type: [string, "null"], format: date-time}
+              actor_ref: {type: string, format: uuid}
+              actor_name: {type: [string, "null"]}
+              at: {type: string, format: date-time}
+        lines:
+          type: array
+          items:
+            type: object
+            required: [item_code, version, min, max, no_goods, note, adj_min, adj_max, adj_reason, actor_ref, actor_name, at]
+            properties:
+              item_code: {type: string}
+              version: {type: integer}
+              min: {$ref: "#/components/schemas/PriceDecimalNull"}
+              max: {$ref: "#/components/schemas/PriceDecimalNull"}
+              no_goods: {type: boolean}
+              note: {type: [string, "null"]}
+              adj_min: {$ref: "#/components/schemas/PriceDecimalNull"}
+              adj_max: {$ref: "#/components/schemas/PriceDecimalNull"}
+              adj_reason: {type: [string, "null"]}
+              actor_ref: {type: string, format: uuid}
+              actor_name: {type: [string, "null"]}
+              at: {type: string, format: date-time}
+        alerts:
+          type: array
+          items:
+            type: object
+            required: [item_code, entry, actor_name]
+            properties:
+              item_code: {type: string}
+              entry: {$ref: "#/components/schemas/PriceAlertVersion"}
+              actor_name: {type: [string, "null"]}
+# @ag-order: 1028
+    PriceAlertRow:
+      allOf:
+        - $ref: "#/components/schemas/PriceAlert"
+        - type: object
+          required: [day, point, item_name, variety, group_code, group_name, unit_name, min, max, note, adjusted, ticket_version, ticket_status,
+            mine, can_act]
+          properties:
+            day: {type: string, format: date}
+            point: {$ref: "#/components/schemas/PriceTicketPoint"}
+            item_name: {type: string}
+            variety: {type: string}
+            group_code: {type: string}
+            group_name: {type: string}
+            unit_name: {type: string}
+            min: {$ref: "#/components/schemas/PriceDecimalNull"}
+            max: {$ref: "#/components/schemas/PriceDecimalNull"}
+            note: {type: [string, "null"]}
+            adjusted: {type: [string, "null"], description: "Giá hiệu chỉnh \"thấp – cao\""}
+            ticket_version: {type: integer}
+            ticket_status: {type: string}
+            mine: {type: boolean}
+            can_act: {type: boolean, description: "Cấp Tỉnh xử lý được (xã phân công / chưa phân công); Cấp Xã phản hồi được"}
+# @ag-order: 1029
+    PriceLineInput:
+      type: object
+      required: [item_code]
+      properties:
+        item_code: {type: string, pattern: "^MH[0-9]{5}$"}
+        min: {$ref: "#/components/schemas/PriceDecimalNull"}
+        max: {$ref: "#/components/schemas/PriceDecimalNull"}
+        no_goods: {type: boolean}
+        note: {type: [string, "null"], maxLength: 500, description: Ghi chú biến động (bắt buộc với dòng bất thường khi gửi)}
+# @ag-order: 1030
+    PriceEntryInput:
+      type: object
+      required: [point, version, submit, lines]
+      properties:
+        point: {type: string}
+        day: {type: string, format: date, description: "Ngày báo giá — Xã vắng = hôm nay; nhập thay bắt buộc"}
+        version: {type: integer, minimum: 0, description: Phiên bản đầu phiếu đã đọc (0 = phiếu mới)}
+        submit: {type: boolean, description: "true = Gửi báo giá (Xã) / Lưu chính thức (nhập thay → Nộp muộn); false = Lưu nháp"}
+        reason: {type: string, maxLength: 500, description: Lý do nộp muộn (nhập thay — bắt buộc)}
+        lines: {type: array, maxItems: 500, items: {$ref: "#/components/schemas/PriceLineInput"}, description: "Dòng thay đổi; dòng không gửi giữ nguyên"}
+# @ag-order: 1031
+    PriceCorrectInput:
+      type: object
+      required: [version, reason, lines]
+      properties:
+        version: {type: integer, minimum: 1}
+        reason: {type: string, minLength: 1, maxLength: 500}
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [item_code, min, max]
+            properties:
+              item_code: {type: string}
+              min: {$ref: "#/components/schemas/Decimal"}
+              max: {$ref: "#/components/schemas/Decimal"}
+# @ag-order: 1032
+    PriceRedateInput:
+      type: object
+      required: [version, day, reason]
+      properties:
+        version: {type: integer, minimum: 1}
+        day: {type: string, format: date}
+        reason: {type: string, minLength: 1, maxLength: 500}
+# @ag-order: 1033
+    PriceDeleteInput:
+      type: object
+      required: [version, reason]
+      properties:
+        version: {type: integer, minimum: 1}
+        reason: {type: string, minLength: 1, maxLength: 500}
+# @ag-order: 1034
+    PriceAlertKey:
+      type: object
+      required: [ticket_id, item_code]
+      properties:
+        ticket_id: {type: string, format: uuid}
+        item_code: {type: string}
+# @ag-order: 1035
+    PriceVerificationRequest:
+      type: object
+      required: [alerts, message]
+      properties:
+        alerts: {type: array, minItems: 1, maxItems: 500, items: {$ref: "#/components/schemas/PriceAlertKey"}}
+        message: {type: string, minLength: 1, maxLength: 1000, description: "Mặc định \"Giá {mặt hàng} tại {xã} chênh {x%} so với giá tham chiếu, đề nghị xã kiểm tra lại\""}
+# @ag-order: 1036
+    PriceVerificationResponse:
+      allOf:
+        - $ref: "#/components/schemas/PriceAlertKey"
+        - type: object
+          required: [choice, explanation]
+          properties:
+            choice: {type: string, enum: [keep, propose]}
+            min: {$ref: "#/components/schemas/PriceDecimalNull"}
+            max: {$ref: "#/components/schemas/PriceDecimalNull"}
+            explanation: {type: string, minLength: 1, maxLength: 1000}
+# @ag-order: 1037
+    PriceAlertDecision:
+      allOf:
+        - $ref: "#/components/schemas/PriceAlertKey"
+        - type: object
+          required: [decision, note]
+          properties:
+            decision: {type: string, enum: [keep, exclude, reopen]}
+            note: {type: string, minLength: 1, maxLength: 1000}
+# @ag-order: 1038
+    PriceWritten:
+      type: object
+      required: [written]
+      properties:
+        written: {type: integer, minimum: 0}
+    # --- pf/price W11.76 ---
+# @ag-order: 1039
+    PriceBoardState:
+      type: string
+      enum: [open, approving, approved, reopened]
+      description: Chưa duyệt | Đang duyệt | Đã duyệt | Đang mở duyệt
+# @ag-order: 1040
+    PriceBoardOp:
+      type: object
+      required: [seq]
+      properties:
+        seq: {type: integer, minimum: 0, description: "Phiên bản sổ bảng giá người gọi đã thấy (khóa lạc quan; 0 = chưa có)"}
+        reason: {type: string, maxLength: 500, description: "Lý do mở duyệt (bắt buộc) / hủy mở duyệt"}
+# @ag-order: 1041
+    PriceBoardLine:
+      type: object
+      required: [item_code, item_name, group_code, group_name, unit_code, unit_name, min, max, avg, points]
+      properties:
+        item_code: {type: string}
+        item_name: {type: string}
+        group_code: {type: string}
+        group_name: {type: string}
+        unit_code: {type: string}
+        unit_name: {type: string}
+        min: {$ref: "#/components/schemas/Decimal"}
+        max: {$ref: "#/components/schemas/Decimal"}
+        avg: {$ref: "#/components/schemas/Decimal"}
+        points: {type: integer, description: Số xã có giá}
+# @ag-order: 1042
+    PriceBoardDay:
+      type: object
+      required: [day, quote, state, version, approved_at]
+      properties:
+        day: {type: string, format: date}
+        quote: {type: boolean}
+        state: {$ref: "#/components/schemas/PriceBoardState"}
+        version: {type: integer}
+        approved_at: {type: [string, "null"], format: date-time}
+# @ag-order: 1043
+    PriceBoardSummary:
+      type: object
+      required: [points, submitted, late, missed, price_lines, excluded, open_alerts]
+      properties:
+        points: {type: integer}
+        submitted: {type: integer}
+        late: {type: integer}
+        missed: {type: integer}
+        price_lines: {type: integer}
+        excluded: {type: integer}
+        open_alerts: {type: integer}
+# @ag-order: 1044
+    PriceBoardPublished:
+      type: object
+      required: [version, approved_at, reopened, week_key, lines]
+      properties:
+        version: {type: integer}
+        approved_at: {type: string, format: date-time}
+        reopened: {type: boolean, description: "Đang mở duyệt — số có thể đổi (nhãn Đang cập nhật)"}
+        week_key: {type: string}
+        lines: {type: array, items: {$ref: "#/components/schemas/PriceBoardLine"}}
+# @ag-order: 1045
+    PriceBoardLog:
+      type: object
+      required: [seq, action, status, version, reason, actor_ref, actor_name, at]
+      properties:
+        seq: {type: integer}
+        action: {type: string, enum: [lock, unlock, approve, reopen, cancel_reopen]}
+        status: {$ref: "#/components/schemas/PriceBoardState"}
+        version: {type: integer}
+        reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        actor_name: {type: [string, "null"]}
+        at: {type: string, format: date-time}
+# @ag-order: 1046
+    PriceBoard:
+      type: object
+      required: [day, quote, lock_at, locked, now, state, seq, version, locked_by, locked_by_name, lock_until, summary, preview, published, log, can, blockers, reopen_days]
+      properties:
+        day: {type: string, format: date}
+        quote: {type: boolean}
+        lock_at: {type: [string, "null"], format: date-time}
+        locked: {type: boolean, description: Đã qua giờ khóa nhập}
+        now: {type: string, format: date-time}
+        state: {$ref: "#/components/schemas/PriceBoardState"}
+        seq: {type: integer}
+        version: {type: integer, description: "Phiên bản đã duyệt hiện hành (0 = chưa duyệt)"}
+        locked_by: {type: [string, "null"], format: uuid}
+        locked_by_name: {type: [string, "null"]}
+        lock_until: {type: [string, "null"], format: date-time}
+        summary: {oneOf: [{$ref: "#/components/schemas/PriceBoardSummary"}, {type: "null"}]}
+        preview: {type: array, items: {$ref: "#/components/schemas/PriceBoardLine"}}
+        published: {oneOf: [{$ref: "#/components/schemas/PriceBoardPublished"}, {type: "null"}]}
+        log: {type: array, items: {$ref: "#/components/schemas/PriceBoardLog"}}
+        can:
+          type: object
+          required: [approve, unlock, reopen, cancel_reopen]
+          properties:
+            approve: {type: boolean}
+            unlock: {type: boolean}
+            reopen: {type: boolean}
+            cancel_reopen: {type: boolean}
+        blockers: {type: array, items: {type: string}, description: Lý do chưa duyệt được}
+        reopen_days: {type: integer}
+    # --- pf/price W11.77: báo cáo giá ---
+# @ag-order: 1047
+    PriceRef:
+      type: object
+      required: [code, name]
+      properties:
+        code: {type: string}
+        name: {type: string}
+# @ag-order: 1048
+    PriceTrend: {type: string, enum: [up, down, flat, ""], description: "Tăng / Giảm / Đi ngang (|Δ%| < ngưỡng đi ngang — CT-04); rỗng = kỳ trước không có giá"}
+# @ag-order: 1049
+    PriceReportItem:
+      type: object
+      required: [item_code, item_name, group_code, group_name, unit_code, unit_name, basic]
+      properties:
+        item_code: {type: string}
+        item_name: {type: string}
+        group_code: {type: string}
+        group_name: {type: string}
+        unit_code: {type: string}
+        unit_name: {type: string}
+        basic: {type: boolean, description: Mặt hàng Cơ bản}
+# @ag-order: 1050
+    PricePointPrice:
+      allOf:
+        - $ref: "#/components/schemas/PriceReportItem"
+        - type: object
+          required: [point_code, point_name, region_code, region_name, min, max, mid, late]
+          properties:
+            point_code: {type: string}
+            point_name: {type: string}
+            region_code: {type: string}
+            region_name: {type: string}
+            min: {type: string}
+            max: {type: string}
+            mid: {type: string, description: P (CT-01)}
+            late: {type: boolean}
+# @ag-order: 1051
+    PriceProgressRow:
+      allOf:
+        - $ref: "#/components/schemas/PriceTicketRow"
+        - type: object
+          required: [updated_at, reminders]
+          properties:
+            updated_at: {type: [string, "null"], format: date-time}
+            reminders: {type: array, items: {type: string, format: date-time}, description: Lần hệ thống đã nhắc trong ngày}
+# @ag-order: 1052
+    PriceProgress:
+      type: object
+      required: [requested, day, no_quote, quote, lock_at, locked, board, now, cards, rows, regions]
+      properties:
+        requested: {type: string, format: date}
+        day: {type: string, format: date}
+        no_quote: {type: boolean, description: "Ngày chọn không phải ngày báo giá — hiển thị ngày báo giá gần nhất"}
+        quote: {type: boolean}
+        lock_at: {type: [string, "null"], format: date-time}
+        locked: {type: boolean}
+        board: {type: string}
+        now: {type: string, format: date-time}
+        cards:
+          type: object
+          required: [points, submitted, draft, not_entered, missed, late, high, low, unassigned, no_officer]
+          properties:
+            points: {type: integer}
+            submitted: {type: integer}
+            draft: {type: integer}
+            not_entered: {type: integer}
+            missed: {type: integer}
+            late: {type: integer}
+            high: {type: integer}
+            low: {type: integer}
+            unassigned: {type: integer}
+            no_officer: {type: integer}
+        rows: {type: array, items: {$ref: "#/components/schemas/PriceProgressRow"}}
+        regions: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+# @ag-order: 1053
+    PriceSummaryLine:
+      allOf:
+        - $ref: "#/components/schemas/PriceReportItem"
+        - type: object
+          required: [min, max, avg, points, prev, change_pct, trend]
+          properties:
+            min: {type: string}
+            max: {type: string}
+            avg: {type: string}
+            points: {type: integer}
+            prev: {type: [string, "null"], description: Giá trung bình kỳ trước}
+            change_pct: {type: [string, "null"]}
+            trend: {$ref: "#/components/schemas/PriceTrend"}
+# @ag-order: 1054
+    PriceSummary:
+      type: object
+      required: [requested, day, version, approved_at, not_today, updating, prev_day, flat_pct, region, read_only, lines, points, regions, groups]
+      properties:
+        requested: {type: string, format: date}
+        day: {type: [string, "null"], format: date, description: "Ngày của bảng đang hiển thị; null = Chưa có dữ liệu"}
+        version: {type: integer}
+        approved_at: {type: [string, "null"], format: date-time}
+        not_today: {type: boolean, description: Chưa công bố hôm nay — bảng gần nhất}
+        updating: {type: boolean, description: Đang cập nhật (mở duyệt) — phiên bản cũ}
+        prev_day: {type: [string, "null"], format: date}
+        flat_pct: {type: string}
+        region: {type: string}
+        read_only: {type: boolean}
+        lines: {type: array, items: {$ref: "#/components/schemas/PriceSummaryLine"}}
+        points: {type: array, items: {$ref: "#/components/schemas/PricePointPrice"}}
+        regions: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+        groups: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+# @ag-order: 1055
+    PricePeriod:
+      type: object
+      required: [from, to, label, days]
+      properties:
+        from: {type: [string, "null"], format: date}
+        to: {type: [string, "null"], format: date}
+        label: {type: string}
+        days: {type: integer, description: Số ngày công bố trong kỳ}
+# @ag-order: 1056
+    PriceMovementLine:
+      allOf:
+        - $ref: "#/components/schemas/PriceReportItem"
+        - type: object
+          required: [cur, prev, change_pct, trend]
+          properties:
+            cur: {type: [string, "null"]}
+            prev: {type: [string, "null"]}
+            change_pct: {type: [string, "null"]}
+            trend: {$ref: "#/components/schemas/PriceTrend"}
+# @ag-order: 1057
+    PriceMovement:
+      type: object
+      required: [period, cur, prev, insufficient, flat_pct, cards, lines, item, trend, points, regions, groups, can_export]
+      properties:
+        period: {type: string, enum: [day, week, month]}
+        cur: {$ref: "#/components/schemas/PricePeriod"}
+        prev: {$ref: "#/components/schemas/PricePeriod"}
+        insufficient: {type: boolean, description: Chưa đủ dữ liệu so sánh}
+        flat_pct: {type: string}
+        cards:
+          type: object
+          required: [up, down, flat, exceeded]
+          properties:
+            up: {type: integer}
+            down: {type: integer}
+            flat: {type: integer}
+            exceeded: {type: integer, description: Cảnh báo đã chốt trong kỳ}
+        lines: {type: array, items: {$ref: "#/components/schemas/PriceMovementLine"}}
+        item: {type: string}
+        trend:
+          type: array
+          items:
+            type: object
+            required: [period, avg]
+            properties:
+              period: {$ref: "#/components/schemas/PricePeriod"}
+              avg: {type: [string, "null"]}
+        points:
+          type: array
+          items:
+            type: object
+            required: [point_code, point_name, region_name, cur, prev, change_pct, trend]
+            properties:
+              point_code: {type: string}
+              point_name: {type: string}
+              region_name: {type: string}
+              cur: {type: [string, "null"]}
+              prev: {type: [string, "null"]}
+              change_pct: {type: [string, "null"]}
+              trend: {$ref: "#/components/schemas/PriceTrend"}
+        regions: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+        groups: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+        can_export: {type: boolean}
+# @ag-order: 1058
+    PriceRegionAvg:
+      type: object
+      required: [region, avg, points]
+      properties:
+        region: {type: string}
+        avg: {type: [string, "null"]}
+        points: {type: integer}
+# @ag-order: 1059
+    PriceDashboardLine:
+      type: object
+      required: [item, avg, prev, change_pct, trend, regions]
+      properties:
+        item: {$ref: "#/components/schemas/PriceReportItem"}
+        avg: {type: string}
+        prev: {type: [string, "null"]}
+        change_pct: {type: [string, "null"]}
+        trend: {$ref: "#/components/schemas/PriceTrend"}
+        regions: {type: array, items: {$ref: "#/components/schemas/PriceRegionAvg"}}
+# @ag-order: 1060
+    PriceDashboard:
+      type: object
+      required: [requested, day, version, approved_at, not_today, updating, prev_day, cards, regions, lines, groups, item, trend, region, drill]
+      properties:
+        requested: {type: string, format: date}
+        day: {type: [string, "null"], format: date}
+        version: {type: integer}
+        approved_at: {type: [string, "null"], format: date-time}
+        not_today: {type: boolean}
+        updating: {type: boolean}
+        prev_day: {type: [string, "null"], format: date}
+        cards:
+          type: object
+          required: [up, down, flat, points]
+          properties:
+            up: {type: integer}
+            down: {type: integer}
+            flat: {type: integer}
+            points: {type: integer, description: Số xã có báo giá}
+        regions:
+          type: array
+          items:
+            type: object
+            required: [code, name, points]
+            properties:
+              code: {type: string}
+              name: {type: string}
+              points: {type: integer}
+        lines: {type: array, items: {$ref: "#/components/schemas/PriceDashboardLine"}}
+        groups:
+          type: array
+          items:
+            type: object
+            required: [code, name, up, down, flat]
+            properties:
+              code: {type: string}
+              name: {type: string}
+              up: {type: integer}
+              down: {type: integer}
+              flat: {type: integer}
+        item: {type: string}
+        trend:
+          type: array
+          items:
+            type: object
+            required: [day, avg, regions]
+            properties:
+              day: {type: string, format: date}
+              avg: {type: [string, "null"]}
+              regions: {type: array, items: {$ref: "#/components/schemas/PriceRegionAvg"}}
+        region: {type: string}
+        drill: {type: array, items: {$ref: "#/components/schemas/PricePointPrice"}}
+# @ag-order: 1061
+    PriceStatRow:
+      type: object
+      required: [officer_ref, officer_name, point_code, point_name, region_code, region_name, required, on_time, late, missed, deleted, adjusted_lines]
+      properties:
+        officer_ref: {type: string, format: uuid}
+        officer_name: {type: [string, "null"]}
+        point_code: {type: string}
+        point_name: {type: string}
+        region_code: {type: string}
+        region_name: {type: string}
+        required: {type: integer}
+        on_time: {type: integer}
+        late: {type: integer}
+        missed: {type: integer}
+        deleted: {type: integer}
+        adjusted_lines: {type: integer}
+# @ag-order: 1062
+    PriceStatMonth:
+      type: object
+      required: [seq, status, version, reason]
+      properties:
+        seq: {type: integer}
+        status: {type: string, enum: [none, closed, open]}
+        version: {type: integer}
+        reason: {type: [string, "null"]}
+        at: {type: string, format: date-time}
+# @ag-order: 1063
+    PriceStats:
+      type: object
+      required: [from, to, monthly, month, snapshot, pending, cards, rows, can_close, can_reopen, regions]
+      properties:
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        monthly: {type: boolean}
+        month: {oneOf: [{$ref: "#/components/schemas/PriceStatMonth"}, {type: "null"}]}
+        snapshot: {type: boolean, description: Số liệu từ ảnh chụp tháng đã khóa}
+        pending: {type: integer, description: Ngày báo giá chưa qua giờ khóa (chưa tính)}
+        cards:
+          type: object
+          required: [quote_days, required, on_time, late, missed]
+          properties:
+            quote_days: {type: integer}
+            required: {type: integer}
+            on_time: {type: integer}
+            late: {type: integer}
+            missed: {type: integer}
+        rows: {type: array, items: {$ref: "#/components/schemas/PriceStatRow"}}
+        can_close: {type: boolean}
+        can_reopen: {type: boolean}
+        regions: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+# @ag-order: 1064
+    PriceStatDay:
+      type: object
+      required: [day, point_code, result, view, ticket_id, deleted, adjusted_lines]
+      properties:
+        day: {type: string, format: date}
+        point_code: {type: string}
+        result: {type: string, enum: [on_time, late, missed]}
+        view: {type: string}
+        ticket_id: {type: [string, "null"], format: uuid}
+        deleted: {type: integer}
+        adjusted_lines: {type: integer}
+# @ag-order: 1065
+    PriceStatMonthOp:
+      type: object
+      required: [month, seq]
+      properties:
+        month: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}
+        seq: {type: integer, description: Phiên bản khóa tháng đã thấy (0 = chưa khóa lần nào)}
+        reason: {type: string, description: Bắt buộc khi mở lại}
+    # --- W11.61: Danh mục KHTC, CT/DA, Kế hoạch năm ---

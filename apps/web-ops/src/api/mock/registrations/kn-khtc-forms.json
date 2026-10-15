@@ -1,0 +1,11 @@
+{
+  "id": "kn-khtc-forms",
+  "source": "./kn-khtc-forms",
+  "app": [
+    {
+      "export": "khtcFormRoutes",
+      "order": 20
+    }
+  ],
+  "admin": []
+}

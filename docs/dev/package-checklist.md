@@ -23,3 +23,11 @@
    - `go run ./tools/archlint ./...`
    - `go run ./tools/contractcheck`
    - golangci-lint
+
+
+## Menu, mock và OpenAPI (WH-A)
+
+1. Đọc [quy ước đăng ký module](module-registrations.md). Thêm tệp menu của module, provider mock + tệp registrations, fragment OpenAPI của module; không sửa tay vùng sinh trong party/menu, implementedMenu, mock/handler hay hai hợp đồng đã gộp.
+2. Từ `apps/web-ops`: `npm run gen:api`, `npm run check:api`, `npm run typecheck`, `npm test`, `npm run build:mock`. Kiểm mục sẵn sàng có trang thật; ưu tiên mock không trùng và không đổi fallback.
+3. Menu đổi có chủ đích: sinh lại golden bằng Go/PG thật; kiểm assertion theo khóa/đường dẫn thay vì tổng số mục. Gói chỉ tái cấu trúc như WH-A phải giữ nguyên từng byte golden và mã API đã sinh.
+4. `go run ./tools/knboundary -base origin/dev`: baseline chỉ giảm sau khi đã gỡ ghép nối thực tế; không thêm alias hay đổi phân loại để che tăng. Chạy party/KN77/migration gates trên PostgreSQL thật và đủ cổng tĩnh trước tích hợp dev.

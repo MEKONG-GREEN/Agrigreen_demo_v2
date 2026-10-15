@@ -116,122 +116,14 @@ const (
 	BadgeAdHocReportsStatus = "extension.report_status.ad_hoc_pending" // P4: báo cáo đột xuất chưa nộp
 )
 
-// adminDeptRoute: màn của Admin theo phòng ban (P3b: /kn/phong-ban/{department}/mau-bao-cao).
-func adminDeptRoute(path string) string { return "/kn/phong-ban/{department}" + path }
-
 // Bộ menu Phòng Trồng trọt (BRD v7.7 §6).
-var trongTrotMenus = map[string][]MenuGroup{
-	port.AudienceTW: {
-		{Key: "dieu_hanh", Label: "Điều hành", Items: []MenuItem{
-			{Key: "tw.dashboard", Label: "Dashboard", Route: "/kn/dashboard", Icon: "dashboard"},
-		}},
-		{Key: "bao_cao", Label: "Báo cáo", Items: []MenuItem{
-			{Key: "tw.bao_cao.tuan", Label: "Báo cáo tuần", Route: "/kn/bao-cao/tuan", Icon: "file"},
-			{Key: "tw.bao_cao.thang", Label: "Báo cáo tháng", Route: "/kn/bao-cao/thang", Icon: "calendar"},
-			{Key: "tw.bao_cao.hang_vu", Label: "Báo cáo hàng vụ", Route: "/kn/bao-cao/vu", Icon: "sprout"},
-			{Key: "tw.bao_cao.nam", Label: "Báo cáo năm", Route: "/kn/bao-cao/nam", Icon: "chart"},
-		}},
-	},
-	port.AudienceTinh: {
-		{Key: "dieu_hanh", Label: "Điều hành", Items: []MenuItem{
-			{Key: "tinh.dashboard", Label: "Dashboard", Route: "/kn/dashboard", Icon: "dashboard"},
-			{Key: "tinh.nhiem_vu", Label: "Nhiệm vụ", Icon: "task", Children: []MenuItem{
-				{Key: "tinh.nhiem_vu.phat_hanh", Label: "Phát hành biểu mẫu", Route: "/kn/nhiem-vu/phat-hanh", Icon: "send"},
-				{Key: "tinh.nhiem_vu.trang_thai_nop", Label: "Trạng thái nộp", Route: "/kn/nhiem-vu/trang-thai-nop", Icon: "bell", BadgeSource: BadgeSubmissionStatus},
-				{Key: "tinh.nhiem_vu.ra_soat", Label: "Rà soát & chốt kỳ", Route: "/kn/nhiem-vu/ra-soat", Icon: "check", BadgeSource: BadgeReviewPending},
-				{Key: "tinh.nhiem_vu.lich_cong_tac", Label: "Lịch công tác", Route: "/kn/nhiem-vu/lich-cong-tac", Icon: "calendar", BadgeSource: BadgeScheduleApprovals},
-			}},
-		}},
-		{Key: "bao_cao", Label: "Báo cáo", Items: []MenuItem{
-			{Key: "tinh.bao_cao.tong_hop", Label: "Báo cáo tổng hợp các xã", Route: "/kn/bao-cao/tong-hop", Icon: "layers"},
-			{Key: "tinh.bao_cao.chi_cuc", Label: "Báo cáo Chi cục", Route: "/kn/bao-cao/chi-cuc", Icon: "file"},
-			{Key: "tinh.bao_cao.dot_xuat", Label: "Báo cáo đột xuất", Route: "/kn/bao-cao/dot-xuat", Icon: "zap",
-				BadgeSource: BadgeAdHocReportsStatus, Requires: &MenuRequirement{ReportType: ReportTypeAdHoc, Level: LevelProvince}},
-		}},
-	},
-	port.AudienceXa: {
-		{Key: "dieu_hanh", Label: "Điều hành", Items: []MenuItem{
-			{Key: "xa.nhiem_vu", Label: "Nhiệm vụ", Icon: "task", Children: []MenuItem{
-				{Key: "xa.nhiem_vu.cong_viec", Label: "Công việc cần làm", Route: "/kn/nhiem-vu/cong-viec", Icon: "bell", BadgeSource: BadgeReportTasksTodo},
-				{Key: "xa.nhiem_vu.lich_cong_tac", Label: "Lịch công tác", Route: "/kn/nhiem-vu/lich-cong-tac", Icon: "calendar"},
-			}},
-		}},
-		{Key: "bao_cao", Label: "Báo cáo", Items: []MenuItem{
-			{Key: "xa.bao_cao.tuan", Label: "Báo cáo tuần", Route: "/kn/bao-cao/tuan", Icon: "file"},
-			{Key: "xa.bao_cao.thang", Label: "Báo cáo tháng", Route: "/kn/bao-cao/thang", Icon: "calendar"},
-			{Key: "xa.bao_cao.hang_vu", Label: "Báo cáo hàng vụ", Route: "/kn/bao-cao/vu", Icon: "sprout"},
-			{Key: "xa.bao_cao.cua_xa", Label: "Báo cáo của xã", Route: "/kn/bao-cao/cua-xa", Icon: "chart"},
-			{Key: "xa.bao_cao.dot_xuat", Label: "Báo cáo đột xuất", Route: "/kn/bao-cao/dot-xuat", Icon: "zap",
-				BadgeSource: BadgeAdHocReportsOpen, Requires: &MenuRequirement{ReportType: ReportTypeAdHoc, Level: LevelCommune}},
-		}},
-		{Key: "du_lieu", Label: "Dữ liệu", Items: []MenuItem{
-			{Key: "xa.thu_thap", Label: "Thu thập dữ liệu", Icon: "database", Children: []MenuItem{
-				{Key: "xa.thu_thap.htx", Label: "Danh sách HTX", Route: "/kn/du-lieu/htx", Icon: "coop"},
-				{Key: "xa.thu_thap.may_moc", Label: "Máy móc HTX", Route: "/kn/du-lieu/may-moc", Icon: "tractor"},
-				{Key: "xa.thu_thap.thua", Label: "Vẽ thửa ruộng", Route: "/kn/du-lieu/ve-thua", Icon: "map"},
-				{Key: "xa.thu_thap.vat_tu", Label: "Vật tư", Route: "/kn/du-lieu/vat-tu", Icon: "package"},
-			}},
-		}},
-	},
-}
+var trongTrotMenus = catalogValue[map[string][]MenuGroup]("trongTrotMenus")
 
 // Bộ menu chung cho phòng ban mới mở bằng cấu hình (UR-KT-02).
-var genericMenus = map[string][]MenuGroup{
-	port.AudienceTW: trongTrotMenus[port.AudienceTW],
-	port.AudienceTinh: {
-		{Key: "dieu_hanh", Label: "Điều hành", Items: []MenuItem{
-			{Key: "tinh.dashboard", Label: "Dashboard", Route: "/kn/dashboard", Icon: "dashboard"},
-			{Key: "tinh.nhiem_vu", Label: "Nhiệm vụ", Icon: "task", Children: []MenuItem{
-				{Key: "tinh.nhiem_vu.phat_hanh", Label: "Phát hành biểu mẫu", Route: "/kn/nhiem-vu/phat-hanh", Icon: "send"},
-				{Key: "tinh.nhiem_vu.trang_thai_nop", Label: "Trạng thái nộp", Route: "/kn/nhiem-vu/trang-thai-nop", Icon: "bell", BadgeSource: BadgeSubmissionStatus},
-				{Key: "tinh.nhiem_vu.ra_soat", Label: "Rà soát & chốt kỳ", Route: "/kn/nhiem-vu/ra-soat", Icon: "check", BadgeSource: BadgeReviewPending},
-			}},
-		}},
-		{Key: "bao_cao", Label: "Báo cáo", Items: []MenuItem{
-			{Key: "tinh.bao_cao.tong_hop", Label: "Báo cáo tổng hợp các xã", Route: "/kn/bao-cao/tong-hop", Icon: "layers"},
-			{Key: "tinh.bao_cao.dot_xuat", Label: "Báo cáo đột xuất", Route: "/kn/bao-cao/dot-xuat", Icon: "zap",
-				BadgeSource: BadgeAdHocReportsStatus, Requires: &MenuRequirement{ReportType: ReportTypeAdHoc, Level: LevelProvince}},
-		}},
-	},
-	port.AudienceXa: {
-		{Key: "dieu_hanh", Label: "Điều hành", Items: []MenuItem{
-			{Key: "xa.nhiem_vu", Label: "Nhiệm vụ", Icon: "task", Children: []MenuItem{
-				{Key: "xa.nhiem_vu.cong_viec", Label: "Công việc cần làm", Route: "/kn/nhiem-vu/cong-viec", Icon: "bell", BadgeSource: BadgeReportTasksTodo},
-			}},
-		}},
-		{Key: "bao_cao", Label: "Báo cáo", Items: []MenuItem{
-			{Key: "xa.bao_cao.tuan", Label: "Báo cáo tuần", Route: "/kn/bao-cao/tuan", Icon: "file"},
-			{Key: "xa.bao_cao.thang", Label: "Báo cáo tháng", Route: "/kn/bao-cao/thang", Icon: "calendar"},
-			{Key: "xa.bao_cao.hang_vu", Label: "Báo cáo hàng vụ", Route: "/kn/bao-cao/vu", Icon: "sprout"},
-			{Key: "xa.bao_cao.cua_xa", Label: "Báo cáo của xã", Route: "/kn/bao-cao/cua-xa", Icon: "chart"},
-			{Key: "xa.bao_cao.dot_xuat", Label: "Báo cáo đột xuất", Route: "/kn/bao-cao/dot-xuat", Icon: "zap",
-				BadgeSource: BadgeAdHocReportsOpen, Requires: &MenuRequirement{ReportType: ReportTypeAdHoc, Level: LevelCommune}},
-		}},
-	},
-}
+var genericMenus = catalogValue[map[string][]MenuGroup]("genericMenus")
 
 // Mục con của một phòng ban trong nhóm "Phòng ban" của Admin (Hình 3c).
-var adminDeptItems = map[string][]MenuItem{
-	port.MenuProfileTrongTrot: {
-		{Key: "admin.pb.theo_doi_nop", Label: "Theo dõi nộp báo cáo", Route: adminDeptRoute("/theo-doi-nop"), Icon: "bell"},
-		{Key: "admin.pb.tong_hop", Label: "Báo cáo tổng hợp các xã", Route: adminDeptRoute("/tong-hop"), Icon: "layers"},
-		{Key: "admin.pb.du_lieu_bao_cao", Label: "Dữ liệu báo cáo các xã", Route: adminDeptRoute("/du-lieu-bao-cao"), Icon: "file"},
-		{Key: "admin.pb.thu_thap", Label: "Thu thập dữ liệu", Route: adminDeptRoute("/thu-thap"), Icon: "database"},
-		// FN-TI-02.07 (P5): Admin xem lịch công tác (chỉ đọc) — cùng màn của Cấp Tỉnh, chưa tách theo phòng ban.
-		{Key: "admin.pb.lich_cong_tac", Label: "Lịch công tác", Route: "/kn/nhiem-vu/lich-cong-tac", Icon: "calendar"},
-		// P6s: màn danh mục nông nghiệp theo phòng ban (FN-AD-04.05); màn danh mục G1 giữ ở /quan-tri/danh-muc.
-		{Key: "admin.pb.danh_muc", Label: "Danh mục nông nghiệp", Route: adminDeptRoute("/danh-muc"), Icon: "package"},
-		// P3b: trình thiết kế mẫu báo cáo dạng lưới Excel (FN-AD-04.06, Hình 27).
-		{Key: "admin.pb.mau_bao_cao", Label: "Mẫu báo cáo", Route: adminDeptRoute("/mau-bao-cao"), Icon: "table"},
-	},
-	port.MenuProfileGeneric: {
-		{Key: "admin.pb.theo_doi_nop", Label: "Theo dõi nộp báo cáo", Route: adminDeptRoute("/theo-doi-nop"), Icon: "bell"},
-		{Key: "admin.pb.tong_hop", Label: "Báo cáo tổng hợp các xã", Route: adminDeptRoute("/tong-hop"), Icon: "layers"},
-		{Key: "admin.pb.du_lieu_bao_cao", Label: "Dữ liệu báo cáo các xã", Route: adminDeptRoute("/du-lieu-bao-cao"), Icon: "file"},
-		{Key: "admin.pb.danh_muc", Label: "Danh mục nông nghiệp", Route: adminDeptRoute("/danh-muc"), Icon: "package"},
-		{Key: "admin.pb.mau_bao_cao", Label: "Mẫu báo cáo", Route: adminDeptRoute("/mau-bao-cao"), Icon: "table"},
-	},
-}
+var adminDeptItems = catalogValue[map[string][]MenuItem]("adminDeptItems")
 
 // AdminDepartmentIcon trả icon của mục phòng ban trong nhóm "Phòng ban" theo bộ menu.
 func AdminDepartmentIcon(profile string) string {
@@ -243,33 +135,8 @@ func AdminDepartmentIcon(profile string) string {
 
 // AdminFixedGroups là nhóm Điều hành và Quản trị hệ thống của Admin (không phụ thuộc phòng ban).
 var (
-	AdminOverview = MenuGroup{Key: "dieu_hanh", Label: "Điều hành", Items: []MenuItem{
-		{Key: "admin.tong_quan", Label: "Tổng quan hệ thống", Route: "/kn/tong-quan", Icon: "dashboard"},
-	}}
-	AdminSystem = MenuGroup{Key: "quan_tri", Label: "Quản trị hệ thống", Items: []MenuItem{
-		{Key: "admin.qt.dvhc", Label: "Đơn vị hành chính", Route: "/kn/quan-tri/don-vi-hanh-chinh", Icon: "map"},
-		// P6s: màn KN v7.7 (FN-AD-04.02); màn G1 giữ ở Công cụ nền tảng — không xóa tính năng.
-		{Key: "admin.qt.co_cau", Label: "Cơ cấu tổ chức 3 cấp", Route: "/kn/quan-tri/co-cau-to-chuc", Icon: "org"},
-		{Key: "admin.qt.phong_ban", Label: "Phòng ban", Route: "/kn/quan-tri/phong-ban", Icon: "building"},
-		{Key: "admin.qt.nguoi_dung", Label: "Người dùng", Route: "/kn/quan-tri/nguoi-dung", Icon: "users"},
-		{Key: "admin.qt.menu_cac_cap", Label: "Menu các cấp", Route: "/kn/quan-tri/menu-cac-cap", Icon: "key"},
-		// Q-13 (tạm, chờ khách): công cụ quản trị nền tảng đã có (G1–G5) đặt trong nhóm Quản trị hệ thống.
-		{Key: "admin.qt.cong_cu", Label: "Công cụ nền tảng (tạm)", Icon: "param", Children: []MenuItem{
-			{Key: "admin.qt.cong_cu.tham_so", Label: "Tham số & phê duyệt", Route: "/quan-tri/tham-so", Icon: "param"},
-			{Key: "admin.qt.cong_cu.tai_khoan", Label: "Tài khoản cán bộ (G1)", Route: "/quan-tri/tai-khoan", Icon: "user"},
-			{Key: "admin.qt.cong_cu.to_chuc", Label: "Cây tổ chức (G1)", Route: "/quan-tri/to-chuc", Icon: "org"},
-			{Key: "admin.qt.cong_cu.mau_xuat", Label: "Mẫu xuất & lịch gửi", Route: "/quan-tri/mau-bao-cao", Icon: "report"},
-			{Key: "admin.qt.cong_cu.xung_dot", Label: "Xung đột đồng bộ", Route: "/quan-tri/xung-dot", Icon: "conflict"},
-			{Key: "admin.qt.cong_cu.giam_sat", Label: "Giám sát đồng bộ", Route: "/quan-tri/giam-sat-dong-bo", Icon: "sync"},
-			{Key: "admin.qt.cong_cu.thiet_bi", Label: "Đồng bộ thiết bị", Route: "/dong-bo", Icon: "sync"},
-			// G5 (ADR-0022/0023/0024): Public API cho bên thứ ba — màn tự kiểm vai (api_client_*, metering_viewer,
-			// billing_*, platform_admin); menu Admin chỉ để tới được màn.
-			{Key: "admin.qt.cong_cu.khach_hang_api", Label: "Khách hàng Public API", Route: "/quan-tri/khach-hang-api", Icon: "key"},
-			{Key: "admin.qt.cong_cu.su_dung_api", Label: "Sử dụng Public API", Route: "/quan-tri/su-dung-api", Icon: "chart"},
-			{Key: "admin.qt.cong_cu.bang_ke", Label: "Bảng kê sử dụng", Route: "/quan-tri/bang-ke", Icon: "report"},
-			{Key: "admin.qt.cong_cu.nhat_ky_xuat", Label: "Nhật ký xuất dữ liệu", Route: "/quan-tri/nhat-ky-xuat", Icon: "shield"},
-		}},
-	}}
+	AdminOverview = catalogValue[MenuGroup]("AdminOverview")
+	AdminSystem   = catalogValue[MenuGroup]("AdminSystem")
 )
 
 // AdminDepartmentGroup là khóa/nhãn của nhóm "Phòng ban" của Admin.
@@ -280,25 +147,12 @@ const (
 
 // defaultRoutes là trang mặc định theo đối tượng (FN-CH-00.01). Trùng accounts/domain.DefaultRoute (P1,
 // default_route của ngữ cảnh phiên) — cả hai kiểm với ca vàng web kn-menu.json.
-var defaultRoutes = map[string]string{
-	port.AudienceTW:    "/kn/dashboard",
-	port.AudienceTinh:  "/kn/dashboard",
-	port.AudienceXa:    "/kn/nhiem-vu/cong-viec",
-	port.AudienceAdmin: "/kn/tong-quan",
-}
+var defaultRoutes = catalogValue[map[string]string]("defaultRoutes")
 
-var profiles = map[string]map[string][]MenuGroup{
-	port.MenuProfileTrongTrot:           trongTrotMenus,
-	port.MenuProfileGeneric:             genericMenus,
-	port.MenuProfileChanNuoiThuySan:     withBusiness(port.MenuProfileChanNuoiThuySan),
-	port.MenuProfileKeHoachTaiChinh:     withBusiness(port.MenuProfileKeHoachTaiChinh),
-	port.MenuProfileThongTinTuyenTruyen: withBusiness(port.MenuProfileThongTinTuyenTruyen),
-	port.MenuProfileHanhChinhTongHop:    withBusiness(port.MenuProfileHanhChinhTongHop),
-}
+var profiles = registeredProfiles()
 
 // MenuProfiles là mọi bộ menu có trong mã (thứ tự cố định — OpenAPI enum menu_profile).
-var MenuProfiles = []string{port.MenuProfileTrongTrot, port.MenuProfileGeneric, port.MenuProfileChanNuoiThuySan,
-	port.MenuProfileKeHoachTaiChinh, port.MenuProfileThongTinTuyenTruyen, port.MenuProfileHanhChinhTongHop}
+var MenuProfiles = catalogValue[[]string]("MenuProfiles")
 
 // KnownMenuProfile cho biết p là bộ menu có trong mã.
 func KnownMenuProfile(p string) bool { _, ok := profiles[p]; return ok }
@@ -396,6 +250,22 @@ func bind(items []MenuItem, department string) []MenuItem {
 		}
 		c.Children = bind(it.Children, department)
 		out = append(out, c)
+	}
+	return out
+}
+
+// registeredProfiles composes every registered profile without a second manual index.
+func registeredProfiles() map[string]map[string][]MenuGroup {
+	out := make(map[string]map[string][]MenuGroup, len(MenuProfiles))
+	for _, profile := range MenuProfiles {
+		switch profile {
+		case port.MenuProfileTrongTrot:
+			out[profile] = trongTrotMenus
+		case port.MenuProfileGeneric:
+			out[profile] = genericMenus
+		default:
+			out[profile] = withBusiness(profile)
+		}
 	}
 	return out
 }

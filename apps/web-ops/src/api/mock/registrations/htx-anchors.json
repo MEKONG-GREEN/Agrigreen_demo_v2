@@ -1,0 +1,11 @@
+{
+  "id": "htx-anchors",
+  "source": "./htx-anchors",
+  "app": [],
+  "admin": [
+    {
+      "export": "htxAnchorRoutes",
+      "order": 16
+    }
+  ]
+}

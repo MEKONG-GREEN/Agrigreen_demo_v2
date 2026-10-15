@@ -1,0 +1,130 @@
+paths:
+# @ag-order: 197
+  /v1/waterway/segments:
+    get:
+      summary: Tuyến sông/kênh của phiên bản mạng đã phát hành, đánh dấu tuyến phù hợp tải trọng sà lan — GIS US-WATER-01
+      description: |
+        Mọi người dùng đã xác thực của tenant. Tuyến nháp không bao giờ xuất hiện. `passable` = tải trọng lưu thông suy ra
+        (rộng/sâu/công trình, có biên an toàn) ≥ `min_load_tons`; tuyến thiếu số liệu không được coi là đi được.
+        AC-2: `passable_count = 0` khi có `min_load_tons` → `message` "Không tìm thấy tuyến…". Chưa phát hành → `version_no = null`, `items` rỗng.
+      operationId: listWaterwayLayer
+      tags: [waterway]
+      parameters:
+        - {name: bbox, in: query, description: "minLng,minLat,maxLng,maxLat", schema: {type: string}}
+        - {name: min_load_tons, in: query, schema: {type: string, pattern: "^[0-9]+(\\.[0-9]+)?$"}}
+        - {name: version, in: query, description: "Ghim phiên bản đã từng phát hành; mặc định phiên bản đang có hiệu lực", schema: {type: integer, minimum: 1}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang (theo segment_ref)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor, total, passable_count, min_load_tons, version_no, message]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/WaterwayLayerSegment"}}
+                  next_cursor: {type: [string, "null"]}
+                  total: {type: integer, description: "Số tuyến trong khung (mọi trang)"}
+                  passable_count: {type: integer, description: "Số tuyến phù hợp tải trọng trong khung (mọi trang)"}
+                  min_load_tons: {type: string}
+                  version_no: {type: [integer, "null"]}
+                  message: {type: [string, "null"]}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 198
+  /v1/waterway/routes:
+    get:
+      summary: Đường thủy ngắn nhất trong số các tuyến ĐI ĐƯỢC với tải trọng yêu cầu (pgr_dijkstra trên phiên bản mạng)
+      description: |
+        Trả hình học đường đi, km (gồm chặng tiếp cận), nhãn nguồn tính (routed | digitised | haversine — Simulation FN-04 BR-04),
+        phiên bản mạng đã dùng và ràng buộc bất lợi nhất trên đường. Không có đường thủy (chưa phát hành, ngoài bán kính tiếp cận,
+        không liên thông, không đủ tải trọng) → `found = false`, khoảng cách Haversine × hệ số #10 kèm `reason`.
+      operationId: routeWaterway
+      tags: [waterway]
+      parameters:
+        - {name: from, in: query, required: true, description: "lat,lng", schema: {type: string}}
+        - {name: to, in: query, required: true, description: "lat,lng", schema: {type: string}}
+        - {name: min_load_tons, in: query, schema: {type: string, pattern: "^[0-9]+(\\.[0-9]+)?$"}}
+        - {name: version, in: query, schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: Kết quả định tuyến
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WaterwayRoute"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 199
+  /v1/waterway/networks/current:
+    get:
+      summary: Phiên bản mạng đang có hiệu lực (để ghim vào kịch bản)
+      operationId: getCurrentWaterwayNetwork
+      tags: [waterway]
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WaterwayNetworkSummary"}
+        "404": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/waterway ---
+
+  # --- G2: pf/accounts (tài khoản nông dân App HTX), pf/party, pf/extension (yêu cầu hỗ trợ) ---
+components:
+  schemas:
+# @ag-order: 722
+    WaterwayLayerSegment:
+      type: object
+      required: [segment_ref, revision, name, waterway_class, data_source, length_m, width_m, depth_m, declared_max_load_tons, max_load_tons, certain, limiting, limiting_structure_ref, passable, geometry]
+      properties:
+        segment_ref: {type: string, format: uuid}
+        revision: {type: integer}
+        name: {type: string}
+        waterway_class: {type: string, enum: [kenh_chinh, noi_dong, muong, song]}
+        data_source: {type: string}
+        length_m: {type: string}
+        width_m: {type: [string, "null"]}
+        depth_m: {type: [string, "null"]}
+        declared_max_load_tons: {type: [string, "null"]}
+        max_load_tons: {type: [string, "null"], description: "Tải trọng lưu thông bất lợi nhất trên đoạn; null = chưa kết luận (thiếu số liệu)"}
+        certain: {type: boolean}
+        limiting: {type: string, description: "width | depth | clearance | declared | none | unknown:<thông số>"}
+        limiting_structure_ref: {type: [string, "null"], format: uuid}
+        passable: {type: boolean}
+        geometry: {$ref: "#/components/schemas/WaterwayLine"}
+# @ag-order: 724
+    WaterwayRoute:
+      type: object
+      required: [version_no, found, distance_km, access_km, source, source_label, geometry, segment_refs, limiting, reason]
+      properties:
+        version_no: {type: [integer, "null"]}
+        found: {type: boolean}
+        distance_km: {type: string}
+        access_km: {type: string}
+        source: {type: string, enum: [routed, digitised, haversine]}
+        source_label: {type: string}
+        geometry: {oneOf: [{$ref: "#/components/schemas/WaterwayLine"}, {type: "null"}]}
+        segment_refs: {type: array, items: {type: string, format: uuid}}
+        limiting: {oneOf: [{$ref: "#/components/schemas/WaterwayLimiting"}, {type: "null"}]}
+        reason: {type: [string, "null"]}
+# @ag-order: 725
+    WaterwayNetworkSummary:
+      type: object
+      required: [id, version_no, status, segment_set_sha256, graph_sha256, rule_version, effective_from]
+      properties:
+        id: {type: string, format: uuid}
+        version_no: {type: integer}
+        status: {type: string, enum: [published]}
+        segment_set_sha256: {type: string}
+        graph_sha256: {type: string}
+        rule_version: {type: string}
+        as_of: {type: string, format: date-time}
+        segment_count: {type: integer}
+        vertex_count: {type: integer}
+        edge_count: {type: integer}
+        effective_from: {type: [string, "null"], format: date-time}
+    # --- hết pf/waterway ---
+
+    # --- G2: tài khoản nông dân, yêu cầu hỗ trợ ---

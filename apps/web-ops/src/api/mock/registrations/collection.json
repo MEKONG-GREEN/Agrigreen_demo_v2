@@ -1,0 +1,11 @@
+{
+  "id": "collection",
+  "source": "./collection",
+  "app": [
+    {
+      "export": "collectionRoutes",
+      "order": 57
+    }
+  ],
+  "admin": []
+}

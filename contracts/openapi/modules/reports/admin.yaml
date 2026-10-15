@@ -1,0 +1,804 @@
+paths:
+# @ag-order: 133
+  /v1/reports/templates:
+    get:
+      summary: Mọi mẫu (mẫu hệ thống + phiên bản mới nhất của tenant, kể cả đã ngừng dùng)
+      operationId: adminListReportTemplates
+      tags: [reports]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/ReportTemplate"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo phiên bản mới của mẫu (việc xuất cũ giữ ảnh chụp phiên bản cũ)
+      operationId: saveReportTemplate
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, definition]
+              properties:
+                key: {type: string, pattern: "^[a-z][a-z0-9_.]{2,63}$"}
+                definition: {$ref: "#/components/schemas/ReportDefinition"}
+      responses:
+        "201":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportTemplate"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 134
+  /v1/reports/templates/{key}/versions:
+    get:
+      summary: Lịch sử phiên bản của mẫu (mới nhất trước; mẫu hệ thống là phiên bản 0)
+      operationId: listReportTemplateVersions
+      tags: [reports]
+      parameters:
+        - {name: key, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/ReportTemplate"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 135
+  /v1/reports/templates/{key}/retire:
+    post:
+      summary: Ngừng dùng mẫu kèm lý do (phiên bản mới trạng thái retired; không xóa)
+      operationId: retireReportTemplate
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: key, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10, maxLength: 500}}}
+      responses:
+        "201":
+          description: Đã ngừng dùng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportTemplate"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+# @ag-order: 136
+  /v1/reports/schedules:
+    get:
+      summary: Lịch gửi người gọi được xem (người lập hoặc phạm vi bao trọn)
+      operationId: listReportSchedules
+      tags: [reports]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/ReportSchedule"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Lập lịch gửi báo cáo (tuần/tháng, giờ Việt Nam). Người nhận là actor_ref — email tra lúc gửi, không lưu
+      description: HTX US-DASH-03 — quản lý HTX (coop_manager) lập lịch mẫu htx.production, chỉ trong HTX của mình (params.cooperative_ref được gán; HTX khác → 403).
+      operationId: createReportSchedule
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [template_key, format, frequency, hour, recipients]
+              properties:
+                template_key: {type: string}
+                format: {type: string, enum: [xlsx, pdf]}
+                unit_code: {type: string}
+                params: {type: object, description: "Như ReportParams của Application API; kỳ tính theo mốc (tháng: tháng trước; tuần: tháng đang chạy)"}
+                frequency: {type: string, enum: [weekly, monthly]}
+                weekday: {type: integer, minimum: 1, maximum: 7, description: "weekly: 1 = thứ Hai"}
+                day_of_month: {type: integer, minimum: 1, maximum: 28, description: "monthly"}
+                hour: {type: integer, minimum: 0, maximum: 23}
+                recipients: {type: array, minItems: 1, maxItems: 50, items: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: Đã lập lịch
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportSchedule"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 137
+  /v1/reports/schedules/{id}/deactivate:
+    post:
+      summary: Ngừng lịch kèm lý do (không xóa; lịch sử chạy giữ nguyên)
+      operationId: deactivateReportSchedule
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10, maxLength: 500}}}
+      responses:
+        "200":
+          description: Lịch
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportSchedule"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 138
+  /v1/reports/schedules/{id}/runs:
+    get:
+      summary: Các lần chạy của lịch — mỗi mốc (tuần ISO / tháng) đúng một lần, kèm kết quả gửi email
+      operationId: listReportScheduleRuns
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Lần chạy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [slot_key, slot_at, status, fired_at]
+                      properties:
+                        slot_key: {type: string, examples: [2026-W40, 2026-10]}
+                        slot_at: {type: string, format: date-time}
+                        status: {type: string, enum: [queued, skipped]}
+                        skip_reason: {type: [string, "null"]}
+                        job_id: {type: [string, "null"], format: uuid}
+                        fired_at: {type: string, format: date-time}
+                        delivery_status: {type: [string, "null"], enum: [sent, skipped, failed, null]}
+                        delivery_note: {type: [string, "null"]}
+                        sent_count: {type: [integer, "null"]}
+                        delivered_at: {type: [string, "null"], format: date-time}
+        "404": {$ref: "#/components/responses/Problem"}
+  # --- pf/reports: mẫu báo cáo dạng lưới KN v7.7 (FN-AD-04.06). Vai platform_admin hoặc reports_admin (MFA). Nháp → đề nghị →
+  # phát hành bởi NGƯỜI KHÁC (≠ người đề nghị, ≠ người sửa cuối — R-56, kiểm ở app/ và CHECK DB) → bất biến → ngừng dùng.
+  # Mẫu chưa gán loại báo cáo không phát hành được. Mọi thao tác ghi sổ nhật ký (GET …/log). ---
+# @ag-order: 139
+  /v1/reports/forms:
+    get:
+      summary: Danh sách mẫu (lọc phòng ban, cấp, trạng thái, loại báo cáo) kèm phiên bản đang soạn và phiên bản phát hành mới nhất
+      operationId: adminListForms
+      tags: [reports]
+      parameters:
+        - {name: department, in: query, schema: {type: string}}
+        - {name: level, in: query, schema: {type: string, enum: [commune, province]}}
+        - {name: status, in: query, schema: {type: string, enum: [active, retired]}}
+        - {name: report_type, in: query, schema: {$ref: "application.yaml#/components/schemas/FormReportType"}}
+      responses:
+        "200":
+          description: Mẫu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [template, open_version, published_version, report_types]
+                      properties:
+                        template: {$ref: "application.yaml#/components/schemas/FormTemplate"}
+                        open_version: {oneOf: [{$ref: "application.yaml#/components/schemas/FormVersion"}, {type: "null"}]}
+                        published_version: {oneOf: [{$ref: "application.yaml#/components/schemas/FormVersion"}, {type: "null"}]}
+                        report_types: {type: array, items: {$ref: "application.yaml#/components/schemas/FormReportType"}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo mẫu mới (trống, nhân bản từ phiên bản khác, hoặc kèm định nghĩa) → phiên bản nháp v1
+      operationId: adminCreateForm
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name, department_code, entry_level]
+              properties:
+                code: {type: string, pattern: "^[A-Z0-9][A-Z0-9_.-]{1,31}$"}
+                name: {type: string, maxLength: 300}
+                department_code: {type: string, examples: [trong_trot]}
+                entry_level: {type: string, enum: [commune, province]}
+                definition: {$ref: "application.yaml#/components/schemas/FormDefinition"}
+                clone_from_version_id: {type: string, format: uuid}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [template, version]
+                properties:
+                  template: {$ref: "application.yaml#/components/schemas/FormTemplate"}
+                  version: {$ref: "application.yaml#/components/schemas/FormVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {description: reports.form_code_taken, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed, reports.form_invalid, reports.formula_invalid, reports.formula_invalid_ref, reports.formula_cycle", $ref: "#/components/responses/Problem"}
+# @ag-order: 140
+  /v1/reports/forms/import:
+    post:
+      summary: Nạp một sheet Excel (.xlsx) thành mẫu mới hoặc nháp mới của mẫu có sẵn (tiêu đề gộp, chữ cái cột, công thức dòng dữ liệu)
+      description: |
+        Có template_id → nháp mới của mẫu đó (409 nếu đang có nháp); không → tạo mẫu (code, name, department_code, entry_level).
+        Bố cục nhận: khung tiêu đề từ header_start; hàng chữ cái A, B, C… và dòng loại cột (tệp do hệ thống xuất) nếu có; dòng dữ
+        liệu đầu tự nhận (dòng đầu có công thức, hoặc STT = 1) hoặc data_row. Công thức tham chiếu dòng khác/sheet khác hoặc hàm
+        ngoài tập con → cột nhập + cảnh báo (report.warnings). Tệp hỏng → 422 reports.form_import_invalid; mọi lần nạp được ghi.
+      operationId: adminImportForm
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: template_id, in: query, schema: {type: string, format: uuid}}
+        - {name: code, in: query, schema: {type: string}}
+        - {name: name, in: query, schema: {type: string}}
+        - {name: department_code, in: query, schema: {type: string}}
+        - {name: entry_level, in: query, schema: {type: string, enum: [commune, province], default: commune}}
+        - {name: sheet, in: query, schema: {type: string}}
+        - {name: header_start, in: query, schema: {type: integer, minimum: 1}}
+        - {name: data_row, in: query, schema: {type: integer, minimum: 1}}
+        - {name: file_name, in: query, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+            schema: {type: string, format: binary}
+      responses:
+        "201":
+          description: Đã nạp thành nháp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [import_id, template, version, report]
+                properties:
+                  import_id: {type: string, format: uuid}
+                  template: {$ref: "application.yaml#/components/schemas/FormTemplate"}
+                  version: {$ref: "application.yaml#/components/schemas/FormVersion"}
+                  report:
+                    type: object
+                    required: [sheet, sheets, header_rows, data_row, columns, merges, formulas, kind_row, warnings]
+                    properties:
+                      sheet: {type: string}
+                      sheets: {type: array, items: {type: string}}
+                      header_rows: {type: integer}
+                      data_row: {type: integer}
+                      columns: {type: integer}
+                      merges: {type: integer}
+                      formulas: {type: integer}
+                      kind_row: {type: boolean}
+                      warnings: {type: [array, "null"], items: {type: string}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: reports.form_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "reports.form_code_taken, reports.form_draft_exists, reports.form_retired", $ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {description: reports.form_import_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 141
+  /v1/reports/forms/seed:
+    post:
+      summary: Khởi tạo 14 mẫu Phòng Trồng trọt (T01–T07 tuần, M01 tháng, V01–V06 hàng vụ) thành nháp v1 + gán loại báo cáo, cấp Xã
+      description: Mẫu đã có (cùng mã, phòng ban) giữ nguyên (skipped). Phần chưa biết từ tệp gốc đánh dấu placeholder/pending “chờ khách Q-01”.
+      operationId: adminSeedForms
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                department_code: {type: string, default: trong_trot}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, skipped]
+                properties:
+                  created: {type: array, items: {type: string}}
+                  skipped: {type: array, items: {type: string}}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 142
+  /v1/reports/forms/{id}:
+    get:
+      summary: Mẫu kèm lịch sử phiên bản (không kèm định nghĩa) và gán loại báo cáo
+      operationId: adminGetForm
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Mẫu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [template, versions, assignments]
+                properties:
+                  template: {$ref: "application.yaml#/components/schemas/FormTemplate"}
+                  versions: {type: array, items: {$ref: "application.yaml#/components/schemas/FormVersion"}}
+                  assignments: {type: array, items: {$ref: "application.yaml#/components/schemas/FormAssignment"}}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 143
+  /v1/reports/forms/{id}/retire:
+    post:
+      summary: Ngừng dùng cả mẫu (không xóa — RB-1), kèm lý do
+      operationId: adminRetireForm
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10, maxLength: 500}}}
+      responses:
+        "200":
+          description: Đã ngừng dùng
+          content:
+            application/json:
+              schema: {$ref: "application.yaml#/components/schemas/FormTemplate"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: reports.form_retired, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 144
+  /v1/reports/forms/{id}/log:
+    get:
+      summary: Nhật ký thiết kế mẫu (API Log chuẩn của màn Detail), mới nhất trước, cursor
+      operationId: adminFormLog
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Nhật ký
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  next_cursor: {type: [string, "null"]}
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, event, actor_ref, actor_display, at, version_id, version, changes, reason, seq]
+                      properties:
+                        id: {type: string, format: uuid}
+                        event:
+                          type: string
+                          enum: [template_created, template_updated, template_retired, draft_created, draft_saved, draft_ops_applied, imported, seeded, proposed, proposal_withdrawn, published, version_retired, assigned, assignment_revoked]
+                        actor_ref: {type: string, format: uuid}
+                        actor_display: {type: [string, "null"], description: "Tên tra từ vault lúc đọc (P1); null ở G1"}
+                        at: {type: string, format: date-time}
+                        version_id: {type: [string, "null"], format: uuid}
+                        version: {type: [integer, "null"]}
+                        changes:
+                          type: array
+                          items:
+                            type: object
+                            required: [field, old, new]
+                            properties:
+                              field: {type: string}
+                              old: {}
+                              new: {}
+                        reason: {type: [string, "null"]}
+                        seq: {type: integer}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 145
+  /v1/reports/forms/{id}/versions:
+    post:
+      summary: Tạo nháp mới từ một phiên bản (mặc định mới nhất); restore = khôi phục phiên bản cũ thành nháp
+      operationId: adminNewFormVersion
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                from_version: {type: integer, minimum: 1}
+                restore: {type: boolean}
+      responses:
+        "201":
+          description: Nháp mới
+          content:
+            application/json:
+              schema: {$ref: "application.yaml#/components/schemas/FormVersion"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "reports.form_draft_exists, reports.form_retired", $ref: "#/components/responses/Problem"}
+# @ag-order: 146
+  /v1/reports/forms/{id}/versions/{v}:
+    get:
+      summary: Một phiên bản kèm định nghĩa lưới (mọi trạng thái)
+      operationId: adminGetFormVersion
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: v, in: path, required: true, schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [template, version]
+                properties:
+                  template: {$ref: "application.yaml#/components/schemas/FormTemplate"}
+                  version: {$ref: "application.yaml#/components/schemas/FormVersion"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 147
+  /v1/reports/forms/{id}/versions/{v}/draft:
+    post:
+      summary: Lưu nháp — thay định nghĩa và/hoặc áp dụng từ kỳ (chỉ phiên bản draft)
+      operationId: adminSaveFormDraft
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: v, in: path, required: true, schema: {type: integer, minimum: 1}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                definition: {$ref: "application.yaml#/components/schemas/FormDefinition"}
+                effective_from: {type: string, format: date}
+                effective_label: {type: string, maxLength: 60}
+      responses:
+        "200":
+          description: Nháp đã lưu
+          content:
+            application/json:
+              schema: {$ref: "application.yaml#/components/schemas/FormVersion"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "reports.form_version_locked, reports.form_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "reports.form_invalid, reports.formula_invalid, reports.formula_invalid_ref, reports.formula_cycle", $ref: "#/components/responses/Problem"}
+# @ag-order: 148
+  /v1/reports/forms/{id}/versions/{v}/ops:
+    post:
+      summary: Thao tác lưới của trình thiết kế (cả lô hoặc không gì) — thêm/xóa/sửa cột, dòng tiêu đề, gộp/tách ô, dòng chỉ tiêu, ràng buộc
+      description: |
+        op ∈ insert_column {at, side before|after, column} · delete_column {letter} · update_column {letter, column} ·
+        insert_header_row {row, side} · delete_header_row {row} · set_header_cell {row, letter, text} · merge {range} · unmerge {range} ·
+        add_indicator {indicator, after} · delete_indicator {code} · set_rule {rule} · delete_rule {id} · set_meta {meta} ·
+        set_groups {groups} · set_totals {totals} · set_period_block {block}. Chèn/xóa cột dời công thức, vùng gộp, nhóm như Excel;
+        xóa cột đang được công thức tham chiếu → 422 reports.formula_invalid_ref (lỗi ở ops[i]).
+      operationId: adminApplyFormOps
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: v, in: path, required: true, schema: {type: integer, minimum: 1}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ops]
+              properties:
+                ops:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items:
+                    type: object
+                    required: [op]
+                    properties:
+                      op: {type: string, enum: [insert_column, delete_column, update_column, insert_header_row, delete_header_row, set_header_cell, merge, unmerge, add_indicator, delete_indicator, set_rule, delete_rule, set_meta, set_groups, set_totals, set_period_block]}
+                      at: {type: string}
+                      side: {type: string, enum: [before, after]}
+                      letter: {type: string}
+                      row: {type: integer}
+                      text: {type: string}
+                      range: {type: string}
+                      code: {type: string}
+                      id: {type: string}
+                      after: {type: string}
+                      column: {$ref: "application.yaml#/components/schemas/FormColumn"}
+                      indicator: {type: object, properties: {code: {type: string}, label: {type: string}, catalog: {type: string}, placeholder: {type: boolean}}}
+                      rule: {$ref: "application.yaml#/components/schemas/FormRule"}
+                      meta:
+                        type: object
+                        properties:
+                          title: {type: string}
+                          sheet_name: {type: string}
+                          requirements: {type: string}
+                          freeze_through: {type: string}
+                          completeness: {type: string, enum: [complete, partial, placeholder]}
+                          pending: {type: array, items: {type: object, properties: {part: {type: string}, detail: {type: string}, question: {type: string}}}}
+                      groups: {type: array, items: {type: object, properties: {id: {type: string}, title: {type: string}, from: {type: string}, to: {type: string}}}}
+                      totals: {type: array, items: {type: object, properties: {kind: {type: string, enum: [region, province]}, label: {type: string}, label_letter: {type: string}}}}
+                      block: {$ref: "application.yaml#/components/schemas/FormPeriodBlock"}
+      responses:
+        "200":
+          description: Nháp sau thao tác
+          content:
+            application/json:
+              schema: {$ref: "application.yaml#/components/schemas/FormVersion"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: reports.form_version_locked, $ref: "#/components/responses/Problem"}
+        "422": {description: "reports.form_invalid, reports.formula_invalid_ref…", $ref: "#/components/responses/Problem"}
+# @ag-order: 149
+  /v1/reports/forms/{id}/versions/{v}/propose:
+    post:
+      summary: Đề nghị phát hành nháp (khóa nội dung) kèm áp dụng từ kỳ — mẫu phải đã gán loại báo cáo
+      operationId: adminProposeFormVersion
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: v, in: path, required: true, schema: {type: integer, minimum: 1}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                effective_from: {type: string, format: date, description: "Ngày bắt đầu kỳ áp dụng; không sớm hơn phiên bản đã phát hành"}
+                effective_label: {type: string, examples: ["Tuần 37/2026"]}
+      responses:
+        "200":
+          description: Đã đề nghị
+          content:
+            application/json:
+              schema: {$ref: "application.yaml#/components/schemas/FormVersion"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "reports.form_version_locked, reports.form_not_assigned, reports.form_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "reports.form_effective_invalid, reports.form_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 150
+  /v1/reports/forms/{id}/versions/{v}/withdraw:
+    post:
+      summary: Rút đề nghị — phiên bản về nháp
+      operationId: adminWithdrawFormVersion
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: v, in: path, required: true, schema: {type: integer, minimum: 1}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, properties: {reason: {type: string, minLength: 10, maxLength: 500}}}
+      responses:
+        "200":
+          description: Đã về nháp
+          content:
+            application/json:
+              schema: {$ref: "application.yaml#/components/schemas/FormVersion"}
+        "409": {description: reports.form_not_proposed, $ref: "#/components/responses/Problem"}
+# @ag-order: 151
+  /v1/reports/forms/{id}/versions/{v}/publish:
+    post:
+      summary: Phát hành phiên bản đã đề nghị — người phát hành ≠ người đề nghị và ≠ người sửa cuối (R-56); từ đây bất biến
+      description: Phát sự kiện pf.reports.form_version.published v1.
+      operationId: adminPublishFormVersion
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: v, in: path, required: true, schema: {type: integer, minimum: 1}}
+      requestBody:
+        content:
+          application/json:
+            schema: {type: object}
+      responses:
+        "200":
+          description: Đã phát hành
+          content:
+            application/json:
+              schema: {$ref: "application.yaml#/components/schemas/FormVersion"}
+        "403": {description: self_approval_forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: "reports.form_not_proposed, reports.form_not_assigned", $ref: "#/components/responses/Problem"}
+# @ag-order: 152
+  /v1/reports/forms/{id}/versions/{v}/retire:
+    post:
+      summary: Ngừng dùng một phiên bản đã phát hành (kèm lý do); công việc đã ghim phiên bản giữ nguyên
+      operationId: adminRetireFormVersion
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: v, in: path, required: true, schema: {type: integer, minimum: 1}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10, maxLength: 500}}}
+      responses:
+        "200":
+          description: Đã ngừng dùng
+          content:
+            application/json:
+              schema: {$ref: "application.yaml#/components/schemas/FormVersion"}
+        "409": {description: reports.form_not_published, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 153
+  /v1/reports/form-versions/{id}/evaluate:
+    post:
+      summary: Xem trước màn nhập — kiểm và tính thử một lưới theo phiên bản (mọi trạng thái, kể cả nháp)
+      operationId: adminEvaluateFormVersion
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "application.yaml#/components/schemas/FormEvalInput"}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "application.yaml#/components/schemas/FormEvalResult"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 154
+  /v1/reports/form-assignments:
+    get:
+      summary: Gán mẫu vào loại báo cáo của phòng ban × cấp (mặc định chỉ đang hiệu lực)
+      operationId: adminListFormAssignments
+      tags: [reports]
+      parameters:
+        - {name: template_id, in: query, schema: {type: string, format: uuid}}
+        - {name: department, in: query, schema: {type: string}}
+        - {name: level, in: query, schema: {type: string, enum: [commune, province]}}
+        - {name: report_type, in: query, schema: {$ref: "application.yaml#/components/schemas/FormReportType"}}
+        - {name: active, in: query, schema: {type: boolean, default: true}}
+      responses:
+        "200":
+          description: Gán
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "application.yaml#/components/schemas/FormAssignment"}}}}
+    post:
+      summary: Gán mẫu vào một loại báo cáo (phòng ban, cấp lấy theo mẫu); một loại gồm nhiều mẫu
+      operationId: adminAssignForm
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [template_id, report_type]
+              properties:
+                template_id: {type: string, format: uuid}
+                report_type: {$ref: "application.yaml#/components/schemas/FormReportType"}
+      responses:
+        "201":
+          description: Đã gán
+          content:
+            application/json:
+              schema: {$ref: "application.yaml#/components/schemas/FormAssignment"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "reports.form_already_assigned, reports.form_retired", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 155
+  /v1/reports/form-assignments/{id}/revoke:
+    post:
+      summary: Bỏ gán (kèm lý do); công việc đã phát hành giữ nguyên
+      operationId: adminRevokeFormAssignment
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10, maxLength: 500}}}
+      responses:
+        "200":
+          description: Đã bỏ gán
+          content:
+            application/json:
+              schema: {$ref: "application.yaml#/components/schemas/FormAssignment"}
+        "404": {description: reports.form_assignment_not_found, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/reports ---
+
+  # --- pf/waterway: mạng đường thủy có phiên bản (mục 16; GIS FN-09, US-WATER-02/03). waterway_editor vẽ/sửa/dựng, waterway_publisher phát hành (≠ người dựng, R-56) ---
+components:
+  schemas:
+# @ag-order: 259
+    ReportDefinition:
+      type: object
+      required: [title, source, grouping, columns, formats]
+      properties:
+        title: {type: string, minLength: 5, maxLength: 200}
+        source:
+          type: string
+          enum: [extension.sowing, extension.growth_pest, extension.program_progress, extension.tasks_sla, extension.period_summary, mechanization.summary, mechanization.shortage_by_coop, mechanization.season_compare, cropcycle.production]
+        grouping: {type: string, enum: [national, province, commune, cooperative]}
+        columns:
+          type: array
+          minItems: 1
+          maxItems: 40
+          items: {type: object, required: [key], properties: {key: {type: string}, title: {type: string}}}
+        formats: {type: array, items: {type: string, enum: [xlsx, pdf]}}
+        provisional_layout: {type: boolean}
+        form_note: {type: string, maxLength: 500}
+# @ag-order: 260
+    ReportTemplate:
+      type: object
+      required: [key, version, builtin, status, definition]
+      properties:
+        key: {type: string}
+        version: {type: integer, minimum: 0}
+        builtin: {type: boolean}
+        status: {type: string, enum: [active, retired]}
+        definition: {$ref: "#/components/schemas/ReportDefinition"}
+        reason: {type: [string, "null"]}
+        created_by: {type: [string, "null"], format: uuid}
+        created_at: {type: [string, "null"], format: date-time}
+# @ag-order: 261
+    ReportSchedule:
+      type: object
+      required: [id, template_key, format, params, frequency, hour, recipients, owner_ref, active, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        template_key: {type: string}
+        format: {type: string, enum: [xlsx, pdf]}
+        unit_code: {type: [string, "null"]}
+        params: {type: object}
+        frequency: {type: string, enum: [weekly, monthly]}
+        weekday: {type: [integer, "null"]}
+        day_of_month: {type: [integer, "null"]}
+        hour: {type: integer}
+        recipients: {type: array, items: {type: string, format: uuid}}
+        owner_ref: {type: string, format: uuid}
+        active: {type: boolean}
+        deactivated_reason: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    # --- hết pf/reports ---
+
+# @ag-end

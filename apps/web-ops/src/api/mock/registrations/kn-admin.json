@@ -1,0 +1,11 @@
+{
+  "id": "kn-admin",
+  "source": "./kn-admin",
+  "app": [],
+  "admin": [
+    {
+      "export": "knAdminRoutes",
+      "order": 0
+    }
+  ]
+}

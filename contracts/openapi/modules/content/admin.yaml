@@ -1,0 +1,406 @@
+paths:
+# @ag-order: 52
+  /v1/documents:
+    get:
+      summary: Tài liệu mọi trạng thái trong phạm vi người gọi (sắp theo ref giảm dần)
+      operationId: adminListDocuments
+      tags: [content]
+      parameters:
+        - {name: status, in: query, description: "Một hoặc nhiều trạng thái, phân tách bằng dấu phẩy", schema: {type: string}}
+        - {name: kind, in: query, schema: {$ref: "#/components/schemas/ContentKind"}}
+        - {name: tag, in: query, schema: {type: string}}
+        - {name: category, in: query, schema: {type: string}}
+        - {name: q, in: query, schema: {type: string}}
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ContentAdminDocument"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo tài liệu ở trạng thái nháp (phiên bản 1). Tệp đính kèm tải sau, gắn bằng phiên bản mới.
+      operationId: createDocument
+      tags: [content]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ContentInput"
+                - type: object
+                  required: [kind, audience]
+                  properties:
+                    kind: {$ref: "#/components/schemas/ContentKind"}
+                    audience:
+                      type: object
+                      required: [level]
+                      properties:
+                        level: {type: string, enum: [national, province, commune]}
+                        units: {type: array, items: {type: string}}
+                    parent_ref: {type: [string, "null"], format: uuid, description: "Bắt buộc với supplement: quy trình chuẩn TW đã xuất bản"}
+      responses:
+        "201": {$ref: "#/components/responses/ContentDocumentVersion"}
+        "403": {description: "forbidden, content.out_of_scope, content.kind_not_allowed", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed, content.audience_invalid, content.tag_invalid, content.parent_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 53
+  /v1/documents/extract:
+    post:
+      summary: Trích nội dung từ Word (.docx) hoặc PDF có lớp chữ để điền sẵn bản nháp — không lưu, không xuất bản (KN US-LIB-03, HTX US-CMS-02)
+      description: |
+        PDF: đọc chữ qua bảng ToUnicode của phông (tiếng Việt có dấu, chuẩn hóa NFC), ghép dòng thành đoạn, cỡ chữ lớn thành tiêu đề.
+        PDF ảnh scan (không có lớp chữ, không OCR), PDF mã hóa, phông không giải mã được, .doc cũ → 422 content.extract_unsupported
+        kèm lý do ở detail; tệp hỏng → 422 content.extract_failed.
+      operationId: extractDocument
+      tags: [content]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary, description: "Tối đa 15 MB"}
+      responses:
+        "200":
+          description: Nội dung trích (Markdown đã lọc)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [title, body, body_format, status]
+                properties:
+                  title: {type: string}
+                  body: {type: string}
+                  body_format: {type: string, enum: [markdown]}
+                  status: {type: string, enum: [draft_only]}
+        "413": {description: content.file_too_large, $ref: "#/components/responses/Problem"}
+        "415": {description: content.file_type_not_allowed, $ref: "#/components/responses/Problem"}
+        "422": {description: "content.extract_unsupported (PDF, .doc), content.extract_failed (tệp lỗi, ảnh scan)", $ref: "#/components/responses/Problem"}
+# @ag-order: 54
+  /v1/documents/{ref}:
+    parameters:
+      - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: Tài liệu (mọi trạng thái) và lịch sử phiên bản
+      operationId: adminGetDocument
+      tags: [content]
+      responses:
+        "200":
+          description: Tài liệu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [document, versions]
+                properties:
+                  document: {$ref: "#/components/schemas/ContentAdminDocument"}
+                  versions: {type: array, items: {$ref: "#/components/schemas/ContentVersionInfo"}}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 55
+  /v1/documents/{ref}/versions:
+    parameters:
+      - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Thêm phiên bản nháp mới (ghi thêm vào sổ; bản đã xuất bản vẫn hiển thị tới khi bản mới được duyệt)
+      operationId: createDocumentVersion
+      tags: [content]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ContentInput"}
+      responses:
+        "201": {$ref: "#/components/responses/ContentDocumentVersion"}
+        "409": {description: "content.invalid_transition — đang chờ duyệt hoặc đã gỡ", $ref: "#/components/responses/Problem"}
+        "422": {description: "content.attachment_not_found, content.tag_invalid, validation_failed", $ref: "#/components/responses/Problem"}
+# @ag-order: 56
+  /v1/documents/{ref}/versions/{no}:
+    parameters:
+      - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: no, in: path, required: true, schema: {type: integer, minimum: 1}}
+    get:
+      summary: Một phiên bản đầy đủ — xem trước giao diện mobile trước khi xuất bản (HTX US-CMS-01)
+      operationId: adminGetDocumentVersion
+      tags: [content]
+      responses:
+        "200": {$ref: "#/components/responses/ContentDocumentVersion"}
+        "404": {description: content.version_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 57
+  /v1/documents/{ref}/attachments:
+    parameters:
+      - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Tải tệp đính kèm (PDF, .docx, JPEG/PNG/WebP, MP4; ≤ 15 MB) — lưu kho đối tượng ghi một lần, kiểm SHA-256
+      operationId: uploadDocumentAttachment
+      tags: [content]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, sha256]
+              properties:
+                file: {type: string, format: binary}
+                sha256: {type: string, pattern: "^[0-9a-fA-F]{64}$", description: SHA-256 nội dung do client tính}
+      responses:
+        "201":
+          description: Đã lưu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, document_ref, file_name, content_type, size, sha256, created_at]
+                properties:
+                  id: {type: string, format: uuid}
+                  document_ref: {type: string, format: uuid}
+                  file_name: {type: string}
+                  content_type: {type: string}
+                  size: {type: integer}
+                  sha256: {type: string}
+                  created_at: {type: string, format: date-time}
+        "413": {description: content.file_too_large, $ref: "#/components/responses/Problem"}
+        "415": {description: content.file_type_not_allowed, $ref: "#/components/responses/Problem"}
+        "422": {description: content.checksum_mismatch, $ref: "#/components/responses/Problem"}
+        "503": {description: "content.dependency_unavailable — chưa cấu hình kho đối tượng", $ref: "#/components/responses/Problem"}
+# @ag-order: 58
+  /v1/documents/{ref}/submit:
+    parameters:
+      - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Gửi phiên bản nháp mới nhất đi duyệt (draft → review)
+      operationId: submitDocument
+      tags: [content]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody: {$ref: "#/components/requestBodies/ContentTransition"}
+      responses:
+        "200": {$ref: "#/components/responses/ContentDocumentState"}
+        "409": {description: content.invalid_transition, $ref: "#/components/responses/Problem"}
+# @ag-order: 59
+  /v1/documents/{ref}/return:
+    parameters:
+      - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Người duyệt trả lại phiên bản đang chờ duyệt, lý do ≥ 10 ký tự
+      operationId: returnDocument
+      tags: [content]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody: {$ref: "#/components/requestBodies/ContentTransition"}
+      responses:
+        "200": {$ref: "#/components/responses/ContentDocumentState"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 60
+  /v1/documents/{ref}/publish:
+    parameters:
+      - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Xuất bản phiên bản đang chờ duyệt; phát pf.content.document.published (và pf.content.alert.published với cảnh báo)
+      operationId: publishDocument
+      tags: [content]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody: {$ref: "#/components/requestBodies/ContentTransition"}
+      responses:
+        "200": {$ref: "#/components/responses/ContentDocumentVersion"}
+        "403": {description: "self_approval_forbidden (tác giả tự duyệt), content.out_of_scope", $ref: "#/components/responses/Problem"}
+        "409": {description: content.invalid_transition, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (BR-05 thiếu phân loại, tin thiếu chuyên mục), content.parent_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 61
+  /v1/documents/{ref}/retire:
+    parameters:
+      - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Gỡ tài liệu (ẩn với người đọc, máy nhận tombstone); lý do ≥ 10 ký tự. Không xóa phiên bản nào.
+      operationId: retireDocument
+      tags: [content]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody: {$ref: "#/components/requestBodies/ContentTransition"}
+      responses:
+        "200": {$ref: "#/components/responses/ContentDocumentState"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 62
+  /v1/documents/{ref}/duplicate:
+    parameters:
+      - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Nhân bản thành tài liệu nháp mới, giữ nội dung, ảnh bìa, chuyên mục (HTX US-CMS-02 AC-1)
+      operationId: duplicateDocument
+      tags: [content]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201": {$ref: "#/components/responses/ContentDocumentVersion"}
+        "404": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/content ---
+
+  # --- pf/geo ---
+components:
+  responses:
+# @ag-order: 247
+    ContentDocumentVersion:
+      description: Tài liệu và một phiên bản (phiên bản vừa ghi, vừa xuất bản hoặc được xem trước)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [document, version]
+            properties:
+              document: {$ref: "#/components/schemas/ContentAdminDocument"}
+              version: {$ref: "#/components/schemas/ContentVersion"}
+# @ag-order: 248
+    ContentDocumentState:
+      description: Trạng thái tài liệu sau chuyển trạng thái
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [document]
+            properties:
+              document: {$ref: "#/components/schemas/ContentAdminDocument"}
+  schemas:
+# @ag-order: 292
+    ContentKind:
+      type: string
+      enum: [procedure, guide, news, alert, supplement]
+      description: procedure = quy trình kỹ thuật chuẩn quốc gia; supplement = hướng dẫn đặc thù địa phương gắn quy trình gốc; alert = cảnh báo khẩn (phát thông báo đẩy theo vùng)
+# @ag-order: 293
+    ContentAudience:
+      type: object
+      required: [level, units]
+      properties:
+        level: {type: string, enum: [national, province, commune]}
+        units: {type: array, items: {type: string}, description: "Rỗng với national; [mã tỉnh] với province; mã các xã (cùng tỉnh) với commune"}
+        province_code: {type: [string, "null"], description: Tỉnh sở hữu (chỉ đọc)}
+# @ag-order: 294
+    ContentDocument:
+      type: object
+      required: [ref, kind, audience, status, tags]
+      properties:
+        ref: {type: string, format: uuid}
+        kind: {$ref: "#/components/schemas/ContentKind"}
+        audience: {$ref: "#/components/schemas/ContentAudience"}
+        parent_ref: {type: [string, "null"], format: uuid}
+        status: {type: string, enum: [draft, review, published, retired]}
+        title: {type: [string, "null"], description: Tiêu đề của bản xuất bản hiện hành}
+        summary: {type: [string, "null"]}
+        category: {type: [string, "null"]}
+        tags: {type: array, items: {type: string}}
+        published_version_no: {type: [integer, "null"]}
+        published_at: {type: [string, "null"], format: date-time}
+        publisher_ref: {type: [string, "null"], format: uuid}
+        retired_at: {type: [string, "null"], format: date-time}
+        retire_reason: {type: [string, "null"]}
+# @ag-order: 295
+    ContentAttachment:
+      type: object
+      required: [id, file_name, content_type, size, sha256, role]
+      properties:
+        id: {type: string, format: uuid}
+        file_name: {type: string}
+        content_type: {type: string, enum: [application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, image/jpeg, image/png, image/webp, video/mp4]}
+        size: {type: integer, maximum: 15728640}
+        sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+        role: {type: string, enum: [attachment, cover]}
+        url: {type: [string, "null"], description: "URL tải có hạn; không ghi log (R-92)"}
+        url_expires_at: {type: [string, "null"], format: date-time}
+# @ag-order: 296
+    ContentVersion:
+      type: object
+      required: [id, version_no, status, title, body, body_format, tags, attachments]
+      properties:
+        id: {type: string, format: uuid}
+        version_no: {type: integer, minimum: 1}
+        status: {type: string, enum: [draft, review, published, superseded, discarded, returned]}
+        title: {type: string}
+        summary: {type: string}
+        body: {type: string, description: "Đã qua bộ lọc allow-list (không script, không on*, liên kết chỉ http/https/mailto/att:<id>). Client hiển thị Markdown ở chế độ tắt HTML thô."}
+        body_format: {type: string, enum: [markdown, html]}
+        category: {type: [string, "null"]}
+        tags: {type: array, items: {type: string}}
+        author_ref: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+        attachments: {type: array, items: {$ref: "#/components/schemas/ContentAttachment"}}
+# @ag-order: 297
+    ContentVersionInfo:
+      type: object
+      required: [version_no, id, status, title, author_ref, recorded_at]
+      properties:
+        version_no: {type: integer}
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [draft, review, published, superseded, discarded, returned]}
+        title: {type: string}
+        author_ref: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+        published_at: {type: [string, "null"], format: date-time}
+        publisher_ref: {type: [string, "null"], format: uuid}
+        return_reason: {type: [string, "null"]}
+# @ag-order: 298
+    ContentAdminDocument:
+      allOf:
+        - $ref: "#/components/schemas/ContentDocument"
+        - type: object
+          required: [created_by, created_at, updated_at, last_version_no]
+          properties:
+            created_by: {type: string, format: uuid}
+            created_at: {type: string, format: date-time}
+            updated_at: {type: string, format: date-time}
+            last_version_no: {type: integer}
+            working_version_no: {type: [integer, "null"]}
+            working_status: {type: [string, "null"], enum: [draft, review, null]}
+# @ag-order: 299
+    ContentInput:
+      type: object
+      required: [title]
+      properties:
+        title: {type: string, maxLength: 300}
+        summary: {type: string, maxLength: 2000}
+        body: {type: string, description: "Tối đa 512 KB; được lọc allow-list khi lưu"}
+        body_format: {type: string, enum: [markdown, html], default: markdown}
+        category: {type: string, enum: [technique, pest_warning, policy, market, event]}
+        tags: {type: array, maxItems: 20, items: {type: string, description: "'<danh mục>:<mã>', danh mục thuộc rice_variety, farm_stage, season, pest"}}
+        attachments:
+          type: array
+          maxItems: 30
+          items:
+            type: object
+            required: [id]
+            properties:
+              id: {type: string, format: uuid, description: Tệp đã tải lên cho tài liệu hoặc có trong phiên bản gần nhất}
+              role: {type: string, enum: [attachment, cover], default: attachment}
+    # --- hết pf/content ---
+
+  requestBodies:
+# @ag-order: 387
+    ContentTransition:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              version_no: {type: integer, minimum: 1, description: "Bắt buộc với submit/return/publish"}
+              reason: {type: string, minLength: 10, description: "Bắt buộc với return/retire"}

@@ -1,0 +1,11 @@
+{
+  "id": "kn-cnts-periods",
+  "source": "./kn-cnts-periods",
+  "app": [
+    {
+      "export": "cntsPeriodRoutes",
+      "order": 14
+    }
+  ],
+  "admin": []
+}
