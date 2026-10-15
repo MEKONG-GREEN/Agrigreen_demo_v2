@@ -75,7 +75,7 @@ Lý do không đặt danh mục ở `cap/masterdata`: một bên dùng (chưa đ
 - Kho định danh: phần mở rộng tùy chọn `client.ProfileBatch` (`POST /v1/subjects/batch-read`, ≤ 200 chủ thể, một lượt hạn mức) — `module.yaml` của vault/identity cung cấp thêm port `ProfileBatch`.
 - `UseEgress`: tải tệp qua điểm kiểm soát xuất pf/metering (ADR-0024, kênh report_export, nội bộ).
 - HTTP: `/v1/hrm/reports*`, `/v1/hrm/report-exports/{id}/file`, `/v1/hrm/dashboard*`; web-ops "Dashboard nhân sự", "Biểu mẫu báo cáo Sở". Giả định: [W11.28](../kn/gia-dinh/W11.28.md).
-### W11.24 kho tài liệu nhân sự (14/10/2026, pf 20261013191234)
+### W11.24 kho tài liệu nhân sự (14/10/2026, pf 20261015083926)
 
 - Sổ `pf_hrm.doc_folder` (cây thư mục, `system_key` cho nghiệp vụ tự lưu tệp, `acl` theo thư mục), `pf_hrm.doc` (phiên bản đầy đủ của tài liệu; xóa = ẩn có lý do), `pf_hrm.doc_access` (xem trước/tải xuống). Route `/v1/hrm/docs*`.
 - Quyền: ma trận FN-20 thêm `docs.view`, `docs.manage` (HCTH, Admin toàn Trung tâm; lãnh đạo phòng `docs.view` đơn vị mình); thư mục ghi đè cho nhóm vai/người dùng, kế thừa xuống thư mục con. Gốc chỉ Admin.

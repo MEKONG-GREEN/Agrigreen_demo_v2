@@ -142,6 +142,13 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "extension.task_not_found": "Không tìm thấy nhiệm vụ, hoặc nhiệm vụ nằm ngoài phạm vi.",
   "content.library_item_not_found": "Tài liệu chưa có trong danh mục cá nhân.",
   // W11.28: báo cáo Sở và dashboard nhân sự.
+  "hrm.folder_not_found": "Không tìm thấy thư mục hoặc bạn không có quyền xem.",
+  "hrm.folder_exists": "Đã có thư mục cùng tên ở cấp này. Vui lòng chọn tên khác.",
+  "hrm.folder_not_empty": "Thư mục còn tài liệu hoặc thư mục con. Chỉ có thể ẩn thư mục rỗng.",
+  "hrm.doc_not_found": "Không tìm thấy tài liệu hoặc bạn không có quyền xem.",
+  "hrm.doc_format": "Định dạng tệp không được hỗ trợ hoặc nội dung không khớp với đuôi tệp.",
+  "hrm.doc_too_large": "Tệp vượt dung lượng cho phép. Vui lòng chọn tệp nhỏ hơn 15 MB.",
+  "hrm.docs_unavailable": "Kho tài liệu hiện chưa sẵn sàng. Vui lòng thử lại sau.",
   "hrm.report_unknown": "Không có biểu báo cáo Sở này. Chọn một biểu từ NS01 đến NS06.",
   "hrm.report_blocked": "Số liệu chưa đạt quy tắc kiểm tra bắt buộc. Sửa các lỗi trước khi xuất báo cáo.",
   "hrm.export_not_found": "Không tìm thấy lần xuất báo cáo này.",

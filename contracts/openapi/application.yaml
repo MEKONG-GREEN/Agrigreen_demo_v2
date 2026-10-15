@@ -9646,7 +9646,7 @@ paths:
                   items: {type: array, items: {$ref: "#/components/schemas/HrmPersonBrief"}}
         "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed (chỉ số lạ), $ref: "#/components/responses/Problem"}
-  # --- pf/hrm W11.24 (pf 20261013191234): KHO TÀI LIỆU NHÂN SỰ (BRD HCTH v3.0 FN-14, UR-HC-25, UR-ADM-10). Quyền: ma trận FN-20
+  # --- pf/hrm W11.24 (pf 20261015083926): KHO TÀI LIỆU NHÂN SỰ (BRD HCTH v3.0 FN-14, UR-HC-25, UR-ADM-10). Quyền: ma trận FN-20
   # (docs.view, docs.manage × none/self/unit/all) ghi đè được theo thư mục (acl, kế thừa xuống thư mục con; người dùng ưu tiên
   # hơn nhóm; Admin cố định). Tệp mã hóa phong bì ở pf/evidence (mục đích hr_records; người xem cần vai kho
   # vault_evidence_viewer). Xóa = ẩn (lý do bắt buộc). Tài liệu gắn nhân viên cần hồ sơ bật (AG_HRM_RECORDS — Q-005).

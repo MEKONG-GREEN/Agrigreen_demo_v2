@@ -18,14 +18,11 @@
 // W11.28 (pf 20261014073846) — BÁO CÁO SỞ NS01–NS06 (FN-12) + DASHBOARD NHÂN SỰ (FN-06): biểu tại ngày chốt (as-of),
 // quy tắc kiểm chéo, nhấn ô xem người, sổ xuất (lịch sử + trường nhạy cảm), tệp Excel dựng lại được (SHA-256).
 //
-// Gói sau của cùng module: W11.24 kho tài liệu, W11.25 nâng bậc, W11.26 đánh giá. Module khác chỉ import hrm/port (R-02).
-// Tệp này là gốc lắp ráp cho cmd/api-platform.
-// W11.24 (pf 20261013191234) — KHO TÀI LIỆU NHÂN SỰ (FN-14): cây thư mục, phân loại, quyền thư mục (ghi đè ma trận FN-20
+// W11.24 (pf 20261015083926) — KHO TÀI LIỆU NHÂN SỰ (FN-14): cây thư mục, phân loại, quyền thư mục (ghi đè ma trận FN-20
 // cho docs.view/docs.manage), tệp qua pf/evidence (mục đích hr_records, khóa của chủ thể "kho tài liệu" ở kho định danh),
 // xóa = ẩn, nhật ký xem trước/tải xuống. Bật bằng UseDocs; tài liệu gắn nhân viên theo cờ AG_HRM_RECORDS.
 //
-// Gói sau của cùng module: W11.25 nâng bậc, W11.26 đánh giá, W11.28
-// báo cáo Sở. Module khác chỉ import hrm/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
+// Gói sau của cùng module: W11.25 nâng bậc, W11.26 đánh giá. Module khác chỉ import hrm/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
 package hrm
 
 import (
