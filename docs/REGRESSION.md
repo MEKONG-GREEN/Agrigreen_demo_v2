@@ -492,3 +492,6 @@ Regression acceptance command: PGriêng, go test -v -count=1 -p 1 -timeout 55m .
 Related test points: TestProgramProgressFR03, TestReportDataSowingAndSummary, TestReportSourceBuildersFiguresAndMissingTargets, genericSourceBuilderBindsJobAndCopies, ownerCatalog/seed/profilegoldens, HTTP/export/KN77. Mchỉaliasvàqualifierkhôngbehavior;N mới gỡcapdefinitions.
 
 Pure-first1203.exit0,0FAIL/SKIP gồmowner/registry/golden/SDK/CLI;KNapp/storecompilekhôngcótest. Script bảo vệ import đơn/nhóm import cuối, không chạyGo khi chưa đủ9callers; đã hoàn tất vàgofmt, không cóCodecompilefailure. Cần14PGproducer/fullhandler vàconsumer trướcdev.
+
+
+Kết quả thực: PG48903.exit0 đủ14/14packagecótest,0FAIL/SKIP trênproduction21d2518f: handler:124.852s, assembly:102.724s, worker:2.211s, formimport:1.994s, reportforms:2.116s, reports:94.348s, kn77:253.871s. KNhandlerfull124.852s bảo vệSQLproducer/FR03/scopes;KNapp/storecompilekhôngtest. Static38201.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. AliasMgiữtypeidentity/5ID/goldenbyte, chưa chuyểndefinitions. ProofTEMP agrigreen-codex-knsplit2reportsm-proof.json; helpercòn8migrationgate trướcdev, N mới gỡcap13DTO/5ID.
