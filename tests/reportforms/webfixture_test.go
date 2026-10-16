@@ -17,7 +17,7 @@ import (
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 )
 
@@ -42,7 +42,7 @@ type evalCase struct {
 type opsCase struct {
 	Name      string               `json:"name"`
 	Code      string               `json:"code"`
-	Ops       []form.Op            `json:"ops"`
+	Ops       []reports.FormOp     `json:"ops"`
 	ErrorCode string               `json:"error_code,omitempty"`
 	ErrorAt   *int                 `json:"error_at,omitempty"`
 	Result    *port.FormDefinition `json:"result,omitempty"`
@@ -83,8 +83,8 @@ func goldenEvalCases(t *testing.T) []evalCase {
 	}
 	for i := range cases {
 		def := seed(t, cases[i].Code)
-		cases[i].Result = form.Evaluate(def, cases[i].Input)
-		cases[i].Totals = form.Totals(def, cases[i].Result.Rows)
+		cases[i].Result = reports.EvaluateForm(def, cases[i].Input)
+		cases[i].Totals = reports.FormTotals(def, cases[i].Result.Rows)
 		if cases[i].Totals == nil {
 			cases[i].Totals = []port.TotalRowResult{}
 		}
@@ -96,52 +96,52 @@ func goldenOpsCases(t *testing.T) []opsCase {
 	col := func(c port.FormColumn) *port.FormColumn { return &c }
 	str := func(s string) *string { return &s }
 	cases := []opsCase{
-		{Name: "chèn cột trước F: dải SUM nở, vùng gộp dời", Code: "T01", Ops: []form.Op{{Op: form.OpInsertColumn, At: "F", Side: "before", Column: col(port.FormColumn{Title: "Ghi chú", Kind: port.ColumnInput, DType: port.DTypeText})}}},
-		{Name: "chèn cột sau O + công thức tham chiếu", Code: "T01", Ops: []form.Op{
-			{Op: form.OpInsertColumn, At: "O", Side: "after", Column: col(port.FormColumn{Title: "Tỷ lệ", Kind: port.ColumnFormula, DType: port.DTypeNumber, Unit: "%", Formula: "IF(D#=0,0,M#/D#*100)"})},
-			{Op: form.OpSetHeaderCell, Row: 1, Letter: "P", Text: "TỶ LỆ"},
-			{Op: form.OpMerge, Range: "P1:P2"},
+		{Name: "chèn cột trước F: dải SUM nở, vùng gộp dời", Code: "T01", Ops: []reports.FormOp{{Op: reports.FormOpInsertColumn, At: "F", Side: "before", Column: col(port.FormColumn{Title: "Ghi chú", Kind: port.ColumnInput, DType: port.DTypeText})}}},
+		{Name: "chèn cột sau O + công thức tham chiếu", Code: "T01", Ops: []reports.FormOp{
+			{Op: reports.FormOpInsertColumn, At: "O", Side: "after", Column: col(port.FormColumn{Title: "Tỷ lệ", Kind: port.ColumnFormula, DType: port.DTypeNumber, Unit: "%", Formula: "IF(D#=0,0,M#/D#*100)"})},
+			{Op: reports.FormOpSetHeaderCell, Row: 1, Letter: "P", Text: "TỶ LỆ"},
+			{Op: reports.FormOpMerge, Range: "P1:P2"},
 		}},
-		{Name: "xóa cột E (không ai tham chiếu)", Code: "T01", Ops: []form.Op{{Op: form.OpDeleteColumn, Letter: "E"}}},
-		{Name: "xóa cột D đang được công thức tham chiếu → lỗi", Code: "T04", Ops: []form.Op{{Op: form.OpDeleteColumn, Letter: "D"}}},
-		{Name: "xóa cột theo kỳ lẻ → lỗi", Code: "T01", Ops: []form.Op{{Op: form.OpDeleteColumn, Letter: "H"}}},
-		{Name: "đổi cột thành công thức sai cú pháp → lỗi", Code: "T01", Ops: []form.Op{{Op: form.OpUpdateColumn, Letter: "E", Column: col(port.FormColumn{Title: "X", Kind: port.ColumnFormula, DType: port.DTypeNumber, Formula: "SUM(D#:"})}}},
-		{Name: "công thức tham chiếu cột không tồn tại → lỗi", Code: "T01", Ops: []form.Op{{Op: form.OpUpdateColumn, Letter: "E", Column: col(port.FormColumn{Title: "X", Kind: port.ColumnFormula, DType: port.DTypeNumber, Formula: "ZZ#*2"})}}},
-		{Name: "công thức vòng → lỗi", Code: "T01", Ops: []form.Op{{Op: form.OpUpdateColumn, Letter: "E", Column: col(port.FormColumn{Title: "X", Kind: port.ColumnFormula, DType: port.DTypeNumber, Formula: "M#+1"})}, {Op: form.OpUpdateColumn, Letter: "M", Column: col(port.FormColumn{Title: "LŨY KẾ", Kind: port.ColumnFormula, DType: port.DTypeNumber, Formula: "SUM(F#:L#)+E#"})}}},
-		{Name: "thêm dòng tiêu đề trên cùng, tách, gộp lại", Code: "T01", Ops: []form.Op{
-			{Op: form.OpInsertHeaderRow, Row: 1, Side: "before"},
-			{Op: form.OpSetHeaderCell, Row: 1, Letter: "A", Text: "PHỤ LỤC 01"},
-			{Op: form.OpMerge, Range: "A1:O1"},
-			{Op: form.OpUnmerge, Range: "F2:L2"},
+		{Name: "xóa cột E (không ai tham chiếu)", Code: "T01", Ops: []reports.FormOp{{Op: reports.FormOpDeleteColumn, Letter: "E"}}},
+		{Name: "xóa cột D đang được công thức tham chiếu → lỗi", Code: "T04", Ops: []reports.FormOp{{Op: reports.FormOpDeleteColumn, Letter: "D"}}},
+		{Name: "xóa cột theo kỳ lẻ → lỗi", Code: "T01", Ops: []reports.FormOp{{Op: reports.FormOpDeleteColumn, Letter: "H"}}},
+		{Name: "đổi cột thành công thức sai cú pháp → lỗi", Code: "T01", Ops: []reports.FormOp{{Op: reports.FormOpUpdateColumn, Letter: "E", Column: col(port.FormColumn{Title: "X", Kind: port.ColumnFormula, DType: port.DTypeNumber, Formula: "SUM(D#:"})}}},
+		{Name: "công thức tham chiếu cột không tồn tại → lỗi", Code: "T01", Ops: []reports.FormOp{{Op: reports.FormOpUpdateColumn, Letter: "E", Column: col(port.FormColumn{Title: "X", Kind: port.ColumnFormula, DType: port.DTypeNumber, Formula: "ZZ#*2"})}}},
+		{Name: "công thức vòng → lỗi", Code: "T01", Ops: []reports.FormOp{{Op: reports.FormOpUpdateColumn, Letter: "E", Column: col(port.FormColumn{Title: "X", Kind: port.ColumnFormula, DType: port.DTypeNumber, Formula: "M#+1"})}, {Op: reports.FormOpUpdateColumn, Letter: "M", Column: col(port.FormColumn{Title: "LŨY KẾ", Kind: port.ColumnFormula, DType: port.DTypeNumber, Formula: "SUM(F#:L#)+E#"})}}},
+		{Name: "thêm dòng tiêu đề trên cùng, tách, gộp lại", Code: "T01", Ops: []reports.FormOp{
+			{Op: reports.FormOpInsertHeaderRow, Row: 1, Side: "before"},
+			{Op: reports.FormOpSetHeaderCell, Row: 1, Letter: "A", Text: "PHỤ LỤC 01"},
+			{Op: reports.FormOpMerge, Range: "A1:O1"},
+			{Op: reports.FormOpUnmerge, Range: "F2:L2"},
 		}},
-		{Name: "xóa dòng tiêu đề 2", Code: "T07", Ops: []form.Op{{Op: form.OpDeleteHeaderRow, Row: 2}}},
-		{Name: "gộp chồng vùng có sẵn → lỗi", Code: "T01", Ops: []form.Op{{Op: form.OpMerge, Range: "E1:G1"}}},
-		{Name: "dòng chỉ tiêu, ràng buộc, meta, nhóm, dòng tổng, khối kỳ", Code: "T05", Ops: []form.Op{
-			{Op: form.OpAddIndicator, Indicator: &port.Indicator{Code: "SB00", Label: "Rầy nâu"}, After: "SB01"},
-			{Op: form.OpDeleteIndicator, Code: "SB20"},
-			{Op: form.OpSetRule, Rule: &port.FormRule{ID: "T05.nang", Expr: "G#<=H#", Message: "Mức nặng không vượt tổng", Severity: port.SeverityWarning, Letters: []string{"G"}}},
-			{Op: form.OpSetMeta, Meta: &form.Meta{Title: str("SÂU BỆNH HẠI LÚA"), FreezeThrough: str("c"), Requirements: str("Nhập diện tích nhiễm theo mức")}},
-			{Op: form.OpSetGroups, Groups: []port.ColumnGroup{{ID: "muc", Title: "Theo mức", From: "E", To: "G"}}},
-			{Op: form.OpSetTotals, Totals: []port.TotalRowDef{{Kind: port.TotalProvince, Label: "Toàn tỉnh", LabelLetter: "C"}}},
+		{Name: "xóa dòng tiêu đề 2", Code: "T07", Ops: []reports.FormOp{{Op: reports.FormOpDeleteHeaderRow, Row: 2}}},
+		{Name: "gộp chồng vùng có sẵn → lỗi", Code: "T01", Ops: []reports.FormOp{{Op: reports.FormOpMerge, Range: "E1:G1"}}},
+		{Name: "dòng chỉ tiêu, ràng buộc, meta, nhóm, dòng tổng, khối kỳ", Code: "T05", Ops: []reports.FormOp{
+			{Op: reports.FormOpAddIndicator, Indicator: &port.Indicator{Code: "SB00", Label: "Rầy nâu"}, After: "SB01"},
+			{Op: reports.FormOpDeleteIndicator, Code: "SB20"},
+			{Op: reports.FormOpSetRule, Rule: &port.FormRule{ID: "T05.nang", Expr: "G#<=H#", Message: "Mức nặng không vượt tổng", Severity: port.SeverityWarning, Letters: []string{"G"}}},
+			{Op: reports.FormOpSetMeta, Meta: &reports.FormMeta{Title: str("SÂU BỆNH HẠI LÚA"), FreezeThrough: str("c"), Requirements: str("Nhập diện tích nhiễm theo mức")}},
+			{Op: reports.FormOpSetGroups, Groups: []port.ColumnGroup{{ID: "muc", Title: "Theo mức", From: "E", To: "G"}}},
+			{Op: reports.FormOpSetTotals, Totals: []port.TotalRowDef{{Kind: port.TotalProvince, Label: "Toàn tỉnh", LabelLetter: "C"}}},
 		}},
-		{Name: "đổi tiêu đề mẫu của khối kỳ", Code: "T01", Ops: []form.Op{{Op: form.OpSetPeriodBlock, Block: &port.PeriodBlock{ID: "xg", FirstLetter: "F", Width: 1, Slots: 7, TitlePattern: "Tuần thứ {n}"}}}},
-		{Name: "tăng số kỳ 7 → 8 (chèn trước khe cuối)", Code: "T01", Ops: []form.Op{
-			{Op: form.OpSetPeriodBlock, Block: &port.PeriodBlock{ID: "xg", FirstLetter: "F", Width: 1, Slots: 8, TitlePattern: "Tuần {n}"}},
-			{Op: form.OpInsertColumn, At: "L", Side: "before", Column: col(port.FormColumn{Key: "xg_tuan_7", Title: "Tuần 7", Kind: port.ColumnPerPeriod, DType: port.DTypeNumber, Unit: "ha", PeriodBlock: "xg", PeriodSlot: 7})},
-			{Op: form.OpUpdateColumn, Letter: "M", Column: col(port.FormColumn{Key: "xg_tuan_8", Title: "Tuần 8", Kind: port.ColumnPerPeriod, DType: port.DTypeNumber, Unit: "ha", PeriodBlock: "xg", PeriodSlot: 8})},
+		{Name: "đổi tiêu đề mẫu của khối kỳ", Code: "T01", Ops: []reports.FormOp{{Op: reports.FormOpSetPeriodBlock, Block: &port.PeriodBlock{ID: "xg", FirstLetter: "F", Width: 1, Slots: 7, TitlePattern: "Tuần thứ {n}"}}}},
+		{Name: "tăng số kỳ 7 → 8 (chèn trước khe cuối)", Code: "T01", Ops: []reports.FormOp{
+			{Op: reports.FormOpSetPeriodBlock, Block: &port.PeriodBlock{ID: "xg", FirstLetter: "F", Width: 1, Slots: 8, TitlePattern: "Tuần {n}"}},
+			{Op: reports.FormOpInsertColumn, At: "L", Side: "before", Column: col(port.FormColumn{Key: "xg_tuan_7", Title: "Tuần 7", Kind: port.ColumnPerPeriod, DType: port.DTypeNumber, Unit: "ha", PeriodBlock: "xg", PeriodSlot: 7})},
+			{Op: reports.FormOpUpdateColumn, Letter: "M", Column: col(port.FormColumn{Key: "xg_tuan_8", Title: "Tuần 8", Kind: port.ColumnPerPeriod, DType: port.DTypeNumber, Unit: "ha", PeriodBlock: "xg", PeriodSlot: 8})},
 		}},
-		{Name: "giảm số kỳ 7 → 6", Code: "T01", Ops: []form.Op{
-			{Op: form.OpSetPeriodBlock, Block: &port.PeriodBlock{ID: "xg", FirstLetter: "F", Width: 1, Slots: 6, TitlePattern: "Tuần {n}"}},
-			{Op: form.OpUpdateColumn, Letter: "L", Column: col(port.FormColumn{Title: "Tuần 7", Kind: port.ColumnInput, DType: port.DTypeNumber})},
-			{Op: form.OpDeleteColumn, Letter: "L"},
+		{Name: "giảm số kỳ 7 → 6", Code: "T01", Ops: []reports.FormOp{
+			{Op: reports.FormOpSetPeriodBlock, Block: &port.PeriodBlock{ID: "xg", FirstLetter: "F", Width: 1, Slots: 6, TitlePattern: "Tuần {n}"}},
+			{Op: reports.FormOpUpdateColumn, Letter: "L", Column: col(port.FormColumn{Title: "Tuần 7", Kind: port.ColumnInput, DType: port.DTypeNumber})},
+			{Op: reports.FormOpDeleteColumn, Letter: "L"},
 		}},
-		{Name: "thao tác không hỗ trợ → lỗi", Code: "T01", Ops: []form.Op{{Op: "explode"}}},
+		{Name: "thao tác không hỗ trợ → lỗi", Code: "T01", Ops: []reports.FormOp{{Op: "explode"}}},
 	}
 	for i := range cases {
-		d, err := form.Apply(seed(t, cases[i].Code), cases[i].Ops)
+		d, err := reports.ApplyForm(seed(t, cases[i].Code), cases[i].Ops)
 		if err != nil {
-			var oe *form.OpError
-			var ve *form.ValidationError
+			var oe *reports.FormOpError
+			var ve *reports.FormValidationError
 			switch {
 			case errors.As(err, &oe):
 				cases[i].ErrorCode, cases[i].ErrorAt = oe.Code, &oe.Index

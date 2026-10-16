@@ -9,8 +9,7 @@ import (
 
 	"github.com/xuri/excelize/v2"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/formimport"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 )
 
@@ -29,11 +28,11 @@ func headerSet(d port.FormDefinition) []string {
 func TestFN_AD_04_06_ImporterRoundTrip(t *testing.T) {
 	for _, code := range []string{"T01", "T04", "T07", "V05", "M01"} {
 		src := seed(t, code)
-		b, err := formimport.Export(src)
+		b, err := reports.ExportFormXLSX(src)
 		if err != nil {
 			t.Fatalf("%s: xuất: %v", code, err)
 		}
-		got, rep, err := formimport.Import(bytes.NewReader(b), formimport.Options{Code: code, Title: src.Title, FileName: code + ".xlsx"})
+		got, rep, err := reports.ImportFormXLSX(bytes.NewReader(b), port.FormImportOptions{Code: code, Title: src.Title, FileName: code + ".xlsx"})
 		if err != nil {
 			t.Fatalf("%s: nạp: %v (%v)", code, err, rep.Warnings)
 		}
@@ -75,7 +74,7 @@ func TestFN_AD_04_06_ImporterRoundTrip(t *testing.T) {
 		}
 		// Tính được như mẫu gốc.
 		in := port.EvalInput{Mode: port.EvalDraft, Rows: []port.EvalRow{{Commune: "c1", Input: map[string]string{"F": "1", "G": "2"}}}}
-		if a, b := form.Evaluate(src, in), form.Evaluate(got, in); a.Rows[0].Cells["M"] != b.Rows[0].Cells["M"] {
+		if a, b := reports.EvaluateForm(src, in), reports.EvaluateForm(got, in); a.Rows[0].Cells["M"] != b.Rows[0].Cells["M"] {
 			t.Fatalf("%s: kết quả tính khác sau khứ hồi", code)
 		}
 	}
@@ -108,7 +107,7 @@ func TestFN_AD_04_06_ImportCustomerSheet(t *testing.T) {
 	if err := x.Write(&buf); err != nil {
 		t.Fatal(err)
 	}
-	d, rep, err := formimport.Import(bytes.NewReader(buf.Bytes()), formimport.Options{Code: "T01", HeaderStart: 2})
+	d, rep, err := reports.ImportFormXLSX(bytes.NewReader(buf.Bytes()), port.FormImportOptions{Code: "T01", HeaderStart: 2})
 	if err != nil {
 		t.Fatalf("%v %v", err, rep.Warnings)
 	}
@@ -131,10 +130,10 @@ func TestFN_AD_04_06_ImportCustomerSheet(t *testing.T) {
 	if !d.Columns[9].Placeholder || !strings.Contains(d.Columns[9].Note, "D5") {
 		t.Fatalf("công thức dòng khác phải giữ nguyên văn để Admin sửa: %+v", d.Columns[9])
 	}
-	if _, _, err := formimport.Import(strings.NewReader("không phải xlsx"), formimport.Options{Code: "T01"}); !errors.Is(err, formimport.ErrInvalid) {
+	if _, _, err := reports.ImportFormXLSX(strings.NewReader("không phải xlsx"), port.FormImportOptions{Code: "T01"}); !errors.Is(err, reports.ErrFormImportInvalid) {
 		t.Fatalf("tệp hỏng: %v", err)
 	}
-	if _, _, err := formimport.Import(bytes.NewReader(buf.Bytes()), formimport.Options{Code: "T01", Sheet: "Không có"}); !errors.Is(err, formimport.ErrInvalid) {
+	if _, _, err := reports.ImportFormXLSX(bytes.NewReader(buf.Bytes()), port.FormImportOptions{Code: "T01", Sheet: "Không có"}); !errors.Is(err, reports.ErrFormImportInvalid) {
 		t.Fatalf("sheet sai: %v", err)
 	}
 }
@@ -150,7 +149,7 @@ func TestFN_AD_04_06_ToRowFormula(t *testing.T) {
 		"F8+1":                 "",
 		"round(f7*1.5,2)":      "ROUND(F#*1.5,2)",
 	} {
-		got, err := formimport.ToRowFormula(src, 7)
+		got, err := reports.ToFormRowFormula(src, 7)
 		if want == "" {
 			if err == nil {
 				t.Errorf("%s phải lỗi, nhận %s", src, got)

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 )
 
@@ -43,7 +43,7 @@ func TestFN_AD_04_06_SeedsValid(t *testing.T) {
 		if s.Code != want[i] || s.Def.Code != s.Code {
 			t.Fatalf("thứ tự/mã mẫu sai: %s", s.Code)
 		}
-		if err := form.Validate(s.Def); err != nil {
+		if err := reports.ValidateForm(s.Def); err != nil {
 			t.Fatalf("%s: %v", s.Code, err)
 		}
 		if s.Code != "T01" && len(s.Def.Pending) == 0 {
@@ -94,7 +94,7 @@ func TestFN_XA_03_02_T04ReachesHR(t *testing.T) {
 	in := port.EvalInput{Mode: port.EvalSubmit, Rows: []port.EvalRow{{Commune: "30292", Region: "KV1",
 		System: map[string]string{"D": "100"},
 		Input:  map[string]string{"K": "10", "L": "8", "N": "40", "O": "5", "P": "2", "R": "6"}}}}
-	r := form.Evaluate(d, in)
+	r := reports.EvaluateForm(d, in)
 	if !r.Valid {
 		t.Fatalf("T04 hợp lệ: %v", issueCodes(r))
 	}
@@ -115,14 +115,14 @@ func TestFN_XA_03_02_OnlyOpenPeriodEditable(t *testing.T) {
 		System: map[string]string{"A": "1", "B": "Khu vực 1", "C": "Phường Bình Đức", "D": "1200"},
 		Input:  map[string]string{"E": "1100", "F": "", "H": "250.5", "N": "2026-10-15"},
 	}}}
-	r := form.Evaluate(d, in)
+	r := reports.EvaluateForm(d, in)
 	if !r.Valid || r.Rows[0].Cells["M"] != "250.5" || r.Rows[0].Cells["D"] != "1200" {
 		t.Fatalf("hợp lệ, M = 250.5: %v %v", issueCodes(r), r.Rows[0].Cells)
 	}
 	in.Rows[0].Input = map[string]string{"G": "10", "M": "999", "D": "5", "E": "abc", "N": "15/10/2026", "ZZ": "1"}
-	r = form.Evaluate(d, in)
+	r = reports.EvaluateForm(d, in)
 	got := issueCodes(r)
-	for _, want := range []string{form.IssuePeriodClosed + "@G", form.IssueNotEditable + "@M", form.IssueNotEditable + "@D", form.IssueInvalidType + "@E", form.IssueInvalidType + "@N", form.IssueUnknownColumn + "@ZZ"} {
+	for _, want := range []string{reports.FormIssuePeriodClosed + "@G", reports.FormIssueNotEditable + "@M", reports.FormIssueNotEditable + "@D", reports.FormIssueInvalidType + "@E", reports.FormIssueInvalidType + "@N", reports.FormIssueUnknownColumn + "@ZZ"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("thiếu %s trong %v", want, got)
 		}
@@ -138,17 +138,17 @@ func TestFN_XA_03_02_T03TraEqualsSown(t *testing.T) {
 	d := seed(t, "T03")
 	row := port.EvalRow{Commune: "30292", Input: map[string]string{"E": "100", "F": "200.5", "G": "50"},
 		XRefs: map[string]map[string]string{"T01": {"M": "350.5"}}}
-	r := form.Evaluate(d, port.EvalInput{Mode: port.EvalSubmit, Rows: []port.EvalRow{row}})
+	r := reports.EvaluateForm(d, port.EvalInput{Mode: port.EvalSubmit, Rows: []port.EvalRow{row}})
 	if !r.Valid || r.Rows[0].Cells["J"] != "350.5" || r.Rows[0].Cells["D"] != "350.5" {
 		t.Fatalf("Σ trà = PL 01 phải hợp lệ: %v %v", issueCodes(r), r.Rows[0].Cells)
 	}
 	row.Input["G"] = "49"
-	r = form.Evaluate(d, port.EvalInput{Mode: port.EvalSubmit, Rows: []port.EvalRow{row}})
-	if r.Valid || !slices.Contains(issueCodes(r), form.IssueRuleFailed+"@J") || r.Issues[0].RuleID != "T03.tong_tra_bang_xg" {
+	r = reports.EvaluateForm(d, port.EvalInput{Mode: port.EvalSubmit, Rows: []port.EvalRow{row}})
+	if r.Valid || !slices.Contains(issueCodes(r), reports.FormIssueRuleFailed+"@J") || r.Issues[0].RuleID != "T03.tong_tra_bang_xg" {
 		t.Fatalf("Σ trà ≠ PL 01 phải báo tại J: %v", issueCodes(r))
 	}
 	row.XRefs = nil
-	r = form.Evaluate(d, port.EvalInput{Mode: port.EvalSubmit, Rows: []port.EvalRow{row}})
+	r = reports.EvaluateForm(d, port.EvalInput{Mode: port.EvalSubmit, Rows: []port.EvalRow{row}})
 	if !r.Valid {
 		t.Fatalf("chưa có PL 01 thì không áp dụng ràng buộc: %v", issueCodes(r))
 	}
@@ -161,15 +161,15 @@ func TestFN_XA_03_02_RequiredAndRange(t *testing.T) {
 	minV := "0"
 	d.Columns[4].Min = &minV
 	in := port.EvalInput{Mode: port.EvalDraft, Rows: []port.EvalRow{{Commune: "x1", Input: map[string]string{}}}}
-	if r := form.Evaluate(d, in); !r.Valid {
+	if r := reports.EvaluateForm(d, in); !r.Valid {
 		t.Fatalf("nháp bỏ kiểm bắt buộc: %v", issueCodes(r))
 	}
 	in.Mode = port.EvalSubmit
-	if r := form.Evaluate(d, in); r.Valid || !slices.Contains(issueCodes(r), form.IssueRequired+"@E") {
+	if r := reports.EvaluateForm(d, in); r.Valid || !slices.Contains(issueCodes(r), reports.FormIssueRequired+"@E") {
 		t.Fatalf("gửi phải kiểm bắt buộc: %v", issueCodes(r))
 	}
 	in.Rows[0].Input["E"] = "-1"
-	if r := form.Evaluate(d, in); !slices.Contains(issueCodes(r), form.IssueOutOfRange+"@E") {
+	if r := reports.EvaluateForm(d, in); !slices.Contains(issueCodes(r), reports.FormIssueOutOfRange+"@E") {
 		t.Fatalf("giới hạn của mẫu: %v", issueCodes(r))
 	}
 }
@@ -183,8 +183,8 @@ func TestFN_TI_02_05_TotalsWeighted(t *testing.T) {
 		{Commune: "c2", Region: "KV1", System: map[string]string{"D": "30"}, Input: map[string]string{"L": "30", "N": "90"}},
 		{Commune: "c3", Region: "KV2", Input: map[string]string{"L": "5", "N": "10"}},
 	}
-	r := form.Evaluate(d, port.EvalInput{Mode: port.EvalDraft, Rows: rows})
-	tot := form.Totals(d, r.Rows)
+	r := reports.EvaluateForm(d, port.EvalInput{Mode: port.EvalDraft, Rows: rows})
+	tot := reports.FormTotals(d, r.Rows)
 	if len(tot) != 3 {
 		t.Fatalf("muốn 2 khu vực + toàn tỉnh, có %d", len(tot))
 	}
@@ -206,11 +206,11 @@ func TestFN_XA_03_02_IndicatorRows(t *testing.T) {
 		{Commune: "c2", Region: "KV1", Indicator: "SB01", Input: map[string]string{"F": "3"}},
 		{Commune: "c1", Region: "KV1", Indicator: "XX"},
 	}}
-	r := form.Evaluate(d, in)
+	r := reports.EvaluateForm(d, in)
 	if r.Valid || len(r.Rows) != 2 || r.Rows[0].Cells["H"] != "3" || !strings.Contains(r.Rows[0].Cells["D"], "Đối tượng sâu bệnh 1") {
 		t.Fatalf("dòng chỉ tiêu: %v %v", issueCodes(r), r.Rows)
 	}
-	tot := form.Totals(d, r.Rows)
+	tot := reports.FormTotals(d, r.Rows)
 	var sb01 port.TotalRowResult
 	for _, x := range tot {
 		if x.Key == "province/SB01" {
@@ -227,14 +227,14 @@ func TestFN_XA_03_02_IndicatorRows(t *testing.T) {
 func TestFN_AD_04_06_DesignerOps(t *testing.T) {
 	d := seed(t, "T01")
 	newCol := port.FormColumn{Title: "Ghi chú", Kind: port.ColumnInput, DType: port.DTypeText}
-	out, err := form.Apply(d, []form.Op{{Op: form.OpInsertColumn, At: "E", Side: "after", Column: &newCol}})
+	out, err := reports.ApplyForm(d, []reports.FormOp{{Op: reports.FormOpInsertColumn, At: "E", Side: "after", Column: &newCol}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if out.Columns[5].Title != "Ghi chú" || out.Columns[13].Formula != "SUM(G#:M#)" || out.PeriodBlocks[0].FirstLetter != "G" || !slices.Contains(out.Header.Merges, "G1:M1") {
 		t.Fatalf("chèn cột sau E: %s %s %v", out.Columns[13].Formula, out.PeriodBlocks[0].FirstLetter, out.Header.Merges)
 	}
-	back, err := form.Apply(out, []form.Op{{Op: form.OpDeleteColumn, Letter: "F"}})
+	back, err := reports.ApplyForm(out, []reports.FormOp{{Op: reports.FormOpDeleteColumn, Letter: "F"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,29 +243,29 @@ func TestFN_AD_04_06_DesignerOps(t *testing.T) {
 	}
 	// Xóa cột E mà một công thức tham chiếu → lỗi tham chiếu.
 	f := port.FormColumn{Title: "Tỷ lệ", Kind: port.ColumnFormula, DType: port.DTypeNumber, Formula: "IF(E#=0,0,M#/E#*100)"}
-	withRatio, err := form.Apply(d, []form.Op{{Op: form.OpInsertColumn, At: "O", Side: "after", Column: &f}})
+	withRatio, err := reports.ApplyForm(d, []reports.FormOp{{Op: reports.FormOpInsertColumn, At: "O", Side: "after", Column: &f}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = form.Apply(withRatio, []form.Op{{Op: form.OpDeleteColumn, Letter: "E"}})
-	var oe *form.OpError
-	if !errors.As(err, &oe) || oe.Code != form.CodeFormulaInvalidRef {
+	_, err = reports.ApplyForm(withRatio, []reports.FormOp{{Op: reports.FormOpDeleteColumn, Letter: "E"}})
+	var oe *reports.FormOpError
+	if !errors.As(err, &oe) || oe.Code != reports.FormCodeFormulaInvalidRef {
 		t.Fatalf("xóa cột được tham chiếu phải lỗi formula_invalid_ref: %v", err)
 	}
 	// Công thức tham chiếu ô không tồn tại → lỗi, không lưu.
 	bad := port.FormColumn{Title: "Sai", Kind: port.ColumnFormula, DType: port.DTypeNumber, Formula: "ZZ#+1"}
-	_, err = form.Apply(d, []form.Op{{Op: form.OpInsertColumn, At: "O", Side: "after", Column: &bad}})
-	var ve *form.ValidationError
-	if !errors.As(err, &ve) || ve.Code() != form.CodeFormulaInvalidRef {
+	_, err = reports.ApplyForm(d, []reports.FormOp{{Op: reports.FormOpInsertColumn, At: "O", Side: "after", Column: &bad}})
+	var ve *reports.FormValidationError
+	if !errors.As(err, &ve) || ve.Code() != reports.FormCodeFormulaInvalidRef {
 		t.Fatalf("tham chiếu không tồn tại: %v", err)
 	}
 	// Dòng tiêu đề + gộp/tách.
-	out, err = form.Apply(d, []form.Op{
-		{Op: form.OpInsertHeaderRow, Row: 1, Side: "before"},
-		{Op: form.OpSetHeaderCell, Row: 1, Letter: "A", Text: "BIỂU PL 01"},
-		{Op: form.OpMerge, Range: "A1:O1"},
-		{Op: form.OpUnmerge, Range: "A1:O1"},
-		{Op: form.OpMerge, Range: "A1:E1"},
+	out, err = reports.ApplyForm(d, []reports.FormOp{
+		{Op: reports.FormOpInsertHeaderRow, Row: 1, Side: "before"},
+		{Op: reports.FormOpSetHeaderCell, Row: 1, Letter: "A", Text: "BIỂU PL 01"},
+		{Op: reports.FormOpMerge, Range: "A1:O1"},
+		{Op: reports.FormOpUnmerge, Range: "A1:O1"},
+		{Op: reports.FormOpMerge, Range: "A1:E1"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -273,21 +273,21 @@ func TestFN_AD_04_06_DesignerOps(t *testing.T) {
 	if out.Header.Rows != 3 || !slices.Contains(out.Header.Merges, "F2:L2") || !slices.Contains(out.Header.Merges, "A2:A3") || !slices.Contains(out.Header.Merges, "A1:E1") {
 		t.Fatalf("dòng tiêu đề: %d %v", out.Header.Rows, out.Header.Merges)
 	}
-	if _, err := form.Apply(d, []form.Op{{Op: form.OpMerge, Range: "E1:G1"}}); err == nil {
+	if _, err := reports.ApplyForm(d, []reports.FormOp{{Op: reports.FormOpMerge, Range: "E1:G1"}}); err == nil {
 		t.Fatal("gộp chồng vùng gộp có sẵn phải lỗi")
 	}
 	// Vòng tham chiếu.
-	cyc := form.Clone(d)
+	cyc := reports.CloneForm(d)
 	cyc.Columns[12].Formula = "SUM(F#:L#)+P#"
 	cyc.Columns = append(cyc.Columns, port.FormColumn{Letter: "P", Title: "x", Kind: port.ColumnFormula, DType: port.DTypeNumber, Formula: "M#"})
-	if err := form.Validate(cyc); !errors.As(err, &ve) || ve.Code() != form.CodeFormulaCycle {
+	if err := reports.ValidateForm(cyc); !errors.As(err, &ve) || ve.Code() != reports.FormCodeFormulaCycle {
 		t.Fatalf("vòng tham chiếu: %v", err)
 	}
 }
 
 // TestFN_TI_02_02_LayoutPeriodLabels: tiêu đề cột theo kỳ đặt theo các kỳ đã chia; khe thừa inactive.
 func TestFN_TI_02_02_LayoutPeriodLabels(t *testing.T) {
-	d := form.Layout(seed(t, "T01"), form.LayoutOptions{PeriodLabels: []string{"Tuần 36", "Tuần 37"}, Season: "THU ĐÔNG 2026"})
+	d := reports.LayoutForm(seed(t, "T01"), reports.FormLayoutOptions{PeriodLabels: []string{"Tuần 36", "Tuần 37"}, Season: "THU ĐÔNG 2026"})
 	if d.Columns[5].Title != "Tuần 36" || d.Columns[6].Title != "Tuần 37" || !d.Columns[7].Inactive || d.Columns[5].Inactive {
 		t.Fatalf("nhãn kỳ: %+v", d.Columns[5:8])
 	}
