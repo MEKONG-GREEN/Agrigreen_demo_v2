@@ -24,7 +24,6 @@ import (
 	"github.com/shopspring/decimal"
 
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
-	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
@@ -53,81 +52,45 @@ var (
 	ErrValveBlocked       = problem.New(http.StatusUnprocessableEntity, "reports.gsheet_valve_blocked", "Van chặn: mẫu có trường không được phép đưa ra ngoài lãnh thổ")
 )
 
-// knActor retains the compatibility name during step A; all decisions use
-// the registered generic projection, never actor/tenant supplied by a resolver.
-type knActor struct {
+// sessionActor keeps authenticated identity separate from the registered scope.
+type sessionActor struct {
 	p        authz.Principal
 	scope    port.SessionActor
 	province string
 }
 
-func (s *Service) kn(ctx context.Context, write bool) (knActor, error) {
-	if s.ResolveSession != nil {
-		p, ok := authz.FromContext(ctx)
-		if !ok {
-			return knActor{}, problem.Unauthenticated
-		}
-		operation := port.SessionReadDispatch
-		if write {
-			operation = port.SessionWriteDispatch
-		}
-		scope, handled, err := s.ResolveSession(ctx, p, operation)
-		if err != nil {
-			return knActor{}, err
-		}
-		if handled {
-			if !scope.Allowed || scope.AllowsDepartment == nil || (!scope.AllDepartments && (scope.Department == "" || !scope.AllowsDepartment(scope.Department))) || (scope.Province == "" && !scope.AllProvinces) {
-				return knActor{}, problem.Forbidden
-			}
-			return knActor{p: p, scope: scope, province: scope.Province}, nil
-		}
+func (s *Service) resolveSessionActor(ctx context.Context, write bool) (sessionActor, error) {
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return sessionActor{}, problem.Unauthenticated
 	}
-	return s.legacyDispatchActor(ctx, write)
-}
-
-// Transitional adapter, removed only after consumers register their policy.
-func (s *Service) legacyDispatchActor(ctx context.Context, write bool) (knActor, error) {
-	roles := []string{authz.KNTinh, authz.KNTW, authz.KNAdmin}
+	if s.ResolveSession == nil {
+		return sessionActor{}, problem.Forbidden
+	}
+	operation := port.SessionReadDispatch
 	if write {
-		roles = []string{authz.KNTinh}
+		operation = port.SessionWriteDispatch
 	}
-	p, k, err := authz.RequireKN(ctx, roles...)
+	scope, handled, err := s.ResolveSession(ctx, p, operation)
 	if err != nil {
-		return knActor{}, err
+		return sessionActor{}, err
 	}
-	scope := port.SessionActor{Allowed: true, Department: k.Department, AllDepartments: k.Role == authz.KNAdmin,
-		AllowsDepartment: k.AllowsDepartment, UnmaskRecipients: k.Role == authz.KNTinh}
-	if k.Support != nil {
-		id := k.Support.OnBehalfOf
-		scope.OnBehalfOf = &id
+	if !handled || !scope.Allowed || scope.AllowsDepartment == nil || (!scope.AllDepartments && (scope.Department == "" || !scope.AllowsDepartment(scope.Department))) || (scope.Province == "" && !scope.AllProvinces) {
+		return sessionActor{}, problem.Forbidden
 	}
-	a := knActor{p: p, scope: scope}
-	if k.Role == authz.KNTW || k.Role == authz.KNAdmin || k.OrgRef == uuid.Nil {
-		return a, nil
-	}
-	if s.Orgs == nil {
-		return a, ErrDependency.WithDetail("chưa nối cây tổ chức (pf/party)")
-	}
-	org, err := s.Orgs.Get(ctx, k.OrgRef)
-	if err != nil {
-		return a, err
-	}
-	if org.Kind != partyport.OrgTTKNNational {
-		a.province = org.AdminUnitCode
-	}
-	return a, nil
+	return sessionActor{p: p, scope: scope, province: scope.Province}, nil
 }
 
-func (a knActor) dept() string {
+func (a sessionActor) dept() string {
 	if a.scope.AllDepartments {
 		return ""
 	}
 	return a.scope.Department
 }
-func (a knActor) allows(province, dept string) bool {
+func (a sessionActor) allows(province, dept string) bool {
 	return a.scope.AllowsDepartment != nil && a.scope.AllowsDepartment(dept) && (a.province == "" || a.province == province)
 }
-func (a knActor) onBehalf() *uuid.UUID {
+func (a sessionActor) onBehalf() *uuid.UUID {
 	if a.scope.OnBehalfOf == nil || *a.scope.OnBehalfOf == uuid.Nil {
 		return nil
 	}
@@ -149,7 +112,7 @@ type RecipientInput struct {
 
 // ListDispatchRecipients trả danh bạ (Cấp Tỉnh thấy đủ địa chỉ; Cấp Quốc gia thấy địa chỉ đã che).
 func (s *Service) ListDispatchRecipients(ctx context.Context, province string) ([]store.DispatchRecipient, bool, error) {
-	a, err := s.kn(ctx, false)
+	a, err := s.resolveSessionActor(ctx, false)
 	if err != nil {
 		return nil, false, err
 	}
@@ -180,7 +143,7 @@ func (s *Service) ListDispatchRecipients(ctx context.Context, province string) (
 
 // AddDispatchRecipient thêm hộp thư đơn vị của Chi cục (người nhận/CC).
 func (s *Service) AddDispatchRecipient(ctx context.Context, in RecipientInput, idem string) (store.DispatchRecipient, error) {
-	a, err := s.kn(ctx, true)
+	a, err := s.resolveSessionActor(ctx, true)
 	if err != nil {
 		return store.DispatchRecipient{}, err
 	}
@@ -218,7 +181,7 @@ func (s *Service) AddDispatchRecipient(ctx context.Context, in RecipientInput, i
 
 // DeactivateDispatchRecipient ngừng dùng một người nhận (không xóa, lý do bắt buộc).
 func (s *Service) DeactivateDispatchRecipient(ctx context.Context, id uuid.UUID, why, idem string) (store.DispatchRecipient, error) {
-	a, err := s.kn(ctx, true)
+	a, err := s.resolveSessionActor(ctx, true)
 	if err != nil {
 		return store.DispatchRecipient{}, err
 	}
@@ -305,7 +268,7 @@ func gridRows(v extensionsrc.ConsolidationView) []render.GridRow {
 
 // CreateDispatch dựng tệp toàn tỉnh của kỳ từ lần tổng hợp gần nhất ("số trong file = số tổng hợp của kỳ").
 func (s *Service) CreateDispatch(ctx context.Context, in DispatchInput, idem string) (DispatchView, error) {
-	a, err := s.kn(ctx, true)
+	a, err := s.resolveSessionActor(ctx, true)
 	if err != nil {
 		return DispatchView{}, err
 	}
@@ -470,7 +433,7 @@ func (s *Service) CreateDispatch(ctx context.Context, in DispatchInput, idem str
 
 // GetDispatch trả lần xuất/gửi kèm tệp và nhật ký.
 func (s *Service) GetDispatch(ctx context.Context, id uuid.UUID) (DispatchView, error) {
-	a, err := s.kn(ctx, false)
+	a, err := s.resolveSessionActor(ctx, false)
 	if err != nil {
 		return DispatchView{}, err
 	}
@@ -495,7 +458,7 @@ func (s *Service) GetDispatch(ctx context.Context, id uuid.UUID) (DispatchView, 
 
 // ListDispatches trả lịch sử xuất/gửi.
 func (s *Service) ListDispatches(ctx context.Context, province string, periodID, before *uuid.UUID, limit int) ([]store.Dispatch, error) {
-	a, err := s.kn(ctx, false)
+	a, err := s.resolveSessionActor(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -516,7 +479,7 @@ func (s *Service) ListDispatches(ctx context.Context, province string, periodID,
 
 // DispatchFileURL cấp URL tải một tệp ("chỉ tải file, không gửi") — qua điểm kiểm soát (download).
 func (s *Service) DispatchFileURL(ctx context.Context, dispatchID, fileID uuid.UUID) (string, error) {
-	a, err := s.kn(ctx, false)
+	a, err := s.resolveSessionActor(ctx, false)
 	if err != nil {
 		return "", err
 	}
@@ -561,7 +524,7 @@ type SendInput struct {
 
 // SendDispatch xếp gửi email (worker gửi SMTP, 202). Gửi lại khi "Gửi lỗi" hoặc đã gửi.
 func (s *Service) SendDispatch(ctx context.Context, id uuid.UUID, in SendInput, idem string) (DispatchView, error) {
-	a, err := s.kn(ctx, true)
+	a, err := s.resolveSessionActor(ctx, true)
 	if err != nil {
 		return DispatchView{}, err
 	}

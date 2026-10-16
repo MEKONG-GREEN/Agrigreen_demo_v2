@@ -341,3 +341,14 @@ Pure-first chỉ lỗi compile thiếu field/kiểu fixture, không tính proof.
 
 
 KNSPLIT-2-REPORTS-A cuối: production540e7249 cố định; `db-full93018.exit0`,13/13package có test PASS,0FAIL/SKIP. Reports handler147.814s, assembly109.611s, worker2.306s, KN77285.926s; fixture KN77 đăng ký policy thật nên quyền/phòng/tỉnh/mask/on-behalf và RLS chạy qua callback mới. `static-first61666.exit0`: đủ build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary390/lint0issues. ProofJSON hostTEMP agrigreen-codex-knsplit2reportsa-proof.json. Không đổi API/SQL/frontend; helper còn chạy migration thật trước FFdev. Bước A không tuyên bố gỡ xong legacy session/realm roles.
+
+
+## KNSPLIT-2-REPORTS-B — Bỏ adapter phiên (nền18dd40f9)
+
+Downstream consumers: reports/app formReader/dispatch, reports handler, assembly, worker, KN77 với policy thật của extension. Dependency evidence: `rg -n 'reports.New|reports.Deps|ReportSessionResolver|formReader|resolveSessionActor' internal cmd tests -g '*.go'`; các factory user-session đã đăng ký bước A. Worker/main chỉ xử lý background, không gọi use case phiên. Handler fixture kiểm native realm. Role groups và source ports không đổi.
+
+Regression acceptance command: PostgreSQL riêng, `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77`; các cổng CODEX-G1 và migration helper. Miễn web/mobile và acceptance ngoài scope vì không đổi contract/UI/SQL; build/vet toàn repo bắt buộc. Đã được user cho phép trong G1, không dữ liệu/SMTP thật, giữ main và worktree.
+
+Related test points: TestReportSessionRequiresRegistration, TestReportSessionAnonymousDenied, TestRegisteredReportSessionIdentityAndFilters, TestRegisteredReportSessionDenialCannotFallBack, TestRegisteredReportSessionNativeRealmCompatibility; KN77 form/dispatch/PII/tenant.
+
+Red.exit1: không resolver và callback unhandled đều cấp quyền từ KNContext ở cả đọc/ghi dispatch và đọc form. Sau gỡ adapter, pure.exit0/reportsapp1.924s,0SKIP. Chờ PG/static/helper, chưa tích hợp.

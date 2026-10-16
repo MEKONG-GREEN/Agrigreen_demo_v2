@@ -77,10 +77,6 @@ func (s *Service) formReader(ctx context.Context, extra ...string) (authz.Princi
 				return q, &actor, nil
 			}
 		}
-		// Compatibility only until step B migrates legacy session consumers.
-		if q.KN != nil {
-			return q, &port.SessionActor{Allowed: true, AllowsDepartment: q.KN.AllowsDepartment}, nil
-		}
 	}
 	return p, nil, err
 }
