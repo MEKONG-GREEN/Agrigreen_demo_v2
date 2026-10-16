@@ -71,4 +71,4 @@ Policy.DispatchProfile là metadata tin cậy lúc bootstrap: nhãn phòng ban c
 
 ## Hợp đồng nguồn KN (KNSPLIT-2-REPORTS-M)
 
-KNproducer/builder dùng extension/port cho ReportData/query/rows/completeness và5ID nguồn. Capability chỉ nhận SourceBuildQuery/SourceData qua builder đăng ký. M dùng alias tạm từKNport tới định nghĩa cap cũ để chuyển consumer trước; N mới chuyển định nghĩa vàoKN và xóa đường cũ. Không đảo alias từcap sangKN. Cổng Consolidations/DispatchHistory dùng chung vẫn cần giữ ởcap vì renderer/worker tiêu thụ; không coi toàn bộKNSPLIT/G1 đãxong.
+KNproducer/builder dùng extension/port cho ReportData/query/rows/completeness và5ID nguồn. Capability chỉ nhận SourceBuildQuery/SourceData qua builder đăng ký. N đã chuyển13định nghĩa và5ID vàoKNport, xóa alias/definitions cap cũ. Generic snapshot contracts nằm trong reports/port/consolidations.go; không còn packageextensionsrc. Không đảo alias từcap sangKN. Cổng Consolidations/DispatchHistory dùng chung vẫn cần giữ ởcap vì renderer/worker tiêu thụ; không coi toàn bộKNSPLIT/G1 đãxong.

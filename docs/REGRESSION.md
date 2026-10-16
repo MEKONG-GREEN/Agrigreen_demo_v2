@@ -495,3 +495,11 @@ Pure-first1203.exit0,0FAIL/SKIP gồmowner/registry/golden/SDK/CLI;KNapp/storeco
 
 
 Kết quả thực: PG48903.exit0 đủ14/14packagecótest,0FAIL/SKIP trênproduction21d2518f: handler:124.852s, assembly:102.724s, worker:2.211s, formimport:1.994s, reportforms:2.116s, reports:94.348s, kn77:253.871s. KNhandlerfull124.852s bảo vệSQLproducer/FR03/scopes;KNapp/storecompilekhôngtest. Static38201.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. AliasMgiữtypeidentity/5ID/goldenbyte, chưa chuyểndefinitions. ProofTEMP agrigreen-codex-knsplit2reportsm-proof.json; helpercòn8migrationgate trướcdev, N mới gỡcap13DTO/5ID.
+
+## KNSPLIT-2-REPORTS-N — Ownership DTO và generic snapshot contract (nền2c26b5a8)
+
+Downstream consumers: KNData producer/builder/catalog vàhandler, reportcycle/app+module glue; capreports app/module dispatch renderer; API/worker/KN77/HTTP/SDK/CLI. Dependency evidence: rg -n 'reports/port/extensionsrc' -g '*.go' . trướcđổi=7files(6genericcallers+KNaliasfile); TEMP agrigreen-codex-knsplit2reportsn-callers.json. Source13definitions/5IDs thànhKNowner; generic6types/error vềcapport; sođốiGo tokens/IDs vớiHEADbase trongTEMPstructure.json, khôngthaySQL/math/JSON.
+
+Regression acceptance command: PGriêng, go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./internal/kn/extension/app ./internal/kn/extension/store ./internal/kn/extension/handler ./internal/kn/extension/reportcycle/app ./cmd/api-platform/assembly ./cmd/worker ./cmd/formimport ./tests/reportforms ./tests/reports ./tests/kn77;15testpackagesdựkiến. CổngCODEX-G1/helper8migrationgate. Miễnweb/mobile vìwire/UI/fixturesbyteskhôngđổi;build/vet toànrepo. Usercho phépG1,khôngSMTP/data thật,giữmain/worktree.
+
+Related test points: ProgramProgressFR03/ReportDataSowingAndSummary/fullKNhandler SQLscope; owner5sourcefigures/missingtargets/metadata golden; reportcycle calendar/provincialimport; capHTTP/render/dispatch/link/DLP/dedup vàKN77. Không thêmtestmirror definitions; thựcchạybehaviorproducer/consumer.

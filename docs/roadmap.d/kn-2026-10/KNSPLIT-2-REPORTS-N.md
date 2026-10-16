@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-REPORTS-N — KNowns13DTO/5ID;6genericcontractscapport,oldfile/inventoryentrygỡ. Chờ15PG/static/helper,giữfields/IDs/bytes.

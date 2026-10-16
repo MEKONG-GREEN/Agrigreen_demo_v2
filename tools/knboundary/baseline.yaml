@@ -259,7 +259,6 @@ couplings:
   - {rule: kn-symbol-in-shared, from: internal/platform/party/store/kn.go, to: (tệp)}
   - {rule: kn-symbol-in-shared, from: internal/platform/party/store/kn.go, to: KNEvent}
   - {rule: kn-symbol-in-shared, from: internal/platform/party/store/kn_collect.go, to: (tệp)}
-  - {rule: kn-symbol-in-shared, from: internal/platform/reports/port/extensionsrc/extensionsrc.go, to: (kiểm kê)}
   - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: (tệp)}
   - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: ErrNoKNContext}
   - {rule: kn-symbol-in-shared, from: internal/shared/authz/kn.go, to: KNAdmin}

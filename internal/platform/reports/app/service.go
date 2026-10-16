@@ -22,7 +22,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -95,7 +94,7 @@ type Service struct {
 	LinkDownloadBase string
 
 	// KN v7.7 P4 — báo cáo Chi cục (dispatch.go): lần tổng hợp của pf/extension, cờ + bộ chuyển Google Sheet (TẮT mặc định).
-	Consolidations extensionsrc.Consolidations
+	Consolidations port.Consolidations
 	GSheet         dispatch.GSheetConfig
 	GSheetPub      dispatch.GSheetPublisher
 	// Egress (G5, ADR-0024 mục 3): điểm kiểm soát xuất DÙNG CHUNG (pf/metering, kênh report_export),

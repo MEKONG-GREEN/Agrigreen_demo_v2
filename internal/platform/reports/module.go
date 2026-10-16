@@ -28,7 +28,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/mail"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/render"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -72,7 +71,7 @@ type Deps struct {
 	Log              *slog.Logger
 	// KN v7.7 P4 — báo cáo Chi cục: lần tổng hợp của pf/extension (nối sau bằng UseConsolidations nếu cần) và biến môi
 	// trường của cờ Google Sheet (nil → TẮT; ADR-0026 "Đề xuất").
-	Consolidations extensionsrc.Consolidations
+	Consolidations port.Consolidations
 	Getenv         func(string) string
 }
 
@@ -108,7 +107,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 }
 
 // UseConsolidations nối cổng lần tổng hợp của pf/extension (báo cáo Chi cục, KN v7.7 P4).
-func (m *Module) UseConsolidations(c extensionsrc.Consolidations) { m.svc.Consolidations = c }
+func (m *Module) UseConsolidations(c port.Consolidations) { m.svc.Consolidations = c }
 
 // UseLinkDownloadBase đặt URL gốc công khai của api-platform cho liên kết tải Chi cục (A4; worker: AG_REPORT_LINK_BASE).
 func (m *Module) UseLinkDownloadBase(base string) { m.svc.LinkDownloadBase = base }
@@ -123,7 +122,7 @@ func (m *Module) UseMailer(ml port.Mailer) { m.svc.Mailer = ml }
 func (m *Module) DispatchHandler() inbox.Handler { return m.svc.HandleDispatchRequested }
 
 // DispatchHistory cho pf/extension biết kỳ đã gửi Chi cục (cảnh báo khi mở lại kỳ).
-func (m *Module) DispatchHistory() extensionsrc.DispatchHistory {
+func (m *Module) DispatchHistory() port.DispatchHistory {
 	return app.DispatchHistory{Svc: m.svc}
 }
 

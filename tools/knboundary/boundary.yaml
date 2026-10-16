@@ -81,7 +81,6 @@ kn_inventory_files:
   - internal/platform/notify/domain/price.go
   - internal/platform/notify/domain/report_cycle.go
   - internal/platform/notify/domain/work_schedule.go
-  - internal/platform/reports/port/extensionsrc/extensionsrc.go
 
 openapi:
   - contracts/openapi/application.yaml

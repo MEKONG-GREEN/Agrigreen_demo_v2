@@ -30,6 +30,7 @@ provides:
     - KHTCReportStates
     - KHTCSourceCrosswalk
     - KHTCSources
+    - ReportData
     - TablePDF
   events:
     - pf.extension.cnts_alert.changed/v1
