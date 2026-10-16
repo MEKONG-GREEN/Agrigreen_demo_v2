@@ -48,3 +48,13 @@ func TestApplicationNamespaceAnalyzersRejectUnsafeSource(t *testing.T) {
 	analysistest.Run(t, analysistest.TestData(), NoFloat, "example.com/ag/internal/kn/extension/khtcreport/app")
 	analysistest.Run(t, analysistest.TestData(), NoHardDelete, "example.com/ag/internal/kn/contact/store")
 }
+
+// The generated driver can import its own tested package; other imports and handwritten drivers stay checked.
+func TestGeneratedDriverSelfImportOnly(t *testing.T) {
+	if err := Boundary.Flags.Set("module", "example.com/ag"); err != nil {
+		t.Fatal(err)
+	}
+	analysistest.Run(t, analysistest.TestData(), Boundary,
+		"example.com/ag/internal/kn/fixture.test",
+		"example.com/ag/internal/kn/handwritten.test")
+}

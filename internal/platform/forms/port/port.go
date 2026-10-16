@@ -15,11 +15,29 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
-// Profile là cấu hình của MỘT bên dùng (ứng dụng) — tương đương mục `cap/forms: {…}` của app.yaml (§7.2).
+// ResolvedActor is an application-owned session projected into the forms capability.
+// Identity and tenant always come from the authenticated principal, never this projection.
+type ResolvedActor struct {
+	Role         string
+	Department   string
+	Scope        authz.Scope
+	Node         uuid.UUID
+	AllowsTarget func(unitKind string, ref uuid.UUID) bool
+}
+
+// ActorResolver returns handled=false only when no application session applies.
+// Errors must never fall back to realm permissions. Registration is server-side only.
+type ActorResolver func(context.Context, authz.Principal, Profile) (ResolvedActor, bool, error)
+
+// Profile là cấu hình của MỘT bên dùng (ứng dụng) — tương đương mục cap/forms của app.yaml.
 type Profile struct {
+	// ResolveActor lets an application own session and target restrictions. Never serialized.
+	ResolveActor ActorResolver `json:"-"`
+
 	// Name: mã bên dùng ([a-z][a-z0-9_]*), vd "kn". Biểu, kỳ, ảnh chụp gắn profile.
 	Name string
 	// Hierarchy: các cấp từ trên xuống, vd [TW, TINH, XA]. Cấp cuối (lá) là cấp nộp bài.

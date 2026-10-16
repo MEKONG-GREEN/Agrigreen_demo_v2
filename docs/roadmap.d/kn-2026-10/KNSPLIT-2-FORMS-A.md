@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-FORMS-A: cổng phân giải ngữ cảnh biểu mẫu theo profile; KN tự đăng ký cấu hình/quy tắc, giữ đường tương thích trong bước đầu. Đang kiểm chứng. [Giả định](../../kn/gia-dinh/KNSPLIT-2-FORMS-A.md).

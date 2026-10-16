@@ -119,3 +119,4 @@ PO chọn: **“G1 chỉ hồ sơ KN; luồng đề nghị để sau G1”.** Qu
 | Gói | Việc | Migration |
 |---|---|---|
 | KNSPLIT-0 14–16/10/2026 | Giữ 3 tệp dở thành commit, rebase dev sau W11.46; chốt các trả lời PO; sinh baseline ban đầu trên988febd9; cổng10 quy tắc, kiểm thử scanner/không tăng baseline, kiểm thử âm DB; D2-KN-01 chốt 16/10: G1 chỉ hồ sơ KN, đề nghị sau G1 | Không có migration mới |
+| KNSPLIT-1 16/10/2026 | Namespace bốn module đã ở internal/kn; module/schema/role DB giữ nguyên. Dev ddd2671f, helper migration thật PASS304,766s;56/56 gói hồi quy và cổng tĩnh đạt, baseline390 không đổi | Không migration mới |

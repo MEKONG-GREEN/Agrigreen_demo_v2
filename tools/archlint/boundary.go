@@ -1,6 +1,7 @@
 package main
 
 import (
+	"go/ast"
 	"strconv"
 	"strings"
 
@@ -63,12 +64,25 @@ func locate(pkg string) loc {
 
 func isBusinessZone(z string) bool { return z == "platform" || z == "mkg" || z == "vault" }
 
+// generatedTestPackage recognizes the toolchain driver, not application source.
+// Its mandatory self-import is not a cross-module dependency (root module tests).
+func generatedTestPackage(pass *analysis.Pass) string {
+	if pass.Pkg.Name() != "main" || !strings.HasSuffix(pass.Pkg.Path(), ".test") || len(pass.Files) != 1 || !ast.IsGenerated(pass.Files[0]) {
+		return ""
+	}
+	return strings.TrimSuffix(pass.Pkg.Path(), ".test")
+}
+
 func runBoundary(pass *analysis.Pass) (any, error) {
+	testedPackage := generatedTestPackage(pass)
 	from := locate(strings.TrimSuffix(pass.Pkg.Path(), "_test"))
 	for _, f := range pass.Files {
 		for _, spec := range f.Imports {
 			imp, err := strconv.Unquote(spec.Path.Value)
 			if err != nil {
+				continue
+			}
+			if testedPackage != "" && (imp == testedPackage || imp == testedPackage+"_test") {
 				continue
 			}
 			if msg := edgeViolation(from.path, imp); msg != "" {

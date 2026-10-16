@@ -250,3 +250,19 @@ KNSPLIT-1 bằng chứng cuối 16/10:
 - `static-final` exit0 sau format: build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary390/lint0issues. `.golangci.yml` giữ lớp dự phòng cấm KN↔MKG; không thêm ngoại lệ.
 - Registry5ca và3gen-check PASS. Sau full PG,5SHA256 golden/menu/spec/generatedTS giữ nguyên;3fixtureJSON chỉ đổi ghi chú đường dẫn, payload đối chiếu bằng JSON hoàn toàn bằng nhau; migrations không đổi. Không có thay đổi mã TS/Dart/API hành vi cần chạy lại web/mobile.
 - Chuẩn bị helper tích hợp dev trên mã này; phải kiểm các cổng migration PostgreSQL thật trước FF, giữ worktree và main.
+
+
+KNSPLIT-1 đã tích hợp: helper7499 exit0; dev ddd2671f; migration8ca PASS304,766s/không SKIP, cổng/tooltests0 và baseline390. Main27afd593 sạch, worktree giữ nguyên.
+
+## KNSPLIT-2-FORMS-A — Đăng ký phân giải ngữ cảnh (nền ddd2671f)
+
+Dependency evidence: tìm formsport.Profile/forms.Deps/assembly.KNProfiles trong internal/cmd/tests. Consumer cấu hình thực tế: extension.FormProfiles, assembly, KN77 closedfig/CNTS/KHTC phiếu/kỳ/nguồn. Forms.resolve dùng chung mọi thao tác capability; KN77/harness E2E kiểm wiring thật. Không đổi số liệu/biểu mẫu API/mobile/web hoặc SQL.
+
+Acceptance: PostgreSQL riêng go test -v -count=1 -p 1 -timeout 55m ./internal/platform/forms/... ./internal/kn/extension ./cmd/api-platform/assembly ./tests/kn77 ./tests/acceptance ./tests/e2e; các cổng CODEX-G1. Thay đổi resolver phải kiểm scope/target/tenant, lỗi không fallback về realm và JSON không mang callback. Cổng knboundary giữ390 trong bước A; không nới cấu hình. Bước B mới gỡ fallback.
+
+Pure-first PASS: application FormProfiles policy (phòng ban/admin/KHTC cấp/giới hạn cơ sở+hộ/cấu hình mới từng lần), generic registered actor identity/scope/target, lỗi cấm fallback và tương thích realm. TestRegisteredActorDatabaseTenantIsolation mới chờ PG thật, không tính pure là DB proof.
+
+
+Bổ sung bước A: static-first bắt báo nhầm R02 ở _testmain.go do Go tự sinh khi module root có test mới. Đã thêm nhận diện đúng driver (main + hậu tố .test + duy nhất AST mang dấu generated), chỉ bỏ kiểm self-import bắt buộc vào chính package đang thử. Các import khác vẫn kiểm đủ; ca âm driver sinh import module khác và driver viết tay import root đều bị R02. Tooltest14,054s PASS. Trước khi sửa công cụ riêng, go list -deps -test xác nhận tools/archlint không thuộc graph PG đang chạy; không đổi bất kỳ Go production/consumer nào sau khi bắt đầu PG.
+
+TestRegisteredActorDatabaseTenantIsolation PASS0,16s trên PostgreSQL thật; toàn forms/app PASS200,033s và forms/handler PASS171,678s, không SKIP. Chưa kết luận whole consumers; đang chạy assembly/KN77/acceptance/e2e.
