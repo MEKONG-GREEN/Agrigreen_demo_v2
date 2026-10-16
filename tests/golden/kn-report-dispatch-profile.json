@@ -1,0 +1,80 @@
+{
+  "Profile": {
+    "SubjectDepartment": "Phòng Trồng trọt",
+    "Salutation": "Kính gửi Chi cục,",
+    "SenderName": "Trung tâm Khuyến nông",
+    "TemplatePrefix": "kn.",
+    "SheetTemplateKey": "kn.gsheet"
+  },
+  "Cases": [
+    {
+      "Name": "closed",
+      "PeriodLabel": "Tuần 36",
+      "RangeLabel": "",
+      "FormCode": "T01",
+      "Forms": [
+        "T01",
+        "T04"
+      ],
+      "Missing": null,
+      "Links": null,
+      "Provisional": false,
+      "Subject": "Báo cáo Phòng Trồng trọt — Tuần 36 — T01, T04",
+      "Body": "Kính gửi Chi cục,\n\nTrung tâm Khuyến nông gửi báo cáo tổng hợp Tuần 36 (): T01, T04.\n\nThư gửi tự động từ hệ thống AgriGreen.",
+      "FileKey": "kn.t01",
+      "SheetKey": "kn.gsheet"
+    },
+    {
+      "Name": "provisional",
+      "PeriodLabel": "Tuần 36",
+      "RangeLabel": "31/08–06/09/2026",
+      "FormCode": "T04",
+      "Forms": [
+        "T04"
+      ],
+      "Missing": [
+        "Xã A",
+        "Xã B"
+      ],
+      "Links": null,
+      "Provisional": true,
+      "Subject": "Báo cáo Phòng Trồng trọt — Tuần 36 — T04 (Tạm tính)",
+      "Body": "Kính gửi Chi cục,\n\nTrung tâm Khuyến nông gửi báo cáo tổng hợp Tuần 36 (31/08–06/09/2026): T04.\nSố liệu TẠM TÍNH (kỳ chưa chốt hoặc còn xã chưa nộp).\nXã chưa nộp: Xã A, Xã B.\n\nThư gửi tự động từ hệ thống AgriGreen.",
+      "FileKey": "kn.t04",
+      "SheetKey": "kn.gsheet"
+    },
+    {
+      "Name": "links",
+      "PeriodLabel": "Tuần 36",
+      "RangeLabel": "",
+      "FormCode": "PL_01",
+      "Forms": [
+        "T01"
+      ],
+      "Missing": null,
+      "Links": [
+        "T01.xlsx: https://example.invalid/one",
+        "T04.pdf: https://example.invalid/two"
+      ],
+      "Provisional": false,
+      "Subject": "Báo cáo Phòng Trồng trọt — Tuần 36 — T01",
+      "Body": "Kính gửi Chi cục,\n\nTrung tâm Khuyến nông gửi báo cáo tổng hợp Tuần 36 (): T01.\n\nTệp vượt giới hạn đính kèm — tải tại (liên kết có hạn):\n- T01.xlsx: https://example.invalid/one\n- T04.pdf: https://example.invalid/two\n\nThư gửi tự động từ hệ thống AgriGreen.",
+      "FileKey": "kn.pl_01",
+      "SheetKey": "kn.gsheet"
+    },
+    {
+      "Name": "empty",
+      "PeriodLabel": "",
+      "RangeLabel": "",
+      "FormCode": "t07",
+      "Forms": null,
+      "Missing": null,
+      "Links": null,
+      "Provisional": false,
+      "Subject": "Báo cáo Phòng Trồng trọt —  — ",
+      "Body": "Kính gửi Chi cục,\n\nTrung tâm Khuyến nông gửi báo cáo tổng hợp  (): .\n\nThư gửi tự động từ hệ thống AgriGreen.",
+      "FileKey": "kn.t07",
+      "SheetKey": "kn.gsheet"
+    }
+  ]
+}

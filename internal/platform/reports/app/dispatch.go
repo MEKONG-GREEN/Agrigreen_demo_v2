@@ -271,6 +271,10 @@ func (s *Service) CreateDispatch(ctx context.Context, in DispatchInput, idem str
 	if err != nil {
 		return DispatchView{}, err
 	}
+	profile, err := s.dispatchProfile()
+	if err != nil {
+		return DispatchView{}, err
+	}
 	if s.Consolidations == nil {
 		return DispatchView{}, ErrDependency.WithDetail("chưa nối lần tổng hợp (pf/extension)")
 	}
@@ -398,7 +402,7 @@ func (s *Service) CreateDispatch(ctx context.Context, in DispatchInput, idem str
 			return err
 		}
 		for _, b := range files {
-			if err := s.egress(ctx, tx, Egress{Kind: EgressDispatch, TenantID: tid, ActorRef: a.p.ActorRef, TemplateKey: "kn." + strings.ToLower(b.f.FormCode),
+			if err := s.egress(ctx, tx, Egress{Kind: EgressDispatch, TenantID: tid, ActorRef: a.p.ActorRef, TemplateKey: dispatchFileKey(profile, b.f.FormCode),
 				Format: b.f.Format, JobID: d.ID}); err != nil {
 				return err
 			}
@@ -407,7 +411,7 @@ func (s *Service) CreateDispatch(ctx context.Context, in DispatchInput, idem str
 			}
 		}
 		for _, u := range links {
-			if err := s.egress(ctx, tx, Egress{Kind: EgressDispatch, TenantID: tid, ActorRef: a.p.ActorRef, TemplateKey: "kn.gsheet", Format: "gsheet", JobID: d.ID}); err != nil {
+			if err := s.egress(ctx, tx, Egress{Kind: EgressDispatch, TenantID: tid, ActorRef: a.p.ActorRef, TemplateKey: profile.SheetTemplateKey, Format: "gsheet", JobID: d.ID}); err != nil {
 				return err
 			}
 			if err := store.InsertGSheetLink(ctx, tx, tid, ids.New(), d.ID, strings.Join(d.Forms, ","), u, s.GSheet.ShareMode, now); err != nil {
@@ -501,7 +505,11 @@ func (s *Service) DispatchFileURL(ctx context.Context, dispatchID, fileID uuid.U
 		for _, f := range fs {
 			if f.ID == fileID {
 				key = f.ObjectKey
-				return s.egress(ctx, tx, Egress{Kind: EgressDownload, TenantID: a.p.TenantID, ActorRef: a.p.ActorRef, TemplateKey: "kn." + strings.ToLower(f.FormCode),
+				profile, err := s.dispatchProfile()
+				if err != nil {
+					return err
+				}
+				return s.egress(ctx, tx, Egress{Kind: EgressDownload, TenantID: a.p.TenantID, ActorRef: a.p.ActorRef, TemplateKey: dispatchFileKey(profile, f.FormCode),
 					Format: f.Format, JobID: dispatchID})
 			}
 		}
@@ -565,9 +573,13 @@ func (s *Service) SendDispatch(ctx context.Context, id uuid.UUID, in SendInput, 
 				return ErrRecipientNotFound.WithField("recipient_ids", x.String())
 			}
 		}
+		profile, err := s.dispatchProfile()
+		if err != nil {
+			return err
+		}
 		subj := strings.TrimSpace(in.Subject)
 		if subj == "" {
-			subj = dispatch.Subject("Phòng Trồng trọt", d.PeriodLabel, strings.Join(d.Forms, ", "), d.Provisional)
+			subj = dispatch.Subject(profile.SubjectDepartment, d.PeriodLabel, strings.Join(d.Forms, ", "), d.Provisional)
 		}
 		if strings.ContainsAny(subj, "\r\n") || len([]rune(subj)) > 300 {
 			return problem.Validation.WithField("subject", "tối đa 300 ký tự, không xuống dòng")
@@ -629,6 +641,10 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	}
 	if d.Status != dispatch.StatusSending || d.Attempts != p.Attempt {
 		return nil // đã xử lý hoặc đã có lần gửi lại mới hơn
+	}
+	profile, err := s.dispatchProfile()
+	if err != nil {
+		return err
 	}
 	now := s.now()
 	fail := func(msg string) error {
@@ -717,10 +733,10 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 			body = *d.Body
 		}
 		if body == "" {
-			return dispatch.Body(d.PeriodLabel, "", d.Forms, d.Provisional, d.Missing, links)
+			return dispatch.BodyFor(profile, d.PeriodLabel, "", d.Forms, d.Provisional, d.Missing, links)
 		}
 		if len(links) > 0 {
-			body += "\n\n" + dispatch.Body(d.PeriodLabel, "", d.Forms, false, nil, links)
+			body += "\n\n" + dispatch.BodyFor(profile, d.PeriodLabel, "", d.Forms, false, nil, links)
 		}
 		return body
 	}

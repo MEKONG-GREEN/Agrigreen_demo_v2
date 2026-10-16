@@ -10,6 +10,7 @@ import (
 func ReportPolicy() reportsport.Policy {
 	readers := []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin}
 	return reportsport.Policy{
+		DispatchProfile:        &reportsport.DispatchProfile{SubjectDepartment: "Phòng Trồng trọt", Salutation: "Kính gửi Chi cục,", SenderName: "Trung tâm Khuyến nông", TemplatePrefix: "kn.", SheetTemplateKey: "kn.gsheet"},
 		ReaderRoles:            readers,
 		FormReaderRoles:        readers,
 		SchedulerRoles:         []string{extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin},

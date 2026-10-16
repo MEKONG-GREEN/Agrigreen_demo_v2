@@ -93,6 +93,27 @@ func Body(periodLabel, rangeLabel string, forms []string, provisional bool, miss
 	return b.String()
 }
 
+// BodyFor renders a message with trusted application labels.
+func BodyFor(profile port.DispatchProfile, periodLabel, rangeLabel string, forms []string, provisional bool, missing []string, links []string) string {
+	var b strings.Builder
+	b.WriteString(profile.Salutation + "\n\n")
+	fmt.Fprintf(&b, "%s gửi báo cáo tổng hợp %s (%s): %s.\n", profile.SenderName, periodLabel, rangeLabel, strings.Join(forms, ", "))
+	if provisional {
+		b.WriteString("Số liệu TẠM TÍNH (kỳ chưa chốt hoặc còn xã chưa nộp).\n")
+		if len(missing) > 0 {
+			b.WriteString("Xã chưa nộp: " + strings.Join(missing, ", ") + ".\n")
+		}
+	}
+	if len(links) > 0 {
+		b.WriteString("\nTệp vượt giới hạn đính kèm — tải tại (liên kết có hạn):\n")
+		for _, l := range links {
+			b.WriteString("- " + l + "\n")
+		}
+	}
+	b.WriteString("\nThư gửi tự động từ hệ thống AgriGreen.")
+	return b.String()
+}
+
 // FileName dựng tên tệp "T01_Tuần 36.xlsx" (bỏ ký tự cấm trong tên tệp).
 func FileName(formCode, periodLabel, ext string) string {
 	n := formCode + "_" + periodLabel

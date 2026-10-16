@@ -64,3 +64,7 @@ Cùng provider thật được nối tại API/hai worker/KN77/tests-reports; CL
 Các ca kiểm thử engine/Excel/web fixtures dùng14mẫu KN hiện ở tests/reportforms (composition root thuần); chạy go test -v -count=1 ./tests/reportforms. Sinh lại fixture chỉ khi thay đổi mẫu có chủ đích: AG_UPDATE_WEB_FIXTURES=1 go test ./tests/reportforms -run TestWebFixtures, sau đó kiểm Vitest tương ứng. Không sinh lại fixture hoặc golden để che thay đổi không chủ đích.
 
 Gốc lắp ráp dùng các hàm thuần tại reports: ValidateForm/EvaluateForm/FormTotals/ApplyForm/CloneForm/LayoutForm, kiểu FormOp/FormMeta/FormLayoutOptions và lỗi FormOpError/FormValidationError; nhập/xuất qua ImportFormXLSX/ExportFormXLSX. Các module nghiệp vụ vẫn dùng port.FormEngine được nối qua dependency. Không import trực tiếp reports/form hoặc reports/formimport từ gốc lắp ráp. Các hàm thuần chuyển tiếp engine hiện hành, không thêm trạng thái/quyền hay thao tác DB.
+
+## Nhãn và namespace gửi báo cáo (KNSPLIT-2-REPORTS-K)
+
+Policy.DispatchProfile là metadata tin cậy lúc bootstrap: nhãn phòng ban cho subject, lời chào/tên bên gửi, namespace khóa tệp và khóa GoogleSheet. KNReportPolicy sở hữu giá trị; capability render chung và giữ kiểm quyền/DLP/tenant. Registry copyvalue/không nhiều default/không nhậnHTTP, thiếu cấu hình ở registry explicit trả dependency unavailable. K nilPolicies cònlegacyprofile/Bodyformattercũ, L mới gỡ. Các policy native không dùng dispatch không cần profile. Nội dung cũ và5site DLP được bảo vệ bằng goldenprofile/messages cùng hồi quy gửi/link/PII.

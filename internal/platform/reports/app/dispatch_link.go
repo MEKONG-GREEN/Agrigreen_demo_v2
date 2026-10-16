@@ -124,8 +124,12 @@ func (s *Service) OpenDispatchLink(ctx context.Context, token, ip string) (LinkF
 		if !found {
 			return ErrLinkNotFound
 		}
+		profile, err := s.dispatchProfile()
+		if err != nil {
+			return err
+		}
 		// Điểm kiểm soát xuất: bên nhận = người nhận Chi cục (mã danh bạ), nguồn = lần gửi.
-		if err := s.egress(ctx, tx, Egress{Kind: EgressDownload, TenantID: tid, ActorRef: l.RecipientRef, TemplateKey: "kn." + strings.ToLower(file.FormCode),
+		if err := s.egress(ctx, tx, Egress{Kind: EgressDownload, TenantID: tid, ActorRef: l.RecipientRef, TemplateKey: dispatchFileKey(profile, file.FormCode),
 			Format: file.Format, JobID: l.DispatchID}); err != nil {
 			egressDenied = true
 			return err

@@ -456,3 +456,11 @@ Static-first15919.exit1 bắt4importimplementationtạicompositionroot,R02;khôn
 
 
 Kết quả cuối: PG-final18936.exit0 đủ13/13packagecótest,0FAIL/SKIP trênproduction3289316b: assembly:97.229s, worker:2.515s, formimport:2.417s, reportforms:2.198s, reports:108.082s, kn77:245.471s. Static-final75388.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues; lỗiR02đãsửatrongmã,khôngnớicổng. ProofhostTEMP agrigreen-codex-knsplit2reportsj-proof.json. 15testpoints/assertioncounts/goldenI/webfixturesgiữ. Helpercòn8migrationgate trướcdev; sourceDTO/dispatchcontent vàKNSPLITkhácchưa xong.
+
+## KNSPLIT-2-REPORTS-K — Dispatch profile registration (nền5e116e26)
+
+Downstream consumers: reports PolicyRegistry/dispatch creation/send/worker/fileURL/publiclink/DLP; dispatch BodyFor generic; KNReportPolicy provider đã nối5compositionroots; API/worker/KN77/tests-reports vàSDK/CLI. Dependency evidence: rg -n 'DispatchProfile|dispatchProfile|BodyFor|dispatchFileKey|TemplatePrefix|SheetTemplateKey|ReportPolicy' internal cmd tests -g '*.go'. Không đổi identity/scope, sổ hoặc wirecontract.
+
+Regression acceptance command: PGriêng, go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./cmd/formimport ./tests/reportforms ./tests/reports ./tests/kn77; staticCODEX-G1/helper8migrationgates.13packagecótest, frontend/mobile miễn vì API/UI/fixtureskhôngđổi; build/vet toànrepo bắt buộc. Usercho phépG1, khôngSMTP/data thật, giữmain/worktree.
+
+Related test points: TestLegacyDispatchProfileContract, TestRegisteredDispatchMessagesMatchLegacyContract, TestRegisteredDispatchProfileCopiesAndIsolation, TestDispatchProfileRegistrationRejectsInvalid, TestReportDispatchProfileMatchesLegacyContract; HTTP/email/linkdedup/PII vàKN77. K cònnillegacy vàBodycũ, Lmớigỡ.

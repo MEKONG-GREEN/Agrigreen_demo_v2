@@ -1,8 +1,10 @@
 package app
 
 import (
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"slices"
+	"strings"
 )
 
 // PolicyRegistry holds an immutable copy of application contributions.
@@ -19,6 +21,17 @@ func NewPolicyRegistry(policies ...port.Policy) *PolicyRegistry {
 		return dst
 	}
 	for _, p := range policies {
+		if p.DispatchProfile != nil {
+			if r.policy.DispatchProfile != nil {
+				panic("reports: duplicate dispatch profile registration")
+			}
+			profile := *p.DispatchProfile
+			if strings.TrimSpace(profile.SubjectDepartment) == "" || strings.TrimSpace(profile.Salutation) == "" || strings.TrimSpace(profile.SenderName) == "" ||
+				!strings.HasSuffix(profile.TemplatePrefix, ".") || !domain.ValidKey(profile.TemplatePrefix+"x") || !domain.ValidKey(profile.SheetTemplateKey) {
+				panic("reports: invalid dispatch profile registration")
+			}
+			r.policy.DispatchProfile = &profile
+		}
 		r.policy.ReaderRoles = merge(r.policy.ReaderRoles, p.ReaderRoles)
 		r.policy.SchedulerRoles = merge(r.policy.SchedulerRoles, p.SchedulerRoles)
 		r.policy.FormReaderRoles = merge(r.policy.FormReaderRoles, p.FormReaderRoles)
@@ -70,4 +83,11 @@ func (r *PolicyRegistry) AttachmentLimitParam() string {
 		return ""
 	}
 	return r.policy.AttachmentLimitParam
+}
+
+func (r *PolicyRegistry) DispatchProfile() (port.DispatchProfile, bool) {
+	if r == nil || r.policy.DispatchProfile == nil {
+		return port.DispatchProfile{}, false
+	}
+	return *r.policy.DispatchProfile, true
 }
