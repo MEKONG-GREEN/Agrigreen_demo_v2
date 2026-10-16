@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-REPORTS-H — Gỡ typedExtension/fallback/thuật toán KN khỏi core, nil/empty failclosed vàowner5source pure đạt; chờ13PG/static/helper.14gridseed vàmodule registrykhác còn.
+- [x] KNSPLIT-2-REPORTS-H — Gỡ bộ dựng KN legacy/typedExtension, thiếu đăng ký failclosed;13/13PGnoSKIP vàstatic đạt, boundary383; helper kiểm8migrationgate trướcdev.14gridseed còn gói sau.

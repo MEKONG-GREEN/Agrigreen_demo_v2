@@ -428,3 +428,6 @@ Downstream consumers: reports/app buildDataset vànativeCGH/HTX helper; KNprovid
 Regression acceptance command: PG riêng, go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./tests/reports ./tests/kn77; staticCODEX-G1 vàhelper8migrationgates. Miễnweb/mobile/acceptance ngoài scope vìkhôngđổicontract/UI/SQL; build/vettoànrepo. Usercho phépG1, khôngSMTP/data thật, giữmain/worktree.
 
 Related test points: TestSourceBuilderRequiresRegistration, TestRegisteredSourceBuilderBindsJobAndCopies/ErrorIsFinal, TestReportSourceBuildersFiguresAndMissingTargets, suiteHTTP vàKN77. Redconfirm.exit1 bắt missingregistry gọilegacy,emptyPASS. Pure74843.exit0 app2.052s/extension1.181s,0FAIL/SKIP. ChờPG/static/helper.
+
+
+Kết quả thực: PG24203.exit0 đủ13/13package,0FAIL/SKIP, productionb43180db không đổi: assembly100.916s/worker2.196s/tests-reports106.907s/KN77252.802s. Static86292.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. Gofmt chỉ2fixturecũ được phép. ProofhostTEMP agrigreen-codex-knsplit2reportsh-proof.json. Không đổi API/SQL/UI nên miễn frontend/mobile; helper còn8migrationgate trước dev.14gridseed còn gói sau.
