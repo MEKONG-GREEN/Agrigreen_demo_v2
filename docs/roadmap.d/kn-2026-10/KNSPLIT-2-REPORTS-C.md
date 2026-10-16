@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-REPORTS-C — Đăng ký nhóm quyền/source/scope và cấu hình attachment của KN vào reports; chờ hồi quy PG/consumer/cổng/helper trước tích hợp. Legacy adapter còn ở bước C, bước D mới gỡ.
+- [x] KNSPLIT-2-REPORTS-C — Registry quyền/source/scope/config KN, parity và13/13PG noSKIP/cổng tĩnh đạt. Helper kiểm migration trước tích hợp; legacy adapter còn đến D, catalog/dataset KN còn gói registry tiếp theo.
