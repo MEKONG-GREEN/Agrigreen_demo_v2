@@ -97,6 +97,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -522,7 +523,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			return nil, func() {}, err
 		}
 		md := masterdata.New(mdPool, clk)
-		rep := reports.New(repPool, clk, reports.Deps{Params: md.Params(), Log: log})
+		rep := reports.New(repPool, clk, reports.Deps{Policies: []reportsport.Policy{extension.ReportPolicy()}, Params: md.Params(), Log: log})
 		// G5 (ADR-0024): lối "lịch" của xuất báo cáo qua điểm kiểm soát chung (kênh report_export) —
 		// Checkpoint của pf/metering (r_metering); workerEgress ghi đè cho kiểm thử.
 		// AG_EGRESS_MODE sai → lỗi khởi động.

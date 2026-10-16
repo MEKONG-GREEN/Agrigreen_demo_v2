@@ -30,7 +30,7 @@ type ScheduleInput struct {
 // CreateSchedule lập lịch gửi định kỳ (US-DASH-03). Phạm vi của người lập được
 // giải và lưu lại; việc xuất theo lịch chỉ trong phạm vi đó.
 func (s *Service) CreateSchedule(ctx context.Context, in ScheduleInput) (domain.Schedule, bool, error) {
-	p, err := authz.Require(ctx, schedulers...)
+	p, err := authz.Require(ctx, s.schedulerRoles()...)
 	if err != nil {
 		return domain.Schedule{}, false, err
 	}
@@ -41,7 +41,7 @@ func (s *Service) CreateSchedule(ctx context.Context, in ScheduleInput) (domain.
 	if err != nil {
 		return domain.Schedule{}, false, err
 	}
-	if sc.Empty() && !coopOnly(p) {
+	if sc.Empty() && !s.coopOnly(p) {
 		return domain.Schedule{}, false, ErrOutOfScope.WithDetail("tài khoản chưa gắn đơn vị công tác")
 	}
 	sch := in.Schedule
@@ -64,7 +64,7 @@ func (s *Service) CreateSchedule(ctx context.Context, in ScheduleInput) (domain.
 		if t.Status != domain.TemplateActive {
 			return ErrTemplateRetired
 		}
-		if !hasAny(p, rolesFor(t.Def.Source)) {
+		if !hasAny(p, s.sourceRoles(t.Def.Source)) {
 			return problem.Forbidden.WithDetail("vai của bạn không được xuất mẫu này")
 		}
 		if !slices.Contains(t.Def.Formats, sch.Format) {
@@ -76,7 +76,7 @@ func (s *Service) CreateSchedule(ctx context.Context, in ScheduleInput) (domain.
 			params.Period = domain.MonthOf(now) // chỉ để kiểm; kỳ thật tính theo từng mốc
 		}
 		// HTX US-DASH-03: lịch của quản lý HTX chỉ trong HTX của người lập.
-		jsc, err := jobScope(p, sc, t.Def, &params)
+		jsc, err := s.jobScope(p, sc, t.Def, &params)
 		if err != nil {
 			return err
 		}
@@ -94,11 +94,11 @@ func (s *Service) CreateSchedule(ctx context.Context, in ScheduleInput) (domain.
 }
 
 // scheduleVisible: người lập, hoặc người có phạm vi bao trọn phạm vi của lịch.
-func scheduleVisible(p authz.Principal, sc authz.Scope, s domain.Schedule) bool {
+func (svc *Service) scheduleVisible(p authz.Principal, sc authz.Scope, s domain.Schedule) bool {
 	if s.OwnerRef == p.ActorRef || sc.All {
 		return true
 	}
-	if coopOnly(p) {
+	if svc.coopOnly(p) {
 		// HTX US-DASH-03: quản lý HTX thấy lịch HTX của HTX mình.
 		return p.OrgRef != uuid.Nil && s.Params.CoopScoped(s.ScopeAll, s.ScopeUnits) && s.Params.CooperativeRef == p.OrgRef.String()
 	}
@@ -115,7 +115,7 @@ func scheduleVisible(p authz.Principal, sc authz.Scope, s domain.Schedule) bool 
 
 // ListSchedules liệt kê lịch người gọi được xem.
 func (s *Service) ListSchedules(ctx context.Context) ([]domain.Schedule, error) {
-	p, err := authz.Require(ctx, schedulers...)
+	p, err := authz.Require(ctx, s.schedulerRoles()...)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (s *Service) ListSchedules(ctx context.Context) ([]domain.Schedule, error) 
 	}
 	out := []domain.Schedule{}
 	for _, x := range all {
-		if scheduleVisible(p, sc, x) {
+		if s.scheduleVisible(p, sc, x) {
 			out = append(out, x)
 		}
 	}
@@ -142,7 +142,7 @@ func (s *Service) ListSchedules(ctx context.Context) ([]domain.Schedule, error) 
 
 // DeactivateSchedule ngừng lịch kèm lý do (không xóa — lịch sử chạy giữ nguyên).
 func (s *Service) DeactivateSchedule(ctx context.Context, id uuid.UUID, reason string) (domain.Schedule, error) {
-	p, err := authz.Require(ctx, schedulers...)
+	p, err := authz.Require(ctx, s.schedulerRoles()...)
 	if err != nil {
 		return domain.Schedule{}, err
 	}
@@ -160,7 +160,7 @@ func (s *Service) DeactivateSchedule(ctx context.Context, id uuid.UUID, reason s
 		if err != nil {
 			return err
 		}
-		if x == nil || !scheduleVisible(p, sc, *x) {
+		if x == nil || !s.scheduleVisible(p, sc, *x) {
 			return ErrScheduleNotFound
 		}
 		if x.Active {
@@ -177,7 +177,7 @@ func (s *Service) DeactivateSchedule(ctx context.Context, id uuid.UUID, reason s
 
 // ScheduleRuns trả các lần chạy của một lịch.
 func (s *Service) ScheduleRuns(ctx context.Context, id uuid.UUID) ([]store.Run, error) {
-	p, err := authz.Require(ctx, schedulers...)
+	p, err := authz.Require(ctx, s.schedulerRoles()...)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func (s *Service) ScheduleRuns(ctx context.Context, id uuid.UUID) ([]store.Run, 
 		if err != nil {
 			return err
 		}
-		if x == nil || !scheduleVisible(p, sc, *x) {
+		if x == nil || !s.scheduleVisible(p, sc, *x) {
 			return ErrScheduleNotFound
 		}
 		out, err = store.RunsOf(ctx, tx, id)

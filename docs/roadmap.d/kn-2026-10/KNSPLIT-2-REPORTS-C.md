@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-REPORTS-C — Đăng ký nhóm quyền/source/scope và cấu hình attachment của KN vào reports; chờ hồi quy PG/consumer/cổng/helper trước tích hợp. Legacy adapter còn ở bước C, bước D mới gỡ.

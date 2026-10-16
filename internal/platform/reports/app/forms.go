@@ -60,7 +60,7 @@ var (
 // formReader retains native realm roles; applications register their session
 // policy separately. A resolver error or explicit denial never falls back.
 func (s *Service) formReader(ctx context.Context, extra ...string) (authz.Principal, *port.SessionActor, error) {
-	p, err := authz.Require(ctx, append(append([]string{}, formReaders...), extra...)...)
+	p, err := authz.Require(ctx, append(append([]string{}, s.formReaderRoles()...), extra...)...)
 	if err == nil {
 		return p, nil, nil
 	}

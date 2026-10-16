@@ -77,7 +77,14 @@ func newFixture(t *testing.T, withDirectory bool) *fixture {
 	}
 	f.store = st
 	f.dir = fakeDirectory{emails: map[uuid.UUID]string{}, members: map[uuid.UUID]uuid.UUID{}}
-	deps := reports.Deps{Scope: f.org, Orgs: f.org, Units: newFakeUnits(), Params: f.params, Catalogs: fakeCatalogs{}, Store: st,
+	deps := reports.Deps{Policies: []port.Policy{{
+		ReaderRoles:            []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin},
+		FormReaderRoles:        []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin},
+		SchedulerRoles:         []string{extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin},
+		OrganizationScopeRoles: []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin},
+		SourceRoles:            map[string][]string{"extension": {extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin}, "cropcycle": {extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin}},
+		AttachmentLimitParam:   extport.ParamAttachmentLimitMB,
+	}}, Scope: f.org, Orgs: f.org, Units: newFakeUnits(), Params: f.params, Catalogs: fakeCatalogs{}, Store: st,
 		Extension: f.ext, Mechanization: f.mech, CropCycle: f.cc, Mailer: f.mailer, LinkBase: "https://ops.test"}
 	if withDirectory {
 		deps.Directory, deps.Recipients = f.dir, f.dir

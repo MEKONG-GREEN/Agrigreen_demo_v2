@@ -354,3 +354,14 @@ Related test points: TestReportSessionRequiresRegistration, TestReportSessionAno
 Red.exit1: không resolver và callback unhandled đều cấp quyền từ KNContext ở cả đọc/ghi dispatch và đọc form. Sau gỡ adapter, pure.exit0/reportsapp1.924s,0SKIP. Chờ PG/static/helper, chưa tích hợp.
 
 Kết quả thực: PGfull53656.exit0 đủ13/13package,0FAIL/SKIP: handler90.414s, assembly66.971s, worker2.088s, KN77196.436s. Production65054726 không đổi. Staticfirst87115.exit1 chỉ docscheck sai định dạng hai tài liệu; build/vet/modgen-check/migrate-base/archlint/contractcheck đã đạt. Sau sửa docs, staticresume44281.exit0: docscheck/MFA/boundary390/lint0issues/diffcheck. Gofmt toàn repo chỉ2fixture cũ được cho phép. ProofJSON hostTEMP agrigreen-codex-knsplit2reportsb-proof.json. Helper còn kiểm8migrationgate trước tích hợp.
+
+
+## KNSPLIT-2-REPORTS-C — Registry role/source/config (nềna85cfabb)
+
+Downstream consumers: reports/app templates/exports/schedules/coop-schedules/forms/dispatch, constructor reports; KN policy owner; API assembly, hai worker factory, KN77, handler fixture. Dependency evidence: `rg -n 'reports.New|reports.Deps|rolesFor|coopOnly|jobScope|jobVisible|scheduleVisible|ReportPolicy' internal cmd tests -g '*.go'`. Registry logic trong app, port chỉ Policy DTO; không thêm import KN vào shared code.
+
+Regression acceptance command: PG riêng với `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77`, static CODEX-G1 và migration helper. Miễn frontend/mobile và acceptance ngoài scope vì DTO/SQL/UI không đổi. Build/vet toàn repo bắt buộc. User đã cho phép G1, không dùng dữ liệu hay SMTP thật, giữ main/worktree.
+
+Related test points: TestPolicyRegistryIsolationAndComposition, TestPolicyRegistryConflictingParameterRejected, TestRegisteredReportPolicyLegacyParity, TestRegisteredReportPolicyDoesNotLeakSources, TestReportPolicyRegistration; KN77 form/dispatch/PII và handler HTX/mixed-role/export/schedules.
+
+Pure-first.exit1 lỗi compile receiver; pure-second app1.467s đạt trước điều chỉnh tầng registry. Boundary precheck39750.exit1 chặn import root KN mới trong shared fixture, đã gỡ (fixture vẫn dùng port dependency có sẵn). Pure-third93503.exit0 app0.994s/extension1.130s,0FAIL/SKIP, gồm immutable/composition/parity/scope/source/owner. Chờ fullPG/static thực; không coi adapter cũ đã gỡ.

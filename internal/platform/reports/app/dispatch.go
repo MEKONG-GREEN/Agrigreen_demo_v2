@@ -666,7 +666,7 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	if err != nil {
 		return err
 	}
-	limitMB, err := s.paramInt(ctx, extport.ParamAttachmentLimitMB, now, decimalInt(dispatch.DefaultAttachmentLimitMB))
+	limitMB, err := s.attachmentLimit(ctx, now)
 	if err != nil {
 		return err
 	}
@@ -822,3 +822,6 @@ func (h DispatchHistory) SentForPeriod(ctx context.Context, tid, periodID uuid.U
 var _ extensionsrc.DispatchHistory = DispatchHistory{}
 
 func decimalInt(n int64) decimal.Decimal { return decimal.NewFromInt(n) }
+
+// Transitional configuration adapter, removed after registrations are live.
+func legacyAttachmentLimitParam() string { return extport.ParamAttachmentLimitMB }

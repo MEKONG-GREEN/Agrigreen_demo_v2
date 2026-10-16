@@ -39,3 +39,8 @@ KNSPLIT-2-FORMS-A đã đăng ký các consumer KN trước; bước B bỏ nhá
 ## Policy phiên của reports (KNSPLIT-2-REPORTS-A)
 
 `reports.Deps.ResolveSession` nhận `port.SessionResolver` do ứng dụng cung cấp. Projection chỉ chứa grant và bộ lọc, không actor/tenant: capability luôn giữ Principal đã xác thực. Operation là forms.read/dispatch.read/dispatch.write; handled denial hoặc error là kết quả cuối, thiếu grant/filter/phạm vi dispatch thì từ chối. Realm đọc mẫu giữ ưu tiên hiện hành. KN đăng ký `extension.ReportSessionResolver(orgs)` tại assembly/worker và KN77; bước B đã gỡ adapter legacy: thiếu resolver hoặc unhandled không cấp quyền phiên; không suy từ Principal.KN. Native realm đọc form vẫn giữ nguyên. Các role group realm cho HTX/CGH chưa được gỡ trong bước này. Không nhận resolver từ HTTP hoặc JSON.
+
+
+## Nhóm quyền và cấu hình reports (KNSPLIT-2-REPORTS-C)
+
+`reports.Deps.Policies` nhận các `port.Policy` tin cậy lúc lắp ráp. Port chỉ DTO, reports/app clone thành registry bất biến; giữ native roles của capability, nối các quyền theo operation/source và các vai có organization scope. Tham số attachment do ứng dụng đăng ký, xung đột key bị chặn ngay bootstrap. KN sở hữu `extension.ReportPolicy()`, đăng ký tại API/worker/KN77. Slice nil còn adapter cũ trong C; slice rỗng chủ động không đóng góp, bước D gỡ hẳn đường cũ. Không nhận policy từ HTTP; actor/tenant/scope dữ liệu không do registration đúc.

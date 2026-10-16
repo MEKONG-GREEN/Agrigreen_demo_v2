@@ -52,7 +52,7 @@ func effectiveTemplates(ctx context.Context, tx pgx.Tx) ([]domain.Template, erro
 
 // ListTemplates (Application API) trả mẫu đang dùng mà người gọi được xuất.
 func (s *Service) ListTemplates(ctx context.Context) ([]domain.Template, error) {
-	p, err := authz.Require(ctx, allReaders...)
+	p, err := authz.Require(ctx, s.readerRoles()...)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (s *Service) ListTemplates(ctx context.Context) ([]domain.Template, error) 
 	}
 	out := []domain.Template{}
 	for _, t := range all {
-		if t.Status == domain.TemplateActive && hasAny(p, rolesFor(t.Def.Source)) {
+		if t.Status == domain.TemplateActive && hasAny(p, s.sourceRoles(t.Def.Source)) {
 			out = append(out, t)
 		}
 	}
