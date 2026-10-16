@@ -466,3 +466,6 @@ Regression acceptance command: PGriêng, go test -v -count=1 -p 1 -timeout 55m .
 Related test points: TestLegacyDispatchProfileContract, TestRegisteredDispatchMessagesMatchLegacyContract, TestRegisteredDispatchProfileCopiesAndIsolation, TestDispatchProfileRegistrationRejectsInvalid, TestReportDispatchProfileMatchesLegacyContract; HTTP/email/linkdedup/PII vàKN77. K cònnillegacy vàBodycũ, Lmớigỡ.
 
 Pure-first27369.exit0:app1.805s/dispatch0.638s/extension2.088s/reportforms1.818s/CLI2.065s,0FAIL/SKIP; capturelegacyexit0 vàmodgen/docs/boundary383/diffPASS. Đối chiếu thực4egresssite:3trongdispatch.go(tệp/gsheet/tải) và1publiclink;5là sốscalarprofile, không phải sốsite. Chờ13PG/static/helper.
+
+
+Kết quả thực: PG21606.exit0 đủ13/13packagecótest,0FAIL/SKIP trênproduction065c1058: assembly:102.166s, worker:2.250s, formimport:2.020s, reportforms:2.157s, reports:104.462s, kn77:248.402s. Static18495.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues.4egresssite/defaultsubject/body qua profile owner; golden4messagecases/provisional/links/keys vàregistryboundaries đạt. ProofTEMP agrigreen-codex-knsplit2reportsk-proof.json. Helpercòn8migrationgate trướcdev; L mới gỡlegacyprofile/Body/capture, sourceDTO vàregistrykhác còn.

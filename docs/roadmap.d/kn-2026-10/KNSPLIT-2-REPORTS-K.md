@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-REPORTS-K — Registry dispatchprofile/ownerKN/bytecontract; chờ13PG/static/helper, L mới bỏlegacy.
+- [x] KNSPLIT-2-REPORTS-K — KN đăng ký5scalar dispatchprofile;4egresssite/messages giữbyte,13/13PGnoSKIP/static đạt,boundary383; helper8migrationgate trướcdev. L mới gỡlegacy.
