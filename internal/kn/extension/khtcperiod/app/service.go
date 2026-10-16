@@ -225,7 +225,7 @@ func (s *Service) draft(ctx context.Context, c caller, in OpenInput, strict bool
 	}
 	if s.Crosswalk != nil {
 		d.SourcesLinked = true
-		if d.Sources, err = s.Crosswalk.Sources(ctx, plan.FormsKind, plan.FormsKey, plan.From, plan.To, codes); err != nil {
+		if d.Sources, err = s.Crosswalk.Sources(ctx, plan.FormsKind, plan.FormsKey, plan.From, domain.QuantityEnd(plan.Type, plan.To, plan.Cutoff), codes); err != nil {
 			return Draft{}, ErrDependency.WithDetail("bộ quy đổi kỳ nguồn lỗi").WithCause(err)
 		}
 	}

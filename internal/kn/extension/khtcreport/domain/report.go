@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	form "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcform/domain"
+	perioddomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/domain"
 	source "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcsource/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/google/uuid"
@@ -423,7 +424,8 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 	}
 	current := map[string]Submitted{}
 	for _, sheet := range latest {
-		if sheet.Year != period.Year || sheet.To.After(period.To) {
+		isCurrentProgram := period.Type == perioddomain.TypeProgram && sheet.PeriodID == period.ID
+		if sheet.Year != period.Year || (sheet.To.After(perioddomain.QuantityEnd(period.Type, period.To, period.Cutoff)) && !isCurrentProgram) {
 			continue
 		}
 		if sheet.Type == "week" || sheet.PeriodID == period.ID {

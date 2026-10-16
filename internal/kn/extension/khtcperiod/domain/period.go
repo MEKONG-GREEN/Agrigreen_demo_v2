@@ -260,3 +260,13 @@ func ValidReason(s string) (string, bool) {
 	n := utf8.RuneCountInString(s)
 	return s, n >= 10 && n <= 500
 }
+
+// QuantityEnd is the date through which full source weeks contribute. Program
+// reports alone permit a cutoff before the requested period end; preserve To
+// for their identity and narrative. Zero cutoff retains legacy pure callers.
+func QuantityEnd(reportType string, to, cutoff time.Time) time.Time {
+	if reportType == TypeProgram && !cutoff.IsZero() && cutoff.Before(to) {
+		return cutoff
+	}
+	return to
+}

@@ -47,7 +47,8 @@ func (s *Service) submitted(ctx context.Context, c caller, p ps.Period) ([]domai
 	}
 	out := []domain.Submitted{}
 	for _, period := range periods {
-		if terminal(events[period.ID]) == pd.PeriodCancelled || period.To.After(p.To) || (period.Type != pd.TypeWeek && period.ID != p.ID) {
+		isCurrentProgram := p.Type == pd.TypeProgram && period.ID == p.ID
+		if terminal(events[period.ID]) == pd.PeriodCancelled || (period.To.After(pd.QuantityEnd(p.Type, p.To, p.Cutoff)) && !isCurrentProgram) || (period.Type != pd.TypeWeek && period.ID != p.ID) {
 			continue
 		}
 		for _, department := range period.Departments {

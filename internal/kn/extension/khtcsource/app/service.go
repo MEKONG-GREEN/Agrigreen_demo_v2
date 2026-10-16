@@ -24,6 +24,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	pdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/domain"
 	pstore "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcsource/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcsource/store"
@@ -263,7 +264,7 @@ func (s *Service) Refresh(ctx context.Context, id uuid.UUID, idem string) (Statu
 		return Status{}, err
 	}
 	target := port.CrosswalkTarget{CalendarID: cal.ID, RuleTag: cal.Rule.Tag(), PeriodType: rc.PeriodWeek}
-	ps, err := s.Sources.Periods(ctx, c.p.TenantID, port.KHTCQuery{PriceAt: &p.Cutoff, ConfirmationAt: cutoffEnd(p.Cutoff), From: wFrom, To: p.To, Target: target})
+	ps, err := s.Sources.Periods(ctx, c.p.TenantID, port.KHTCQuery{PriceAt: &p.Cutoff, ConfirmationAt: cutoffEnd(p.Cutoff), From: wFrom, To: pdomain.QuantityEnd(p.Type, p.To, p.Cutoff), Target: target})
 	if err != nil {
 		return Status{}, ErrDependency.WithDetail("đọc số liệu nguồn lỗi").WithCause(err)
 	}
@@ -309,7 +310,7 @@ func (s *Service) Refresh(ctx context.Context, id uuid.UUID, idem string) (Statu
 				fz[w] = f
 			}
 		}
-		v.V = domain.EvaluateAt(k, ps, fz, p.From, p.To, p.Cutoff)
+		v.V = domain.EvaluateAt(k, ps, fz, p.From, pdomain.QuantityEnd(p.Type, p.To, p.Cutoff), p.Cutoff)
 		cur[raw] = v.V
 		vals = append(vals, v)
 	}
@@ -331,10 +332,10 @@ func (s *Service) Refresh(ctx context.Context, id uuid.UUID, idem string) (Statu
 				Old: ch.Old, New: ch.New})
 		}
 	}
-	rows := domain.RowsAt(ps, p.From, p.To, p.Cutoff)
+	rows := domain.RowsAt(ps, p.From, pdomain.QuantityEnd(p.Type, p.To, p.Cutoff), p.Cutoff)
 	closed := true
 	for _, x := range ps {
-		if !dayOf(x.TargetTo).Before(dayOf(p.From)) && !dayOf(x.TargetTo).After(dayOf(p.To)) {
+		if !dayOf(x.TargetTo).Before(dayOf(p.From)) && !dayOf(x.TargetTo).After(dayOf(pdomain.QuantityEnd(p.Type, p.To, p.Cutoff))) {
 			closed = closed && x.Closed
 		}
 	}
@@ -532,9 +533,9 @@ func (s *Service) Status(ctx context.Context, id uuid.UUID) (Status, error) {
 		st.Entries = entries
 	}
 	cal := calendarOf(p)
-	live, lerr := s.Sources.Periods(ctx, c.p.TenantID, port.KHTCQuery{PriceAt: &p.Cutoff, ConfirmationAt: cutoffEnd(p.Cutoff), From: p.From, To: p.To,
+	live, lerr := s.Sources.Periods(ctx, c.p.TenantID, port.KHTCQuery{PriceAt: &p.Cutoff, ConfirmationAt: cutoffEnd(p.Cutoff), From: p.From, To: pdomain.QuantityEnd(p.Type, p.To, p.Cutoff),
 		Target: port.CrosswalkTarget{CalendarID: cal.ID, RuleTag: cal.Rule.Tag(), PeriodType: rc.PeriodWeek}})
-	liveRows := domain.RowsAt(live, p.From, p.To, p.Cutoff)
+	liveRows := domain.RowsAt(live, p.From, pdomain.QuantityEnd(p.Type, p.To, p.Cutoff), p.Cutoff)
 	switch {
 	case lerr != nil:
 		st.LiveError = "không đọc được số liệu nguồn hiện tại"
