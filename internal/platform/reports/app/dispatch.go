@@ -23,7 +23,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
@@ -822,6 +821,3 @@ func (h DispatchHistory) SentForPeriod(ctx context.Context, tid, periodID uuid.U
 var _ extensionsrc.DispatchHistory = DispatchHistory{}
 
 func decimalInt(n int64) decimal.Decimal { return decimal.NewFromInt(n) }
-
-// Transitional configuration adapter, removed after registrations are live.
-func legacyAttachmentLimitParam() string { return extport.ParamAttachmentLimitMB }

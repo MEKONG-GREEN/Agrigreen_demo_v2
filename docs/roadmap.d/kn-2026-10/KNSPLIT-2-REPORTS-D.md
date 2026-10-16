@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-REPORTS-D — Gỡ adapter realm/config KN ngầm, bảo vệ thiếu registry bằng test âm và ma trận10vai/mixed HTX; chờ PG/consumer/static/helper trước tích hợp. Catalog/dataset/seed còn gói tiếp theo.

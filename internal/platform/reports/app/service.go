@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -14,14 +15,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
@@ -58,36 +56,11 @@ var (
 // DownloadTTL là thời hạn URL tải tệp (≤ objstore.MaxPresignTTL).
 const DownloadTTL = 10 * time.Minute
 
-// Nhóm vai.
+// Native capability roles. Application roles are registered through Policy.
 var (
-	knRoles  = []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, authz.RolePlatformAdmin}
-	cghRoles = []string{mechport.RoleCGHViewer, mechport.RoleCGHAdmin, authz.RolePlatformAdmin}
-	// HTX US-DASH-02: quản lý HTX (chỉ HTX mình) và cán bộ KN theo phạm vi xã/tỉnh.
-	htxRoles      = append([]string{ccport.RoleCoopManager}, knRoles...)
-	allReaders    = []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, mechport.RoleCGHViewer, mechport.RoleCGHAdmin, ccport.RoleCoopManager, port.RoleReportsAdmin, port.RoleMasterdataAdmin, authz.RolePlatformAdmin}
+	cghRoles      = []string{mechport.RoleCGHViewer, mechport.RoleCGHAdmin, authz.RolePlatformAdmin}
 	templateAdmin = []string{port.RoleReportsAdmin, port.RoleMasterdataAdmin, authz.RolePlatformAdmin}
-	// Lập lịch: cán bộ quản lý (TTKN QG/tỉnh — KN US-DASH-03), Admin CGH và quản lý HTX
-	// (HTX US-DASH-03, chỉ mẫu HTX — rolesFor chặn mẫu khác).
-	schedulers = []string{extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, mechport.RoleCGHAdmin, ccport.RoleCoopManager, authz.RolePlatformAdmin}
 )
-
-// rolesFor trả vai được xuất từ một nguồn dữ liệu.
-func rolesFor(source string) []string {
-	switch domain.Sources[source].Module {
-	case "mechanization":
-		return cghRoles
-	case "cropcycle":
-		return htxRoles
-	}
-	return knRoles
-}
-
-// coopOnly: người gọi xem số liệu HTX CHỈ của HTX mình (Principal.OrgRef) — quản lý
-// HTX không kèm vai KN/quản trị (HTX US-DASH-01 AC-3). Phạm vi xã của tổ chức HTX
-// (pf/party) KHÔNG dùng cho nguồn HTX: một xã có nhiều HTX.
-func coopOnly(p authz.Principal) bool {
-	return p.Has(ccport.RoleCoopManager) && !hasAny(p, knRoles)
-}
 
 func hasAny(p authz.Principal, roles []string) bool {
 	return slices.ContainsFunc(roles, p.Has)

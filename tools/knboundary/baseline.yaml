@@ -24,8 +24,6 @@ couplings:
   - {rule: import-into-kn, from: internal/platform/notify/handler/price_integration_test.go, to: internal/kn/price/port}
   - {rule: import-into-kn, from: internal/platform/notify/handler/report_cycle_integration_test.go, to: internal/kn/extension/port}
   - {rule: import-into-kn, from: internal/platform/notify/module.go, to: internal/kn/extension/port}
-  - {rule: import-into-kn, from: internal/platform/reports/app/dispatch.go, to: internal/kn/extension/port}
-  - {rule: import-into-kn, from: internal/platform/reports/app/service.go, to: internal/kn/extension/port}
   - {rule: import-into-kn, from: internal/platform/reports/handler/coop_schedule_integration_test.go, to: internal/kn/extension/port}
   - {rule: import-into-kn, from: internal/platform/reports/handler/egress_integration_test.go, to: internal/kn/extension/port}
   - {rule: import-into-kn, from: internal/platform/reports/handler/forms_integration_test.go, to: internal/kn/extension/port}

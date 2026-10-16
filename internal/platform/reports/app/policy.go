@@ -11,31 +11,19 @@ import (
 	"time"
 )
 
-// Step C keeps the old realm adapter only when no registry was supplied.
+// Native rules are extended only by explicitly registered application policy.
 func (s *Service) readerRoles() []string {
-	if s.Policies == nil {
-		return allReaders
-	}
 	base := append([]string{}, cghRoles...)
 	base = append(base, ccport.RoleCoopManager, port.RoleReportsAdmin, port.RoleMasterdataAdmin)
 	return append(base, s.Policies.ReaderRoles()...)
 }
 func (s *Service) schedulerRoles() []string {
-	if s.Policies == nil {
-		return schedulers
-	}
 	return append([]string{mechport.RoleCGHAdmin, ccport.RoleCoopManager, authz.RolePlatformAdmin}, s.Policies.SchedulerRoles()...)
 }
 func (s *Service) formReaderRoles() []string {
-	if s.Policies == nil {
-		return formReaders
-	}
 	return append([]string{port.RoleReportsAdmin, authz.RolePlatformAdmin}, s.Policies.FormReaderRoles()...)
 }
 func (s *Service) sourceRoles(source string) []string {
-	if s.Policies == nil {
-		return rolesFor(source)
-	}
 	module := domain.Sources[source].Module
 	base := []string{authz.RolePlatformAdmin}
 	switch module {
@@ -47,16 +35,10 @@ func (s *Service) sourceRoles(source string) []string {
 	return append(base, s.Policies.SourceRoles(module)...)
 }
 func (s *Service) coopOnly(p authz.Principal) bool {
-	if s.Policies == nil {
-		return coopOnly(p)
-	}
 	return p.Has(ccport.RoleCoopManager) && !p.Has(authz.RolePlatformAdmin) && !hasAny(p, s.Policies.OrganizationScopeRoles())
 }
 func (s *Service) attachmentLimit(ctx context.Context, at time.Time) (int, error) {
 	key := s.Policies.AttachmentLimitParam()
-	if s.Policies == nil {
-		key = legacyAttachmentLimitParam()
-	}
 	if key == "" {
 		return dispatch.DefaultAttachmentLimitMB, nil
 	}

@@ -367,3 +367,14 @@ Related test points: TestPolicyRegistryIsolationAndComposition, TestPolicyRegist
 Pure-first.exit1 lỗi compile receiver; pure-second app1.467s đạt trước điều chỉnh tầng registry. Boundary precheck39750.exit1 chặn import root KN mới trong shared fixture, đã gỡ (fixture vẫn dùng port dependency có sẵn). Pure-third93503.exit0 app0.994s/extension1.130s,0FAIL/SKIP, gồm immutable/composition/parity/scope/source/owner. Chờ fullPG/static thực; không coi adapter cũ đã gỡ.
 
 Kết quả thực: PG84909.exit0 đủ13/13package,0FAIL/SKIP (handler:89.326s, assembly:68.985s, worker:1.863s, kn77:202.519s); production9bc7bb6b không đổi. Static40357.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary390/lint0issues. Gofmt toàn repo chỉ2fixture cũ được phép. ProofJSON hostTEMP agrigreen-codex-knsplit2reportsc-proof.json. Helper còn kiểm8migrationgate trước tích hợp. Sau D, danh mục nguồn KN trong domain.Sources/BuiltinTemplates và các bộ dựng dataset vẫn cần registry; không coi chỉ hết import là hoàn tất toàn bộ reports.
+
+
+## KNSPLIT-2-REPORTS-D — Bỏ realm/config adapter (nền08121510)
+
+Downstream consumers: reports templates/exports/schedules/coop-schedules/forms/dispatch; API, cả hai worker, KN77, handler fixture đã đăng ký policy. Dependency evidence: `rg -n 'reports.New|reports.Deps|readerRoles|schedulerRoles|sourceRoles|coopOnly|attachmentLimit' internal cmd tests -g '*.go'`. Không đổi source/catalog/data contract, UI hay SQL.
+
+Regression acceptance command: PG riêng với `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77`, cổng CODEX-G1/helper8migrationgate. Miễn web/mobile/acceptance ngoài scope, build/vet toàn repo bắt buộc. User đã cho phép trong G1, không dữ liệu/SMTP thật, main/worktree giữ nguyên.
+
+Related test points: TestReportPolicyRequiresRegistration, TestRegisteredReportPolicyRoleMatrix, TestRegisteredReportPolicyDoesNotLeakSources, TestPolicyRegistryIsolationAndComposition, TestPolicyRegistryConflictingParameterRejected; các ca KN77 session/phòng/tỉnh/PII và handler HTX/export/lịch.
+
+Red2392.exit1 bắt đúng nil policy suy quyền/scope/param ngầm, empty registry PASS. Pure-first thiếu import domain (compile), đã khôi phục. Pure-second.exit0 app1.630s,0FAIL/SKIP, ma trận10vai và mixed HTX giữ phạm vi HTX, mẫu, nguồn và tác vụ. Chờ PG/static/helper thật; catalog/dataset/seed vẫn có việc tiếp theo.

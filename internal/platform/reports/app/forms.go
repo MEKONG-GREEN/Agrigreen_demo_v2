@@ -52,10 +52,7 @@ var (
 
 // Vai của mẫu báo cáo KN v7.7: Admin (platform_admin) và reports_admin thiết kế, đề nghị và
 // phát hành — người phát hành phải KHÁC người đề nghị/sửa cuối (R-56).
-var (
-	formAdmins  = []string{port.RoleReportsAdmin, authz.RolePlatformAdmin}
-	formReaders = append(append([]string{}, knRoles...), port.RoleReportsAdmin)
-)
+var formAdmins = []string{port.RoleReportsAdmin, authz.RolePlatformAdmin}
 
 // formReader retains native realm roles; applications register their session
 // policy separately. A resolver error or explicit denial never falls back.

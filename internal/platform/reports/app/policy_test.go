@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
+	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -12,14 +13,28 @@ import (
 	"time"
 )
 
-func TestRegisteredReportPolicyLegacyParity(t *testing.T) {
-	old := Service{}
-	registered := Service{Policies: NewPolicyRegistry(port.Policy{
-		ReaderRoles: knRoles, FormReaderRoles: knRoles,
-		SchedulerRoles: knRoles[1:3], OrganizationScopeRoles: knRoles,
-		SourceRoles:          map[string][]string{"extension": knRoles, "cropcycle": knRoles},
-		AttachmentLimitParam: legacyAttachmentLimitParam(),
+// Fixed role matrix preserves the behavior proved against the old adapter in C.
+func TestRegisteredReportPolicyRoleMatrix(t *testing.T) {
+	roles := []string{"registered_reader", "registered_manager", "registered_national"}
+	svc := Service{Policies: NewPolicyRegistry(port.Policy{
+		ReaderRoles: roles, FormReaderRoles: roles, SchedulerRoles: roles[1:], OrganizationScopeRoles: roles,
+		SourceRoles: map[string][]string{"extension": roles, "cropcycle": roles}, AttachmentLimitParam: "application.limit",
 	})}
+	cases := []struct {
+		role                                                                         string
+		read, schedule, form, extension, mechanization, cropcycle, organizationScope bool
+	}{
+		{"registered_reader", true, false, true, true, false, true, true},
+		{"registered_manager", true, true, true, true, false, true, true},
+		{"registered_national", true, true, true, true, false, true, true},
+		{mechport.RoleCGHViewer, true, false, false, false, true, false, false},
+		{mechport.RoleCGHAdmin, true, true, false, false, true, false, false},
+		{ccport.RoleCoopManager, true, true, false, false, false, true, false},
+		{port.RoleReportsAdmin, true, false, true, false, false, false, false},
+		{port.RoleMasterdataAdmin, true, false, false, false, false, false, false},
+		{authz.RolePlatformAdmin, true, true, true, true, true, true, true},
+		{"unknown", false, false, false, false, false, false, false},
+	}
 	var cropSource string
 	for source, spec := range domain.Sources {
 		if spec.Module == "cropcycle" {
@@ -30,40 +45,46 @@ func TestRegisteredReportPolicyLegacyParity(t *testing.T) {
 	if cropSource == "" {
 		t.Fatal("missing HTX source")
 	}
-	for _, role := range append(append([]string{}, allReaders...), "unknown") {
+	for _, tc := range cases {
 		for _, mixed := range []bool{false, true} {
-			p := authz.Principal{ActorRef: uuid.New(), OrgRef: uuid.New(), Roles: []string{role}}
+			p := authz.Principal{ActorRef: uuid.New(), OrgRef: uuid.New(), Roles: []string{tc.role}}
 			if mixed {
 				p.Roles = append(p.Roles, ccport.RoleCoopManager)
 			}
-			if hasAny(p, old.readerRoles()) != hasAny(p, registered.readerRoles()) || hasAny(p, old.schedulerRoles()) != hasAny(p, registered.schedulerRoles()) || hasAny(p, old.formReaderRoles()) != hasAny(p, registered.formReaderRoles()) || old.coopOnly(p) != registered.coopOnly(p) {
-				t.Fatalf("role/scope parity lost role=%s mixed=%v", role, mixed)
+			wantCoop := (mixed || tc.role == ccport.RoleCoopManager) && !tc.organizationScope
+			if hasAny(p, svc.readerRoles()) != (tc.read || mixed) || hasAny(p, svc.schedulerRoles()) != (tc.schedule || mixed) || hasAny(p, svc.formReaderRoles()) != tc.form || svc.coopOnly(p) != wantCoop {
+				t.Fatalf("operation/scope matrix role=%s mixed=%v", tc.role, mixed)
 			}
-			for source := range domain.Sources {
-				if hasAny(p, old.sourceRoles(source)) != hasAny(p, registered.sourceRoles(source)) {
-					t.Fatalf("source policy changed role=%s source=%s mixed=%v", role, source, mixed)
+			for source, spec := range domain.Sources {
+				want := map[string]bool{"extension": tc.extension, "mechanization": tc.mechanization, "cropcycle": tc.cropcycle || mixed}[spec.Module]
+				if hasAny(p, svc.sourceRoles(source)) != want {
+					t.Fatalf("source matrix role=%s source=%s mixed=%v", tc.role, source, mixed)
 				}
 			}
 			sc := authz.Scope{Units: []string{"89"}}
-			before, after := domain.Params{}, domain.Params{}
-			a, errA := old.jobScope(p, sc, domain.Definition{Source: cropSource}, &before)
-			b, errB := registered.jobScope(p, sc, domain.Definition{Source: cropSource}, &after)
-			if !reflect.DeepEqual(a, b) || !reflect.DeepEqual(before, after) || (errA == nil) != (errB == nil) {
-				t.Fatalf("HTX scope changed role=%s mixed=%v", role, mixed)
+			query := domain.Params{}
+			got, err := svc.jobScope(p, sc, domain.Definition{Source: cropSource}, &query)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if wantCoop {
+				if !got.Empty() || query.CooperativeRef != p.OrgRef.String() {
+					t.Fatalf("HTX scope escaped role=%s mixed=%v", tc.role, mixed)
+				}
+			} else if !reflect.DeepEqual(got, sc) || query.CooperativeRef != "" {
+				t.Fatalf("organization scope lost role=%s mixed=%v", tc.role, mixed)
 			}
 			job := domain.Job{RequestedBy: uuid.New(), Def: domain.Definition{Source: cropSource}, ScopeUnits: []string{"89"}, Params: domain.Params{CooperativeRef: p.OrgRef.String()}}
-			if old.jobVisible(p, sc, job) != registered.jobVisible(p, sc, job) {
-				t.Fatalf("export visibility changed role=%s mixed=%v", role, mixed)
+			if svc.jobVisible(p, sc, job) != ((tc.cropcycle || mixed) && !wantCoop) {
+				t.Fatalf("export visibility role=%s mixed=%v", tc.role, mixed)
 			}
-
-			sch := domain.Schedule{OwnerRef: uuid.New(), ScopeUnits: []string{"89"}, Params: domain.Params{CooperativeRef: p.OrgRef.String()}}
-			if old.scheduleVisible(p, sc, sch) != registered.scheduleVisible(p, sc, sch) {
-				t.Fatalf("schedule visibility changed role=%s mixed=%v", role, mixed)
+			// A cooperative-only schedule can be shared inside the same cooperative,
+			// while organization-scoped readers must not infer territory from zero units.
+			sch := domain.Schedule{OwnerRef: uuid.New(), Params: domain.Params{CooperativeRef: p.OrgRef.String()}}
+			if svc.scheduleVisible(p, sc, sch) != wantCoop {
+				t.Fatalf("schedule visibility role=%s mixed=%v", tc.role, mixed)
 			}
 		}
-	}
-	if registered.Policies.AttachmentLimitParam() != legacyAttachmentLimitParam() {
-		t.Fatal("attachment parameter changed")
 	}
 }
 
