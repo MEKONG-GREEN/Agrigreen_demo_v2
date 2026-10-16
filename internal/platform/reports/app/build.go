@@ -169,32 +169,39 @@ func (s *Service) buildDataset(ctx context.Context, j domain.Job) (domain.Datase
 	meta := []domain.Meta{{Label: "Ngày xuất", Value: domain.FormatDateTimeVN(j.RequestedAt)}}
 	var b built
 	var err error
-	switch src.Module {
-	case "extension":
-		if s.Extension == nil {
-			return domain.Dataset{}, ErrDependency.WithDetail("chưa nối cổng dữ liệu pf/extension")
+	if builder, ok := s.Builders.lookup(j.Def.Source); ok {
+		b, err = s.buildRegisteredSource(ctx, j, sc, builder)
+	} else {
+		switch src.Module {
+		case "extension":
+			if s.Builders != nil {
+				return domain.Dataset{}, ErrDependency.WithDetail("chưa đăng ký bộ dựng nguồn báo cáo")
+			}
+			if s.Extension == nil {
+				return domain.Dataset{}, ErrDependency.WithDetail("chưa nối cổng dữ liệu pf/extension")
+			}
+			b, err = s.buildExtension(ctx, j, sc, n)
+		case "mechanization":
+			if s.Mechanization == nil {
+				return domain.Dataset{}, ErrDependency.WithDetail("chưa nối cổng dữ liệu pf/mechanization")
+			}
+			b, err = s.buildMechanization(ctx, j, sc, n)
+		case "cropcycle":
+			if s.CropCycle == nil {
+				return domain.Dataset{}, ErrDependency.WithDetail("chưa nối cổng dữ liệu pf/cropcycle")
+			}
+			b, err = s.buildHTX(ctx, j, sc, n)
+			if err != nil {
+				return domain.Dataset{}, err
+			}
+			ds := domain.BuildWithSources(j.Def, j.Params.Level, b.rows, b.total, s.sourceSpecs())
+			ds.Meta = append(meta, b.meta...)
+			ds.Provisional = b.provisional
+			ds.Notes = append(b.notes, ds.Notes...)
+			return ds, nil
+		default:
+			return domain.Dataset{}, ErrDependency.WithDetail("chưa nối bộ dựng nguồn báo cáo")
 		}
-		b, err = s.buildExtension(ctx, j, sc, n)
-	case "mechanization":
-		if s.Mechanization == nil {
-			return domain.Dataset{}, ErrDependency.WithDetail("chưa nối cổng dữ liệu pf/mechanization")
-		}
-		b, err = s.buildMechanization(ctx, j, sc, n)
-	case "cropcycle":
-		if s.CropCycle == nil {
-			return domain.Dataset{}, ErrDependency.WithDetail("chưa nối cổng dữ liệu pf/cropcycle")
-		}
-		b, err = s.buildHTX(ctx, j, sc, n)
-		if err != nil {
-			return domain.Dataset{}, err
-		}
-		ds := domain.BuildWithSources(j.Def, j.Params.Level, b.rows, b.total, s.sourceSpecs())
-		ds.Meta = append(meta, b.meta...)
-		ds.Provisional = b.provisional
-		ds.Notes = append(b.notes, ds.Notes...)
-		return ds, nil
-	default:
-		return domain.Dataset{}, ErrDependency.WithDetail("chưa nối bộ dựng nguồn báo cáo")
 	}
 	if err != nil {
 		return domain.Dataset{}, err

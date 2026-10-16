@@ -406,3 +406,14 @@ Related test points: TestReportCatalogRequiresRegistration, TestRegisteredCatalo
 Red65265.exit1/app1.630s bắt đúng missingcatalog suy5source/5builtin; emptycase PASS. Pure-first77518.exit0 app1.903s/domain0.606s/extension1.463s,0FAIL/SKIP. Golden giữ byte; legacy generator đã xóa, fixture đọc artifact E. Role tests vẫn loop instance catalog9source, không giảm xuốngnative4. Cột theo cấp được bảo vệ bằng registered golden, domain test generic giữ normalize/format/grouping. Chờ PG/static/helper.
 
 Kết quả thực: PG76145.exit0 trênproduction224c98f9 đủ13/13package,0FAIL/SKIP (assembly:108.861s, worker:2.156s, reports:129.151s, kn77:405.491s). Static12762.exit1 chỉ2unused helpers unitCols/cols; cácgate build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383 trước lint đãqua. SauPGdừng,304da4aa chỉxóa11dòng là2privatefunction khôngcaller; khôngđổi runtime/import/schema. Staticcleanup99059.exit0:domain/app pure PASSnoSKIP/lint0issues/modgen/diff. GiữPGconsumerproof vìcleanupunreachable nội bộ và đãkiểmmodule; helpervẫnrebuild/vet/arch/gates/migrationtrênheadcuối. Đây làexemptionhẹpdựatheodiff+unusedproof, khônggọifullPGđãchạytrên304. ProofJSONhostTEMP agrigreen-codex-knsplit2reportsf-proof.json. Data-builder/14gridseed còn gói sau.
+
+
+## KNSPLIT-2-REPORTS-G — Source builder registration (nềndefb45d8)
+
+Downstream consumers: reports/app buildDataset/query/row conversion, constructor reports; KN ReportBuilders; API và2worker factory; KN77 vàtests/reports dùng provider thật. Dependency evidence: rg -n 'buildDataset|buildExtension|ReportBuilders|SourceBuilderRegistration|reports.New' internal cmd tests -g '*.go'. Native CGH/HTX, cap render/DLP và catalog không thay hành vi.
+
+Regression acceptance command: PG riêng, go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./tests/reports ./tests/kn77, đủCODEX-G1/static/helper8migrationgates. Miễn frontend/mobile/acceptance ngoài scope vì wire contract/UI/SQL không đổi; build/vet toàn repo bắt buộc. User cho phépG1, không dữ liệu/SMTP thật, giữmain/worktree.
+
+Related test points: TestRegisteredSourceBuilderBindsJobAndCopies, TestRegisteredSourceBuilderErrorIsFinal, TestSourceBuilderRegistryRejectsInvalid, TestReportSourceBuildersFiguresAndMissingTargets; suite HTTP export/lịch/HTX và KN77 quyền/snapshot/PII.
+
+Pure-first2490.exit0 app1.746s/extension1.376s; pure-second51584.exit0 app1.105s/extension1.496s,0FAIL/SKIP. Figures xác nhận3.3ha/5báo cáo,30/300=10%/2HTX, missingtargetnull,5nguồn/groupbyvariety/completeness; corejob/scope/period/alias/errorfinal. ChờPG/static/helper, adapter nil-legacy còn trongG.

@@ -49,3 +49,8 @@ KNSPLIT-2-FORMS-A đã đăng ký các consumer KN trước; bước B bỏ nhá
 ## Catalog reports (KNSPLIT-2-REPORTS-E)
 
 `reports.Deps.Catalog` nhận các `port.CatalogRegistration` lúc lắp ráp. Native sources/templates thuộc capability; ứng dụng đăng ký metadata của mình qua DTO, reports/app tạo registry bất biến riêng cho mỗi Service. Không đăng ký qua HTTP, không mutate global Sources. Cùng catalog được dùng khi validate mẫu, kiểm source role, giải template, chuẩn hóa lịch/bộ lọc và dựng cột xuất. KN sở hữu `extension.ReportCatalog()`; fixture lắp ráp thật đặt ở tests/reports và KN77. F đã bỏ legacy adapter: nil hoặc empty slice chỉ có native4source/4template CGH/HTX; KN phải đăng ký catalog rõ ràng. Cột/tiêu đề/bố cục cũ được bảo vệ bằng golden legacy byte.
+
+
+## Source builder của reports (KNSPLIT-2-REPORTS-G)
+
+Deps.Builders nhận SourceBuilderRegistration tin cậy lúc bootstrap. Registry private app, port chỉ DTO/interface, callback nhận SourceBuildQuery được tạo từ job và trả SourceData decimal. Callback không đúc actor/tenant mới; scope/columns/result được clone. Error không fallback. KN đăng ký ReportBuilders với read ports/lookup/Clock, giữ metadata dùng chung/render/DLP tại capability. Nil còn adapter cũ trongG, explicit empty thiếubuilder trả503, H mới gỡ legacy. Không nhận registration từ HTTP.
