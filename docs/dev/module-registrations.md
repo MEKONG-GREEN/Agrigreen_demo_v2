@@ -25,12 +25,12 @@ Nguồn ở `contracts/openapi/modules/<owner>/{application,admin}.yaml`, tự q
 Nội dung YAML được ghép nguyên văn, không chuyển JSON hay đổi cách scanner nhận diện route. Bộ sinh OpenAPI hiện hành tiếp tục kiểm cấu trúc và tham chiếu. Fragment dùng chung đặt `common`, phần có một chủ sở hữu đi theo tag và đồ thị tham chiếu của operation. Marker kết thúc `# @ag-end` tùy chọn giữ dòng trống YAML gốc mà không tạo blank-EOF trong fragment; bộ ghép bỏ marker. Không sửa tệp migration trong gói WH-A.
 
 
-## Ngữ cảnh của biểu mẫu (KNSPLIT-2, bước A)
+## Ngữ cảnh của biểu mẫu (KNSPLIT-2)
 
 Cấu hình ứng dụng được truyền vào danh sách Profile khi dựng cap/forms. Profile.ResolveActor nhận Principal đã xác thực và cấu hình profile; ứng dụng trả ResolvedActor gồm vai, phòng ban, phạm vi đơn vị, Nút và bộ lọc cơ sở/hộ. KN cung cấp extension.FormProfiles(); gốc lắp ráp chỉ nối cấu hình, forms không import KN.
 
-Resolver trả handled=true khi có ngữ cảnh ứng dụng. Không đủ quyền phải trả lỗi; lỗi được trả thẳng và không rơi về quyền realm. handled=false chỉ dành cho trường hợp không có ngữ cảnh ứng dụng áp dụng, khi đó bước A vẫn dùng nhánh tương thích/realm. Chính sách phòng ban và giới hạn mục tiêu thuộc ứng dụng. Forms luôn kiểm phạm vi đơn vị cha trước bộ lọc mục tiêu.
+Resolver trả handled=true khi có ngữ cảnh ứng dụng. Không đủ quyền phải trả lỗi; lỗi được trả thẳng và không rơi về quyền realm. handled=false chỉ dành cho trường hợp không có ngữ cảnh ứng dụng áp dụng, khi đó chỉ xét vai realm đã cấu hình. Không suy ngữ cảnh ứng dụng ngầm từ Principal. Chính sách phòng ban và giới hạn mục tiêu thuộc ứng dụng. Forms luôn kiểm phạm vi đơn vị cha trước bộ lọc mục tiêu.
 
 ActorRef và TenantID lấy từ Principal; ResolvedActor không có trường để thay hai giá trị đó. Callback chỉ cấu hình phía server, không nhận qua HTTP và không xuất trong JSON của Profile. Cấu hình mới cần kiểm lỗi từ chối không fallback, phạm vi/giới hạn mục tiêu và cách ly tenant qua DB thật. Mẫu chứng minh: TestRegisteredActorDatabaseTenantIsolation và TestApplicationFormRegistrationPreservesPolicy.
 
-Đây là bước đăng ký trước khi gỡ legacy; forms còn nhánh KNContext tương thích cho consumer chưa chuyển. KNSPLIT-2-FORMS-B sẽ bỏ nhánh đó sau khi các consumer và fixture dùng resolver. Không coi bước A là đã hoàn tất tách KN.
+KNSPLIT-2-FORMS-A đã đăng ký các consumer KN trước; bước B bỏ nhánh KNContext khỏi lõi forms và chuyển fixture sang resolver. Profile chưa đăng ký không được suy quyền phiên ứng dụng. Đây chỉ là phần biểu mẫu; các registry và ranh giới dữ liệu khác vẫn cần hoàn tất để nghiệm thu tách KN.

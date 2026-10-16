@@ -3,7 +3,7 @@
 // sự kiện pf.forms.period.closed và mã lỗi.
 //
 // Bên dùng cấu hình module (kiến trúc v4.1 §7.2: `cap/forms: {hierarchy, publish_by, close_by}`) bằng Profile; gốc
-// lắp ráp truyền danh sách Profile khi dựng module (KN: KNProfile của cmd/api-platform/assembly).
+// lắp ráp truyền danh sách Profile khi dựng module (KN: KNProfile do ứng dụng đăng ký).
 package port
 
 import (
@@ -42,7 +42,7 @@ type Profile struct {
 	Name string
 	// Hierarchy: các cấp từ trên xuống, vd [TW, TINH, XA]. Cấp cuối (lá) là cấp nộp bài.
 	Hierarchy []string
-	// Roles: vai → cấp. Vai là vai ngữ cảnh phiên KN (authz.KNContext.Role) hoặc vai realm.
+	// Roles: vai → cấp. Vai do resolver ứng dụng cung cấp hoặc vai realm.
 	Roles map[string]string
 	// PublishBy: cấp được phát hành kỳ (KN: TINH). CloseBy: cấp được chốt/mở lại kỳ (KN: TINH).
 	PublishBy string
@@ -59,7 +59,7 @@ type Profile struct {
 	// UnitKinds: loại đơn vị lá được phát hành kỳ (W11.05, D4 X4) — UnitCommune, UnitFacility, UnitHousehold,
 	// UnitDepartment; phần tử đầu là mặc định. Rỗng = [UnitCommune] (hành vi trước W11.05). UnitPerson chưa hỗ trợ.
 	UnitKinds []string
-	// Departments: phòng ban KN được dùng profile (rỗng = mọi phòng ban). Admin KN luôn qua (định nghĩa biểu).
+	// Departments: phòng ban của ứng dụng; resolver kiểm chính sách truy cập và quyền quản trị.
 	Departments []string
 	// MaxSubmissions: số lần gửi tối đa mặc định của một đơn vị trong kỳ (0 = không giới hạn); kỳ đặt riêng được khi
 	// phát hành. Lần gửi thứ MaxSubmissions khóa đơn vị (KHTC FN-TI-02.03, Q-081).

@@ -277,3 +277,14 @@ Bằng chứng cuối KNSPLIT-2-FORMS-A:
 - `static-final` exit0: build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary390/lint0issues trên công cụ nhận diện driver cuối. Tool-final14,256s PASS, ca âm cho driver viết tay và công cụ sinh khác vẫn R02.
 - Sau full PG, chỉ tăng độ mạnh TestRegisteredActorScopeAndIdentity: callback cho phép mục tiêu ngoài địa bàn, capability vẫn bắt buộc từ chối bằng Scope. `pure-final` exit0:3ca đăng ký/scope/error/realm PASS1,583s; không sửa production, không cần chạy lặp hồi quy dữ liệu.
 - Không đổi OpenAPI/mã web/mobile/migrations. Profile.ResolveActor json:- đã được kiểm serialize; không lộ callback. Chuẩn bị helper chỉ FFdev sau migration gates thật. Bước B vẫn phải gỡ legacy, không tuyên bố tách KN hoàn tất ở bước A.
+
+
+KNSPLIT-2-FORMS-A đã tích hợp dev75745d27: helper57920 exit0, migration8ca PASS251,305s/không SKIP; root profile và công cụ kiến trúc đạt, giữ main/worktree.
+
+## KNSPLIT-2-FORMS-B — Gỡ nhánh KN trong cap/forms (nền75745d27)
+
+Dependency evidence: tìm authz.KN/RequireKN/.KN trong forms trước/sau; các constructor cấu hình ở assembly và KN77 đều nhận extension.FormProfiles từ A. Adapter và assembly/forms.go không đổi trong B, nên đường production KN đã được A kiểm8/8 giữ nguyên. B đổi nhánh profile không đăng ký và các fixture của capability. Kiểm trực tiếp forms/... +extension root +assembly +KN77 trên PostgreSQL riêng, cổng CODEX-G1. Không chạy lặp acceptance/e2e trên cùng wiring/callback đã đạt ở A khi không có thay đổi ảnh hưởng; mở rộng nếu xuất hiện lỗi mới.
+
+Ca âm trước sửa: negative-before lần đầu không hợp lệ vì fixture cấp viết thường, không tính là bằng chứng lỗi quyền. Đã sửa cấp UPPER/LEAF; negative-before-second exit1 đúng vì KNContext được suy và đi đến errNoPool. Sau gỡ legacy, pure-first exit0: TestFormsRequiresRegisteredSessionProjection nhận Forbidden trước DB; scope/error/realm và KN profile chính sách vẫn PASS. Không đổi test để bỏ điều kiện.
+
+Không còn authz.KN*/RequireKN hoặc đọc .KN trong toàn bộ forms (cả fixture Go); không import KN vào forms. Bộ lọc Scope trước target và tenant/actor của Principal giữ nguyên. Baseline390 không đổi vì scanner không có entry Go forms trước B; không thay rules/aliases/baseline để tạo giảm giả. Cần xét ngữ nghĩa và ca âm runtime bên cạnh số lượng. Đang kiểm PostgreSQL thật, chưa tích hợp B.

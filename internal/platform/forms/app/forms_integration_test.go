@@ -64,11 +64,11 @@ func (sqlApprovals) Decide(ctx context.Context, in wfport.DecideInput) (wfport.D
 }
 
 // fxProfile: TW → TINH → XA, Tỉnh phát hành/rà soát/chốt; cho biểu mẫu thử; chặn chốt khi còn bài chờ rà soát.
-var fxProfile = port.Profile{Name: "fx", Hierarchy: []string{"TW", "TINH", "XA"}, Roles: map[string]string{"tw": "TW", "tinh": "TINH", "xa": "XA"},
+var fxProfile = port.Profile{Name: "fx", ResolveActor: fixtureActorResolver, Hierarchy: []string{"TW", "TINH", "XA"}, Roles: map[string]string{"tw": "TW", "tinh": "TINH", "xa": "XA"},
 	PublishBy: "TINH", CloseBy: "TINH", DefineBy: []string{"admin"}, AllowFixtures: true, RequireReviewedBeforeClose: true}
 
 // prodProfile: như production — không phát hành trên biểu mẫu thử (chờ Q-01).
-var prodProfile = port.Profile{Name: "prod", Hierarchy: []string{"TW", "TINH", "XA"}, Roles: map[string]string{"tinh": "TINH", "xa": "XA"},
+var prodProfile = port.Profile{Name: "prod", ResolveActor: fixtureActorResolver, Hierarchy: []string{"TW", "TINH", "XA"}, Roles: map[string]string{"tinh": "TINH", "xa": "XA"},
 	PublishBy: "TINH", CloseBy: "TINH", DefineBy: []string{"admin"}}
 
 type fx struct {
@@ -92,7 +92,7 @@ func newFx(t *testing.T) *fx {
 	return &fx{t: t, ctx: context.Background(), svc: svc, clk: clk, env: env, own: own, tid: ids.New()}
 }
 
-// as trả ctx của người gọi có ngữ cảnh KN vai role, phạm vi units, Nút node (Nil → mới).
+// as supplies the fixture application session, including role, scope and node.
 func (f *fx) as(tid, actor uuid.UUID, role string, node uuid.UUID, units ...string) context.Context {
 	if actor == uuid.Nil {
 		actor = ids.New()
@@ -101,7 +101,7 @@ func (f *fx) as(tid, actor uuid.UUID, role string, node uuid.UUID, units ...stri
 	if role == "admin" || role == "tw" {
 		sc = authz.Scope{All: true}
 	}
-	return authz.WithPrincipal(f.ctx, authz.Principal{ActorRef: actor, TenantID: tid, KN: &authz.KNContext{Role: role, Scope: sc, OrgRef: node}})
+	return fixtureContext(f.ctx, authz.Principal{ActorRef: actor, TenantID: tid}, port.ResolvedActor{Role: role, Scope: sc, Node: node})
 }
 
 func isProblem(err error, code string) bool {

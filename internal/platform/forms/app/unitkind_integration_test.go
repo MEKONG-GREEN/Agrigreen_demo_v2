@@ -22,10 +22,10 @@ import (
 // W11.05: đơn vị lá tổng quát. cnts: xã/cơ sở/hộ, chỉ phòng chan_nuoi; khtc: đơn vị = phòng ban, kn_tinh của
 // ke_hoach là cấp phát hành, kn_tinh phòng khác là cấp lá, tối đa 3 lần gửi.
 var (
-	cntsProfile = port.Profile{Name: "cnts", Hierarchy: []string{"TW", "TINH", "XA"}, Roles: map[string]string{"tinh": "TINH", "xa": "XA"},
+	cntsProfile = port.Profile{Name: "cnts", ResolveActor: fixtureActorResolver, Hierarchy: []string{"TW", "TINH", "XA"}, Roles: map[string]string{"tinh": "TINH", "xa": "XA"},
 		PublishBy: "TINH", CloseBy: "TINH", DefineBy: []string{"admin"}, AllowFixtures: true,
 		UnitKinds: []string{port.UnitCommune, port.UnitFacility, port.UnitHousehold}, Departments: []string{"chan_nuoi"}}
-	khtcProfile = port.Profile{Name: "khtc", Hierarchy: []string{"TINH", "PHONG"}, Roles: map[string]string{"tinh@ke_hoach": "TINH", "tinh": "PHONG"},
+	khtcProfile = port.Profile{Name: "khtc", ResolveActor: fixtureActorResolver, Hierarchy: []string{"TINH", "PHONG"}, Roles: map[string]string{"tinh@ke_hoach": "TINH", "tinh": "PHONG"},
 		PublishBy: "TINH", CloseBy: "TINH", DefineBy: []string{"admin"}, AllowFixtures: true, UnitKinds: []string{port.UnitDepartment}, MaxSubmissions: 3}
 )
 
@@ -45,8 +45,7 @@ func (f *fx) asDept(actor uuid.UUID, role, dept string, node uuid.UUID, units ..
 	if actor == uuid.Nil {
 		actor = ids.New()
 	}
-	return authz.WithPrincipal(f.ctx, authz.Principal{ActorRef: actor, TenantID: f.tid,
-		KN: &authz.KNContext{Role: role, Department: dept, Scope: authz.Scope{Units: units}, OrgRef: node}})
+	return fixtureContext(f.ctx, authz.Principal{ActorRef: actor, TenantID: f.tid}, port.ResolvedActor{Role: role, Department: dept, Scope: authz.Scope{Units: units}, Node: node})
 }
 
 func unitOf(t *testing.T, v PeriodView, u string) UnitView {

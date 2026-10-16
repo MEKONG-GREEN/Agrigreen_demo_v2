@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-FORMS-B: gỡ ngữ cảnh KN trực tiếp khỏi lõi biểu mẫu và fixture, chỉ dùng resolver ứng dụng/vai realm; kiểm từ chối suy quyền ngoài đăng ký. Đang hồi quy. [Giả định](../../kn/gia-dinh/KNSPLIT-2-FORMS-B.md).

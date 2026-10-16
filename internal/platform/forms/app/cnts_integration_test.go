@@ -58,8 +58,7 @@ func TestFormsCNTSPeriods_W1142(t *testing.T) {
 	admin := f.as(f.tid, uuid.Nil, "admin", uuid.Nil)
 	tinh := f.asDept(uuid.Nil, "tinh", "chan_nuoi", node, "X1", "X2")
 	xaRef := ids.New()
-	xa1 := authz.WithPrincipal(f.ctx, authz.Principal{ActorRef: xaRef, TenantID: f.tid,
-		KN: &authz.KNContext{Role: "xa", Department: "chan_nuoi", Scope: authz.Scope{Units: []string{"X1"}}, OrgRef: ids.New()}})
+	xa1 := fixtureContext(f.ctx, authz.Principal{ActorRef: xaRef, TenantID: f.tid}, port.ResolvedActor{Role: "xa", Department: "chan_nuoi", Scope: authz.Scope{Units: []string{"X1"}}, Node: ids.New()})
 	xa1b := f.asDept(uuid.Nil, "xa", "chan_nuoi", ids.New(), "X1")
 	tpls, err := svc.InstallFixtures(admin, "cnts", "")
 	f.must(err, "fixture")

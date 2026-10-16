@@ -102,3 +102,22 @@ func TestRegisteredActorDatabaseTenantIsolation(t *testing.T) {
 		t.Fatalf("tenant isolation: own=%d other=%d", len(own), len(foreign))
 	}
 }
+
+func TestRegisteredActorCannotInheritRealmPrivileges(t *testing.T) {
+	for _, role := range []string{"", "unregistered_role"} {
+		t.Run(role, func(t *testing.T) {
+			profile := fxProfile
+			profile.ResolveActor = func(context.Context, authz.Principal, port.Profile) (port.ResolvedActor, bool, error) {
+				return port.ResolvedActor{Role: role}, true, nil
+			}
+			svc, err := NewService(nil, nil, nil, []port.Profile{profile})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx := authz.WithPrincipal(context.Background(), authz.Principal{ActorRef: ids.New(), TenantID: ids.New(), Roles: []string{"admin"}})
+			if _, _, err := svc.resolve(ctx, profile.Name); !isProblem(err, problem.Forbidden.Code) {
+				t.Fatalf("application role inherited realm privileges: %v", err)
+			}
+		})
+	}
+}

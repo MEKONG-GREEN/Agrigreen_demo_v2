@@ -80,17 +80,16 @@ func (s *Service) Profiles() []port.Profile {
 type actor struct {
 	ref, tenant  uuid.UUID
 	role, level  string
-	dept         string // phòng ban của ngữ cảnh KN (rỗng: vai realm, Admin)
+	dept         string // phòng ban do ứng dụng cung cấp (rỗng: vai realm)
 	leaf         bool   // cấp của người gọi là cấp lá (cấp nộp bài)
 	scope        authz.Scope
 	node         uuid.UUID
 	define       bool
 	targetFilter func(string, uuid.UUID) bool
-	kn           *authz.KNContext // ngữ cảnh phiên KN (nil: vai realm) — W11.07 giới hạn cơ sở/hộ của Cấp Xã
 }
 
-// resolve tìm profile và cấp của người gọi: ngữ cảnh phiên KN (vai, phạm vi, Nút) nếu có, không thì vai realm
-// (chỉ cấp cao nhất có phạm vi toàn quốc; cấp khác không có phạm vi đơn vị → chỉ thao tác không cần phạm vi).
+// resolve uses the registered application session, otherwise the configured realm roles.
+// Application policy and target restrictions are supplied by the profile resolver.
 func (s *Service) resolve(ctx context.Context, name string) (port.Profile, actor, error) {
 	p, ok := authz.FromContext(ctx)
 	if !ok {
@@ -116,26 +115,16 @@ func (s *Service) resolve(ctx context.Context, name string) (port.Profile, actor
 		}
 	}
 	if !handled {
-		// Compatibility path removed after all callers register their application adapter.
-		if p.KN != nil {
-			a.role, a.scope, a.node, a.dept, a.kn = p.KN.Role, p.KN.Scope, p.KN.OrgRef, p.KN.Department, p.KN
-			a.level = prof.LevelOf(a.role, a.dept)
-			a.define = slices.Contains(prof.DefineBy, a.role)
-			if len(prof.Departments) > 0 && a.role != authz.KNAdmin && !slices.Contains(prof.Departments, a.dept) {
-				return prof, a, problem.Forbidden.WithDetail("cấu hình biểu " + name + " không dành cho phòng ban của phiên")
+		for _, r := range p.Roles {
+			if l, ok := prof.Roles[r]; ok && a.level == "" {
+				a.role, a.level = r, l
 			}
-		} else {
-			for _, r := range p.Roles {
-				if l, ok := prof.Roles[r]; ok && a.level == "" {
-					a.role, a.level = r, l
-				}
-				if slices.Contains(prof.DefineBy, r) {
-					a.define = true
-				}
+			if slices.Contains(prof.DefineBy, r) {
+				a.define = true
 			}
-			if a.level != "" && a.level == prof.Hierarchy[0] {
-				a.scope = authz.Scope{All: true}
-			}
+		}
+		if a.level != "" && a.level == prof.Hierarchy[0] {
+			a.scope = authz.Scope{All: true}
 		}
 	}
 	if a.level == "" && !a.define {
@@ -158,17 +147,6 @@ func (a actor) allowsUnit(spec domain.Spec, units []string, u string) bool {
 	if a.targetFilter != nil && (spec.UnitKind == port.UnitFacility || spec.UnitKind == port.UnitHousehold) {
 		ref, _ := uuid.Parse(u)
 		return a.targetFilter(spec.UnitKind, ref)
-	}
-	// W11.07/W11.42: Cấp Xã có giới hạn cơ sở/hộ chỉ thấy cơ sở/hộ trong danh sách của lần gán (mã đơn vị = UUID).
-	if a.kn != nil && (spec.UnitKind == port.UnitFacility || spec.UnitKind == port.UnitHousehold) {
-		ref, err := uuid.Parse(u)
-		if err != nil {
-			ref = uuid.Nil // mã không phải UUID: chỉ qua khi lần gán không giới hạn cơ sở/hộ
-		}
-		if spec.UnitKind == port.UnitFacility {
-			return a.kn.AllowsFacility(ref)
-		}
-		return a.kn.AllowsHousehold(ref)
 	}
 	return true
 }
