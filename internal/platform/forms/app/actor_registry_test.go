@@ -20,7 +20,7 @@ func TestRegisteredActorScopeAndIdentity(t *testing.T) {
 	profile := fxProfile
 	profile.ResolveActor = func(_ context.Context, _ authz.Principal, _ port.Profile) (port.ResolvedActor, bool, error) {
 		return port.ResolvedActor{Role: "xa", Department: "operations", Scope: authz.Scope{Units: []string{"A"}}, Node: allowed,
-			AllowsTarget: func(_ string, ref uuid.UUID) bool { return ref == allowed }}, true, nil
+			AllowsTarget: func(_ string, ref uuid.UUID) bool { return ref == allowed || ref == outside }}, true, nil
 	}
 	svc, err := NewService(nil, nil, nil, []port.Profile{profile})
 	if err != nil {

@@ -4,4 +4,4 @@ Bước A của chuyển hai bước: forms/port.Profile nhận ActorResolver do
 
 Giữ fallback cũ để các consumer chuyển dần, chưa coi là đã gỡ KN khỏi forms/shared-authz. Bước B sẽ chuyển fixture/consumer còn lại sang resolver, gỡ nhánh KNContext và prune baseline có bằng chứng. Không thêm import KN trong forms, không đổi migration/API/tenant hay quyết định PO. Hạn chế quyền từ chối phải trả lỗi thẳng, không rơi về quyền realm. Adapter không tham gia D2/MRV.
 
-Đang kiểm chứng PostgreSQL và consumers trước tích hợp; bằng chứng tại docs/REGRESSION.md.
+Đã đạt8/8 gói hồi quy PostgreSQL/consumer, cổng tĩnh và ca âm phạm vi. Tích hợp bằng helper sau migration gates thật; bằng chứng tại docs/REGRESSION.md.
