@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-REPORTS-N — KNowns13DTO/5ID;6genericcontractscapport,oldfile/inventoryentrygỡ. Chờ15PG/static/helper,giữfields/IDs/bytes.
+- [x] KNSPLIT-2-REPORTS-N — KNowns13DTO/5ID,6genericcontractscapport;15/15PGnoSKIP/static đạt,boundary383→382; helper8migrationgate trướcdev. G1cònregistry/data/tenant/client/reminder.
