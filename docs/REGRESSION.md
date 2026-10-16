@@ -419,3 +419,12 @@ Related test points: TestRegisteredSourceBuilderBindsJobAndCopies, TestRegistere
 Pure-first2490.exit0 app1.746s/extension1.376s; pure-second51584.exit0 app1.105s/extension1.496s,0FAIL/SKIP. Figures xác nhận3.3ha/5báo cáo,30/300=10%/2HTX, missingtargetnull,5nguồn/groupbyvariety/completeness; corejob/scope/period/alias/errorfinal. ChờPG/static/helper, adapter nil-legacy còn trongG.
 
 Kết quả thực: PG29811.exit0 đủ13/13package,0FAIL/SKIP (assembly:128.531s, worker:2.342s, reports:87.318s, kn77:201.760s); productionc9f07902 không đổi. Static25052.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. Gofmt toànrepo chỉ2fixtureoldallowed. Suite HTTP dùngbuilderKNthật vàgiữmọiassertion; pure5nguồn/missingtarget/alias/errorfinal đạt. ProofJSONhostTEMP agrigreen-codex-knsplit2reportsg-proof.json. Helper còn8migrationgate trướcdev; H mới gỡ adapter legacy,14seed còn gói sau.
+
+
+## KNSPLIT-2-REPORTS-H — Builder bắt buộc (nền51d9ebf5)
+
+Downstream consumers: reports/app buildDataset vànativeCGH/HTX helper; KNprovider5source; API/2worker/KN77/tests-reports. Dependency evidence: rg -n 'Extension|buildExtension|buildProgram|SourceBuilder|ReportBuilders|seasonLabel|limit' internal/platform/reports internal/kn/extension cmd tests -g '*.go'. GiữConsolidations/DispatchHistory vàhelper native, không đổi wire/SQL/UI.
+
+Regression acceptance command: PG riêng, go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./tests/reports ./tests/kn77; staticCODEX-G1 vàhelper8migrationgates. Miễnweb/mobile/acceptance ngoài scope vìkhôngđổicontract/UI/SQL; build/vettoànrepo. Usercho phépG1, khôngSMTP/data thật, giữmain/worktree.
+
+Related test points: TestSourceBuilderRequiresRegistration, TestRegisteredSourceBuilderBindsJobAndCopies/ErrorIsFinal, TestReportSourceBuildersFiguresAndMissingTargets, suiteHTTP vàKN77. Redconfirm.exit1 bắt missingregistry gọilegacy,emptyPASS. Pure74843.exit0 app2.052s/extension1.181s,0FAIL/SKIP. ChờPG/static/helper.

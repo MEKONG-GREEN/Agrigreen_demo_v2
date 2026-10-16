@@ -275,7 +275,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	rep := reports.New(unit, clk, reports.Deps{Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: kn.ReportData(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Catalogs: md.Catalogs(), Clock: clk}), Catalog: []reportsport.CatalogRegistration{extension.ReportCatalog()}, Policies: []reportsport.Policy{extension.ReportPolicy()},
 		ResolveSession: extension.ReportSessionResolver(pty.Orgs()),
 		Scope:          pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
-		Extension: kn.ReportData(), Mechanization: mech.ReportData(), CropCycle: coop.ReportData(), Directory: acc.MailDirectory(),
+		Mechanization: mech.ReportData(), CropCycle: coop.ReportData(), Directory: acc.MailDirectory(),
 		Recipients:     acc.ReportRecipients(),                 // HTX US-DASH-03: người nhận = tài khoản của HTX
 		Consolidations: kn.Consolidations(), Getenv: os.Getenv, // KN v7.7 P4: báo cáo Chi cục; cờ Google Sheet (tắt mặc định)
 		LinkDownloadBase: os.Getenv("AG_REPORT_LINK_BASE"), // A4: liên kết tải Chi cục (route công khai /v1/public/report-links)

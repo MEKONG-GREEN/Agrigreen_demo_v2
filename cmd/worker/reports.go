@@ -92,7 +92,7 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 	return reports.New(nil, clk, reports.Deps{Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: kn.ReportData(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Catalogs: md.Catalogs(), Clock: clk}), Catalog: []repport.CatalogRegistration{extension.ReportCatalog()}, Policies: []repport.Policy{extension.ReportPolicy()},
 		ResolveSession: extension.ReportSessionResolver(pty.Orgs()),
 		Scope:          pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
-		Extension: kn.ReportData(), Mechanization: mech.ReportData(), CropCycle: coop.ReportData(), Directory: dir, Mailer: mailer, LinkBase: os.Getenv("AG_WEB_OPS_URL"), Log: log,
+		Mechanization: mech.ReportData(), CropCycle: coop.ReportData(), Directory: dir, Mailer: mailer, LinkBase: os.Getenv("AG_WEB_OPS_URL"), Log: log,
 		LinkDownloadBase: os.Getenv("AG_REPORT_LINK_BASE"), // A4: liên kết tải Chi cục do api-platform phục vụ
 	}), nil
 }

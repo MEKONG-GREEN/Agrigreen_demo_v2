@@ -60,7 +60,6 @@ type Deps struct {
 	Params         params.Params // reports.daily_export_quota, reports.export_anomaly_threshold
 	Catalogs       mdport.Catalogs
 	Store          objstore.Store // reports/<tenant>/<job>.<định dạng>
-	Extension      extensionsrc.ReportData
 	Mechanization  mechanizationsrc.ReportData
 	CropCycle      cropcyclesrc.ReportData    // pf/cropcycle: báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03)
 	Directory      accountsport.MailDirectory // pf/accounts hiện thực; nil → bỏ gửi email
@@ -87,7 +86,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	svc := &app.Service{
 		ResolveSession: d.ResolveSession,
 		DB:             db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
-		Store: d.Store, Extension: d.Extension, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,
+		Store: d.Store, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,
 		LinkBase: d.LinkBase, LinkDownloadBase: d.LinkDownloadBase, Consolidations: d.Consolidations,
 	}
 	if d.Builders != nil {

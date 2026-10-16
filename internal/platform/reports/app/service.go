@@ -76,14 +76,12 @@ type Service struct {
 	Clock          clock.Clock
 	Log            *slog.Logger
 
-	Scope    partyport.ScopeResolver
-	Orgs     partyport.Orgs
-	Units    partyport.AdminUnits
-	Params   params.Params
-	Catalogs mdport.Catalogs
-	Store    objstore.Store
-
-	Extension     extensionsrc.ReportData
+	Scope         partyport.ScopeResolver
+	Orgs          partyport.Orgs
+	Units         partyport.AdminUnits
+	Params        params.Params
+	Catalogs      mdport.Catalogs
+	Store         objstore.Store
 	Mechanization mechanizationsrc.ReportData
 	CropCycle     cropcyclesrc.ReportData // HTX US-DASH-02: sản lượng HTX
 
