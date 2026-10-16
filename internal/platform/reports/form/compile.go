@@ -1,7 +1,5 @@
-// Package form là engine mẫu báo cáo dạng lưới Excel của KN v7.7 (FN-AD-04.06,
-// FN-XA-03.02): kiểm cấu trúc định nghĩa, tính lưới bài nộp (ô nhập, công thức,
-// ràng buộc của mẫu), dựng dòng tổng Khu vực/Toàn tỉnh, thao tác của trình thiết
-// kế (thêm/xóa cột, dòng tiêu đề, gộp ô…) và bộ 14 mẫu Phòng Trồng trọt.
+// Package form kiểm cấu trúc và tính lưới theo định nghĩa do ứng dụng cung cấp:
+// ô nhập/công thức/ràng buộc, dòng tổng và thao tác thiết kế trên bản sao.
 //
 // Thuần (không DB, không đồng hồ). Mọi số là decimal (R-10, archlint agnofloat).
 package form

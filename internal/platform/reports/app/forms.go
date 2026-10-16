@@ -1,9 +1,8 @@
 package app
 
-// Mẫu báo cáo dạng lưới KN v7.7 (FN-AD-04.06; kn-v7.7-plan P3): tạo mẫu, nháp, thao tác
-// lưới, đề nghị → phát hành (người phát hành ≠ người đề nghị và ≠ người sửa cuối, R-56),
-// phiên bản đã phát hành bất biến, gán loại báo cáo, nạp Excel, nhật ký, seed 14 mẫu
-// Phòng Trồng trọt, cổng FormEngine cho P4.
+// Capability mẫu lưới: nháp, thao tác, đề nghị và phát hành bốn mắt (R-56),
+// phiên bản bất biến, gán loại, nhập Excel và nhật ký. Bộ seed thuộc đăng ký
+// của ứng dụng; FormEngine cung cấp thao tác chung cho bên dùng.
 
 import (
 	"bytes"

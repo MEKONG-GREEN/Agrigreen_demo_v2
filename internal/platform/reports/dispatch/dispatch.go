@@ -72,27 +72,6 @@ func Subject(department, periodLabel, season string, provisional bool) string {
 	return s
 }
 
-// Body là nội dung tự điền (sửa được). Không PII: chỉ kỳ, biểu, tình trạng.
-func Body(periodLabel, rangeLabel string, forms []string, provisional bool, missing []string, links []string) string {
-	var b strings.Builder
-	b.WriteString("Kính gửi Chi cục,\n\n")
-	fmt.Fprintf(&b, "Trung tâm Khuyến nông gửi báo cáo tổng hợp %s (%s): %s.\n", periodLabel, rangeLabel, strings.Join(forms, ", "))
-	if provisional {
-		b.WriteString("Số liệu TẠM TÍNH (kỳ chưa chốt hoặc còn xã chưa nộp).\n")
-		if len(missing) > 0 {
-			b.WriteString("Xã chưa nộp: " + strings.Join(missing, ", ") + ".\n")
-		}
-	}
-	if len(links) > 0 {
-		b.WriteString("\nTệp vượt giới hạn đính kèm — tải tại (liên kết có hạn):\n")
-		for _, l := range links {
-			b.WriteString("- " + l + "\n")
-		}
-	}
-	b.WriteString("\nThư gửi tự động từ hệ thống AgriGreen.")
-	return b.String()
-}
-
 // BodyFor renders a message with trusted application labels.
 func BodyFor(profile port.DispatchProfile, periodLabel, rangeLabel string, forms []string, provisional bool, missing []string, links []string) string {
 	var b strings.Builder

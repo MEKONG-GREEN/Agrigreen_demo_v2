@@ -469,3 +469,13 @@ Pure-first27369.exit0:app1.805s/dispatch0.638s/extension2.088s/reportforms1.818s
 
 
 Kết quả thực: PG21606.exit0 đủ13/13packagecótest,0FAIL/SKIP trênproduction065c1058: assembly:102.166s, worker:2.250s, formimport:2.020s, reportforms:2.157s, reports:104.462s, kn77:248.402s. Static18495.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues.4egresssite/defaultsubject/body qua profile owner; golden4messagecases/provisional/links/keys vàregistryboundaries đạt. ProofTEMP agrigreen-codex-knsplit2reportsk-proof.json. Helpercòn8migrationgate trướcdev; L mới gỡlegacyprofile/Body/capture, sourceDTO vàregistrykhác còn.
+
+## KNSPLIT-2-REPORTS-L — Dispatch profile bắt buộc (nềnbb8dffb2)
+
+Downstream consumers: reports app dispatch/profile/worker/file/link/DLP vàgenericBodyFor, KNReportPolicy,API/haiworker/tests-reports/KN77. Dependency evidence: rg -n 'dispatchProfile|DispatchProfile|legacyDispatchProfile|BodyFor|dispatch.Body|dispatchFileKey' internal cmd tests -g '*.go'. Khôngđổiwire/SQL/UI/identity/scope/token/recipientdedup.
+
+Regression acceptance command: PGriêng, go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./cmd/formimport ./tests/reportforms ./tests/reports ./tests/kn77; đủstaticCODEX-G1/helper8migrationgate. Frontend/mobile miễn vì API/UI/fixturesbytekhôngđổi; build/vettoànrepo. User cho phépG1,khôngSMTP/data thật,giữmain/worktree.
+
+Related test points: TestDispatchProfileRequiresRegistration; TestRegisteredDispatchMessagesMatchLegacyContract; TestRegisteredDispatchProfileCopiesAndIsolation; TestDispatchProfileRegistrationRejectsInvalid; TestReportDispatchProfileMatchesLegacyContract; nativeMessageHelpers/GSheetValve vàHTTP/KN77/DLP/PII/dedup. Red1325.exit1 nilsuykn.,emptyPASS;giữfrozenartifactK,khôngcòngenerator.
+
+Pure-first4346.exit0 app1.048s/dispatch0.578s/extension1.347s/reportforms2.008s/CLI1.982s,0FAIL/SKIP; nil/empty failclosed, owner/frozenmessage/provisional/link/keys/registryboundary giữ. Hai mô tả Go cũ đồng bộ việc seed thuộc ứng dụng saupure, không đổi executable. Chờ13PG/static/helper trênheadcuối.

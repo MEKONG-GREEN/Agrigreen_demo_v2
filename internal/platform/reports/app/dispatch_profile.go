@@ -5,14 +5,7 @@ import (
 	"strings"
 )
 
-// Removed with the legacy adapter in the second migration step.
-func legacyDispatchProfile() port.DispatchProfile {
-	return port.DispatchProfile{SubjectDepartment: "Phòng Trồng trọt", Salutation: "Kính gửi Chi cục,", SenderName: "Trung tâm Khuyến nông", TemplatePrefix: "kn.", SheetTemplateKey: "kn.gsheet"}
-}
 func (s *Service) dispatchProfile() (port.DispatchProfile, error) {
-	if s.Policies == nil {
-		return legacyDispatchProfile(), nil
-	}
 	if profile, ok := s.Policies.DispatchProfile(); ok {
 		return profile, nil
 	}

@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-REPORTS-L — Thiếu dispatchprofile failclosed, bỏKNlabels/namespaceimplicit vàcapture; giữgolden/owner. Chờ13PG/static/helper.

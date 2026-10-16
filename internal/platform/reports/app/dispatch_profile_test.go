@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -39,38 +38,6 @@ func loadDispatchProfileContract(t *testing.T) dispatchProfileContract {
 		t.Fatal(err)
 	}
 	return c
-}
-func TestLegacyDispatchProfileContract(t *testing.T) {
-	c := dispatchProfileContract{Profile: legacyDispatchProfile(), Cases: []dispatchProfileCase{
-		{Name: "closed", PeriodLabel: "Tuần 36", Forms: []string{"T01", "T04"}, FormCode: "T01"},
-		{Name: "provisional", PeriodLabel: "Tuần 36", RangeLabel: "31/08–06/09/2026", Forms: []string{"T04"}, Provisional: true, Missing: []string{"Xã A", "Xã B"}, FormCode: "T04"},
-		{Name: "links", PeriodLabel: "Tuần 36", Forms: []string{"T01"}, Links: []string{"T01.xlsx: https://example.invalid/one", "T04.pdf: https://example.invalid/two"}, FormCode: "PL_01"},
-		{Name: "empty", FormCode: "t07"},
-	}}
-	for i := range c.Cases {
-		p := &c.Cases[i]
-		p.Subject = dispatch.Subject("Phòng Trồng trọt", p.PeriodLabel, strings.Join(p.Forms, ", "), p.Provisional)
-		p.Body = dispatch.Body(p.PeriodLabel, p.RangeLabel, p.Forms, p.Provisional, p.Missing, p.Links)
-		p.FileKey = "kn." + strings.ToLower(p.FormCode)
-		p.SheetKey = "kn.gsheet"
-	}
-	got, err := json.MarshalIndent(c, "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-	got = append(got, '\n')
-	if os.Getenv("AG_CAPTURE_LEGACY_DISPATCH_PROFILE") == "1" {
-		if err := os.WriteFile(dispatchProfileContractPath(), got, 0600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	want, err := os.ReadFile(dispatchProfileContractPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatal("legacy dispatch contract changed")
-	}
 }
 func TestRegisteredDispatchMessagesMatchLegacyContract(t *testing.T) {
 	c := loadDispatchProfileContract(t)
