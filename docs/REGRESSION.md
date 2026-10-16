@@ -431,3 +431,11 @@ Related test points: TestSourceBuilderRequiresRegistration, TestRegisteredSource
 
 
 Kết quả thực: PG24203.exit0 đủ13/13package,0FAIL/SKIP, productionb43180db không đổi: assembly100.916s/worker2.196s/tests-reports106.907s/KN77252.802s. Static86292.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. Gofmt chỉ2fixturecũ được phép. ProofhostTEMP agrigreen-codex-knsplit2reportsh-proof.json. Không đổi API/SQL/UI nên miễn frontend/mobile; helper còn8migrationgate trước dev.14gridseed còn gói sau.
+
+## KNSPLIT-2-REPORTS-I — Form seed registry (nền59621835)
+
+Downstream consumers: reports/app seed transaction; constructor/handler; KN ReportFormSeeds; API/haiworker/KN77/tests-reports vàCLIformimport. Dependency evidence: rg -n 'TrongTrotSeeds|SeedTrongTrot|SeedForms|ReportFormSeeds|FormSeedRegistration|reports.New' internal cmd tests -g '*.go'. Giữ API/SQL/UI; frontend/mobile miễn vì không đổi contract/fixtures, ownergoldenbyte kiểm layout/formula cũ.
+
+Regression acceptance command: PG riêng với go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./cmd/formimport ./tests/reports ./tests/kn77; đủstaticCODEX-G1/helper8migrationgates. User đã cho phép G1, không SMTP/data thật, giữmain/worktrees. Không dùng DB skip làm bằng chứng.
+
+Related test points: TestLegacyFormSeedContract, TestReportFormSeedsMatchLegacyContract, TestRegisteredFormSeedsIsolationAndCopies, TestFormSeedRegistryRejectsInvalid; TestSeedExportUsesOwnerLayout; HTTPFormLifecycleSoD/ImportEndpoint và KN77. I còn nillegacy, explicit empty không suy seed.

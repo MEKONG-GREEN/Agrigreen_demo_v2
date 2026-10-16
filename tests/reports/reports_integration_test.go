@@ -78,7 +78,7 @@ func newFixture(t *testing.T, withDirectory bool) *fixture {
 	}
 	f.store = st
 	f.dir = fakeDirectory{emails: map[uuid.UUID]string{}, members: map[uuid.UUID]uuid.UUID{}}
-	deps := reports.Deps{Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: f.ext, Orgs: f.org, Units: newFakeUnits(), Catalogs: fakeCatalogs{}, Clock: f.clk}), Catalog: []port.CatalogRegistration{extension.ReportCatalog()}, Policies: []port.Policy{extension.ReportPolicy()}, Scope: f.org, Orgs: f.org, Units: newFakeUnits(), Params: f.params, Catalogs: fakeCatalogs{}, Store: st,
+	deps := reports.Deps{FormSeeds: []port.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: f.ext, Orgs: f.org, Units: newFakeUnits(), Catalogs: fakeCatalogs{}, Clock: f.clk}), Catalog: []port.CatalogRegistration{extension.ReportCatalog()}, Policies: []port.Policy{extension.ReportPolicy()}, Scope: f.org, Orgs: f.org, Units: newFakeUnits(), Params: f.params, Catalogs: fakeCatalogs{}, Store: st,
 		Mechanization: f.mech, CropCycle: f.cc, Mailer: f.mailer, LinkBase: "https://ops.test"}
 	if withDirectory {
 		deps.Directory, deps.Recipients = f.dir, f.dir

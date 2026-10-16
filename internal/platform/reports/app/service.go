@@ -68,6 +68,7 @@ func hasAny(p authz.Principal, roles []string) bool {
 
 // Service là use case của module.
 type Service struct {
+	FormSeeds      *FormSeedRegistry
 	Builders       *SourceBuilderRegistry
 	Catalog        *CatalogRegistry
 	Policies       *PolicyRegistry

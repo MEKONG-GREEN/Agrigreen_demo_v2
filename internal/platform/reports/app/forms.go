@@ -1061,29 +1061,32 @@ func (s *Service) ImportForm(ctx context.Context, data []byte, in ImportInput, i
 	return res, nil
 }
 
-// SeedResult là kết quả khởi tạo 14 mẫu.
+// SeedResult là kết quả khởi tạo bộ mẫu đã đăng ký.
 type SeedResult struct {
 	Created []string
 	Skipped []string
 }
 
-// SeedTrongTrot khởi tạo 14 mẫu Phòng Trồng trọt (T01–T07, M01, V01–V06) thành nháp v1 và gán
-// loại báo cáo (tuần/tháng/hàng vụ, cấp Xã). Mẫu đã có (cùng mã, phòng ban) giữ nguyên.
-// Phát hành vẫn qua đề nghị → người khác duyệt (R-56).
-func (s *Service) SeedTrongTrot(ctx context.Context, dept, idem string) (SeedResult, error) {
+// SeedForms creates draft v1 and assignments from trusted application registration.
+// Existing codes are preserved; publication still requires a second person (R-56).
+func (s *Service) SeedForms(ctx context.Context, dept, idem string) (SeedResult, error) {
 	p, err := authz.Require(ctx, formAdmins...)
 	if err != nil {
 		return SeedResult{}, err
 	}
+	set, err := s.formSeedSet()
+	if err != nil {
+		return SeedResult{}, err
+	}
 	if dept == "" {
-		dept = port.DefaultDepartment
+		dept = set.DefaultDepartment
 	}
 	if !deptRe(dept) {
 		return SeedResult{}, problem.Validation.WithField("department_code", "mã phòng ban chữ thường, số, gạch dưới")
 	}
 	res := SeedResult{Created: []string{}, Skipped: []string{}}
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
-		for _, sd := range form.TrongTrotSeeds() {
+		for _, sd := range set.Templates {
 			if dup, err := store.FormTemplateByCode(ctx, tx, dept, sd.Code); err != nil {
 				return err
 			} else if dup != nil {
@@ -1100,7 +1103,7 @@ func (s *Service) SeedTrongTrot(ctx context.Context, dept, idem string) (SeedRes
 				return err
 			}
 			if err := s.formEvent(ctx, tx, p.TenantID, p.ActorRef, t.ID, &v, "seeded",
-				[]Change{{"seed", nil, form.SeedVersion}, {"completeness", nil, sd.Def.Completeness}, {"pending", nil, len(sd.Def.Pending)}}, nil, idemOr(idem, sd.Code)); err != nil {
+				[]Change{{"seed", nil, set.Version}, {"completeness", nil, sd.Def.Completeness}, {"pending", nil, len(sd.Def.Pending)}}, nil, idemOr(idem, sd.Code)); err != nil {
 				return err
 			}
 			if _, err := s.assign(ctx, tx, p, t.ID, sd.ReportType, idemOr(idem, sd.Code+":asg")); err != nil {

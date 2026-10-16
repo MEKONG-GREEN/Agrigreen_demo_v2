@@ -50,6 +50,7 @@ const JobSchedules = "reports_schedules"
 // Deps là phụ thuộc của module. Thiếu cổng nào thì thao tác cần nó trả 503
 // reports.dependency_unavailable; thiếu Directory/Mailer thì bỏ gửi email kèm cảnh báo.
 type Deps struct {
+	FormSeeds      []port.FormSeedRegistration
 	Builders       []port.SourceBuilderRegistration
 	Catalog        []port.CatalogRegistration
 	Policies       []port.Policy
@@ -88,6 +89,9 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		DB:             db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
 		Store: d.Store, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,
 		LinkBase: d.LinkBase, LinkDownloadBase: d.LinkDownloadBase, Consolidations: d.Consolidations,
+	}
+	if d.FormSeeds != nil {
+		svc.FormSeeds = app.NewFormSeedRegistry(d.FormSeeds...)
 	}
 	if d.Builders != nil {
 		svc.Builders = app.NewSourceBuilderRegistry(d.Builders...)

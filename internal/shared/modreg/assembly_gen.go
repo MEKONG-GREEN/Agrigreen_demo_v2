@@ -8,7 +8,7 @@ var assembly = map[string][]string{
 	"api-public":          {"pf/apiclient", "pf/cooperative", "pf/cropcycle", "pf/geo", "pf/masterdata", "pf/metering", "pf/mrv"},
 	"drill":               {"pf/kref", "pf/masterdata", "pf/mechanization", "pf/party"},
 	"edge-agent":          {},
-	"formimport":          {"pf/reports"},
+	"formimport":          {"pf/extension", "pf/reports"},
 	"identity-vault":      {"vault/identity"},
 	"ingest":              {"mkg/measurement"},
 	"integration-gateway": {"pf/apiclient", "pf/cooperative", "pf/cropcycle", "pf/geo", "pf/masterdata", "pf/metering", "pf/mrv"},

@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-REPORTS-I — Registry và ownerKN14seed, goldenbyte/cách ly đã đạt; chờPG/static/helper. J mới bỏlegacy.
