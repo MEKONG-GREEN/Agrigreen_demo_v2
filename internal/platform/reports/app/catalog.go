@@ -72,14 +72,14 @@ func (r *CatalogRegistry) Templates() []domain.Template {
 }
 func (s *Service) sourceSpecs() map[string]domain.SourceSpec {
 	if s.Catalog == nil {
-		return domain.Sources
+		return domain.NativeSources()
 	}
 	return s.Catalog.Sources()
 }
 func (s *Service) sourceSpec(key string) domain.SourceSpec { return s.sourceSpecs()[key] }
 func (s *Service) builtinTemplates() []domain.Template {
 	if s.Catalog == nil {
-		return domain.Builtins()
+		return domain.NativeBuiltins()
 	}
 	return s.Catalog.Templates()
 }

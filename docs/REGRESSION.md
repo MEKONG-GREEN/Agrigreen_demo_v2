@@ -393,3 +393,14 @@ Related test points: TestLegacyReportCatalogContract, TestRegisteredCatalogMatch
 Golden-capture.exit0/app1.810s từ legacy metadata, không từ provider mới. Pure-first chỉ compile unused import. Pure-second90371.exit0 app2.209s/domain0.836s/extension1.712s,0FAIL/SKIP:5source/5layout owner khớp byte và9source/9layout sau merge cùng validate/build. Không coi bộ dựng hoặc seed đã chuyển. Chờ PG/static/helper thực.
 
 Kết quả thực: PG70172.exit0 đủ13/13package,0FAIL/SKIP (assembly:116.892s, worker:2.050s, reports:115.207s, kn77:289.793s); production67c70932 không đổi. Static60148.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. Gofmt toàn repo chỉ2fixture cũ được phép. Đối chiếu gitdf2ba484 xác nhận7file/19testfunction và assertion counts giữ nguyên sau chuyển tests/reports. Golden cũ và provider KN khớpbyte. ProofJSON hostTEMP agrigreen-codex-knsplit2reportse-proof.json. Helper còn kiểm8migrationgate trước tích hợp; F mới gỡ legacy catalog, data-builder/14gridseed còn gói sau.
+
+ 
+## KNSPLIT-2-REPORTS-F — Catalog registration bắt buộc (nền2a877d33)
+
+Downstream consumers: reports/domain defaults/validation/column build; app registry/template/export/schedule/policy/buildDataset; API/hai worker/KN77/tests-reports đã đăng ký owner KN thật. Dependency evidence: rg -n 'Sources|NativeSources|Builtins|sourceSpecs|builtinTemplates|CatalogRegistration|ReportCatalog' internal/platform/reports internal/kn/extension cmd tests -g '*.go'. Test suite HTTP hiện ở tests/reports, không tính handler cũ không có test.
+
+Regression acceptance command: PostgreSQL riêng với go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./tests/reports ./tests/kn77, đủ static CODEX-G1/helper8migrationgate. Miễn UI/mobile/acceptance ngoài scope vì không đổi wire contract/SQL/UI; build/vet toàn repo bắt buộc. User đã cho phép G1, không dữ liệu/SMTP thật, giữ main/worktree.
+
+Related test points: TestReportCatalogRequiresRegistration, TestRegisteredCatalogMergesContract, TestRegisteredCatalogColumnLevels, TestCatalogRegistrationIsolation/RejectsAmbiguity, TestReportCatalogMatchesLegacyContract; role matrix10vai/mixed HTX và KN77/session/PII.
+
+Red65265.exit1/app1.630s bắt đúng missingcatalog suy5source/5builtin; emptycase PASS. Pure-first77518.exit0 app1.903s/domain0.606s/extension1.463s,0FAIL/SKIP. Golden giữ byte; legacy generator đã xóa, fixture đọc artifact E. Role tests vẫn loop instance catalog9source, không giảm xuốngnative4. Cột theo cấp được bảo vệ bằng registered golden, domain test generic giữ normalize/format/grouping. Chờ PG/static/helper.

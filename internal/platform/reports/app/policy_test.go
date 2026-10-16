@@ -16,7 +16,7 @@ import (
 // Fixed role matrix preserves the behavior proved against the old adapter in C.
 func TestRegisteredReportPolicyRoleMatrix(t *testing.T) {
 	roles := []string{"registered_reader", "registered_manager", "registered_national"}
-	svc := Service{Policies: NewPolicyRegistry(port.Policy{
+	svc := Service{Catalog: NewCatalogRegistry(contractCatalogContribution(t)), Policies: NewPolicyRegistry(port.Policy{
 		ReaderRoles: roles, FormReaderRoles: roles, SchedulerRoles: roles[1:], OrganizationScopeRoles: roles,
 		SourceRoles: map[string][]string{"extension": roles, "cropcycle": roles}, AttachmentLimitParam: "application.limit",
 	})}
@@ -36,7 +36,7 @@ func TestRegisteredReportPolicyRoleMatrix(t *testing.T) {
 		{"unknown", false, false, false, false, false, false, false},
 	}
 	var cropSource string
-	for source, spec := range domain.Sources {
+	for source, spec := range svc.sourceSpecs() {
 		if spec.Module == "cropcycle" {
 			cropSource = source
 			break
@@ -55,7 +55,7 @@ func TestRegisteredReportPolicyRoleMatrix(t *testing.T) {
 			if hasAny(p, svc.readerRoles()) != (tc.read || mixed) || hasAny(p, svc.schedulerRoles()) != (tc.schedule || mixed) || hasAny(p, svc.formReaderRoles()) != tc.form || svc.coopOnly(p) != wantCoop {
 				t.Fatalf("operation/scope matrix role=%s mixed=%v", tc.role, mixed)
 			}
-			for source, spec := range domain.Sources {
+			for source, spec := range svc.sourceSpecs() {
 				want := map[string]bool{"extension": tc.extension, "mechanization": tc.mechanization, "cropcycle": tc.cropcycle || mixed}[spec.Module]
 				if hasAny(p, svc.sourceRoles(source)) != want {
 					t.Fatalf("source matrix role=%s source=%s mixed=%v", tc.role, source, mixed)
@@ -89,12 +89,12 @@ func TestRegisteredReportPolicyRoleMatrix(t *testing.T) {
 }
 
 func TestRegisteredReportPolicyDoesNotLeakSources(t *testing.T) {
-	svc := Service{Policies: NewPolicyRegistry(port.Policy{ReaderRoles: []string{"module_reader"}, SourceRoles: map[string][]string{"extension": {"module_reader"}}})}
+	svc := Service{Catalog: NewCatalogRegistry(contractCatalogContribution(t)), Policies: NewPolicyRegistry(port.Policy{ReaderRoles: []string{"module_reader"}, SourceRoles: map[string][]string{"extension": {"module_reader"}}})}
 	p := authz.Principal{Roles: []string{"module_reader"}}
 	if !hasAny(p, svc.readerRoles()) || hasAny(p, svc.schedulerRoles()) || hasAny(p, svc.formReaderRoles()) {
 		t.Fatal("registration granted a different operation")
 	}
-	for source, spec := range domain.Sources {
+	for source, spec := range svc.sourceSpecs() {
 		if hasAny(p, svc.sourceRoles(source)) != (spec.Module == "extension") {
 			t.Fatalf("source grant leaked: %s", source)
 		}

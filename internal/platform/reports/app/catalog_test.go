@@ -2,95 +2,72 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
-	"os"
-	"path/filepath"
 	"reflect"
-	"runtime"
-	"sort"
 	"testing"
 )
 
-// Capture the verified legacy metadata as an independent owner-migration oracle.
-func legacyCatalogContribution() port.CatalogRegistration {
-	r := port.CatalogRegistration{Sources: map[string]port.CatalogSource{}, Templates: []port.CatalogTemplate{}}
-	for key, src := range domain.Sources {
-		if src.Module == "extension" {
-			out := port.CatalogSource{Key: key, Module: src.Module, Levels: append([]string{}, src.Levels...), DefaultLevel: src.DefaultLevel, NeedsPeriod: src.NeedsPeriod, UsesSeason: src.UsesSeason, NeedsCompare: src.NeedsCompare}
-			for _, c := range src.Columns {
-				out.Columns = append(out.Columns, port.CatalogColumn{Key: c.Key, Title: c.Title, Kind: string(c.Kind), Scale: c.Scale, MinLevel: c.MinLevel, MaxLevel: c.MaxLevel})
-			}
-			r.Sources[key] = out
+// Cumulative coverage retains the legacy golden after deleting the adapter
+// that produced it. The owner still compares every byte of the same artifact.
+func TestRegisteredCatalogMergesContract(t *testing.T) {
+	contribution := contractCatalogContribution(t)
+	svc := Service{Catalog: NewCatalogRegistry(contribution)}
+	native := domain.NativeSources()
+	if len(native) != 4 || len(svc.sourceSpecs()) != 9 || len(svc.builtinTemplates()) != 9 {
+		t.Fatal("native and registered catalog cardinality changed")
+	}
+	for key, spec := range native {
+		if !reflect.DeepEqual(spec, svc.sourceSpec(key)) {
+			t.Fatalf("native source changed: %s", key)
 		}
 	}
-	for _, tpl := range domain.Builtins() {
-		if _, ok := r.Sources[tpl.Def.Source]; ok {
-			d := tpl.Def
-			def := port.CatalogDefinition{Title: d.Title, Source: d.Source, Grouping: d.Grouping, Formats: append([]string{}, d.Formats...), Provisional: d.Provisional, FormNote: d.FormNote}
-			for _, c := range d.Columns {
-				def.Columns = append(def.Columns, port.CatalogTemplateColumn{Key: c.Key, Title: c.Title})
-			}
-			r.Templates = append(r.Templates, port.CatalogTemplate{Key: tpl.Key, Def: def})
+	for _, template := range domain.NativeBuiltins() {
+		got, ok := svc.builtinTemplate(template.Key)
+		if !ok || !reflect.DeepEqual(template, got) {
+			t.Fatalf("native builtin changed: %s", template.Key)
 		}
 	}
-	return r
-}
-func TestLegacyReportCatalogContract(t *testing.T) {
-	contribution := legacyCatalogContribution()
-	if len(contribution.Sources) != 5 || len(contribution.Templates) != 5 {
-		t.Fatal("legacy catalog capture must contain five sources and five layouts")
+	for key, spec := range contribution.Sources {
+		got := svc.sourceSpec(key)
+		if got.Key != key || got.Module != spec.Module || len(got.Columns) != len(spec.Columns) {
+			t.Fatalf("registered source schema missing: %s", key)
+		}
 	}
-	got, err := json.MarshalIndent(contribution, "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-	got = append(got, '\n')
-	_, file, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(file), "../../../../tests/golden/kn-report-catalog.json")
-	if os.Getenv("AG_UPDATE_KN_REPORT_CATALOG") == "1" {
-		if err := os.WriteFile(path, got, 0600); err != nil {
+	for _, template := range contribution.Templates {
+		got, ok := svc.builtinTemplate(template.Key)
+		if !ok || got.Version != 0 || got.Status != domain.TemplateActive || got.Def.Title != template.Def.Title || got.Def.Source != template.Def.Source || len(got.Def.Columns) != len(template.Def.Columns) {
+			t.Fatalf("registered builtin changed: %s", template.Key)
+		}
+		if err := got.Def.ValidateWithSources(svc.sourceSpecs()); err != nil {
 			t.Fatal(err)
 		}
-	}
-	want, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != string(want) {
-		t.Fatal("legacy metadata differs from the recorded catalog contract")
 	}
 }
-func TestRegisteredCatalogMatchesLegacy(t *testing.T) {
-	old := Service{}
-	registered := Service{Catalog: NewCatalogRegistry(legacyCatalogContribution())}
-	if !reflect.DeepEqual(old.sourceSpecs(), registered.sourceSpecs()) {
-		t.Fatal("source schema changed during registration")
+
+func TestRegisteredCatalogColumnLevels(t *testing.T) {
+	svc := Service{Catalog: NewCatalogRegistry(contractCatalogContribution(t))}
+	template, ok := svc.builtinTemplate("kn.program_progress")
+	if !ok {
+		t.Fatal("registered program layout missing")
 	}
-	a, b := old.builtinTemplates(), registered.builtinTemplates()
-	sort.Slice(a, func(i, j int) bool { return a[i].Key < a[j].Key })
-	sort.Slice(b, func(i, j int) bool { return b[i].Key < b[j].Key })
-	if !reflect.DeepEqual(a, b) {
-		t.Fatal("builtin layout metadata changed during registration")
+	def := template.Def
+	def.Columns = append(def.Columns, domain.Column{Key: "commune_name", Title: "Xã"})
+	has := func(ds domain.Dataset, key string) bool {
+		for _, c := range ds.Columns {
+			if c.Key == key {
+				return true
+			}
+		}
+		return false
 	}
-	for _, tpl := range a {
-		before, after := tpl.Def, tpl.Def
-		if err := before.Validate(); err != nil {
-			t.Fatal(err)
-		}
-		if err := after.ValidateWithSources(registered.sourceSpecs()); err != nil {
-			t.Fatal(err)
-		}
-		if !reflect.DeepEqual(before, after) {
-			t.Fatal("definition normalization changed")
-		}
-		rows := []domain.Row{{"sown_area_ha": domain.Int(3), "capacity": domain.Int(4)}}
-		x := domain.Build(before, before.Grouping, rows, nil)
-		y := domain.BuildWithSources(after, after.Grouping, rows, nil, registered.sourceSpecs())
-		if !reflect.DeepEqual(x, y) {
-			t.Fatal("export columns/values changed during catalog registration")
-		}
+	commune := domain.BuildWithSources(def, domain.LevelCommune, nil, nil, svc.sourceSpecs())
+	if has(commune, "target_ha") || has(commune, "registered_pct") || !has(commune, "commune_name") {
+		t.Fatal("province-only targets/ratio or commune name violated registered level rules")
+	}
+	province := domain.BuildWithSources(def, domain.LevelProvince, nil, nil, svc.sourceSpecs())
+	if has(province, "commune_name") || !has(province, "target_ha") || !has(province, "registered_pct") {
+		t.Fatal("registered province level lost targets/ratio or exposed commune name")
 	}
 }
 func testCatalogRegistration() port.CatalogRegistration {

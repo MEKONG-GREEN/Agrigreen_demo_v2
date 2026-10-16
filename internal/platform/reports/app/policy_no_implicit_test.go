@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -25,13 +24,13 @@ func TestReportPolicyRequiresRegistration(t *testing.T) {
 		registry *PolicyRegistry
 	}{{name: "missing"}, {name: "empty", registry: NewPolicyRegistry()}} {
 		t.Run(tc.name, func(t *testing.T) {
-			svc := Service{Policies: tc.registry}
+			svc := Service{Catalog: NewCatalogRegistry(contractCatalogContribution(t)), Policies: tc.registry}
 			for _, role := range []string{"kn_officer", "kn_province_admin", "kn_national_admin"} {
 				p := authz.Principal{Roles: []string{role}}
 				if hasAny(p, svc.readerRoles()) || hasAny(p, svc.schedulerRoles()) || hasAny(p, svc.formReaderRoles()) {
 					t.Errorf("unregistered role inferred operation grant: %s", role)
 				}
-				for source := range domain.Sources {
+				for source := range svc.sourceSpecs() {
 					if hasAny(p, svc.sourceRoles(source)) {
 						t.Errorf("unregistered role inferred source grant: %s %s", role, source)
 					}
