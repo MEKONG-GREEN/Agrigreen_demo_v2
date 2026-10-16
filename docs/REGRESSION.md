@@ -417,3 +417,5 @@ Regression acceptance command: PG riêng, go test -v -count=1 -p 1 -timeout 55m 
 Related test points: TestRegisteredSourceBuilderBindsJobAndCopies, TestRegisteredSourceBuilderErrorIsFinal, TestSourceBuilderRegistryRejectsInvalid, TestReportSourceBuildersFiguresAndMissingTargets; suite HTTP export/lịch/HTX và KN77 quyền/snapshot/PII.
 
 Pure-first2490.exit0 app1.746s/extension1.376s; pure-second51584.exit0 app1.105s/extension1.496s,0FAIL/SKIP. Figures xác nhận3.3ha/5báo cáo,30/300=10%/2HTX, missingtargetnull,5nguồn/groupbyvariety/completeness; corejob/scope/period/alias/errorfinal. ChờPG/static/helper, adapter nil-legacy còn trongG.
+
+Kết quả thực: PG29811.exit0 đủ13/13package,0FAIL/SKIP (assembly:128.531s, worker:2.342s, reports:87.318s, kn77:201.760s); productionc9f07902 không đổi. Static25052.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. Gofmt toànrepo chỉ2fixtureoldallowed. Suite HTTP dùngbuilderKNthật vàgiữmọiassertion; pure5nguồn/missingtarget/alias/errorfinal đạt. ProofJSONhostTEMP agrigreen-codex-knsplit2reportsg-proof.json. Helper còn8migrationgate trướcdev; H mới gỡ adapter legacy,14seed còn gói sau.

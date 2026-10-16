@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-REPORTS-G — Registry source-builder generic và KNowner5nguồn, pure số học/thiếu mục tiêu/grouping/tenant-scope/alias/errorfinal đạt. Chờ13PG/static/helper trướcdev; legacy còn đếnH,14gridseed còn gói sau.
+- [x] KNSPLIT-2-REPORTS-G — Genericbuilderregistry vàKNowner5nguồn, sốhọc/scope/alias/errorfinal/pure và13/13PG noSKIP/static đạt. Helper migration trướcdev; legacy còn đếnH,14seed còn gói sau.
