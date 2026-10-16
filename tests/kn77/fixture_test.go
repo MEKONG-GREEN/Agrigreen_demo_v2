@@ -216,7 +216,7 @@ func newFixture(t *testing.T, o fixtureOpts) *fixture {
 		text: "kn.period_rule/v2;week_start=wed;week=year;month=week_end"}}}
 	f.ext = extension.New(extPool, f.clk, extension.Deps{Orgs: og, Units: units{names: names}, Params: f.extParams})
 	f.repParams = &repParams{v: map[string]decimal.Decimal{}}
-	f.rep = reports.New(repPool, f.clk, reports.Deps{Orgs: og, Units: units{names: names}, Store: st, Mailer: f.mail, Getenv: func(string) string { return "" },
+	f.rep = reports.New(repPool, f.clk, reports.Deps{ResolveSession: extension.ReportSessionResolver(og), Orgs: og, Units: units{names: names}, Store: st, Mailer: f.mail, Getenv: func(string) string { return "" },
 		Params: f.repParams})
 	f.ext.UseReportCycle(extension.ReportCycleDeps{Forms: f.rep.Forms(), Regions: rg, Assignments: f.asg})
 	f.ext.UseDispatchHistory(f.rep.DispatchHistory())

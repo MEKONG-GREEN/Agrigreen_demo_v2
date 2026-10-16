@@ -90,7 +90,8 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 		log.Warn("chưa cấu hình AG_SMTP_* — lịch gửi báo cáo sẽ bỏ gửi email", "event", "startup", "outcome", "skipped")
 	}
 	return reports.New(nil, clk, reports.Deps{
-		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
+		ResolveSession: extension.ReportSessionResolver(pty.Orgs()),
+		Scope:          pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
 		Extension: kn.ReportData(), Mechanization: mech.ReportData(), CropCycle: coop.ReportData(), Directory: dir, Mailer: mailer, LinkBase: os.Getenv("AG_WEB_OPS_URL"), Log: log,
 		LinkDownloadBase: os.Getenv("AG_REPORT_LINK_BASE"), // A4: liên kết tải Chi cục do api-platform phục vụ
 	}), nil

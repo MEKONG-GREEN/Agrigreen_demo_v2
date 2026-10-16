@@ -329,3 +329,12 @@ Related test points: KH-FN-TI-02.09, KH-UR-TI-12/13; `TestKH_M5_ProgramUsesCutof
 
 
 Kết quả cuối Mẫu5: production79d9acc3 giữ nguyên. `db-resume15895.exit0`: assembly138.677s, KN77353.770s, golden1.204s; đủ11/11package khi ghép8package đã hoàn tất trong full trước gián đoạn, không đổi whole full thành exit0. Không FAIL/SKIP. TestKH_M5_ProgramCutoffHTTP PASS19.31s gồm Excel phụ lục10/100, giữ To/cutoff riêng, hash/cảnh báo và byte cũ bất biến sau sửa phiếu/nguồn tuần sau cutoff rồi refresh; TestKH_M5_LiveProgramSourceCrosswalk PASS0.68s, cutoff giữa tuần chỉ nhận nguồn của tuần đã hết. `static-after-crosswalk52241.exit0`: build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary390/lint0issues. ProofJSON hostTEMP agrigreen-codex-w1166programcutoff-proof.json. Chỉ thay test DTO sau production79d9acc3; chưa có API/SQL/frontend đổi. Helper còn kiểm migration trước FFdev.
+
+
+## KNSPLIT-2-REPORTS-A — Session registry (nền0237b812)
+
+Downstream consumers: reports/app formReader/dispatch actor; reports module Deps; extension policy; assembly và worker factory; KN77 đăng ký policy thật. Legacy realm role groups/schedulers/HTX export không đổi.
+Dependency evidence: `rg -n 'reports.New|reports.Deps|formReader|knDeptAllows' internal cmd tests -g '*.go'`; scope callback tác động3đường đọc form và8use case dispatch. Dependency mới chỉ port/context callback, không actor/tenant projection. Existing native realm tests của handler bảo vệ compatibility; KN77/assembly kiểm đường session thật.
+Regression acceptance command: PG riêng, `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77`; đủ static/helper migration trước FFdev. Miễn frontend/mobile và acceptance/e2e ngoài phạm vi vì không đổi contract/DTO hoặc core consumer các module khác. Phạm vi user đã cho phép qua CODEX-G1; không dùng dữ liệu hay SMTP thật, không sửa main/xóa worktree.
+Related test points: TestRegisteredReportSessionIdentityAndFilters, TestRegisteredReportSessionDenialCannotFallBack, TestRegisteredReportSessionLegacyAndRealmCompatibility, TestReportSessionPolicyRolesAndDepartments; các test KN77 form/dispatch/PII/tenant hiện hành.
+Pure-first chỉ lỗi compile thiếu field/kiểu fixture, không tính proof. Pure-second58639.exit0: reports/app0.675s, extension1.867s,4test mới PASS không SKIP. Chưa tích hợp, chờ PG/static thực.

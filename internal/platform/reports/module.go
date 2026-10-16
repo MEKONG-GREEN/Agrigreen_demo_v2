@@ -50,16 +50,17 @@ const JobSchedules = "reports_schedules"
 // Deps là phụ thuộc của module. Thiếu cổng nào thì thao tác cần nó trả 503
 // reports.dependency_unavailable; thiếu Directory/Mailer thì bỏ gửi email kèm cảnh báo.
 type Deps struct {
-	Scope         partyport.ScopeResolver
-	Orgs          partyport.Orgs
-	Units         partyport.AdminUnits
-	Params        params.Params // reports.daily_export_quota, reports.export_anomaly_threshold
-	Catalogs      mdport.Catalogs
-	Store         objstore.Store // reports/<tenant>/<job>.<định dạng>
-	Extension     extensionsrc.ReportData
-	Mechanization mechanizationsrc.ReportData
-	CropCycle     cropcyclesrc.ReportData    // pf/cropcycle: báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03)
-	Directory     accountsport.MailDirectory // pf/accounts hiện thực; nil → bỏ gửi email
+	ResolveSession port.SessionResolver
+	Scope          partyport.ScopeResolver
+	Orgs           partyport.Orgs
+	Units          partyport.AdminUnits
+	Params         params.Params // reports.daily_export_quota, reports.export_anomaly_threshold
+	Catalogs       mdport.Catalogs
+	Store          objstore.Store // reports/<tenant>/<job>.<định dạng>
+	Extension      extensionsrc.ReportData
+	Mechanization  mechanizationsrc.ReportData
+	CropCycle      cropcyclesrc.ReportData    // pf/cropcycle: báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03)
+	Directory      accountsport.MailDirectory // pf/accounts hiện thực; nil → bỏ gửi email
 	// Recipients: tài khoản của HTX để quản lý HTX chọn người nhận lịch (HTX US-DASH-03); nil → 503.
 	Recipients accountsport.RecipientDirectory
 	Mailer     port.Mailer
@@ -81,7 +82,8 @@ type Module struct{ svc *app.Service }
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	db = forModule(db)
 	svc := &app.Service{
-		DB: db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
+		ResolveSession: d.ResolveSession,
+		DB:             db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
 		Store: d.Store, Extension: d.Extension, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,
 		LinkBase: d.LinkBase, LinkDownloadBase: d.LinkDownloadBase, Consolidations: d.Consolidations,
 	}

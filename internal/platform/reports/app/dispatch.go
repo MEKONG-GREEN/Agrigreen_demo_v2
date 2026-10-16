@@ -53,14 +53,40 @@ var (
 	ErrValveBlocked       = problem.New(http.StatusUnprocessableEntity, "reports.gsheet_valve_blocked", "Van chặn: mẫu có trường không được phép đưa ra ngoài lãnh thổ")
 )
 
-// knActor là người gọi KN v7.7 (ngữ cảnh phiên P1) kèm tỉnh của Nút.
+// knActor retains the compatibility name during step A; all decisions use
+// the registered generic projection, never actor/tenant supplied by a resolver.
 type knActor struct {
 	p        authz.Principal
-	k        authz.KNContext
+	scope    port.SessionActor
 	province string
 }
 
 func (s *Service) kn(ctx context.Context, write bool) (knActor, error) {
+	if s.ResolveSession != nil {
+		p, ok := authz.FromContext(ctx)
+		if !ok {
+			return knActor{}, problem.Unauthenticated
+		}
+		operation := port.SessionReadDispatch
+		if write {
+			operation = port.SessionWriteDispatch
+		}
+		scope, handled, err := s.ResolveSession(ctx, p, operation)
+		if err != nil {
+			return knActor{}, err
+		}
+		if handled {
+			if !scope.Allowed || scope.AllowsDepartment == nil || (!scope.AllDepartments && (scope.Department == "" || !scope.AllowsDepartment(scope.Department))) || (scope.Province == "" && !scope.AllProvinces) {
+				return knActor{}, problem.Forbidden
+			}
+			return knActor{p: p, scope: scope, province: scope.Province}, nil
+		}
+	}
+	return s.legacyDispatchActor(ctx, write)
+}
+
+// Transitional adapter, removed only after consumers register their policy.
+func (s *Service) legacyDispatchActor(ctx context.Context, write bool) (knActor, error) {
 	roles := []string{authz.KNTinh, authz.KNTW, authz.KNAdmin}
 	if write {
 		roles = []string{authz.KNTinh}
@@ -69,7 +95,13 @@ func (s *Service) kn(ctx context.Context, write bool) (knActor, error) {
 	if err != nil {
 		return knActor{}, err
 	}
-	a := knActor{p: p, k: k}
+	scope := port.SessionActor{Allowed: true, Department: k.Department, AllDepartments: k.Role == authz.KNAdmin,
+		AllowsDepartment: k.AllowsDepartment, UnmaskRecipients: k.Role == authz.KNTinh}
+	if k.Support != nil {
+		id := k.Support.OnBehalfOf
+		scope.OnBehalfOf = &id
+	}
+	a := knActor{p: p, scope: scope}
 	if k.Role == authz.KNTW || k.Role == authz.KNAdmin || k.OrgRef == uuid.Nil {
 		return a, nil
 	}
@@ -87,21 +119,19 @@ func (s *Service) kn(ctx context.Context, write bool) (knActor, error) {
 }
 
 func (a knActor) dept() string {
-	if a.k.Role == authz.KNAdmin {
+	if a.scope.AllDepartments {
 		return ""
 	}
-	return a.k.Department
+	return a.scope.Department
 }
-
 func (a knActor) allows(province, dept string) bool {
-	return a.k.AllowsDepartment(dept) && (a.province == "" || a.province == province)
+	return a.scope.AllowsDepartment != nil && a.scope.AllowsDepartment(dept) && (a.province == "" || a.province == province)
 }
-
 func (a knActor) onBehalf() *uuid.UUID {
-	if a.k.Support == nil || a.k.Support.OnBehalfOf == uuid.Nil {
+	if a.scope.OnBehalfOf == nil || *a.scope.OnBehalfOf == uuid.Nil {
 		return nil
 	}
-	v := a.k.Support.OnBehalfOf
+	v := *a.scope.OnBehalfOf
 	return &v
 }
 
@@ -129,14 +159,14 @@ func (s *Service) ListDispatchRecipients(ctx context.Context, province string) (
 	if province == "" {
 		return nil, false, problem.Validation.WithField("province", "chọn tỉnh")
 	}
-	dept := a.k.Department
+	dept := a.scope.Department
 	var out []store.DispatchRecipient
 	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
 		var err error
 		out, err = store.Recipients(ctx, tx, province, dept, false)
 		return err
 	})
-	masked := a.k.Role != authz.KNTinh
+	masked := !a.scope.UnmaskRecipients
 	if masked {
 		for i := range out {
 			if out[i].Address != nil {
@@ -164,7 +194,7 @@ func (s *Service) AddDispatchRecipient(ctx context.Context, in RecipientInput, i
 		return store.DispatchRecipient{}, problem.Validation.WithField("kind", "to | cc")
 	}
 	now := s.now()
-	r := store.DispatchRecipient{ID: ids.New(), Department: a.k.Department, Province: a.province, Label: in.Label, Address: &in.Address, Kind: in.Kind,
+	r := store.DispatchRecipient{ID: ids.New(), Department: a.scope.Department, Province: a.province, Label: in.Label, Address: &in.Address, Kind: in.Kind,
 		IsDefault: in.IsDefault, Active: true, CreatedBy: a.p.ActorRef, CreatedAt: now, UpdatedAt: now}
 	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
 		existing, err := store.Recipients(ctx, tx, r.Province, r.Department, true)
