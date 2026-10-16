@@ -33,9 +33,14 @@ func TestKH_M5_ProgramCutoffHTTP(t *testing.T) {
 func TestKH_M5_LiveProgramSourceCrosswalk(t *testing.T) {
 	f := newKHTCFormFx(t)
 	ctx := authz.WithPrincipal(context.Background(), authz.Principal{ActorRef: f.khtcUser, TenantID: f.tid})
+	seedM4Boards(t, f, f.tid, []string{"2026-10-06", "2026-10-07"}, 1, 1000)
 	from, _ := time.Parse(time.DateOnly, "2025-12-31")
-	to, _ := time.Parse(time.DateOnly, "2026-10-06")
-	if _, err := f.ext.KHTCSourceCrosswalk().Sources(ctx, "adhoc", "2026-CT-1013", from, to, []string{dTT, dTTTT}); err != nil {
+	to, _ := time.Parse(time.DateOnly, "2026-10-08")
+	refs, err := f.ext.KHTCSourceCrosswalk().Sources(ctx, "adhoc", "2026-CT-1013", from, to, []string{dTT, dTTTT})
+	if err != nil {
 		t.Fatalf("production program crosswalk: %v", err)
+	}
+	if len(refs) != 1 || refs[0].NativeKey != "2026-10-06" {
+		t.Fatalf("program source bounds/custom key: %+v", refs)
 	}
 }

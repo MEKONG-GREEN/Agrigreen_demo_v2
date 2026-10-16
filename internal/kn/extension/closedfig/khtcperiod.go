@@ -62,7 +62,13 @@ func (c KHTCCrosswalk) Sources(ctx context.Context, kind, key string, from, to t
 	if err != nil {
 		return nil, err
 	}
+	bounded := kind == rcdomain.PeriodAdhoc
 	t := port.CrosswalkTarget{PeriodType: kind}
+	// Program forms have an adhoc identity, but their sources use actual D8
+	// weeks within the requested bounds, not the custom forms key.
+	if bounded {
+		t.PeriodType = rcdomain.PeriodWeek
+	}
 	if c.RuleTag != nil {
 		t.RuleTag = c.RuleTag(ctx, from)
 	}
@@ -73,7 +79,7 @@ func (c KHTCCrosswalk) Sources(ctx context.Context, kind, key string, from, to t
 	var out []port.KHTCSourceRef
 	seen := map[string]bool{}
 	for _, p := range ps {
-		if key != "" && p.TargetKey != key {
+		if (!bounded && key != "" && p.TargetKey != key) || (bounded && (p.TargetTo.Before(from) || p.TargetTo.After(to))) {
 			continue
 		}
 		for _, d := range p.Departments {
