@@ -11,8 +11,8 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/domain"
+	knreportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/store"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -20,16 +20,16 @@ import (
 // lọc theo phạm vi do pf/reports truyền (đã kiểm vai lúc yêu cầu xuất).
 type ReportData struct{ Svc *Service }
 
-var _ extensionsrc.ReportData = ReportData{}
+var _ knreportsport.ReportData = ReportData{}
 
 // errBadQuery: truy vấn thiếu tenant hoặc kỳ không hợp lệ (lỗi lập trình của bên gọi).
 var errBadQuery = errors.New("extension: truy vấn báo cáo thiếu tenant hoặc kỳ không hợp lệ")
 
-func (d ReportData) filter(q extensionsrc.ReportQuery) store.DataFilter {
+func (d ReportData) filter(q knreportsport.ReportQuery) store.DataFilter {
 	return store.DataFilter{All: q.Scope.All, Units: q.Scope.Units, Unit: q.Unit}
 }
 
-func (d ReportData) check(q extensionsrc.ReportQuery, needPeriods bool) error {
+func (d ReportData) check(q knreportsport.ReportQuery, needPeriods bool) error {
 	if q.TenantID == uuid.Nil {
 		return errBadQuery
 	}
@@ -46,7 +46,7 @@ func (d ReportData) check(q extensionsrc.ReportQuery, needPeriods bool) error {
 	return nil
 }
 
-func (d ReportData) tx(ctx context.Context, q extensionsrc.ReportQuery, fn func(pgx.Tx) error) error {
+func (d ReportData) tx(ctx context.Context, q knreportsport.ReportQuery, fn func(pgx.Tx) error) error {
 	if q.Scope.Empty() {
 		return nil // phạm vi rỗng: không thấy gì (mặc định chặn)
 	}
@@ -54,8 +54,8 @@ func (d ReportData) tx(ctx context.Context, q extensionsrc.ReportQuery, fn func(
 }
 
 // completeness tính xã chưa báo cáo và tỉnh chưa chốt kỳ (US-DASH-02 AC-1).
-func completeness(ctx context.Context, tx pgx.Tx, f store.DataFilter, periods []string) (extensionsrc.Completeness, error) {
-	var c extensionsrc.Completeness
+func completeness(ctx context.Context, tx pgx.Tx, f store.DataFilter, periods []string) (knreportsport.Completeness, error) {
+	var c knreportsport.Completeness
 	expected, err := store.ExpectedCommunes(ctx, tx, f)
 	if err != nil {
 		return c, err
@@ -95,8 +95,8 @@ func completeness(ctx context.Context, tx pgx.Tx, f store.DataFilter, periods []
 }
 
 // Sowing: FR-01 diện tích đã sạ theo xã × vụ × giống.
-func (d ReportData) Sowing(ctx context.Context, q extensionsrc.ReportQuery) (extensionsrc.SowingData, error) {
-	var out extensionsrc.SowingData
+func (d ReportData) Sowing(ctx context.Context, q knreportsport.ReportQuery) (knreportsport.SowingData, error) {
+	var out knreportsport.SowingData
 	if err := d.check(q, true); err != nil {
 		return out, err
 	}
@@ -112,8 +112,8 @@ func (d ReportData) Sowing(ctx context.Context, q extensionsrc.ReportQuery) (ext
 }
 
 // GrowthPest: FR-02 sâu bệnh theo xã × loại × mức độ.
-func (d ReportData) GrowthPest(ctx context.Context, q extensionsrc.ReportQuery) (extensionsrc.PestData, error) {
-	var out extensionsrc.PestData
+func (d ReportData) GrowthPest(ctx context.Context, q knreportsport.ReportQuery) (knreportsport.PestData, error) {
+	var out knreportsport.PestData
 	if err := d.check(q, true); err != nil {
 		return out, err
 	}
@@ -130,8 +130,8 @@ func (d ReportData) GrowthPest(ctx context.Context, q extensionsrc.ReportQuery) 
 
 // ProgramProgress: FR-03 tiến độ Đề án theo HTX × vụ kèm mục tiêu tỉnh.
 // Tạm tính khi còn dòng chưa được Admin tỉnh duyệt.
-func (d ReportData) ProgramProgress(ctx context.Context, q extensionsrc.ReportQuery) (extensionsrc.ProgramData, error) {
-	out := extensionsrc.ProgramData{Targets: map[string]*decimal.Decimal{}}
+func (d ReportData) ProgramProgress(ctx context.Context, q knreportsport.ReportQuery) (knreportsport.ProgramData, error) {
+	out := knreportsport.ProgramData{Targets: map[string]*decimal.Decimal{}}
 	if err := d.check(q, false); err != nil {
 		return out, err
 	}
@@ -179,8 +179,8 @@ func periodRange(periods []string) (time.Time, time.Time, error) {
 }
 
 // TasksSLA: nhiệm vụ hỗ trợ trong kỳ — tạo mới, đóng, đúng hạn SLA, leo thang, đang mở/quá hạn tại At.
-func (d ReportData) TasksSLA(ctx context.Context, q extensionsrc.ReportQuery) (extensionsrc.TaskData, error) {
-	var out extensionsrc.TaskData
+func (d ReportData) TasksSLA(ctx context.Context, q knreportsport.ReportQuery) (knreportsport.TaskData, error) {
+	var out knreportsport.TaskData
 	if err := d.check(q, true); err != nil {
 		return out, err
 	}
@@ -201,8 +201,8 @@ func (d ReportData) TasksSLA(ctx context.Context, q extensionsrc.ReportQuery) (e
 }
 
 // PeriodSummary: FR-05 gom FR-01, FR-02, FR-03 và nhiệm vụ theo xã cho kỳ tháng/quý/năm.
-func (d ReportData) PeriodSummary(ctx context.Context, q extensionsrc.ReportQuery) (extensionsrc.SummaryData, error) {
-	var out extensionsrc.SummaryData
+func (d ReportData) PeriodSummary(ctx context.Context, q knreportsport.ReportQuery) (knreportsport.SummaryData, error) {
+	var out knreportsport.SummaryData
 	sow, err := d.Sowing(ctx, q)
 	if err != nil {
 		return out, err
@@ -221,11 +221,11 @@ func (d ReportData) PeriodSummary(ctx context.Context, q extensionsrc.ReportQuer
 	if err != nil {
 		return out, err
 	}
-	rows := map[store.UnitPair]*extensionsrc.SummaryRow{}
-	row := func(p, c string) *extensionsrc.SummaryRow {
+	rows := map[store.UnitPair]*knreportsport.SummaryRow{}
+	row := func(p, c string) *knreportsport.SummaryRow {
 		k := store.UnitPair{Province: p, Commune: c}
 		if rows[k] == nil {
-			rows[k] = &extensionsrc.SummaryRow{ProvinceCode: p, CommuneCode: c, SownAreaHa: decimal.Zero, AffectedAreaHa: decimal.Zero,
+			rows[k] = &knreportsport.SummaryRow{ProvinceCode: p, CommuneCode: c, SownAreaHa: decimal.Zero, AffectedAreaHa: decimal.Zero,
 				RegisteredHa: decimal.Zero, CompletedHa: decimal.Zero}
 		}
 		return rows[k]

@@ -68,3 +68,7 @@ Gốc lắp ráp dùng các hàm thuần tại reports: ValidateForm/EvaluateFor
 ## Nhãn và namespace gửi báo cáo (KNSPLIT-2-REPORTS-K)
 
 Policy.DispatchProfile là metadata tin cậy lúc bootstrap: nhãn phòng ban cho subject, lời chào/tên bên gửi, namespace khóa tệp và khóa GoogleSheet. KNReportPolicy sở hữu giá trị; capability render chung và giữ kiểm quyền/DLP/tenant. Registry copyvalue/không nhiều default/không nhậnHTTP, thiếu cấu hình ở registry explicit trả dependency unavailable. L đã gỡ legacyprofile vàformatterBodyKNcũ: nil hoặc empty registry thiếu profile đều trả dependency unavailable. Generic BodyFor chỉ dùng nhãn đăng ký. Các policy native không dùng dispatch không cần profile. Nội dung cũ và4site DLP được bảo vệ bằng goldenprofile/messages cùng hồi quy gửi/link/PII.
+
+## Hợp đồng nguồn KN (KNSPLIT-2-REPORTS-M)
+
+KNproducer/builder dùng extension/port cho ReportData/query/rows/completeness và5ID nguồn. Capability chỉ nhận SourceBuildQuery/SourceData qua builder đăng ký. M dùng alias tạm từKNport tới định nghĩa cap cũ để chuyển consumer trước; N mới chuyển định nghĩa vàoKN và xóa đường cũ. Không đảo alias từcap sangKN. Cổng Consolidations/DispatchHistory dùng chung vẫn cần giữ ởcap vì renderer/worker tiêu thụ; không coi toàn bộKNSPLIT/G1 đãxong.

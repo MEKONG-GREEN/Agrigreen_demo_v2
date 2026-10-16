@@ -482,3 +482,13 @@ Pure-first4346.exit0 app1.048s/dispatch0.578s/extension1.347s/reportforms2.008s/
 
 
 Kết quả thực: PG31787.exit0 đủ13/13packagecótest,0FAIL/SKIP trênproduction2d72d02e: assembly:104.953s, worker:2.184s, formimport:2.182s, reportforms:2.043s, reports:93.995s, kn77:247.438s. Static68012.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. Missing/emptyprofiledenied, owner/genericfrozenmessages và4DLPsite/copy/invalid/duplicate đạt;khôngđổiartifactK/I/webfixtures. ProofTEMP agrigreen-codex-knsplit2reportsl-proof.json. Helpercòn8migrationgate trướcdev. SourceDTO/data/registrykhác/tenant/client/KHTCremindercòn.
+
+## KNSPLIT-2-REPORTS-M — Consumer nguồn dữ liệu qua KNport (nền5cb2d5c8)
+
+Downstream consumers: KNextension app/program+reportdata/store/reportdata/module/builder/catalog+test/handler source integration; tests/reports fakeData; generic builder/query/export; API/worker/KN77/SDK/CLI. Dependency evidence: rg -l 'extensionsrc\.(ReportQuery|ReportData|Completeness|SowingRow|SowingData|PestRow|PestData|ProgramRow|ProgramData|TaskRow|TaskData|SummaryRow|SummaryData)' -g '*.go' .; rg -l 'reportsport.Source(Sowing|GrowthPest|ProgramProgress|TasksSLA|PeriodSummary)' -g '*.go' .; inventoryTEMP agrigreen-codex-knsplit2reportsm-callers.json.9changedcallers,13DTO+5IDs; khôngplatformconsumer phảiimportKN.
+
+Regression acceptance command: PGriêng, go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./internal/kn/extension/app ./internal/kn/extension/store ./internal/kn/extension/handler ./cmd/api-platform/assembly ./cmd/worker ./cmd/formimport ./tests/reportforms ./tests/reports ./tests/kn77.14testpackagesdựkiến,app/storekhôngtestnhưngcompile;fullKNhandler bảo vệSQLproducer/scopes. ĐủstaticCODEX-G1/helper8migrationgate; miễnfrontend/mobile vì wire/UI/fixtureskhôngđổi; build/vet toànrepo. Usercho phépG1,khôngSMTP/data thật,giữmain/worktree.
+
+Related test points: TestProgramProgressFR03, TestReportDataSowingAndSummary, TestReportSourceBuildersFiguresAndMissingTargets, genericSourceBuilderBindsJobAndCopies, ownerCatalog/seed/profilegoldens, HTTP/export/KN77. Mchỉaliasvàqualifierkhôngbehavior;N mới gỡcapdefinitions.
+
+Pure-first1203.exit0,0FAIL/SKIP gồmowner/registry/golden/SDK/CLI;KNapp/storecompilekhôngcótest. Script bảo vệ import đơn/nhóm import cuối, không chạyGo khi chưa đủ9callers; đã hoàn tất vàgofmt, không cóCodecompilefailure. Cần14PGproducer/fullhandler vàconsumer trướcdev.

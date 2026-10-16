@@ -16,7 +16,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/store"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
@@ -193,23 +192,23 @@ func (s *Service) ApproveProgramReport(ctx context.Context, id uuid.UUID, note s
 }
 
 // ProgramProgress trả tiến độ Đề án trong phạm vi người gọi (FR-03, FR-10 lớp bản đồ).
-func (s *Service) ProgramProgress(ctx context.Context, unit, season string, year int) (extensionsrc.ProgramData, error) {
+func (s *Service) ProgramProgress(ctx context.Context, unit, season string, year int) (port.ProgramData, error) {
 	p, err := authz.Require(ctx, knReaders...)
 	if err != nil {
-		return extensionsrc.ProgramData{}, err
+		return port.ProgramData{}, err
 	}
 	sc, err := s.scope(ctx, p)
 	if err != nil {
-		return extensionsrc.ProgramData{}, err
+		return port.ProgramData{}, err
 	}
 	if sc.Empty() {
-		return extensionsrc.ProgramData{}, ErrOutOfScope.WithDetail("tài khoản chưa gắn đơn vị công tác")
+		return port.ProgramData{}, ErrOutOfScope.WithDetail("tài khoản chưa gắn đơn vị công tác")
 	}
 	unit = strings.TrimSpace(unit)
 	if unit != "" && !sc.Allows(unit) {
-		return extensionsrc.ProgramData{}, ErrOutOfScope
+		return port.ProgramData{}, ErrOutOfScope
 	}
-	return ReportData{Svc: s}.ProgramProgress(ctx, extensionsrc.ReportQuery{
+	return ReportData{Svc: s}.ProgramProgress(ctx, port.ReportQuery{
 		TenantID: p.TenantID, Scope: sc, Unit: unit, SeasonCode: strings.TrimSpace(season), SeasonYear: year, At: s.now(),
 	})
 }

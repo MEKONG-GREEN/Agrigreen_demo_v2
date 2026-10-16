@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-REPORTS-M — Chuyển9consumer sangKNport aliases13DTO/5ID, giữtypeidentity; chờ14PG/static/helper. N mới sở hữu định nghĩa vàgỡcap cũ.

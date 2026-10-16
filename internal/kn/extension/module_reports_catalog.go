@@ -1,6 +1,9 @@
 package extension
 
-import reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+import (
+	knreportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+)
 
 const reportCatalogProvisionalNote = "Mẫu tạm: BRD chỉ nêu \"theo mẫu Bộ NN&MT/NN&PTNT\" nhưng chưa có mẫu biểu chính thức — bố cục sẽ điều chỉnh khi Bộ ban hành."
 
@@ -29,7 +32,7 @@ func reportCatalogTemplateColumns(sources map[string]reportsport.CatalogSource, 
 // ReportCatalog owns the source schema and default report layouts of KN.
 func ReportCatalog() reportsport.CatalogRegistration {
 	sources := map[string]reportsport.CatalogSource{
-		reportsport.SourceSowing: {Key: reportsport.SourceSowing, Module: "extension", Levels: reportCatalogLevels(), DefaultLevel: "province", NeedsPeriod: true,
+		knreportsport.SourceSowing: {Key: knreportsport.SourceSowing, Module: "extension", Levels: reportCatalogLevels(), DefaultLevel: "province", NeedsPeriod: true,
 			Columns: reportCatalogColumns(
 				reportsport.CatalogColumn{Key: "season_code", Title: "Vụ", Kind: "text"},
 				reportsport.CatalogColumn{Key: "variety_code", Title: "Giống", Kind: "text"},
@@ -37,7 +40,7 @@ func ReportCatalog() reportsport.CatalogRegistration {
 				reportsport.CatalogColumn{Key: "cooperatives", Title: "Số HTX báo cáo", Kind: "int"},
 				reportsport.CatalogColumn{Key: "reports", Title: "Số báo cáo", Kind: "int"},
 			)},
-		reportsport.SourceGrowthPest: {Key: reportsport.SourceGrowthPest, Module: "extension", Levels: reportCatalogLevels(), DefaultLevel: "province", NeedsPeriod: true,
+		knreportsport.SourceGrowthPest: {Key: knreportsport.SourceGrowthPest, Module: "extension", Levels: reportCatalogLevels(), DefaultLevel: "province", NeedsPeriod: true,
 			Columns: reportCatalogColumns(
 				reportsport.CatalogColumn{Key: "pest_code", Title: "Sâu bệnh", Kind: "text"},
 				reportsport.CatalogColumn{Key: "severity", Title: "Mức độ nhiễm", Kind: "text"},
@@ -45,7 +48,7 @@ func ReportCatalog() reportsport.CatalogRegistration {
 				reportsport.CatalogColumn{Key: "observations", Title: "Số lượt quan sát", Kind: "int"},
 				reportsport.CatalogColumn{Key: "urgent", Title: "Phản ánh khẩn", Kind: "int"},
 			)},
-		reportsport.SourceProgramProgress: {Key: reportsport.SourceProgramProgress, Module: "extension",
+		knreportsport.SourceProgramProgress: {Key: knreportsport.SourceProgramProgress, Module: "extension",
 			Levels: []string{"national", "province", "commune", "cooperative"}, DefaultLevel: "province", UsesSeason: true,
 			Columns: reportCatalogColumns(
 				reportsport.CatalogColumn{Key: "cooperative_name", Title: "HTX", Kind: "text", MinLevel: "cooperative"},
@@ -58,7 +61,7 @@ func ReportCatalog() reportsport.CatalogRegistration {
 				reportsport.CatalogColumn{Key: "cooperatives", Title: "Số HTX", Kind: "int"},
 				reportsport.CatalogColumn{Key: "unapproved", Title: "Chưa duyệt", Kind: "int"},
 			)},
-		reportsport.SourceTasksSLA: {Key: reportsport.SourceTasksSLA, Module: "extension", Levels: reportCatalogLevels(), DefaultLevel: "province", NeedsPeriod: true,
+		knreportsport.SourceTasksSLA: {Key: knreportsport.SourceTasksSLA, Module: "extension", Levels: reportCatalogLevels(), DefaultLevel: "province", NeedsPeriod: true,
 			Columns: reportCatalogColumns(
 				reportsport.CatalogColumn{Key: "opened", Title: "Nhiệm vụ mới", Kind: "int"},
 				reportsport.CatalogColumn{Key: "resolved", Title: "Đã xử lý", Kind: "int"},
@@ -67,7 +70,7 @@ func ReportCatalog() reportsport.CatalogRegistration {
 				reportsport.CatalogColumn{Key: "open", Title: "Đang mở", Kind: "int"},
 				reportsport.CatalogColumn{Key: "overdue", Title: "Quá hạn", Kind: "int"},
 			)},
-		reportsport.SourcePeriodSummary: {Key: reportsport.SourcePeriodSummary, Module: "extension", Levels: reportCatalogLevels(), DefaultLevel: "province", NeedsPeriod: true,
+		knreportsport.SourcePeriodSummary: {Key: knreportsport.SourcePeriodSummary, Module: "extension", Levels: reportCatalogLevels(), DefaultLevel: "province", NeedsPeriod: true,
 			Columns: reportCatalogColumns(
 				reportsport.CatalogColumn{Key: "sown_area_ha", Title: "Diện tích đã sạ (ha)", Kind: "decimal", Scale: 2},
 				reportsport.CatalogColumn{Key: "affected_area_ha", Title: "Diện tích nhiễm sâu bệnh (ha)", Kind: "decimal", Scale: 2},
@@ -84,22 +87,22 @@ func ReportCatalog() reportsport.CatalogRegistration {
 		return reportsport.CatalogTemplate{Key: key, Def: def}
 	}
 	return reportsport.CatalogRegistration{Sources: sources, Templates: []reportsport.CatalogTemplate{
-		mk("kn.sowing_progress", reportsport.CatalogDefinition{Title: "Báo cáo tiến độ gieo sạ", Source: reportsport.SourceSowing, Grouping: "commune",
-			Columns: reportCatalogTemplateColumns(sources, reportsport.SourceSowing, "province_name", "commune_name", "season_code", "variety_code", "sown_area_ha", "cooperatives"),
+		mk("kn.sowing_progress", reportsport.CatalogDefinition{Title: "Báo cáo tiến độ gieo sạ", Source: knreportsport.SourceSowing, Grouping: "commune",
+			Columns: reportCatalogTemplateColumns(sources, knreportsport.SourceSowing, "province_name", "commune_name", "season_code", "variety_code", "sown_area_ha", "cooperatives"),
 			Formats: []string{"xlsx", "pdf"}, Provisional: true, FormNote: reportCatalogProvisionalNote}),
-		mk("kn.growth_pest", reportsport.CatalogDefinition{Title: "Báo cáo tình hình sinh trưởng và sâu bệnh", Source: reportsport.SourceGrowthPest, Grouping: "commune",
-			Columns: reportCatalogTemplateColumns(sources, reportsport.SourceGrowthPest, "province_name", "commune_name", "pest_code", "severity", "affected_area_ha", "observations", "urgent"),
+		mk("kn.growth_pest", reportsport.CatalogDefinition{Title: "Báo cáo tình hình sinh trưởng và sâu bệnh", Source: knreportsport.SourceGrowthPest, Grouping: "commune",
+			Columns: reportCatalogTemplateColumns(sources, knreportsport.SourceGrowthPest, "province_name", "commune_name", "pest_code", "severity", "affected_area_ha", "observations", "urgent"),
 			Formats: []string{"xlsx", "pdf"}, Provisional: true, FormNote: reportCatalogProvisionalNote}),
-		mk("kn.program_progress", reportsport.CatalogDefinition{Title: "Báo cáo tiến độ Đề án 1 triệu ha lúa chất lượng cao, phát thải thấp", Source: reportsport.SourceProgramProgress,
+		mk("kn.program_progress", reportsport.CatalogDefinition{Title: "Báo cáo tiến độ Đề án 1 triệu ha lúa chất lượng cao, phát thải thấp", Source: knreportsport.SourceProgramProgress,
 			Grouping: "province",
-			Columns: reportCatalogTemplateColumns(sources, reportsport.SourceProgramProgress, "province_name", "season", "target_ha", "registered_ha", "deploying_ha", "completed_ha",
+			Columns: reportCatalogTemplateColumns(sources, knreportsport.SourceProgramProgress, "province_name", "season", "target_ha", "registered_ha", "deploying_ha", "completed_ha",
 				"registered_pct", "cooperatives", "unapproved"),
 			Formats: []string{"xlsx", "pdf"}, Provisional: true, FormNote: reportCatalogProvisionalNote}),
-		mk("kn.tasks_sla", reportsport.CatalogDefinition{Title: "Báo cáo xử lý nhiệm vụ hỗ trợ", Source: reportsport.SourceTasksSLA, Grouping: "province",
-			Columns: reportCatalogTemplateColumns(sources, reportsport.SourceTasksSLA, "province_name", "opened", "resolved", "on_time", "escalated", "open", "overdue"),
+		mk("kn.tasks_sla", reportsport.CatalogDefinition{Title: "Báo cáo xử lý nhiệm vụ hỗ trợ", Source: knreportsport.SourceTasksSLA, Grouping: "province",
+			Columns: reportCatalogTemplateColumns(sources, knreportsport.SourceTasksSLA, "province_name", "opened", "resolved", "on_time", "escalated", "open", "overdue"),
 			Formats: []string{"xlsx", "pdf"}, Provisional: true, FormNote: reportCatalogProvisionalNote}),
-		mk("kn.period_summary", reportsport.CatalogDefinition{Title: "Tổng hợp báo cáo kỳ", Source: reportsport.SourcePeriodSummary, Grouping: "province",
-			Columns: reportCatalogTemplateColumns(sources, reportsport.SourcePeriodSummary, "province_name", "sown_area_ha", "affected_area_ha", "pest_reports", "urgent_reports",
+		mk("kn.period_summary", reportsport.CatalogDefinition{Title: "Tổng hợp báo cáo kỳ", Source: knreportsport.SourcePeriodSummary, Grouping: "province",
+			Columns: reportCatalogTemplateColumns(sources, knreportsport.SourcePeriodSummary, "province_name", "sown_area_ha", "affected_area_ha", "pest_reports", "urgent_reports",
 				"registered_ha", "completed_ha", "tasks_opened", "tasks_resolved", "tasks_overdue"),
 			Formats: []string{"xlsx", "pdf"}, Provisional: true, FormNote: reportCatalogProvisionalNote}),
 	}}

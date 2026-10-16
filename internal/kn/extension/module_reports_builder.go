@@ -2,10 +2,10 @@ package extension
 
 import (
 	"context"
+	knreportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/google/uuid"
@@ -17,7 +17,7 @@ import (
 )
 
 type ReportBuilderDeps struct {
-	Data     extensionsrc.ReportData
+	Data     knreportsport.ReportData
 	Orgs     partyport.Orgs
 	Units    partyport.AdminUnits
 	Catalogs mdport.Catalogs
@@ -28,7 +28,7 @@ type reportSourceBuilder struct{ deps ReportBuilderDeps }
 func ReportBuilders(deps ReportBuilderDeps) []reportsport.SourceBuilderRegistration {
 	b := &reportSourceBuilder{deps: deps}
 	out := []reportsport.SourceBuilderRegistration{}
-	for _, source := range []string{reportsport.SourceSowing, reportsport.SourceGrowthPest, reportsport.SourceProgramProgress, reportsport.SourceTasksSLA, reportsport.SourcePeriodSummary} {
+	for _, source := range []string{knreportsport.SourceSowing, knreportsport.SourceGrowthPest, knreportsport.SourceProgramProgress, knreportsport.SourceTasksSLA, knreportsport.SourcePeriodSummary} {
 		out = append(out, reportsport.SourceBuilderRegistration{Source: source, Build: b.build})
 	}
 	return out
@@ -178,7 +178,7 @@ func (n *reportSourceNames) unitKey(ctx context.Context, level, province, commun
 
 func reportSourceInt64(n int64) decimal.Decimal { return decimal.NewFromInt(n) }
 
-func reportSourceCompletenessNotes(c extensionsrc.Completeness) []string {
+func reportSourceCompletenessNotes(c knreportsport.Completeness) []string {
 	var out []string
 	if len(c.MissingCommunes) > 0 {
 		out = append(out, "Còn "+strconv.Itoa(len(c.MissingCommunes))+"/"+strconv.Itoa(c.ExpectedCommunes)+" xã chưa gửi báo cáo của kỳ: "+
@@ -204,7 +204,7 @@ func (s *reportSourceBuilder) build(ctx context.Context, request reportsport.Sou
 	if s.deps.Data == nil {
 		return reportsport.SourceData{}, problem.New(http.StatusServiceUnavailable, "reports.dependency_unavailable", "Dịch vụ phụ thuộc chưa sẵn sàng").WithDetail("chưa nối cổng dữ liệu pf/extension")
 	}
-	q := extensionsrc.ReportQuery{TenantID: request.TenantID, Scope: request.Scope, Unit: request.Unit, Periods: request.Periods, SeasonCode: request.SeasonCode, SeasonYear: request.SeasonYear, At: request.At}
+	q := knreportsport.ReportQuery{TenantID: request.TenantID, Scope: request.Scope, Unit: request.Unit, Periods: request.Periods, SeasonCode: request.SeasonCode, SeasonYear: request.SeasonYear, At: request.At}
 	label := request.PeriodLabel
 	n := &reportSourceNames{d: s.deps, at: request.At, cache: map[string]string{}}
 	var b reportsport.SourceData
@@ -213,9 +213,9 @@ func (s *reportSourceBuilder) build(ctx context.Context, request reportsport.Sou
 	}
 	lv := request.Level
 	g := newReportSourceGrouper()
-	var comp extensionsrc.Completeness
+	var comp knreportsport.Completeness
 	switch request.Source {
-	case reportsport.SourceSowing:
+	case knreportsport.SourceSowing:
 		d, err := s.deps.Data.Sowing(ctx, q)
 		if err != nil {
 			return b, err
@@ -228,7 +228,7 @@ func (s *reportSourceBuilder) build(ctx context.Context, request reportsport.Sou
 				"sown_area_ha": r.SownAreaHa, "cooperatives": reportSourceInt64(r.Cooperatives), "reports": reportSourceInt64(r.Reports)})
 		}
 		comp = d.Completeness
-	case reportsport.SourceGrowthPest:
+	case knreportsport.SourceGrowthPest:
 		d, err := s.deps.Data.GrowthPest(ctx, q)
 		if err != nil {
 			return b, err
@@ -241,7 +241,7 @@ func (s *reportSourceBuilder) build(ctx context.Context, request reportsport.Sou
 				"affected_area_ha": r.AffectedAreaHa, "observations": reportSourceInt64(r.Observations), "urgent": reportSourceInt64(r.Urgent)})
 		}
 		comp = d.Completeness
-	case reportsport.SourceTasksSLA:
+	case knreportsport.SourceTasksSLA:
 		d, err := s.deps.Data.TasksSLA(ctx, q)
 		if err != nil {
 			return b, err
@@ -251,7 +251,7 @@ func (s *reportSourceBuilder) build(ctx context.Context, request reportsport.Sou
 			g.add(k, base, map[string]decimal.Decimal{"opened": reportSourceInt64(r.Opened), "resolved": reportSourceInt64(r.Resolved), "on_time": reportSourceInt64(r.OnTime),
 				"escalated": reportSourceInt64(r.Escalated), "open": reportSourceInt64(r.Open), "overdue": reportSourceInt64(r.Overdue)})
 		}
-	case reportsport.SourcePeriodSummary:
+	case knreportsport.SourcePeriodSummary:
 		d, err := s.deps.Data.PeriodSummary(ctx, q)
 		if err != nil {
 			return b, err
@@ -264,7 +264,7 @@ func (s *reportSourceBuilder) build(ctx context.Context, request reportsport.Sou
 				"tasks_overdue": reportSourceInt64(r.TasksOverdue)})
 		}
 		comp = d.Completeness
-	case reportsport.SourceProgramProgress:
+	case knreportsport.SourceProgramProgress:
 		return s.buildProgram(ctx, request, q, n)
 	}
 	b.Rows, b.Total = g.result(), g.totalRow()
@@ -288,7 +288,7 @@ func reportSourceDims(def reportsport.SourceBuildQuery, kv ...string) string {
 	return b.String()
 }
 
-func (s *reportSourceBuilder) buildProgram(ctx context.Context, request reportsport.SourceBuildQuery, q extensionsrc.ReportQuery, n *reportSourceNames) (reportsport.SourceData, error) {
+func (s *reportSourceBuilder) buildProgram(ctx context.Context, request reportsport.SourceBuildQuery, q knreportsport.ReportQuery, n *reportSourceNames) (reportsport.SourceData, error) {
 	d, err := s.deps.Data.ProgramProgress(ctx, q)
 	if err != nil {
 		return reportsport.SourceData{}, err

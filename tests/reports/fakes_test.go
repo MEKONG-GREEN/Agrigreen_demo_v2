@@ -8,12 +8,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	knreportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -156,16 +156,16 @@ func dp(s string) *decimal.Decimal {
 // fakeExt là cổng dữ liệu pf/extension giả: số liệu cố định, ghi lại truy vấn.
 type fakeExt struct {
 	mu   sync.Mutex
-	last extensionsrc.ReportQuery
+	last knreportsport.ReportQuery
 }
 
-func (f *fakeExt) record(q extensionsrc.ReportQuery) {
+func (f *fakeExt) record(q knreportsport.ReportQuery) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.last = q
 }
 
-func (f *fakeExt) lastQuery() extensionsrc.ReportQuery {
+func (f *fakeExt) lastQuery() knreportsport.ReportQuery {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.last
@@ -175,41 +175,41 @@ func inScope(sc authz.Scope, commune, province string) bool {
 	return sc.All || sc.Allows(commune) || sc.Allows(province)
 }
 
-func (f *fakeExt) Sowing(_ context.Context, q extensionsrc.ReportQuery) (extensionsrc.SowingData, error) {
+func (f *fakeExt) Sowing(_ context.Context, q knreportsport.ReportQuery) (knreportsport.SowingData, error) {
 	f.record(q)
-	all := []extensionsrc.SowingRow{
+	all := []knreportsport.SowingRow{
 		{ProvinceCode: pAG, CommuneCode: cBinhDuc, SeasonCode: "HT", VarietyCode: "ST25", SownAreaHa: d("1234.5678"), Cooperatives: 2, Reports: 3},
 		{ProvinceCode: pAG, CommuneCode: cBinhDuc, SeasonCode: "HT", VarietyCode: "OM5451", SownAreaHa: d("0.1"), Cooperatives: 1, Reports: 1},
 		{ProvinceCode: pCT, CommuneCode: cCaiKhe, SeasonCode: "HT", VarietyCode: "ST25", SownAreaHa: d("10"), Cooperatives: 1, Reports: 1},
 	}
-	var out extensionsrc.SowingData
+	var out knreportsport.SowingData
 	for _, r := range all {
 		if inScope(q.Scope, r.CommuneCode, r.ProvinceCode) {
 			out.Rows = append(out.Rows, r)
 		}
 	}
-	out.Completeness = extensionsrc.Completeness{ExpectedCommunes: 2, ReportedCommunes: 1, MissingCommunes: []string{cMyThoi}, Provisional: true}
+	out.Completeness = knreportsport.Completeness{ExpectedCommunes: 2, ReportedCommunes: 1, MissingCommunes: []string{cMyThoi}, Provisional: true}
 	return out, nil
 }
 
-func (f *fakeExt) GrowthPest(_ context.Context, q extensionsrc.ReportQuery) (extensionsrc.PestData, error) {
+func (f *fakeExt) GrowthPest(_ context.Context, q knreportsport.ReportQuery) (knreportsport.PestData, error) {
 	f.record(q)
-	return extensionsrc.PestData{}, nil
+	return knreportsport.PestData{}, nil
 }
 
-func (f *fakeExt) ProgramProgress(_ context.Context, q extensionsrc.ReportQuery) (extensionsrc.ProgramData, error) {
+func (f *fakeExt) ProgramProgress(_ context.Context, q knreportsport.ReportQuery) (knreportsport.ProgramData, error) {
 	f.record(q)
-	return extensionsrc.ProgramData{Targets: map[string]*decimal.Decimal{}}, nil
+	return knreportsport.ProgramData{Targets: map[string]*decimal.Decimal{}}, nil
 }
 
-func (f *fakeExt) TasksSLA(_ context.Context, q extensionsrc.ReportQuery) (extensionsrc.TaskData, error) {
+func (f *fakeExt) TasksSLA(_ context.Context, q knreportsport.ReportQuery) (knreportsport.TaskData, error) {
 	f.record(q)
-	return extensionsrc.TaskData{}, nil
+	return knreportsport.TaskData{}, nil
 }
 
-func (f *fakeExt) PeriodSummary(_ context.Context, q extensionsrc.ReportQuery) (extensionsrc.SummaryData, error) {
+func (f *fakeExt) PeriodSummary(_ context.Context, q knreportsport.ReportQuery) (knreportsport.SummaryData, error) {
 	f.record(q)
-	return extensionsrc.SummaryData{}, nil
+	return knreportsport.SummaryData{}, nil
 }
 
 // fakeMech trả "kết quả cân đối đã lưu" cố định — số có 4 chữ số thập phân để
@@ -299,7 +299,7 @@ var (
 	_ partyport.AdminUnits            = (*fakeUnits)(nil)
 	_ params.Params                   = (*fakeParams)(nil)
 	_ mdport.Catalogs                 = fakeCatalogs{}
-	_ extensionsrc.ReportData         = (*fakeExt)(nil)
+	_ knreportsport.ReportData        = (*fakeExt)(nil)
 	_ mechanizationsrc.ReportData     = (*fakeMech)(nil)
 	_ cropcyclesrc.ReportData         = (*fakeCC)(nil)
 	_ accountsport.MailDirectory      = fakeDirectory{}

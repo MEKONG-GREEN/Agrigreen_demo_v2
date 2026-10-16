@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -51,11 +50,11 @@ func TestProgramProgressFR03(t *testing.T) {
 	}
 	// Cổng cho pf/reports: lọc đúng phạm vi truyền vào; tỉnh 92 không có dòng nào.
 	ctx := tenant.WithID(context.Background(), f.tenant)
-	d, err := f.mod.ReportData().ProgramProgress(ctx, extensionsrc.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{Units: []string{"30001"}}})
+	d, err := f.mod.ReportData().ProgramProgress(ctx, port.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{Units: []string{"30001"}}})
 	if err != nil || len(d.Rows) != 1 || d.Rows[0].RegisteredHa.String() != "300.5" || d.Rows[0].CompletedHa.String() != "50.25" || !d.Rows[0].Approved {
 		t.Fatalf("cổng đọc theo phạm vi xã: %+v %v", d, err)
 	}
-	if d, _ := f.mod.ReportData().ProgramProgress(ctx, extensionsrc.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{Units: []string{"92", "31001"}}}); len(d.Rows) != 0 {
+	if d, _ := f.mod.ReportData().ProgramProgress(ctx, port.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{Units: []string{"92", "31001"}}}); len(d.Rows) != 0 {
 		t.Fatalf("tỉnh khác: %+v", d.Rows)
 	}
 	// Gửi lại cùng HTX × vụ → phiên bản 2, phải duyệt lại.
@@ -63,7 +62,7 @@ func TestProgramProgressFR03(t *testing.T) {
 	if num(r2.body, "report", "version") != 2 {
 		t.Fatalf("phiên bản: %v", r2.body)
 	}
-	d, _ = f.mod.ReportData().ProgramProgress(ctx, extensionsrc.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{Units: []string{"30001"}}})
+	d, _ = f.mod.ReportData().ProgramProgress(ctx, port.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{Units: []string{"30001"}}})
 	if d.Rows[0].Approved || d.Rows[0].RegisteredHa.String() != "320" || !d.Completeness.Provisional {
 		t.Fatalf("phiên bản mới chưa duyệt: %+v", d)
 	}
@@ -86,7 +85,7 @@ func TestReportDataSowingAndSummary(t *testing.T) {
 	sow(p.off31001, "31001", f.org.c3.String(), "ST25", "5")
 	ctx := tenant.WithID(context.Background(), f.tenant)
 	rd := f.mod.ReportData()
-	q := extensionsrc.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{Units: []string{"89", "30001", "30002"}}, Periods: []string{"2026-09"}, At: t0}
+	q := port.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{Units: []string{"89", "30001", "30002"}}, Periods: []string{"2026-09"}, At: t0}
 	d, err := rd.Sowing(ctx, q)
 	if err != nil || len(d.Rows) != 2 {
 		t.Fatalf("gieo sạ tỉnh 89: %+v %v", d, err)
@@ -99,15 +98,15 @@ func TestReportDataSowingAndSummary(t *testing.T) {
 		t.Fatalf("xã 30002 chưa báo cáo → tạm tính: %+v", c)
 	}
 	// Quý III gom tháng 7–9; toàn quốc thấy cả 31001.
-	sum, err := rd.PeriodSummary(ctx, extensionsrc.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{All: true},
+	sum, err := rd.PeriodSummary(ctx, port.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{All: true},
 		Periods: []string{"2026-07", "2026-08", "2026-09"}, At: t0})
 	if err != nil || len(sum.Rows) != 2 || sum.Rows[0].SownAreaHa.String() != "10.1235" || sum.Rows[1].SownAreaHa.String() != "5" {
 		t.Fatalf("tổng hợp kỳ quý: %+v %v", sum.Rows, err)
 	}
-	if d, _ := rd.Sowing(ctx, extensionsrc.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{}, Periods: []string{"2026-09"}}); len(d.Rows) != 0 {
+	if d, _ := rd.Sowing(ctx, port.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{}, Periods: []string{"2026-09"}}); len(d.Rows) != 0 {
 		t.Fatal("phạm vi rỗng không thấy gì")
 	}
-	if _, err := rd.Sowing(ctx, extensionsrc.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{All: true}}); err == nil {
+	if _, err := rd.Sowing(ctx, port.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{All: true}}); err == nil {
 		t.Fatal("thiếu kỳ phải lỗi")
 	}
 }

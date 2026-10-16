@@ -37,7 +37,6 @@ import (
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
@@ -196,7 +195,7 @@ func (m *Module) Staff() notifyport.StaffDirectory { return app.StaffDirectory{S
 func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
 
 // ReportData cho pf/reports: đọc dữ liệu báo cáo FR-01..FR-05 theo phạm vi đã giải.
-func (m *Module) ReportData() extensionsrc.ReportData { return app.ReportData{Svc: m.svc} }
+func (m *Module) ReportData() port.ReportData { return app.ReportData{Svc: m.svc} }
 
 // OverdueTenants dựng bộ tìm tenant có nhiệm vụ quá hạn từ pool vai
 // ag_ops_jobs (worker, nối thẳng).
