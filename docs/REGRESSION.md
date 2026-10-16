@@ -479,3 +479,6 @@ Regression acceptance command: PGriêng, go test -v -count=1 -p 1 -timeout 55m .
 Related test points: TestDispatchProfileRequiresRegistration; TestRegisteredDispatchMessagesMatchLegacyContract; TestRegisteredDispatchProfileCopiesAndIsolation; TestDispatchProfileRegistrationRejectsInvalid; TestReportDispatchProfileMatchesLegacyContract; nativeMessageHelpers/GSheetValve vàHTTP/KN77/DLP/PII/dedup. Red1325.exit1 nilsuykn.,emptyPASS;giữfrozenartifactK,khôngcòngenerator.
 
 Pure-first4346.exit0 app1.048s/dispatch0.578s/extension1.347s/reportforms2.008s/CLI1.982s,0FAIL/SKIP; nil/empty failclosed, owner/frozenmessage/provisional/link/keys/registryboundary giữ. Hai mô tả Go cũ đồng bộ việc seed thuộc ứng dụng saupure, không đổi executable. Chờ13PG/static/helper trênheadcuối.
+
+
+Kết quả thực: PG31787.exit0 đủ13/13packagecótest,0FAIL/SKIP trênproduction2d72d02e: assembly:104.953s, worker:2.184s, formimport:2.182s, reportforms:2.043s, reports:93.995s, kn77:247.438s. Static68012.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. Missing/emptyprofiledenied, owner/genericfrozenmessages và4DLPsite/copy/invalid/duplicate đạt;khôngđổiartifactK/I/webfixtures. ProofTEMP agrigreen-codex-knsplit2reportsl-proof.json. Helpercòn8migrationgate trướcdev. SourceDTO/data/registrykhác/tenant/client/KHTCremindercòn.
