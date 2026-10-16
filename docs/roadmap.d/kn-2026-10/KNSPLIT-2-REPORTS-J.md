@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-REPORTS-J — Bỏ KNseed/default/wrapper khỏi cap, giữ15ca/byteartifact vàowner thật; chờPG/static/helper.
+- [x] KNSPLIT-2-REPORTS-J — Gỡ KNseed/default/wrapper, giữ15ca/byteartifact;13/13PG-finalnoSKIP/static-final đạt trên3289316b,boundary383; helper8migrationgate trướcdev. Dispatchcontent/sourceDTOcònkiểmkê.
