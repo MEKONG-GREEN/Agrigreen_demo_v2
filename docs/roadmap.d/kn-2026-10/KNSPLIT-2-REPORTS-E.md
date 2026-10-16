@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-REPORTS-E — Catalog5source/5builtin doKN đăng ký, goldenlegacy byteđúng và registry theoService; suite integration ởtests/reports dùng provider thật. ChờPG/static/helper. Adapter catalog cũ còn đếnF; data-builder/14gridseed còn gói sau.
+- [x] KNSPLIT-2-REPORTS-E — Catalog KN5source/5builtin qua instance registry, goldenlegacy byteđúng; 13/13PG noSKIP/static đạt, baseline388→383 do chuyển nguyênsuite tests/reports. Helper migration trước dev; F mới bỏ legacycatalog, builder/14gridseed còn gói sau.
