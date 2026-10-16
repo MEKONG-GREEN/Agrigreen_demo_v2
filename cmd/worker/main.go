@@ -523,7 +523,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			return nil, func() {}, err
 		}
 		md := masterdata.New(mdPool, clk)
-		rep := reports.New(repPool, clk, reports.Deps{Policies: []reportsport.Policy{extension.ReportPolicy()}, Params: md.Params(), Log: log})
+		rep := reports.New(repPool, clk, reports.Deps{Catalog: []reportsport.CatalogRegistration{extension.ReportCatalog()}, Policies: []reportsport.Policy{extension.ReportPolicy()}, Params: md.Params(), Log: log})
 		// G5 (ADR-0024): lối "lịch" của xuất báo cáo qua điểm kiểm soát chung (kênh report_export) —
 		// Checkpoint của pf/metering (r_metering); workerEgress ghi đè cho kiểm thử.
 		// AG_EGRESS_MODE sai → lỗi khởi động.

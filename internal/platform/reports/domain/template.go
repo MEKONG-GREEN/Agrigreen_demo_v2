@@ -92,7 +92,7 @@ func cols(extra ...ColumnSpec) []ColumnSpec { return append(unitCols(), extra...
 var extLevels = []string{LevelNational, LevelProvince, LevelCommune}
 
 // Sources là các nguồn dữ liệu được hỗ trợ.
-var Sources = map[string]SourceSpec{
+var legacySourceSpecs = map[string]SourceSpec{
 	port.SourceSowing: {Key: port.SourceSowing, Module: "extension", Levels: extLevels, DefaultLevel: LevelProvince, NeedsPeriod: true,
 		Columns: cols(
 			ColumnSpec{Key: "season_code", Title: "Vụ", Kind: KindText},
@@ -143,6 +143,9 @@ var Sources = map[string]SourceSpec{
 			ColumnSpec{Key: "tasks_resolved", Title: "Nhiệm vụ đã xử lý", Kind: KindInt},
 			ColumnSpec{Key: "tasks_overdue", Title: "Nhiệm vụ quá hạn", Kind: KindInt},
 		)},
+}
+
+var nativeSourceSpecs = map[string]SourceSpec{
 	// CGH FN-10 — cột đúng "Cấu trúc file xuất Excel/PDF" của BRD v1.3.
 	port.SourceCGHSummary: {Key: port.SourceCGHSummary, Module: "mechanization", Levels: []string{LevelProvince, LevelCommune},
 		DefaultLevel: LevelProvince, UsesSeason: true,
@@ -209,6 +212,9 @@ var Sources = map[string]SourceSpec{
 		}},
 }
 
+// Sources remains the legacy default during the registry migration.
+var Sources = legacySources()
+
 // HasColumn cho biết mẫu có cột key.
 func (d Definition) HasColumn(key string) bool {
 	return slices.ContainsFunc(d.Columns, func(c Column) bool { return c.Key == key })
@@ -262,9 +268,12 @@ func (e FieldError) Error() string { return e.Field + ": " + e.Msg }
 func ValidKey(k string) bool { return keyRe.MatchString(k) }
 
 // Validate kiểm định nghĩa mẫu: nguồn có hỗ trợ, cấp tổng hợp hợp lệ, cột thuộc nguồn, định dạng.
-func (d *Definition) Validate() error {
+func (d *Definition) Validate() error { return d.ValidateWithSources(Sources) }
+
+// ValidateWithSources validates against the application's immutable catalog.
+func (d *Definition) ValidateWithSources(sources map[string]SourceSpec) error {
 	d.Title, d.FormNote = strings.TrimSpace(d.Title), strings.TrimSpace(d.FormNote)
-	src, ok := Sources[d.Source]
+	src, ok := sources[d.Source]
 	switch {
 	case len([]rune(d.Title)) < 5 || len([]rune(d.Title)) > 200:
 		return FieldError{"title", "5–200 ký tự"}
@@ -307,8 +316,9 @@ func (d *Definition) Validate() error {
 }
 
 // LevelAllowed cho biết cấp có dùng được với nguồn.
-func LevelAllowed(source, level string) bool {
-	return slices.Contains(Sources[source].Levels, level)
+func LevelAllowed(source, level string) bool { return LevelAllowedWithSources(source, level, Sources) }
+func LevelAllowedWithSources(source, level string, sources map[string]SourceSpec) bool {
+	return slices.Contains(sources[source].Levels, level)
 }
 
 // ColumnVisible: cột có MinLevel chỉ hiện khi cấp tổng hợp đủ chi tiết.

@@ -44,3 +44,8 @@ KNSPLIT-2-FORMS-A đã đăng ký các consumer KN trước; bước B bỏ nhá
 ## Nhóm quyền và cấu hình reports (KNSPLIT-2-REPORTS-C)
 
 `reports.Deps.Policies` nhận các `port.Policy` tin cậy lúc lắp ráp. Port chỉ DTO, reports/app clone thành registry bất biến; giữ native roles của capability, nối các quyền theo operation/source và các vai có organization scope. Tham số attachment do ứng dụng đăng ký, xung đột key bị chặn ngay bootstrap. KN sở hữu `extension.ReportPolicy()`, đăng ký tại API/worker/KN77. Bước D đã gỡ adapter cũ: slice nil hoặc rỗng đều chỉ giữ native capability grants, không suy vai hay attachment parameter của ứng dụng. Không nhận policy từ HTTP; actor/tenant/scope dữ liệu không do registration đúc.
+
+
+## Catalog reports (KNSPLIT-2-REPORTS-E)
+
+`reports.Deps.Catalog` nhận các `port.CatalogRegistration` lúc lắp ráp. Native sources/templates thuộc capability; ứng dụng đăng ký metadata của mình qua DTO, reports/app tạo registry bất biến riêng cho mỗi Service. Không đăng ký qua HTTP, không mutate global Sources. Cùng catalog được dùng khi validate mẫu, kiểm source role, giải template, chuẩn hóa lịch/bộ lọc và dựng cột xuất. KN sở hữu `extension.ReportCatalog()`; fixture lắp ráp thật đặt ở tests/reports và KN77. Trong E nil còn legacy adapter, F mới bỏ; empty slice chủ động chỉ native CGH/HTX. Cột/tiêu đề/bố cục cũ được bảo vệ bằng golden legacy byte.

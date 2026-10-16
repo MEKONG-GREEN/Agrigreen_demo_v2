@@ -272,7 +272,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	nt.UseAreaFarmers(AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}) // HTX US-NEWS-03
 
 	// pf/reports: API tạo việc xuất và cấp URL tải; worker dựng tệp (cmd/worker). Địa chỉ email tra qua pf/accounts (MailDirectory).
-	rep := reports.New(unit, clk, reports.Deps{Policies: []reportsport.Policy{extension.ReportPolicy()},
+	rep := reports.New(unit, clk, reports.Deps{Catalog: []reportsport.CatalogRegistration{extension.ReportCatalog()}, Policies: []reportsport.Policy{extension.ReportPolicy()},
 		ResolveSession: extension.ReportSessionResolver(pty.Orgs()),
 		Scope:          pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
 		Extension: kn.ReportData(), Mechanization: mech.ReportData(), CropCycle: coop.ReportData(), Directory: acc.MailDirectory(),

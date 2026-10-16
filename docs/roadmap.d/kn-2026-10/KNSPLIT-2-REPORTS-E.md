@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-REPORTS-E — Catalog5source/5builtin doKN đăng ký, goldenlegacy byteđúng và registry theoService; suite integration ởtests/reports dùng provider thật. ChờPG/static/helper. Adapter catalog cũ còn đếnF; data-builder/14gridseed còn gói sau.

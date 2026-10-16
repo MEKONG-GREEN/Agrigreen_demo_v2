@@ -380,3 +380,14 @@ Related test points: TestReportPolicyRequiresRegistration, TestRegisteredReportP
 Red2392.exit1 bắt đúng nil policy suy quyền/scope/param ngầm, empty registry PASS. Pure-first thiếu import domain (compile), đã khôi phục. Pure-second.exit0 app1.630s,0FAIL/SKIP, ma trận10vai và mixed HTX giữ phạm vi HTX, mẫu, nguồn và tác vụ. Chờ PG/static/helper thật; catalog/dataset/seed vẫn có việc tiếp theo.
 
 Kết quả thực: PG65853.exit0 đủ13/13package,0FAIL/SKIP (handler:124.084s, assembly:107.913s, worker:2.382s, kn77:254.394s); production53a19e4d không đổi. Static44159.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary388/lint0issues. Gofmt toàn repo chỉ2fixture cũ được phép. Baseline chỉ xóa2entry import đã gỡ. ProofJSON hostTEMP agrigreen-codex-knsplit2reportsd-proof.json. Helper còn kiểm8migrationgate trước tích hợp; source/catalog/seed vẫn có gói tiếp theo.
+
+
+## KNSPLIT-2-REPORTS-E — Catalog registry và consumer suite (nềndf2ba484)
+
+Downstream consumers: reports/domain validate/build columns; reports/app template resolution/exports/schedules/policy/buildDataset; module Deps; KN ReportCatalog; API/hai worker/KN77; integration suite tests/reports. Dependency evidence: `rg -n 'domain.Sources|sourceSpecs|sourceSpec|Builtin|resolveTemplate|effectiveTemplates|CatalogRegistration|ReportCatalog|reports.New' internal cmd tests -g '*.go'`. Bảy test files chuyển từ reports/handler sang tests/reports, assertions giữ nguyên; fixture giờ dùng provider KN thật qua root lắp ráp. Thay command hiện hành để tránh chạy thư mục handler không còn test rồi báo đạt.
+
+Regression acceptance command: PostgreSQL riêng, `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./tests/reports ./tests/kn77`, đủ static CODEX-G1/helper8migrationgate. Miễn frontend/mobile/acceptance ngoài scope vì contract/DTO wire/UI/SQL không đổi; build/vet toàn repo vẫn bắt buộc. User đã cho phép G1, không dữ liệu/SMTP thật, giữ main/worktrees.
+
+Related test points: TestLegacyReportCatalogContract, TestRegisteredCatalogMatchesLegacy, TestCatalogRegistrationIsolation, TestCatalogRegistrationRejectsAmbiguity, TestReportCatalogMatchesLegacyContract; toàn bộ suite reports HTTP đã chuyển, KN77 quyền/phòng/tỉnh/PII/tenant.
+
+Golden-capture.exit0/app1.810s từ legacy metadata, không từ provider mới. Pure-first chỉ compile unused import. Pure-second90371.exit0 app2.209s/domain0.836s/extension1.712s,0FAIL/SKIP:5source/5layout owner khớp byte và9source/9layout sau merge cùng validate/build. Không coi bộ dựng hoặc seed đã chuyển. Chờ PG/static/helper thực.

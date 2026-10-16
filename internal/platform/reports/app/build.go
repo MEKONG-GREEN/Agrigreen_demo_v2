@@ -162,7 +162,10 @@ func (s *Service) buildDataset(ctx context.Context, j domain.Job) (domain.Datase
 	ctx = tenant.WithID(ctx, j.TenantID)
 	sc := authz.Scope{All: j.ScopeAll, Units: j.ScopeUnits}
 	n := &names{s: s, cache: map[string]string{}}
-	src := domain.Sources[j.Def.Source]
+	src, registered := s.sourceSpecs()[j.Def.Source]
+	if !registered {
+		return domain.Dataset{}, ErrDependency.WithDetail("nguồn báo cáo chưa được đăng ký")
+	}
 	meta := []domain.Meta{{Label: "Ngày xuất", Value: domain.FormatDateTimeVN(j.RequestedAt)}}
 	var b built
 	var err error
@@ -185,11 +188,13 @@ func (s *Service) buildDataset(ctx context.Context, j domain.Job) (domain.Datase
 		if err != nil {
 			return domain.Dataset{}, err
 		}
-		ds := domain.Build(j.Def, j.Params.Level, b.rows, b.total)
+		ds := domain.BuildWithSources(j.Def, j.Params.Level, b.rows, b.total, s.sourceSpecs())
 		ds.Meta = append(meta, b.meta...)
 		ds.Provisional = b.provisional
 		ds.Notes = append(b.notes, ds.Notes...)
 		return ds, nil
+	default:
+		return domain.Dataset{}, ErrDependency.WithDetail("chưa nối bộ dựng nguồn báo cáo")
 	}
 	if err != nil {
 		return domain.Dataset{}, err
@@ -205,7 +210,7 @@ func (s *Service) buildDataset(ctx context.Context, j domain.Job) (domain.Datase
 	if j.Params.MachineType != "" {
 		meta = append(meta, domain.Meta{Label: "Chủng loại", Value: n.catalog(ctx, mdport.CatalogMachineType, j.Params.MachineType)})
 	}
-	ds := domain.Build(j.Def, j.Params.Level, b.rows, b.total)
+	ds := domain.BuildWithSources(j.Def, j.Params.Level, b.rows, b.total, s.sourceSpecs())
 	ds.Meta = meta
 	ds.Provisional = b.provisional
 	ds.Notes = append(b.notes, ds.Notes...)

@@ -57,7 +57,7 @@ func (s *Service) CreateSchedule(ctx context.Context, in ScheduleInput) (domain.
 			sch, replayed = *prev, true
 			return nil
 		}
-		t, err := resolveTemplate(ctx, tx, strings.TrimSpace(sch.TemplateKey))
+		t, err := s.resolveTemplate(ctx, tx, strings.TrimSpace(sch.TemplateKey))
 		if err != nil {
 			return err
 		}
@@ -72,7 +72,7 @@ func (s *Service) CreateSchedule(ctx context.Context, in ScheduleInput) (domain.
 		}
 		params := sch.Params
 		params.UnitCode = strings.TrimSpace(sch.UnitCode)
-		if params.Period == "" && domain.Sources[t.Def.Source].NeedsPeriod {
+		if params.Period == "" && s.sourceSpec(t.Def.Source).NeedsPeriod {
 			params.Period = domain.MonthOf(now) // chỉ để kiểm; kỳ thật tính theo từng mốc
 		}
 		// HTX US-DASH-03: lịch của quản lý HTX chỉ trong HTX của người lập.
@@ -285,7 +285,7 @@ func (s *Service) fire(ctx context.Context, id, tid uuid.UUID, slotAt time.Time,
 		if exists, err := store.RunExists(ctx, tx, id, slot); err != nil || exists {
 			return err
 		}
-		t, err := resolveTemplate(ctx, tx, sch.TemplateKey)
+		t, err := s.resolveTemplate(ctx, tx, sch.TemplateKey)
 		if errors.Is(err, ErrTemplateNotFound) || (err == nil && t.Status != domain.TemplateActive) {
 			return skip("mẫu báo cáo đã ngừng dùng")
 		}
@@ -293,7 +293,7 @@ func (s *Service) fire(ctx context.Context, id, tid uuid.UUID, slotAt time.Time,
 			return err
 		}
 		params := sch.Params
-		if domain.Sources[t.Def.Source].NeedsPeriod {
+		if s.sourceSpec(t.Def.Source).NeedsPeriod {
 			params.Period = sch.ReportPeriod(slotAt)
 		}
 		sid := sch.ID

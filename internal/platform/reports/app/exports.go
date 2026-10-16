@@ -41,7 +41,7 @@ func (s *Service) reach(ctx context.Context, p authz.Principal) (authz.Scope, er
 // khác → 403), phạm vi đơn vị để trống (domain.Params.CoopScoped). Còn lại: phạm vi
 // đơn vị, rỗng → 403.
 func (s *Service) jobScope(p authz.Principal, sc authz.Scope, def domain.Definition, params *domain.Params) (authz.Scope, error) {
-	if domain.Sources[def.Source].Module == "cropcycle" && s.coopOnly(p) {
+	if s.sourceSpec(def.Source).Module == "cropcycle" && s.coopOnly(p) {
 		if p.OrgRef == uuid.Nil {
 			return sc, ErrOutOfScope.WithDetail("tài khoản chưa gắn HTX")
 		}
@@ -68,12 +68,12 @@ type ExportInput struct {
 // normalizeParams kiểm và chuẩn hóa bộ lọc theo nguồn của mẫu (FN-10 BR-01: tệp
 // khớp đúng bộ lọc). now dùng cho kỳ mặc định (tháng hiện tại).
 func (s *Service) normalizeParams(ctx context.Context, def domain.Definition, in domain.Params, sc authz.Scope, now time.Time) (domain.Params, error) {
-	src := domain.Sources[def.Source]
+	src := s.sourceSpec(def.Source)
 	p := domain.Params{Level: strings.TrimSpace(in.Level), UnitCode: strings.TrimSpace(in.UnitCode), MachineType: strings.TrimSpace(in.MachineType)}
 	if p.Level == "" {
 		p.Level = def.Grouping
 	}
-	if !domain.LevelAllowed(def.Source, p.Level) {
+	if !domain.LevelAllowedWithSources(def.Source, p.Level, s.sourceSpecs()) {
 		return p, problem.Validation.WithField("level", "mẫu này hỗ trợ cấp "+strings.Join(src.Levels, ", "))
 	}
 	if p.UnitCode != "" {
@@ -171,7 +171,7 @@ func (s *Service) RequestExport(ctx context.Context, in ExportInput) (domain.Job
 			job, replayed = *prev, true
 			return nil
 		}
-		t, err := resolveTemplate(ctx, tx, strings.TrimSpace(in.TemplateKey))
+		t, err := s.resolveTemplate(ctx, tx, strings.TrimSpace(in.TemplateKey))
 		if err != nil {
 			return err
 		}
@@ -241,7 +241,7 @@ func (s *Service) jobVisible(p authz.Principal, sc authz.Scope, j domain.Job) bo
 	if !hasAny(p, s.sourceRoles(j.Def.Source)) {
 		return false
 	}
-	if domain.Sources[j.Def.Source].Module == "cropcycle" && s.coopOnly(p) {
+	if s.sourceSpec(j.Def.Source).Module == "cropcycle" && s.coopOnly(p) {
 		// HTX US-DASH-02: quản lý HTX chỉ thấy việc xuất trong phạm vi HTX của mình.
 		return p.OrgRef != uuid.Nil && j.Params.CoopScoped(j.ScopeAll, j.ScopeUnits) && j.Params.CooperativeRef == p.OrgRef.String()
 	}

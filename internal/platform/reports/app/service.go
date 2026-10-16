@@ -68,6 +68,7 @@ func hasAny(p authz.Principal, roles []string) bool {
 
 // Service là use case của module.
 type Service struct {
+	Catalog        *CatalogRegistry
 	Policies       *PolicyRegistry
 	ResolveSession port.SessionResolver
 	DB             tenant.Beginner // pool vai reports_app

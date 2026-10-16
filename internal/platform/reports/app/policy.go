@@ -5,7 +5,6 @@ import (
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"time"
@@ -24,7 +23,7 @@ func (s *Service) formReaderRoles() []string {
 	return append([]string{port.RoleReportsAdmin, authz.RolePlatformAdmin}, s.Policies.FormReaderRoles()...)
 }
 func (s *Service) sourceRoles(source string) []string {
-	module := domain.Sources[source].Module
+	module := s.sourceSpec(source).Module
 	base := []string{authz.RolePlatformAdmin}
 	switch module {
 	case "mechanization":
