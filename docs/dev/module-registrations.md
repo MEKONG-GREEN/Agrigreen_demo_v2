@@ -54,3 +54,9 @@ KNSPLIT-2-FORMS-A đã đăng ký các consumer KN trước; bước B bỏ nhá
 ## Source builder của reports (KNSPLIT-2-REPORTS-G)
 
 Deps.Builders nhận SourceBuilderRegistration tin cậy lúc bootstrap. Registry private app, port chỉ DTO/interface, callback nhận SourceBuildQuery được tạo từ job và trả SourceData decimal. Callback không đúc actor/tenant mới; scope/columns/result được clone. Error không fallback. KN đăng ký ReportBuilders với read ports/lookup/Clock, giữ metadata dùng chung/render/DLP tại capability. H đã gỡ adapter và thuật toán KN cũ khỏi capability: nil hoặc empty registry thiếu builder đều trả503. KN tự sở hữu thuật toán cho5nguồn; capability giữ các builder native CGH/HTX. Không nhận registration từ HTTP.
+
+## Bộ mẫu reports khởi tạo (KNSPLIT-2-REPORTS-I)
+
+Deps.FormSeeds nhận FormSeedRegistration tin cậy lúc bootstrap; KN sở hữu ReportFormSeeds gồm14mẫu cùng default department/version. Capability tạo registry riêng cho Service, kiểm key/mã/default/định nghĩa hợp lệ rồi clone sâu input/output. Một default được chọn cho endpoint seed hiện hành; request chỉ chọn phòng ban đích, không nhận cấu hình seed hoặc thay tenant/actor. Nil còn adapter legacy trong I; explicit empty hoặc không có default trả dependency unavailable. Bước J sẽ xóa adapter.
+
+Cùng provider thật được nối tại API/hai worker/KN77/tests-reports; CLIformimport lấy owner trực tiếp. Golden kn-report-form-seeds.json được chụp từ nguồn cũ và owner so byte, không cập nhật golden để chấp nhận thay đổi ngoài ý muốn. Engine/formimport/web fixtures vẫn được kiểm theo hợp đồng hiện hành. Mã mẫu đã có không bị ghi đè; mẫu mới là nháp, phát hành vẫn qua hai người.

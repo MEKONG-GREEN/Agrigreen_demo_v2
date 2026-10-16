@@ -439,3 +439,6 @@ Downstream consumers: reports/app seed transaction; constructor/handler; KN Repo
 Regression acceptance command: PG riêng với go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./cmd/formimport ./tests/reports ./tests/kn77; đủstaticCODEX-G1/helper8migrationgates. User đã cho phép G1, không SMTP/data thật, giữmain/worktrees. Không dùng DB skip làm bằng chứng.
 
 Related test points: TestLegacyFormSeedContract, TestReportFormSeedsMatchLegacyContract, TestRegisteredFormSeedsIsolationAndCopies, TestFormSeedRegistryRejectsInvalid; TestSeedExportUsesOwnerLayout; HTTPFormLifecycleSoD/ImportEndpoint và KN77. I còn nillegacy, explicit empty không suy seed.
+
+
+Kết quả thực: PG16172.exit0 đủ14/14package,0FAIL/SKIP trênproduction0e709333: assembly110.482s/worker2.298s/CLI2.054s/tests-reports95.188s/KN77249.011s. Static20646.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. Owner14seed/goldenbyte/registryboundary/CLI226cộtHR đạt. ProofhostTEMP agrigreen-codex-knsplit2reportsi-proof.json; helper còn8migrationgate trướcdev. J mới gỡlegacy vàchuyểnca seed-engine/import/webfixture ra compositionroot, không đổiassertion/fixture.
