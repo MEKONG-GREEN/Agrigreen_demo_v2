@@ -309,3 +309,23 @@ PG-third75575.exit0:130.448s, TestKH_M4_PriceCutoffPublishedReader (cả2case), 
 
 
 Kết quả cuối W11.66 M4 trên commit6552808b: `db-full59187.exit0`,11/11 package có kiểm thử PASS,0FAIL/SKIP; assembly118.555s, KN77294.702s, closedfig0.642s, source domain0.899s, form domain1.125s, period app0.495s/domain0.591s, report app1.943s/domain1.115s, extension2.465s, golden0.616s. Go không đổi suốt lượt chạy; proofJSON hostTEMP agrigreen-codex-w1166cutoff-proof.json. `static-final27382.exit0`: build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary390/lint0issues, diff-check0. gofmt chỉ2fixture cũ được w-common cho phép. Không thay API/SQL/web/mobile nên miễn các bộ không bị tác động như đã nêu. Helper còn phải chạy cổng migration và kiểm tra nền dev trước FF; không tuyên bố helper đạt trước kết quả thực.
+
+
+## W11.66 — Mẫu5 ngày chốt trước cuối kỳ (nền59acadd7)
+
+Downstream consumers: period/domain.QuantityEnd → period/app (danh sách nguồn), source/app (query/evaluate/capture/status), report/domain.Compose và report/app.submitted; closedfig.KHTCCrosswalk.Sources cho custom FormsKind=adhoc. Gốc extension/assembly và KN77 kiểm wiring thật.
+
+Dependency evidence: `rg -l 'khtcperiod/domain|khtcsource|closedfig' internal/kn/extension cmd tests -g '*.go'`; cùng11package của gói M4. Hợp đồng API/SQL/frontend không đổi; miễn web/mobile và các consumer ngoài KHTC vì chỉ số Mẫu5/crosswalk custom thay hành vi. Build/vet toàn repo vẫn bắt buộc.
+
+Regression acceptance command: PG riêng với `go test -v -count=1 -p 1 -timeout 55m` cho closedfig, khtcsource/..., khtcform/..., khtcperiod/..., khtcreport/..., extension root, assembly, tests/kn77, tests/golden/khtc. Cổng CODEX-G1 và migration helper trước FFdev. Phạm vi này nằm trong yêu cầu G1 đã được user cho phép, không dữ liệu thật, không sửa main/xóa worktree.
+
+Related test points: KH-FN-TI-02.09, KH-UR-TI-12/13; `TestKH_M5_ProgramUsesCutoffForWeeklyFigures`, `TestKH_M5_ProgramCutoffHTTP`, `TestKH_M5_LiveProgramSourceCrosswalk`.
+
+- Red-pure.exit1: tuần sau cutoff vẫn vào phụ lục/captured submissions; red-pg.exit1/127.329s: phiếu100 thay vì10, module120 thay vì100.
+- Sửa QuantityEnd trên5cbfd91a; pure-first.exit0. PG-first.exit1/145.056s: HTTPcutoff PASS11.14s, live crosswalk đỏ đúng lỗi PeriodOf(adhoc,nil). Không coi whole command đạt.
+- 79d9acc3: custom adhoc forms lấy nguồn theo tuần D8 thật trong khoảng From..To, không so custom FormsKey với native week. Full PG65906 bị gián đoạn khi hết hạn mức, không có mã thoát cuối;8package đã hoàn tất PASS,0FAIL/SKIP: closedfig0.831s, source domain0.712s, form domain1.168s, period app0.721s/domain0.778s, report app1.732s/domain1.249s, extension1.790s. Giữ phần bằng chứng này trên production Go không đổi.
+- Sau reset chỉ bổ sung test DTO/Excel/hash. Resume PG15895 chạy3nhóm còn thiếu assembly, KN77, golden; đang chờ kết quả thực. Ca HTTP kiểm phụ lục Excel10/100; đổi phiếu/nguồn của tuần sau cutoff không đổi input hash/cảnh báo và không sửa byte Excel cũ, kể cả refresh. Live crosswalk kiểm cutoff giữa tuần8/10 chỉ nhận board6/10, không lấy7/10.
+- Static-after-crosswalk52241 đang chạy trên production79d9acc3 và test bổ sung. Chưa tích hợp khi chưa đủ kết quả.
+
+
+Kết quả cuối Mẫu5: production79d9acc3 giữ nguyên. `db-resume15895.exit0`: assembly138.677s, KN77353.770s, golden1.204s; đủ11/11package khi ghép8package đã hoàn tất trong full trước gián đoạn, không đổi whole full thành exit0. Không FAIL/SKIP. TestKH_M5_ProgramCutoffHTTP PASS19.31s gồm Excel phụ lục10/100, giữ To/cutoff riêng, hash/cảnh báo và byte cũ bất biến sau sửa phiếu/nguồn tuần sau cutoff rồi refresh; TestKH_M5_LiveProgramSourceCrosswalk PASS0.68s, cutoff giữa tuần chỉ nhận nguồn của tuần đã hết. `static-after-crosswalk52241.exit0`: build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary390/lint0issues. ProofJSON hostTEMP agrigreen-codex-w1166programcutoff-proof.json. Chỉ thay test DTO sau production79d9acc3; chưa có API/SQL/frontend đổi. Helper còn kiểm migration trước FFdev.

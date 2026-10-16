@@ -29,6 +29,11 @@ type reportDetail struct {
 	Content struct {
 		Texts map[string]string `json:"texts"`
 		Data  struct {
+			InputHash string `json:"input_hash"`
+			Period    struct {
+				To     string `json:"to"`
+				Cutoff string `json:"cutoff"`
+			} `json:"period"`
 			Plan        extport.KHTCPlan `json:"plan"`
 			Rows        []reportTestRow  `json:"rows"`
 			Provisional []string         `json:"provisional"`

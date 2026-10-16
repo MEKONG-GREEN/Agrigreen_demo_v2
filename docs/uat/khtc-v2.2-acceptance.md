@@ -205,3 +205,6 @@ Web cuối566ca/68tệp PASS137,54s, registry5PASS, checkAPI/lint/typecheck/buil
 
 
 Bổ sung M4 (16/10/2026, W11.66): `TestKH_M4_PriceCutoffPublishedReader` đối chứng hai ngày giá không sau cutoff14/10 dù kỳ hết13/10, và nguồn giá cũ hơn62ngày; `TestKH_M4_SparsePriceItems` giữ hai ngày riêng cho mặt hàng thưa báo giá. `TestKH_M4_ExportKeepsPriceSnapshot` kiểm cách ly tenant, đọc hai cột ngày/min từ Excel thật, cảnh báo khi board ngoài kỳ đổi, bản xuất cũ giữ nguyên byte sau duyệt và refresh. `TestKH_M4_PriceDateDoesNotExtendQuantityPeriod` giữ kỳ số lượng/D8; `TestKH_M4_LegacyPriceProjectionDoesNotInventSourceChange` bảo vệ snapshot cũ khỏi cảnh báo giả. Toàn bộ11package liên quan PASS không SKIP, xem REGRESSION. Không thay M1–M7; phần số lượng/phiếu Mẫu5 khi cutoff sớm tiếp tục được kiểm chứng riêng.
+
+
+Bổ sung KH-FN-TI-02.09 (Mẫu5 cutoff sớm,16/10): `TestKH_M5_ProgramUsesCutoffForWeeklyFigures` giữ tuần nguồn trọn vẹn tới cutoff và phiếu hiện tại cho lời văn; `TestKH_M5_ProgramCutoffHTTP` đối chứng10 thay vì100 từ phiếu,100 thay vì120 từ module; đọc Excel phụ lục10/100 và giữ hash/cảnh báo/byte cũ sau thay dữ liệu tuần sau. `TestKH_M5_LiveProgramSourceCrosswalk` kiểm đường published thật với custom FormsKey và cutoff giữa tuần. Đủ11package liên quan PASS không SKIP; không đổi identity kỳ/To hoặc M4/M6. Xem REGRESSION.
