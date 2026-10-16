@@ -139,6 +139,9 @@ func (f *khtcFx) do(method, path, role, dept string, actor uuid.UUID, idem strin
 	f.t.Helper()
 	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(method, path, bytes.NewReader(raw))
+	requestCtx, cancel := context.WithTimeout(req.Context(), 30*time.Second)
+	defer cancel()
+	req = req.WithContext(requestCtx)
 	req.Header.Set("Content-Type", "application/json")
 	k := authz.KNContext{Role: role, Department: dept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1"}}}
 	if role == authz.KNAdmin {

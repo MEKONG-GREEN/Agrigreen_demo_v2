@@ -110,7 +110,7 @@ func (r Reader) Periods(ctx context.Context, tid uuid.UUID, q port.KHTCQuery) ([
 	if err != nil {
 		return nil, err
 	}
-	if err := applyHTX(ctx, r.HTX, figs); err != nil {
+	if err := applyHTXAt(ctx, r.HTX, figs, q.ConfirmationAt); err != nil {
 		return nil, err
 	}
 	var keep []port.ClosedFigure
@@ -310,4 +310,27 @@ func Assemble(conv []port.TargetFigure, t port.CrosswalkTarget, tc rcdomain.Cale
 		d = span.To.AddDate(0, 0, 1)
 	}
 	return out
+}
+
+// MetricNames uses the existing versioned board product, under the same tenant RLS as figures.
+func (r Reader) MetricNames(ctx context.Context, tid uuid.UUID, cutoff time.Time) (map[string]port.KHTCMetricName, error) {
+	out := map[string]port.KHTCMetricName{}
+	err := tenant.WithTenantTxOptions(ctx, r.DB, tid, pgx.TxOptions{AccessMode: pgx.ReadOnly}, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT DISTINCT ON (item_code) item_code, item_name, unit_code FROM pf_price_pub.v1_board_daily
+    WHERE profile=$1 AND board_date <= $2::date ORDER BY item_code, board_date DESC`, priceProfile, cutoff.Format(time.DateOnly))
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var code string
+			var name port.KHTCMetricName
+			if err := rows.Scan(&code, &name.Label, &name.Unit); err != nil {
+				return err
+			}
+			out[strings.ToLower(code)] = name
+		}
+		return rows.Err()
+	})
+	return out, err
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -25,6 +26,10 @@ import (
 
 // applyHTX cập nhật trạng thái xác nhận của các dòng HTX theo cổng D2 (gọi NGOÀI giao dịch đọc — cổng mở giao dịch riêng).
 func applyHTX(ctx context.Context, h port.HTXConfirmations, figs []port.ClosedFigure) error {
+	return applyHTXAt(ctx, h, figs, nil)
+}
+
+func applyHTXAt(ctx context.Context, h port.HTXConfirmations, figs []port.ClosedFigure, at *time.Time) error {
 	type rowT = map[string]any
 	type target struct {
 		f    *port.ClosedFigure
@@ -58,7 +63,17 @@ func applyHTX(ctx context.Context, h port.HTXConfirmations, figs []port.ClosedFi
 	}
 	status := map[uuid.UUID]string{}
 	if h != nil {
-		m, err := h.Confirmations(ctx, refs)
+		var m map[uuid.UUID]string
+		var err error
+		if at != nil {
+			history, ok := h.(port.HTXConfirmationHistory)
+			if !ok {
+				return fmt.Errorf("closedfig: missing historical HTX confirmation reader")
+			}
+			m, err = history.ConfirmationsAt(ctx, refs, *at)
+		} else {
+			m, err = h.Confirmations(ctx, refs)
+		}
 		if err != nil {
 			return err
 		}

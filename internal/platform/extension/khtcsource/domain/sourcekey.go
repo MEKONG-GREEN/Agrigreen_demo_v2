@@ -112,3 +112,71 @@ func cellOf(m map[string]string, k string) (string, bool) {
 	}
 	return "", false
 }
+
+// ReportKeys discovers the fixed Mẫu 1 production and price inputs, independently
+// of annual-plan program entries. Ratios and plan targets are never summed.
+func ReportKeys(periods []port.KHTCPeriod) []string {
+	keys := map[string]bool{}
+	for _, period := range periods {
+		for _, dept := range period.Departments {
+			for _, form := range dept.Forms {
+				cells := map[string]string{}
+				for key, value := range form.Last {
+					cells[key] = value
+				}
+				for key, value := range form.Sum {
+					cells[key] = value
+				}
+				for _, src := range form.Sources {
+					for key, value := range src.Cells {
+						cells[key] = value
+					}
+				}
+				code := strings.ToLower(form.FormCode)
+				for cell := range cells {
+					cell = strings.ToLower(cell)
+					mode := ""
+					switch dept.DepartmentCode {
+					case "chan_nuoi_thuy_san":
+						if (code == "cnts-bm04" || code == "bm-04") && strings.HasPrefix(cell, "tong_dan_") {
+							mode = ModeCumulative
+						}
+						if (code == "cnts-bm18" || code == "bm-18") && strings.HasSuffix(cell, "_luy_ke_nam") && (strings.HasPrefix(cell, "khai_thac_") || strings.HasPrefix(cell, "nuoi_trong_") || cell == "tong_san_luong_luy_ke_nam") {
+							mode = ModeCumulative
+						}
+						if (code == "cnts-bm17" || code == "bm-17") && slices.Contains([]string{"ca", "tom", "muc", "khac"}, cell) {
+							mode = ModeSum
+						}
+					case "trong_trot":
+						parts := strings.Split(cell, "/")
+						field := parts[len(parts)-1]
+						if slices.Contains([]string{"t01", "t04", "t07", "pl01"}, code) && slices.Contains([]string{"luy_ke", "dt_xg", "dt_th", "san_luong", "dt_th_luy_ke", "san_luong_luy_ke"}, field) {
+							mode = ModeSeason
+						}
+					case "thong_tin_truyen_thong":
+						if code == formPriceBoard && strings.HasSuffix(cell, "/price_min") {
+							mode = ModePrice
+							cell = strings.TrimSuffix(cell, "/price_min")
+						}
+						if code == formPriceTickets && cell == "tickets_collected" {
+							mode = ModeSum
+						}
+					}
+					if mode == "" {
+						continue
+					}
+					raw := mode + ":" + dept.DepartmentCode + ":" + code + ":" + strings.ReplaceAll(cell, "/", ":")
+					if _, err := ParseSourceKey(raw); err == nil {
+						keys[raw] = true
+					}
+				}
+			}
+		}
+	}
+	out := make([]string, 0, len(keys))
+	for key := range keys {
+		out = append(out, key)
+	}
+	slices.Sort(out)
+	return out
+}

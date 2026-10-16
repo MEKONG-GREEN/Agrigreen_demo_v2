@@ -11,6 +11,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -211,6 +212,15 @@ func TestAttachMSTClaimIdempotentAudit_D2(t *testing.T) {
 	g, evs, err := f.svc.Get(f.mkg(), a.AnchorID)
 	if err != nil || g.Status != domain.StatusClaimed || g.Confirmation != domain.ConfirmationConfirmed || *g.HTXAccountRef != account {
 		t.Fatalf("neo sau nhận quyền: %+v %v", g, err)
+	}
+	for _, tc := range []struct {
+		at   time.Time
+		want bool
+	}{{g.ClaimedAt.Add(-time.Nanosecond), false}, {*g.ClaimedAt, true}, {g.ClaimedAt.Add(time.Hour), true}} {
+		got, e := f.svc.ConfirmedAt(f.kn(), []uuid.UUID{org}, tc.at)
+		if e != nil || got[org] != tc.want {
+			t.Fatalf("historical confirmation at %s want %v got %v err %v", tc.at, tc.want, got, e)
+		}
 	}
 	var acts []string
 	for _, e := range evs {

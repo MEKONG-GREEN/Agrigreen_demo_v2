@@ -51,8 +51,9 @@ var (
 
 // Service là use case bộ đọc nguồn module.
 type Service struct {
-	DB    tenant.Beginner // pool của pf/extension (r_extension)
-	Clock clock.Clock
+	Finals port.KHTCReportStates // W11.66: final reports freeze refreshes
+	DB     tenant.Beginner       // pool của pf/extension (r_extension)
+	Clock  clock.Clock
 	// Sources: port KHTCSources (ADR-0053 §7) — thiếu → 503.
 	Sources port.KHTCSources
 	// Plans: Kế hoạch năm (W11.61) — tùy chọn; thiếu → ảnh chụp chỉ có dòng nguồn, không có số hạng mục.
@@ -244,6 +245,15 @@ func (s *Service) Refresh(ctx context.Context, id uuid.UUID, idem string) (Statu
 	if err := canRefresh(c, p); err != nil {
 		return Status{}, err
 	}
+	if s.Finals != nil {
+		final, e := s.Finals.HasFinal(ctx, id.String())
+		if e != nil {
+			return Status{}, ErrDependency.WithCause(e)
+		}
+		if final {
+			return Status{}, ErrTerminal.WithDetail("Báo cáo đã có Bản cuối")
+		}
+	}
 	if term != "" {
 		return Status{}, ErrTerminal.WithDetail("kỳ đã đóng giữ số đã chốt — phần chênh vào kỳ mở kế tiếp")
 	}
@@ -253,13 +263,18 @@ func (s *Service) Refresh(ctx context.Context, id uuid.UUID, idem string) (Statu
 		return Status{}, err
 	}
 	target := port.CrosswalkTarget{CalendarID: cal.ID, RuleTag: cal.Rule.Tag(), PeriodType: rc.PeriodWeek}
-	ps, err := s.Sources.Periods(ctx, c.p.TenantID, port.KHTCQuery{From: wFrom, To: p.To, Target: target})
+	ps, err := s.Sources.Periods(ctx, c.p.TenantID, port.KHTCQuery{ConfirmationAt: cutoffEnd(p.Cutoff), From: wFrom, To: p.To, Target: target})
 	if err != nil {
 		return Status{}, ErrDependency.WithDetail("đọc số liệu nguồn lỗi").WithCause(err)
 	}
 	planVer, keys, _, err := s.planKeys(ctx, p)
 	if err != nil {
 		return Status{}, err
+	}
+	for _, key := range domain.ReportKeys(ps) {
+		if _, exists := keys[key]; !exists {
+			keys[key] = []uuid.UUID{}
+		}
 	}
 	var weekKeys []string
 	for _, x := range ps {
@@ -350,6 +365,10 @@ func dayOf(t time.Time) time.Time {
 }
 
 func classify(err error) error {
+	var finalError *pgconn.PgError
+	if errors.As(err, &finalError) && finalError.ConstraintName == "khtc_report_already_final" {
+		return ErrTerminal.WithDetail("Báo cáo đã có Bản cuối")
+	}
 	var pg *pgconn.PgError
 	if !errors.As(err, &pg) {
 		return err
@@ -493,6 +512,13 @@ func (s *Service) Status(ctx context.Context, id uuid.UUID) (Status, error) {
 		return Status{}, err
 	}
 	st := Status{PeriodID: id, OwnerRef: Owner(p), Terminal: term, Snapshot: snap, Values: vals, CanRefresh: term == "" && canRefresh(c, p) == nil}
+	if s.Finals != nil {
+		final, e := s.Finals.HasFinal(ctx, id.String())
+		if e != nil {
+			return Status{}, ErrDependency.WithCause(e)
+		}
+		st.CanRefresh = st.CanRefresh && !final
+	}
 	refs := []uuid.UUID{st.OwnerRef}
 	if snap != nil {
 		refs = append(refs, snap.ActorRef)
@@ -506,7 +532,7 @@ func (s *Service) Status(ctx context.Context, id uuid.UUID) (Status, error) {
 		st.Entries = entries
 	}
 	cal := calendarOf(p)
-	live, lerr := s.Sources.Periods(ctx, c.p.TenantID, port.KHTCQuery{From: p.From, To: p.To,
+	live, lerr := s.Sources.Periods(ctx, c.p.TenantID, port.KHTCQuery{ConfirmationAt: cutoffEnd(p.Cutoff), From: p.From, To: p.To,
 		Target: port.CrosswalkTarget{CalendarID: cal.ID, RuleTag: cal.Rule.Tag(), PeriodType: rc.PeriodWeek}})
 	liveRows := domain.Rows(live, p.From, p.To)
 	switch {
@@ -569,4 +595,11 @@ func (s *Service) History(ctx context.Context, id uuid.UUID) ([]HistoryEntry, ma
 	}
 	_, _, entries, _ := s.planKeys(ctx, p)
 	return out, entries, nil
+}
+
+// Cutoff is a calendar date stored at UTC midnight. Resolve its END in Vietnam (M6).
+func cutoffEnd(day time.Time) *time.Time {
+	start := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, clock.Zone())
+	end := start.AddDate(0, 0, 1).Add(-time.Microsecond).UTC()
+	return &end
 }

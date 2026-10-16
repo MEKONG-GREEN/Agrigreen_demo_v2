@@ -111,10 +111,11 @@ const (
 
 // KHTCQuery: tỉnh và khoảng ngày [From, To] — trả mọi kỳ KHTC giao với khoảng. Departments rỗng = mọi phòng có số.
 type KHTCQuery struct {
-	Province    string
-	From, To    time.Time
-	Departments []string
-	Target      CrosswalkTarget
+	ConfirmationAt *time.Time // M6: end of the report cutoff day in Vietnam; nil retains current-state callers.
+	Province       string
+	From, To       time.Time
+	Departments    []string
+	Target         CrosswalkTarget
 }
 
 // KHTCPeriod là một kỳ KHTC với số của từng phòng.
@@ -215,4 +216,17 @@ type ClosedFigure struct {
 	ConfirmationStatus string
 	FiguresHash        *string
 	StatusHash         *string
+}
+
+// KHTCMetricName is presentation metadata copied into the report's frozen payload.
+type KHTCMetricName struct{ Label, Unit string }
+
+// KHTCMetricNames reads published labels as of the reporting cutoff, never private source tables.
+type KHTCMetricNames interface {
+	MetricNames(ctx context.Context, tenantID uuid.UUID, cutoff time.Time) (map[string]KHTCMetricName, error)
+}
+
+// HTXConfirmationHistory is an optional historical read implemented by the existing data provider.
+type HTXConfirmationHistory interface {
+	ConfirmationsAt(context.Context, []uuid.UUID, time.Time) (map[uuid.UUID]string, error)
 }

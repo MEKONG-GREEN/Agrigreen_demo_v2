@@ -8781,6 +8781,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/periods/{id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bản soạn Mẫu 1–5, ô số chỉ đọc và mốc dữ liệu */
+        get: operations["extensionKhtcReportGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lưu ô hành chính và lời văn; không nhận số liệu hệ thống */
+        post: operations["extensionKhtcReportSave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cán bộ phụ trách cập nhật số liệu, giữ ô hành chính sửa tay */
+        post: operations["extensionKhtcReportRefresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử các phiên bản Excel bất biến */
+        get: operations["extensionKhtcReportExports"];
+        put?: never;
+        /** Xuất Excel từ bản soạn đã lưu; xác nhận cảnh báo Tạm tính */
+        post: operations["extensionKhtcReportExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/exports/{exportID}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải nguyên tệp của phiên bản đã xuất */
+        get: operations["extensionKhtcReportDownload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/exports/{exportID}/final": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đánh dấu Bản cuối khi không Tạm tính và nguồn chưa đổi */
+        post: operations["extensionKhtcReportFinalize"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -18135,6 +18238,253 @@ export interface components {
             late: boolean;
             /** @description Cần xử lý: Chưa nhập, Lưu nháp (nút Tiếp tục), Trễ hạn, Yêu cầu bổ sung */
             actionable: boolean;
+        };
+        KHTCReportPeriod: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            type: "week" | "month" | "quarter" | "year" | "program";
+            year: number;
+            name: string;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** Format: date-time */
+            cutoff: string;
+            departments: string[];
+            no: number | null;
+            scope: string | null;
+        };
+        KHTCReportPlan: {
+            /** Format: uuid */
+            VersionID: string;
+            Year: number;
+            Version: number;
+            DecisionNo: string;
+            Entries: {
+                [key: string]: unknown;
+            }[] | null;
+        } & {
+            [key: string]: unknown;
+        };
+        KHTCReportSourceRef: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            /** Format: uuid */
+            plan_version_id: string | null;
+            figures_hash: string;
+            status_hash: string;
+            closed: boolean;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCReportSourceMetric: {
+            key: string;
+            department: string;
+            form: string;
+            label: string;
+            unit: string;
+            stock: boolean;
+            value: components["schemas"]["KHTCReportSourceValue"];
+            trace?: {
+                target_key: string;
+                module: string;
+                calendar: string;
+                native_key: string;
+                /** Format: date-time */
+                from: string | null;
+                /** Format: date-time */
+                to: string | null;
+                closed: boolean;
+                figures_hash: string | null;
+            }[];
+        };
+        KHTCReportSourceValue: {
+            Cumulative: string | null;
+            Base: string | null;
+            Increment: string | null;
+            YearToDate: string | null;
+            Sum: string | null;
+            Min: string | null;
+            Max: string | null;
+            Unconfirmed: string | null;
+            Closed: boolean;
+            NoSource: boolean;
+            Frozen: boolean;
+            SourceChanged: boolean;
+            Fallback: boolean;
+            Unavailable: boolean;
+            SourceKey: string;
+            Mode: string;
+            BaseRef: string;
+            PriceDay: string;
+            PriceDays: {
+                Day: string;
+                Min: string;
+                Max: string;
+            }[] | null;
+            SourceKeys: string[] | null;
+            Weeks: {
+                [key: string]: unknown;
+            }[] | null;
+        };
+        KHTCReportSubmission: {
+            /** Format: uuid */
+            period_id: string;
+            department: string;
+            type: string;
+            year: number;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** Format: uuid */
+            submission_id: string;
+            attempt: number;
+            /** Format: uuid */
+            sheet_id: string;
+            hash: string;
+            decision: string;
+        };
+        KHTCReportRow: {
+            /** Format: uuid */
+            ref: string;
+            /** Format: uuid */
+            parent_ref: string | null;
+            /** Format: uuid */
+            program_ref: string | null;
+            kind: string;
+            tab: string;
+            roman: string;
+            name: string;
+            unit: string;
+            department: string;
+            planned: string | null;
+            scale: string;
+            in_period: string;
+            adjustment: string;
+            year_to_date: string;
+            percent: string | null;
+            level: string;
+            status: string;
+            content: string;
+            people: string;
+            budget: string;
+            missing: boolean;
+            source_key: string;
+            communes: string[];
+        };
+        KHTCReportData: {
+            period: components["schemas"]["KHTCReportPeriod"];
+            /** @enum {string} */
+            template: "mau_1" | "mau_2" | "mau_3" | "mau_4" | "mau_5";
+            plan: components["schemas"]["KHTCReportPlan"];
+            sources: components["schemas"]["KHTCReportSourceRef"] | null;
+            metrics: components["schemas"]["KHTCReportSourceMetric"][];
+            submissions: components["schemas"]["KHTCReportSubmission"][];
+            rows: components["schemas"]["KHTCReportRow"][];
+            form_texts: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            provisional: string[];
+            input_hash: string;
+            /** Format: date-time */
+            captured_at: string;
+        };
+        KHTCReportAdminField: {
+            system: string;
+            override: string | null;
+            /** Format: uuid */
+            actor: string | null;
+            /** Format: date-time */
+            at: string | null;
+            system_changed: boolean;
+        };
+        KHTCReportContent: {
+            data: components["schemas"]["KHTCReportData"];
+            admin: {
+                [key: string]: components["schemas"]["KHTCReportAdminField"];
+            };
+            texts: {
+                [key: string]: string;
+            };
+        };
+        KHTCReportSection: {
+            key: string;
+            title: string;
+            editable: boolean;
+        };
+        KHTCReportFinal: {
+            /** Format: uuid */
+            export_id: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCReportDetail: {
+            /** Format: uuid */
+            period_id: string;
+            /** Format: uuid */
+            draft_id: string | null;
+            version: number;
+            content: components["schemas"]["KHTCReportContent"];
+            sections: components["schemas"]["KHTCReportSection"][];
+            final: components["schemas"]["KHTCReportFinal"] | null;
+            editable: boolean;
+            can_refresh: boolean;
+            source_changed: boolean;
+            source_error: string;
+            terminal: string;
+        };
+        KHTCReportSave: {
+            base_version: number;
+            admin?: {
+                [key: string]: string | null;
+            };
+            texts?: {
+                [key: string]: string;
+            };
+        };
+        KHTCReportRefresh: {
+            base_version: number;
+        };
+        KHTCReportFilter: {
+            department?: string;
+            program?: string;
+            commune?: string;
+            /** @enum {string} */
+            level?: "" | "achieved" | "progressing" | "slow" | "qualitative";
+        };
+        KHTCReportExportInput: {
+            base_version: number;
+            acknowledge_provisional?: boolean;
+            filter?: components["schemas"]["KHTCReportFilter"];
+        };
+        KHTCReportExport: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            period_id: string;
+            version: number;
+            /** Format: uuid */
+            draft_id: string;
+            file_name: string;
+            body_hash: string;
+            input_hash: string;
+            provisional: boolean;
+            filter: components["schemas"]["KHTCReportFilter"];
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCReportExportList: {
+            items: components["schemas"]["KHTCReportExport"][];
         };
     };
     responses: {
@@ -36382,6 +36732,235 @@ export interface operations {
             };
             /** @description extension.khtc_import_invalid */
             422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportSave: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCReportSave"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportRefresh: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCReportRefresh"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportExports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportExportList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportExport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCReportExportInput"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportExport"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                exportID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportFinalize: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                exportID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
 }

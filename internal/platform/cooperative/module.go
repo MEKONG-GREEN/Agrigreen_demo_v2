@@ -13,6 +13,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -349,6 +350,22 @@ func (p plotStats) DigitizedByCooperative(ctx context.Context, coops []uuid.UUID
 	out := make(map[uuid.UUID]partyport.PlotStat, len(m))
 	for k, v := range m {
 		out[k] = partyport.PlotStat(v)
+	}
+	return out, nil
+}
+
+// ConfirmationsAt implements the optional historical reporting reader on the existing port adapter.
+func (h htxConfirmations) ConfirmationsAt(ctx context.Context, coops []uuid.UUID, at time.Time) (map[uuid.UUID]string, error) {
+	confirmed, err := h.a.ConfirmedAt(ctx, coops, at)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[uuid.UUID]string, len(confirmed))
+	for id, value := range confirmed {
+		out[id] = port.HTXUnconfirmed
+		if value {
+			out[id] = port.HTXConfirmed
+		}
 	}
 	return out, nil
 }

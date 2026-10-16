@@ -21,7 +21,10 @@ depends:
 provides:
   ports:
     - ClosedFigures
+    - HTXConfirmationHistory
+    - KHTCMetricNames
     - KHTCPlanDepartments
+    - KHTCPlanVersions
     - KHTCPlans
     - KHTCPrograms
     - KHTCReportStates

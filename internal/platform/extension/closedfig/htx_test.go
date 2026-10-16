@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -68,5 +69,52 @@ func TestApplyHTX_D2_PFPUB(t *testing.T) {
 	}
 	if none[0].ConfirmationStatus != port.ConfirmationUnconfirmed || string(none[1].Rows) != before {
 		t.Fatalf("không nối cổng: %+v", none)
+	}
+}
+
+type historicalHTX struct {
+	fakeHTX
+	at   time.Time
+	seen *time.Time
+}
+
+func (h historicalHTX) ConfirmationsAt(_ context.Context, refs []uuid.UUID, at time.Time) (map[uuid.UUID]string, error) {
+	*h.seen = at
+	out := map[uuid.UUID]string{}
+	for _, ref := range refs {
+		out[ref] = port.ConfirmationUnconfirmed
+		if !at.Before(h.at) {
+			out[ref] = port.ConfirmationConfirmed
+		}
+	}
+	return out, nil
+}
+func TestKH_M6ConfirmationAtCutoffInsteadOfCurrent(t *testing.T) {
+	id := ids.New()
+	claimed := time.Date(2026, 10, 14, 1, 0, 0, 0, time.UTC)
+	seen := time.Time{}
+	h := historicalHTX{fakeHTX: fakeHTX{id: port.ConfirmationConfirmed}, at: claimed, seen: &seen}
+	makeFig := func() []port.ClosedFigure {
+		raw, _ := json.Marshal([]map[string]any{{"key": id.String(), "unit": id.String(), "unit_kind": port.UnitKindCooperative, "cells": map[string]string{"members": "70"}, "confirmation": "confirmed"}})
+		return []port.ClosedFigure{{Rows: raw}}
+	}
+	cutoff := time.Date(2026, 10, 13, 16, 59, 59, 999999999, time.UTC)
+	figs := makeFig()
+	if err := applyHTXAt(context.Background(), h, figs, &cutoff); err != nil {
+		t.Fatal(err)
+	}
+	if !seen.Equal(cutoff) || figs[0].ConfirmationStatus != port.ConfirmationUnconfirmed {
+		t.Fatalf("after-cutoff claim leaked to old report: seen %s figure %+v", seen, figs)
+	}
+	next := claimed.Add(time.Hour)
+	figs = makeFig()
+	if err := applyHTXAt(context.Background(), h, figs, &next); err != nil {
+		t.Fatal(err)
+	}
+	if figs[0].ConfirmationStatus != port.ConfirmationConfirmed {
+		t.Fatal("next cutoff missed claim")
+	}
+	if err := applyHTXAt(context.Background(), fakeHTX{id: port.ConfirmationConfirmed}, makeFig(), &cutoff); err == nil {
+		t.Fatal("historical reader must not fall back to current state")
 	}
 }

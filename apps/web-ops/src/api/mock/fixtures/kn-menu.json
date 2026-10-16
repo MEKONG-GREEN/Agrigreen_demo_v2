@@ -89,7 +89,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -286,7 +286,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -449,7 +449,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -655,7 +655,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -827,7 +827,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -936,7 +936,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -1257,7 +1257,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -1463,7 +1463,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -1572,7 +1572,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -1693,9 +1693,7 @@
         "route": "/kn/khtc/tien-do",
         "icon": "chart",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -1704,9 +1702,16 @@
         "route": "/kn/khtc/bao-cao-da-xuat",
         "icon": "report",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.khtc.bao_cao",
+        "label": "Soạn báo cáo (Mẫu 1–5)",
+        "route": "/kn/khtc/bao-cao",
+        "icon": "report",
+        "badge_source": null,
+        "enabled": true,
         "children": []
        }
       ]
@@ -1769,7 +1774,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -1871,7 +1876,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -2007,7 +2012,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -2277,7 +2282,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -2430,7 +2435,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -2522,7 +2527,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -2763,7 +2768,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -2882,7 +2887,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   },
@@ -3170,6 +3175,15 @@
           "label": "Danh mục KHTC",
           "route": "/kn/phong-ban/ke_hoach_tai_chinh/danh-muc-khtc",
           "icon": "catalog",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
+         },
+         {
+          "key": "admin.pb.khtc_bao_cao",
+          "label": "Báo cáo KHTC",
+          "route": "/kn/phong-ban/ke_hoach_tai_chinh/bao-cao-khtc",
+          "icon": "report",
           "badge_source": null,
           "enabled": false,
           "children": []
@@ -3542,7 +3556,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v3",
+    "menu_version": "kn.menu/v4",
     "org_ref": null
    }
   }
@@ -3585,5 +3599,5 @@
    "menu_profile": "hanh_chinh_tong_hop"
   }
  ],
- "menu_version": "kn.menu/v3"
+ "menu_version": "kn.menu/v4"
 }

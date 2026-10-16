@@ -155,6 +155,10 @@ func (s *Service) project(ctx context.Context, c caller, p store.Period, evs []s
 		}
 		_, err := domain.CanCancel(d.State, false, "hủy kỳ — kiểm tra nút")
 		d.CanCancel = err == nil
+		if s.Reports != nil {
+			final, e := s.Reports.HasFinal(ctx, p.ID.String())
+			d.CanCancel = d.CanCancel && e == nil && !final
+		}
 	}
 	return d
 }
@@ -341,6 +345,17 @@ func (s *Service) Close(ctx context.Context, id uuid.UUID, reason, idem string) 
 // native (phiếu gỡ khỏi module các phòng, số liệu không vào ảnh chụp) rồi ghi sự kiện hủy. Kỳ đã hủy không tính khi
 // kiểm mở trùng — mở lại đúng kỳ đó được.
 func (s *Service) Cancel(ctx context.Context, id uuid.UUID, reason, idem string) (Detail, error) {
+	if s.GuardCancel != nil {
+		err := s.GuardCancel(ctx, id, func(tx pgx.Tx) error { _, e := s.cancel(ctx, id, reason, idem, tx); return e })
+		if err != nil {
+			return Detail{}, err
+		}
+		return s.Get(ctx, id)
+	}
+	return s.cancel(ctx, id, reason, idem, nil)
+}
+
+func (s *Service) cancel(ctx context.Context, id uuid.UUID, reason, idem string, protected pgx.Tx) (Detail, error) {
 	c, err := s.writer(ctx)
 	if err != nil {
 		return Detail{}, err
@@ -369,8 +384,13 @@ func (s *Service) Cancel(ctx context.Context, id uuid.UUID, reason, idem string)
 		return Detail{}, err
 	}
 	st := d.State
-	if err := s.appendEvent(ctx, c, store.Event{PeriodID: id, Action: store.ActionCancelled, Reason: &why, State: &st},
-		eventIdem(idem, "cancel", id)); err != nil {
+	event := store.Event{PeriodID: id, Action: store.ActionCancelled, Reason: &why, State: &st}
+	if protected != nil {
+		event.ID, event.ActorRef, event.EventTime = ids.New(), c.p.ActorRef, s.now()
+		err := store.InsertEvent(ctx, protected, c.p.TenantID, &event, eventIdem(idem, "cancel", id))
+		return Detail{}, classify(err)
+	}
+	if err := s.appendEvent(ctx, c, event, eventIdem(idem, "cancel", id)); err != nil {
 		return Detail{}, err
 	}
 	return s.Get(ctx, id)

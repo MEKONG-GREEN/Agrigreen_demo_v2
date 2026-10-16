@@ -382,12 +382,12 @@ func FrozenWeeks(ctx context.Context, tx pgx.Tx, weekKeys []string) (map[string]
 	if len(weekKeys) == 0 {
 		return out, nil
 	}
-	rows, err := tx.Query(ctx, `SELECT p.period_key, v.source_key, v.cumulative::text, v.increment::text, v.year_to_date::text, v.unconfirmed::text
+	rows, err := tx.Query(ctx, `SELECT p.period_key, v.source_key, v.cumulative::text, v.increment::text, v.year_to_date::text, v.unconfirmed::text, v.sum_value::text
 	  FROM pf_extension.khtc_period p
 	  JOIN LATERAL (SELECT s.id FROM pf_extension.khtc_snapshot s WHERE s.tenant_id = p.tenant_id AND s.period_id = p.id
 	                 ORDER BY s.seq DESC LIMIT 1) ls ON true
 	  JOIN pf_extension.khtc_snapshot_value v ON v.tenant_id = p.tenant_id AND v.snapshot_id = ls.id
-	 WHERE p.report_type = 'week' AND p.period_key = ANY($1::text[]) AND v.cumulative IS NOT NULL
+	 WHERE p.report_type = 'week' AND p.period_key = ANY($1::text[]) AND (v.cumulative IS NOT NULL OR v.sum_value IS NOT NULL)
 	   AND EXISTS (SELECT 1 FROM pf_extension.khtc_period_event e WHERE e.tenant_id = p.tenant_id AND e.period_id = p.id AND e.action = 'closed')`,
 		weekKeys)
 	if err != nil {
@@ -396,15 +396,21 @@ func FrozenWeeks(ctx context.Context, tx pgx.Tx, weekKeys []string) (map[string]
 	defer rows.Close()
 	for rows.Next() {
 		var week, key string
-		var cum, inc, ytd, unc *string
-		if err := rows.Scan(&week, &key, &cum, &inc, &ytd, &unc); err != nil {
+		var cum, inc, ytd, unc, sum *string
+		if err := rows.Scan(&week, &key, &cum, &inc, &ytd, &unc, &sum); err != nil {
 			return nil, err
 		}
 		c, err := decOf(cum)
-		if err != nil || c == nil {
+		if err != nil {
 			return nil, err
 		}
-		f := domain.Frozen{Cumulative: *c}
+		f := domain.Frozen{}
+		if c != nil {
+			f.Cumulative = *c
+		}
+		if f.Sum, err = decOf(sum); err != nil {
+			return nil, err
+		}
 		if f.Increment, err = decOf(inc); err != nil {
 			return nil, err
 		}

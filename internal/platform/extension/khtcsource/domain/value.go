@@ -24,6 +24,7 @@ import (
 
 // Frozen là số đã chốt của khóa nguồn ở một tuần KHTC đã đóng (ảnh chụp cuối của kỳ tuần đó).
 type Frozen struct {
+	Sum         *decimal.Decimal // immutable period flow for a closed KHTC week (W11.66)
 	Cumulative  decimal.Decimal
 	Increment   *decimal.Decimal // nil → lũy kế − gốc
 	YearToDate  *decimal.Decimal // nil → tính
@@ -179,6 +180,16 @@ func Evaluate(k SourceKey, periods []port.KHTCPeriod, frozen map[string]Frozen, 
 	switch k.Mode {
 	case ModeSum:
 		v.Sum = ptr(sum)
+		yearly, unconfirmed := decimal.Zero, decimal.Zero
+		for _, w := range weeks {
+			if w.To.Year() == to.Year() && !dayOnly(w.To).After(to) {
+				yearly = yearly.Add(w.Sum)
+			}
+		}
+		for _, w := range in {
+			unconfirmed = unconfirmed.Add(w.Unconfirmed)
+		}
+		v.YearToDate, v.Unconfirmed = ptr(yearly), ptr(unconfirmed)
 	case ModePrice:
 		price(&v, k, periods, from, to)
 	default:
@@ -226,7 +237,24 @@ func week(k SourceKey, p port.KHTCPeriod, prev *Week, frozen map[string]Frozen) 
 	if w.Unavailable {
 		w.Closed = false
 	}
-	if k.Mode == ModeSum || k.Mode == ModePrice {
+	if k.Mode == ModeSum {
+		if f != nil {
+			if raw, ok := cellOf(f.SumUnconfirmed, k.Cell); ok {
+				w.Unconfirmed, _ = dec(raw)
+			}
+		}
+		if fixed, ok := frozen[p.TargetKey]; ok && fixed.Sum != nil {
+			w.SourceChanged = !w.Sum.Equal(*fixed.Sum)
+			w.Sum = *fixed.Sum
+			w.Frozen = true
+			w.Closed = true
+			if fixed.Unconfirmed != nil {
+				w.Unconfirmed = *fixed.Unconfirmed
+			}
+		}
+		return w
+	}
+	if k.Mode == ModePrice {
 		return w
 	}
 	// Lũy kế, gốc, trong kỳ.

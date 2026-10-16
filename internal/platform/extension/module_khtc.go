@@ -83,6 +83,9 @@ func (m *Module) UseKHTCPeriods(d KHTCDeps) {
 	s.Forms, s.Control, s.MaxSubmissions = d.Forms, d.Control, d.MaxSubmissions
 	if d.Entry != nil {
 		m.khtcFormSvc().Entry = d.Entry
+		if m.khtcReports != nil {
+			m.khtcReports.Forms = d.Entry
+		}
 	}
 	// Cổng tùy chọn: chỉ ghi khi có (nối riêng bằng Use* khác không bị xóa).
 	if d.Departments != nil {

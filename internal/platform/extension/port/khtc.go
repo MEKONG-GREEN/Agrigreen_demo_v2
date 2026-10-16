@@ -51,23 +51,29 @@ type KHTCPrograms interface {
 
 // KHTCPlanEntry là một dòng kế hoạch năm (CT/DA, nhóm, hạng mục).
 type KHTCPlanEntry struct {
-	Ref         uuid.UUID
-	Tab         string // programs | prev_year | central_project | cooperation | research | advisory
-	Kind        string // program | group | item
-	ParentRef   *uuid.UUID
-	ProgramRef  *uuid.UUID
-	Roman       string // số La Mã của CT ở tab "Các chương trình" (BR-DL-21), rỗng với dòng khác
-	SortOrder   int
-	Code        string
-	Name        string
-	UnitCode    string
-	PlannedQty  *decimal.Decimal
-	ScaleNote   string
-	Department  string // phòng phụ trách (hạng mục)
-	DataSource  string // form | module (hạng mục)
-	SourceKey   string // khóa nguồn module (BR-DL-10)
-	Tracking    string // tracking | stopped
-	StoppedFrom *time.Time
+	Ref          uuid.UUID
+	Tab          string // programs | prev_year | central_project | cooperation | research | advisory
+	Kind         string // program | group | item
+	ParentRef    *uuid.UUID
+	ProgramRef   *uuid.UUID
+	Roman        string // số La Mã của CT ở tab "Các chương trình" (BR-DL-21), rỗng với dòng khác
+	SortOrder    int
+	Code         string
+	Name         string
+	UnitCode     string
+	PlannedQty   *decimal.Decimal
+	ScaleNote    string
+	Department   string // phòng phụ trách (hạng mục)
+	DataSource   string // form | module (hạng mục)
+	SourceKey    string // khóa nguồn module (BR-DL-10)
+	Tracking     string // tracking | stopped
+	StoppedFrom  *time.Time
+	Communes     []string // địa bàn theo kế hoạch, dùng bộ lọc Mẫu 5
+	PointsCount  *int
+	Budget       *decimal.Decimal
+	FundingCode  string
+	FieldCode    string
+	StopDecision string
 }
 
 // KHTCPlan là một phiên bản kế hoạch năm.
@@ -86,6 +92,11 @@ type KHTCPlans interface {
 	// PlanAt trả phiên bản dùng cho ngày at (BR-DL-13: ngày hiệu lực ≤ at, gần nhất); CT/DA ngừng trước at không có
 	// số La Mã. Chưa có → ErrKHTCPlanNotFound.
 	PlanAt(ctx context.Context, year int, at time.Time) (KHTCPlan, error)
+}
+
+// KHTCPlanVersions resolves an immutable plan identity recorded by a closed source snapshot.
+type KHTCPlanVersions interface {
+	PlanVersion(ctx context.Context, year int, versionID uuid.UUID, at time.Time) (KHTCPlan, error)
 }
 
 // ---------------------------------------------------------------------------

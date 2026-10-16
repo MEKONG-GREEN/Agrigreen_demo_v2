@@ -6,6 +6,7 @@ import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { json, problem, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
+import { khtcMockStore } from "./kn-khtc-periods";
 
 type S = components["schemas"];
 type Status = S["KHTCSourceStatus"];
@@ -134,7 +135,7 @@ function status(ctx: Ctx, id: string): Status {
     owner_ref: OWNER,
     owner_name: "Cán bộ KHTC phụ trách",
     terminal: null,
-    can_refresh: canRefresh(ctx),
+    can_refresh: canRefresh(ctx) && !khtcMockStore().find(p => p.p.id === id)?.reportFinal,
     source_changed: changed,
     live: !last,
     snapshot: last ? last.snap : null,
@@ -170,6 +171,7 @@ export const khtcSourceRoutes: Route[] = [
       if (!canRefresh(ctx))
         return problem(403, "extension.khtc_refresh_not_owner", "Chỉ cán bộ KHTC phụ trách kỳ được \"Cập nhật số liệu\"");
       const id = ctx.params[0]!;
+      if (khtcMockStore().find(p => p.p.id === id)?.reportFinal) return problem(409, "extension.khtc_report_final", "Báo cáo đã có Bản cuối");
       const s = stored(id);
       const prev = s.snaps[s.snaps.length - 1];
       const vals = values(s.live);
@@ -213,3 +215,8 @@ export const khtcSourceRoutes: Route[] = [
     },
   },
 ];
+
+export function khtcReportSource(ctx: Ctx, id: string, refresh = false): Status {
+ if (refresh) { const response = khtcSourceRoutes[1]!.handler({ ...ctx, params: [id] }); if (!response.ok) throw new Error("Không cập nhật được nguồn giả lập"); }
+ return structuredClone(status(ctx, id));
+}

@@ -1,6 +1,6 @@
 # ADR-0055: Tách hệ thống Khuyến nông
 
-**Trạng thái:** Chốt ranh giới và phạm vi G1 theo PO; đề xuất đối chiếu D2 tại mục Ảnh hưởng chưa được duyệt. **Ngày:** 16/10/2026 (KNSPLIT-0). **Nguồn:** trả lời PO 14–15/10/2026 và CODEX-G1 mục 5–6.
+**Trạng thái:** Chốt ranh giới và phạm vi G1 theo PO; D2-KN-01 đã chốt: G1 chỉ hồ sơ KN, luồng đề nghị để sau G1. **Ngày:** 16/10/2026 (KNSPLIT-0). **Nguồn:** trả lời PO 14–15/10/2026 và CODEX-G1 mục 5–6.
 
 **Thay thế một phần:** [ADR-0049](0049-cap-price-pf-price.md) (Báo giá thuộc KN), [ADR-0054](0054-cap-directory-pf-contact.md) (Contact thuộc KN).
 **Liên quan:** [ADR-0052/D2](0052-dong-so-huu-mkg-htx-neo-mst.md), [ADR-0041](0041-mfa-theo-nhom-d24.md), [ADR-0020](0020-lien-thong-platform-mkg-khac-tenant.md), [ADR-0033](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md), [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0030](0030-doc-tai-cho-co-cap-phep.md), [ADR-0031](0031-vai-tong-hop-r-agg.md), [ADR-0035](0035-cap-phep-tong-hop-theo-xa-nguong-k.md), [ADR-0053](0053-hop-dong-so-lieu-da-chot-closed-figures.md).
@@ -19,7 +19,7 @@ Các số kiểm kê ban đầu ngày 14/10 là lịch sử. Baseline ban đầu
 | Q-KNS-01 | KN là hệ thống độc lập; chỉ trao đổi với hệ khác qua nền tảng dữ liệu dùng chung (hợp đồng _pub, data product, lớp tích hợp); không gọi trong tiến trình vào module hệ khác. |
 | Q-KNS-02 | Đích là độc lập logic. Không yêu cầu ranh giới vật lý; binary/realm/cụm riêng chỉ sau G1 khi vận hành cần. Đây là quyết định phạm vi của PO. |
 | Q-KNS-03 | Một tenant KN cho mỗi Trung tâm tỉnh. Chuyển dữ liệu KN cũ sang tenant KN trong G1, forward-only; không giữ dữ liệu KN hoạt động ở tenant lưu ký như phương án cũ. |
-| Q-KNS-04 | KN không ghi dữ liệu HTX, kể cả đi vòng qua port hoặc lệnh tích hợp. Dữ liệu KN tạo về HTX là bản ghi riêng của KN, chia sẻ qua nền tảng dữ liệu. Đối chiếu luồng HTX tạm D2 phải xin chốt riêng theo mục Ảnh hưởng. |
+| Q-KNS-04 | KN không ghi dữ liệu HTX, kể cả đi vòng qua port hoặc lệnh tích hợp. Dữ liệu KN tạo về HTX là bản ghi riêng của KN, chia sẻ qua nền tảng dữ liệu. D2-KN-01 đã chốt riêng: G1 chỉ hồ sơ KN, luồng đề nghị sang MKG để sau G1 (mục Ảnh hưởng). |
 | Q-KNS-05 | Hệ nào có chức năng thì sở hữu bản riêng. Theo BRD, Báo giá thuộc Phòng TTTT của KN và Contact FN-13 thuộc Phòng HCTH; cả hai module thuộc KN. |
 | Q-KNS-06 | Thu thập MRV hiện ở apps/field-app thuộc HTX/MKG. Không chuyển dữ liệu/quyền MRV vào tenant KN khi di chuyển. |
 
@@ -95,23 +95,17 @@ Mỗi gói chuyển theo hai bước: thêm adapter đăng ký, sau đó xóa đ
 
 Chỉ mở sau G1 khi có nhu cầu vận hành, hợp đồng/cấp độ được PO duyệt hoặc số đo quá tải/sự cố cho thấy cần. Quyết định hiện tại không yêu cầu tách cụm/binary/realm.
 
-## Ảnh hưởng — đề xuất đối chiếu CEO D2 (chờ PO, chưa áp dụng)
+## Ảnh hưởng — D2-KN-01 đã chốt với PO ngày 16/10/2026
 
-CODEX-G1 mục5 yêu cầu KN không ghi HTX và đồng thời cấm tự sửa D2. ADR-0052 hiện cho KN/MKG tạo HTX tạm neo MST trong pf_coop. Bản ghi riêng KN đáp ứng ranh giới mới nhưng cần chốt người thực hiện bước tạo HTX tạm.
+PO chọn: **“G1 chỉ hồ sơ KN; luồng đề nghị để sau G1”.** Quyết định này thay trạng thái chờ của đề xuất D2-KN-01, không đổi quyết định đồng sở hữu D2 của CEO.
 
-**Phương án đề nghị D2-KN-01:**
+1. Trong G1, KN chỉ tạo và quản lý hồ sơ riêng trong tenant Trung tâm tỉnh: MST, địa bàn, thông tin nghiệp vụ, nguồn/bằng chứng và tham chiếu HTX đã được cấp phép chia sẻ. KN không tạo Nút cooperative, Neo MST hay dữ liệu/sổ HTX; không gọi đường ghi HTX qua port hoặc lệnh tích hợp.
+2. Luồng KN gửi đề nghị → MKG kiểm thỏa thuận/MST → duyệt và tạo HTX tạm/Neo bằng quyền MKG **để sau G1**. Không có API/outbox tiếp nhận, phê duyệt hoặc tác vụ tự tạo HTX từ hồ sơ KN trong phạm vi bàn giao G1.
+3. HTX tạm do MKG tạo ngoài luồng KN và quy trình HTX kích hoạt/nhận quyền tiếp tục theo ADR-0052. Đồng sở hữu, MST duy nhất, thỏa thuận và phân tách số chưa xác nhận giữ nguyên. Không sửa ADR-0052 để áp dụng phương án đề nghị đã hoãn.
+4. KN đọc trạng thái xác nhận qua sản phẩm dữ liệu có cấp phép; M6 lấy tại cuối ngày chốt. Báo cáo đã gửi/Bản cuối không tự phát hành lại.
+5. HTX/Nút/Neo và sổ HTX cũ giữ nguyên chủ/tenant trong đợt chuyển KN. Hồ sơ riêng KN chuyển forward-only và liên kết lịch sử qua ánh xạ ID/agreement_ref; không sửa lịch sử HTX.
 
-1. KN lập hồ sơ riêng về HTX trong tenant Trung tâm: MST, địa bàn, thông tin nghiệp vụ, nguồn/bằng chứng thỏa thuận, tham chiếu HTX nếu đã được chia sẻ. Không tạo Nút cooperative hoặc gọi API tạo Neo HTX bằng quyền KN.
-2. KN công bố hồ sơ đề nghị qua nền tảng dữ liệu/outbox, có mã hồ sơ và khóa chống trùng. Đây là đề nghị có nguồn KN, không phải lệnh tự động ghi HTX.
-3. Cán bộ MKG có quyền tiếp nhận, kiểm thỏa thuận/MST và phê duyệt. Sau duyệt, hệ HTX/MKG tạo HTX tạm + Neo theo D2 bằng quyền MKG; liên kết lại mã hồ sơ KN qua sự kiện/kết quả công bố. Bị từ chối hoặc chưa duyệt thì chỉ có hồ sơ KN, chưa có HTX tạm.
-4. Khi HTX kích hoạt/tiếp nhận, HTX/MKG thực hiện quy trình D2 hiện có; KN đọc trạng thái xác nhận qua confirmations_v1 có cấp phép. Số chưa xác nhận tách riêng; báo cáo đã gửi/Bản cuối không tự phát hành lại.
-5. HTX/Nút/Neo và sổ HTX cũ giữ nguyên, không đổi chủ/tenant bằng đợt chuyển KN. Bản ghi riêng KN được chuyển forward-only/ánh xạ ID, liên kết dữ liệu cũ qua nền tảng và agreement_ref; không sửa lịch sử HTX.
-
-**Tác động để PO duyệt:** trách nhiệm tạo HTX tạm từ nhánh KN chuyển thành “KN đề nghị, MKG duyệt và tạo”. Có bước phê duyệt MKG trước khi dữ liệu HTX tồn tại. D2 về đồng sở hữu, MST duy nhất, thỏa thuận, kích hoạt và phân tách số chưa xác nhận giữ nguyên. Nếu PO không chọn phương án này, cần chỉ định quy trình thay thế vẫn không cấp đường ghi HTX cho KN.
-
-Phương án thay thế: G1 chỉ có hồ sơ riêng KN; HTX tạm chỉ được MKG tạo ngoài luồng đề nghị hoặc khi triển khai luồng tiếp nhận sau G1. Phương án này giảm tự động hóa, cần nêu rõ phần bàn giao.
-
-**Chưa sửa ADR-0052, API tạo Neo hiện hành hoặc luồng dữ liệu D2 theo đề xuất này.** Gói tách hệ chỉ triển khai phần phụ thuộc đề xuất sau khi PO trả lời. Các gói registry/namespace/KHTC không phụ thuộc vẫn tiếp tục.
+Đề xuất ban đầu “KN gửi đề nghị, MKG duyệt và tạo” được giữ là hướng sau G1; không còn là quyết định đang chờ cho KNSPLIT-2/4b. Các gói tách tiếp tục theo phạm vi G1 đã chốt ở trên.
 
 ## Hệ quả
 
@@ -124,4 +118,4 @@ Phương án thay thế: G1 chỉ có hồ sơ riêng KN; HTX tạm chỉ đư�
 
 | Gói | Việc | Migration |
 |---|---|---|
-| KNSPLIT-0 14–16/10/2026 | Giữ 3 tệp dở thành commit, rebase dev sau W11.46; chốt các trả lời PO; sinh baseline ban đầu trên988febd9; cổng10 quy tắc, kiểm thử scanner/không tăng baseline, kiểm thử âm DB; đề xuất D2-KN-01 chờ PO | Không có migration mới |
+| KNSPLIT-0 14–16/10/2026 | Giữ 3 tệp dở thành commit, rebase dev sau W11.46; chốt các trả lời PO; sinh baseline ban đầu trên988febd9; cổng10 quy tắc, kiểm thử scanner/không tăng baseline, kiểm thử âm DB; D2-KN-01 chốt 16/10: G1 chỉ hồ sơ KN, đề nghị sau G1 | Không có migration mới |

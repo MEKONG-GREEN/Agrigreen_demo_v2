@@ -73,9 +73,10 @@ type Service struct {
 	// Departments: phòng ban đang áp dụng của đơn vị (mặc định phòng tham gia, tên phòng). Tùy chọn.
 	Departments partyport.Departments
 	// Crosswalk (gói PFPUB), Plan (W11.61), Reports (KH6): tùy chọn — xem extension/port/khtc.go.
-	Crosswalk extport.KHTCSourceCrosswalk
-	Plan      extport.KHTCPlanDepartments
-	Reports   extport.KHTCReportStates
+	Crosswalk   extport.KHTCSourceCrosswalk
+	Plan        extport.KHTCPlanDepartments
+	Reports     extport.KHTCReportStates
+	GuardCancel func(context.Context, uuid.UUID, func(pgx.Tx) error) error
 	// MaxSubmissions: số lần gửi tối đa mặc định (gốc lắp ráp đặt = KNKHTCProfile.MaxSubmissions).
 	MaxSubmissions int
 	// Drafts (tùy chọn, W11.63 nối): phòng đã "Lưu nháp" phiếu ở máy chủ, kèm số lần gửi đã thấy khi lưu — nháp sau lần gửi

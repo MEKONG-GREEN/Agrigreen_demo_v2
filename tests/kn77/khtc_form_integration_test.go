@@ -6,6 +6,7 @@ package kn77_test
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
@@ -42,6 +44,7 @@ const (
 // kfFx là fixture phiếu KHTC: Kỳ KHTC + phiếu + Kế hoạch năm 2026 có hạng mục của TT (nhập + nguồn module), TTTT (số phiếu giá
 // nguồn module + tin bài), CNTS.
 type kfFx struct {
+	ext *extension.Module
 	*khtcFx
 	khtcUser uuid.UUID
 	item     string // TT "Mô hình lúa chất lượng cao" — 100 ha
@@ -66,7 +69,19 @@ func newKHTCFormFx(t *testing.T) *kfFx {
 	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), Entry: fm.Entry(), Crosswalk: cw,
 		MaxSubmissions: platformasm.KNKHTCProfile.MaxSubmissions})
 	base := &khtcFx{t: t, clk: clk, cw: cw, tid: ids.New(), node: ids.New()}
-	base.eng = httpx.NewEngine(slog.New(slog.NewTextHandler(io.Discard, nil)), 8<<20)
+	base.eng = httpx.NewEngine(slog.New(slog.NewTextHandler(io.MultiWriter(io.Discard, tlog{t}), nil)), 8<<20)
+	base.eng.Use(func(c *gin.Context) {
+		c.Next()
+		for _, issue := range c.Errors {
+			for err := issue.Err; err != nil; err = errors.Unwrap(err) {
+				t.Logf("HTTP internal cause: %v", err)
+				var pg *pgconn.PgError
+				if errors.As(err, &pg) {
+					t.Logf("PG detail=%s where=%s", pg.Detail, pg.Where)
+				}
+			}
+		}
+	})
 	g := base.eng.Group("/v1", func(c *gin.Context) {
 		var k authz.KNContext
 		_ = json.Unmarshal([]byte(c.GetHeader("X-Test-KN")), &k)
@@ -74,10 +89,12 @@ func newKHTCFormFx(t *testing.T) *kfFx {
 		// Như httpx.Authenticate: người gọi + tenant ở ctx (cổng Kế hoạch năm đọc tenant từ ctx).
 		ctx := tenant.WithID(c.Request.Context(), base.tid)
 		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, authz.Principal{ActorRef: actor, TenantID: base.tid, KN: &k}))
+		scope, _ := json.Marshal(k)
+		c.Request = c.Request.WithContext(idempotency.WithAuthorizationScope(c.Request.Context(), scope))
 	}, idempotency.Middleware(ops))
 	fm.RegisterApp(g)
 	kn.RegisterApp(g)
-	f := &kfFx{khtcFx: base, khtcUser: ids.New()}
+	f := &kfFx{khtcFx: base, khtcUser: ids.New(), ext: kn}
 	f.seedPlan()
 	c, b := f.do(http.MethodPost, "/v1/extension/khtc/form-template/install", authz.KNAdmin, "", uuid.Nil, "", nil)
 	f.ok(c, b, nil)

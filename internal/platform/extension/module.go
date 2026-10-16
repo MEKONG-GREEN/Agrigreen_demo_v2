@@ -87,7 +87,8 @@ type Module struct {
 	// W11.64: bộ đọc nguồn module của Kỳ KHTC (extension/khtcsource, module_khtcsource.go).
 	khtcSrc *khtcSourceService
 	// W11.63: phiếu Báo cáo cho KHTC (extension/khtcform, module_khtc.go).
-	khtcForms *khtcFormService
+	khtcForms   *khtcFormService
+	khtcReports *khtcReportService
 	// W11.43 (D4 CN3): quy tắc liên biểu + 12 cảnh báo CNTS, vòng đời cảnh báo, nhắc nộp theo biểu (module_cntsalert.go).
 	alert *alertapp.Service
 	// W11.46 (D4 CN6): lịch trực KSGM BM-03, lịch tiêm phòng BM-07 (extension/cntscal).
@@ -134,6 +135,9 @@ func (m *Module) UseRoleHolders(h accport.RoleHolders) { m.svc.Holders = h }
 // xuất nội bộ: ghi egress_event, không bao giờ bị chặn kể cả AG_EGRESS_MODE=enforce.
 func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
 	m.svc.Egress, m.svc.EgressMode, m.svc.Log = cp, mode, log
+	if m.khtcReports != nil {
+		m.khtcReports.Egress, m.khtcReports.EgressMode = cp, mode
+	}
 	m.khtc.Egress, m.khtc.EgressMode, m.khtc.Log = cp, mode, log // W11.61: "Xuất Excel" Kế hoạch năm
 }
 
@@ -166,6 +170,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	khtchandler.Handler{Svc: m.khtc}.RegisterApp(rg)
 	m.registerKHTCPeriods(rg) // W11.62
 	obhandler.Handler{Svc: m.ob}.RegisterApp(rg)
+	m.registerKHTCReports(rg)                          // W11.66
 	m.registerKHTCSources(rg)                          // W11.64
 	alerthandler.Handler{Svc: m.alert}.RegisterApp(rg) // W11.43
 	calhandler.Handler{Svc: m.cal}.RegisterApp(rg)

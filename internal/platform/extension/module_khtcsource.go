@@ -6,6 +6,7 @@ package extension
 
 import (
 	"context"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -41,3 +42,14 @@ type liveKHTCSources struct{ m *Module }
 func (l liveKHTCSources) Periods(ctx context.Context, tid uuid.UUID, q port.KHTCQuery) ([]port.KHTCPeriod, error) {
 	return l.m.KHTCSources().Periods(ctx, tid, q)
 }
+
+// Forward presentation metadata through the same live provider wrapper as numeric sources.
+func (l liveKHTCSources) MetricNames(ctx context.Context, tid uuid.UUID, cutoff time.Time) (map[string]port.KHTCMetricName, error) {
+	reader, ok := l.m.KHTCSources().(port.KHTCMetricNames)
+	if !ok {
+		return nil, nil
+	}
+	return reader.MetricNames(ctx, tid, cutoff)
+}
+
+var _ port.KHTCMetricNames = liveKHTCSources{}

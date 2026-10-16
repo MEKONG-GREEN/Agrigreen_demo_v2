@@ -20,7 +20,7 @@ import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v3";
+export const MENU_VERSION = "kn.menu/v4";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -690,15 +690,19 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
         "key": "tinh.khtc.tien_do",
         "label": "Tiến độ các chương trình",
         "route": "/kn/khtc/tien-do",
-        "icon": "chart",
-        "soon": true
+        "icon": "chart"
       },
       {
         "key": "tinh.khtc.da_xuat",
         "label": "Báo cáo đã xuất",
         "route": "/kn/khtc/bao-cao-da-xuat",
-        "icon": "report",
-        "soon": true
+        "icon": "report"
+      },
+      {
+        "key": "tinh.khtc.bao_cao",
+        "label": "Soạn báo cáo (Mẫu 1–5)",
+        "route": "/kn/khtc/bao-cao",
+        "icon": "report"
       }
     ],
     "kn_tw": [
@@ -921,6 +925,12 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "label": "Danh mục KHTC",
       "route": "/kn/phong-ban/{department}/danh-muc-khtc",
       "icon": "catalog"
+    },
+    {
+      "key": "admin.pb.khtc_bao_cao",
+      "label": "Báo cáo KHTC",
+      "route": "/kn/phong-ban/{department}/bao-cao-khtc",
+      "icon": "report"
     }
   ],
   "thong_tin_truyen_thong": [

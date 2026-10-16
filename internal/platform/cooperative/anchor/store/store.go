@@ -276,6 +276,11 @@ func ConfirmedSQL(tenantCol, orgCol string) string {
 
 // Confirmed trả trạng thái đã xác nhận của từng Nút (Nút không có neo claimed → false).
 func Confirmed(ctx context.Context, tx pgx.Tx, orgs []uuid.UUID) (map[uuid.UUID]bool, error) {
+	return ConfirmedAt(ctx, tx, orgs, nil)
+}
+
+// ConfirmedAt evaluates the immutable claim timestamp at a historical reporting cutoff.
+func ConfirmedAt(ctx context.Context, tx pgx.Tx, orgs []uuid.UUID, at *time.Time) (map[uuid.UUID]bool, error) {
 	out := make(map[uuid.UUID]bool, len(orgs))
 	for _, o := range orgs {
 		out[o] = false
@@ -289,7 +294,7 @@ func Confirmed(ctx context.Context, tx pgx.Tx, orgs []uuid.UUID) (map[uuid.UUID]
 	}
 	rows, err := tx.Query(ctx, `SELECT al.org_ref FROM pf_coop.htx_anchor_alias al
 	  JOIN pf_coop.htx_anchor a ON a.tenant_id = al.tenant_id AND a.anchor_id = al.anchor_id
-	  WHERE al.org_ref = ANY($1::text[]::uuid[]) AND a.status = 'claimed'`, strs)
+	  WHERE al.org_ref = ANY($1::text[]::uuid[]) AND a.status = 'claimed' AND ($2::timestamptz IS NULL OR a.claimed_at <= $2::timestamptz)`, strs, at)
 	if err != nil {
 		return nil, err
 	}

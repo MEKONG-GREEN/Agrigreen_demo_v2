@@ -849,3 +849,8 @@ export const khtcFormRoutes: Route[] = [
     },
   },
 ];
+
+/** Report reader: only latest submitted sheets, never DRAFTS. */
+export function khtcReportInputs(s: Stored, dept: string) {
+ return { plan: structuredClone(PLAN[dept] ?? []), submission: structuredClone(subsOf(s, dept)[0] ?? null) };
+}

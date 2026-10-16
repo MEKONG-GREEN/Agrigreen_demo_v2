@@ -194,3 +194,32 @@ Kết quả WH-A cuối trên commit e1ed8b3c:
 - Chuẩn bị tích hợp bằng helper vào dev; ca KN77 đã chạy đầy đủ trên mã cuối, helper chạy lại party và các cổng migration trên cây sau rebase. Chưa có thay đổi Go nghiệp vụ sau các kết quả này.
 
 Tích hợp WH-A: helper38351 mã0, dev a83b0b90; full party chạy lại (handler110,157s) và migration gates342,476s PASS. Các cổng sau rebase đều0, baseline390. Giữ nguyên worktree/nhánh và main27afd593.
+
+
+## W11.66 — báo cáo KHTC và nguồn/phiếu/kỳ (đang kiểm chứng, nền 75f83976)
+
+Dependency evidence: `rg -n 'KHTCPlanVersions|KHTCPlans|GuardCancel|khtcReportSvc|khtcSourceSvc' internal cmd tests`; `rg -n 'createReportApi|khtcReportInputs|khtcReportSource|khtcReportRoutes' apps/web-ops/src`; registry WH-A sinh menu/mock/OpenAPI.
+Downstream consumers: extension KHTC plan/form/period/source/report, closedfig, cap/forms, platform assembly, party menu/domain/handler, tests/kn77, web API/mock/editor/shell/menu. Không đổi Flutter hoặc API MRV, miễn chạy lại mobile cho W11.66.
+Regression acceptance command: PG thật `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/extension/... ./internal/platform/forms/... ./cmd/api-platform/assembly ./internal/platform/party/... ./tests/kn77`; migration gates; các cổng tĩnh CODEX-G1, boundary-base. Web `npm run check:api`, typecheck/lint, full Vitest, build:mock và browser editor. Golden menu sinh bằng TestWebMenuFixture trên PG thật.
+Propagation rule: thay đổi plan port, source Sum/YTD/ReportKeys, final/cancel guards phải kiểm toàn bộ consumers trên. Biên dịch không chạy test và DB SKIP không tính là bằng chứng nghiệp vụ.
+Related test points: KH-FN-TI-02.05…02.09, TestKH_ReportSumYearToDateAndFrozenWeeks, TestKH_ReportKeysDoNotRequireProgramPlan, TestKH_ReportFinalAndCancelConcurrent, TestKH_ReportCancelBeforeFinalDoesNotWaitOnItself, TestKH_ReportClosedSnapshotKeepsPlanVersion.
+
+- HTTP report-sixth exit0: ba ca report thật, Excel mở lại, phiếu đã gửi/resend, provisional/access, final/cancel và giữ byte tệp cũ; 128,276s, không SKIP.
+- Pure-third exit0: mở lại Mẫu1–5, số trong kỳ20/điều chỉnh−5/lũy kế85/85%, hai ngày giá8000–13500 và8500–14000, phụ lục và không công thức; domain6ca và source goldens + discovery/sum-YTD đạt.
+- Boundary-first0:390 couplings đúng baseline, không nới scanner/config.
+- HTTP seventh: hủy thường, final/cancel đồng thời, closed-plan PASS; một assertion provenance dùng substring999 đã trúng UUID ngẫu nhiên, sửa kiểm khóa Sheet/cells không được serialize (số12 và phiên bản cũ đã được kiểm độc lập). Lượt kiểm lại/full consumers còn chờ. Không tích hợp khi chưa đủ xanh.
+- Web report contract hai ca PASS sau sửa fixture thêm cong_tac_khac bắt buộc. TSC-third0, ESLint phạm vi mới0. Chưa kết luận full web/browser/build hoặc full PG/gates.
+
+W11.66 kiểm chứng bổ sung 16/10:
+
+- `report-ninth` exit0:8ca HTTP PG riêng,360,519s, không SKIP; gồm chép duy nhất Mẫu5II và giữ blank đã lưu. Lượt eighth dùng sai cú pháp timeout nên không chạy đúng package, exit1, không tính đạt.
+- `pure-sixth` exit0: Excel SUM(F:H)=100 trên các ô numeric, phần trăm numeric85.0%, phụ lục đúng5cột +sheet chi tiết; truy nguyên kỳ nguồn/gốc đóng. `pure-seventh` exit0: thêm năng suất7.4=tổng740/tổng100ha, diện tích0→không tạo số, nguồn chưa chốt giữ Tạm tính.
+- Static second-final và third-final exit0 trước trace/yield: build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary390/lint0issues. Đã sửa2lint trước đó; cần kiểm lại sau trace/yield.
+- Full-second đã dừng có chủ đích để sửa thiếu sót Excel, giữ log không tính đạt. `db-full-third` đang chạy trên Go đóng băng: toàn party/extension/forms/cooperative-anchor/cooperative/assembly/KN77; bao gồm lịch sử xác nhận HTX M6 ở consumeranchor. `web-final-third` đang chạy trên schema/UI mới nhất. Lượt web-second chặn preflight do schema vừa đổi, không tính đạt.
+
+Bằng chứng cuối giao diện/cổng tĩnh W11.66:
+
+- `static-fourth-final` exit0 trên mã có trace/yield: build/vet/modgen-check/migrate-base/archlint/contract/docs/MFA/boundary390, golangci-lint0issues, diff-check0.
+- `web-final-third` đã checkAPI/lint/typecheck0; full test đỏ do worker lịch công tác không khởi động,552ca/67tệp đạt, không dùng làm full verdict.
+- `web-final-fourth` exit0: nhóm lịch riêng14ca đạt; chạy lại đầy đủ **566ca/68tệp PASS137,54s**, registry5PASS, build:mock thành công; browser KH-REPORT-UI-0011PASS14,7s trên bản dựng mới, CI không dùng server cũ, không tăng timeout/không retry. Không sửa mã web sau lượt này.
+- Full Go/PG consumers `db-full-third` còn chạy; chưa tích hợp. Migration riêng trước đó477bảng RLS,0SKIP, không thay SQL migration sau lượt đó; helper vẫn phải kiểm migration trên commit sau rebase.

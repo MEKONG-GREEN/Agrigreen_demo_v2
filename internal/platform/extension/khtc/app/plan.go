@@ -431,21 +431,54 @@ func (s *Service) CopyDraft(ctx context.Context, year int) (Draft, error) {
 
 // PlanAt trả phiên bản dùng cho ngày at (BR-DL-13).
 func (p Ports) PlanAt(ctx context.Context, year int, at time.Time) (port.KHTCPlan, error) {
+	return p.planVersion(ctx, year, uuid.Nil, at)
+}
+
+func (p Ports) PlanVersion(ctx context.Context, year int, versionID uuid.UUID, at time.Time) (port.KHTCPlan, error) {
+	return p.planVersion(ctx, year, versionID, at)
+}
+
+func (p Ports) planVersion(ctx context.Context, year int, versionID uuid.UUID, at time.Time) (port.KHTCPlan, error) {
 	day := time.Date(at.Year(), at.Month(), at.Day(), 0, 0, 0, 0, time.UTC)
 	var out port.KHTCPlan
 	err := p.tx(ctx, func(tx pgx.Tx) error {
-		v, _, es, err := loadPlan(ctx, tx, year, 0, &day)
+		version := 0
+		if versionID != uuid.Nil {
+			versions, err := store.Versions(ctx, tx, year)
+			if err != nil {
+				return err
+			}
+			for _, v := range versions {
+				if v.ID == versionID {
+					version = int(v.Seq)
+					break
+				}
+			}
+			if version == 0 {
+				return ErrPlanNotFound
+			}
+		}
+		v, _, es, err := loadPlan(ctx, tx, year, version, &day)
 		if err != nil {
 			return err
 		}
 		out = port.KHTCPlan{VersionID: v.ID, Year: v.Year, Version: int(v.Seq), DecisionNo: v.DecisionNo, DecisionDate: v.DecisionDate,
 			EffectiveFrom: v.EffectiveFrom}
+		programs, err := store.ProgramsCurrent(ctx, tx)
+		if err != nil {
+			return err
+		}
+		names := programMap(programs)
 		roman := domain.RomanNumbers(es, &day)
 		for _, e := range es {
+			if e.Kind == domain.EntryProgram && e.Name == "" && e.ProgramRef != nil {
+				e.Name = names[*e.ProgramRef].Name
+			}
 			out.Entries = append(out.Entries, port.KHTCPlanEntry{Ref: e.Ref, Tab: e.Tab, Kind: e.Kind, ParentRef: e.ParentRef,
 				ProgramRef: e.ProgramRef, Roman: roman[e.Ref], SortOrder: e.SortOrder, Code: e.Code, Name: e.Name, UnitCode: e.UnitCode,
 				PlannedQty: e.PlannedQty, ScaleNote: e.ScaleNote, Department: e.Department, DataSource: e.DataSource,
-				SourceKey: e.SourceKey, Tracking: e.Tracking, StoppedFrom: e.StoppedFrom})
+				SourceKey: e.SourceKey, Tracking: e.Tracking, StoppedFrom: e.StoppedFrom, Communes: append([]string(nil), e.Communes...),
+				PointsCount: e.PointsCount, Budget: e.Budget, FundingCode: e.FundingCode, FieldCode: e.FieldCode, StopDecision: e.StopDecision})
 		}
 		return nil
 	})

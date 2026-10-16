@@ -177,9 +177,11 @@ Số liệu tính tại ngày chốt (Thứ Ba, cuối ngày). HTX05 và HTX06 d
 | 2026-W49 (đã gửi) | 6 = 4 + 2 | 420 = 300 + 120 | Không phát hành lại sau khi xã nhận (Q10) |
 | 2026-W50 | 6 = **5 + 1** | 420 = **370 + 50** | Tổng không đổi, chỉ nhãn đổi |
 
-## 4. Điểm mở cần PO và KHTC quyết khi ký
+## 4. M1–M7 đã chốt với PO trong chat G1 (15/10/2026)
 
-| # | Điểm | Mặc định trong tài liệu và golden | Phương án khác |
+PO đã xác nhận **chốt cả M1–M7 theo giá trị hiện hành**. Đây là quyết định sản phẩm đã ghi trong chat, không thay cho chữ ký nghiệm thu thực tế của đơn vị. Cột phương án khác chỉ giữ làm lịch sử, không còn là lựa chọn đang chờ.
+
+| # | Điểm | Giá trị đã chốt trong tài liệu và golden | Phương án khác (lịch sử) |
 |---|---|---|---|
 | M1 | Tuần KHTC không có kỳ nguồn (G02) được coi là "đã chốt" | Có. Tập rỗng thì mọi kỳ đều đã chốt. Mẫu 1 in "không phát sinh". | Coi là "chưa chốt": KHTC phải đóng kỳ theo ngoại lệ BR-DL-15 |
 | M2 | Gốc của tuần K khi tuần K−1 đã đóng (G04) | Dùng số đã đóng của K−1. Phần sửa đi vào tuần đang mở, lũy kế KHTC = lũy kế nguồn. | Dùng số mới của nguồn: lũy kế năm KHTC sẽ lệch số đã sửa |

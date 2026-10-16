@@ -748,3 +748,10 @@ func (s *Service) CurrentOrg(ctx context.Context, tid, org uuid.UUID) (uuid.UUID
 
 // Now cho handler (thời điểm phản hồi).
 func (s *Service) Now() time.Time { return s.Clock.Now() }
+
+// ConfirmedAt returns claim state at the report cutoff; later claims cannot rewrite past status.
+func (s *Service) ConfirmedAt(ctx context.Context, orgs []uuid.UUID, at time.Time) (map[uuid.UUID]bool, error) {
+	var out map[uuid.UUID]bool
+	err := tenant.FromCtxTx(ctx, s.DB, func(tx pgx.Tx) error { var e error; out, e = store.ConfirmedAt(ctx, tx, orgs, &at); return e })
+	return out, err
+}

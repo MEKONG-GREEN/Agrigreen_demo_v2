@@ -80,6 +80,12 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "geo.dependency_unavailable": "Dịch vụ bản đồ tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
   // pf/extension, pf/content, pf/mechanization
   "extension.out_of_scope": "Dữ liệu nằm ngoài phạm vi TW → Tỉnh → Xã được phân quyền.",
+  "extension.khtc_report_not_found": "Không tìm thấy báo cáo hoặc bản xuất trong phạm vi được giao.",
+  "extension.khtc_report_final": "Báo cáo đã có Bản cuối. Bạn có thể xem và tải lại tệp đã lưu.",
+  "extension.khtc_report_version_conflict": "Bản soạn đã thay đổi. Tải lại trước khi lưu hoặc xuất.",
+  "extension.khtc_report_provisional": "Báo cáo còn Tạm tính. Kiểm tra nguồn và phiếu; xác nhận nếu cần xuất bản tạm.",
+  "extension.khtc_report_source_changed": "Nguồn đã thay đổi. Cập nhật số liệu trước khi đánh dấu Bản cuối.",
+  "extension.khtc_report_invalid": "Nội dung chưa hợp lệ. Các ô số liệu do hệ thống tính và chỉ được xem.",
   "extension.dependency_unavailable": "Dịch vụ khuyến nông tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
   "content.document_not_found": "Tài liệu không tồn tại, đã gỡ hoặc nằm ngoài phạm vi.",
   "content.dependency_unavailable": "Thư viện số tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",

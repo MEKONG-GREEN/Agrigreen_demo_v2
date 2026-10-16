@@ -181,6 +181,7 @@ export function planOf(b: Input): Plan | { field: string; reason: string } {
 
 // --- trạng thái ---
 export interface Stored {
+ reportFinal?: boolean;
   p: Period;
   submitted: Record<
     string,
@@ -265,7 +266,7 @@ function project(s: Stored): Period {
     },
     can_close: state === "complete" || (state === "late" && lateEnough),
     close_forced: state === "late" && lateEnough,
-    can_cancel: ["opened", "collecting", "late", "complete"].includes(state),
+    can_cancel: !s.reportFinal && ["opened", "collecting", "late", "complete"].includes(state),
   };
 }
 
@@ -592,6 +593,7 @@ export const khtcPeriodRoutes: Route[] = [
           ];
           break;
         default:
+          if (s.reportFinal) return problem(409, "extension.khtc_report_final", "Báo cáo đã có Bản cuối");
           if (!reasonOk(b.reason))
             return validation([
               { field: "reason", reason: "bắt buộc, 10–500 ký tự" },
