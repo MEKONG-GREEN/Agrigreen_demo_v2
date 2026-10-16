@@ -3,7 +3,7 @@ package assembly
 import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"

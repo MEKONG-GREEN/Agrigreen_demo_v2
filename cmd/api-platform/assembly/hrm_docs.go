@@ -1,10 +1,10 @@
 package assembly
 
 import (
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm"
+	hrmport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence"
 	evport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/hrm"
-	hrmport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/hrm/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 

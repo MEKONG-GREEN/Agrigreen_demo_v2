@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 
+	contactport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/contact/port"
+	hrmport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/port"
 	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	contactport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/contact/port"
-	hrmport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/hrm/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 )

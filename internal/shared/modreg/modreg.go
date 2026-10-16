@@ -63,8 +63,9 @@ const (
 // (nội bộ), vault (kho định danh), ts (chuỗi thời gian).
 var Zones = []string{"pf", "mkg", "vault", "ts"}
 
-// zoneDirs ánh xạ thư mục internal/<dir> sang tiền tố tên module.
-var zoneDirs = map[string]string{"platform": "pf", "mkg": "mkg", "vault": "vault"}
+// zoneDirs ánh xạ namespace Go sang định danh DB. Namespace ứng dụng giữ tên pf/*
+// để không đổi schema, vai DB, công bố và tham số đã phát hành (KNSPLIT-1).
+var zoneDirs = map[string]string{"platform": "pf", "kn": "pf", "mkg": "mkg", "vault": "vault"}
 
 // Provides là những gì module cung cấp cho module khác.
 type Provides struct {
@@ -400,6 +401,7 @@ func New(ms []*Manifest) (*Registry, error) {
 // Glob là mẫu tìm module.yaml tương đối gốc repo.
 var Glob = []string{
 	"internal/platform/*/" + FileName,
+	"internal/kn/*/" + FileName,
 	"internal/mkg/*/" + FileName,
 	"internal/vault/*/" + FileName,
 }

@@ -90,7 +90,7 @@ Database dựng mới từ đầu không gặp lỗi, vì lúc thêm cột sổ 
 - `TestRollCountByIdemReturnsNewestAfterExpiry` (`internal/mkg/fieldops/handler`): mẫu một dòng.
 - `TestParamVersionByIdemReturnsNewestAfterExpiry` (`internal/mkg/hub/handler`): helper tự thêm `LIMIT 1`, có JOIN và bí danh.
 - `TestLegsByIdemPrefixReturnsNewestSetAfterExpiry` (`internal/mkg/logistics/handler`): nhiều dòng theo tiền tố.
-- `TestMaterialByIdemKeysReturnsNewestPerKeyAfterExpiry` (`internal/platform/extension/material/handler`): lô khóa.
+- `TestMaterialByIdemKeysReturnsNewestPerKeyAfterExpiry` (`internal/kn/extension/material/handler`): lô khóa.
 - `TestNewestByIdem` (`internal/shared/ledger`): chuỗi SQL của helper.
 
 ## Hiện thực — sổ phụ hiệu lực của danh mục CNTS (W11.41, pf 000146, 12/10/2026)

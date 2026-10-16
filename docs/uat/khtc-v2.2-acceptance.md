@@ -77,7 +77,7 @@ Như [kn-v7.7-acceptance.md §1](kn-v7.7-acceptance.md#1-cách-chạy). Hai lệ
 
 ```
 go test -count=1 ./tests/golden/khtc/                                              # bộ dữ liệu đối chứng nhất quán
-go test -count=1 -run "KHTCQA|PeriodRule" ./internal/platform/extension/reportcycle/domain/   # quy đổi tuần bằng lịch kỳ W11.03
+go test -count=1 -run "KHTCQA|PeriodRule" ./internal/kn/extension/reportcycle/domain/   # quy đổi tuần bằng lịch kỳ W11.03
 ```
 
 Kiểm thử tích hợp KHTC (khi có) đặt tên `TestKH_…` và đọc bộ dữ liệu bằng `khtcgolden.Load()` (gói `tests/golden/khtc`, dữ liệu nhúng). Mỗi ca G01…G06 dựng dữ liệu nguồn, chạy "Cập nhật số liệu", rồi so số KHTC với `Expected` của từng bước.

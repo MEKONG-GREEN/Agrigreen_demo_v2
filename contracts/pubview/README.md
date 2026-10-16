@@ -63,6 +63,6 @@ View công bố `pf_<module>_pub.v<N>_<tên>` (R-DB-10, W6.3 — [modules.md](..
 
 1. Bảng nguồn trong `pf_price` (sổ `shared.apply_ledger`, FORCE RLS): phiên bản bảng giá ngày đã duyệt (ngày, số phiên bản, lúc duyệt, **khóa tuần `week_key`/`week_year` lưu lúc duyệt** theo lịch kỳ hệ thống W11.03, trạng thái mở duyệt), dòng bảng giá (mặt hàng, min/max/bình quân `numeric`, số xã có giá) và phiếu báo giá W11.75 có liên kết tới phiên bản bảng giá (phiếu xóa mềm/thay thế không đếm).
 2. Một migration **chỉ đụng `pf_price_pub`** (`<số>_pf_price_pub_*` hoặc `<số>_pf_pub_*`): `CREATE VIEW pf_price_pub.v1_board_daily`, `pf_price_pub.v1_ticket_week` đúng cột và thứ tự của hai tệp hợp đồng; `GRANT SELECT … TO r_price_pub`. Nếu chính sách RLS của bảng nguồn gọi hàm ngoài `shared.current_tenant()`, cấp EXECUTE cho `r_agg` (modules.md mục `r_agg`).
-3. `//ag:pubview pf_price_pub.board_daily v1` và `//ag:pubview pf_price_pub.ticket_week v1` trong `internal/platform/price/port/port.go`, chạy `go run ./tools/modgen`.
+3. `//ag:pubview pf_price_pub.board_daily v1` và `//ag:pubview pf_price_pub.ticket_week v1` trong `internal/kn/price/port/port.go`, chạy `go run ./tools/modgen`.
 4. Đổi `status` hai tệp thành `published`, sửa `migration`; số view trong `TestPubViewsDeclaredAndPrivileges_W63` +2 và số module công bố 4 → 5; `TestContracts_W1110` không đổi số hợp đồng.
 5. `days_scheduled` tính theo lịch báo giá có phiên bản (pf 000139: ngày trong tuần + ngoại lệ) tại ngày đó; `week_closed` = `days_approved = days_scheduled` và không ngày nào đang mở duyệt.

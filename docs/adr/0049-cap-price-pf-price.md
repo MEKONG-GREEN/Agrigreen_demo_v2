@@ -1,6 +1,6 @@
 # ADR-0049: `cap/price` = module năng lực `pf/price` — chuỗi giá có hiệu lực, danh mục nền, công bố là quyền riêng
 
-**Trạng thái:** Đề xuất — khung hiện thực ở W11.71 (10/10/2026); phạm vi G1 theo QĐ-5 mặc định (a), chờ chủ sản phẩm (Q-044) · **Ngày:** 10/10/2026 (gói W11.71) · **Yêu cầu:** kiến trúc v4.1 §26 (`cap/price`), §5.1 (ma trận KN ●, HTX ○, MKG ●, NH ●), R-CODE-01, R-MOD-04, R-MOD-09, R-DB-10, Phụ lục A (G1 cần `cap/price` tối thiểu) · **Nguồn:** BRD Báo giá nông sản v1.3 (07/10/2026), đối chiếu v4.3/MKG v1.4/BRD KN Phụ lục D mục 2.3, BG1 · **Thành phần:** `internal/platform/price`, `cmd/api-platform/assembly/price.go`, `migrations/pf/000138_pf_price.up.sql`, `tools/archlint/nofloat.go` · **Liên quan:** [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0031](0031-vai-tong-hop-r-agg.md), [ADR-0033](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md), [ADR-0035](0035-cap-phep-tong-hop-theo-xa-nguong-k.md)
+**Trạng thái:** Đề xuất — khung hiện thực ở W11.71 (10/10/2026); phạm vi G1 theo QĐ-5 mặc định (a), chờ chủ sản phẩm (Q-044) · **Ngày:** 10/10/2026 (gói W11.71) · **Yêu cầu:** kiến trúc v4.1 §26 (`cap/price`), §5.1 (ma trận KN ●, HTX ○, MKG ●, NH ●), R-CODE-01, R-MOD-04, R-MOD-09, R-DB-10, Phụ lục A (G1 cần `cap/price` tối thiểu) · **Nguồn:** BRD Báo giá nông sản v1.3 (07/10/2026), đối chiếu v4.3/MKG v1.4/BRD KN Phụ lục D mục 2.3, BG1 · **Thành phần:** `internal/kn/price`, `cmd/api-platform/assembly/price.go`, `migrations/pf/000138_pf_price.up.sql`, `tools/archlint/nofloat.go` · **Liên quan:** [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0031](0031-vai-tong-hop-r-agg.md), [ADR-0033](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md), [ADR-0035](0035-cap-phep-tong-hop-theo-xa-nguong-k.md)
 
 > **Bị thay thế một phần bởi [ADR-0055](0055-tach-he-thong-khuyen-nong.md)** (trả lời PO Q-KNS-05, 14/10/2026): Báo giá không còn là năng lực dùng chung `cap/price`. Theo BRD "Hệ thống Khuyến nông — Module: Báo giá nông sản (Phòng Thông tin Tuyên truyền)" v1.3, đây là chức năng của KN (Phòng TTTT), nên `pf/price` thuộc hệ KN. Hệ khác cần báo giá thì dựng bản riêng; muốn dùng dữ liệu báo giá KN thì đọc qua `pf_price_pub`. Phần còn lại của ADR này (mô hình dữ liệu, hồ sơ, lịch) giữ nguyên.
 
@@ -15,7 +15,7 @@
 
 ### 1. Một module năng lực `pf/price`
 
-`pf/price` (`internal/platform/price`, `kind: capability`, `aka: [cap/price]`, `zones: [pf]`, `enable: per_tenant`) sở hữu schema `pf_price` (nội bộ) và `pf_price_pub` (view công bố). Vai nhóm `r_price` (ADR-0028; `app_platform` là thành viên), vai đọc view `r_price_pub` (thành viên: `r_metrics`, `r_agg`). Module khác chỉ import `price/port` (R-02).
+`pf/price` (`internal/kn/price`, `kind: capability`, `aka: [cap/price]`, `zones: [pf]`, `enable: per_tenant`) sở hữu schema `pf_price` (nội bộ) và `pf_price_pub` (view công bố). Vai nhóm `r_price` (ADR-0028; `app_platform` là thành viên), vai đọc view `r_price_pub` (thành viên: `r_metrics`, `r_agg`). Module khác chỉ import `price/port` (R-02).
 
 Quy trình phiếu xã hằng ngày nằm TRONG `pf/price` như **nguồn giá nội tại** (không module domain nào khác cần nó). Điều tra giá thành là nguồn giá thứ hai, cũng trong `pf/price`; PII nông hộ đi `vault/identity` (chỉ giữ `household_ref`/băm SĐT).
 
@@ -26,7 +26,7 @@ Quy trình phiếu xã hằng ngày nằm TRONG `pf/price` như **nguồn giá n
 ### 3. Dữ liệu: sổ chỉ ghi thêm, hiệu lực theo ngày báo giá, decimal
 
 - Mọi bảng nghiệp vụ là sổ chỉ ghi thêm (`shared.apply_ledger`), RLS `p_tenant` (`shared.apply_tenant_rls`). Danh mục có phiên bản: mỗi dòng là một phiên bản của một mã (`version = seq` của chuỗi `<loại>:<mã>`), hiệu lực theo `valid_from` (date, giờ VN) — BRD BR-02 "mọi thay đổi áp dụng từ ngày báo giá kế tiếp"; ngưng là phiên bản `retired`, không xóa (BR-04).
-- Giá, %, ngưỡng là `numeric` ở DB và decimal ở Go. `internal/platform/price` nằm trong `floatFreeZones` của agnofloat (cấm cả trong kiểm thử).
+- Giá, %, ngưỡng là `numeric` ở DB và decimal ở Go. `internal/kn/price` nằm trong `floatFreeZones` của agnofloat (cấm cả trong kiểm thử).
 - Một danh mục mặt hàng duy nhất ở `pf/price`; KHTC và module khác đọc qua `port.Catalog` (đề xuất Q-082).
 
 ### 4. Điểm mở rộng cho các gói sau
@@ -64,10 +64,10 @@ Bảng giá xã là giá thị trường, không phải dữ liệu hộ → kh�
 
 ### W11.71 khung (10/10/2026, pf 000138)
 
-- `internal/platform/price`: `module.yaml` (sinh: `ports: [Catalog]`, `owns_schema: [pf_price, pf_price_pub]`), `port` (Profile, Catalog, PubSchema, `price.profile_not_found`), `domain` (mã, `valid_from` theo ngày VN, 5 nhóm hàng BRD + 8 đơn vị tính mặc định), `store`, `app`, `handler`.
+- `internal/kn/price`: `module.yaml` (sinh: `ports: [Catalog]`, `owns_schema: [pf_price, pf_price_pub]`), `port` (Profile, Catalog, PubSchema, `price.profile_not_found`), `domain` (mã, `valid_from` theo ngày VN, 5 nhóm hàng BRD + 8 đơn vị tính mặc định), `store`, `app`, `handler`.
 - pf 000138: schema `pf_price`, `pf_price_pub` (chưa view); sổ `pf_price.unit`, `pf_price.commodity_group`; quyền `r_price` SELECT/INSERT + `k_ref`; `r_price_pub` USAGE schema công bố. Xã báo giá KHÔNG có ở khung (W11.72: cần ĐVHC có hiệu lực, không đơn giản).
 - HTTP (`contracts/openapi/application.yaml`, mục pf/price): `GET /v1/price/status`, `GET /v1/price/catalog?at=`, `POST /v1/price/catalog/defaults` (Admin KN; chỉ ghi mã chưa có).
-- `app/KN/app.yaml` thêm `pf/price`; agnofloat `floatFreeZones` thêm `/internal/platform/price`; `dbadmin` kiểm thử: `laterGroups`, số vai nhóm, `r_price_pub`.
+- `app/KN/app.yaml` thêm `pf/price`; agnofloat `floatFreeZones` thêm `/internal/kn/price`; `dbadmin` kiểm thử: `laterGroups`, số vai nhóm, `r_price_pub`.
 - Giả định (docs/kn/gia-dinh-brd-2026-10.md): QĐ-5 (a), Q-082 (một danh mục ở `cap/price`), mã phòng ban `thong_tin_truyen_thong`, danh sách đơn vị tính mặc định.
 
 ### W11.74 lịch báo giá, giờ khóa, nhắc, ngưỡng (10/10/2026, pf 000139)

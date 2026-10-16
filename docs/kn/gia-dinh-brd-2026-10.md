@@ -34,7 +34,7 @@ Mặc định chung của đợt (theo hướng dẫn đợt W11):
 
 | Câu hỏi | Lựa chọn đã dùng | Ở đâu | Đổi thế nào |
 |---|---|---|---|
-| QĐ-5 / Q-044 — Báo giá có vào G1 15/12? | (a) G1 = Trồng trọt + Báo giá vận hành ngày: `pf/price` ghép vào `app/KN`, `enable: per_tenant` mặc định bật | `app/KN/app.yaml`, `internal/platform/price/module.yaml` | (b): giữ module, tắt cho tenant qua cổng bật module (`pf_party.module_enablement_event`) — không sửa mã |
+| QĐ-5 / Q-044 — Báo giá có vào G1 15/12? | (a) G1 = Trồng trọt + Báo giá vận hành ngày: `pf/price` ghép vào `app/KN`, `enable: per_tenant` mặc định bật | `app/KN/app.yaml`, `internal/kn/price/module.yaml` | (b): giữ module, tắt cho tenant qua cổng bật module (`pf_party.module_enablement_event`) — không sửa mã |
 | Q-082 — Chủ danh mục mặt hàng giá | Một danh mục ở `cap/price` (Phòng TTTT), KHTC đọc qua `price/port.Catalog` | ADR-0049 §3 | Nếu KHTC là chủ: `pf/price` đọc danh mục KHTC qua port, giữ sổ của mình cho lịch sử |
 | Mã phòng ban Phòng TTTT (Q-02, mâu thuẫn tên "Thông tin Tuyên truyền" / "Thông tin – Truyền thông") | `thong_tin_truyen_thong` trong `KNPriceProfile.Department` (chỉ thông tin, khung chưa lọc theo phòng ban) | `cmd/api-platform/assembly/price.go` | Sửa một hằng ở gốc lắp ráp |
 | Ai ghi danh mục nền ở khung | Chỉ Admin KN (`ManageBy: [admin]`); cờ "Quản trị nghiệp vụ báo giá" của Cấp Tỉnh ở W11.72 | `KNPriceProfile.ManageBy` | W11.72 mở rộng `port.Profile` |
@@ -108,7 +108,7 @@ Chưa làm trong gói này: mở loại kỳ ngày/quý/KSGM ở "Phát hành bi
 
 | Câu hỏi | Lựa chọn đã dùng | Ở đâu | Đổi thế nào |
 |---|---|---|---|
-| Q-082 — Chủ danh mục mặt hàng giá | Một danh mục ở `cap/price` (Phòng TTTT/QTNV theo thời kỳ), KHTC đọc qua `price/port.Items` | `internal/platform/price/port/item.go` | Nếu KHTC là chủ: nạp danh mục KHTC vào sổ `pf_price.item` qua port, giữ lịch sử phiên bản |
+| Q-082 — Chủ danh mục mặt hàng giá | Một danh mục ở `cap/price` (Phòng TTTT/QTNV theo thời kỳ), KHTC đọc qua `price/port.Items` | `internal/kn/price/port/item.go` | Nếu KHTC là chủ: nạp danh mục KHTC vào sổ `pf_price.item` qua port, giữ lịch sử phiên bản |
 | Cờ "Quản trị nghiệp vụ" (BR-06) chưa có | Mọi Cấp Tỉnh có quyền QTNV cho tới khi W11.72 nối `ItemHooks.Steward`; Admin KN (vai quản trị) luôn được | `app/item.go` (`steward`) | W11.72 gọi `Module.SetItemHooks` với `Steward` đọc cờ |
 | "Ngày báo giá kế tiếp" (BR-02) | Ngày báo giá kế tiếp theo lịch W11.74 của bên dùng đầu tiên (`Service.NextQuoteDay`, nối ở gốc lắp ráp bằng `Module.WireItemCalendar`); không có kỳ trong 60 ngày → ngày mai | `cmd/api-platform/assembly/price.go` | — |
 | "Đã có giá" / "đã có phiếu gửi hôm nay" khi chưa có phiếu | Chưa có giá, chưa có phiếu → không khóa ĐVT, cho hiệu lực từ hôm nay | `ItemHooks.HasPrice`, `HasSheets` | W11.75 nối sổ phiếu |

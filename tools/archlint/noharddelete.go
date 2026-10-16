@@ -23,7 +23,7 @@ var NoHardDelete = &analysis.Analyzer{
 var hardDeleteSQL = regexp.MustCompile(`(?is)\b(delete\s+from|truncate(\s+table)?\s+[a-z_"])`)
 
 func businessPkg(pkg string) bool {
-	return strings.Contains(pkg, "/internal/platform/") || strings.Contains(pkg, "/internal/mkg/")
+	return strings.Contains(pkg, "/internal/platform/") || strings.Contains(pkg, "/internal/kn/") || strings.Contains(pkg, "/internal/mkg/")
 }
 
 func rebuildFunc(name string) bool {

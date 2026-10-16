@@ -9,10 +9,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
+	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/port"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/price"
-	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/price/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 )

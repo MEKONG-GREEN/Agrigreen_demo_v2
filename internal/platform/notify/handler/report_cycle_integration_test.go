@@ -3,7 +3,7 @@ package handler_test
 import (
 	"testing"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"

@@ -8,7 +8,7 @@
 // quy về tuần đó đã chốt (không có kỳ nguồn → đã chốt).
 //
 // Chỉ dùng trong kiểm thử. Gói không import mã trong internal/ (kiểm thử quy đổi bằng hàm lịch kỳ W11.03 nằm ở
-// internal/platform/extension/reportcycle/domain/khtc_golden_test.go); các gói sau nối dữ liệu này vào kiểm thử tích
+// internal/kn/extension/reportcycle/domain/khtc_golden_test.go); các gói sau nối dữ liệu này vào kiểm thử tích
 // hợp của mình (W11.62–W11.66).
 package khtcgolden
 

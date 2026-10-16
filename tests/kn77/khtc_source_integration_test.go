@@ -23,8 +23,8 @@ import (
 	"github.com/shopspring/decimal"
 
 	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"

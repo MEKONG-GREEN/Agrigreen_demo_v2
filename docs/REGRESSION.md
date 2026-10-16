@@ -17,7 +17,7 @@ Không coi kết quả SKIP là đạt.
 
 Downstream consumers: extension (reportcycle, khtcform, khtcperiod, cntsalert), reports,
 assembly API và worker; tests/kn77, tests/e2e/g5_scenario là bên kiểm chứng liên module.
-Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/forms/... ./internal/platform/extension/cntsalert/... ./internal/platform/reports/... ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77`.
+Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/forms/... ./internal/kn/extension/cntsalert/... ./internal/platform/reports/... ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77`.
 Propagation rule: thay port, vòng đời bài nộp hoặc sự kiện → chạy các bên tiêu thụ trên;
 chỉ sửa nội bộ và giữ nguyên hợp đồng → ghi lý do miễn cụ thể, không miễn mặc định.
 
@@ -25,7 +25,7 @@ chỉ sửa nội bộ và giữ nguyên hợp đồng → ghi lý do miễn c�
 
 Downstream consumers: notify (sự kiện), reports (port nguồn), assembly API, worker,
 web-ops (OpenAPI/mock/menu), tests/kn77. Party cung cấp menu bị sửa trong W11.43.
-Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/extension/cntsalert/... ./internal/platform/notify/... ./internal/platform/party/... ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77`.
+Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/extension/cntsalert/... ./internal/platform/notify/... ./internal/platform/party/... ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77`.
 Propagation rule: thay cảnh báo/sự kiện/menu → chạy notify, party, assembly, worker,
 kn77 và web: `npm run gen:api`, `npm run typecheck`, `npm test -- --maxWorkers=1 --pool=threads`, `npm run build:mock`.
 
@@ -48,8 +48,8 @@ Migration chạy nhóm `SchemaIsolation|RLSExplain|ModuleGroup|LoginRoles|NoCros
 
 ## Kết quả W11.43
 
-- Core: `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/forms/... ./internal/platform/extension/cntsalert/... ./internal/platform/notify/...` — mã thoát 0, PostgreSQL thật, không SKIP. Có `TestFormsSubmissionFeed_W1143`, `TestCNTSAlerts_W1143`, `TestCNTSNotifications_W1143` PASS.
-- Sau sửa CNTS-SCOPE-001: chạy lại `./internal/platform/extension/cntsalert/...` với cùng tham số và cụm PostgreSQL tạm — mã thoát 0; `TestProvinceAlertScope_W1143` và HTTP `TestCNTSAlerts_W1143` PASS. Thay đổi chỉ thu hẹp điều kiện đọc cảnh báo theo tỉnh; không đổi port/sự kiện/payload.
+- Core: `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/forms/... ./internal/kn/extension/cntsalert/... ./internal/platform/notify/...` — mã thoát 0, PostgreSQL thật, không SKIP. Có `TestFormsSubmissionFeed_W1143`, `TestCNTSAlerts_W1143`, `TestCNTSNotifications_W1143` PASS.
+- Sau sửa CNTS-SCOPE-001: chạy lại `./internal/kn/extension/cntsalert/...` với cùng tham số và cụm PostgreSQL tạm — mã thoát 0; `TestProvinceAlertScope_W1143` và HTTP `TestCNTSAlerts_W1143` PASS. Thay đổi chỉ thu hẹp điều kiện đọc cảnh báo theo tỉnh; không đổi port/sự kiện/payload.
 - Downstream: `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/platform/party/... ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77` — mã thoát 0, PostgreSQL thật, không SKIP; bao gồm các kịch bản KN77, CNTS tổng hợp, phiếu KHTC và cập nhật nguồn KHTC. Toàn bộ hợp lệnh hồi quy đã đạt.
 - `TestWebMenuFixture` (AG_UPDATE_WEB_FIXTURES=1) rồi `TestG5ThirdPartyToStatement` — mã thoát 0; golden menu không thay đổi byte.
 - Cổng migration `SchemaIsolation|RLSExplain|ModuleGroup|LoginRoles|NoCrossModule|LedgerAddColumn` — mã thoát 0, PostgreSQL thật, không SKIP; RLS EXPLAIN kiểm 466 bảng, 0 bỏ qua.
@@ -61,7 +61,7 @@ Migration chạy nhóm `SchemaIsolation|RLSExplain|ModuleGroup|LoginRoles|NoCros
 
 Dependency evidence: `rg -l 'internal/platform/(hrm|evidence)/port|internal/vault/identity/client' internal cmd tests -g '*.go'`; đối chiếu `hrm/module.yaml`, `assembly/hrm_docs.go` và consumer dùng port HRM/evidence. W11.24 thêm mục đích `hr_records`, thêm nhóm quyền tài liệu, không đổi chữ ký cổng đã có.
 Downstream consumers: party (menu), evidence (lưu/mở tệp), vault/identity (mục đích mở khóa), assembly API, kn77; web-ops (menu, OpenAPI, quyền, kho tài liệu).
-Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/hrm/... ./internal/platform/evidence/... ./internal/platform/party/... ./internal/vault/identity/... ./cmd/identity-vault ./cmd/api-platform/assembly ./tests/kn77` (PostgreSQL tạm).
+Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/hrm/... ./internal/platform/evidence/... ./internal/platform/party/... ./internal/vault/identity/... ./cmd/identity-vault ./cmd/api-platform/assembly ./tests/kn77` (PostgreSQL tạm).
 Propagation rule: thay hợp đồng/quyền hiện hữu hoặc đường mở tệp → chạy đủ các bên trên; thay chỉ mục đích mới → vẫn chạy toàn bộ evidence và vault để bảo vệ mục đích cũ.
 Exemptions: cooperative, mrv và extension tiêu thụ cổng evidence/vault hiện hữu nhưng không dùng `hr_records`; chữ ký, resolver, mục đích và điều kiện đồng ý của chúng giữ nguyên. Bằng chứng hành vi cũ là suite evidence/vault, bao gồm `TestOpenChecksSubjectAndLogs_W65`, `TestOpenLegacyFileWithoutSubject_W65` và ca MRV trong `TestOpenHRRecordsWithoutConsent_W1124`. Contact đọc `StaffDirectory`, không dùng quyền tài liệu; suite HRM và assembly giữ đường này. Nếu những hợp đồng đó đổi thì bỏ các miễn kiểm này và mở rộng lượt chạy.
 Sau phát hiện dùng sai mục đích, chạy lại evidence + assembly và thêm `./internal/platform/sync/...`; mục đích riêng chuyển sang registry có ràng buộc module/loại chủ thể. Tất cả bên tiêu thụ registry được lắp ráp lại.
@@ -69,7 +69,7 @@ Related test points: HRM-DOC-PURPOSE-001 (`TestOpenHRRecordsWithoutConsent_W1124
 
 Kết quả tiếp nhận W11.24 ngày 15/10/2026:
 
-- HRM domain/app và full HTTP handler (danh mục, hồ sơ, báo cáo Sở, kho tài liệu, benchmark 1.000 hồ sơ) PASS trên PostgreSQL thật. Sau bổ sung HRM-DOC-FILE-001, `go test -v -count=1 -p 1 -timeout 55m -run 'TestHRMDocsHTTP_W1124|TestOpen|TestAttach|TestStorage|TestAssembly|TestWire|TestBootstrap|TestKN|TestContact' ./internal/platform/hrm/handler ./internal/platform/evidence/... ./cmd/api-platform/assembly` hoàn tất PASS cho HRM Docs, các ca evidence được chọn và `TestContactOverHRM_W1123`. Log có dấu dọn cụm; kiểm chứng log trả mã 0, không FAIL/SKIP. Không dùng các lượt trước bản sửa để chứng minh ca mới.
+- HRM domain/app và full HTTP handler (danh mục, hồ sơ, báo cáo Sở, kho tài liệu, benchmark 1.000 hồ sơ) PASS trên PostgreSQL thật. Sau bổ sung HRM-DOC-FILE-001, `go test -v -count=1 -p 1 -timeout 55m -run 'TestHRMDocsHTTP_W1124|TestOpen|TestAttach|TestStorage|TestAssembly|TestWire|TestBootstrap|TestKN|TestContact' ./internal/kn/hrm/handler ./internal/platform/evidence/... ./cmd/api-platform/assembly` hoàn tất PASS cho HRM Docs, các ca evidence được chọn và `TestContactOverHRM_W1123`. Log có dấu dọn cụm; kiểm chứng log trả mã 0, không FAIL/SKIP. Không dùng các lượt trước bản sửa để chứng minh ca mới.
 - Evidence full, assembly full và sync full PASS, mã thoát 0; bảo vệ đường mở tệp hiện trường và tệp cũ. Party full + golden menu, vault/identity full và cmd/identity-vault full PASS; ca `TestHRRecordsUnwrapHTTP_W1124` PASS. Lỗi trùng helper `recFixture.raw` đã được bảo vệ bằng việc biên dịch/chạy chung hai suite Reports/Docs; đổi helper Docs thành `rawDoc`, không sửa kỳ vọng nghiệp vụ.
 - Cổng migration `SchemaIsolation|RLSExplain|ModuleGroup|LoginRoles|NoCrossModule|LedgerAddColumn` — mã thoát 0; RLS EXPLAIN kiểm 469 bảng, 0 bỏ qua, 0 ngoại lệ. Migration mới 20261015083926 chỉ đổi tên, SQL giữ nguyên SHA-256.
 - Web: 60 tệp, 519 ca được kiểm tra. Lượt đầu 511 PASS, 8 ca menu đọc fixture cũ trước khi Go sinh xong; sau sinh lại, 37 ca menu/problem PASS, mã thoát 0. Typecheck, gen:api và build:mock PASS, mã thoát 0. Không đổi timeout hoặc ngưỡng kiểm tra.
@@ -118,7 +118,7 @@ Quy trình `rebase-merge.ps1 -Pkg orgui` hoàn tất mã thoát 0, gộp dev t�
 
 Dependency evidence: `rg -l 'internal/platform/(extension|accounts|notify)/port' internal cmd -g '*.go'` (189 tệp) và `rg -l 'internal/shared/idempotency' internal cmd -g '*.go'` (104 tệp, gồm fixture); đối chiếu module.yaml, assembly/modules.go và cmd/worker/notify.go.
 Downstream consumers: party/menu, accounts/XaScopes và middleware, extension/lịch/cảnh báo, notify/inbox/push, assembly, worker, tests/kn77; API dùng chung chống trùng được bảo vệ bởi tests/e2e G1/G3/G4/G5 và các ca acceptance chống trùng. Web-ops (menu, API, mock, lịch), field-app (lịch, check-in, outbox).
-Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/extension/... ./internal/platform/accounts/... ./internal/platform/party/... ./internal/platform/notify/... ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77` trên cụm PostgreSQL tạm.
+Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/extension/... ./internal/platform/accounts/... ./internal/platform/party/... ./internal/platform/notify/... ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77` trên cụm PostgreSQL tạm.
 Regression acceptance command (hạ tầng dùng chung): `go test -v ./internal/shared/idempotency`; `go test -v -count=1 -p 1 -timeout 55m ./tests/e2e ./tests/acceptance ./migrations -run 'TestG1|TestG3|TestG4|TestG5|TestPrototype|TestSchemaIsolation|TestRLSExplain|TestModuleGroup|TestLoginRoles|TestNoCrossModule|TestLedgerAddColumn'`.
 Propagation rule: đổi phạm vi/phiên bản/lịch, giải ngữ cảnh hoặc chống trùng → chạy đủ các bên trên. Các module chỉ gọi notify qua sự kiện cũ không đổi payload; suite notify full bảo vệ các kênh cũ. Giá/dịch vụ HTX không đổi nghiệp vụ, build/vet + e2e G1–G5 bảo vệ đường tích hợp; acceptance kiểm phát lại phản hồi, khác người/tenant/payload/route và lỗi. Không miễn các cổng migration hoặc web/mobile.
 Related test points: CNTS-ROSTER-SCOPE-001/002, CNTS-DUTY-NOTIFY-001, IDEM-SCOPE-001/002/003. Bằng chứng lỗi: ca hai tỉnh ban đầu lộ danh mục/cán bộ; ca gửi lại trên tháng/phiên/phạm vi khác ban đầu đều trả201 và dữ liệu tỉnh cũ. Sau sửa phải trả422 `idempotency_key_reused`, retry hợp lệ giữ201.
@@ -200,7 +200,7 @@ Tích hợp WH-A: helper38351 mã0, dev a83b0b90; full party chạy lại (handl
 
 Dependency evidence: `rg -n 'KHTCPlanVersions|KHTCPlans|GuardCancel|khtcReportSvc|khtcSourceSvc' internal cmd tests`; `rg -n 'createReportApi|khtcReportInputs|khtcReportSource|khtcReportRoutes' apps/web-ops/src`; registry WH-A sinh menu/mock/OpenAPI.
 Downstream consumers: extension KHTC plan/form/period/source/report, closedfig, cap/forms, platform assembly, party menu/domain/handler, tests/kn77, web API/mock/editor/shell/menu. Không đổi Flutter hoặc API MRV, miễn chạy lại mobile cho W11.66.
-Regression acceptance command: PG thật `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/extension/... ./internal/platform/forms/... ./cmd/api-platform/assembly ./internal/platform/party/... ./tests/kn77`; migration gates; các cổng tĩnh CODEX-G1, boundary-base. Web `npm run check:api`, typecheck/lint, full Vitest, build:mock và browser editor. Golden menu sinh bằng TestWebMenuFixture trên PG thật.
+Regression acceptance command: PG thật `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/extension/... ./internal/platform/forms/... ./cmd/api-platform/assembly ./internal/platform/party/... ./tests/kn77`; migration gates; các cổng tĩnh CODEX-G1, boundary-base. Web `npm run check:api`, typecheck/lint, full Vitest, build:mock và browser editor. Golden menu sinh bằng TestWebMenuFixture trên PG thật.
 Propagation rule: thay đổi plan port, source Sum/YTD/ReportKeys, final/cancel guards phải kiểm toàn bộ consumers trên. Biên dịch không chạy test và DB SKIP không tính là bằng chứng nghiệp vụ.
 Related test points: KH-FN-TI-02.05…02.09, TestKH_ReportSumYearToDateAndFrozenWeeks, TestKH_ReportKeysDoNotRequireProgramPlan, TestKH_ReportFinalAndCancelConcurrent, TestKH_ReportCancelBeforeFinalDoesNotWaitOnItself, TestKH_ReportClosedSnapshotKeepsPlanVersion.
 
@@ -227,3 +227,26 @@ Bằng chứng cuối giao diện/cổng tĩnh W11.66:
 Khôi phục 16/10 lúc13:54: full-third đã kết thúc tất cả package trước KN77 với PASS (party/extension/forms/cooperative-anchor/assembly), nhưng tiến trình bị gián đoạn trong KN77, không có mã thoát cuối. Không coi toàn lệnh đó là xanh. Cây mã không đổi (0a1093de); chỉ chạy lại `go test -v -count=1 -p 1 -timeout 55m ./tests/kn77` trong `kn77-final` với PostgreSQL riêng. Giữ bằng chứng package đã hoàn tất, không chạy lặp toàn suite không cần thiết.
 
 Kết quả cuối backend W11.66: 31 package có kiểm thử bắt buộc đều có dòng hoàn tất PASS, không FAIL/SKIP, trên mã0a1093de. Package trước KN77 từ full-third; **kn77-final exit0,268,904s**, đủ tất cả ca báo cáo mới trên trace/yield cuối. Đối chiếu danh sách bằng `go list -f` với TestGoFiles/XTestGoFiles; proofJSON ở hostTEMP agrigreen-codex-w1166-consumer-proof.json. Whole full-third bị gián đoạn không được đổi thành exit0. Chuẩn bị helper trên cùng nền dev75f83976; helper chạy report component và migration gates thật, không chạy lại toàn bộ consumers không đổi.
+
+
+W11.66 đã tích hợp dev b13ae196: helper exit0, migration gates thật PASS263,804s, build/vet/modgen/migrate-base/archlint/boundary390 đạt; giữ toàn bộ worktree và main.
+
+## KNSPLIT-1 — Namespace KN (đang kiểm chứng, nền b13ae196)
+
+Dependency evidence: tìm các import internal/kn/{extension,price,hrm,contact} trong internal/cmd/tests; consumers trực tiếp gồm accounts, notify, reports, assembly và worker. Party/forms tiêu thụ registry và hợp đồng đã chuyển; KN77/acceptance/e2e/golden dùng đường dẫn mới. modreg/modgen/archlint quản lý mọi module.
+
+Acceptance: PostgreSQL riêng, go test -v -count=1 -p 1 -timeout 55m ./internal/kn/... ./internal/platform/accounts/... ./internal/platform/notify/... ./internal/platform/reports/... ./internal/platform/party/... ./internal/platform/forms/... ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77 ./tests/acceptance ./tests/e2e ./tests/golden/khtc; migration gates qua helper và các cổng CODEX-G1. Không sửa Go khi chạy hồi quy.
+
+Tool-first exit1: kiểm thử mới phát hiện /extension/khtc không bao phủ các package cạnh nó. Đã bổ sung phạm vi cả namespace cũ/mới, không đổi kiểm thử để bỏ lỗi. Tool-second exit0: modreg, modgen, archlint, knboundary; gồm từ chối hai chủ schema cùng định danh, giữ wiring, R02/R03/shared/vault/port và chạy analyzer trên float/DELETE thật trong namespace mới.
+
+Registry menu/mock/OpenAPI sinh lại thành công; năm SHA256 golden/menu/spec/TS giống hệt b13ae196, migrations không đổi. Không thay nguồn web/mobile nên miễn chạy lại suite giao diện trên bytes không đổi. Chưa có kết luận hồi quy dữ liệu/tĩnh hoặc tích hợp; cập nhật khi có mã thoát thật.
+
+
+KNSPLIT-1 bằng chứng cuối 16/10:
+
+- `db-full-second` exit1 chỉ vì TestNamedModulesMatchCatalog giả định mọi module ở platform. Tất cả 55 package còn lại PASS, không SKIP: gồm bốn chủ KN, accounts/notify/reports/party/forms, worker, KN77, acceptance, e2e, golden. Giữ log đỏ, không đổi thành exit0.
+- Sau khi lệnh kết thúc, sửa assertion đối chiếu chính xác PkgPath với manifest.Dir, đồng thời bắt buộc bốn module nằm internal/kn. `assembly-final` exit0: assembly118,698s PostgreSQL riêng; modreg/modgen/archlint/knboundary đạt. Tổng 56/56 package bắt buộc có PASS; không chạy lặp 55 package không đổi.
+- Đối chiếu2102 SHA Go xác nhận đóng băng mã trong suốt full PG. Sau đó gofmt383 tệp đã thay; so gofmt(index) với working tree chứng minh toàn bộ Go nghiệp vụ chỉ đổi định dạng, duy nhất assertion assembly đổi ngữ nghĩa. Hai fixture archlint chưa định dạng từ nền được giữ theo w-common. Proof consumers/format JSON lưu hostTEMP.
+- `static-final` exit0 sau format: build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary390/lint0issues. `.golangci.yml` giữ lớp dự phòng cấm KN↔MKG; không thêm ngoại lệ.
+- Registry5ca và3gen-check PASS. Sau full PG,5SHA256 golden/menu/spec/generatedTS giữ nguyên;3fixtureJSON chỉ đổi ghi chú đường dẫn, payload đối chiếu bằng JSON hoàn toàn bằng nhau; migrations không đổi. Không có thay đổi mã TS/Dart/API hành vi cần chạy lại web/mobile.
+- Chuẩn bị helper tích hợp dev trên mã này; phải kiểm các cổng migration PostgreSQL thật trước FF, giữ worktree và main.

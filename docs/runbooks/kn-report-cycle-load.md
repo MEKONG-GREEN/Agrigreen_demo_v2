@@ -1,6 +1,6 @@
 # Ghi chú tải: vòng đời báo cáo KN v7.7 (phát hành, tổng hợp, dashboard)
 
-Phạm vi: gói P4 (`internal/platform/extension/reportcycle`). Mục tiêu BRD: dashboard Tỉnh/TW < 5 giây với 500 người dùng
+Phạm vi: gói P4 (`internal/kn/extension/reportcycle`). Mục tiêu BRD: dashboard Tỉnh/TW < 5 giây với 500 người dùng
 đồng thời (FN-TW-01.01 AC); phát hành 5 biểu × 102 xã × 17 kỳ = 8.670 công việc (FN-TI-02.02, Hình 7).
 
 ## Thiết kế để đạt mục tiêu

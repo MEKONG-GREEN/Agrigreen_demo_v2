@@ -6,9 +6,9 @@ import (
 
 	"github.com/google/uuid"
 
+	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/port"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
-	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/price/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 )
 

@@ -102,3 +102,9 @@ func WriteSheetsXLSX(w io.Writer, sheets []Sheet) error {
 	}
 	return f.Write(w)
 }
+
+// SetColumnWidth applies presentation-only sizing in whole character units.
+// Keep the Excel library's floating-point layout API outside exact numeric callers.
+func SetColumnWidth(file *excelize.File, sheet, first, last string, width int) error {
+	return file.SetColWidth(sheet, first, last, float64(width))
+}

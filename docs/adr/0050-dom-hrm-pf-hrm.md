@@ -1,6 +1,6 @@
 # ADR-0050: `dom/hrm` = module nghiệp vụ `pf/hrm` — danh mục nhân sự ở module của chủ, không ở `cap/masterdata`
 
-**Trạng thái:** Đề xuất — khung + danh mục nhân sự hiện thực ở W11.21 (12/10/2026, pf 000147); dữ liệu thật chờ Phòng HCTH (Q-070) · **Ngày:** 12/10/2026 (gói W11.21) · **Yêu cầu:** kiến trúc v4.1 §5 (bốn tầng), §7.1 (R-MOD-05, R-MOD-09), R-CODE-01, RB-3 (PII qua vault) · **Nguồn:** BRD Hành chính – Tổng hợp v3.0 (07/10/2026) FN-19, UR-ADM-08; đối chiếu v4.3/MKG v1.4/BRD KN Phụ lục C mục H1, H2, §2.5 · **Thành phần:** `internal/platform/hrm`, `cmd/api-platform/assembly/hrm.go`, `migrations/pf/000147_pf_hrm_catalog.up.sql`, `tools/archlint/nofloat.go` · **Liên quan:** [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0049](0049-cap-price-pf-price.md)
+**Trạng thái:** Đề xuất — khung + danh mục nhân sự hiện thực ở W11.21 (12/10/2026, pf 000147); dữ liệu thật chờ Phòng HCTH (Q-070) · **Ngày:** 12/10/2026 (gói W11.21) · **Yêu cầu:** kiến trúc v4.1 §5 (bốn tầng), §7.1 (R-MOD-05, R-MOD-09), R-CODE-01, RB-3 (PII qua vault) · **Nguồn:** BRD Hành chính – Tổng hợp v3.0 (07/10/2026) FN-19, UR-ADM-08; đối chiếu v4.3/MKG v1.4/BRD KN Phụ lục C mục H1, H2, §2.5 · **Thành phần:** `internal/kn/hrm`, `cmd/api-platform/assembly/hrm.go`, `migrations/pf/000147_pf_hrm_catalog.up.sql`, `tools/archlint/nofloat.go` · **Liên quan:** [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0049](0049-cap-price-pf-price.md)
 
 ## Bối cảnh
 
@@ -13,7 +13,7 @@
 
 ### 1. Dựng `pf/hrm` ngay ở W11.21
 
-`pf/hrm` (`internal/platform/hrm`, `kind: domain`, `aka: [dom/hrm]`, `zones: [pf]`, `enable: per_tenant`) sở hữu schema `pf_hrm`; vai nhóm `r_hrm` (ADR-0028; `app_platform` là thành viên). W11.21 dựng khung (module.yaml, port, app, store, handler, gốc lắp ráp, `app/KN`, modgen, kiểm thử vai) cùng với danh mục; W11.22 thêm hồ sơ vào cùng module, cùng schema (migration riêng). Không schema `_pub` ở khung (báo cáo Sở W11.28 đọc trong module; thêm `pf_hrm_pub` khi `cap/analytics` cần).
+`pf/hrm` (`internal/kn/hrm`, `kind: domain`, `aka: [dom/hrm]`, `zones: [pf]`, `enable: per_tenant`) sở hữu schema `pf_hrm`; vai nhóm `r_hrm` (ADR-0028; `app_platform` là thành viên). W11.21 dựng khung (module.yaml, port, app, store, handler, gốc lắp ráp, `app/KN`, modgen, kiểm thử vai) cùng với danh mục; W11.22 thêm hồ sơ vào cùng module, cùng schema (migration riêng). Không schema `_pub` ở khung (báo cáo Sở W11.28 đọc trong module; thêm `pf_hrm_pub` khi `cap/analytics` cần).
 
 Lý do không đặt danh mục ở `cap/masterdata`: một bên dùng (chưa đạt quy tắc ba); thuộc tính và quy tắc riêng của miền; nếu đặt ở tầng capability thì `pf/hrm` phải đọc ngược qua port mà không thêm gì cho bên khác; chủ dữ liệu (HCTH) khác chủ của tham số chung.
 
@@ -48,7 +48,7 @@ Lý do không đặt danh mục ở `cap/masterdata`: một bên dùng (chưa đ
 
 ### W11.21 khung + danh mục nhân sự (12/10/2026, pf 000147)
 
-- `internal/platform/hrm`: `module.yaml` (sinh: `ports: [Catalog]`, `owns_schema: [pf_hrm]`), `port` (Access, Catalog, lỗi `hrm.*`), `domain` (16 loại danh mục, chuẩn hóa mã ngạch — AC-03, thuộc tính theo loại, bảng hệ số, tham số, dữ liệu mặc định), `store`, `app`, `handler`.
+- `internal/kn/hrm`: `module.yaml` (sinh: `ports: [Catalog]`, `owns_schema: [pf_hrm]`), `port` (Access, Catalog, lỗi `hrm.*`), `domain` (16 loại danh mục, chuẩn hóa mã ngạch — AC-03, thuộc tính theo loại, bảng hệ số, tham số, dữ liệu mặc định), `store`, `app`, `handler`.
 - pf 000147: schema `pf_hrm`; sổ `catalog_item`, `grade_scale`, `rule_param` (apply_ledger, RLS); `r_hrm` SELECT/INSERT + `k_ref`.
 - HTTP (`contracts/openapi/application.yaml`, mục pf/hrm): `GET /v1/hrm/status`, `POST /v1/hrm/defaults`, `GET|POST /v1/hrm/catalogs/{kind}`, `GET /v1/hrm/catalogs/{kind}/{code}/history`, `POST /v1/hrm/catalogs/{kind}/{code}/revise`, `GET /v1/hrm/grade-scales?at=`, `POST /v1/hrm/grade-scales/{grade}`, `GET /v1/hrm/grade-scales/{grade}/history`, `GET|POST /v1/hrm/rules/{key}`.
 - Dữ liệu mặc định: theo BRD (mẫu ngạch có tên, nhóm tương đương, trình độ + nhóm chuyên ngành NS05, LLCT, QLNN, ngoại ngữ, tin học, Kinh/"Không"); còn lại là mẫu (chức vụ, chuyên ngành, khen thưởng, kỷ luật, biến động, lý do nghỉ, bảng hệ số NĐ 204/2004, hai tham số) — `placeholder = true`.

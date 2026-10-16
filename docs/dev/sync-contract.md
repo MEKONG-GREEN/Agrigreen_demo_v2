@@ -188,7 +188,7 @@ Chiều xuống entity `plot`: `data = {ref, code, name, commune_code, cooperati
 
 ### Payload `field_report` (pf/extension, `app.ReportPayload`)
 
-Nguồn: `internal/platform/extension/app/payload.go` (`ReportPayload.ToReport`), `domain/report.go` (`Report.Validate`), `app/reports.go` (`SubmitReport`). `id` của bản ghi là mã báo cáo; `event_time` lấy từ phong bì. Trường lạ bị bỏ qua (app **không** gửi GPS).
+Nguồn: `internal/kn/extension/app/payload.go` (`ReportPayload.ToReport`), `domain/report.go` (`Report.Validate`), `app/reports.go` (`SubmitReport`). `id` của bản ghi là mã báo cáo; `event_time` lấy từ phong bì. Trường lạ bị bỏ qua (app **không** gửi GPS).
 
 ```json
 {
@@ -287,7 +287,7 @@ Mọi entity chỉ `create` / `correct`; `event_time` là lúc xảy ra tại ru
 
 ## Báo cáo KN v7.7 (P7, field-app Cán bộ xã — FN-XA-03.01/03.02, N-07)
 
-Nguồn: `internal/platform/extension/reportcycle/app/sync.go` (`ReportSync`, `ReportSink`), `store/sync.go`; migration pf 000077 (`report_task.sync_seq` tăng ở mọi UPDATE qua trigger, `report_task.created_seq` cấp một lần). Kiểm thử: `tests/kn77/p7_sync_integration_test.go` (`TestFN_XA_03_02_OfflineReportSync`).
+Nguồn: `internal/kn/extension/reportcycle/app/sync.go` (`ReportSync`, `ReportSink`), `store/sync.go`; migration pf 000077 (`report_task.sync_seq` tăng ở mọi UPDATE qua trigger, `report_task.created_seq` cấp một lần). Kiểm thử: `tests/kn77/p7_sync_integration_test.go` (`TestFN_XA_03_02_OfflineReportSync`).
 
 **Ngữ cảnh phiên.** Request mang `X-AG-Context` (P1) → pf/sync lấy phạm vi pull/push = `Principal.KN.Scope` (Cấp Xã: các xã phụ trách), KHÔNG theo `org_ref` của token; dấu vân tay con trỏ có thêm `kn:<vai>:<phòng ban>:` → đổi vai trò/phòng ban/xã phụ trách = `reset: true`. Đơn vị phụ trách xung đột = Nút của ngữ cảnh. Không có header → đường cũ (`ScopeResolver`), entity báo cáo bị bỏ qua (Source trả 403), các entity khác vẫn đồng bộ. Chỉ vai `kn_xa` nhận/gửi entity báo cáo; dữ liệu lọc theo phòng ban của ngữ cảnh.
 

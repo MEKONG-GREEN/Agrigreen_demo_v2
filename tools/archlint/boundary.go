@@ -49,6 +49,9 @@ func locate(pkg string) loc {
 		return loc{path: pkg}
 	}
 	l := loc{path: pkg, internal: true, zone: parts[1]}
+	if l.zone == "kn" {
+		l.zone = "platform"
+	} // same DB zone, independent application namespace (KNSPLIT-1)
 	if len(parts) >= 3 {
 		l.module = parts[2]
 	}

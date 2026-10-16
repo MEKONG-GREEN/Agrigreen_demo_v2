@@ -1,0 +1,1 @@
+- [x] KNSPLIT-1 (16/10/2026, không migration): chuyển bốn module sang internal/kn, giữ schema/module/role DB; cổng kiến trúc và số chính xác bao phủ namespace mới. Hồi quy56/56 gói đạt, baseline390; tích hợp dev bằng helper sau migration gates thật. [Giả định](../../kn/gia-dinh/KNSPLIT-1.md), [bằng chứng](../../REGRESSION.md).

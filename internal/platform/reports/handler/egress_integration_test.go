@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"

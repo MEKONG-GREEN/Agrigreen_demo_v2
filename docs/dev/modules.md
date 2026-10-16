@@ -339,7 +339,7 @@ Kiến trúc v4.1 §26, §7.2. Module năng lực `pf/forms` (`internal/platform
 
 ## Module nhân sự `dom/hrm` (W11.21)
 
-[ADR-0050](../adr/0050-dom-hrm-pf-hrm.md). Module nghiệp vụ `pf/hrm` (`internal/platform/hrm`, `dom/hrm`, `kind: domain`, `enable: per_tenant`) sở hữu `pf_hrm` (pf 000147); vai `r_hrm` (không vai cũ, `app_platform` là thành viên). Toàn module cấm float (agnofloat): hệ số, PCCV, % là decimal/`numeric`.
+[ADR-0050](../adr/0050-dom-hrm-pf-hrm.md). Module nghiệp vụ `pf/hrm` (`internal/kn/hrm`, `dom/hrm`, `kind: domain`, `enable: per_tenant`) sở hữu `pf_hrm` (pf 000147); vai `r_hrm` (không vai cũ, `app_platform` là thành viên). Toàn module cấm float (agnofloat): hệ số, PCCV, % là decimal/`numeric`.
 
 | Thành phần | W11.21 | Gói mở rộng |
 |---|---|---|
@@ -357,11 +357,11 @@ Bảng mới của các gói sau: migration riêng tên `<số>_pf_hrm_<việc>.
 
 ## Danh bạ dùng chung `cap/directory` (W11.23)
 
-[ADR-0054](../adr/0054-cap-directory-pf-contact.md). Module năng lực `pf/contact` (`internal/platform/contact`, `kind: capability`, `enable: always`) sở hữu `pf_contact` (pf 20261013230912; sổ `person` — liên hệ ngoài tỉnh, `unit` — thẻ Đơn vị; không PII); vai `r_contact` (`app_platform` là thành viên). Port: `Access` (bộ trường theo vai ngữ cảnh/realm, vai cập nhật — KN ở `cmd/api-platform/assembly/contact.go`), `Staff` (nguồn cán bộ thuộc tỉnh), `Labels` (tên đơn vị nội bộ, tên xã), `Names` (họ tên theo tài khoản — cùng chữ ký `party/port.ActorNames`; `pf/extension` dùng qua `UseContactNames`, Q-072). PII đọc bằng thẻ danh bạ của kho (`client.Directory.Cards`, mục đích `contact.directory`, vai `vault_directory`); ghi liên hệ ngoài tỉnh bằng `Create`/`Amend`/ngăn `contact.card` (vai `vault_registrar`). HTTP `/v1/contacts/access|persons[/{id}[/revise]]|units[/{id}/revise]`; bộ "basic" có DTO riêng — thêm trường vào `basicPersonDTO` là vi phạm BR-03 (kiểm thử `TestContact_FieldFiltering` so khóa và byte).
+[ADR-0054](../adr/0054-cap-directory-pf-contact.md). Module năng lực `pf/contact` (`internal/kn/contact`, `kind: capability`, `enable: always`) sở hữu `pf_contact` (pf 20261013230912; sổ `person` — liên hệ ngoài tỉnh, `unit` — thẻ Đơn vị; không PII); vai `r_contact` (`app_platform` là thành viên). Port: `Access` (bộ trường theo vai ngữ cảnh/realm, vai cập nhật — KN ở `cmd/api-platform/assembly/contact.go`), `Staff` (nguồn cán bộ thuộc tỉnh), `Labels` (tên đơn vị nội bộ, tên xã), `Names` (họ tên theo tài khoản — cùng chữ ký `party/port.ActorNames`; `pf/extension` dùng qua `UseContactNames`, Q-072). PII đọc bằng thẻ danh bạ của kho (`client.Directory.Cards`, mục đích `contact.directory`, vai `vault_directory`); ghi liên hệ ngoài tỉnh bằng `Create`/`Amend`/ngăn `contact.card` (vai `vault_registrar`). HTTP `/v1/contacts/access|persons[/{id}[/revise]]|units[/{id}/revise]`; bộ "basic" có DTO riêng — thêm trường vào `basicPersonDTO` là vi phạm BR-03 (kiểm thử `TestContact_FieldFiltering` so khóa và byte).
 
 ## Kế hoạch năm KHTC trong `dom/extension` (W11.61)
 
-Gói con `internal/platform/extension/khtc` (schema `pf_extension`, migration pf 20261013070305), phòng ban `ke_hoach_tai_chinh`:
+Gói con `internal/kn/extension/khtc` (schema `pf_extension`, migration pf 20261013070305), phòng ban `ke_hoach_tai_chinh`:
 
 - Sổ `khtc_catalog_item` (Danh mục KHTC, 7 loại), `khtc_program` (danh sách CT/DA chủ — quyết định D20), `khtc_plan_version` (phiên bản theo QĐ, `entries_hash`) + bảng chỉ ghi thêm `khtc_plan_entry` (cả cây mỗi phiên bản).
 - Cổng cho module khác: `extension/port.KHTCPrograms` (Program, Programs — CNTS W11.47 tham chiếu `program_ref`) và `extension/port.KHTCPlans` (PlanAt — phiên bản hiệu lực theo ngày, BR-DL-13; W11.62/63/65). Gốc lắp ráp lấy qua `Module.KHTCPrograms()`, `Module.KHTCPlans()`.
@@ -370,7 +370,7 @@ Gói con `internal/platform/extension/khtc` (schema `pf_extension`, migration pf
 
 ## Khung giá `cap/price` (W11.71)
 
-[ADR-0049](../adr/0049-cap-price-pf-price.md); kiến trúc v4.1 §26. Module năng lực `pf/price` (`internal/platform/price`, `cap/price`, `enable: per_tenant`) sở hữu `pf_price` và `pf_price_pub` (pf 000138); vai `r_price` (không vai cũ, `app_platform` là thành viên), `r_price_pub` (đọc view công bố — chưa có view, `v1_board_daily` ở W11.76). Toàn module cấm float (agnofloat `floatFreeZones`, R-CODE-01): giá, % là decimal/`numeric`.
+[ADR-0049](../adr/0049-cap-price-pf-price.md); kiến trúc v4.1 §26. Module năng lực `pf/price` (`internal/kn/price`, `cap/price`, `enable: per_tenant`) sở hữu `pf_price` và `pf_price_pub` (pf 000138); vai `r_price` (không vai cũ, `app_platform` là thành viên), `r_price_pub` (đọc view công bố — chưa có view, `v1_board_daily` ở W11.76). Toàn module cấm float (agnofloat `floatFreeZones`, R-CODE-01): giá, % là decimal/`numeric`.
 
 | Thành phần | Khung W11.71 | Gói mở rộng |
 |---|---|---|

@@ -19,7 +19,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/xuri/excelize/v2"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"

@@ -8,7 +8,7 @@
 Báo giá vào **G1 (15/12/2026) với dữ liệu thật** theo QĐ-5 (a). Mã có ở W11.71–W11.76 (`pf/price`, ADR-0049):
 - W11.71–W11.76 đã gộp vào `dev`. W11.76 (duyệt / mở duyệt bảng giá, pf 000151–000152) có ở `dev` từ mốc `1425a53c` (13/10/2026).
 
-Kiểm thử được tra bằng `git grep "func Test" -- internal/platform/price` và tên `it(...)` của Vitest `apps/web-ops/src/kn/price/**`. Giả định đã dùng nằm ở [gia-dinh-brd-2026-10.md](../kn/gia-dinh-brd-2026-10.md) (mục W11.71–W11.75) và ADR-0049 mục "Hiện thực".
+Kiểm thử được tra bằng `git grep "func Test" -- internal/kn/price` và tên `it(...)` của Vitest `apps/web-ops/src/kn/price/**`. Giả định đã dùng nằm ở [gia-dinh-brd-2026-10.md](../kn/gia-dinh-brd-2026-10.md) (mục W11.71–W11.75) và ADR-0049 mục "Hiện thực".
 
 Yêu cầu lấy từ BRD Báo giá v1.3:
 - 31 UR (Mục III, cột "Đợt");
@@ -48,7 +48,7 @@ Phần **mã** còn thiếu ở các dòng trong G1:
 Như [kn-v7.7-acceptance.md §1](kn-v7.7-acceptance.md#1-cách-chạy):
 
 ```
-go test -count=1 ./internal/platform/price/... ./internal/platform/notify/domain/   # cần PostgreSQL cho *_integration_test
+go test -count=1 ./internal/kn/price/... ./internal/platform/notify/domain/   # cần PostgreSQL cho *_integration_test
 cd apps/web-ops; npx vitest run src/kn/price
 ```
 

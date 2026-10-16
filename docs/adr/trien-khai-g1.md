@@ -85,7 +85,7 @@ Lời văn đã chỉnh cho khớp mã: `tenant_id` lấy từ claim của token
 
 | # | Cam kết | Nơi hiện thực | Kiểm thử | Trạng thái |
 |---|---|---|---|---|
-| 11.1 | `extension`: nhiệm vụ hỗ trợ + SLA, chỉ đạo khẩn, lớp tập huấn, danh bạ trực (App KN) | `internal/platform/extension` (pf 000006, 000016, 000026) | kiểm thử `extension/handler` (KN US-TASK-*, US-DIR-*) | đã có |
+| 11.1 | `extension`: nhiệm vụ hỗ trợ + SLA, chỉ đạo khẩn, lớp tập huấn, danh bạ trực (App KN) | `internal/kn/extension` (pf 000006, 000016, 000026) | kiểm thử `extension/handler` (KN US-TASK-*, US-DIR-*) | đã có |
 | 11.2 | `mechanization`: máy, chủ sở hữu, định mức có hiệu lực, cân đối cung–cầu (CGH QT-01/02/03) | `internal/platform/mechanization` (pf 000007, 000015, 000035) | `TestBalanceUsesNormAtSeasonAndPilotStages`, `TestSavedResultsImmutableAndChainVerifies` | đã có |
 | 11.3 | `cropcycle`: mùa vụ theo SOP, nhật ký canh tác dạng sổ, sản lượng decimal. Sửa nhật ký là bản ghi bù | `internal/platform/cropcycle` (pf 000020, 000021, 000040) | `TestFarmLogCorrection_HTX_US_LOG_01_AC3`, `TestSeasonCorrectionAndCancel`, `TestHarvestDeclare_HTX_US_YIELD_01_03` | đã có |
 | 11.4 | `content`: thư viện quy trình, tin tức, CMS (KN + HTX) | `internal/platform/content` (pf 000005, 000014) | kiểm thử `content/handler` | đã có |

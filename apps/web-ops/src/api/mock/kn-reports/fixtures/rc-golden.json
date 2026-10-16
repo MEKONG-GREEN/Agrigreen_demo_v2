@@ -1,5 +1,5 @@
 {
- "_note": "SINH TỰ ĐỘNG bởi TestWebReportCycleFixture (internal/platform/extension/reportcycle/domain) — không sửa tay.",
+ "_note": "SINH TỰ ĐỘNG bởi TestWebReportCycleFixture (internal/kn/extension/reportcycle/domain) — không sửa tay.",
  "status_labels": {
   "adjustment_requested": "Yêu cầu điều chỉnh",
   "awaiting_reopen": "Chờ mở kỳ",

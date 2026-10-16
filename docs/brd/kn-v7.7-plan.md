@@ -120,14 +120,14 @@ P7 (sau hợp đồng P1, P3/P4, P5) ──────────────�
   8. **Dashboard** (`GET /v1/extension/kn-dashboard?province|region&season&period`): đọc snapshot + trạng thái nộp; < 5 s/500 người (đọc bảng tóm tắt, cache theo `consolidation_run`).
   9. **Báo cáo TW/Tỉnh/Xã:** xem bảng theo mẫu từ snapshot, so sánh cùng kỳ năm trước, nhãn Đã chốt/Tạm tính, Báo cáo của xã + thống kê của xã.
   10. **Chi cục** (`pf_reports`): danh bạ người nhận (mặc định lần trước), `POST /v1/reports/dispatches` (xuất tệp: Excel theo mẫu, PDF, link Google), `POST /:id/send` (SMTP công vụ, **đính kèm** — mở rộng `mail/smtp.go`), giới hạn dung lượng → chỉ link, gửi lại, log; bộ chuyển `reports/gsheet` **tắt mặc định** theo ADR mới (gap §4.3) — viết ADR-0022 trước khi bật.
-- **Tệp:** `internal/platform/extension/*` (gói con `reportcycle`), `internal/platform/reports/{dispatch,gsheet,mail}`, `internal/platform/notify` (kiểu mới), `internal/platform/sync` (entity pull mới — ghi chú cho người tích hợp nếu đụng `sync-contract.md`), `migrations/pf/000068–000073`, OpenAPI cả hai tệp, `contracts/events/pf.extension.report_task.*`, `pf.extension.submission.*`, `pf.extension.period.*`, `pf.extension.consolidation.completed`, `docs/errors.md`, `docs/adr/0022-xuat-google-sheets.md` (Đề xuất).
+- **Tệp:** `internal/kn/extension/*` (gói con `reportcycle`), `internal/platform/reports/{dispatch,gsheet,mail}`, `internal/platform/notify` (kiểu mới), `internal/platform/sync` (entity pull mới — ghi chú cho người tích hợp nếu đụng `sync-contract.md`), `migrations/pf/000068–000073`, OpenAPI cả hai tệp, `contracts/events/pf.extension.report_task.*`, `pf.extension.submission.*`, `pf.extension.period.*`, `pf.extension.consolidation.completed`, `docs/errors.md`, `docs/adr/0022-xuat-google-sheets.md` (Đề xuất).
 - **Phụ thuộc:** P1 (context, scope), P3 (mẫu, engine), P2 (khu vực).
 - **Câu hỏi:** Q-07, Q-08, Q-09, Q-14, Q-15, Q-17, Q-18, Q-20.
 
 ### P5 — Lịch công tác tuần
 - **FN:** FN-XA-03.08, FN-TI-02.07.
 - **Phạm vi:** lịch tuần mỗi cán bộ (mặc định tuần kế tiếp), mục theo ngày + buổi/giờ, sao chép tuần trước, cảnh báo trùng giờ, Nháp → Chờ duyệt → Đã duyệt / Yêu cầu chỉnh sửa (lý do), điều chỉnh lịch đã duyệt → phần điều chỉnh chờ duyệt lại, khóa tuần đã kết thúc, “Đăng ký muộn”, tab Chưa đăng ký, duyệt hàng loạt, nhắc người duyệt quá hạn, xuất Excel/PDF; người duyệt = Cấp Tỉnh cùng phòng ban, cùng tỉnh, cấp quản lý “Trưởng phòng” (Q-05); hạn đăng ký, hạn duyệt là tham số theo tỉnh; cán bộ tỉnh đăng ký lịch của mình (ai duyệt? Q-16).
-- **Tệp:** `internal/platform/extension` (gói con `schedule`), `migrations/pf/000075`, OpenAPI `application.yaml` (`/v1/extension/work-schedules*`, `/approve`, `/request-changes`, `/bulk-approve`, `/unregistered`), sự kiện `pf.extension.work_schedule.*`, notify kiểu `work_schedule_*`.
+- **Tệp:** `internal/kn/extension` (gói con `schedule`), `migrations/pf/000075`, OpenAPI `application.yaml` (`/v1/extension/work-schedules*`, `/approve`, `/request-changes`, `/bulk-approve`, `/unregistered`), sự kiện `pf.extension.work_schedule.*`, notify kiểu `work_schedule_*`.
 - **Phụ thuộc:** P1.
 - **Câu hỏi:** Q-05, Q-16.
 

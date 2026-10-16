@@ -355,8 +355,11 @@ func normalizeEOL(b []byte) []byte { return bytes.ReplaceAll(b, []byte("\r\n"), 
 // moduleDirs trả internal/<vùng>/<module> (gạch chéo xuôi) có ít nhất một tệp .go.
 func moduleDirs(root string) ([]string, error) {
 	var out []string
-	for _, zone := range []string{"platform", "mkg", "vault"} {
+	for _, zone := range []string{"platform", "kn", "mkg", "vault"} {
 		entries, err := os.ReadDir(filepath.Join(root, "internal", zone))
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}
