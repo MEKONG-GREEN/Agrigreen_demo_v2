@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-REPORTS-F — Gỡ5source/5builtin KN implicit khỏi domain, giữ native4 và catalog KN đăng ký; test âm/golden/quyền9source/cột theo cấp đạt. ChờPG/static/helper; data-builder và14gridseed còn gói sau.
+- [x] KNSPLIT-2-REPORTS-F — GỡcatalogKNimplicit, negative/golden/quyền9source/visibility đạt;13/13PG noSKIP trên224,304chỉxóa2unusedhelpers vàdomain/app/lintđạt. Helperrebuild/migrationtrướcdev; builder/14gridseed còn gói sau.
