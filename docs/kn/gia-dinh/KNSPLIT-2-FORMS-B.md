@@ -4,4 +4,4 @@ Gỡ nhánh tự đọc Principal.KN, actor.kn và phép kiểm KN riêng trong 
 
 Fixture app/HTTP của forms dùng resolver giả độc lập và dữ liệu ResolvedActor trong context; không mượn kiểu KNContext hoặc import module KN. Giữ các ca lịch sử CNTS/KHTC để kiểm khả năng generic theo cơ sở/phòng ban, không dời luật KN vào tên generic.
 
-Ca âm ở assembly chứng minh profile chưa đăng ký resolver không tự suy quyền từ ngữ cảnh KN: đường cũ đi đến DB dù không có realm roles; sau gỡ phải Forbidden trước DB. Các ca resolver nhận diện phiên nhưng vai rỗng/lạ không được kế thừa quyền realm cao hơn. Đang hồi quy trước tích hợp; xem docs/REGRESSION.md.
+Ca âm ở assembly chứng minh profile chưa đăng ký resolver không tự suy quyền từ ngữ cảnh KN: đường cũ đi đến DB dù không có realm roles; sau gỡ phải Forbidden trước DB. Các ca resolver nhận diện phiên nhưng vai rỗng/lạ không được kế thừa quyền realm cao hơn. Đã đạt6/6 gói hồi quy PostgreSQL/consumer và các cổng tĩnh; tích hợp bằng helper sau migration gates thật. Xem docs/REGRESSION.md.
