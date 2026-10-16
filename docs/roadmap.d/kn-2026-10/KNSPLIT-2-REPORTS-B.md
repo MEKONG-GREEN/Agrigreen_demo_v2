@@ -1,3 +1,1 @@
-# KNSPLIT-2-REPORTS-B
-
-- [ ] Gỡ suy quyền phiên KN trong lõi reports sau registry A; test âm thiếu/không xử lý callback và hồi quy PG thật. Chưa tích hợp. Các role group và extension source port còn phải chuyển registry/sản phẩm dữ liệu ở gói tiếp theo.
+- [x] KNSPLIT-2-REPORTS-B — Gỡ adapter suy quyền phiên KN trong reports; test âm trước sửa, đủ13/13PG/consumer không SKIP và cổng tĩnh đạt. Helper kiểm migration trước tích hợp dev. Role group/source ports còn gói tiếp theo.
