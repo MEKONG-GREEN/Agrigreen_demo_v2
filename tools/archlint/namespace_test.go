@@ -56,5 +56,6 @@ func TestGeneratedDriverSelfImportOnly(t *testing.T) {
 	}
 	analysistest.Run(t, analysistest.TestData(), Boundary,
 		"example.com/ag/internal/kn/fixture.test",
-		"example.com/ag/internal/kn/handwritten.test")
+		"example.com/ag/internal/kn/handwritten.test",
+		"example.com/ag/internal/kn/othergen.test")
 }
