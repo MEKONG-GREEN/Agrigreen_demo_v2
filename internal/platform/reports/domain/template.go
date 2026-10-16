@@ -78,17 +78,6 @@ func (s SourceSpec) Column(key string) (ColumnSpec, bool) {
 	return ColumnSpec{}, false
 }
 
-func unitCols() []ColumnSpec {
-	return []ColumnSpec{
-		{Key: "province_code", Title: "Mã tỉnh", Kind: KindText, MinLevel: LevelProvince},
-		{Key: "province_name", Title: "Tỉnh/Thành phố", Kind: KindText, MinLevel: LevelProvince},
-		{Key: "commune_code", Title: "Mã xã", Kind: KindText, MinLevel: LevelCommune},
-		{Key: "commune_name", Title: "Xã/Phường", Kind: KindText, MinLevel: LevelCommune},
-	}
-}
-
-func cols(extra ...ColumnSpec) []ColumnSpec { return append(unitCols(), extra...) }
-
 // Sources là các nguồn dữ liệu được hỗ trợ.
 var nativeSourceSpecs = map[string]SourceSpec{
 	// CGH FN-10 — cột đúng "Cấu trúc file xuất Excel/PDF" của BRD v1.3.
