@@ -394,7 +394,7 @@ Golden-capture.exit0/app1.810s từ legacy metadata, không từ provider mới.
 
 Kết quả thực: PG70172.exit0 đủ13/13package,0FAIL/SKIP (assembly:116.892s, worker:2.050s, reports:115.207s, kn77:289.793s); production67c70932 không đổi. Static60148.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. Gofmt toàn repo chỉ2fixture cũ được phép. Đối chiếu gitdf2ba484 xác nhận7file/19testfunction và assertion counts giữ nguyên sau chuyển tests/reports. Golden cũ và provider KN khớpbyte. ProofJSON hostTEMP agrigreen-codex-knsplit2reportse-proof.json. Helper còn kiểm8migrationgate trước tích hợp; F mới gỡ legacy catalog, data-builder/14gridseed còn gói sau.
 
- 
+
 ## KNSPLIT-2-REPORTS-F — Catalog registration bắt buộc (nền2a877d33)
 
 Downstream consumers: reports/domain defaults/validation/column build; app registry/template/export/schedule/policy/buildDataset; API/hai worker/KN77/tests-reports đã đăng ký owner KN thật. Dependency evidence: rg -n 'Sources|NativeSources|Builtins|sourceSpecs|builtinTemplates|CatalogRegistration|ReportCatalog' internal/platform/reports internal/kn/extension cmd tests -g '*.go'. Test suite HTTP hiện ở tests/reports, không tính handler cũ không có test.
