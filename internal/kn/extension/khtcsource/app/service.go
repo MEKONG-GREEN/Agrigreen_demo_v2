@@ -263,7 +263,7 @@ func (s *Service) Refresh(ctx context.Context, id uuid.UUID, idem string) (Statu
 		return Status{}, err
 	}
 	target := port.CrosswalkTarget{CalendarID: cal.ID, RuleTag: cal.Rule.Tag(), PeriodType: rc.PeriodWeek}
-	ps, err := s.Sources.Periods(ctx, c.p.TenantID, port.KHTCQuery{ConfirmationAt: cutoffEnd(p.Cutoff), From: wFrom, To: p.To, Target: target})
+	ps, err := s.Sources.Periods(ctx, c.p.TenantID, port.KHTCQuery{PriceAt: &p.Cutoff, ConfirmationAt: cutoffEnd(p.Cutoff), From: wFrom, To: p.To, Target: target})
 	if err != nil {
 		return Status{}, ErrDependency.WithDetail("đọc số liệu nguồn lỗi").WithCause(err)
 	}
@@ -309,7 +309,7 @@ func (s *Service) Refresh(ctx context.Context, id uuid.UUID, idem string) (Statu
 				fz[w] = f
 			}
 		}
-		v.V = domain.Evaluate(k, ps, fz, p.From, p.To)
+		v.V = domain.EvaluateAt(k, ps, fz, p.From, p.To, p.Cutoff)
 		cur[raw] = v.V
 		vals = append(vals, v)
 	}
@@ -331,7 +331,7 @@ func (s *Service) Refresh(ctx context.Context, id uuid.UUID, idem string) (Statu
 				Old: ch.Old, New: ch.New})
 		}
 	}
-	rows := domain.Rows(ps, p.From, p.To)
+	rows := domain.RowsAt(ps, p.From, p.To, p.Cutoff)
 	closed := true
 	for _, x := range ps {
 		if !dayOf(x.TargetTo).Before(dayOf(p.From)) && !dayOf(x.TargetTo).After(dayOf(p.To)) {
@@ -532,9 +532,9 @@ func (s *Service) Status(ctx context.Context, id uuid.UUID) (Status, error) {
 		st.Entries = entries
 	}
 	cal := calendarOf(p)
-	live, lerr := s.Sources.Periods(ctx, c.p.TenantID, port.KHTCQuery{ConfirmationAt: cutoffEnd(p.Cutoff), From: p.From, To: p.To,
+	live, lerr := s.Sources.Periods(ctx, c.p.TenantID, port.KHTCQuery{PriceAt: &p.Cutoff, ConfirmationAt: cutoffEnd(p.Cutoff), From: p.From, To: p.To,
 		Target: port.CrosswalkTarget{CalendarID: cal.ID, RuleTag: cal.Rule.Tag(), PeriodType: rc.PeriodWeek}})
-	liveRows := domain.Rows(live, p.From, p.To)
+	liveRows := domain.RowsAt(live, p.From, p.To, p.Cutoff)
 	switch {
 	case lerr != nil:
 		st.LiveError = "không đọc được số liệu nguồn hiện tại"

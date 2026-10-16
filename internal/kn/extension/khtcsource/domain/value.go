@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -19,7 +20,7 @@ import (
 //   - Q6 (D17): tuần "đã chốt" khi mọi kỳ nguồn (mọi biểu của phòng) quy vào tuần đã chốt; không có kỳ nguồn → đã chốt.
 //   - Q7: tuần KHTC đã đóng giữ số (Frozen) — nguồn đổi sau đó chỉ gắn SourceChanged, phần chênh vào tuần mở kế tiếp.
 //   - Lũy kế năm KHTC = Σ trong kỳ của các tuần cùng năm KHTC (năm của ngày cuối tuần).
-//   - Q8/D22: giá = min/max toàn tỉnh của mặt hàng ở bảng giá đã duyệt; hai ngày đã duyệt gần nhất không sau cuối kỳ.
+//   - Q8/D22: giá = min/max toàn tỉnh của mặt hàng ở bảng giá đã duyệt; hai ngày đã duyệt gần nhất không sau ngày chốt.
 //   - Q9/D2: phần "Chưa xác nhận" tách riêng (Unconfirmed), vẫn tính vào tổng.
 
 // Frozen là số đã chốt của khóa nguồn ở một tuần KHTC đã đóng (ảnh chụp cuối của kỳ tuần đó).
@@ -68,7 +69,7 @@ type Value struct {
 	Increment     *decimal.Decimal // cum, season: Σ trong kỳ các tuần của kỳ
 	YearToDate    *decimal.Decimal
 	Sum           *decimal.Decimal // sum
-	Min, Max      *decimal.Decimal // price: ngày đã duyệt gần nhất không sau cuối kỳ
+	Min, Max      *decimal.Decimal // price: ngày đã duyệt gần nhất không sau ngày chốt
 	PriceDay      string
 	PriceDays     []PriceDay // price: hai ngày đã duyệt gần nhất
 	Unconfirmed   *decimal.Decimal
@@ -139,6 +140,11 @@ func seriesOf(mode string, s port.SourcePeriodRef) string {
 // gốc và lũy kế năm) và số đã giữ của tuần KHTC đã đóng (khóa tuần → Frozen). Kỳ KHTC = các tuần có ngày cuối trong
 // [from, to].
 func Evaluate(k SourceKey, periods []port.KHTCPeriod, frozen map[string]Frozen, from, to time.Time) Value {
+	return EvaluateAt(k, periods, frozen, from, to, to)
+}
+
+// EvaluateAt uses [from,to] for quantities and priceAt for the M4 price columns.
+func EvaluateAt(k SourceKey, periods []port.KHTCPeriod, frozen map[string]Frozen, from, to, priceAt time.Time) Value {
 	from, to = dayOnly(from), dayOnly(to)
 	weeks := make([]Week, 0, len(periods))
 	for i, p := range periods {
@@ -191,7 +197,7 @@ func Evaluate(k SourceKey, periods []port.KHTCPeriod, frozen map[string]Frozen, 
 		}
 		v.YearToDate, v.Unconfirmed = ptr(yearly), ptr(unconfirmed)
 	case ModePrice:
-		price(&v, k, periods, from, to)
+		price(&v, k, periods, from, dayOnly(priceAt))
 	default:
 		v.Cumulative, v.Base, v.BaseRef, v.Increment = ptr(last.Cumulative), ptr(first.Base), first.BaseRef, ptr(inc)
 		v.YearToDate, v.Unconfirmed = ptr(last.YearToDate), ptr(last.Unconfirmed)
@@ -299,11 +305,11 @@ func week(k SourceKey, p port.KHTCPeriod, prev *Week, frozen map[string]Frozen) 
 }
 
 // price điền giá của mặt hàng: các ngày bảng giá đã duyệt (kỳ nguồn PRICE-BOARD đã chốt có ô của mặt hàng) không sau
-// cuối kỳ; giá của kỳ = ngày đã duyệt gần nhất, hai cột = hai ngày gần nhất (Q8, M4). Không ngày duyệt trong kỳ →
+// ngày chốt; giá của kỳ = ngày đã duyệt gần nhất, hai cột = hai ngày gần nhất (Q8, M4). Không ngày duyệt trong kỳ →
 // Fallback (D22).
 func price(v *Value, k SourceKey, periods []port.KHTCPeriod, from, to time.Time) {
 	days := map[string]PriceDay{}
-	for _, p := range periods {
+	for _, p := range pricePeriods(periods) {
 		_, f := find(p, k)
 		if f == nil {
 			continue
@@ -333,10 +339,44 @@ func price(v *Value, k SourceKey, periods []port.KHTCPeriod, from, to time.Time)
 	for _, d := range keys {
 		v.PriceDays = append(v.PriceDays, days[d])
 	}
+	v.NoSource = len(v.PriceDays) == 0
+	v.SourceKeys = nil
+	for _, p := range pricePeriods(periods) {
+		_, f := find(p, k)
+		if f == nil {
+			continue
+		}
+		for _, src := range f.Sources {
+			if src.Closed && slices.Contains(keys, dayOnly(src.To).Format(time.DateOnly)) && !slices.Contains(v.SourceKeys, identity(src)) {
+				v.SourceKeys = append(v.SourceKeys, identity(src))
+			}
+		}
+	}
 	v.Fallback = true
 	if n := len(v.PriceDays); n > 0 {
 		last := v.PriceDays[n-1]
 		v.Min, v.Max, v.PriceDay = ptr(last.Min), ptr(last.Max), last.Day
 		v.Fallback = last.Day < from.Format(time.DateOnly)
 	}
+}
+
+// pricePeriods chooses the explicit as-of projection when provided, including
+// an empty one. Its target keys stay those computed by D8, not the report week.
+func pricePeriods(periods []port.KHTCPeriod) []port.KHTCPeriod {
+	var out []port.KHTCPeriod
+	found := false
+	for _, p := range periods {
+		if p.PriceAsOf == nil {
+			continue
+		}
+		found = true
+		for _, f := range p.PriceAsOf {
+			out = append(out, port.KHTCPeriod{TargetKey: f.TargetKey, TargetFrom: f.TargetFrom, TargetTo: f.TargetTo,
+				Departments: []port.DepartmentFigures{{DepartmentCode: f.DepartmentCode, Forms: []port.TargetFigure{f}}}})
+		}
+	}
+	if found {
+		return out
+	}
+	return periods
 }

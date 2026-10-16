@@ -111,6 +111,8 @@ const (
 
 // KHTCQuery: tỉnh và khoảng ngày [From, To] — trả mọi kỳ KHTC giao với khoảng. Departments rỗng = mọi phòng có số.
 type KHTCQuery struct {
+	PriceAt *time.Time // M4: calendar date for approved prices; nil retains the quantity-period reader.
+
 	ConfirmationAt *time.Time // M6: end of the report cutoff day in Vietnam; nil retains current-state callers.
 	Province       string
 	From, To       time.Time
@@ -120,6 +122,11 @@ type KHTCQuery struct {
 
 // KHTCPeriod là một kỳ KHTC với số của từng phòng.
 type KHTCPeriod struct {
+	// PriceAsOf contains full approved boards covering the last two days per item at PriceAt. Nil is
+	// the legacy weekly projection; non-nil (even empty) is authoritative. Each
+	// figure retains its actual D8 target, independently of the quantity period.
+	PriceAsOf []TargetFigure
+
 	RuleVersion           string
 	TargetCalendarID      string
 	TargetCalendarVersion int

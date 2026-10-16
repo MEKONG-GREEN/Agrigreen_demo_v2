@@ -35,7 +35,8 @@ var priceCalendarVersion = rcdomain.CalendarVersionDefault
 // priceProfile là bên dùng cap/price của KN.
 const priceProfile = "kn"
 
-// priceLookback: số ngày đọc lùi trước kỳ đầu để lấy "ngày đã duyệt gần nhất" (D22) khi kỳ không có ngày duyệt.
+// priceLookback bounds the legacy weekly/crosswalk fallback only. M4 report
+// prices use readApprovedPricesAt independently, without an age limit.
 const priceLookback = 62
 
 // PriceBoardRow là một dòng của pf_price_pub.v1_board_daily (cột dùng — hợp đồng published, pf 000152 — W11.76).
@@ -79,9 +80,9 @@ func (r Reader) Periods(ctx context.Context, tid uuid.UUID, q port.KHTCQuery) ([
 		return nil, err
 	}
 	wFrom, wTo := first.From, last.To
-	var figs []port.ClosedFigure
+	var figs, priceAsOf []port.ClosedFigure
 	priceOK := false
-	err = tenant.WithTenantTxOptions(ctx, r.DB, tid, pgx.TxOptions{AccessMode: pgx.ReadOnly}, func(tx pgx.Tx) error {
+	err = tenant.WithTenantTxOptions(ctx, r.DB, tid, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly}, func(tx pgx.Tx) error {
 		lb := wFrom.AddDate(0, 0, -priceLookback)
 		fam, err := readFamily(ctx, tx, tid, port.ClosedFiguresQuery{Province: q.Province, From: &wFrom, To: &wTo})
 		if err != nil {
@@ -105,6 +106,13 @@ func (r Reader) Periods(ctx context.Context, tid uuid.UUID, q port.KHTCQuery) ([
 			return err
 		}
 		figs = append(figs, PriceFigures(q.Province, boards, tickets)...)
+		if q.PriceAt != nil {
+			approved, err := readApprovedPricesAt(ctx, tx, *q.PriceAt)
+			if err != nil {
+				return err
+			}
+			priceAsOf = PriceFigures(q.Province, approved, nil)
+		}
 		return nil
 	})
 	if err != nil {
@@ -123,7 +131,18 @@ func (r Reader) Periods(ctx context.Context, tid uuid.UUID, q port.KHTCQuery) ([
 	if err != nil {
 		return nil, err
 	}
-	return Assemble(conv, t, tc, wFrom, wTo, q.Departments, priceOK, wants(q.Departments, PriceDepartment)), nil
+	out := Assemble(conv, t, tc, wFrom, wTo, q.Departments, priceOK, wants(q.Departments, PriceDepartment))
+	if q.PriceAt != nil && len(out) > 0 && wants(q.Departments, PriceDepartment) {
+		asOf, err := Convert(priceAsOf, t)
+		if err != nil {
+			return nil, err
+		}
+		if asOf == nil {
+			asOf = []port.TargetFigure{}
+		}
+		out[len(out)-1].PriceAsOf = asOf
+	}
+	return out, nil
 }
 
 func wants(depts []string, d string) bool { return len(depts) == 0 || slices.Contains(depts, d) }
@@ -147,6 +166,24 @@ func readPrice(ctx context.Context, tx pgx.Tx, boardFrom, to, weekFrom time.Time
 	}
 	tickets, err := pgx.CollectRows(rows, pgx.RowToStructByPos[PriceTicketRow])
 	return boards, tickets, err
+}
+
+// readApprovedPricesAt has no age limit. RLS on the published view supplies
+// the tenant boundary; rank separately per item so sparse items retain two days.
+func readApprovedPricesAt(ctx context.Context, tx pgx.Tx, day time.Time) ([]PriceBoardRow, error) {
+	rows, err := tx.Query(ctx, `WITH ranked AS (
+  SELECT board_date, row_number() OVER (PARTITION BY item_code ORDER BY board_date DESC) AS n
+  FROM pf_price_pub.v1_board_daily
+  WHERE profile=$1 AND board_date <= $2::date AND NOT board_reopened)
+ SELECT board_date, board_version::bigint, approved_at, board_reopened, item_code,
+  price_min::text, price_max::text, price_avg::text, points_reported
+ FROM pf_price_pub.v1_board_daily
+ WHERE profile=$1 AND NOT board_reopened AND board_date IN (SELECT board_date FROM ranked WHERE n <= 2)
+ ORDER BY board_date, item_code`, priceProfile, day.Format(time.DateOnly))
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[PriceBoardRow])
 }
 
 // PriceFigures chuyển dòng giá về dạng kỳ nguồn của họ closed_figures/v1 (hàm thuần): mỗi ngày bảng giá đã duyệt là

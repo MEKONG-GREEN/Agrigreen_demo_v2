@@ -118,7 +118,11 @@ func cellOf(m map[string]string, k string) (string, bool) {
 func ReportKeys(periods []port.KHTCPeriod) []string {
 	keys := map[string]bool{}
 	for _, period := range periods {
-		for _, dept := range period.Departments {
+		depts := append([]port.DepartmentFigures(nil), period.Departments...)
+		for _, f := range period.PriceAsOf {
+			depts = append(depts, port.DepartmentFigures{DepartmentCode: f.DepartmentCode, Forms: []port.TargetFigure{f}})
+		}
+		for _, dept := range depts {
 			for _, form := range dept.Forms {
 				cells := map[string]string{}
 				for key, value := range form.Last {

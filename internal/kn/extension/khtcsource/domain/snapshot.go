@@ -79,6 +79,34 @@ func Rows(periods []port.KHTCPeriod, from, to time.Time) []Row {
 	return out
 }
 
+// RowsAt captures the exact as-of price inputs, independent of quantity bounds.
+// Existing snapshots are never rewritten. Legacy source adapters retain Rows.
+func RowsAt(periods []port.KHTCPeriod, from, to, priceAt time.Time) []Row {
+	prices := pricePeriods(periods)
+	explicit := false
+	for _, p := range periods {
+		explicit = explicit || p.PriceAsOf != nil
+	}
+	if !explicit {
+		return Rows(periods, from, to)
+	}
+	var out []Row
+	for _, row := range Rows(periods, from, to) {
+		if row.FormCode != port.PriceFormBoard {
+			out = append(out, row)
+		}
+	}
+	for _, p := range prices {
+		for _, row := range Rows([]port.KHTCPeriod{p}, p.TargetTo, p.TargetTo) {
+			if row.To != nil && !dayOnly(*row.To).After(dayOnly(priceAt)) {
+				row.Fallback = dayOnly(*row.To).Before(dayOnly(from))
+				out = append(out, row)
+			}
+		}
+	}
+	return out
+}
+
 // Thay đổi của nguồn so với ảnh chụp.
 const (
 	ChangeAdded   = "added"   // kỳ nguồn mới quy vào kỳ (vd nguồn chốt kỳ mới, ngày giá mới được duyệt)
@@ -100,13 +128,24 @@ func hashOf(p *string) string {
 	return *p
 }
 
+// A daily board keeps the same source identity when an old weekly fallback
+// projection is replaced by its actual D8 target. This prevents false warnings
+// for existing snapshots; the full approved board hash still detects changes.
+func sourceIdentity(r Row) string {
+	if r.FormCode == port.PriceFormBoard {
+		r.TargetKey = ""
+		r.Fallback = false
+	}
+	return r.Identity()
+}
+
 // Changes so dòng hiện tại của port với ảnh chụp: chỉ so figures_hash và tập kỳ nguồn — đổi status_hash (nhận HTX,
 // D2) KHÔNG phải "Nguồn đã thay đổi". Dòng mức phòng không so. Chỉ cảnh báo, không ghi đè (BR-DL-04).
 func Changes(snap, live []Row) []SourceChange {
 	was := map[string]Row{}
 	for _, r := range snap {
 		if r.HasSource() {
-			was[r.Identity()] = r
+			was[sourceIdentity(r)] = r
 		}
 	}
 	var out []SourceChange
@@ -115,7 +154,7 @@ func Changes(snap, live []Row) []SourceChange {
 		if !r.HasSource() {
 			continue
 		}
-		id := r.Identity()
+		id := sourceIdentity(r)
 		seen[id] = true
 		o, ok := was[id]
 		switch {
@@ -126,7 +165,7 @@ func Changes(snap, live []Row) []SourceChange {
 		}
 	}
 	for _, r := range snap {
-		if r.HasSource() && !seen[r.Identity()] {
+		if r.HasSource() && !seen[sourceIdentity(r)] {
 			out = append(out, SourceChange{Kind: ChangeRemoved, Row: r})
 		}
 	}
