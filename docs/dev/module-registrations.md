@@ -57,6 +57,8 @@ Deps.Builders nhận SourceBuilderRegistration tin cậy lúc bootstrap. Registr
 
 ## Bộ mẫu reports khởi tạo (KNSPLIT-2-REPORTS-I)
 
-Deps.FormSeeds nhận FormSeedRegistration tin cậy lúc bootstrap; KN sở hữu ReportFormSeeds gồm14mẫu cùng default department/version. Capability tạo registry riêng cho Service, kiểm key/mã/default/định nghĩa hợp lệ rồi clone sâu input/output. Một default được chọn cho endpoint seed hiện hành; request chỉ chọn phòng ban đích, không nhận cấu hình seed hoặc thay tenant/actor. Nil còn adapter legacy trong I; explicit empty hoặc không có default trả dependency unavailable. Bước J sẽ xóa adapter.
+Deps.FormSeeds nhận FormSeedRegistration tin cậy lúc bootstrap; KN sở hữu ReportFormSeeds gồm14mẫu cùng default department/version. Capability tạo registry riêng cho Service, kiểm key/mã/default/định nghĩa hợp lệ rồi clone sâu input/output. Một default được chọn cho endpoint seed hiện hành; request chỉ chọn phòng ban đích, không nhận cấu hình seed hoặc thay tenant/actor. J đã xóa adapter và bộ mẫu KN khỏi capability: nil, empty hoặc không có default đều trả dependency unavailable; ứng dụng phải đăng ký bộ mẫu của mình.
 
 Cùng provider thật được nối tại API/hai worker/KN77/tests-reports; CLIformimport lấy owner trực tiếp. Golden kn-report-form-seeds.json được chụp từ nguồn cũ và owner so byte, không cập nhật golden để chấp nhận thay đổi ngoài ý muốn. Engine/formimport/web fixtures vẫn được kiểm theo hợp đồng hiện hành. Mã mẫu đã có không bị ghi đè; mẫu mới là nháp, phát hành vẫn qua hai người.
+
+Các ca kiểm thử engine/Excel/web fixtures dùng14mẫu KN hiện ở tests/reportforms (composition root thuần); chạy go test -v -count=1 ./tests/reportforms. Sinh lại fixture chỉ khi thay đổi mẫu có chủ đích: AG_UPDATE_WEB_FIXTURES=1 go test ./tests/reportforms -run TestWebFixtures, sau đó kiểm Vitest tương ứng. Không sinh lại fixture hoặc golden để che thay đổi không chủ đích.

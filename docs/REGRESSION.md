@@ -442,3 +442,11 @@ Related test points: TestLegacyFormSeedContract, TestReportFormSeedsMatchLegacyC
 
 
 Kết quả thực: PG16172.exit0 đủ14/14package,0FAIL/SKIP trênproduction0e709333: assembly110.482s/worker2.298s/CLI2.054s/tests-reports95.188s/KN77249.011s. Static20646.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. Owner14seed/goldenbyte/registryboundary/CLI226cộtHR đạt. ProofhostTEMP agrigreen-codex-knsplit2reportsi-proof.json; helper còn8migrationgate trướcdev. J mới gỡlegacy vàchuyểnca seed-engine/import/webfixture ra compositionroot, không đổiassertion/fixture.
+
+## KNSPLIT-2-REPORTS-J — Seed registration bắt buộc (nền69410282)
+
+Downstream consumers: reports seed service/constructor/handler; KN14seed; API/haiworker/KN77/tests-reports; CLIformimport; tests/reportforms gồm15testfunction chuyển nguyên assertion từ3tệp cũ. Dependency evidence: rg -n 'FormSeed|SeedForms|ReportFormSeeds|TrongTrotSeedDefinitions|TrongTrotSeeds|DefaultDepartment' internal cmd tests -g '*.go'. Engine/import/webfixture test chuyển sang compositionroot thuần; không kéo KNroot vào module dùng chung.
+
+Regression acceptance command: PGriêng, go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./cmd/formimport ./tests/reportforms ./tests/reports ./tests/kn77; đủstaticCODEX-G1/helper8migrationgate. Dự kiến13packagecótest, không tính form/formimport nay không có test. Frontend/mobile miễn do contract/UI/fixtures không đổi byte; build/vet toànrepo. User cho phép G1, khôngSMTP/data thật, giữmain/worktrees.
+
+Related test points: TestFormSeedsRequireRegistration; TestRegisteredFormSeedsIsolationAndCopies/RejectsInvalid; TestReportFormSeedsMatchLegacyContract;15ca engine/formula/Excel/webfixture; CLISeedExportUsesOwnerLayout và HTTP/KN77. Red99079.exit1 nil suy14,emptyPASS; giữ frozenartifactI, không còn capturegenerator.

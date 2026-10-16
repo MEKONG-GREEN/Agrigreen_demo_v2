@@ -62,18 +62,7 @@ func (r *FormSeedRegistry) defaultSet() (port.FormSeedRegistration, bool) {
 	return copyFormSeedSet(set), ok
 }
 
-// legacyFormSeedSet is removed in the second migration step.
-func legacyFormSeedSet() port.FormSeedRegistration {
-	set := port.FormSeedRegistration{Key: "kn.trong_trot", Default: true, DefaultDepartment: port.DefaultDepartment, Version: form.SeedVersion}
-	for _, seed := range form.TrongTrotSeeds() {
-		set.Templates = append(set.Templates, port.FormSeedTemplate{Code: seed.Code, Name: seed.Name, EntryLevel: seed.EntryLevel, ReportType: seed.ReportType, Def: seed.Def})
-	}
-	return set
-}
 func (s *Service) formSeedSet() (port.FormSeedRegistration, error) {
-	if s.FormSeeds == nil {
-		return legacyFormSeedSet(), nil
-	}
 	if set, ok := s.FormSeeds.defaultSet(); ok {
 		return set, nil
 	}

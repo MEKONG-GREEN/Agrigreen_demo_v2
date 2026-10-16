@@ -11,28 +11,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 )
 
-func TestLegacyFormSeedContract(t *testing.T) {
-	got, err := json.MarshalIndent(legacyFormSeedSet(), "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-	got = append(got, '\n')
-	_, file, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(file), "../../../../tests/golden/kn-report-form-seeds.json")
-	if os.Getenv("AG_CAPTURE_LEGACY_FORM_SEEDS") == "1" {
-		if err := os.WriteFile(path, got, 0600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	want, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatal("legacy form seed contract changed")
-	}
-}
-
 func formSeedFixture(t *testing.T) port.FormSeedRegistration {
 	t.Helper()
 	_, file, _, _ := runtime.Caller(0)

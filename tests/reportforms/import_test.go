@@ -1,4 +1,4 @@
-package formimport_test
+package reportformstest
 
 import (
 	"bytes"
@@ -13,17 +13,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/formimport"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 )
-
-func seed(t *testing.T, code string) port.FormDefinition {
-	t.Helper()
-	for _, s := range form.TrongTrotSeeds() {
-		if s.Code == code {
-			return s.Def
-		}
-	}
-	t.Fatalf("không có %s", code)
-	return port.FormDefinition{}
-}
 
 func headerSet(d port.FormDefinition) []string {
 	var out []string

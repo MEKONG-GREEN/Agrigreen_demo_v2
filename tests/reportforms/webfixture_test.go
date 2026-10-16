@@ -1,10 +1,10 @@
-package form_test
+package reportformstest
 
 // Tệp mẫu cho web-ops (P3b): backend giả lập của web dùng ĐÚNG định nghĩa 14 mẫu khởi tạo và bộ
 // ca tính/thao tác vàng do engine Go sinh ra, để bản port TS của bộ tính (chỉ dùng trong chế độ
 // giả lập) không lệch với máy chủ. Lệch → test này hỏng; sinh lại:
 //
-//	AG_UPDATE_WEB_FIXTURES=1 go test ./internal/platform/reports/form -run TestWebFixtures
+//	AG_UPDATE_WEB_FIXTURES=1 go test ./tests/reportforms -run TestWebFixtures
 //
 // rồi chạy Vitest (src/api/mock/forms/engine.test.ts so bản TS với ca vàng).
 
@@ -16,11 +16,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 )
 
-const webFixtureDir = "../../../../apps/web-ops/src/api/mock/forms/fixtures"
+const webFixtureDir = "../../apps/web-ops/src/api/mock/forms/fixtures"
 
 type webSeed struct {
 	Code       string              `json:"code"`
@@ -171,7 +172,7 @@ func marshal(t *testing.T, v any) []byte {
 // TestWebFixtures (FN-AD-04.06, P3b): tệp mẫu của backend giả lập web khớp engine Go.
 func TestWebFixtures(t *testing.T) {
 	seeds := []webSeed{}
-	for _, s := range form.TrongTrotSeeds() {
+	for _, s := range extension.ReportFormSeeds().Templates {
 		seeds = append(seeds, webSeed{Code: s.Code, Name: s.Name, EntryLevel: s.EntryLevel, ReportType: s.ReportType, Definition: s.Def})
 	}
 	files := map[string][]byte{

@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-REPORTS-J — Bỏ KNseed/default/wrapper khỏi cap, giữ15ca/byteartifact vàowner thật; chờPG/static/helper.

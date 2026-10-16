@@ -1,4 +1,4 @@
-package form_test
+package reportformstest
 
 import (
 	"encoding/json"
@@ -8,13 +8,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 )
 
 func seed(t *testing.T, code string) port.FormDefinition {
 	t.Helper()
-	for _, s := range form.TrongTrotSeeds() {
+	for _, s := range extension.ReportFormSeeds().Templates {
 		if s.Code == code {
 			return s.Def
 		}
@@ -33,7 +34,7 @@ func issueCodes(r port.EvalResult) []string {
 
 // TestFN_AD_04_06_SeedsValid: 14 mẫu khởi tạo đều hợp lệ; phần chưa biết có cờ chờ khách Q-01.
 func TestFN_AD_04_06_SeedsValid(t *testing.T) {
-	seeds := form.TrongTrotSeeds()
+	seeds := extension.ReportFormSeeds().Templates
 	if len(seeds) != 14 {
 		t.Fatalf("muốn 14 mẫu, có %d", len(seeds))
 	}
@@ -54,8 +55,8 @@ func TestFN_AD_04_06_SeedsValid(t *testing.T) {
 			}
 		}
 		for _, c := range s.Def.Columns {
-			if c.Placeholder && !strings.Contains(c.Title, form.Pending) {
-				t.Errorf("%s cột %s: placeholder phải có nhãn %q", s.Code, c.Letter, form.Pending)
+			if c.Placeholder && !strings.Contains(c.Title, "chờ khách Q-01") {
+				t.Errorf("%s cột %s: placeholder phải có nhãn %q", s.Code, c.Letter, "chờ khách Q-01")
 			}
 		}
 	}
@@ -302,7 +303,7 @@ func TestFN_TI_02_02_LayoutPeriodLabels(t *testing.T) {
 // TestFN_AD_04_06_SchemaContract: mọi trường JSON của định nghĩa (seed T01, T04, T07) có trong
 // contracts/schemas/form-template.v1.json — hợp đồng lưới cho web/app không lệch mã.
 func TestFN_AD_04_06_SchemaContract(t *testing.T) {
-	raw, err := os.ReadFile("../../../../contracts/schemas/form-template.v1.json")
+	raw, err := os.ReadFile("../../contracts/schemas/form-template.v1.json")
 	if err != nil {
 		t.Fatal(err)
 	}

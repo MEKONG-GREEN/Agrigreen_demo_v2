@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
@@ -378,7 +379,8 @@ func TestFN_AD_04_06_ImportEndpoint(t *testing.T) {
 	f := newFixture(t, false)
 	a := f.as(f.org.national, authz.RolePlatformAdmin)
 	var t04 port.FormDefinition
-	for _, d := range reports.TrongTrotSeedDefinitions() {
+	for _, seedTemplate := range extension.ReportFormSeeds().Templates {
+		d := seedTemplate.Def
 		if d.Code == "T04" {
 			t04 = d
 		}

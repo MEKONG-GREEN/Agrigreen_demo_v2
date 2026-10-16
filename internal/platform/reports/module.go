@@ -23,7 +23,6 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/formimport"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/mail"
@@ -175,16 +174,6 @@ func ImportFormXLSX(r io.Reader, o port.FormImportOptions) (port.FormDefinition,
 
 // ExportFormXLSX dựng tệp mẫu Excel đúng bố cục của một định nghĩa.
 func ExportFormXLSX(def port.FormDefinition) ([]byte, error) { return formimport.Export(def) }
-
-// TrongTrotSeedDefinitions trả 14 định nghĩa mẫu Phòng Trồng trọt khởi tạo (T01–T07, M01, V01–V06).
-func TrongTrotSeedDefinitions() []port.FormDefinition {
-	seeds := form.TrongTrotSeeds()
-	out := make([]port.FormDefinition, 0, len(seeds))
-	for _, s := range seeds {
-		out = append(out, s.Def)
-	}
-	return out
-}
 
 // ExportHandler là inbox.Handler cho pf.reports.export.requested (consumer port.ExportConsumer).
 func (m *Module) ExportHandler() inbox.Handler { return m.svc.HandleExportRequested }
