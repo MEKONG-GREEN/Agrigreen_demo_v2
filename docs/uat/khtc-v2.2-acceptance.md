@@ -202,3 +202,6 @@ Các package party/extension/forms/cooperative-anchor/assembly đều hoàn tấ
 Web cuối566ca/68tệp PASS137,54s, registry5PASS, checkAPI/lint/typecheck/buildmock0; ca trình duyệt báo cáo1PASS14,7s. Cổng tĩnh cuối đều0, boundary390. Excel mở lại kiểm ô số cộng được, %numeric, phụ lục5cột, gốc/trace, hai ngày giá; năm53tuần/13chương trình và năng suất gia quyền đã kiểm. Quy trình helper còn kiểm migration trước khi đẩy dev.
 
 **Toàn G1 vẫn chưa xong:** KNSPLIT1/2/4b/3 và3hàng KHTC về trang mặc định (UR/FN đăng nhập), nhắc hạn KHTC. Không mở lại các quyết định PO; không tự nhận đã bàn giao Word/richtext/mẫu khách chưa cung cấp.
+
+
+Bổ sung M4 (16/10/2026, W11.66): `TestKH_M4_PriceCutoffPublishedReader` đối chứng hai ngày giá không sau cutoff14/10 dù kỳ hết13/10, và nguồn giá cũ hơn62ngày; `TestKH_M4_SparsePriceItems` giữ hai ngày riêng cho mặt hàng thưa báo giá. `TestKH_M4_ExportKeepsPriceSnapshot` kiểm cách ly tenant, đọc hai cột ngày/min từ Excel thật, cảnh báo khi board ngoài kỳ đổi, bản xuất cũ giữ nguyên byte sau duyệt và refresh. `TestKH_M4_PriceDateDoesNotExtendQuantityPeriod` giữ kỳ số lượng/D8; `TestKH_M4_LegacyPriceProjectionDoesNotInventSourceChange` bảo vệ snapshot cũ khỏi cảnh báo giả. Toàn bộ11package liên quan PASS không SKIP, xem REGRESSION. Không thay M1–M7; phần số lượng/phiếu Mẫu5 khi cutoff sớm tiếp tục được kiểm chứng riêng.

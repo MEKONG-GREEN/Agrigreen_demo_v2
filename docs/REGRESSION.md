@@ -291,3 +291,21 @@ Không còn authz.KN*/RequireKN hoặc đọc .KN trong toàn bộ forms (cả f
 
 
 Bằng chứng cuối FORMS-B: db-full-first40826 exit0,6/6 package PASS, không FAIL/SKIP. Forms/app117,186s (gồm vai rỗng/lạ không kế thừa realm), domain1,101s, handler107,744s, extension root2,388s, assembly107,875s (ca không suy quyền ngoài registry), KN77272,255s. Go production/consumer đối chiếu SHA không đổi. Static-first43350 exit0: build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary390/lint0issues. Ba cấu hình và callback KN từ A giữ nguyên; không đổi API/SQL/Frontend nên giữ proof acceptance/e2e A671,369s/242,864s. Chuẩn bị helper trên commit cuối, chỉ FFdev sau migration gates thật.
+
+
+## W11.66 — M4 bổ sung, nền dev8af9ad17 (16/10/2026)
+
+Downstream consumers: closedfig → khtcsource domain/app/store/handler → khtcform/app và khtcreport domain/app; extension assembly và KN77 HTTP. Truy vấn KHTC thêm PriceAt/PriceAsOf chỉ nội bộ; không thay hợp đồng API/SQL/UI. Miễn chạy lại web/mobile vì không đổi schema công khai, handler DTO, fixture, TypeScript hoặc Dart.
+
+Dependency evidence: `rg -l 'internal/kn/extension/(closedfig|khtcsource)' internal cmd tests -g '*.go'`; `go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}'` trên closedfig, khtcsource/..., khtcform/..., khtcperiod/..., khtcreport/..., extension root, assembly, KN77, golden/khtc cho11 package có test. Các port consumer khác chỉ nhận field cộng thêm, được build/vet toàn repo; không đổi constructor/registry/HTX/forms, acceptance/E2E ngoài KHTC không bị đổi hành vi.
+
+Regression acceptance command: PostgreSQL riêng, `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/extension/closedfig ./internal/kn/extension/khtcsource/... ./internal/kn/extension/khtcform/... ./internal/kn/extension/khtcperiod/... ./internal/kn/extension/khtcreport/... ./internal/kn/extension ./cmd/api-platform/assembly ./tests/kn77 ./tests/golden/khtc`; cổng CODEX-G1 và migration helper trước tích hợp. Scope được user cho phép trong CODEX-G1; không mạng trừ fetch/push dev qua helper, không dữ liệu thật, không sửa main/xóa worktree.
+
+Related test points: M4, KH-FN-TI-02.05, KH-UR-TI-12/13. Ca mới `TestKH_M4_PriceCutoffPublishedReader`, `TestKH_M4_ExportKeepsPriceSnapshot`, `TestKH_M4_SparsePriceItems`, `TestKH_M4_PriceDateDoesNotExtendQuantityPeriod`, `TestKH_M4_LegacyPriceProjectionDoesNotInventSourceChange`.
+
+Red-before: `red.exit1` đúng lỗi nghiệp vụ trên production trước sửa: muốn13/14-10 nhưng lấy12/13-10; chỉ có giá năm2025 thì không phát hiện khóa giá. Bốn package miền thuần/closedfig/report domain/app sau sửa PASS, `pure-first.exit0`; golden hiện có giữ nguyên. PG first/second sau refactor fixture exit1 do kiểu tham số fixture SQL (không tính đạt). PG third đang chạy sau ép kiểu SQL rõ ràng. Static-first build/vet/modgen/migrate-base/archlint/contract đạt rồi docscheck báo tên tệp sai; đã nhập ghi chú vào đúng W11.66.md, static-second docs/MFA/boundary390/lint0issues exit0. Còn chờ PG/gates cuối, chưa tích hợp.
+
+PG-third75575.exit0:130.448s, TestKH_M4_PriceCutoffPublishedReader (cả2case), TestKH_M4_ExportKeepsPriceSnapshot, TestKH_M4_SparsePriceItems PASS, không SKIP. Đã kiểm2cột/ngày/min trong Excel thật, byte cũ bất biến sau duyệt giá mới và refresh; snapshotrow giữactualD8, nguồnđổi ngoài kỳđược phát hiện; tenantkhác khônglọtgiá. Bắt đầu11package hồi quy đầy đủ trên mã cố định.
+
+
+Kết quả cuối W11.66 M4 trên commit6552808b: `db-full59187.exit0`,11/11 package có kiểm thử PASS,0FAIL/SKIP; assembly118.555s, KN77294.702s, closedfig0.642s, source domain0.899s, form domain1.125s, period app0.495s/domain0.591s, report app1.943s/domain1.115s, extension2.465s, golden0.616s. Go không đổi suốt lượt chạy; proofJSON hostTEMP agrigreen-codex-w1166cutoff-proof.json. `static-final27382.exit0`: build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary390/lint0issues, diff-check0. gofmt chỉ2fixture cũ được w-common cho phép. Không thay API/SQL/web/mobile nên miễn các bộ không bị tác động như đã nêu. Helper còn phải chạy cổng migration và kiểm tra nền dev trước FF; không tuyên bố helper đạt trước kết quả thực.
