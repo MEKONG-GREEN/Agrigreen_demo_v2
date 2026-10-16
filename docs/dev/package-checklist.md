@@ -31,3 +31,8 @@
 2. Từ `apps/web-ops`: `npm run gen:api`, `npm run check:api`, `npm run typecheck`, `npm test`, `npm run build:mock`. Kiểm mục sẵn sàng có trang thật; ưu tiên mock không trùng và không đổi fallback.
 3. Menu đổi có chủ đích: sinh lại golden bằng Go/PG thật; kiểm assertion theo khóa/đường dẫn thay vì tổng số mục. Gói chỉ tái cấu trúc như WH-A phải giữ nguyên từng byte golden và mã API đã sinh.
 4. `go run ./tools/knboundary -base origin/dev`: baseline chỉ giảm sau khi đã gỡ ghép nối thực tế; không thêm alias hay đổi phân loại để che tăng. Chạy party/KN77/migration gates trên PostgreSQL thật và đủ cổng tĩnh trước tích hợp dev.
+
+
+## Cấu hình biểu mẫu của ứng dụng
+
+Profile và chính sách phiên đặt trong module ứng dụng; truyền ActorResolver qua forms/port theo [quy ước đăng ký](module-registrations.md). Lỗi phân quyền không fallback; kiểm Scope trước bộ lọc cơ sở/hộ, giữ tenant/actor của Principal và bỏ callback khỏi JSON. Phải có ca DB thật chứng minh tenant khác không đọc dữ liệu viết qua resolver, cùng hồi quy forms và consumer đang dùng profile. Chỉ gỡ đường tương thích khi consumer đã chuyển và các cổng đạt.

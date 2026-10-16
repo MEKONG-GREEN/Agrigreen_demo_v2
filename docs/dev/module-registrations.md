@@ -23,3 +23,14 @@ Các provider KN (`./kn*`) ghép trong vùng sinh của điểm vào KN có sẵ
 Nguồn ở `contracts/openapi/modules/<owner>/{application,admin}.yaml`, tự quét cả thư mục con. Phần info/server/security ở `<surface>.base.yaml`; `application.yaml`/`admin.yaml` là đầu ra. Fragment chứa `paths:` và/hoặc `components:` với section chuẩn OpenAPI. Trước mỗi path/component thêm `# @ag-order: <số nguyên>` ở đầu dòng. Số hiện tại giữ nguyên thứ tự bản nền; nguồn mới dùng số lớn hơn hoặc đặt vào khoảng thứ tự mong muốn. Nếu trùng thứ tự, thứ tự đường dẫn tệp rồi khóa quyết định ổn định. Không tách các thao tác cùng path sang hai chủ sở hữu: bộ ghép từ chối path/component trùng.
 
 Nội dung YAML được ghép nguyên văn, không chuyển JSON hay đổi cách scanner nhận diện route. Bộ sinh OpenAPI hiện hành tiếp tục kiểm cấu trúc và tham chiếu. Fragment dùng chung đặt `common`, phần có một chủ sở hữu đi theo tag và đồ thị tham chiếu của operation. Marker kết thúc `# @ag-end` tùy chọn giữ dòng trống YAML gốc mà không tạo blank-EOF trong fragment; bộ ghép bỏ marker. Không sửa tệp migration trong gói WH-A.
+
+
+## Ngữ cảnh của biểu mẫu (KNSPLIT-2, bước A)
+
+Cấu hình ứng dụng được truyền vào danh sách Profile khi dựng cap/forms. Profile.ResolveActor nhận Principal đã xác thực và cấu hình profile; ứng dụng trả ResolvedActor gồm vai, phòng ban, phạm vi đơn vị, Nút và bộ lọc cơ sở/hộ. KN cung cấp extension.FormProfiles(); gốc lắp ráp chỉ nối cấu hình, forms không import KN.
+
+Resolver trả handled=true khi có ngữ cảnh ứng dụng. Không đủ quyền phải trả lỗi; lỗi được trả thẳng và không rơi về quyền realm. handled=false chỉ dành cho trường hợp không có ngữ cảnh ứng dụng áp dụng, khi đó bước A vẫn dùng nhánh tương thích/realm. Chính sách phòng ban và giới hạn mục tiêu thuộc ứng dụng. Forms luôn kiểm phạm vi đơn vị cha trước bộ lọc mục tiêu.
+
+ActorRef và TenantID lấy từ Principal; ResolvedActor không có trường để thay hai giá trị đó. Callback chỉ cấu hình phía server, không nhận qua HTTP và không xuất trong JSON của Profile. Cấu hình mới cần kiểm lỗi từ chối không fallback, phạm vi/giới hạn mục tiêu và cách ly tenant qua DB thật. Mẫu chứng minh: TestRegisteredActorDatabaseTenantIsolation và TestApplicationFormRegistrationPreservesPolicy.
+
+Đây là bước đăng ký trước khi gỡ legacy; forms còn nhánh KNContext tương thích cho consumer chưa chuyển. KNSPLIT-2-FORMS-B sẽ bỏ nhánh đó sau khi các consumer và fixture dùng resolver. Không coi bước A là đã hoàn tất tách KN.
