@@ -34,3 +34,8 @@ Resolver trả handled=true khi có ngữ cảnh ứng dụng. Không đủ quy�
 ActorRef và TenantID lấy từ Principal; ResolvedActor không có trường để thay hai giá trị đó. Callback chỉ cấu hình phía server, không nhận qua HTTP và không xuất trong JSON của Profile. Cấu hình mới cần kiểm lỗi từ chối không fallback, phạm vi/giới hạn mục tiêu và cách ly tenant qua DB thật. Mẫu chứng minh: TestRegisteredActorDatabaseTenantIsolation và TestApplicationFormRegistrationPreservesPolicy.
 
 KNSPLIT-2-FORMS-A đã đăng ký các consumer KN trước; bước B bỏ nhánh KNContext khỏi lõi forms và chuyển fixture sang resolver. Profile chưa đăng ký không được suy quyền phiên ứng dụng. Đây chỉ là phần biểu mẫu; các registry và ranh giới dữ liệu khác vẫn cần hoàn tất để nghiệm thu tách KN.
+
+
+## Policy phiên của reports (KNSPLIT-2-REPORTS-A)
+
+`reports.Deps.ResolveSession` nhận `port.SessionResolver` do ứng dụng cung cấp. Projection chỉ chứa grant và bộ lọc, không actor/tenant: capability luôn giữ Principal đã xác thực. Operation là forms.read/dispatch.read/dispatch.write; handled denial hoặc error là kết quả cuối, thiếu grant/filter/phạm vi dispatch thì từ chối. Realm đọc mẫu giữ ưu tiên hiện hành. KN đăng ký `extension.ReportSessionResolver(orgs)` tại assembly/worker và KN77; gói A còn adapter legacy để chuyển consumer, gói B mới gỡ. Các role group realm cho HTX/CGH chưa được gỡ trong bước này. Không nhận resolver từ HTTP hoặc JSON.

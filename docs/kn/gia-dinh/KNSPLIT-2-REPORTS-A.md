@@ -7,3 +7,5 @@ KN sở hữu ReportSessionResolver: vai nào đọc layout, vai nào đọc/g�
 Đã nối policy thật ở api-platform assembly, worker reports factory và fixture KN77. Không thay gửi SMTP/tích hợp bên ngoài, không bật Google Sheet; báo giá/MRV/tenant/D2 và M1–M7 giữ nguyên. Error dependency dùng mã reports.dependency_unavailable đã có.
 
 Kiểm chứng: ca thuần identity, phạm vi phòng/tỉnh, mask địa chỉ, on-behalf copy, deny/error không fallback, realm/legacy compatibility và policy KN gồm ViewOnly. Cần chạy PG thật reports/... + extension root + assembly + worker + KN77, cổng CODEX-G1/helper trước tích hợp. Không lặp các suite không đổi UI/API/SQL; bước B phải có test âm không tự suy KN khi chưa đăng ký.
+
+Kết quả thực:13/13package PG/consumer PASS (KN77285.926s),0SKIP, cổng tĩnh0/boundary390/lint0issues. Chi tiết REGRESSION; helper kiểm migration trước tích hợp.
