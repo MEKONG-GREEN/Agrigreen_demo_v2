@@ -464,3 +464,5 @@ Downstream consumers: reports PolicyRegistry/dispatch creation/send/worker/fileU
 Regression acceptance command: PGriêng, go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./internal/kn/extension ./cmd/api-platform/assembly ./cmd/worker ./cmd/formimport ./tests/reportforms ./tests/reports ./tests/kn77; staticCODEX-G1/helper8migrationgates.13packagecótest, frontend/mobile miễn vì API/UI/fixtureskhôngđổi; build/vet toànrepo bắt buộc. Usercho phépG1, khôngSMTP/data thật, giữmain/worktree.
 
 Related test points: TestLegacyDispatchProfileContract, TestRegisteredDispatchMessagesMatchLegacyContract, TestRegisteredDispatchProfileCopiesAndIsolation, TestDispatchProfileRegistrationRejectsInvalid, TestReportDispatchProfileMatchesLegacyContract; HTTP/email/linkdedup/PII vàKN77. K cònnillegacy vàBodycũ, Lmớigỡ.
+
+Pure-first27369.exit0:app1.805s/dispatch0.638s/extension2.088s/reportforms1.818s/CLI2.065s,0FAIL/SKIP; capturelegacyexit0 vàmodgen/docs/boundary383/diffPASS. Đối chiếu thực4egresssite:3trongdispatch.go(tệp/gsheet/tải) và1publiclink;5là sốscalarprofile, không phải sốsite. Chờ13PG/static/helper.
