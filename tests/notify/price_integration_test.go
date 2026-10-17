@@ -11,10 +11,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/app"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -138,13 +136,30 @@ func (f *fixture) flushEmail(tid uuid.UUID) error {
 	return last
 }
 
-func (f *fixture) emailRows(kind string) map[uuid.UUID]domain.EmailJob {
+// emailDeliveryState is an observation of stored retry state, not a notification implementation DTO.
+type emailDeliveryState struct {
+	Status   string
+	Attempts int
+}
+
+func (f *fixture) emailRows(kind string) map[uuid.UUID]emailDeliveryState {
 	f.t.Helper()
-	var out map[uuid.UUID]domain.EmailJob
+	out := map[uuid.UUID]emailDeliveryState{}
 	if err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
-		var e error
-		out, e = store.EmailDeliveries(context.Background(), tx, kind)
-		return e
+		rows, err := tx.Query(context.Background(), "SELECT recipient_ref, status, attempts FROM pf_notify.email_delivery WHERE kind = $1", kind)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var ref uuid.UUID
+			var state emailDeliveryState
+			if err := rows.Scan(&ref, &state.Status, &state.Attempts); err != nil {
+				return err
+			}
+			out[ref] = state
+		}
+		return rows.Err()
 	}); err != nil {
 		f.t.Fatal(err)
 	}
@@ -190,7 +205,7 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 		t.Fatal(err)
 	}
 	in := ctv.inbox()
-	if len(in) != 1 || in[0]["kind"] != port.KindPriceVerifyRequest || in[0]["deep_link"] != domain.PriceVerifyLink ||
+	if len(in) != 1 || in[0]["kind"] != port.KindPriceVerifyRequest || in[0]["deep_link"] != "/kn/bao-gia/xac-minh" ||
 		!strings.Contains(in[0]["title"].(string), "Mỹ Chánh") {
 		t.Fatalf("CTV nhận một yêu cầu xác minh: %v", in)
 	}
@@ -199,7 +214,7 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 			t.Fatalf("%s không nhận yêu cầu xác minh của Xã: %v", name, n)
 		}
 	}
-	if rows := f.emailRows(port.KindPriceVerifyRequest); len(rows) != 1 || rows[ctv.actor].Status != domain.DeliveryPending {
+	if rows := f.emailRows(port.KindPriceVerifyRequest); len(rows) != 1 || rows[ctv.actor].Status != "pending" {
 		t.Fatalf("một lần gửi email cho CTV: %+v", rows)
 	}
 	if err := f.flushEmail(f.tenant); err != nil {
@@ -240,16 +255,16 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 	if k := kindsOf(ctv.inbox()); len(k) != 1 {
 		t.Fatalf("CTV không nhận cảnh báo của Cấp Tỉnh: %v", k)
 	}
-	if err := f.flushEmail(f.tenant); !errors.Is(err, app.ErrEmailRetry) {
+	if err := f.flushEmail(f.tenant); !errors.Is(err, notify.ErrEmailRetry) {
 		t.Fatalf("lỗi tạm của máy chủ thư → giao lại: %v", err)
 	}
 	if err := f.flushEmail(f.tenant); err != nil {
 		t.Fatal(err)
 	}
 	rows := f.emailRows(port.KindPriceAlert)
-	if len(rows) != 3 || rows[owner.actor].Status != domain.DeliverySent || rows[owner.actor].Attempts != 2 ||
-		rows[other.actor].Status != domain.DeliverySent || rows[other.actor].Attempts != 1 ||
-		rows[steward.actor].Status != domain.DeliveryDropped || rows[steward.actor].Attempts != 1 {
+	if len(rows) != 3 || rows[owner.actor].Status != "sent" || rows[owner.actor].Attempts != 2 ||
+		rows[other.actor].Status != "sent" || rows[other.actor].Attempts != 1 ||
+		rows[steward.actor].Status != "dropped" || rows[steward.actor].Attempts != 1 {
 		t.Fatalf("trạng thái email cảnh báo: %+v", rows)
 	}
 	if len(f.mailer.to("tran.thi.owner@mekong.vn")) != 1 || len(f.mailer.to("le.van.other@mekong.vn")) != 1 {

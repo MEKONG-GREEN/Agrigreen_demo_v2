@@ -2,8 +2,7 @@ package notify_test
 
 import (
 	"context"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/channel"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -126,7 +125,7 @@ func (fakeUnits) Current(_ context.Context, code string, _ time.Time) ([]string,
 // fakePusher ghi lại thông điệp; token trong invalid → ErrTokenInvalid, trong flaky → lỗi tạm.
 type fakePusher struct {
 	mu      sync.Mutex
-	sent    []domain.PushMessage
+	sent    []notify.PushMessage
 	bodies  [][]byte
 	invalid map[string]bool
 	flaky   map[string]int
@@ -134,17 +133,17 @@ type fakePusher struct {
 
 func (p *fakePusher) Name() string { return "fake" }
 
-func (p *fakePusher) Send(_ context.Context, m domain.PushMessage) error {
+func (p *fakePusher) Send(_ context.Context, m notify.PushMessage) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.invalid[m.Token] {
-		return channel.ErrTokenInvalid
+		return notify.ErrTokenInvalid
 	}
 	if p.flaky[m.Token] > 0 {
 		p.flaky[m.Token]--
 		return context.DeadlineExceeded
 	}
-	body, err := channel.BuildFCMRequest(m)
+	body, err := notify.BuildFCMRequest(m)
 	if err != nil {
 		return err
 	}
@@ -153,8 +152,8 @@ func (p *fakePusher) Send(_ context.Context, m domain.PushMessage) error {
 	return nil
 }
 
-func (p *fakePusher) messages() []domain.PushMessage {
+func (p *fakePusher) messages() []notify.PushMessage {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return append([]domain.PushMessage(nil), p.sent...)
+	return append([]notify.PushMessage(nil), p.sent...)
 }

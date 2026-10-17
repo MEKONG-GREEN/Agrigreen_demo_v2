@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 )
@@ -25,7 +24,7 @@ func TestDormantWarningToAccountItself_D24(t *testing.T) {
 	}
 	in := me.inbox()
 	if len(in) != 1 || in[0]["kind"] != port.KindAccountDormant || in[0]["severity"] != port.SeverityUrgent ||
-		in[0]["deep_link"] != domain.AccountDormantLink || !strings.Contains(in[0]["body"].(string), "38 ngày") ||
+		in[0]["deep_link"] != "/login" || !strings.Contains(in[0]["body"].(string), "38 ngày") ||
 		!strings.Contains(in[0]["body"].(string), "16/10/2026") {
 		t.Fatalf("tài khoản nhận một báo trước: %v", in)
 	}
