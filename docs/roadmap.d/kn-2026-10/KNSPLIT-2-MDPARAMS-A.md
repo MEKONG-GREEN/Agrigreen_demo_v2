@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-MDPARAMS-A — ParamRegistration immutable, KN sở hữu 16 mô tả/13 seed; chờ hồi quy PostgreSQL/cổng tĩnh/helper trước dev. B mới xóa nguồn cũ; G1 còn các phần tách hệ thống.
+- [x] KNSPLIT-2-MDPARAMS-A — Registry immutable, KN sở hữu16metadata/13seed;16/16PGnoSKIP/static đạt, boundary382. Helper8migration trướcdev; B mới gỡlegacy. G1 chưa hoàn tất.
