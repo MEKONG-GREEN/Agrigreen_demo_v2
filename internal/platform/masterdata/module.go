@@ -35,9 +35,9 @@ type Module struct {
 }
 
 // New tạo module với pool của vai masterdata_app.
-func New(db tenant.Beginner, clk clock.Clock) *Module {
+func New(db tenant.Beginner, clk clock.Clock, registrations ...port.ParamRegistration) *Module {
 	db = forModule(db)
-	return &Module{svc: &app.Service{DB: db, Clock: clk}}
+	return &Module{svc: &app.Service{DB: db, Clock: clk, ParamRegistry: app.NewParamRegistry(registrations...)}}
 }
 
 // RegisterApp gắn route chỉ đọc của Application API.

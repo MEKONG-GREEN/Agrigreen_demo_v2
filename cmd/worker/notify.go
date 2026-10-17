@@ -60,7 +60,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 		return nil, err
 	}
 	clk := clock.System{}
-	md := masterdata.New(mdPool, clk)
+	md := masterdata.New(mdPool, clk, extension.MasterdataParams())
 	kn := extension.New(extPool, clk, extension.Deps{Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs()})
 	log.Info("kênh thông báo", "event", "startup", "push", ch.Pusher.Name(), "email", ch.Mailer != nil, "outcome", "ok")
 	// pf/cooperative (W3.3): nông hộ có thửa theo xã (schema pf_coop, r_cooperative).

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -48,7 +49,7 @@ func krefSources(open func(role string) (*pgxpool.Pool, error)) (krefport.Source
 		return krefport.Sources{}, err
 	}
 	pty := party.New(partyPool, clk)
-	md := masterdata.New(mdPool, clk)
+	md := masterdata.New(mdPool, clk, extension.MasterdataParams())
 	return krefport.Sources{
 		Orgs: pty.KRefOrgs(), ShareGrants: pty.KRefShareGrants(), AdminUnits: md.KRefAdminUnits(),
 		Tenants: kref.UnionTenants(party.KRefTenants(pub), masterdata.KRefTenants(pub), kref.ProjectedTenants(pub)),

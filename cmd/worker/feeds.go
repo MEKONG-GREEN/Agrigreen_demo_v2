@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"log/slog"
 	"os"
 
@@ -47,7 +48,7 @@ func apiclientFeedJobs(ctx context.Context, direct string, closeFn *func(), log 
 		return nil, err
 	}
 	clk := clock.System{}
-	md := masterdata.New(pool, clk)
+	md := masterdata.New(pool, clk, extension.MasterdataParams())
 	cc := cropcycle.New(pool, clk, cropcycle.Deps{})
 	coop := cooperative.New(pool, clk, cooperative.Deps{}) // W3.3: dữ kiện thửa và vụ ở pf_coop (r_cooperative)
 	cc.UseCollectionVolume(coop.Plots(), coop.Seasons(), md.AdminUnits())

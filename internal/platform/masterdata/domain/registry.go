@@ -42,22 +42,15 @@ func CatalogAttrs(c string) []string {
 
 // Kiểu giá trị của tham số.
 const (
-	ParamKindDecimal = "decimal"
-	ParamKindText    = "text"
+	ParamKindDecimal = port.ParamKindDecimal
+	ParamKindText    = port.ParamKindText
 	// ParamKindColor: tham số chuỗi là mã màu HEX "#RRGGBB" (GIS US-CFG-01 AC-2).
-	ParamKindColor = "color"
+	ParamKindColor = port.ParamKindColor
 )
 
 // ParamSpec là mô tả của một khóa tham số trong sổ đăng ký (G-07). Min/Max là
 // khoảng hợp lệ gợi ý cho giao diện (số thập phân dạng chuỗi), rỗng = không giới hạn.
-type ParamSpec struct {
-	Key         string // khóa, hoặc tiền tố với khóa có chiều (Dimensional)
-	Name        string
-	Unit        string
-	Kind        string
-	Min, Max    string
-	Dimensional bool // khóa có chiều: Key + ":<chiều>…"
-}
+type ParamSpec = port.ParamSpec
 
 // ParamRegistry là các khóa tham số hệ thống đang dùng (mọi module). Khóa có
 // chiều (vd định mức theo loại máy × khâu) chỉ xuất hiện trong sổ khi đã có

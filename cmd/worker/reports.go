@@ -63,7 +63,7 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 		return nil, err
 	}
 	clk := clock.System{}
-	md := masterdata.New(pool, clk)
+	md := masterdata.New(pool, clk, extension.MasterdataParams())
 	pty := party.New(pool, clk, party.Deps{AdminUnits: md.AdminUnits()})
 	kn := extension.New(pool, clk, extension.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),

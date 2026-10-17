@@ -157,7 +157,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		store = s
 	}
 
-	md := masterdata.New(unit, clk)
+	md := masterdata.New(unit, clk, extension.MasterdataParams())
 
 	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
 	wf := wireWorkflow(unit, clk, md, pty) // W6.1: cap/workflow cho duyệt tham số, cấp quyền (r_workflow, W2.6: cùng pool đơn vị)

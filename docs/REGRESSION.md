@@ -506,3 +506,11 @@ Related test points: ProgramProgressFR03/ReportDataSowingAndSummary/fullKNhandle
 
 
 Kết quả thực: PG95125.exit0 đủ15/15packagecótest,0FAIL/SKIP trênproduction6e1b094c. Static29556.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary382/lint0issues. Source13definitions/5IDownKN,generic6contractscapport,0oldSrcimports; tokens/IDs/errorstring/goldens/webfixturesgiữ. Baseline383→382 chỉoldinventorycouplingđãxóa,canonicalpathsuntouched. ProofTEMP agrigreen-codex-knsplit2reportsn-proof.json. Helpercòn8migrationgate trướcdev;registry/data/tenant/client/KHTCremindercòn.
+
+## KNSPLIT-2-MDPARAMS-A — Registry tham số (nền 05b77fab)
+
+Downstream consumers: masterdata Seed/ListParams/RestoreDefault/Display; KN reportcycle/cntsalert/cntscal/outbreak đọc tham số đã duyệt; API assembly, worker (reports/notify/feeds/kref và công việc extension/accounts), KN77. Evidence: rg -n 'masterdata.New\(' --glob '*.go' internal tests cmd (17 call sites trước đổi); rg -n 'SpecOf\(|ParamRegistry|Defaults\(|ValidateProposal\(' internal/platform/masterdata. KN chỉ đăng ký tại 6 composition files/10 constructor calls; các command khác không lắp KN vẫn dùng native.
+
+Acceptance: private PG, go test -v -count=1 -p 1 -timeout 55m ./internal/platform/masterdata/... ./internal/kn/extension ./internal/kn/extension/reportcycle/... ./internal/kn/extension/cntsalert/... ./internal/kn/extension/cntscal/... ./internal/kn/extension/outbreak/... ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77. Native core metadata/display/GIS and owner calendars/alerts/GPS/outbreak covered; tests without files compile only. Full build/vet/static CODEX-G1 + helper migration8gate. Web/mobile exempt: API wire, fixtures and UI unchanged.
+
+Test points: registry deep copy, multi-instance isolation, conflict/duplicate/cross-owner seed, bad date/decimal/color; frozen old metadata/default/date/source golden; new HTTP TestRegisteredParamsSeedRestoreAndTenantIsolation proves RLS, idempotent seed, permissions and restore through four-eye approval. Existing SQL seed/calendar/alerts/KN77 regression retained. First pure test compilation failed on a map-value assignment in test code, corrected before full regression; no DB test claimed from that attempt.

@@ -132,7 +132,7 @@ func (s *Service) ListParams(ctx context.Context, q ParamsQuery) (Page[ParamEntr
 	for k := range stats {
 		keys[k] = true
 	}
-	for _, sp := range domain.ParamRegistry {
+	for _, sp := range s.parameterSpecs() {
 		if !sp.Dimensional && strings.HasPrefix(sp.Key, q.Prefix) {
 			keys[sp.Key] = true
 		}
@@ -153,7 +153,7 @@ func (s *Service) ListParams(ctx context.Context, q ParamsQuery) (Page[ParamEntr
 	pg.Items = make([]ParamEntry, 0, len(sorted))
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		for _, k := range sorted {
-			e := ParamEntry{ParamSpec: domain.SpecOf(k), Key: k, SubmittedCount: stats[k].Submitted}
+			e := ParamEntry{ParamSpec: s.parameterSpec(k), Key: k, SubmittedCount: stats[k].Submitted}
 			if e.Name == k && stats[k].HasText {
 				e.Kind = domain.ParamKindText
 			}

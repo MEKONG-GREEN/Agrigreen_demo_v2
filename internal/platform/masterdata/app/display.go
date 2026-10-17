@@ -76,7 +76,7 @@ func (s *Service) RestoreDefault(ctx context.Context, in RestoreDefaultInput) (d
 	if err := domain.ValidateParamKey(in.Key); err != nil {
 		return domain.ParamVersion{}, false, asProblem(err)
 	}
-	ds, err := Defaults()
+	ds, err := s.parameterDefaults()
 	if err != nil {
 		return domain.ParamVersion{}, false, err
 	}
@@ -131,7 +131,7 @@ func (s *Service) DisplayConfig(ctx context.Context) (DisplayConfig, error) {
 	if err != nil {
 		return DisplayConfig{}, err
 	}
-	ds, err := Defaults()
+	ds, err := s.parameterDefaults()
 	if err != nil {
 		return DisplayConfig{}, err
 	}

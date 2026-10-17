@@ -48,16 +48,9 @@ type catalogFile struct {
 }
 
 type paramFile struct {
-	Format string `json:"format"`
-	Source string `json:"source"`
-	Params []struct {
-		Key           string  `json:"key"`
-		Value         *string `json:"value"`
-		Text          *string `json:"text"`
-		Unit          string  `json:"unit"`
-		EffectiveFrom string  `json:"effective_from"`
-		SourceDoc     string  `json:"source_doc"`
-	} `json:"params"`
+	Format string           `json:"format"`
+	Source string           `json:"source"`
+	Params []port.ParamSeed `json:"params"`
 }
 
 func decodeStrict(raw []byte, v any) error {
@@ -90,12 +83,12 @@ func (s *Service) Seed(ctx context.Context, tid uuid.UUID) (SeedResult, error) {
 	if err := decodeStrict(seeddata.Catalogs, &cf); err != nil {
 		return res, fmt.Errorf("masterdata: dữ liệu nhúng catalogs lỗi: %w", err)
 	}
-	var pf paramFile
-	if err := decodeStrict(seeddata.Params, &pf); err != nil {
-		return res, fmt.Errorf("masterdata: dữ liệu nhúng params lỗi: %w", err)
+	paramSeeds, err := s.parameterSeeds()
+	if err != nil {
+		return res, err
 	}
-	if cf.Format != domain.CatalogFormat || pf.Format != domain.ParamFormat {
-		return res, fmt.Errorf("masterdata: dữ liệu nhúng sai định dạng (%q, %q)", cf.Format, pf.Format)
+	if cf.Format != domain.CatalogFormat {
+		return res, fmt.Errorf("masterdata: dữ liệu nhúng sai định dạng (%q)", cf.Format)
 	}
 	now := s.Clock.Now()
 	err = s.tx(ctx, tid, func(tx pgx.Tx) error {
@@ -127,7 +120,7 @@ func (s *Service) Seed(ctx context.Context, tid uuid.UUID) (SeedResult, error) {
 			}
 			res.Items++
 		}
-		for _, raw := range pf.Params {
+		for _, raw := range paramSeeds {
 			created, e := s.seedParam(ctx, tx, tid, raw.Key, raw.Value, raw.Text, raw.Unit, raw.EffectiveFrom, raw.SourceDoc)
 			if e != nil {
 				return e
@@ -168,7 +161,7 @@ func (s *Service) seedParam(ctx context.Context, tx pgx.Tx, tid uuid.UUID, key s
 		}
 		v.Value = &d
 	}
-	if err := v.ValidateProposal(); err != nil {
+	if err := s.validateParameterProposal(v); err != nil {
 		return false, fmt.Errorf("masterdata: tham số nhúng %s: %w", key, err)
 	}
 	if err := store.InsertVersion(ctx, tx, &v); err != nil {

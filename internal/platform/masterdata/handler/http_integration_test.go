@@ -49,11 +49,13 @@ type fixture struct {
 	admin *httptest.Server
 }
 
-func newFixture(t *testing.T) *fixture {
+func newFixture(t *testing.T) *fixture { return newFixtureWithParams(t) }
+
+func newFixtureWithParams(t *testing.T, registrations ...port.ParamRegistration) *fixture {
 	t.Helper()
 	env := pgtest.Get(t)
 	iss := authztest.New(t)
-	mod := masterdata.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{})
+	mod := masterdata.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, registrations...)
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	log := telemetry.NewLogger("test", io.Discard)
 
