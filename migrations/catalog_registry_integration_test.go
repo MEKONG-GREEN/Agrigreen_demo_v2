@@ -42,8 +42,10 @@ func TestCatalogRegistryConstraintUpgrade(t *testing.T) {
 	snapshot := func() (int64, string) {
 		var n int64
 		var sum string
-		if err := pool.QueryRow(ctx, `SELECT count(*),md5(coalesce(string_agg(to_jsonb(e)::text,'' ORDER BY id),''))
-   FROM pf_masterdata.catalog_effective e WHERE tenant_id=$1`, tid).Scan(&n, &sum); err != nil {
+		if err := tenant.WithTenantTx(ctx, pool, tid, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `SELECT count(*),md5(coalesce(string_agg(to_jsonb(e)::text,'' ORDER BY id),''))
+   FROM pf_masterdata.catalog_effective e WHERE tenant_id=$1`, tid).Scan(&n, &sum)
+		}); err != nil {
 			t.Fatal(err)
 		}
 		return n, sum

@@ -542,3 +542,6 @@ Cổng tĩnh đầu trên98de1e3a dừng ở vet (alias public khiến literal h
 
 
 Lượt FINAL đầu (e6b50ace) không đạt: static-final lỗi ST1012 tên2biến lỗi riêng; generic HTTP test phát hiện2nhánh list/item vẫn gọi domain.EffectiveDated nên ?at bỏqua registry và trảv2 thayv1. Dừng đúng driver41135/child, cluster56892 cleanup, khôngtínhPASS. Đã nối2nhánh qua Service.CatalogEffectiveDated và bổsungassert listAt; đổi tên2biến errCatalog*. Chạy targeted PG date/RLS/sync +newupgrade trước full18 trênhead đãsửa. Giữ log cũ làm proofFAIL, khôngoverwrite.
+
+
+Verified-code51844.exit0 đủ18/18packagecótest,0FAIL/SKIP trênproductionb0f4bb2f; KN77249.112s/composition2.159s, actualGo/testprocess0. Đã sửa CHỈ snapshot trong test nâng cấp sang tenant.WithTenantTx, giữ SQL/prodGo nguyên; không cần lặp18package vìtestmigrationskhôngnằmtrong18packageđãchạy. Chạy lại newupgrade riêng. Bước chuẩn bị script test từng bị auto-review chặn khiGođangchạy; đãchờkếtthúc vàxácnhậnprocess0 trước sửa trực tiếp, khôngbypass.
