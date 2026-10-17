@@ -52,6 +52,7 @@ var DBModule = db.Module("pf/notify")
 // thiếu Staff → dùng thông báo chủ đề; thiếu Units → không mở rộng tỉnh ra xã;
 // thiếu Pusher → consumer gửi đẩy lỗi (vào DLQ); thiếu Mailer → tắt email tóm tắt.
 type Deps struct {
+	Renderers []port.EventRendererRegistration
 	Consumers []port.ConsumerRegistration
 	Scope     partyport.ScopeResolver
 	Devices   syncport.Devices
@@ -122,6 +123,14 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		SyncEntities: d.SyncEntities, PriceDesk: d.PriceDesk, Emails: d.Emails, EmailMailer: d.EmailMailer, LinkBase: d.LinkBase,
 	})}
 	m.consumers = newConsumerRegistry(m.nativeConsumers(), d.Consumers)
+	var subscribed, native []string
+	for _, c := range m.Consumers() {
+		subscribed = append(subscribed, c.Events...)
+	}
+	for _, c := range m.nativeConsumers() {
+		native = append(native, c.consumer.Events...)
+	}
+	m.svc.RegisterEventRenderers(d.Renderers, subscribed, native)
 	return m
 }
 

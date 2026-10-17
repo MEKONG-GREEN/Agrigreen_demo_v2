@@ -10,3 +10,8 @@ import (
 func NotificationConsumers() []notifyport.ConsumerRegistration {
 	return []notifyport.ConsumerRegistration{extension.NotificationConsumers(), price.NotificationConsumers()}
 }
+
+// NotificationRenderers supplies source-owned pure builders to every API/worker constructor.
+func NotificationRenderers() []notifyport.EventRendererRegistration {
+	return extension.NotificationRenderers()
+}

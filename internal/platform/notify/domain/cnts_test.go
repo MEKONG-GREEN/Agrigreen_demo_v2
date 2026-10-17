@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
@@ -40,4 +41,50 @@ func TestCNTSNotifications_W1143(t *testing.T) {
 	if len(ns) != 1 || ns[0].Kind != port.KindCNTSFormReminder || !ns[0].Email || !ns[0].Normalize() {
 		t.Fatalf("nhắc nộp kèm email: %+v", ns)
 	}
+}
+
+// Captures only the pre-existing legacy implementation in phase A. Expected output is frozen after execution.
+func TestCNTSLegacyRendererVectors(t *testing.T) {
+	var inputs []struct {
+		Name, Event, Payload string
+		At                   time.Time
+	}
+	raw, err := os.ReadFile("../../../../tests/golden/kn-notify-cnts-inputs.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &inputs); err != nil {
+		t.Fatal(err)
+	}
+	if len(inputs) != 46 {
+		t.Fatalf("vector count: %d", len(inputs))
+	}
+	type result struct {
+		Name   string
+		Drafts []port.NotificationDraft
+		Error  string
+	}
+	results := make([]result, 0, len(inputs))
+	for _, in := range inputs {
+		ns, err := CNTSNotifications(in.Event, json.RawMessage(in.Payload), in.At)
+		var drafts []port.NotificationDraft
+		if ns != nil {
+			drafts = make([]port.NotificationDraft, len(ns))
+		}
+		for i, n := range ns {
+			drafts[i] = port.NotificationDraft{RecipientRef: n.RecipientRef,
+				Audience: port.DraftAudience{National: n.Audience.National, Units: n.Audience.Units, OrgRef: n.Audience.OrgRef, Roles: n.Audience.Roles},
+				Kind:     n.Kind, Severity: n.Severity, Title: n.Title, Body: n.Body, DeepLink: n.DeepLink, SubjectRef: n.SubjectRef, CreatedAt: n.CreatedAt, Email: n.Email}
+		}
+		r := result{Name: in.Name, Drafts: drafts}
+		if err != nil {
+			r.Error = err.Error()
+		}
+		results = append(results, r)
+	}
+	data, err := json.Marshal(results)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("OLD_CNTS=" + string(data))
 }

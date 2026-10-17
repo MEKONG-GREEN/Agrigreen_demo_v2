@@ -56,6 +56,12 @@ var HandledEvents = []string{
 // đẩy, trong CÙNG giao dịch với dòng shared.inbox (R-61). Giao lặp → inbox bỏ qua;
 // kể cả gọi thẳng hai lần, chỉ mục duy nhất (sự kiện, người nhận) chặn trùng.
 func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
+	if ns, handled, err := s.eventRenderers.render(env.EventType, env.Payload, env.OccurredAt); handled {
+		if err != nil || len(ns) == 0 {
+			return err
+		}
+		return s.deliver(ctx, tx, env, ns)
+	}
 	switch env.EventType {
 	case accport.EventUserDormantWarning:
 		// D24: báo trước khóa tài khoản không hoạt động → chính tài khoản (chuông + email).
