@@ -20,6 +20,8 @@ func TestRendererConstructorChecksConsumerOwnership(t *testing.T) {
 			New(nil, clock.System{}, Deps{Renderers: []port.EventRendererRegistration{{Events: []string{event}, Render: renderer}}})
 		})
 	}
-	New(nil, clock.System{}, Deps{Consumers: []port.ConsumerRegistration{sampleConsumerRegistration()},
+	reg := sampleConsumerRegistration()
+	reg.Definitions[0].Order = 1 // Slot 2 belongs to the native content consumer.
+	New(nil, clock.System{}, Deps{Consumers: []port.ConsumerRegistration{reg},
 		Renderers: []port.EventRendererRegistration{{Events: []string{"fixture.owned.event"}, Render: renderer}}})
 }
