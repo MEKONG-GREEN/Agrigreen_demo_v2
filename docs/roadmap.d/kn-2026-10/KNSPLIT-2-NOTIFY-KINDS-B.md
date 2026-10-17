@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-NOTIFY-KINDS-B: ba bước nâng cấp ràng buộc loại thông báo, giữ dòng cũ và registry; chờ bằng chứng kiểm thử/tích hợp.
