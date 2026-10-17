@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
 	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/port"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/google/uuid"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -48,59 +48,64 @@ type priceDirectoryContract struct {
 	Steps         []priceDirectoryStep
 }
 
-func TestPriceDirectoryMatchesLegacyAndCopiesProfiles(t *testing.T) {
-	tid := uuid.MustParse("44444444-4444-4444-8444-444444444444")
-	for _, mode := range []string{"normal", "error", "nil-holders", "empty-profiles"} {
-		for _, profile := range []string{"first", "", "second", "unknown"} {
-			t.Run(mode+"/"+profile, func(t *testing.T) {
-				profiles := []priceport.Profile{{Name: "first", Department: "dept1", StewardDuty: "duty1"}, {Name: "second", Department: "dept2"}}
-				if mode == "empty-profiles" {
-					profiles = nil
-				}
-				contract := priceDirectoryContract{Mode: mode, Profile: profile, TenantID: tid}
-				for _, p := range profiles {
-					contract.Profiles = append(contract.Profiles, priceDirectoryProfileInput{p.Name, p.Department, p.StewardDuty})
-				}
-				a, b := &priceHolders{failure: mode == "error", refs: []uuid.UUID{tid}}, &priceHolders{failure: mode == "error", refs: []uuid.UUID{tid}}
-				var x, y accport.RoleHolders = a, b
-				if mode == "nil-holders" {
-					x, y = nil, nil
-				}
-				legacy := assembly.NotifyPriceDesk{Holders: x, Profiles: append([]priceport.Profile(nil), profiles...)}
-				owned := price.NewNotificationDirectory(y, profiles)
-				if len(profiles) > 0 {
-					profiles[0].Name = "corrupt"
-					profiles[0].Department = "corrupt"
-					profiles[0].StewardDuty = "corrupt"
-				}
-				for _, kind := range []string{"officers", "stewards"} {
-					var got, want []uuid.UUID
-					var errA, errB error
-					if kind == "officers" {
-						want, errA = legacy.ProvinceOfficers(context.Background(), tid, profile)
-						got, errB = owned.ProvinceOfficers(context.Background(), tid, profile)
-					} else {
-						want, errA = legacy.Stewards(context.Background(), tid, profile)
-						got, errB = owned.Stewards(context.Background(), tid, profile)
-					}
-					ea, eb := "", ""
-					if errA != nil {
-						ea = errA.Error()
-					}
-					if errB != nil {
-						eb = errB.Error()
-					}
-					if !reflect.DeepEqual(got, want) || ea != eb || !reflect.DeepEqual(a.calls, b.calls) {
-						t.Fatalf("directory mismatch %v %v %v %v", got, want, a.calls, b.calls)
-					}
-					contract.Steps = append(contract.Steps, priceDirectoryStep{Operation: kind, Recipients: want, Error: ea, Calls: append([]string(nil), a.calls...)})
-				}
-				data, err := json.Marshal(contract)
-				if err != nil {
-					t.Fatal(err)
-				}
-				t.Log("OLD_PRICE_DIRECTORY=" + string(data))
-			})
+// The expected selector calls and results were captured from the old assembly adapter in PRICE-A.
+// Read only: this test must not regenerate the legacy oracle from the owned implementation.
+func TestPriceDirectoryMatchesFrozenLegacyAndCopiesProfiles(t *testing.T) {
+	raw, err := os.ReadFile("../golden/kn-notify-price-directory.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var contracts []priceDirectoryContract
+	if err := json.Unmarshal(raw, &contracts); err != nil {
+		t.Fatal(err)
+	}
+	if len(contracts) != 16 {
+		t.Fatal("missing directory contracts")
+	}
+	operations := 0
+	for _, contract := range contracts {
+		if len(contract.Steps) != 2 {
+			t.Fatal("missing selector operations")
 		}
+		operations += len(contract.Steps)
+		t.Run(contract.Mode+"/"+contract.Profile, func(t *testing.T) {
+			profiles := make([]priceport.Profile, len(contract.Profiles))
+			for i, p := range contract.Profiles {
+				profiles[i] = priceport.Profile{Name: p.Name, Department: p.Department, StewardDuty: p.StewardDuty}
+			}
+			holder := &priceHolders{failure: contract.Mode == "error", refs: []uuid.UUID{contract.TenantID}}
+			var lookup accport.RoleHolders = holder
+			if contract.Mode == "nil-holders" {
+				lookup = nil
+			}
+			directory := price.NewNotificationDirectory(lookup, profiles)
+			if len(profiles) > 0 {
+				profiles[0].Name = "corrupt"
+				profiles[0].Department = "corrupt"
+				profiles[0].StewardDuty = "corrupt"
+			}
+			for _, step := range contract.Steps {
+				var got []uuid.UUID
+				var err error
+				switch step.Operation {
+				case "officers":
+					got, err = directory.ProvinceOfficers(context.Background(), contract.TenantID, contract.Profile)
+				case "stewards":
+					got, err = directory.Stewards(context.Background(), contract.TenantID, contract.Profile)
+				default:
+					t.Fatalf("unknown captured operation %q", step.Operation)
+				}
+				errText := ""
+				if err != nil {
+					errText = err.Error()
+				}
+				if !reflect.DeepEqual(got, step.Recipients) || errText != step.Error || !reflect.DeepEqual(holder.calls, step.Calls) {
+					t.Fatalf("%s: got %v / %q / %v; want %v / %q / %v", step.Operation, got, errText, holder.calls, step.Recipients, step.Error, step.Calls)
+				}
+			}
+		})
+	}
+	if operations != 32 {
+		t.Fatal("missing directory operations")
 	}
 }

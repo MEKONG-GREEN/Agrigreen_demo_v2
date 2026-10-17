@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
-	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/port"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
@@ -45,9 +44,7 @@ var HandledEvents = []string{
 	extport.EventTaskCreated, coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened,
 	ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived,
 	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale, mrvport.EventAlertRaised,
-	meteringport.EventEgressAnomaly, priceport.EventReminderIssued, priceport.EventAlertRaised,
-	priceport.EventVerificationRequested, priceport.EventVerificationResponded, priceport.EventVerificationDecided,
-	priceport.EventLockSummarized, priceport.EventBoardPublished, priceport.EventBoardReopened, priceport.EventTicketProxied,
+	meteringport.EventEgressAnomaly,
 }
 
 // HandleEvent là inbox.Handler cho các sự kiện nguồn: dựng thông báo, xếp lần gửi
@@ -74,10 +71,6 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			return err
 		}
 		return s.deliver(ctx, tx, env, []domain.Notification{n})
-	case priceport.EventReminderIssued, priceport.EventAlertRaised, priceport.EventVerificationRequested,
-		priceport.EventVerificationResponded, priceport.EventVerificationDecided, priceport.EventLockSummarized,
-		priceport.EventBoardPublished, priceport.EventBoardReopened, priceport.EventTicketProxied:
-		return s.onPrice(ctx, tx, env)
 	case extport.EventDirectiveIssued:
 		var p extport.DirectiveIssuedV1
 		if err := decode(env, &p); err != nil {

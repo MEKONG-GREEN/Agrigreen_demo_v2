@@ -207,7 +207,7 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 		t.Fatal(err)
 	}
 	in := ctv.inbox()
-	if len(in) != 1 || in[0]["kind"] != port.KindPriceVerifyRequest || in[0]["deep_link"] != "/kn/bao-gia/xac-minh" ||
+	if len(in) != 1 || in[0]["kind"] != priceport.KindPriceVerifyRequest || in[0]["deep_link"] != "/kn/bao-gia/xac-minh" ||
 		!strings.Contains(in[0]["title"].(string), "Mỹ Chánh") {
 		t.Fatalf("CTV nhận một yêu cầu xác minh: %v", in)
 	}
@@ -216,7 +216,7 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 			t.Fatalf("%s không nhận yêu cầu xác minh của Xã: %v", name, n)
 		}
 	}
-	if rows := f.emailRows(port.KindPriceVerifyRequest); len(rows) != 1 || rows[ctv.actor].Status != "pending" {
+	if rows := f.emailRows(priceport.KindPriceVerifyRequest); len(rows) != 1 || rows[ctv.actor].Status != "pending" {
 		t.Fatalf("một lần gửi email cho CTV: %+v", rows)
 	}
 	if err := f.flushEmail(f.tenant); err != nil {
@@ -231,10 +231,10 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 	}
 	// Lô được giao lại sau khi đã gửi → không gửi lặp.
 	var batch uuid.UUID
-	for _, r := range f.emailRows(port.KindPriceVerifyRequest) {
+	for _, r := range f.emailRows(priceport.KindPriceVerifyRequest) {
 		batch = r.BatchID
 	}
-	env := f.event(f.tenant, port.EventEmailRequested, port.EmailRequestedV1{BatchID: batch, Kind: port.KindPriceVerifyRequest, Deliveries: 1})
+	env := f.event(f.tenant, port.EventEmailRequested, port.EmailRequestedV1{BatchID: batch, Kind: priceport.KindPriceVerifyRequest, Deliveries: 1})
 	if err := f.mod.EmailHandler()(context.Background(), nil, env); err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +250,7 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 		PointName: "Bình Đức", TicketID: uuid.New(), ItemCodes: []string{"MH00002"}})
 	f.process(priceport.NotifyConsumerPrice, alert)
 	for name, c := range map[string]caller{"owner": owner, "other": other, "steward": steward} {
-		if k := kindsOf(c.inbox()); len(k) != 1 || k[0] != port.KindPriceAlert {
+		if k := kindsOf(c.inbox()); len(k) != 1 || k[0] != priceport.KindPriceAlert {
 			t.Fatalf("%s nhận một cảnh báo: %v", name, k)
 		}
 	}
@@ -263,7 +263,7 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 	if err := f.flushEmail(f.tenant); err != nil {
 		t.Fatal(err)
 	}
-	rows := f.emailRows(port.KindPriceAlert)
+	rows := f.emailRows(priceport.KindPriceAlert)
 	if len(rows) != 3 || rows[owner.actor].Status != "sent" || rows[owner.actor].Attempts != 2 ||
 		rows[other.actor].Status != "sent" || rows[other.actor].Attempts != 1 ||
 		rows[steward.actor].Status != "dropped" || rows[steward.actor].Attempts != 1 {
@@ -277,7 +277,7 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 	f.process(priceport.NotifyConsumerPrice, f.event(f.tenant, priceport.EventVerificationResponded, priceport.VerificationRespondedV1{
 		Profile: "kn", Day: day, PointCode: "XBG0001", PointName: "Mỹ Chánh", TicketID: ticket, ItemCode: "MH00001", Choice: "keep",
 		OwnerRef: &owner.actor, ResponderRef: ctv.actor}))
-	if k := kindsOf(owner.inbox()); len(k) != 2 || k[0] != port.KindPriceVerifyReply {
+	if k := kindsOf(owner.inbox()); len(k) != 2 || k[0] != priceport.KindPriceVerifyReply {
 		t.Fatalf("người được phân công nhận phản hồi: %v", k)
 	}
 	if k := kindsOf(other.inbox()); len(k) != 1 {
@@ -295,7 +295,7 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 	for name, c := range map[string]caller{"owner": owner, "other": other, "steward": steward} {
 		n := 0
 		for _, k := range kindsOf(c.inbox()) {
-			if k == port.KindPriceLockSummary {
+			if k == priceport.KindPriceLockSummary {
 				n++
 			}
 		}
@@ -328,13 +328,13 @@ func TestPriceDecisionToOfficer_NOTIF(t *testing.T) {
 	f.process(priceport.NotifyConsumerPrice, f.event(f.tenant, priceport.EventVerificationDecided, priceport.VerificationDecidedV1{Profile: "kn",
 		Day: "2026-10-12", PointName: "Mỹ Chánh", TicketID: uuid.New(), ItemCodes: []string{"MH00001"},
 		Decision: priceport.DecisionKept, OfficerRef: &ctv.actor, DeciderRef: tinh.actor}))
-	if k := kindsOf(ctv.inbox()); len(k) != 1 || k[0] != port.KindPriceVerifyDecision {
+	if k := kindsOf(ctv.inbox()); len(k) != 1 || k[0] != priceport.KindPriceVerifyDecision {
 		t.Fatalf("kết quả xử lý → CTV: %v", k)
 	}
 	if k := kindsOf(tinh.inbox()); len(k) != 0 {
 		t.Fatalf("người quyết định không tự nhận: %v", k)
 	}
-	if rows := f.emailRows(port.KindPriceVerifyDecision); len(rows) != 1 || rows[ctv.actor].Kind != port.KindPriceVerifyDecision {
+	if rows := f.emailRows(priceport.KindPriceVerifyDecision); len(rows) != 1 || rows[ctv.actor].Kind != priceport.KindPriceVerifyDecision {
 		t.Fatalf("xếp một email cho CTV: %+v", rows)
 	}
 }

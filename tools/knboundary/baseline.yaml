@@ -8,9 +8,6 @@
 couplings:
   - {rule: import-into-kn, from: internal/platform/accounts/app/kn_extension_test.go, to: internal/kn/extension/port}
   - {rule: import-into-kn, from: internal/platform/notify/app/consume.go, to: internal/kn/extension/port}
-  - {rule: import-into-kn, from: internal/platform/notify/app/consume.go, to: internal/kn/price/port}
-  - {rule: import-into-kn, from: internal/platform/notify/domain/price.go, to: internal/kn/price/port}
-  - {rule: import-into-kn, from: internal/platform/notify/domain/price_test.go, to: internal/kn/price/port}
   - {rule: import-into-kn, from: internal/platform/notify/domain/templates.go, to: internal/kn/extension/port}
   - {rule: kn-import-htx, from: internal/kn/extension/app/service.go, to: internal/platform/cooperative/port}
   - {rule: kn-import-htx, from: internal/kn/extension/handler/unified_integration_test.go, to: internal/platform/cooperative/port}
@@ -156,7 +153,6 @@ couplings:
   - {rule: kn-symbol-in-shared, from: internal/platform/cropcycle/app/service.go, to: accKN}
   - {rule: kn-symbol-in-shared, from: internal/platform/mechanization/app/department_usage.go, to: (kiểm kê)}
   - {rule: kn-symbol-in-shared, from: internal/platform/mechanization/handler/machine_count.go, to: Handler.RegisterKNMachineCounts}
-  - {rule: kn-symbol-in-shared, from: internal/platform/notify/domain/price.go, to: (kiểm kê)}
   - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn.go, to: (tệp)}
   - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn.go, to: KN}
   - {rule: kn-symbol-in-shared, from: internal/platform/party/app/kn_collect.go, to: (tệp)}

@@ -70,8 +70,6 @@ type Deps struct {
 	NudgeHourly   int
 	// SyncEntities: entity chiều xuống của pf/sync để kiểm entities[] của POST /v1/sync/nudge.
 	SyncEntities []string
-	// PriceDesk (gói NOTIF): người nhận Cấp Tỉnh của Báo giá nông sản (gốc lắp ráp, pf/accounts); nil → chủ đề Cấp Tỉnh.
-	PriceDesk port.PriceDesk
 	// Emails (gói NOTIF): tra email người nhận lúc gửi (pf/accounts — Keycloak); nil → không gửi email theo người nhận.
 	Emails port.EmailDirectory
 	// EmailMailer (gói NOTIF): kênh email theo người nhận (Channels.EmailMailer); nil → Mailer.
@@ -121,7 +119,7 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m := &Module{svc: app.NewService(db.ForModule(b, DBModule), clk, app.Deps{
 		Scope: d.Scope, Devices: d.Devices, Staff: d.Staff, Units: d.Units, Farmers: d.Farmers, Pusher: d.Pusher, Mailer: d.Mailer,
 		DigestTo: d.DigestTo, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
-		SyncEntities: d.SyncEntities, PriceDesk: d.PriceDesk, Emails: d.Emails, EmailMailer: d.EmailMailer, LinkBase: d.LinkBase,
+		SyncEntities: d.SyncEntities, Emails: d.Emails, EmailMailer: d.EmailMailer, LinkBase: d.LinkBase,
 	})}
 	m.consumers = newConsumerRegistry(m.nativeConsumers(), d.Consumers)
 	var subscribed, native []string
@@ -190,9 +188,6 @@ func (m *Module) PushHandler() inbox.Handler { return m.svc.HandlePush }
 
 // EmailHandler là handler của pf.notify.email.requested (gói NOTIF).
 func (m *Module) EmailHandler() inbox.Handler { return m.svc.HandleEmail }
-
-// UsePriceDesk nối người nhận Cấp Tỉnh của Báo giá nông sản (gói NOTIF). Gốc lắp ráp gọi sau khi dựng pf/accounts.
-func (m *Module) UsePriceDesk(d port.PriceDesk) { m.svc.PriceDesk = d }
 
 // DigestTenants dựng bộ tìm tenant có email tóm tắt chờ gửi từ pool vai
 // ag_ops_jobs (worker, nối thẳng).

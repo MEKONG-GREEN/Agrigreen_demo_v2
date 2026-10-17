@@ -751,3 +751,12 @@ Không SQL/schema/migration/OpenAPI/UI/mobile thay đổi. Static đầy đủ, 
 
 
 Kết quả thật production f4e5322c/test-name-fix d9b6c177: pure81844 actual0/5 testpackage; directory capture actual0/16 ca/32 thao tác; staticverified50048 actual0 toàn cổng/boundary324/lint0/gofmt chỉ hai fixture cũ (static41310 exit1 ST1012 giữ log). Full9PG81245 actualexit0, không FAIL/SKIP; API assembly132.843s. Ca lookup retry/tenant/redaction mới và toàn bộ giá/email/topic/CNTS/workflow cùng generic delivery guards PASS. Cụm riêng59962/4e5265f0ea5b đã dọn, Go0; không sửa Go sauPG. Helper9 migration và remote còn cần trước dev.
+
+
+## KNSPLIT-2-NOTIFY-PRICE-B — Xóa đường báo giá legacy
+
+Nền ca6ec58e. RED82657 actualexit1 đúng 18 fallback (nil/empty builder × chín sự kiện). Xóa chín case/metadata HandledEvents, pipeline app/domain cùng unit/capture generator, PriceDesk và Deps/UsePriceDesk cũ. Chín KindPrice chuyển nguyên khai báo về KNpriceport, không alias. Selector assembly cũ đã đối chiếu A được xóa; worker dùng NotificationDirectory KN. Các hợp đồng email dùng chung giữ nguyên nội dung, tệp đổi tên sau khi đã gỡ nghiệp vụ báo giá. EmailMessage vốn chỉ dùng Title/Body/DeepLink chung, không chọn theo KindPrice.
+
+Giữ nguyên tám golden Gitblob từ A: consumer16/41, CNTS46, workflow77, price118 inputs/expected và directory16/32. Directory test chỉ đọc expected cũ đã capture, giữ kiểm bản sao ba trường profile, kết quả/lỗi/tenant/role/duty và thứ tự gọi; không tạo expected từ owner, không giữ selector cũ hay import assembly để tạo oracle. Unit legacy được thay bằng các ca full draft/lỗi/query nói trên và toàn PG giá/email/topic/delivery.
+
+Impact: notify dispatch/Deps/module metadata, worker, assembly, KNprice và fixture/test. Giữ core transaction/Normalize/Redact/RLS/inbox/provenance, native MRV thuộc HTX/MKG. Không SQL/schema/migration/API/UI/mobile thay đổi. Cần pure5, fullstatic, actualpruneonly (nền324), full9PG và helper9migration/remote trước dev; chưa coi các bước chưa chạy là đạt. G1 còn directive/task/digest và các gói đảo phụ thuộc, dữ liệu, route, tenant, client, KHTC reminder. Main/worktrees/lịch tự tiếp tục giữ.

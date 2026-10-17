@@ -78,7 +78,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	ownedDesk := knprice.NewNotificationDirectory(acc.RoleHolders(), assembly.PriceProfiles())
 	d := notify.Deps{Builders: assembly.NotificationBuilders(ownedDesk), Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
 		EmailMailer: ch.EmailMailer, DigestTo: ch.DigestTo, Log: log, LinkBase: os.Getenv("AG_WEB_OPS_URL"),
-		PriceDesk: assembly.NotifyPriceDesk{Holders: acc.RoleHolders(), Profiles: assembly.PriceProfiles()}}
+	}
 	if dir := acc.MailDirectory(); dir != nil {
 		d.Emails = assembly.NotifyEmails{Dir: dir}
 	} else {

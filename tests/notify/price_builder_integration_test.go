@@ -55,7 +55,7 @@ func TestPriceOwnedBuilderLookupRetryTenantAndRedaction(t *testing.T) {
 		t.Fatal("lookup retry/replay not idempotent")
 	}
 	got := a.inbox()
-	if len(got) != 1 || got[0]["kind"] != notifyport.KindPriceAlert || got[0]["deep_link"] != "/kn/bao-gia/kiem-duyet" || strings.Contains(got[0]["title"].(string), "0901234567") || !strings.Contains(got[0]["title"].(string), "***") {
+	if len(got) != 1 || got[0]["kind"] != priceport.KindPriceAlert || got[0]["deep_link"] != "/kn/bao-gia/kiem-duyet" || strings.Contains(got[0]["title"].(string), "0901234567") || !strings.Contains(got[0]["title"].(string), "***") {
 		t.Fatalf("builder delivery/redaction: %v", got)
 	}
 	if len(foreign.inbox()) != 0 {

@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-NOTIFY-PRICE-B: Xóa đường báo giá legacy, chuyển chín Kind về KN; đang kiểm chứng golden/static/PG/helper.

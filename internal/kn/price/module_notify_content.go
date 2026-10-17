@@ -76,7 +76,7 @@ const (
 // priceNotificationProvinceRoles: vai của thông báo chủ đề Cấp Tỉnh khi không tra được người nhận cụ thể (không email).
 var priceNotificationProvinceRoles = []string{authz.KNTinh, partyport.RoleKNProvinceAdmin}
 
-// priceNotificationMessage là thông báo Báo giá dựng từ một sự kiện, CHƯA chọn người nhận Cấp Tỉnh (app tra notifyport.PriceDesk).
+// priceNotificationMessage là thông báo Báo giá dựng từ một sự kiện, CHƯA chọn người nhận Cấp Tỉnh (builder tra priceport.PriceDesk).
 type priceNotificationMessage struct {
 	Tpl     priceNotificationTemplate
 	Profile string
@@ -138,7 +138,7 @@ func priceNotificationMessages(eventType string, payload json.RawMessage, occurr
 		if err := dec(&p); err != nil {
 			return nil, true, err
 		}
-		t := tpl(notifyport.KindPriceAlert, priceNotificationReviewLink, &p.TicketID,
+		t := tpl(priceport.KindPriceAlert, priceNotificationReviewLink, &p.TicketID,
 			fmt.Sprintf("Cảnh báo biến động giá — %s, %s", p.PointName, priceNotificationDay(p.Day)),
 			fmt.Sprintf("Xã %s gửi báo giá ngày %s có %d mặt hàng vượt ngưỡng (Tạm tính): %s. Vui lòng rà soát.",
 				p.PointName, priceNotificationDay(p.Day), len(p.ItemCodes), priceNotificationItems(p.ItemCodes)))
@@ -148,7 +148,7 @@ func priceNotificationMessages(eventType string, payload json.RawMessage, occurr
 		if err := dec(&p); err != nil {
 			return nil, true, err
 		}
-		t := tpl(notifyport.KindPriceVerifyRequest, priceNotificationVerifyLink, &p.TicketID,
+		t := tpl(priceport.KindPriceVerifyRequest, priceNotificationVerifyLink, &p.TicketID,
 			fmt.Sprintf("Yêu cầu xác minh giá — %s, %s", p.PointName, priceNotificationDay(p.Day)),
 			fmt.Sprintf("Cấp Tỉnh đề nghị xã kiểm tra lại %d mặt hàng (%s) của báo giá ngày %s. Hạn phản hồi: %s.",
 				len(p.ItemCodes), priceNotificationItems(p.ItemCodes), priceNotificationDay(p.Day), priceNotificationVietnamTime(priceNotificationTime(p.RespondBy, occurred))))
@@ -162,7 +162,7 @@ func priceNotificationMessages(eventType string, payload json.RawMessage, occurr
 		if p.Choice == "propose" {
 			choice = "đề xuất giá mới"
 		}
-		t := tpl(notifyport.KindPriceVerifyReply, priceNotificationReviewLink, &p.TicketID,
+		t := tpl(priceport.KindPriceVerifyReply, priceNotificationReviewLink, &p.TicketID,
 			fmt.Sprintf("Xã đã phản hồi xác minh — %s, %s", p.PointName, priceNotificationDay(p.Day)),
 			fmt.Sprintf("Xã %s phản hồi mặt hàng %s (báo giá ngày %s): %s. Xem giải trình và chốt cảnh báo.",
 				p.PointName, p.ItemCode, priceNotificationDay(p.Day), choice))
@@ -177,7 +177,7 @@ func priceNotificationMessages(eventType string, payload json.RawMessage, occurr
 		if verb == "" {
 			verb = p.Decision
 		}
-		t := tpl(notifyport.KindPriceVerifyDecision, priceNotificationVerifyLink, &p.TicketID,
+		t := tpl(priceport.KindPriceVerifyDecision, priceNotificationVerifyLink, &p.TicketID,
 			fmt.Sprintf("Kết quả xử lý báo giá — %s, %s", p.PointName, priceNotificationDay(p.Day)),
 			fmt.Sprintf("Cấp Tỉnh đã %s: %s (báo giá ngày %s).", verb, priceNotificationItems(p.ItemCodes), priceNotificationDay(p.Day)))
 		return []priceNotificationMessage{{Tpl: t, Profile: p.Profile, Xa: priceNotificationRefList(p.OfficerRef), Exclude: p.DeciderRef, Email: true}}, true, nil
@@ -186,7 +186,7 @@ func priceNotificationMessages(eventType string, payload json.RawMessage, occurr
 		if err := dec(&p); err != nil {
 			return nil, true, err
 		}
-		t := tpl(notifyport.KindPriceLockSummary, priceNotificationReviewLink, nil, fmt.Sprintf("Khóa nhập báo giá ngày %s", priceNotificationDay(p.Day)),
+		t := tpl(priceport.KindPriceLockSummary, priceNotificationReviewLink, nil, fmt.Sprintf("Khóa nhập báo giá ngày %s", priceNotificationDay(p.Day)),
 			fmt.Sprintf("Đã khóa nhập lúc %s. %d/%d xã gửi đúng hạn, %d nộp muộn, %d không nộp; %d cảnh báo chưa xử lý.",
 				priceNotificationVietnamTime(priceNotificationTime(p.LockAt, occurred)), p.Submitted, p.Points, p.Late, p.Missed, p.OpenAlerts))
 		return []priceNotificationMessage{{Tpl: t, Profile: p.Profile, Tinh: true, Email: true}}, true, nil
@@ -199,7 +199,7 @@ func priceNotificationMessages(eventType string, payload json.RawMessage, occurr
 		if p.Reapproval {
 			title = fmt.Sprintf("Bảng giá ngày %s đã duyệt lại (v%d)", priceNotificationDay(p.BoardDate), p.Version)
 		}
-		t := tpl(notifyport.KindPriceBoardApproved, priceNotificationReviewLink, nil, title,
+		t := tpl(priceport.KindPriceBoardApproved, priceNotificationReviewLink, nil, title,
 			fmt.Sprintf("%d mặt hàng, %d phiếu báo giá. Bảng giá đã công bố cho các cấp.", p.Items, p.Tickets))
 		return []priceNotificationMessage{{Tpl: t, Profile: p.Profile, Tinh: true}}, true, nil
 	case priceport.EventBoardReopened:
@@ -207,7 +207,7 @@ func priceNotificationMessages(eventType string, payload json.RawMessage, occurr
 		if err := dec(&p); err != nil {
 			return nil, true, err
 		}
-		t := tpl(notifyport.KindPriceBoardReopened, priceNotificationReviewLink, nil, fmt.Sprintf("Bảng giá ngày %s đang mở duyệt", priceNotificationDay(p.BoardDate)),
+		t := tpl(priceport.KindPriceBoardReopened, priceNotificationReviewLink, nil, fmt.Sprintf("Bảng giá ngày %s đang mở duyệt", priceNotificationDay(p.BoardDate)),
 			fmt.Sprintf("Phiên bản v%d đang mở duyệt để sửa; các cấp vẫn thấy v%d (\"Đang cập nhật\") tới khi duyệt lại.", p.Version, p.Version))
 		return []priceNotificationMessage{{Tpl: t, Profile: p.Profile, Tinh: true, Exclude: p.ActorRef}}, true, nil
 	case priceport.EventTicketProxied:
@@ -215,7 +215,7 @@ func priceNotificationMessages(eventType string, payload json.RawMessage, occurr
 		if err := dec(&p); err != nil {
 			return nil, true, err
 		}
-		t := tpl(notifyport.KindPriceProxyEntry, priceNotificationHistoryLink, &p.TicketID,
+		t := tpl(priceport.KindPriceProxyEntry, priceNotificationHistoryLink, &p.TicketID,
 			fmt.Sprintf("Cấp Tỉnh đã nhập thay báo giá — %s, %s", p.PointName, priceNotificationDay(p.Day)),
 			fmt.Sprintf("Báo giá ngày %s của xã %s (%d mặt hàng) được Cấp Tỉnh nhập thay, gắn nhãn Nộp muộn.", priceNotificationDay(p.Day),
 				p.PointName, p.Items))
@@ -231,7 +231,7 @@ func priceNotificationReminder(p priceport.ReminderIssuedV1, occurred time.Time)
 	if !p.InApp && !p.Test {
 		return nil
 	}
-	t := priceNotificationTemplate{Kind: notifyport.KindPriceReminder, Severity: notifyport.SeverityNormal, Title: p.Title, Body: p.Body,
+	t := priceNotificationTemplate{Kind: priceport.KindPriceReminder, Severity: notifyport.SeverityNormal, Title: p.Title, Body: p.Body,
 		DeepLink: priceNotificationReminderLink, CreatedAt: occurred}
 	if rs := priceNotificationRefs(p.RecipientRefs); len(rs) > 0 {
 		return []priceNotificationMessage{{Tpl: t, Profile: p.Profile, Xa: rs, Email: p.Email}}

@@ -5,7 +5,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// PriceDesk tìm người nhận Cấp Tỉnh của Báo giá nông sản (pf/notify khai cổng; gốc lắp ráp hiện thực từ pf/accounts —
+// PriceDesk tìm người nhận Cấp Tỉnh của Báo giá nông sản (KN khai cổng; directory dùng RoleHolders/DutyHolders của pf/accounts —
 // lần gán Cấp Tỉnh của phòng ban chủ dữ liệu giá và cờ nhiệm vụ QTNV). Tenant truyền tường minh (consumer của worker
 // không có Principal). Chỉ mã tham chiếu — không tên, không email. nil → thông báo chủ đề theo vai Cấp Tỉnh (không email).
 type PriceDesk interface {
