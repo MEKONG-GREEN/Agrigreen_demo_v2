@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-MDCATALOG-B — Xóa fallback 12 schema/60 seed CNTS; giữ 25 hàm HTTP và golden 170 ca. Cần đầy đủ PG, cổng tĩnh và helper trước dev; typed lookup là gói sau.
+- [x] KNSPLIT-2-MDCATALOG-B — Bỏ12schema/60seedngầm, giữ25hàmHTTP, 55seednative vàgolden170ca;18/18PG+fullstaticđạt, baseline369. Helper9migration trướcdev; typedlookup/data/tenant/client/KHTCreminder còn.
