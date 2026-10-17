@@ -18,6 +18,6 @@ func NotificationRenderers() []notifyport.EventRendererRegistration {
 }
 
 // NotificationBuilders supplies source-owned builders with explicit read-only recipient lookup.
-func NotificationBuilders(directory priceport.PriceDesk) []notifyport.EventBuilderRegistration {
-	return price.NotificationBuilders(directory)
+func NotificationBuilders(directory priceport.PriceDesk, staff notifyport.StaffDirectory) []notifyport.EventBuilderRegistration {
+	return append(price.NotificationBuilders(directory), extension.TaskNotificationBuilders(staff)...)
 }

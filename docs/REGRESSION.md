@@ -766,3 +766,14 @@ Pure68503 actualexit0 đủ năm package có test (+KNprice compile). RED82657 a
 
 
 Kết quả thật production824ea9f7: pure68503actual0/5package, static38890actual0/fullgates/boundary320/lint0/gofmt2old. Full9PG38198actualexit0, không FAIL/SKIP; giá/email/topic, lookup retry/tenant/redaction, CNTS/workflow và generic delivery guards đều PASS. Cụm riêng54797/61007113c1ac đã dọn,Go0; không Gochange sauPG. Tám golden nguyên ca6ec58e, chín Kind và hợp đồng email đúng nguyên văn; baseline324→320 chỉ bốn mục xóa thực. Cần helper9migration/remote trước dev.
+
+
+## KNSPLIT-2-NOTIFY-TASK-A — Bộ dựng nhiệm vụ do KN đăng ký
+
+Nền caf12d98. Hai đường giao việc/leo thang cũ được tách cơ học khỏi deliver thành private legacyTaskNotifications trong chính consume.go, không thêm cap→KN import. So thân bộ chọn chỉ thay return-deliver thành trả kết quả; domain/templates.go nguyên Gitblob. Capture62334 actual0 với83 input cố định. Trước khi có owner Task2, hai luồng PostgreSQL TestTaskCreatedNotifiesAssigneeKNUSTASK01 và TestTaskEscalatedRecipients chạy legacy thực qua helper,1084 actualexit0/noFAIL-SKIP. Sau đó mới cố định OLD expected83; không lấy expected từ owner hay copy selector trong generator.
+
+KNextension đăng ký TaskNotificationBuilders hai sự kiện qua generic EventBuilder đã có, chỉ nhận context/tenant/raw/time và StaffDirectory chỉ đọc. Giữ nil-vs-zero assignee (khác tiêu đề), nil/empty drafts, đếm admin kể cả actorNil, lọc cấp tỉnh/tỉnh đúng, duplicate/thứ tự, fallback role, province→commune (kể cả đơn vị rỗng), priority/reason, múi giờ/lỗi/chuỗi dài. API/worker truyền kn.Staff, hai điểm chỉ liệt kê consumer dùng nil; fixture PG dùng f.staff. Pure aggregate10 và các provider CNTS3/Workflow7 giữ nguyên. Legacy hai sự kiện/domainKind/templates và StaffDirectory core vẫn giữ cho A, B mới xóa task legacy; directory còn được native/Directive dùng.
+
+Owner chỉ đọc hai golden Task83 và so toàn draft/lỗi/lookup; tám golden cũ phải giữ nguyên. Ca PG mới kiểm lỗi lookup giữ identity, retry cùng event, dedup, tenant và redaction. Phạm vi full9PG như PRICE-B: notify/... +KN extension/price roots +assembly +worker +tests/notifyconsumers +tests/notify. Cần pure5/fullstatic/boundary320 không tăng, fullPG9 thật không SKIP/FAIL, helper9migration/remote trước dev. Chưa coi các cổng chưa chạy là đạt.
+
+Không SQL/schema/migration/OpenAPI/UI/mobile change; core vẫn Normalize/Redact,transaction/RLS/inbox/provenance. Native MRV thuộc HTX/MKG. Task chỉ đưa tổng source builders lên21/22, Directive/digest và các policy KN trên native events, authz/accounts/party/data/routes/tenant/client/KHTC reminder còn. Main/worktrees/lịch giữ, G1 chưa hoàn tất.

@@ -45,7 +45,7 @@ func Queues() []Queue {
 		{Name: simport.OptimizerConsumer, Events: []string{simport.EventJobRequested}},
 		{Name: krefport.Consumer, Events: krefport.Events}, // W2.5: bản chiếu k_ref
 	}
-	for _, c := range notify.New(nil, clock.System{}, notify.Deps{Consumers: NotificationConsumers(), Renderers: NotificationRenderers(), Builders: NotificationBuilders(nil)}).Consumers() {
+	for _, c := range notify.New(nil, clock.System{}, notify.Deps{Consumers: NotificationConsumers(), Renderers: NotificationRenderers(), Builders: NotificationBuilders(nil, nil)}).Consumers() {
 		out = append(out, Queue{Name: c.Name, Events: c.Events})
 	}
 	for _, c := range Consumers {

@@ -76,7 +76,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	acc := accounts.New(accPool, clk, accounts.Deps{Directory: kc})
 	farmers := assembly.AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}
 	ownedDesk := knprice.NewNotificationDirectory(acc.RoleHolders(), assembly.PriceProfiles())
-	d := notify.Deps{Builders: assembly.NotificationBuilders(ownedDesk), Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
+	d := notify.Deps{Builders: assembly.NotificationBuilders(ownedDesk, kn.Staff()), Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
 		EmailMailer: ch.EmailMailer, DigestTo: ch.DigestTo, Log: log, LinkBase: os.Getenv("AG_WEB_OPS_URL"),
 	}
 	if dir := acc.MailDirectory(); dir != nil {
@@ -92,7 +92,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 func notifyConsumers(log *slog.Logger) []consumer {
 	lazy := &notifyLazy{log: log}
 	// Danh sách consumer và sự kiện lấy từ module (không cần DB để liệt kê).
-	specs := notify.New(nil, clock.System{}, notify.Deps{Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Builders: assembly.NotificationBuilders(nil)}).Consumers()
+	specs := notify.New(nil, clock.System{}, notify.Deps{Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Builders: assembly.NotificationBuilders(nil, nil)}).Consumers()
 	out := make([]consumer, 0, len(specs))
 	for i := range specs {
 		sp := specs[i]

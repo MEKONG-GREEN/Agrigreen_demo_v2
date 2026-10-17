@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-NOTIFY-TASK-A: Hai builder nhiệm vụ KN và83 OLD vectors; đang kiểm chứng owner/static/PG/helper trước dev.

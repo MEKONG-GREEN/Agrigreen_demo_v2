@@ -1,0 +1,2576 @@
+[
+  {
+    "Name": "created-low-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên thấp, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-low-unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Yêu cầu hỗ trợ chưa có cán bộ nhận — cần phân công",
+        "Body": "Xã 91001, ưu tiên thấp, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-low-zero-assignee",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên thấp, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "escalated-low-sla_overdue",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên thấp, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên thấp, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-low-manual",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ được chuyển tiếp lên tỉnh",
+        "Body": "Xã 91001, ưu tiên thấp, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ được chuyển tiếp lên tỉnh",
+        "Body": "Xã 91001, ưu tiên thấp, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-low-unknown",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên thấp, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên thấp, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "created-normal-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-normal-unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Yêu cầu hỗ trợ chưa có cán bộ nhận — cần phân công",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-normal-zero-assignee",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "escalated-normal-sla_overdue",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-normal-manual",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ được chuyển tiếp lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ được chuyển tiếp lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-normal-unknown",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "created-high-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên cao, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-high-unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "urgent",
+        "Title": "Yêu cầu hỗ trợ chưa có cán bộ nhận — cần phân công",
+        "Body": "Xã 91001, ưu tiên cao, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-high-zero-assignee",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên cao, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "escalated-high-sla_overdue",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên cao, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên cao, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-high-manual",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ được chuyển tiếp lên tỉnh",
+        "Body": "Xã 91001, ưu tiên cao, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ được chuyển tiếp lên tỉnh",
+        "Body": "Xã 91001, ưu tiên cao, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-high-unknown",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên cao, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên cao, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "created-urgent-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên khẩn, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-urgent-unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "urgent",
+        "Title": "Yêu cầu hỗ trợ chưa có cán bộ nhận — cần phân công",
+        "Body": "Xã 91001, ưu tiên khẩn, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-urgent-zero-assignee",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên khẩn, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "escalated-urgent-sla_overdue",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên khẩn, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên khẩn, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-urgent-manual",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ được chuyển tiếp lên tỉnh",
+        "Body": "Xã 91001, ưu tiên khẩn, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ được chuyển tiếp lên tỉnh",
+        "Body": "Xã 91001, ưu tiên khẩn, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-urgent-unknown",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên khẩn, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "urgent",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên khẩn, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "created-unknown-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-unknown-unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Yêu cầu hỗ trợ chưa có cán bộ nhận — cần phân công",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-unknown-zero-assignee",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "escalated-unknown-sla_overdue",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-unknown-manual",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ được chuyển tiếp lên tỉnh",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ được chuyển tiếp lên tỉnh",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-unknown-unknown",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "created--assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created--unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Yêu cầu hỗ trợ chưa có cán bộ nhận — cần phân công",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created--zero-assignee",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "escalated--sla_overdue",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated--manual",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ được chuyển tiếp lên tỉnh",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ được chuyển tiếp lên tỉnh",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated--unknown",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên , hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "created-no-province",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91001"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Yêu cầu hỗ trợ chưa có cán bộ nhận — cần phân công",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-no-unit",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            ""
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Yêu cầu hỗ trợ chưa có cán bộ nhận — cần phân công",
+        "Body": "Xã , ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-zero-task",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/00000000-0000-0000-0000-000000000000",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-bad-created",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T04:05:06Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-empty-created",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T04:05:06Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-bad-due",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 13/10/2027 11:05.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-empty-due",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 13/10/2027 11:05.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-other-source",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-long-commune",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã áááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááá, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-phone-commune",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 0901234567, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "escalated-nil-records-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-nil-records-unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-empty-records-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-empty-records-unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-duplicate-admin-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-duplicate-admin-unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-nil-admin-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-nil-admin-unassigned",
+    "Drafts": null,
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-commune-only-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-commune-only-unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-wrong-province-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-wrong-province-unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-empty-unit-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-empty-unit-unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-mixed-assigned",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-mixed-unassigned",
+    "Drafts": [
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-no-province",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "escalated-no-target",
+    "Drafts": null,
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "escalated-zero-task",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/00000000-0000-0000-0000-000000000000",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/00000000-0000-0000-0000-000000000000",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-bad-event-time",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T04:05:06Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T04:05:06Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-empty-event-time",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T04:05:06Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T04:05:06Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-bad-due",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 13/10/2027 11:05.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 13/10/2027 11:05.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-empty-due",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 13/10/2027 11:05.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 13/10/2027 11:05.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-long-commune",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã áááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááá, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã áááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááá, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-phone-commune",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 0901234567, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 0901234567, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-nil-directory",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "escalated-lookup-error",
+    "Drafts": null,
+    "Error": "fixture staff failure",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91"
+    ]
+  },
+  {
+    "Name": "escalated-lookup-error-no-province",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_escalated",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ quá hạn SLA đã leo thang lên tỉnh",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-bad-json",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.task.created hỏng: unexpected end of JSON input",
+    "Calls": null
+  },
+  {
+    "Name": "created-wrong-type",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.task.created hỏng: json: cannot unmarshal bool into Go struct field TaskCreatedV1.task_id of type uuid.UUID: JSON value must be string type",
+    "Calls": null
+  },
+  {
+    "Name": "created-nil-payload",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.task.created hỏng: unexpected end of JSON input",
+    "Calls": null
+  },
+  {
+    "Name": "escalated-bad-json",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.task.escalated hỏng: unexpected end of JSON input",
+    "Calls": null
+  },
+  {
+    "Name": "escalated-wrong-type",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.task.escalated hỏng: json: cannot unmarshal bool into Go struct field TaskEscalatedV1.task_id of type uuid.UUID: JSON value must be string type",
+    "Calls": null
+  },
+  {
+    "Name": "escalated-nil-payload",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.task.escalated hỏng: unexpected end of JSON input",
+    "Calls": null
+  },
+  {
+    "Name": "created-directory-error-unused",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "created-nil-directory",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "task_assigned",
+        "Severity": "normal",
+        "Title": "Nhiệm vụ hỗ trợ mới từ App HTX",
+        "Body": "Xã 91001, ưu tiên bình thường, hạn 14/10/2027 10:00.",
+        "DeepLink": "/extension/tasks/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "unknown",
+    "Drafts": null,
+    "Error": "",
+    "Calls": null
+  }
+]
