@@ -10,3 +10,6 @@ Impact: tìm tất cả năm kind, CNTSEvents/CNTSNotifications/links và nhánh
 
 
 Pure61559 actualexit0 đủ5package, RED27832actual1→GREEN gồm nil/empty×3event khôngfallback, registered3event giữdecodeerror; 46owner outputs/errors khớp frozen. Git blob cả3golden nguyên1eb927b0. Modgen/prune343→330 đúng13legacyentries, rule/alias không đổi. Git ghi rename5declaration100% từportcap vềKNport; không alias. Production3d910ce6; chưa static/PG/helper/dev.
+
+
+Static86023 actualexit1 ở vet do import notify/port đã không còn dùng trong test lịch trực sau chuyển hằng về extport. Bỏ đúng import thừa, không sửa assertion/production. Pure61559 actual0 không bị ảnh hưởng; chưaPG. Giữ static.log/.exit1, chạy static-verified và DB/helper chỉ guard static-verified.exit0.
