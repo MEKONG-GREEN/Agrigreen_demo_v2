@@ -116,7 +116,7 @@ func TestNotificationKindConstraintUpgrade(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, kind := range []string{"", "_leading", "UPPER", "kind_v1", "a.b", "has space", strings.Repeat("a", 41)} {
+	for _, kind := range []string{"", "_leading", "UPPER", "kind_v1", "a.b", "has space", "a\n", "é", "α", strings.Repeat("a", 41)} {
 		reject(kind)
 	}
 	if got, _ := snapshot(); got != 1003 {

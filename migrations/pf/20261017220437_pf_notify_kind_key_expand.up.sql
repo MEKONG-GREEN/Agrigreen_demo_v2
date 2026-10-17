@@ -3,4 +3,4 @@
 SET LOCAL lock_timeout = '5s';
 ALTER TABLE pf_notify.notification
   ADD CONSTRAINT notification_kind_key_shape
-  CHECK (kind ~ '^[a-z][a-z_]{0,39}$') NOT VALID;
+  CHECK ((kind COLLATE "C") ~ '^[a-z][a-z_]{0,39}$') NOT VALID;

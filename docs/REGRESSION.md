@@ -863,3 +863,5 @@ TestRegisteredFutureKindEmailAndUnknownAtomicRetry phát hai draft: draft đầu
 Rollback ứng dụng giữ ba migration tiến; không khôi phục CHECK cũ vì có thể đã có loại mới đã đăng ký. Không rollback dữ liệu hay sửa tenant. Nếu cần quay mã cũ, phải dừng producer loại mới trước; quy trình vận hành này không cho phép xóa dòng hoặc hạ schema.
 
 Impact: DDL pf_notify và hai nhóm test, không đổi code production Go/API/UI/mobile. Bắt buộc pure5, static đầy đủ/boundary318 không tăng, full9PG không FAIL/SKIP và helper có 10 migration PASS (giữ 9 cũ + NotificationKindConstraintUpgrade), rồi xác minh remote dev. Chưa kiểm thử thì không đánh dấu tích hợp. G1 còn native KN policies, dữ liệu/rights/routes/tenant/client/KHTC; main, worktrees và lịch tự tiếp tục giữ.
+
+Pure61588actual0/5pkg.16goldenGitblobs/baseline318/rules/oldmigrations/runtimeGo nguyên aff0f755. Trước static, khóa SQL collation C để ASCII không phụ thuộc locale; bổ sung ca newline/Unicode trong test upgrade. Các pure package không đổi, chưa chạy PG/helper10/dev.
