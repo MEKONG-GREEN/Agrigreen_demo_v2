@@ -53,16 +53,6 @@ const (
 	KindMRVAnomaly = "mrv_anomaly"
 	// KindMRVOverdue: hồ sơ MRV chờ duyệt quá hạn — mức 1 người duyệt, mức 2 quản trị TTKN tỉnh (KN US-MRV-06).
 	KindMRVOverdue = "mrv_overdue"
-	// KindWorkScheduleSubmitted: lịch công tác tuần gửi duyệt / điều chỉnh chờ duyệt lại → người duyệt Cấp Tỉnh
-	// (KN v7.7 FN-TI-02.07: "lịch Cán bộ xã gửi hiện ngay ở Chờ duyệt"). Ràng buộc kind trong DB do migration
-	// pf_notify của P4 (000073) mở rộng — chưa có thì consumer không ghi được (người tích hợp thêm kind này).
-	KindWorkScheduleSubmitted = "work_schedule_submitted"
-	// KindWorkScheduleReviewed: kết quả duyệt (Đã duyệt / Yêu cầu chỉnh sửa kèm lý do) → người đăng ký
-	// (KN v7.7 FN-XA-03.08 AC; kế hoạch 000073).
-	KindWorkScheduleReviewed = "work_schedule_reviewed"
-	// KindWorkScheduleDue: nhắc hạn đăng ký lịch tuần (cán bộ chưa gửi) hoặc lịch chờ duyệt quá hạn (người duyệt)
-	// (KN v7.7 FN-TI-02.07 luồng phụ; kế hoạch 000073).
-	KindWorkScheduleDue = "work_schedule_due"
 	// KindEgressAnomaly: khối lượng xuất dữ liệu bất thường lần đầu trong ngày (pf/metering, DLP — ADR-0024,
 	// G5) → người nhận DLP của tenant CHỦ DỮ LIỆU (EgressAnomalyRoles; migration pf 000083).
 	KindEgressAnomaly = "egress_anomaly"

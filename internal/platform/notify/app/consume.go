@@ -43,10 +43,8 @@ var HandledEvents = []string{
 	contentport.EventDocumentPublished, syncport.EventConflictOpened, syncport.EventDeviceRevoked,
 	partyport.EventOrgDeactivated, coopport.EventHouseholdRegistered, coopport.EventHouseholdMembershipChanged,
 	extport.EventTaskCreated, coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened,
-	extport.EventReportBatchIssued, extport.EventReportTaskReminded, extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened,
 	ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived,
 	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale, mrvport.EventAlertRaised,
-	extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed, extport.EventWorkScheduleReminded,
 	meteringport.EventEgressAnomaly, priceport.EventReminderIssued, priceport.EventAlertRaised,
 	priceport.EventVerificationRequested, priceport.EventVerificationResponded, priceport.EventVerificationDecided,
 	priceport.EventLockSummarized, priceport.EventBoardPublished, priceport.EventBoardReopened, priceport.EventTicketProxied,
@@ -74,15 +72,6 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 		priceport.EventVerificationResponded, priceport.EventVerificationDecided, priceport.EventLockSummarized,
 		priceport.EventBoardPublished, priceport.EventBoardReopened, priceport.EventTicketProxied:
 		return s.onPrice(ctx, tx, env)
-	case extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed, extport.EventWorkScheduleReminded:
-		ns, err := domain.WorkScheduleNotifications(env.EventType, env.Payload, env.OccurredAt)
-		if err != nil {
-			return err
-		}
-		if len(ns) == 0 {
-			return nil
-		}
-		return s.deliver(ctx, tx, env, ns)
 	case extport.EventDirectiveIssued:
 		var p extport.DirectiveIssuedV1
 		if err := decode(env, &p); err != nil {
@@ -219,16 +208,6 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 		}
 		a := domain.Audience{National: true, Roles: []string{mechport.RoleCGHAdmin}}
 		return s.deliver(ctx, tx, env, []domain.Notification{domain.AreaFeedStaleTemplate(p, env.OccurredAt).ForAudience(a)})
-	case extport.EventReportBatchIssued, extport.EventReportTaskReminded, extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened:
-		// KN v7.7 P4: công việc mới, nhắc, yêu cầu điều chỉnh, mở lại kỳ → cán bộ phụ trách (đẩy chỉ dữ liệu, < 1 phút).
-		ns, err := domain.ReportCycleNotifications(env.EventType, env.Payload, env.OccurredAt)
-		if err != nil {
-			return err
-		}
-		if len(ns) == 0 {
-			return nil
-		}
-		return s.deliver(ctx, tx, env, ns)
 	case meteringport.EventEgressAnomaly:
 		// G5 (ADR-0024, mục 18 DLP): tenant phong bì = CHỦ DỮ LIỆU → chủ đề toàn tenant theo vai người
 		// nhận DLP (port.EgressAnomalyRoles — tạm, chờ khách Q5-5). Idempotent: inbox + (sự kiện, người nhận).

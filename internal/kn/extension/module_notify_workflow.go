@@ -45,7 +45,7 @@ func renderWorkScheduleNotifications(eventType string, payload json.RawMessage, 
 		if p.Late {
 			body += " Đăng ký muộn."
 		}
-		tpl := sourceNotificationTemplate{Kind: notifyport.KindWorkScheduleSubmitted, Severity: notifyport.SeverityNormal, Title: title, Body: body,
+		tpl := sourceNotificationTemplate{Kind: extport.KindWorkScheduleSubmitted, Severity: notifyport.SeverityNormal, Title: title, Body: body,
 			DeepLink: "/extension/work-schedules/" + p.ScheduleID.String(), SubjectRef: sourceNotificationRef(p.ScheduleID),
 			CreatedAt: sourceNotificationTime(p.EventTime, occurred)}
 		var out []notifyport.NotificationDraft
@@ -76,7 +76,7 @@ func renderWorkScheduleNotifications(eventType string, payload json.RawMessage, 
 			}
 			body += " — sửa và gửi lại."
 		}
-		tpl := sourceNotificationTemplate{Kind: notifyport.KindWorkScheduleReviewed, Severity: notifyport.SeverityNormal, Title: title, Body: body,
+		tpl := sourceNotificationTemplate{Kind: extport.KindWorkScheduleReviewed, Severity: notifyport.SeverityNormal, Title: title, Body: body,
 			DeepLink: "/extension/work-schedules/" + p.ScheduleID.String(), SubjectRef: sourceNotificationRef(p.ScheduleID),
 			CreatedAt: sourceNotificationTime(p.EventTime, occurred)}
 		return []notifyport.NotificationDraft{tpl.For(p.OwnerRef)}, nil
@@ -94,7 +94,7 @@ func renderWorkScheduleNotifications(eventType string, payload json.RawMessage, 
 			body = fmt.Sprintf("Còn %d lịch tuần %s chờ duyệt, hạn duyệt %s.", p.Pending, workflowNotificationWeekLabel(p.WeekStart), due)
 			link = "/extension/work-schedules"
 		}
-		tpl := sourceNotificationTemplate{Kind: notifyport.KindWorkScheduleDue, Severity: notifyport.SeverityNormal, Title: title, Body: body,
+		tpl := sourceNotificationTemplate{Kind: extport.KindWorkScheduleDue, Severity: notifyport.SeverityNormal, Title: title, Body: body,
 			DeepLink: link, CreatedAt: occurred}
 		var out []notifyport.NotificationDraft
 		for _, r := range sourceNotificationRecipients(p.RecipientRefs) {
@@ -147,7 +147,7 @@ func renderReportCycleNotifications(eventType string, payload json.RawMessage, o
 					continue
 				}
 				delete(seen, r)
-				t := sourceNotificationTemplate{Kind: notifyport.KindReportTaskAssigned, Severity: notifyport.SeverityNormal, Title: "Có công việc nộp báo cáo mới",
+				t := sourceNotificationTemplate{Kind: extport.KindReportTaskAssigned, Severity: notifyport.SeverityNormal, Title: "Có công việc nộp báo cáo mới",
 					Body:     fmt.Sprintf("%s — %d công việc (%d kỳ), hạn kỳ đầu %s.", p.SeasonLabel, n, p.PeriodCount, due),
 					DeepLink: "/kn/nhiem-vu/cong-viec", SubjectRef: workflowNotificationParseRef(p.BatchID), CreatedAt: at}
 				out = append(out, t.For(r))
@@ -159,9 +159,9 @@ func renderReportCycleNotifications(eventType string, payload json.RawMessage, o
 		if err := json.Unmarshal(payload, &p); err != nil {
 			return bad(err)
 		}
-		kind, title := notifyport.KindReportReminder, "Cấp Tỉnh nhắc nộp báo cáo"
+		kind, title := extport.KindReportReminder, "Cấp Tỉnh nhắc nộp báo cáo"
 		if p.Mode != extport.ReminderManual {
-			kind, title = notifyport.KindReportTaskDue, "Nhắc hạn nộp báo cáo"
+			kind, title = extport.KindReportTaskDue, "Nhắc hạn nộp báo cáo"
 		}
 		tpl = sourceNotificationTemplate{Kind: kind, Severity: notifyport.SeverityNormal, Title: title, Body: p.PeriodLabel + ": " + sourceNotificationTruncate(p.Message, 400),
 			DeepLink: "/kn/nhiem-vu/cong-viec", SubjectRef: workflowNotificationParseRef(p.PeriodID), CreatedAt: sourceNotificationTime(p.EventTime, occurred)}
@@ -171,7 +171,7 @@ func renderReportCycleNotifications(eventType string, payload json.RawMessage, o
 		if err := json.Unmarshal(payload, &p); err != nil {
 			return bad(err)
 		}
-		tpl = sourceNotificationTemplate{Kind: notifyport.KindReportAdjustmentRequested, Severity: notifyport.SeverityNormal, Title: "Yêu cầu điều chỉnh báo cáo",
+		tpl = sourceNotificationTemplate{Kind: extport.KindReportAdjustmentRequested, Severity: notifyport.SeverityNormal, Title: "Yêu cầu điều chỉnh báo cáo",
 			Body: p.FormCode + " · " + p.PeriodLabel + " · xã " + p.CommuneCode + ": " + sourceNotificationTruncate(p.Reason, 400), DeepLink: "/kn/nhiem-vu/cong-viec/" + p.TaskID,
 			SubjectRef: workflowNotificationParseRef(p.TaskID), CreatedAt: sourceNotificationTime(p.EventTime, occurred)}
 		recips = workflowNotificationRefs(p.RecipientRefs)
@@ -180,7 +180,7 @@ func renderReportCycleNotifications(eventType string, payload json.RawMessage, o
 		if err := json.Unmarshal(payload, &p); err != nil {
 			return bad(err)
 		}
-		tpl = sourceNotificationTemplate{Kind: notifyport.KindReportPeriodReopened, Severity: notifyport.SeverityNormal, Title: "Kỳ báo cáo được mở lại",
+		tpl = sourceNotificationTemplate{Kind: extport.KindReportPeriodReopened, Severity: notifyport.SeverityNormal, Title: "Kỳ báo cáo được mở lại",
 			Body:     fmt.Sprintf("%s mở lại đến %s: %s", p.Label, sourceNotificationVietnamTime(sourceNotificationTime(p.ReopenUntil, occurred)), sourceNotificationTruncate(p.Reason, 300)),
 			DeepLink: "/kn/nhiem-vu/cong-viec", SubjectRef: workflowNotificationParseRef(p.PeriodID), CreatedAt: sourceNotificationTime(p.EventTime, occurred)}
 		recips = workflowNotificationRefs(p.RecipientRefs)

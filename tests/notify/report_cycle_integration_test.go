@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -32,7 +31,7 @@ func TestFN_TI_02_03_ReportCycleInbox(t *testing.T) {
 	for _, n := range in {
 		kinds[n["kind"]] = true
 	}
-	if len(in) != 2 || !kinds[port.KindReportTaskAssigned] || !kinds[port.KindReportReminder] {
+	if len(in) != 2 || !kinds[extport.KindReportTaskAssigned] || !kinds[extport.KindReportReminder] {
 		t.Fatalf("cán bộ phụ trách: %v", in)
 	}
 	if len(b.inbox()) != 0 {

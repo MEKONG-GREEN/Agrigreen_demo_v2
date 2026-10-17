@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-NOTIFY-CONTENT-B: Xóa7fallback workflow, chuyển8kind vềKN; kiểm tra77+46golden vàfullPG/migration trướcdev.

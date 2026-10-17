@@ -722,3 +722,10 @@ Pure94378 actualexit0 đủ5package;77workflow fullfield/errors/nil-empty khớp
 
 
 Chốt trên production86884560/golden928d6d84: capture actual0/77OLD; pure94378actual0/5package/77workflow+46CNTS, static75993actual0/fullgates/boundary330/lint0/gofmt2old. PG68631actualexit0 đủ9/9package,0FAIL/SKIP; assembly 110.101s, testsnotify 122.371s. Owner10callback thực qua4startupsites vàPGfixture, lịch công tác/báo cáo, CNTS và generic delivery guards PASS. Private58377/f9d0a5a0abfc cleanup,Go0 trướchelper. Không Gochange sauPG. ProofhostTEMP agrigreen-codex-knsplit2notifycontenta-proof.json, lệnh nhận cùngprefix-db-full.ps1 (privatePG/fullnotify/...+KNroots+assembly/worker+testsnotifyconsumers+testsnotify). Cầnhelper9migration/remote trướcdev; legacy7 vẫngiữA. G1 còn, khôngclaimnotifydone.
+
+
+## KNSPLIT-2-NOTIFY-CONTENT-B — Xóa workflow legacy
+
+Nềncf58e84e, RED80687 actualexit1 đúng14fallback nil/empty×7. Xóa7nhánh và7metadata HandledEvents, hai builder legacy cùng unit/generator; refsOf/parseRef/weekLabel chỉ có caller trong hai file đã xóa. Chuyển nguyên8Kinddecl (Work3/Report5) về KNport, không alias; owner/test report đổi qualifier, giữ assertion. Coregeneric registry/Normalize/Tx/RLS/IDs/source provenance và nativeMRV giữ. Không SQL/schema/migration/UI/API change.
+
+Giữ5golden Gitblobs: metadata16/41, CNTS46inputs/expected, workflow77inputs/expected. Owner chỉ đọc expectedOLD đã capture trước. Unit cũ được thay bằng77fullfield/error/nil-empty+46CNTS và fullPG work/report/deliveryguards; không thêm cap→KN import hay API chỉ để giữ test. Phạm vi full9PG nhưA, pure5/fullstatic/actualpruneonly/helper9/remote trướcdev. Chưa coi code là đã đạt cho tới actualexit. G1còn, main/worktrees/lịchACTIVEgiữ.
