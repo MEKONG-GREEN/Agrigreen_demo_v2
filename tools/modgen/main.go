@@ -160,7 +160,7 @@ func run(root string, check bool) ([]string, error) {
 			Publications:   publications(s.directives),
 			DataProducts:   s.directives["dataproduct"],
 		}
-		next.Consumes = modreg.Consumes{Events: s.consumes}
+		next.Consumes = modreg.Consumes{Events: s.consumes, Publications: s.directives["readpubview"]}
 		next.Permissions = s.roles
 		next.OwnsSchema = owners[name]
 		all = append(all, &next)
@@ -573,7 +573,7 @@ func (s *scan) classify(idx map[string]*portPkg) {
 	s.consumes = keys(events)
 }
 
-var reDirective = regexp.MustCompile(`^//ag:(event|internal-event|publication|pubview|dataproduct)\s+(\S+)(?:\s+(v[0-9]+))?`)
+var reDirective = regexp.MustCompile(`^//ag:(event|internal-event|publication|pubview|readpubview|dataproduct)\s+(\S+)(?:\s+(v[0-9]+))?`)
 
 // publications gộp van công bố (//ag:publication) và view công bố _pub (//ag:pubview), đã sắp.
 func publications(directives map[string][]string) []string {

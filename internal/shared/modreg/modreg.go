@@ -83,6 +83,8 @@ type Provides struct {
 // module phát khai trong provides.events / provides.internal_events.
 type Consumes struct {
 	Events []string `yaml:"events"` // <tên>/v<N>, cùng dạng provides.events
+	// Publications: versioned _pub contracts read as data, outside the call dependency graph.
+	Publications []string `yaml:"publications,omitempty"`
 }
 
 // Manifest là nội dung một module.yaml.
@@ -244,6 +246,12 @@ func (m *Manifest) Validate() error {
 		}
 	}
 	listCheck("provides.data_products", m.Provides.DataProducts, reSnake)
+	listCheck("consumes.publications", m.Consumes.Publications, rePublish)
+	for _, publication := range m.Consumes.Publications {
+		if _, ok := ParsePubView(publication); !ok {
+			bad("consumes.publications %q: expected a versioned _pub view", publication)
+		}
+	}
 	listCheck("consumes.events", m.Consumes.Events, reEvent)
 	for _, e := range m.Consumes.Events {
 		if EventProducer(e) == m.Name {
@@ -391,6 +399,9 @@ func New(ms []*Manifest) (*Registry, error) {
 				errs = append(errs, fmt.Errorf("%s: consumes.events %q: %s không khai sự kiện này trong provides", m.Path, e, p.Name))
 			}
 		}
+	}
+	if _, err := publicationReaders(ms); err != nil {
+		errs = append(errs, err)
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, err

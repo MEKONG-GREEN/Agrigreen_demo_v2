@@ -63,6 +63,11 @@ provides:
   data_products: []
 consumes:
   events: [pf.forms.submission.recorded/v1]
+  publications:
+    - pf_extension_pub.closed_figures/v1
+    - pf_forms_pub.closed_figures/v1
+    - pf_price_pub.board_daily/v1
+    - pf_price_pub.ticket_week/v1
 permissions: []
 shares: []
 owns_schema: [pf_extension, pf_extension_pub]

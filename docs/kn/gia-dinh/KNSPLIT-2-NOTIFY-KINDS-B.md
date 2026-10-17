@@ -16,3 +16,5 @@ Pure61588actual0/5pkg.16goldenGitblobs/baseline318/rules/oldmigrations/runtimeGo
 
 
 Kết quả thật: pure61588actual0/5pkg, static87585actual0/toàn cổng/boundary318/lint0/gofmt2old. Full9PG24163actualexit0/không FAIL-SKIP: assembly152.348s/testsnotify156.797s. FutureKindEmailAndUnknownAtomicRetry PASS0.14s, 43 loại cũ vẫn lưu được. Private58456/6f98d006511b đã dọn,Go0; không sửa Go/SQL sauPG.16goldens/rules/baseline/runtimeGo/oldmigrations nguyên aff0f755. Còn kiểm thử nâng cấp 1.000 dòng và 9 cổng migration trong helper10 trước remote dev.
+
+KindsB đã dev9df8d64d, helper31908actual0/10migrationPASS631.739s; NotificationKindConstraintUpgradePASS108.63s với1.000dòng giữcount/checksum/3phases/guard. Private57956/72f1a38a6339 dọn,remote xác minh/main27afd593 nguyênsạch; không lặp kiểm thử chỉ vì cập nhật tài liệu.

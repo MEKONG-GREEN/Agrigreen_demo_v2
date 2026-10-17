@@ -28,6 +28,8 @@ type CatalogEntry struct {
 	OwnsSchema []string
 	// Shares: bảng chia sẻ được (shares, ADR-0030) — tên logic, đã sắp (W4.1: kiểm module_table của cấp phép).
 	Shares []string
+	// PubReadOwners: publishers resolved from consumes.publications at build time.
+	PubReadOwners []string
 }
 
 // Catalog trả mọi module theo tên (bản sao).
@@ -44,6 +46,7 @@ func (e CatalogEntry) clone() CatalogEntry {
 	e.Zones = slices.Clone(e.Zones)
 	e.OwnsSchema = slices.Clone(e.OwnsSchema)
 	e.Shares = slices.Clone(e.Shares)
+	e.PubReadOwners = slices.Clone(e.PubReadOwners)
 	return e
 }
 
@@ -129,6 +132,10 @@ func RoleBlocked(role string, disabled func(module string) bool) (blocked bool, 
 
 // FormatCatalog sinh nội dung catalog_gen.go (đã gofmt) từ các manifest.
 func FormatCatalog(mods []*Manifest) ([]byte, error) {
+	readers, err := publicationReaders(mods)
+	if err != nil {
+		return nil, err
+	}
 	sorted := slices.Clone(mods)
 	slices.SortFunc(sorted, func(a, b *Manifest) int { return strings.Compare(a.Name, b.Name) })
 	var b bytes.Buffer
@@ -140,9 +147,13 @@ func FormatCatalog(mods []*Manifest) ([]byte, error) {
 		slices.Sort(perms)
 		shares := slices.Clone(m.Shares)
 		slices.Sort(shares)
-		fmt.Fprintf(&b, "\t{Name: %s, Kind: %s, Enable: %s, Permissions: %s, Zones: %s, OwnsSchema: %s, Shares: %s},\n",
+		fmt.Fprintf(&b, "\t{Name: %s, Kind: %s, Enable: %s, Permissions: %s, Zones: %s, OwnsSchema: %s, Shares: %s",
 			strconv.Quote(m.Name), strconv.Quote(string(m.Kind)), strconv.Quote(string(m.Enable)),
 			goStrings(perms), goStrings(m.Zones), goStrings(m.OwnsSchema), goStrings(shares))
+		if owners := readers[m.Name]; len(owners) > 0 {
+			fmt.Fprintf(&b, ", PubReadOwners: %s", goStrings(owners))
+		}
+		b.WriteString("},\n")
 	}
 	b.WriteString("}\n")
 	// W7.1 (R-DB-12): phụ thuộc module cho bộ chạy migration v2 (thứ tự topo) — biến riêng ở cuối tệp để gộp

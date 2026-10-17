@@ -41,6 +41,9 @@ func Format(m *Manifest) []byte {
 	b.WriteString("  data_products:" + flow(m.Provides.DataProducts, true) + "\n")
 	b.WriteString("consumes:\n")
 	b.WriteString("  events:" + flow(m.Consumes.Events, true) + "\n")
+	if len(m.Consumes.Publications) > 0 {
+		b.WriteString("  publications:" + flow(m.Consumes.Publications, true) + "\n")
+	}
 	b.WriteString("permissions:" + flow(m.Permissions, true) + "\n")
 	b.WriteString("shares:" + flow(m.Shares, true) + "\n")
 	b.WriteString("owns_schema:" + flow(m.OwnsSchema, true) + "\n")

@@ -596,3 +596,8 @@ Bộ chạy v2 (`internal/shared/migrator`, [ADR-0038](../adr/0038-bo-chay-migra
 
 Xem [sổ hồi quy](../REGRESSION.md) để tái lập đồ thị tiêu thụ và các lệnh chấp nhận
 khi đổi port, sự kiện, namespace hoặc phần lắp ráp liên module.
+
+
+### Khai báo bên đọc view công bố
+
+Module đọc ghi //ag:readpubview <schema>_pub.<tên> v<N> trong mã của mình. modgen sinh consumes.publications và catalog.PubReadOwners; registry từ chối nguồn/phiên bản chưa công bố, schema không thuộc chủ, khác cụm hoặc khai trùng. Đây là phụ thuộc dữ liệu, không thêm cạnh gọi depends. A chưa đổi bootstrap; bước B sẽ sử dụng metadata thay cấu hình PubReaders hardcode. Vai _pub vẫn có quyền SELECT theo schema như hiện trạng; không coi mỗi khai báo là một ACL SQL riêng.

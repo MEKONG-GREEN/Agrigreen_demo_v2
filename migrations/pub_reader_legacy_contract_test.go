@@ -3,6 +3,8 @@ package migrations_test
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -115,5 +117,19 @@ func TestLegacyPublishedReaderAccessContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("OLD_PUBLISHED_READERS=" + string(raw))
+	wantRaw, err := os.ReadFile("../tests/golden/pub-reader-access.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want, got any
+	if err := json.Unmarshal(wantRaw, &want); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("publication access changed from frozen old contract: %s", raw)
+	}
+
 }
