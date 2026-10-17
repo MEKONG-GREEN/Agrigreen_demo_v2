@@ -845,3 +845,6 @@ Registry immutable theo instance, startup một lần, pattern a-z/underscore1..
 Unit kiểm clone/isolation/init/native/format và từ chối trướcDB; external so25owner keys vớiOLD43. PG thực phát đủ43keys, unknown không ghi và retry/dedup, thiếu khai báo ownedkind không chạmDB. A giữ nguyên finite CHECK/SQL/schema/migrations; B chỉ được cutover sau actualupgrade/count/checksum/row preservation và không sửa migration cũ. Đây là thêm validation, không nới cổng CI hay alias.
 
 Impact fullnotify/... +KN extension/price +APIassembly/worker +testsnotifyconsumers/testsnotify,9package có test. Cần pure5/fullstatic/boundary318 không tăng/full9PG thậtnoFAIL-SKIP/helper9/remote trướcdev.15oldgoldens nguyên43b14525, thêmfrozenkindcontract. KhôngAPI/UI/mobile thay đổi. G1 còn nativeKNpolicies/data/rights/routes/tenant/client/KHTC reminder; quyết địnhPO/main/worktrees/lịch giữ.
+
+
+Pure48851actual0 đủ5testpackage(+KNpricecompile), Kindregistry clone/isolation/pattern/duplicate/native/initonce/unknown-beforeDB và25ownerdefinitions khớpOLD43 PASS;52/11/job và các golden nguồn cũ giữ.15oldgoldenGitblobs nguyên43b14525, baseline/rules nguyên, không migrationchange. TrướcPGcompile sửa riêng test mới EventHandler chỉ trả một error (không hai giá trị); không đổi production/pure assertions. Production7870e3d8;chưa static/full9PG/helper/dev.

@@ -63,7 +63,7 @@ func TestRegisteredKindVocabularyPersistsAndUnknownRollsBack(t *testing.T) {
 	}
 	selected = "fixture_kind"
 	event := f.event(f.tenant, "fixture.kind.created", map[string]string{"kind": selected})
-	if _, err := f.mod.EventHandler()(context.Background(), nil, event); err == nil {
+	if err := f.mod.EventHandler()(context.Background(), nil, event); err == nil {
 		t.Fatal("unregistered kind reached DB")
 	}
 	if count() != 43 {
