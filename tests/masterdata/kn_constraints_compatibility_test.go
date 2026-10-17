@@ -1,6 +1,7 @@
 package masterdata_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"reflect"
 	"testing"
@@ -71,4 +72,10 @@ func TestKNConstraintsMatchLegacy(t *testing.T) {
 	if len(legacy) != 13 || !reflect.DeepEqual(legacy, owned) {
 		t.Fatalf("owner constraints changed legacy problems:\nlegacy=%+v\nowner=%+v", legacy, owned)
 	}
+	// Freeze only results produced by the old path, after the complete owner comparison succeeded.
+	raw, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("LEGACY_CONSTRAINT_CONTRACTS=%s", raw)
 }

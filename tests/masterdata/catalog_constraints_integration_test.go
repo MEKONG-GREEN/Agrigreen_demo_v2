@@ -124,7 +124,7 @@ func TestRegisteredCatalogTransactionConstraints(t *testing.T) {
 	if st != 200 {
 		t.Fatalf("deactivate reference: %d %v", st, b)
 	}
-	st, b = admin.adm(http.MethodPost, "/v1/masterdata/catalogs/fixture_asset/items/A/reactivate", nil)
+	st, b = admin.adm(http.MethodPost, "/v1/masterdata/catalogs/fixture_asset/items/A/reactivate", map[string]any{})
 	constraintIssue(t, st, b, 422, "masterdata.catalog_ref_invalid", "Mục tham chiếu (nhóm cây trồng, cây trồng bị ảnh hưởng) không có hoặc đã ngừng dùng", "attrs.parent", "P")
 	// Same code and tokens in another tenant must not see the first tenant's reservations.
 	other := f.caller(f.seeded(), port.RoleMasterdataAdmin)
