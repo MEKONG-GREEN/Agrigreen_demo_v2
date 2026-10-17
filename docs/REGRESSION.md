@@ -795,3 +795,6 @@ Impact: core notify dispatch/metadata/domain/port, KN extension và test PG tr�
 
 
 Pure19893 actualexit0 đủ năm package có test (+KNprice compile). RED88183actual1→GREEN nil/empty×2 không fallback; registered Task vẫn kiểm malformed với prefixhỏng nguyên.83 owner full draft/lỗi/lookup và mọi golden cũ đạt. Mười golden Gitblob nguyên1c86931a; hai Kind giữ identifier/literal/comments (chỉ alignment gofmt đổi), mọi Kind còn lại không đổi. Prune thực320→320, không có mục lỗi thời; baseline/rule nguyên Gitblob, không ép giảm hay nới cổng. Production8f5096bf; chưa static/PG/helper/dev.
+
+
+Kết quả thật production8f5096bf: pure19893actual0/5pkg, static47969actual0/fullgates/boundary320/lint0/gofmt2old. Full9PG18321actualexit0,không FAIL/SKIP; testsnotify150.634s. Task owner thực qua fixture, lookup retry/tenant/redaction, giá/email/topic, CNTS/workflow và generic delivery guards đềuPASS. Private53084/85282d26557d cleanup,Go0; không Gochange sauPG.83Task và10goldens nguyên1c86931a; hai Kindidentifier/literal/comments đúng, baseline320→320 vàruleblobgiữ. Cầnhelper9migration/remote trước dev.

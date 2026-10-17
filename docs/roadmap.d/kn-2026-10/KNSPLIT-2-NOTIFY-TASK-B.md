@@ -1,1 +1,1 @@
-- [x] KNSPLIT-2-NOTIFY-TASK-B: Xóa legacy nhiệm vụ/chuyển hai Kind; đang kiểm chứng83golden/static/PG/helper.
+- [x] KNSPLIT-2-NOTIFY-TASK-B: Xóa task legacy/chuyển hai Kind;83OLD/10goldens/pure/static/full9PG đạt,chờhelper9/remote.
