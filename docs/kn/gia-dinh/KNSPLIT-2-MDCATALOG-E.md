@@ -1,0 +1,11 @@
+## KNSPLIT-2-MDCATALOG-E — Quy tắc giao dịch do KN khai báo
+
+Nền6b1b88fe. CatalogDefinition nhận Constraints thuần cấu hình: thuộc tính UUID cố định, callback thuần trả tham chiếu đang dùng, đơn vị hành chính theo cấp/ngày, mã đặt chỗ từ các thuộc tính có thứ tự. Registry kiểm cấu hình khi khởi động, sao chép sâu pointer/slice và truyền bản sao attrs cho callback. Callback không nhận tenant/principal/SQL/transaction. Core vẫn kiểm known catalog, quyền, RLS và ghi sổ trong cùng Tx. SQL token bind catalog/thuộc tính/dấu phân cách/mã, kể cả dữ liệu đã ngừng dùng; không nội suy SQL.
+
+KN khai báo đủ12constraints (kể cả rỗng), owns bản đồ tham chiếu, parser mũi tiêm, thứ tự GS→GC và full hợp đồng lỗi cũ (status/code/title/field/reason). Mã UUID tạo trước normalize, bỏ giá trị caller, giữ UUID hiện có sau khóa row khi update/import. Create/update/import/seed/reactivate dùng cùng đường checkRefs. Schema/rule_version/hash/ledger vật lý và ba migration đã có giữ nguyên; không thêm migration. Đường CNTS legacy giữ tạm để so sánh E, F mới xóa legacy/di chuyển typed DTO+const+interface; chưa hoàn tất masterdata.
+
+Test mới: registry invalid/deepcopy/callback mutation/full Problem; generic fixture không KN kiểm reference, cấp/ngày đơn vị, UUID create/update/import, rollback cả import khi conflict409, đặt chỗ cross-attr/inactive, reactivate với ref đã ngừng, RLS, SQL-looking token;13HTTP problem đầy đủ so sánh legacy với owner. Giữ frozen12schema/60seed/170normalize,17lookup,16param/13seed nguyên byte.
+
+Impact evidence: rg checkRefs/prepareFacilityRef/keepFacilityRef + imports CNTSCatalogs và NewCNTSCatalogs ở cmd/KN/accounts. Thay đường runtime write nên full22scope C: masterdata/app/domain+tests/masterdata+KNroot/app/store/handler/reportcycle/cntsalert/cntscal/outbreak+accounts app/domain/handler/port+APIassembly/worker+KN77+frozencomposition. D7 chỉ xóa deadlookup không đủ cho E. Cổng tĩnh đầy đủ, helper9migration thật/noSKIP trước dev. Không đổi HTTP/OpenAPI/UI/mobile nên không cần web/mobile. Không tuyên bố hiệu năng quy mô production từ fixture nhỏ.
+
+Pure/static/PG/helper còn phải ghi exit thật. Giữ PO tenant mỗi Trung tâm tỉnh/MRV HTX-MKG/D2 chỉ hồ sơ KN/mẫu KHTC nạp sẵn/M1–M7. G1 còn authz/accounts/party/notify/data products/routes/tenant/client/nhắc phiếu. Main/worktrees/lịch tự tiếp tục giữ.

@@ -87,6 +87,9 @@ func (s *Service) getItem(ctx context.Context, tid uuid.UUID, catalog, code stri
 // (cây trồng cấp 1 đang dùng, khác chính nó); sâu bệnh gắn cây trồng bị ảnh hưởng đang dùng (KN v7.7); danh mục
 // CNTS theo checkCNTSRefs (W11.41) với on là ngày áp dụng.
 func (s *Service) checkRefs(ctx context.Context, tx pgx.Tx, it domain.Item, on time.Time) error {
+	if d, ok := s.CatalogRegistry.definition(it.Catalog); ok && d.Constraints != nil {
+		return s.checkCatalogConstraints(ctx, tx, it, on, *d.Constraints)
+	}
 	if s.catalogEffective(it.Catalog) {
 		return checkCNTSRefs(ctx, tx, it, on)
 	}
@@ -167,7 +170,7 @@ func (s *Service) CreateItem(ctx context.Context, in domain.Item, key string) (d
 	if err := s.knownCatalog(in.Catalog); err != nil {
 		return domain.Item{}, false, err
 	}
-	it, err := s.normalizeCatalogItem(prepareFacilityRef(in))
+	it, err := s.normalizeCatalogItem(s.prepareCatalogIdentity(in))
 	if err != nil {
 		return domain.Item{}, false, asProblem(err)
 	}
@@ -221,7 +224,7 @@ func (s *Service) UpdateItem(ctx context.Context, in domain.Item) (domain.Item, 
 	if err := s.knownCatalog(in.Catalog); err != nil {
 		return domain.Item{}, err
 	}
-	upd, err := s.normalizeCatalogItem(prepareFacilityRef(in))
+	upd, err := s.normalizeCatalogItem(s.prepareCatalogIdentity(in))
 	if err != nil {
 		return domain.Item{}, asProblem(err)
 	}
@@ -239,7 +242,7 @@ func (s *Service) UpdateItem(ctx context.Context, in domain.Item) (domain.Item, 
 		if cur == nil {
 			return ErrItemNotFound
 		}
-		upd = keepFacilityRef(upd, *cur)
+		upd = s.keepCatalogIdentity(upd, *cur)
 		if cur.SameContent(upd) {
 			out = *cur
 			return nil

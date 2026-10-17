@@ -120,6 +120,7 @@ func MasterdataCatalogs() mdport.CatalogRegistration {
 		c := key
 		reg.Definitions = append(reg.Definitions, mdport.CatalogDefinition{
 			Catalog: c, Name: names[c], Attributes: cnts[c], EffectiveDated: true, Sync: true, SeedValidFrom: "2000-01-01",
+			Constraints: catalogTransactionConstraints(c),
 			ValidateAttrs: func(attrs map[string]string) error {
 				return catalogNormalizeCNTS(mdport.CatalogItem{Catalog: c, Attrs: attrs})
 			},

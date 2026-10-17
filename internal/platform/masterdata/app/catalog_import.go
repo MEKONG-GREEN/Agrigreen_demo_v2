@@ -141,7 +141,7 @@ func (s *Service) ImportCatalogs(ctx context.Context, body io.Reader, key string
 				}
 				it.ValidFrom = d
 			}
-			norm, err := s.normalizeCatalogItem(prepareFacilityRef(it))
+			norm, err := s.normalizeCatalogItem(s.prepareCatalogIdentity(it))
 			if err != nil {
 				row.Reason = importReason(err)
 				res.add(row)
@@ -161,7 +161,7 @@ func (s *Service) ImportCatalogs(ctx context.Context, body io.Reader, key string
 				return err
 			}
 			if cur != nil {
-				norm = keepFacilityRef(norm, *cur)
+				norm = s.keepCatalogIdentity(norm, *cur)
 				if cur.SameContent(norm) {
 					row.Status = ImportRowSkipped
 				} else {

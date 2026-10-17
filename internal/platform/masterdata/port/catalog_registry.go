@@ -24,6 +24,7 @@ type CatalogDefinition struct {
 	Sync           bool
 	SeedValidFrom  string
 	ValidateAttrs  func(map[string]string) error `json:"-"`
+	Constraints    *CatalogConstraints           `json:"-"`
 }
 
 type CatalogSeed struct {

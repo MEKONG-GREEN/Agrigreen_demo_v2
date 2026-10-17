@@ -25,6 +25,19 @@ type CatalogRegistry struct {
 
 func cloneCatalogDefinition(d port.CatalogDefinition) port.CatalogDefinition {
 	d.Attributes = maps.Clone(d.Attributes)
+	if d.Constraints != nil {
+		c := *d.Constraints
+		if c.AdminUnit != nil {
+			u := *c.AdminUnit
+			c.AdminUnit = &u
+		}
+		if c.UniqueTokens != nil {
+			u := *c.UniqueTokens
+			u.Attributes = slices.Clone(u.Attributes)
+			c.UniqueTokens = &u
+		}
+		d.Constraints = &c
+	}
 	return d
 }
 func cloneCatalogSeed(s port.CatalogSeed) port.CatalogSeed {
@@ -53,6 +66,7 @@ func NewCatalogRegistry(registrations ...port.CatalogRegistration) *CatalogRegis
 					panic("masterdata: invalid catalog attribute " + name)
 				}
 			}
+			validateCatalogConstraints(d)
 			if d.EffectiveDated {
 				from, err := domain.ParseDay(d.SeedValidFrom)
 				if err != nil || domain.ValidateValidFrom(from) != nil {

@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-MDCATALOG-E — registry transaction constraints + KN owner, chờ pure/static/PG22/helper9 thực. Legacy giữ tới F.
