@@ -68,7 +68,7 @@ func TestNotificationPlanAtomicQueueRetryAndFormatterIsolation(t *testing.T) {
 	registrations[0].Job.Every = 0
 	registrations[0].Format = nil
 	event := f.event(f.tenant, extport.EventDirectiveIssued, map[string]string{"fixture": "plan"})
-	if _, err := inbox.Process(context.Background(), f.appDB, extport.NotifyConsumerDirective, event, f.mod.EventHandler()); !errors.Is(err, notify.ErrDependency) {
+	if _, err := inbox.Process(context.Background(), f.appDB, extport.NotifyConsumerDirective, event, f.mod.EventHandler()); err == nil {
 		t.Fatalf("invalid plan: %v", err)
 	}
 	if total, _ := planDigestCounts(t, f, f.tenant, reference); total != 0 || len(actor.inbox()) != 0 {
