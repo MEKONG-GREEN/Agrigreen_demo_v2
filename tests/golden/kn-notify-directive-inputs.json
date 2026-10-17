@@ -1,0 +1,1220 @@
+[
+  {
+    "Name": "normal-snapshot",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"normal\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"33333333-3333-4333-8333-333333333333\"],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "normal-staff",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"normal\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "normal-topic",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"normal\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": null,
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "normal-no-audience",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"normal\",\"audience_units\":null,\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "NilStaff": true
+    }
+  },
+  {
+    "Name": "urgent-snapshot",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"33333333-3333-4333-8333-333333333333\"],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "urgent-staff",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "urgent-topic",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": null,
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "urgent-no-audience",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":null,\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "NilStaff": true
+    }
+  },
+  {
+    "Name": "unknown-snapshot",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"unknown\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"33333333-3333-4333-8333-333333333333\"],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "unknown-staff",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"unknown\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "unknown-topic",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"unknown\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": null,
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "unknown-no-audience",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"unknown\",\"audience_units\":null,\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "NilStaff": true
+    }
+  },
+  {
+    "Name": "-snapshot",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"33333333-3333-4333-8333-333333333333\"],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "-staff",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "-topic",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": null,
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "-no-audience",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"\",\"audience_units\":null,\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "NilStaff": true
+    }
+  },
+  {
+    "Name": "URGENT-snapshot",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"URGENT\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"33333333-3333-4333-8333-333333333333\"],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "URGENT-staff",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"URGENT\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "URGENT-topic",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"URGENT\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": null,
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "URGENT-no-audience",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"URGENT\",\"audience_units\":null,\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "NilStaff": true
+    }
+  },
+  {
+    "Name": "zero-targets",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[\"00000000-0000-0000-0000-000000000000\",\"00000000-0000-0000-0000-000000000000\"],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "nil-staff",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "NilStaff": true
+    }
+  },
+  {
+    "Name": "empty-staff",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "duplicate-staff",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "22222222-2222-4222-8222-222222222222"
+        },
+        {
+          "ActorRef": "00000000-0000-0000-0000-000000000000"
+        },
+        {
+          "ActorRef": "22222222-2222-4222-8222-222222222222"
+        },
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "only-zero-staff",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "00000000-0000-0000-0000-000000000000"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "foreign-unit-staff",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "22222222-2222-4222-8222-222222222222",
+          "UnitCode": "92001",
+          "ProvinceCode": "92"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "nil-units-directory",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": null,
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "NilUnits": true
+    }
+  },
+  {
+    "Name": "empty-units",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": null,
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "blank-units",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": null,
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "ignored-province-codes",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":null,\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "NilStaff": true
+    }
+  },
+  {
+    "Name": "unknown-unit",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"unknown\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": null,
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "NotFound": [
+        "unknown"
+      ]
+    }
+  },
+  {
+    "Name": "mixed-unit-notfound",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"unknown\",\"91\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": null,
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "NotFound": [
+        "unknown"
+      ]
+    }
+  },
+  {
+    "Name": "unit-error-first",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": null,
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "UnitsError": "91"
+    }
+  },
+  {
+    "Name": "unit-error-second",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": null,
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "UnitsError": "91001"
+    }
+  },
+  {
+    "Name": "unit-error-not-used",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"33333333-3333-4333-8333-333333333333\"],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "UnitsError": "91"
+    }
+  },
+  {
+    "Name": "staff-error",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "StaffError": true
+    }
+  },
+  {
+    "Name": "staff-error-without-units",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":null,\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "StaffError": true
+    }
+  },
+  {
+    "Name": "staff-error-not-used",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"33333333-3333-4333-8333-333333333333\"],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "StaffError": true
+    }
+  },
+  {
+    "Name": "zero-document",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"00000000-0000-0000-0000-000000000000\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"33333333-3333-4333-8333-333333333333\"],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "invalid-issued-time",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"33333333-3333-4333-8333-333333333333\"],\"issued_at\":\"bad\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "empty-issued-time",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"33333333-3333-4333-8333-333333333333\"],\"issued_at\":\"\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "utc-issued-time",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"33333333-3333-4333-8333-333333333333\"],\"issued_at\":\"2027-10-12T23:00:00Z\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "nil-target-field",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "empty-target-field",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"91\",\"91\",\"91001\",\"\"],\"province_codes\":[\"91\"],\"target_refs\":[],\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "long-units",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"áááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááá\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "NilStaff": true,
+      "NilUnits": true
+    }
+  },
+  {
+    "Name": "phone-shaped-unit",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":\"11111111-1111-4111-8111-111111111111\",\"severity\":\"urgent\",\"audience_units\":[\"0901234567\"],\"province_codes\":[\"91\"],\"target_refs\":null,\"issued_at\":\"2027-10-13T10:30:00+07:00\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      },
+      "NilStaff": true,
+      "NilUnits": true
+    }
+  },
+  {
+    "Name": "bad-json",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "nil-payload",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "bad-id",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"directive_id\":false}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "bad-units",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"audience_units\":false}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "bad-target",
+    "Event": "pf.extension.directive.issued",
+    "Payload": "{\"target_refs\":[\"not-uuid\"]}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "unknown-event",
+    "Event": "pf.extension.directive.unknown",
+    "Payload": "{",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Staff": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ],
+      "Children": {
+        "91": [
+          "91",
+          "91001",
+          "91002"
+        ],
+        "91001": [
+          "91001"
+        ]
+      }
+    }
+  }
+]

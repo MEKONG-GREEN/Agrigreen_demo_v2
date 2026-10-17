@@ -71,11 +71,7 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 		}
 		return s.deliver(ctx, tx, env, []domain.Notification{n})
 	case extport.EventDirectiveIssued:
-		var p extport.DirectiveIssuedV1
-		if err := decode(env, &p); err != nil {
-			return err
-		}
-		return s.onDirective(ctx, tx, env, p)
+		return s.onDirective(ctx, tx, env)
 	case coopport.EventHouseholdRegistered:
 		var p coopport.HouseholdRegisteredV1
 		if err := decode(env, &p); err != nil {
@@ -272,14 +268,27 @@ func decode(env outbox.Envelope, v any) error {
 // onDirective: người nhận là target_refs (danh bạ chụp lúc ban hành). Không có →
 // tra danh bạ hiện tại theo vùng; vẫn không có → thông báo chủ đề cho cán bộ của vùng.
 // Chỉ đạo khẩn còn được xếp vào email tóm tắt.
-func (s *Service) onDirective(ctx context.Context, tx pgx.Tx, env outbox.Envelope, p extport.DirectiveIssuedV1) error {
+type legacyDirectiveResult struct {
+	Notifications []domain.Notification
+	Digest        *domain.DigestItem
+}
+
+// legacyDirectivePlan is the unchanged source selection and digest intent, separated from writes for capture.
+func (s *Service) legacyDirectivePlan(ctx context.Context, env outbox.Envelope) (legacyDirectiveResult, error) {
+	if env.EventType != extport.EventDirectiveIssued {
+		return legacyDirectiveResult{}, nil
+	}
+	var p extport.DirectiveIssuedV1
+	if err := decode(env, &p); err != nil {
+		return legacyDirectiveResult{}, err
+	}
 	tpl := domain.DirectiveTemplate(p, env.OccurredAt)
 	targets := domain.DedupRefs(p.TargetRefs)
 	units := domain.DedupUnits(p.AudienceUnits)
 	if len(targets) == 0 && s.Staff != nil {
 		staff, err := s.Staff.ActiveStaff(ctx, env.TenantID, units)
 		if err != nil {
-			return err
+			return legacyDirectiveResult{}, err
 		}
 		for _, st := range staff {
 			targets = append(targets, st.ActorRef)
@@ -293,17 +302,28 @@ func (s *Service) onDirective(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 	if len(ns) == 0 && len(units) > 0 {
 		exp, err := s.expandUnits(ctx, units, env.OccurredAt)
 		if err != nil {
-			return err
+			return legacyDirectiveResult{}, err
 		}
 		ns = append(ns, tpl.ForAudience(domain.Audience{Units: exp, Roles: officerRoles}))
 	}
+
+	var digest *domain.DigestItem
 	if p.Severity == port.SeverityUrgent {
-		if err := store.InsertDigestItem(ctx, tx, env.TenantID, domain.DigestItem{DirectiveID: p.DirectiveID,
-			AudienceUnits: units, IssuedAt: tpl.CreatedAt}, env.EventID, s.now()); err != nil {
+		digest = &domain.DigestItem{DirectiveID: p.DirectiveID, AudienceUnits: units, IssuedAt: tpl.CreatedAt}
+	}
+	return legacyDirectiveResult{Notifications: ns, Digest: digest}, nil
+}
+func (s *Service) onDirective(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
+	plan, err := s.legacyDirectivePlan(ctx, env)
+	if err != nil {
+		return err
+	}
+	if plan.Digest != nil {
+		if err := store.InsertDigestItem(ctx, tx, env.TenantID, *plan.Digest, env.EventID, s.now()); err != nil {
 			return err
 		}
 	}
-	return s.deliver(ctx, tx, env, ns)
+	return s.deliver(ctx, tx, env, plan.Notifications)
 }
 
 // onCommuneHousehold: người nhận là cán bộ khuyến nông cấp XÃ của xã có nông hộ
