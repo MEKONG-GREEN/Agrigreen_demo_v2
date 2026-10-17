@@ -9,3 +9,6 @@ KN extension tự khai bốn view v1 đang đọc thực trong closedfig: extens
 Unit kiểm thiếu khai báo, sai nguồn/phiên bản/schema/cụm, duplicate, self read, clone và sinh YAML/catalog. Test ngoài module đối chiếu metadata mới với cấu hình bootstrap cũ. Hồi quy PostgreSQL gồm metrics/handler, tests/kn77, APIassembly, worker; helper11 gồm 10 cổng cũ + actual ACL contract. Không thay DDL, SQL đọc nghiệp vụ, OpenAPI/UI/mobile, quyền, alias hoặc quy tắc baseline318. Giữ các golden cũ và M1–M7/D2/tenant perCenter/MRV HTX-MKG. G1 còn native policies/dữ liệu/rights/routes/tenant/client/KHTC; lịch/main/worktrees giữ.
 
 Khi gói sau bổ sung data product hợp lệ, phải giữ ảnh chụp OLD và ghi rõ tập quyền mới cần thêm; không ghi đè golden OLD hoặc bỏ kiểm quyền.
+
+
+Pure2292exit0 nhưng có1SKIP TestBootstrapClustersOnlySelected_G4 do thiếuPGenv; chỉ7purepackages đủPASS,nativeDBadminunitPASS nhưng CHƯAfullDBadmin. ToànDBadmin chuyểnthêmvào full5PG đểrequiredca chạy thật,nofail/skip; khôngsửamã/assertion. 27existinggoldenGitblobs/baseline318/rules/SQLmigrations/DBadminbootstrap giữ9df8d64d. Chỉextension.module.yaml thêmconsumes.publications; dependsnguyên. Productionc10fed41;OLD26/41/15capture99143actual0. Chưa static/full5PG/helper11/dev.
