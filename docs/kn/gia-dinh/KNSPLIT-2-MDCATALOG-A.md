@@ -18,3 +18,6 @@ Lượt FINAL đầu (e6b50ace) không đạt: static-final lỗi ST1012 tên2bi
 
 
 Verified-code51844.exit0 đủ18/18packagecótest,0FAIL/SKIP trênproductionb0f4bb2f; KN77249.112s/composition2.159s, actualGo/testprocess0. Đã sửa CHỈ snapshot trong test nâng cấp sang tenant.WithTenantTx, giữ SQL/prodGo nguyên; không cần lặp18package vìtestmigrationskhôngnằmtrong18packageđãchạy. Chạy lại newupgrade riêng. Bước chuẩn bị script test từng bị auto-review chặn khiGođangchạy; đãchờkếtthúc vàxácnhậnprocess0 trước sửa trực tiếp, khôngbypass.
+
+
+Kết quả cuối: code18/18 verified-code51844.exit0 trên productionb0f4bb2f, 0FAIL/SKIP. Chỉtest snapshot sauđó sửa scope (05681eca), SQL/prodGo khôngđổi: upgrade-repaired47221.exit0/PASS178.001s (test74.24s),1.000 dòng checksumnguyênqua3phase và1.001dòngchuỗibămsạchsauthêmtênmới. Static-repaired85467.exit0 fullgates/boundary371/lint0; test-followup vet/lint0; gofmtchỉ2fixtureold. Frozen12schema/60seed/170casegiữ. ProofTEMP agrigreen-codex-knsplit2mdcataloga-proof.json. Auto-review từng chặn prep/vet khi Gođangchạy; đã chờactualexit/process0 và thực hiện tuần tự, khôngbypass. Cầnhelper9migration (8mandatory+newupgrade) trướcdev. CatalogB/dependencies/tenant/client/KHTCreminder/G1 còn.

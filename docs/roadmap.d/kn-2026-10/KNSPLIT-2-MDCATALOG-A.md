@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-MDCATALOG-A — 12schema/60seed KN đăng ký vào core;170ca frozen đạt, generic date storage3migration, chờPG/static/helper. B mới gỡlegacy; typed lookup/registrykhác/data/tenant/client/reminder còn.
+- [x] KNSPLIT-2-MDCATALOG-A — 12schema/60seed/170case frozen;18/18PGcode+upgrade1000rows/checksum/hash đạt, fullstatic/boundary371. Helper9migration trướcdev; B mới gỡlegacy, typedlookup/data/tenant/client/reminder còn.
