@@ -575,3 +575,6 @@ Adapter extension.NewCNTSCatalogs sở hữu phép chuyển cơ sở giết mổ
 Pure4 package đạt. TestW1141_CNTSCatalogs chạy đường owner thật và giữ các assertion trước; thêm 17 phép so sánh đầy đủ giá trị/thứ tự/lỗi với legacy trên cùng DB (3 ngày ×4 lookup + ItemAt, missing facility, vaccine, unknown refs, communes). Test generic không có provider KN kiểm ItemAt/ListAt/date/lookup, SQL values, cross-tenant/undeclared attr; pure negative unknown schemas chặn trước storage. Golden12/60/170 và params16/13 giữ nguyên byte.
 
 Hồi quy dự kiến22gói: B18 + accounts app/domain/handler/port (consumer phạm vi cơ sở). Suite tests/masterdata chạy đầu để fail fast, sau đó21package cùng cụm PG riêng; không chạy song song hay chỉnh Go trong khi test. Toàn bộ cổng tĩnh, baseline không tăng, helper9migration (8mandatory+upgrade) trước dev. Không đổi HTTP/OpenAPI/UI/mobile hay migration; không cần chạy web/mobile. Giữ D2 hồ sơ KN, tenant mỗi Trung tâm tỉnh, MRV HTX/MKG và M1–M7.
+
+
+Static đầu trênbf8c0f30 đạt build/vet/modgen/migrate/archlint/contract/docs/MFA/boundary369, dừng tại errorlint do3negative-test so lỗi bằng !=. Sửa test dùng errors.Is, không đổi production; chạy lại targeted pure và static-repaired. Không coi static ban đầu là đạt; giữ log/exit ban đầu.

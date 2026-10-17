@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -14,13 +15,13 @@ func TestEffectiveCatalogsRequireRegisteredSchema(t *testing.T) {
 	ctx := tenant.WithID(context.Background(), uuid.New())
 	for _, reg := range []*CatalogRegistry{nil, NewCatalogRegistry()} {
 		p := EffectiveCatalogsPort{Svc: &Service{CatalogRegistry: reg}}
-		if _, err := p.ItemAt(ctx, "unregistered_catalog", "A", time.Time{}); err != ErrCatalogNotFound {
+		if _, err := p.ItemAt(ctx, "unregistered_catalog", "A", time.Time{}); !errors.Is(err, ErrCatalogNotFound) {
 			t.Fatalf("item: %v", err)
 		}
-		if _, err := p.ListAt(ctx, "unregistered_catalog", time.Time{}); err != ErrCatalogNotFound {
+		if _, err := p.ListAt(ctx, "unregistered_catalog", time.Time{}); !errors.Is(err, ErrCatalogNotFound) {
 			t.Fatalf("list: %v", err)
 		}
-		if _, err := p.CodeByAttribute(ctx, "unregistered_catalog", "value", "x"); err != ErrCatalogNotFound {
+		if _, err := p.CodeByAttribute(ctx, "unregistered_catalog", "value", "x"); !errors.Is(err, ErrCatalogNotFound) {
 			t.Fatalf("lookup: %v", err)
 		}
 	}
