@@ -37,7 +37,7 @@ func TestCNTSOwnedRenderersMatchLegacy(t *testing.T) {
 		t.Fatal("missing legacy vectors")
 	}
 	renderers := map[string]notifyport.EventRenderer{}
-	for _, r := range extension.NotificationRenderers() {
+	for _, r := range extension.CNTSNotificationRenderers() {
 		for _, event := range r.Events {
 			if renderers[event] != nil {
 				t.Fatal("duplicate renderer")
@@ -79,7 +79,7 @@ func TestCNTSRenderersRequireOwnerRegistration(t *testing.T) {
 				registrations = []notifyport.EventRendererRegistration{}
 			}
 			module := notify.New(nil, clock.System{}, notify.Deps{Consumers: []notifyport.ConsumerRegistration{extension.NotificationConsumers()}, Renderers: registrations})
-			for _, registration := range extension.NotificationRenderers() {
+			for _, registration := range extension.CNTSNotificationRenderers() {
 				for _, event := range registration.Events {
 					if err := module.EventHandler()(context.Background(), nil, outbox.Envelope{EventType: event, Payload: json.RawMessage("{")}); err != nil {
 						t.Errorf("CNTS legacy fallback without owner renderer for %s: %v", event, err)
@@ -88,8 +88,8 @@ func TestCNTSRenderersRequireOwnerRegistration(t *testing.T) {
 			}
 		})
 	}
-	module := notify.New(nil, clock.System{}, notify.Deps{Consumers: []notifyport.ConsumerRegistration{extension.NotificationConsumers()}, Renderers: extension.NotificationRenderers()})
-	for _, registration := range extension.NotificationRenderers() {
+	module := notify.New(nil, clock.System{}, notify.Deps{Consumers: []notifyport.ConsumerRegistration{extension.NotificationConsumers()}, Renderers: extension.CNTSNotificationRenderers()})
+	for _, registration := range extension.CNTSNotificationRenderers() {
 		for _, event := range registration.Events {
 			if err := module.EventHandler()(context.Background(), nil, outbox.Envelope{EventType: event, Payload: json.RawMessage("{")}); err == nil {
 				t.Errorf("registered CNTS renderer did not reject malformed %s", event)
