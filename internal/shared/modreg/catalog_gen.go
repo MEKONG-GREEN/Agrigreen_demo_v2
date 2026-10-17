@@ -66,6 +66,7 @@ var catalogDepends = map[string][]string{
 	"pf/mrv":           {"pf/apiclient", "pf/party", "pf/sync"},
 	"pf/notify":        {"pf/party", "pf/sync"},
 	"pf/party":         {"pf/kref", "pf/sync", "vault/identity"},
+	"pf/price":         {"pf/notify"},
 	"pf/reports":       {"pf/accounts", "pf/masterdata", "pf/party"},
 	"pf/sync":          {"pf/accounts", "pf/evidence", "pf/party", "vault/identity"},
 	"pf/waterway":      {"pf/geo", "pf/masterdata", "pf/party"},

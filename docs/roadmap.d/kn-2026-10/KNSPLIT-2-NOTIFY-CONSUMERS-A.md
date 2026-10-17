@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-NOTIFY-CONSUMERS-A — registry + KN6groups/22events, frozenlegacy16/41; pure4 đạt, chờ static/PG8/helper9. Fallback/B/builders còn.

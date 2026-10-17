@@ -216,7 +216,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	// dùng cổng thiết bị độc lập (syncmod.NewDevices) để không vòng phụ thuộc. API chỉ
 	// xếp lần gửi đẩy; gửi thật ở consumer pf.notify.push của worker.
 	nt := notify.New(unit, clk, notify.Deps{
-		Scope: pty.ScopeResolver(), Devices: syncmod.NewDevices(unit), Staff: kn.Staff(), Units: md.AdminUnits(),
+		Consumers: NotificationConsumers(),
+		Scope:     pty.ScopeResolver(), Devices: syncmod.NewDevices(unit), Staff: kn.Staff(), Units: md.AdminUnits(),
 	})
 
 	// ADR-0006: con trỏ pull ký HMAC — production bắt buộc AG_SYNC_CURSOR_KEY ≥ 32 byte.

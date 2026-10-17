@@ -54,10 +54,11 @@ var DBModule = db.Module("pf/notify")
 // thiếu Staff → dùng thông báo chủ đề; thiếu Units → không mở rộng tỉnh ra xã;
 // thiếu Pusher → consumer gửi đẩy lỗi (vào DLQ); thiếu Mailer → tắt email tóm tắt.
 type Deps struct {
-	Scope   partyport.ScopeResolver
-	Devices syncport.Devices
-	Staff   port.StaffDirectory
-	Units   partyport.AdminUnits
+	Consumers []port.ConsumerRegistration
+	Scope     partyport.ScopeResolver
+	Devices   syncport.Devices
+	Staff     port.StaffDirectory
+	Units     partyport.AdminUnits
 	// Farmers (tùy chọn): nông dân có thửa trong địa bàn cảnh báo khẩn (HTX US-NEWS-03).
 	Farmers  port.AreaFarmers
 	Pusher   channel.Pusher
@@ -109,16 +110,21 @@ func ChannelsFromEnv(log *slog.Logger) (Channels, error) {
 }
 
 // Module là pf/notify đã nối.
-type Module struct{ svc *app.Service }
+type Module struct {
+	svc       *app.Service
+	consumers *consumerRegistry
+}
 
 // New tạo module trên pool b: vai đăng nhập của đơn vị triển khai (app_platform, app_worker) hoặc vai cũ
 // notify_app. Mọi giao dịch module tự mở chạy dưới vai r_notify (db.ForModule).
 func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
-	return &Module{svc: app.NewService(db.ForModule(b, DBModule), clk, app.Deps{
+	m := &Module{svc: app.NewService(db.ForModule(b, DBModule), clk, app.Deps{
 		Scope: d.Scope, Devices: d.Devices, Staff: d.Staff, Units: d.Units, Farmers: d.Farmers, Pusher: d.Pusher, Mailer: d.Mailer,
 		DigestTo: d.DigestTo, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
 		SyncEntities: d.SyncEntities, PriceDesk: d.PriceDesk, Emails: d.Emails, EmailMailer: d.EmailMailer, LinkBase: d.LinkBase,
 	})}
+	m.consumers = newConsumerRegistry(m.legacyConsumers(), nativeConsumerNames(), d.Consumers)
+	return m
 }
 
 // RegisterApp gắn route Application API.
@@ -147,7 +153,10 @@ type Consumer struct {
 
 // Consumers trả consumer của module, một consumer mỗi nhóm sự kiện (mục 6). Mọi
 // handler idempotent qua shared.inbox; lỗi → giao lại rồi DLQ (R-62).
-func (m *Module) Consumers() []Consumer {
+func (m *Module) Consumers() []Consumer { return m.consumers.consumers(m.svc.HandleEvent) }
+
+// legacyConsumers is retained only until registered metadata has been reconciled.
+func (m *Module) legacyConsumers() []Consumer {
 	ev := m.svc.HandleEvent
 	return []Consumer{
 		{Name: port.ConsumerDirective, Events: []string{extport.EventDirectiveIssued}, Handler: ev},
@@ -209,4 +218,13 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 			return err
 		},
 	}}
+}
+
+// nativeConsumerNames protects capability subscriptions and their specialized handlers.
+func nativeConsumerNames() map[string]bool {
+	return map[string]bool{
+		port.ConsumerContent: true, port.ConsumerSync: true, port.ConsumerParty: true, port.ConsumerCropCycle: true,
+		port.ConsumerIntegration: true, port.ConsumerMRV: true, port.ConsumerEgressAnomaly: true,
+		port.ConsumerAccounts: true, port.ConsumerPush: true, port.ConsumerEmail: true,
+	}
 }

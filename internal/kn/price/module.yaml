@@ -6,7 +6,8 @@ aka: [cap/price]
 kind: capability
 zones: [pf]
 version: 1.0.0
-depends: {}
+depends:
+  pf/notify: ">=1.0 <2"
 provides:
   ports:
     - Boards
