@@ -7,3 +7,6 @@ KNextension đăng ký TaskNotificationBuilders hai sự kiện qua generic Even
 Owner chỉ đọc hai golden Task83 và so toàn draft/lỗi/lookup; tám golden cũ phải giữ nguyên. Ca PG mới kiểm lỗi lookup giữ identity, retry cùng event, dedup, tenant và redaction. Phạm vi full9PG như PRICE-B: notify/... +KN extension/price roots +assembly +worker +tests/notifyconsumers +tests/notify. Cần pure5/fullstatic/boundary320 không tăng, fullPG9 thật không SKIP/FAIL, helper9migration/remote trước dev. Chưa coi các cổng chưa chạy là đạt.
 
 Không SQL/schema/migration/OpenAPI/UI/mobile change; core vẫn Normalize/Redact,transaction/RLS/inbox/provenance. Native MRV thuộc HTX/MKG. Task chỉ đưa tổng source builders lên21/22, Directive/digest và các policy KN trên native events, authz/accounts/party/data/routes/tenant/client/KHTC reminder còn. Main/worktrees/lịch giữ, G1 chưa hoàn tất.
+
+
+Pureverified93148 actualexit0 đủ năm package có test (+KNprice compile); cả83 task raw draft/lỗi/lookup khớp OLD, kể cả sáu tiền tố lỗi đã được oracle bắt (pure70080exit1 giữ log). Chỉ sửa hai fmt trong owner, không sửa golden/assertion. Tám golden Gitblob cũ nguyên caf12d98, hai golden Task nguyên1d1a8626. Source legacy extraction d2dc5ad3/domain templates và PGold1084 bảo vệ bước tách trước owner. Production owner1d1a8626/fix3edde170; chưa static/full9PG/helper/dev.
