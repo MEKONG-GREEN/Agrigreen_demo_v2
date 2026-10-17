@@ -1,11 +1,1 @@
-## KNSPLIT-2-NOTIFY-CNTS-A — Đăng ký bộ dựng nội dung CNTS
-
-Nền be78d4aa. Thêm EventRendererRegistration và NotificationDraft thuần vào notify/port. Callback chỉ nhận loại sự kiện, JSON và thời điểm; không nhận DB, giao dịch, tenant hay danh tính nguồn. Core sao chép JSON đầu vào và mọi pointer/slice của kết quả; khởi tạo đúng một lần, từ chối sự kiện trùng, không có subscription và ghi đè sự kiện native. IDs, source_event, inbox, Normalize/Redact, matching, RLS và gửi thông báo vẫn thuộc notify.
-
-KN/extension đăng ký ba sự kiện CNTS: cảnh báo, nhắc nộp biểu và đổi ca. Sao chép hành vi hiện tại, giữ người nhận, vai chủ đề, email, tiêu đề, đường dẫn, lỗi, UTC, nil/empty và giới hạn 400 rune. A giữ nguyên builder CNTS legacy để đối chiếu; B mới xóa đường cũ và chuyển hằng KN. Các builder giá, lịch công tác, báo cáo, quyền KN và tenant còn việc; chưa coi notify hay G1 hoàn tất. MRV vẫn HTX/MKG.
-
-Bốn điểm khởi tạo API/worker nạp cùng provider; fixture PG dùng provider thật. 46 input cố định bao gồm ba loại sự kiện, dữ liệu lỗi, phiên bản/tháng sai, trùng/nil người nhận, chủ đề không email, giờ lệch múi/fallback và 399/400/401 rune. Expected được lấy từ builder cũ sau capture-verified17578 actualexit0 rồi lưu tests/golden/kn-notify-cnts.json; test owner chỉ đọc expected. Capture32325 exit1 do fixture chọn nhầm slot native2, đã sửa slot1; log lỗi giữ nguyên, không tính đạt.
-
-Kiểm tra registry bao gồm sao chép, identity/provenance không được cung cấp bởi draft, lỗi/empty không đi tiếp DB, instance độc lập, invalid/duplicate/native override và khởi tạo hai lần. Bổ sung PG kiểm tra alert/reminder qua owner, email direct/topic, inbox replay, tenant/scope, callback generic vẫn chịu redaction/normalization/invalid-link và source_event do core gán. Kiểm tra lịch trực hiện hữu giữ nguyên.
-
-Impact tìm từ HandleEvent, notify.New và ba sự kiện CNTS; không đổi SQL production/schema/migration/OpenAPI/UI/mobile. Phạm vi hồi quy: full notify/... (thêm app unit), KN extension/price roots, API assembly, worker, tests/notifyconsumers và tests/notify (9 package có test). Module consumers và domain legacy giữ ở A; baseline dự kiến343 không tăng, không đổi rule/alias. Chỉ tích hợp dev sau pure, full static, PG thật không FAIL/SKIP và helper9migration; main/worktree giữ.
+- [ ] KNSPLIT-2-NOTIFY-CNTS-A: Đăng ký bộ dựng CNTS tại KN; đối chiếu 46 ca cũ, kiểm tra hộp thư và migration thật trước tích hợp dev.
