@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-MDPARAMS-B — Gỡ16metadata/13seed KN cũ, chuyển11keys/helper vềKN; pure đạt, chờ17PG/static/helper. Catalog/data/tenant/client/reminder còn.

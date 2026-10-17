@@ -4,14 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/seeddata"
 )
 
 func sampleParamRegistration() port.ParamRegistration {
@@ -123,47 +121,6 @@ func TestParamRegistryRejectsInvalidRegistration(t *testing.T) {
 	NewParamRegistry(in, in)
 }
 
-// Captures the pre-extraction metadata and seed rows. Removed with the legacy path.
-func TestCaptureLegacyParamRegistration(t *testing.T) {
-	var reg port.ParamRegistration
-	for _, sp := range domain.ParamRegistry {
-		if strings.HasPrefix(sp.Key, "extension.") || strings.HasPrefix(sp.Key, "cnts.") {
-			reg.Specs = append(reg.Specs, sp)
-		}
-	}
-	var pf paramFile
-	if err := decodeStrict(seeddata.Params, &pf); err != nil {
-		t.Fatal(err)
-	}
-	for _, seed := range pf.Params {
-		if strings.HasPrefix(seed.Key, "extension.") || strings.HasPrefix(seed.Key, "cnts.") {
-			reg.Seeds = append(reg.Seeds, seed)
-		}
-	}
-	if len(reg.Specs) != 16 || len(reg.Seeds) != 13 {
-		t.Fatalf("legacy inventory: %d/%d", len(reg.Specs), len(reg.Seeds))
-	}
-	raw, err := json.MarshalIndent(reg, "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw = append(raw, '\n')
-	_, file, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(file), "../../../../tests/golden/kn-masterdata-params.json")
-	if os.Getenv("AG_CAPTURE_LEGACY_PARAMS") == "1" {
-		if err := os.WriteFile(path, raw, 0644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	want, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(raw, want) {
-		t.Fatal("legacy metadata/defaults changed")
-	}
-}
-
 func TestRegisteredColorProposal(t *testing.T) {
 	svc := &Service{ParamRegistry: NewParamRegistry(port.ParamRegistration{Specs: []port.ParamSpec{{Key: "fixture.color", Name: "Màu", Kind: port.ParamKindColor}}})}
 	value := "#12AB34"
@@ -174,5 +131,48 @@ func TestRegisteredColorProposal(t *testing.T) {
 	value = "blue"
 	if err := svc.validateParameterProposal(v); err == nil {
 		t.Fatal("unregistered color validation path")
+	}
+}
+
+func TestParametersRequireRegistration(t *testing.T) {
+	_, file, _, _ := runtime.Caller(0)
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(file), "../../../../tests/golden/kn-masterdata-params.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var owned port.ParamRegistration
+	if err := json.Unmarshal(raw, &owned); err != nil {
+		t.Fatal(err)
+	}
+	if len(owned.Specs) != 16 || len(owned.Seeds) != 13 {
+		t.Fatal("frozen ownership inventory changed")
+	}
+	for _, tc := range []struct {
+		name     string
+		registry *ParamRegistry
+	}{{"nil", nil}, {"empty", NewParamRegistry()}} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &Service{ParamRegistry: tc.registry}
+			specs := svc.parameterSpecs()
+			for _, expected := range owned.Specs {
+				for _, sp := range specs {
+					if sp.Key == expected.Key {
+						t.Fatalf("unregistered parameter inferred: %s", sp.Key)
+					}
+				}
+				if svc.parameterSpec(expected.Key).Name != expected.Key {
+					t.Fatalf("unregistered label inferred: %s", expected.Key)
+				}
+			}
+			defaults, err := svc.parameterDefaults()
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, seed := range owned.Seeds {
+				if _, found := defaults[seed.Key]; found {
+					t.Fatalf("unregistered default inferred: %s", seed.Key)
+				}
+			}
+		})
 	}
 }

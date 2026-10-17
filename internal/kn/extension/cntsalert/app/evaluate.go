@@ -17,7 +17,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 )
@@ -186,7 +185,7 @@ func (s *Service) onSubmission(ctx context.Context, tx pgx.Tx, tid uuid.UUID, su
 		if err != nil {
 			return err
 		}
-		fs := domain.ChangeFindings(sub.Values, prev, domain.HerdFields, s.threshold(ctx, mdport.ParamCNTSHerdChangePct, at, 15))
+		fs := domain.ChangeFindings(sub.Values, prev, domain.HerdFields, s.threshold(ctx, port.ParamCNTSHerdChangePct, at, 15))
 		if err := s.verdict(ctx, tx, tid, s.base(domain.KindHerdChange, sub, province), fs, len(fs) > 0, rs, sub.Submitter); err != nil {
 			return err
 		}
@@ -196,7 +195,7 @@ func (s *Service) onSubmission(ctx context.Context, tx pgx.Tx, tid uuid.UUID, su
 		if err != nil {
 			return err
 		}
-		fs := domain.ChangeFindings(sub.Values, prev, domain.FishingFields, s.threshold(ctx, mdport.ParamCNTSFishingChangePct, at, 50))
+		fs := domain.ChangeFindings(sub.Values, prev, domain.FishingFields, s.threshold(ctx, port.ParamCNTSFishingChangePct, at, 50))
 		return s.verdict(ctx, tx, tid, s.base(domain.KindFishingChange, sub, province), fs, len(fs) > 0, rs, sub.Submitter)
 	case domain.FormBM01:
 		zero := domain.SlaughterZero(sub.Values, sub.NilReport)
@@ -219,7 +218,7 @@ func (s *Service) previous(ctx context.Context, tid uuid.UUID, sub formsport.Rec
 	if sub.From == nil || sub.To == nil {
 		return nil, nil
 	}
-	n := s.threshold(ctx, mdport.ParamCNTSLookbackPeriods, sub.EventTime, 4).IntPart()
+	n := s.threshold(ctx, port.ParamCNTSLookbackPeriods, sub.EventTime, 4).IntPart()
 	if n < 1 {
 		n = 1
 	}
@@ -252,8 +251,8 @@ func (s *Service) spikeCheck(ctx context.Context, tx pgx.Tx, tid uuid.UUID, sub 
 		}
 	}
 	at := sub.EventTime
-	fs := domain.SlaughterSpike(sub.Values, hist, s.threshold(ctx, mdport.ParamCNTSSlaughterSpikeFactor, at, 3),
-		int(s.threshold(ctx, mdport.ParamCNTSSlaughterSpikeMinDays, at, 7).IntPart()))
+	fs := domain.SlaughterSpike(sub.Values, hist, s.threshold(ctx, port.ParamCNTSSlaughterSpikeFactor, at, 3),
+		int(s.threshold(ctx, port.ParamCNTSSlaughterSpikeMinDays, at, 7).IntPart()))
 	return s.verdict(ctx, tx, tid, s.base(domain.KindSlaughterSpike, sub, rs.province), fs, len(fs) > 0, rs, sub.Submitter)
 }
 

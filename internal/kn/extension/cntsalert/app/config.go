@@ -18,7 +18,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -60,17 +59,17 @@ type ConfigView struct {
 }
 
 var thresholdKeys = []struct{ Key, Label, Unit string }{
-	{mdport.ParamCNTSHerdChangePct, "Tổng đàn biến động (BM-04) quá", "%"},
-	{mdport.ParamCNTSFishingChangePct, "Khai thác thủy sản biến động (BM-17) quá", "%"},
-	{mdport.ParamCNTSSlaughterSpikeFactor, "KSGM bất thường: lớn hơn n lần trung bình 4 tuần", "lần"},
-	{mdport.ParamCNTSSlaughterSpikeMinDays, "KSGM bất thường: số ngày có số liệu tối thiểu", "ngày"},
-	{mdport.ParamCNTSLookbackPeriods, "\"Kỳ gần nhất\" tìm lùi tối đa", "kỳ"},
-	{mdport.IndicatorKey(mdport.ParamCNTSIndicatorMinPrefix, "PH", ""), "pH tối thiểu", ""},
-	{mdport.IndicatorKey(mdport.ParamCNTSIndicatorMaxPrefix, "PH", ""), "pH tối đa", ""},
-	{mdport.IndicatorKey(mdport.ParamCNTSIndicatorMinPrefix, "DO", ""), "Oxy hòa tan tối thiểu", "mg/l"},
-	{mdport.ParamCNTSLocationDistanceM, "Vị trí lần ghi cách điểm quá", "m"},
-	{mdport.ParamCNTSGPSAccuracyM, "Sai số GPS quá", "m"},
-	{mdport.ParamCNTSLogOverdueDays, "Quá hạn ghi nhật ký thêm", "ngày"},
+	{port.ParamCNTSHerdChangePct, "Tổng đàn biến động (BM-04) quá", "%"},
+	{port.ParamCNTSFishingChangePct, "Khai thác thủy sản biến động (BM-17) quá", "%"},
+	{port.ParamCNTSSlaughterSpikeFactor, "KSGM bất thường: lớn hơn n lần trung bình 4 tuần", "lần"},
+	{port.ParamCNTSSlaughterSpikeMinDays, "KSGM bất thường: số ngày có số liệu tối thiểu", "ngày"},
+	{port.ParamCNTSLookbackPeriods, "\"Kỳ gần nhất\" tìm lùi tối đa", "kỳ"},
+	{port.IndicatorKey(port.ParamCNTSIndicatorMinPrefix, "PH", ""), "pH tối thiểu", ""},
+	{port.IndicatorKey(port.ParamCNTSIndicatorMaxPrefix, "PH", ""), "pH tối đa", ""},
+	{port.IndicatorKey(port.ParamCNTSIndicatorMinPrefix, "DO", ""), "Oxy hòa tan tối thiểu", "mg/l"},
+	{port.ParamCNTSLocationDistanceM, "Vị trí lần ghi cách điểm quá", "m"},
+	{port.ParamCNTSGPSAccuracyM, "Sai số GPS quá", "m"},
+	{port.ParamCNTSLogOverdueDays, "Quá hạn ghi nhật ký thêm", "ngày"},
 }
 
 func (s *Service) configs(ctx context.Context, tx pgx.Tx) (map[string]store.Config, error) {

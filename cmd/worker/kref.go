@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/kref"
 	krefport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/kref/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"

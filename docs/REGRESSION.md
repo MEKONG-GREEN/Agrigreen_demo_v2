@@ -517,3 +517,11 @@ Test points: registry deep copy, multi-instance isolation, conflict/duplicate/cr
 
 
 Kết quả thực trên production27248e07: PG90646.exit0 đủ16/16 package có test, 0FAIL/SKIP (handler:282.126s, handler:114.069s, handler:106.552s, handler:117.097s, assembly:111.522s, worker:2.764s, kn77:301.189s). TestRegisteredParamsSeedRestoreAndTenantIsolation PASS6.75s; frozen16spec/13seed, registry invalid/crossowner/deepcopy/isolation/color đạt. Static81712.exit0 đủ build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary382/lint0issues; gofmt chỉ2fixturecũ. ProofTEMP agrigreen-codex-knsplit2mdparamsa-proof.json. Helper còn8migrationgate trước dev. B mới xóa legacy và chuyển11keys/helper về KN.
+
+## KNSPLIT-2-MDPARAMS-B — Gỡ nguồn cũ, KN sở hữu khóa (nền c098c8bd)
+
+Downstream consumers: masterdata metadata/default/seed/restore/display; KN cntsalert config/evaluate, extension app schedule_dept GPS; API/worker/KN77. Evidence: rg -l 'ParamCNTS|IndicatorKey' internal cmd tests -g '*.go' = 4 KN callers + old cap port/domain registry before deletion; TEMP structure.json proves exact old 11-key/helper source block and native JSON row data unchanged, including MRV. Shared handler fixture needs no KN seed assertions; actual owner registration stays at API/worker roots.
+
+Acceptance: private PG, go test -v -count=1 -p 1 -timeout 55m ./internal/platform/masterdata/... ./internal/kn/extension ./internal/kn/extension/app ./internal/kn/extension/store ./internal/kn/extension/handler ./internal/kn/extension/reportcycle/... ./internal/kn/extension/cntsalert/... ./internal/kn/extension/cntscal/... ./internal/kn/extension/outbreak/... ./cmd/api-platform/assembly ./cmd/worker ./tests/kn77. 17 test packages expected (A16 + KNhandler), app/store compile-only. Full static CODEX-G1/helper8migration; web/mobile exempt because wire/UI/fixtures unchanged.
+
+Test points: TestParametersRequireRegistration nil/empty RED exit1 on A (1.855s), then GREEN; owner frozen metadata/default/date/source; registry invalid/deepcopy/crossowner/color; TestRegisteredParamsSeedRestoreAndTenantIsolation; schedule GPS, alert thresholds, CNTS calendar/outbreak, KHTC snapshots and native GIS/default regression. No test assertions weakened. Dead global default cache and capture removed; frozen artifact retained.

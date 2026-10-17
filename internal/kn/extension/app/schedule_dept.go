@@ -14,7 +14,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
@@ -93,7 +92,7 @@ func (s *Service) deptSettings(ctx context.Context, st *ScheduleSettings, dept, 
 	} else if ok && v.Value.IsPositive() {
 		st.CheckinFarM = v.Value.InexactFloat64()
 	}
-	if v, ok, err := s.deptParam(ctx, mdport.ParamCNTSGPSAccuracyM, "", "", at); err != nil {
+	if v, ok, err := s.deptParam(ctx, port.ParamCNTSGPSAccuracyM, "", "", at); err != nil {
 		return err
 	} else if ok && v.Value.IsPositive() {
 		st.CheckinAccM = v.Value.InexactFloat64()

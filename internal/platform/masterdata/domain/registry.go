@@ -60,9 +60,6 @@ var ParamRegistry = []ParamSpec{
 	{Key: port.ParamCGHCoverageAttention, Name: "Ngưỡng Cần chú ý", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "500"},
 	{Key: port.ParamCGHCoverageSurplusFrom, Name: "Ngưỡng Thừa máy", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "1000"},
 	{Key: port.ParamCGHNormPrefix, Name: "Định mức máy", Unit: "ha/máy/vụ", Kind: ParamKindDecimal, Min: "0", Dimensional: true},
-	{Key: "extension.task_sla_hours", Name: "SLA xử lý nhiệm vụ hỗ trợ", Unit: "giờ", Kind: ParamKindDecimal, Min: "1", Max: "720"},
-	{Key: "extension.duty_status_ttl_hours", Name: "Thời hạn trạng thái trực", Unit: "giờ", Kind: ParamKindDecimal, Min: "1", Max: "168"},
-	{Key: "extension.target_sown_area_ha", Name: "Mục tiêu diện tích gieo sạ", Unit: "ha", Kind: ParamKindDecimal, Min: "0", Dimensional: true},
 	{Key: "geo.overlap_tolerance_pct", Name: "Ngưỡng chồng lấn ranh giới thửa", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "100"},
 	{Key: "geo.area_deviation_max_pct", Name: "Ngưỡng lệch diện tích khai báo", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "100"},
 	{Key: "sync.conflict_sla_hours", Name: "SLA xử lý xung đột đồng bộ", Unit: "giờ", Kind: ParamKindDecimal, Min: "1", Max: "720"},
@@ -91,23 +88,6 @@ var ParamRegistry = []ParamSpec{
 	{Key: "mrv.co2.transport_waterway_kg_per_tkm", Name: "Hệ số phát thải vận chuyển đường thủy (tạm)", Unit: "kgCO2e/t·km", Kind: ParamKindDecimal, Min: "0", Max: "10"},
 	{Key: "mrv.anomaly_no_record_days", Name: "Số ngày không có bản ghi mới → cảnh báo bất thường", Unit: "ngày", Kind: ParamKindDecimal, Min: "1", Max: "120"},
 	{Key: "mrv.compare_window_days", Name: "Cửa sổ ghép nhật ký HTX ↔ minh chứng cán bộ", Unit: "ngày", Kind: ParamKindDecimal, Min: "0", Max: "30"},
-	// W11.03 lịch kỳ hệ thống dùng chung (extension/port.ParamPeriodRule, ParamKSGMWeekStarts).
-	// D8 (CEO 13/10/2026): khóa ":<mã phòng>" = lịch tuần riêng của phòng (vd extension.report_period_rule:chan_nuoi_thuy_san),
-	// đè tham số chung; Text = tag quy tắc kèm ";cal=<phòng>:v<n>".
-	{Key: "extension.report_period_rule", Name: "Quy tắc chia kỳ báo cáo (lịch tuần; \":<mã phòng>\" = lịch riêng của phòng)", Kind: ParamKindText},
-	{Key: "extension.ksgm_week_starts", Name: "Ranh giới 4 tuần KSGM của tháng (vd 1,8,15,22)", Kind: ParamKindText, Dimensional: true},
-	// W11.41 ngưỡng mặc định CNTS (BRD CNTS v3.7 Mục III.5, UR-TINH-13; seeddata/params.json).
-	{Key: port.ParamCNTSIndicatorMinPrefix, Name: "Ngưỡng dưới chỉ tiêu theo dõi CNTS", Kind: ParamKindDecimal, Dimensional: true},
-	{Key: port.ParamCNTSIndicatorMaxPrefix, Name: "Ngưỡng trên chỉ tiêu theo dõi CNTS", Kind: ParamKindDecimal, Dimensional: true},
-	{Key: port.ParamCNTSHerdChangePct, Name: "Biến động tổng đàn BM-04 so kỳ gần nhất", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "1000"},
-	{Key: port.ParamCNTSFishingChangePct, Name: "Biến động khai thác thủy sản BM-17 so kỳ gần nhất", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "1000"},
-	{Key: port.ParamCNTSSlaughterSpikeFactor, Name: "KSGM bất thường: hệ số so trung bình 4 tuần", Unit: "lần", Kind: ParamKindDecimal, Min: "1", Max: "100"},
-	{Key: port.ParamCNTSSlaughterSpikeMinDays, Name: "KSGM bất thường: số ngày có số liệu tối thiểu", Unit: "ngày", Kind: ParamKindDecimal, Min: "1", Max: "28"},
-	{Key: port.ParamCNTSLookbackPeriods, Name: "Kỳ gần nhất: số kỳ tìm lùi tối đa", Unit: "kỳ", Kind: ParamKindDecimal, Min: "1", Max: "12"},
-	{Key: port.ParamCNTSLocationDistanceM, Name: "Khoảng cách lần ghi tới điểm mô hình", Unit: "m", Kind: ParamKindDecimal, Min: "0", Max: "10000"},
-	{Key: port.ParamCNTSGPSAccuracyM, Name: "Sai số GPS tối đa của lần ghi", Unit: "m", Kind: ParamKindDecimal, Min: "0", Max: "1000"},
-	{Key: port.ParamCNTSLogOverdueDays, Name: "Quá hạn ghi nhật ký: số ngày thêm sau tần suất", Unit: "ngày", Kind: ParamKindDecimal, Min: "0", Max: "30"},
-	{Key: port.ParamCNTSMortalityPctPrefix, Name: "Tỷ lệ chết tối đa theo loại mô hình", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "100", Dimensional: true},
 }
 
 var stageNames = map[string]string{
