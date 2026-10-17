@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/google/uuid"
 	"os"
 	"reflect"
@@ -79,5 +82,32 @@ func TestTaskOwnedBuildersMatchLegacy(t *testing.T) {
 				t.Fatalf("got %s / %q / %v; want %s / %q / %v", a, errText, directory.calls, b, want.Error, want.Calls)
 			}
 		})
+	}
+}
+
+func TestTaskBuildersRequireOwnerRegistration(t *testing.T) {
+	for _, mode := range []string{"nil", "empty"} {
+		t.Run(mode, func(t *testing.T) {
+			var registrations []notifyport.EventBuilderRegistration
+			if mode == "empty" {
+				registrations = []notifyport.EventBuilderRegistration{}
+			}
+			module := notify.New(nil, clock.System{}, notify.Deps{Consumers: []notifyport.ConsumerRegistration{extension.NotificationConsumers()}, Builders: registrations})
+			for _, registration := range extension.TaskNotificationBuilders(nil) {
+				for _, event := range registration.Events {
+					if err := module.EventHandler()(context.Background(), nil, outbox.Envelope{EventType: event, Payload: json.RawMessage("{")}); err != nil {
+						t.Errorf("Task legacy fallback without owner builder for %s: %v", event, err)
+					}
+				}
+			}
+		})
+	}
+	module := notify.New(nil, clock.System{}, notify.Deps{Consumers: []notifyport.ConsumerRegistration{extension.NotificationConsumers()}, Builders: extension.TaskNotificationBuilders(nil)})
+	for _, registration := range extension.TaskNotificationBuilders(nil) {
+		for _, event := range registration.Events {
+			if err := module.EventHandler()(context.Background(), nil, outbox.Envelope{EventType: event, Payload: json.RawMessage("{")}); err == nil {
+				t.Errorf("registered Task builder did not reject malformed %s", event)
+			}
+		}
 	}
 }
