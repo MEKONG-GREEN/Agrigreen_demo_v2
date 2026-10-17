@@ -52,6 +52,7 @@ var DBModule = db.Module("pf/notify")
 // thiếu Staff → dùng thông báo chủ đề; thiếu Units → không mở rộng tỉnh ra xã;
 // thiếu Pusher → consumer gửi đẩy lỗi (vào DLQ); thiếu Mailer → tắt email tóm tắt.
 type Deps struct {
+	Digests   []port.DigestRegistration
 	Builders  []port.EventBuilderRegistration
 	Renderers []port.EventRendererRegistration
 	Consumers []port.ConsumerRegistration
@@ -131,6 +132,7 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	}
 	m.svc.RegisterEventRenderers(d.Renderers, subscribed, native)
 	m.svc.RegisterEventBuilders(d.Builders, subscribed, native)
+	m.svc.RegisterDigestPolicies(d.Digests, subscribed, native)
 	return m
 }
 
@@ -197,8 +199,12 @@ func DigestTenants(pool *pgxpool.Pool) app.TenantLister {
 
 // Jobs trả job định kỳ (chỉ chạy ở leader): email tóm tắt chỉ đạo khẩn mỗi giờ.
 func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job {
+	definition, configured := m.svc.DigestJobDefinition()
+	if !configured {
+		definition = port.DigestJobDefinition{Name: port.JobEmailDigest, Every: time.Hour, Timeout: 10 * time.Minute, LogMessage: "email tóm tắt chỉ đạo khẩn"}
+	} // legacy adapter path, removed in step B
 	return []schedule.Job{{
-		Name: port.JobEmailDigest, Spec: schedule.Every{Interval: time.Hour}, RunOnStart: false, Timeout: 10 * time.Minute,
+		Name: definition.Name, Spec: schedule.Every{Interval: definition.Every}, RunOnStart: definition.RunOnStart, Timeout: definition.Timeout,
 		Run: func(ctx context.Context) error {
 			n, err := m.svc.RunEmailDigest(ctx, tenants)
 			if log != nil {
@@ -206,7 +212,7 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 				if err != nil {
 					outcome = "error"
 				}
-				log.Info("email tóm tắt chỉ đạo khẩn", "event", "job."+port.JobEmailDigest, "sent", n, "outcome", outcome)
+				log.Info(definition.LogMessage, "event", "job."+definition.Name, "sent", n, "outcome", outcome)
 			}
 			return err
 		},

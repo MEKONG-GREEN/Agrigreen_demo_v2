@@ -31,8 +31,8 @@ func TestEventBuilderCopiesContextAndProvenance(t *testing.T) {
 	regs[0].Events[0] = "corrupt"
 	regs[0].Build = nil
 	payload := json.RawMessage("{}")
-	got, handled, err := s.eventBuilders.build(ctx, tid, "fixture.owned", payload, at)
-	if err != nil || !handled || len(got) != 1 || string(payload) != "{}" {
+	got, digests, handled, err := s.eventBuilders.build(ctx, tid, "fixture.owned", payload, at)
+	if err != nil || !handled || len(got) != 1 || string(payload) != "{}" || digests != nil {
 		t.Fatalf("dispatch %v %v %v", got, handled, err)
 	}
 	n := got[0]
@@ -53,7 +53,7 @@ func TestEventBuilderCopiesContextAndProvenance(t *testing.T) {
 	if ref == uuid.Nil || drafts[0].Audience.Units[0] != "corrupt" {
 		t.Fatal("caller changed builder state")
 	}
-	if ns, ok, err := s.eventBuilders.build(ctx, tid, "fixture.absent", nil, at); ok || err != nil || ns != nil {
+	if ns, digests, ok, err := s.eventBuilders.build(ctx, tid, "fixture.absent", nil, at); ok || err != nil || ns != nil || digests != nil {
 		t.Fatal("unknown event was handled")
 	}
 	other := &Service{}
@@ -77,8 +77,8 @@ func TestEventBuilderEmptyAndErrorsDoNotFallThrough(t *testing.T) {
 				}
 				return nil, nil
 			}}}, []string{"fixture.owned"}, nil)
-			ns, ok, err := s.eventBuilders.build(context.Background(), uuid.New(), "fixture.owned", nil, time.Time{})
-			if !ok || (mode == "nil" && ns != nil) || (mode == "empty" && (ns == nil || len(ns) != 0)) || (mode == "error" && (!errors.Is(err, failure) || ns != nil)) {
+			ns, digests, ok, err := s.eventBuilders.build(context.Background(), uuid.New(), "fixture.owned", nil, time.Time{})
+			if digests != nil || !ok || (mode == "nil" && ns != nil) || (mode == "empty" && (ns == nil || len(ns) != 0)) || (mode == "error" && (!errors.Is(err, failure) || ns != nil)) {
 				t.Fatal("nil/empty/error contract")
 			}
 			var want error
@@ -144,7 +144,7 @@ func TestEventBuilderInvalidAndCrossRegistry(t *testing.T) {
 	if _, ok, err := s.eventRenderers.render("fixture.pure", nil, time.Time{}); !ok || err != nil {
 		t.Fatal("disjoint pure renderer lost")
 	}
-	if _, ok, err := s.eventBuilders.build(context.Background(), uuid.Nil, "fixture.lookup", nil, time.Time{}); !ok || err != nil {
+	if _, digests, ok, err := s.eventBuilders.build(context.Background(), uuid.Nil, "fixture.lookup", nil, time.Time{}); !ok || err != nil || digests != nil {
 		t.Fatal("disjoint lookup builder lost")
 	}
 }

@@ -14,4 +14,6 @@ type EventBuilder func(ctx context.Context, tenantID uuid.UUID, eventType string
 type EventBuilderRegistration struct {
 	Events []string
 	Build  EventBuilder
+	// Exactly one of Build or Plan must be supplied.
+	Plan EventPlanner
 }

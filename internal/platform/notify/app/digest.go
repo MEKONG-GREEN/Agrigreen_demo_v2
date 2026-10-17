@@ -42,7 +42,10 @@ func (s *Service) RunEmailDigest(ctx context.Context, tenants TenantLister) (int
 			if err != nil || len(items) == 0 {
 				return err
 			}
-			subject, body := DigestMessage(items)
+			subject, body := s.formatDigest(items)
+			if subject == "" || body == "" {
+				return fmt.Errorf("notify: %w: empty digest content", ErrDependency)
+			}
 			if err := s.Mailer.Send(ctx, s.DigestTo, subject, body); err != nil {
 				return err
 			}

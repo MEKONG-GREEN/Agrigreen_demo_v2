@@ -10,7 +10,11 @@ import (
 	"time"
 )
 
-type eventBuilderRegistry map[string]port.EventBuilder
+type eventBuilderBinding struct {
+	build port.EventBuilder
+	plan  port.EventPlanner
+}
+type eventBuilderRegistry map[string]*eventBuilderBinding
 
 // RegisterEventBuilders is a startup-only operation, with the same ownership checks as pure renderers.
 func (s *Service) RegisterEventBuilders(registrations []port.EventBuilderRegistration, subscribed, native []string) {
@@ -26,27 +30,37 @@ func (s *Service) RegisterEventBuilders(registrations []port.EventBuilderRegistr
 	}
 	registry := eventBuilderRegistry{}
 	for _, registration := range registrations {
-		if registration.Build == nil || len(registration.Events) == 0 {
+		if (registration.Build == nil) == (registration.Plan == nil) || len(registration.Events) == 0 {
 			panic("notify: invalid event builder")
 		}
 		for _, event := range registration.Events {
 			if !rendererEventPattern.MatchString(event) || !allowed[event] || reserved[event] || registry[event] != nil || s.eventRenderers[event] != nil {
 				panic("notify: invalid, duplicate or reserved builder event " + event)
 			}
-			registry[event] = registration.Build
+			registry[event] = &eventBuilderBinding{build: registration.Build, plan: registration.Plan}
 		}
 	}
 	s.eventBuilders = registry
 }
 
-func (r eventBuilderRegistry) build(ctx context.Context, tenantID uuid.UUID, event string, payload json.RawMessage, at time.Time) ([]domain.Notification, bool, error) {
-	builder, ok := r[event]
+func (r eventBuilderRegistry) build(ctx context.Context, tenantID uuid.UUID, event string, payload json.RawMessage, at time.Time) ([]domain.Notification, []port.DigestDraft, bool, error) {
+	binding, ok := r[event]
 	if !ok {
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
-	drafts, err := builder(ctx, tenantID, event, slices.Clone(payload), at)
+	var plan port.NotificationPlan
+	var err error
+	if binding.plan != nil {
+		plan, err = binding.plan(ctx, tenantID, event, slices.Clone(payload), at)
+	} else {
+		plan.Drafts, err = binding.build(ctx, tenantID, event, slices.Clone(payload), at)
+	}
 	if err != nil {
-		return nil, true, err
+		return nil, nil, true, err
 	}
-	return notificationsFromDrafts(drafts), true, nil
+	digests := slices.Clone(plan.Digests)
+	for i := range digests {
+		digests[i].AudienceUnits = slices.Clone(digests[i].AudienceUnits)
+	}
+	return notificationsFromDrafts(plan.Drafts), digests, true, nil
 }
