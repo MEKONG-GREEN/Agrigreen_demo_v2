@@ -13,3 +13,6 @@ Pure61559 actualexit0 đủ5package, RED27832actual1→GREEN gồm nil/empty×3e
 
 
 Static86023 actualexit1 ở vet do import notify/port đã không còn dùng trong test lịch trực sau chuyển hằng về extport. Bỏ đúng import thừa, không sửa assertion/production. Pure61559 actual0 không bị ảnh hưởng; chưaPG. Giữ static.log/.exit1, chạy static-verified và DB/helper chỉ guard static-verified.exit0.
+
+
+Kết quả thực trên production3d910ce6/test-importfixe9a837eb: RED27832actual1→pure61559actual0/5package; staticverified64675actual0 toàn cổng/boundary330/lint0/gofmt2fixture cũ, static86023unusedimportfail giữ log. PG20718actualexit0 đủ9/9package,0FAIL/SKIP. Thời gian: notify 1.727s; app 1.596s; channel 1.955s; domain 1.657s; extension 1.659s; assembly 84.940s; worker 2.296s; notifyconsumers 1.906s; notify 87.204s. Private63105/6ef201eede13 đã dọn, Go0 trước helper. Registered owner CNTS alert/reminder/duty, topic/email, tenant/scope, inbox replay, Normalize/Redact, invalid→rollback và source provenance PASS. Ba frozen Gitblob giữ1eb927b0; không Gochange sauPG. Lệnh nhận: hostTEMP agrigreen-codex-knsplit2notifycntsb-db-full.ps1 (privatePG, fullnotify/... KNroots assembly worker testsnotifyconsumers testsnotify), actual0. ProofB hostTEMP agrigreen-codex-knsplit2notifycntsb-proof.json. Cầnhelper9migration/remote trước Bdev; nhómKNkhác/G1 vẫn còn.

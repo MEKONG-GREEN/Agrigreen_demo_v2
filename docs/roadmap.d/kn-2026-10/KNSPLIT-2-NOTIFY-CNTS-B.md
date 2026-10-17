@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-NOTIFY-CNTS-B: Xóa fallback CNTS và chuyển năm kind về KN; giữ 46 golden, kiểm tra PG và migration trước dev.
+- [x] KNSPLIT-2-NOTIFY-CNTS-B: Bỏ fallback và chuyển năm kind về KN; 46 golden giữ, PG9 đạt, chờ helper migration và xác minh dev.
