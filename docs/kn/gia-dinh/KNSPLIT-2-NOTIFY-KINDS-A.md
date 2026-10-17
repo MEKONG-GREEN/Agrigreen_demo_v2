@@ -10,3 +10,6 @@ Impact fullnotify/... +KN extension/price +APIassembly/worker +testsnotifyconsum
 
 
 Pure48851actual0 đủ5testpackage(+KNpricecompile), Kindregistry clone/isolation/pattern/duplicate/native/initonce/unknown-beforeDB và25ownerdefinitions khớpOLD43 PASS;52/11/job và các golden nguồn cũ giữ.15oldgoldenGitblobs nguyên43b14525, baseline/rules nguyên, không migrationchange. TrướcPGcompile sửa riêng test mới EventHandler chỉ trả một error (không hai giá trị); không đổi production/pure assertions. Production7870e3d8;chưa static/full9PG/helper/dev.
+
+
+Static57288 actualexit0 đủ toàn cổng, boundary318/lint0/gofmt chỉ2 fixture cũ. Full9PG42658 actualexit0/không FAIL-SKIP: assembly148.655s, testsnotify160.004s, phát đủ43keys qua runtime, unknown bị chặn và retry/dedup, thiếu ownedkind không ghi. Private56976/8f91017f953f đã dọn;Go0; không sửa Go sauPG. Pure48851actual0/capture5154actual0. Còn helper9migration +remote trước tích hợp.
