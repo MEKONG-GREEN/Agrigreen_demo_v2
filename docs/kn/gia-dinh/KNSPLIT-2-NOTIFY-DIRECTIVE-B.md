@@ -10,3 +10,6 @@ Notify/G1 còn kindCHECK/nativeKNrecipient policy/authz/accounts/party/data/rout
 
 
 Pureverified27854actual0 đủ5testpackage(+KNpricecompile), saupure66557exit1 do importthừa đã giữ log; chỉ bỏ import, không sửa logic/assertions/golden. RED19162actual1→GREEN đủ5fallback bịgỡ: missingplanner2/missingpolicyjob2/lister1.52plans+11email+job và15goldensGitblob nguyên292d9a15. KindDirective/JobEmailDigestidentifier/literal/comments đúng, mọiKind khác giữ; các SQLrawstrings trongstore/push.go đúng byte, không migrationchange. Baseline320→318 chỉ2importKNđãxóa, rule/aliaskhôngđổi. Production7d96c150/importfixc3815d8f;chưa static/full9PG/helper/dev.
+
+
+Kết quả thật production7d96c150/importfixc3815d8f+f1d951a9: pureverified27854actual0/5pkg, staticverified47713actual0/fullgates/boundary318/lint0/gofmt2old (pure66557/static4756failimportgiữlog). Full9PG27314actualexit0,không FAIL/SKIP. OwnerDirective/GenericAtomicPlan/urgentnoaudience/lookupretry/SMTPdedup/formatterMarkSent, giá/nhiệm vụ/CNTS/workflow và coreguards đềuPASS. Private52216/a43de0a826fc cleanup,Go0; khôngGochange sauPG.15goldens giữ292d9a15,SQLrawstrings/twoidentifierliteralcommentsnguyên;baseline320→318chỉ2imports.Gỡ5legacyfallbackđãGREEN.Cầnhelper9migration/remote trướcdev.
