@@ -138,6 +138,8 @@ func (f *fixture) flushEmail(tid uuid.UUID) error {
 
 // emailDeliveryState is an observation of stored retry state, not a notification implementation DTO.
 type emailDeliveryState struct {
+	BatchID  uuid.UUID
+	Kind     string
 	Status   string
 	Attempts int
 }
@@ -146,7 +148,7 @@ func (f *fixture) emailRows(kind string) map[uuid.UUID]emailDeliveryState {
 	f.t.Helper()
 	out := map[uuid.UUID]emailDeliveryState{}
 	if err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
-		rows, err := tx.Query(context.Background(), "SELECT recipient_ref, status, attempts FROM pf_notify.email_delivery WHERE kind = $1", kind)
+		rows, err := tx.Query(context.Background(), "SELECT recipient_ref, batch_id, kind, status, attempts FROM pf_notify.email_delivery WHERE kind = $1", kind)
 		if err != nil {
 			return err
 		}
@@ -154,7 +156,7 @@ func (f *fixture) emailRows(kind string) map[uuid.UUID]emailDeliveryState {
 		for rows.Next() {
 			var ref uuid.UUID
 			var state emailDeliveryState
-			if err := rows.Scan(&ref, &state.Status, &state.Attempts); err != nil {
+			if err := rows.Scan(&ref, &state.BatchID, &state.Kind, &state.Status, &state.Attempts); err != nil {
 				return err
 			}
 			out[ref] = state

@@ -660,3 +660,6 @@ Impact: rg ConsumerIDs/notify.New/registry+testmove tokenproof, gitdiff. Hồi q
 
 
 Cổng static đầu74787exit1 ởR-02 vì compositiontests còn importnotify app/domain/store/channel (build/vet/modgen/migrate đạt); log giữ, không coi đạt. Sửa bằng public root channel contract cho injectablePusher (PushMessage alias, realFCMencoder, ErrTokenInvalid/ErrEmailRetry giữsameidentity), expectedlink/status literals độc lập; helperemailRows chỉ SELECT recipient_ref/status/attempts theo kind trongtenantTx để quan sátDB. Không thêm auth/DB façade cho test. Theo dõi cuối vẫn đủ30Testbody (29Test+TestMain) token-normalized IDqualifier/publicerror/literalconstant khớp703bc354, không bỏ assertion; helperSQL quan sát thay storecall, cậpnhậtproofBtestmove. Followup44103actualexit0 notifyroot+frozencomposition; sourcehandlers/SMTPlogic không đổi. Chạy static-verified, DB/helperguards chỉ dùng static-verified.exit0; chưaPG/Bdev.
+
+
+Static-verified70713exit1 ởvet phát hiện helperSQL quan sát thiếu BatchID (ca replay) vàKind (ca quyết định). Bổ sung hai cột thực đang được assertion cũ dùng; không sửa assertion/production. Chỉ snapshothelperDB đổi, vẫn bind kind/tenantTx. Giữ log/static-verified1; static-final mới là guardDB/helper. Pure95918/followup44103đạt; chưaPG. Không coi build/vetfail làPASS.
