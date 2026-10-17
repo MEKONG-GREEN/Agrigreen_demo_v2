@@ -20,7 +20,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
@@ -30,7 +29,6 @@ import (
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/channel"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/store"
@@ -123,7 +121,7 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		DigestTo: d.DigestTo, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
 		SyncEntities: d.SyncEntities, PriceDesk: d.PriceDesk, Emails: d.Emails, EmailMailer: d.EmailMailer, LinkBase: d.LinkBase,
 	})}
-	m.consumers = newConsumerRegistry(m.legacyConsumers(), nativeConsumerNames(), d.Consumers)
+	m.consumers = newConsumerRegistry(m.nativeConsumers(), d.Consumers)
 	return m
 }
 
@@ -155,32 +153,21 @@ type Consumer struct {
 // handler idempotent qua shared.inbox; lỗi → giao lại rồi DLQ (R-62).
 func (m *Module) Consumers() []Consumer { return m.consumers.consumers(m.svc.HandleEvent) }
 
-// legacyConsumers is retained only until registered metadata has been reconciled.
-func (m *Module) legacyConsumers() []Consumer {
+// nativeConsumers declares only capability-owned subscriptions. Stable positions preserve the
+// assembled catalog order when an application registers its source-event groups.
+func (m *Module) nativeConsumers() []orderedConsumer {
 	ev := m.svc.HandleEvent
-	return []Consumer{
-		{Name: port.ConsumerDirective, Events: []string{extport.EventDirectiveIssued}, Handler: ev},
-		{Name: port.ConsumerContent, Events: []string{contentport.EventAlertPublished, contentport.EventDocumentPublished}, Handler: ev},
-		{Name: port.ConsumerTask, Events: []string{extport.EventTaskEscalated, extport.EventTaskCreated}, Handler: ev},
-		{Name: port.ConsumerSync, Events: []string{syncport.EventConflictOpened, syncport.EventDeviceRevoked}, Handler: ev},
-		{Name: port.ConsumerParty, Events: []string{partyport.EventOrgDeactivated, coopport.EventHouseholdRegistered,
-			coopport.EventHouseholdMembershipChanged}, Handler: ev},
-		{Name: port.ConsumerCropCycle, Events: []string{coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened,
-			ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived}, Handler: ev},
-		{Name: port.ConsumerReportCycle, Events: []string{extport.EventReportBatchIssued, extport.EventReportTaskReminded,
-			extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened}, Handler: ev},
-		{Name: port.ConsumerIntegration, Events: []string{syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale}, Handler: ev},
-		{Name: port.ConsumerMRV, Events: []string{mrvport.EventAlertRaised}, Handler: ev},
-		{Name: port.ConsumerWorkSchedule, Events: []string{extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed,
-			extport.EventWorkScheduleReminded}, Handler: ev},
-		{Name: port.ConsumerEgressAnomaly, Events: []string{meteringport.EventEgressAnomaly}, Handler: ev},
-		// W11.74 nhắc nhập giá; gói NOTIF: cảnh báo, xác minh, tổng hợp giờ khóa, duyệt / mở duyệt bảng giá.
-		{Name: port.ConsumerPrice, Events: domain.PriceEvents, Handler: ev},
-		// D24: báo trước khóa tài khoản không hoạt động (pf/accounts job accounts_dormant).
-		{Name: port.ConsumerCNTS, Events: domain.CNTSEvents, Handler: ev}, // W11.43: cảnh báo, nhắc nộp biểu kỳ CNTS
-		{Name: port.ConsumerAccounts, Events: []string{accport.EventUserDormantWarning}, Handler: ev},
-		{Name: port.ConsumerPush, Events: []string{port.EventPushRequested}, Handler: m.svc.HandlePush},
-		{Name: port.ConsumerEmail, Events: []string{port.EventEmailRequested}, Handler: m.svc.HandleEmail},
+	return []orderedConsumer{
+		{order: 2, consumer: Consumer{Name: port.ConsumerContent, Events: []string{contentport.EventAlertPublished, contentport.EventDocumentPublished}, Handler: ev}},
+		{order: 4, consumer: Consumer{Name: port.ConsumerSync, Events: []string{syncport.EventConflictOpened, syncport.EventDeviceRevoked}, Handler: ev}},
+		{order: 5, consumer: Consumer{Name: port.ConsumerParty, Events: []string{partyport.EventOrgDeactivated, coopport.EventHouseholdRegistered, coopport.EventHouseholdMembershipChanged}, Handler: ev}},
+		{order: 6, consumer: Consumer{Name: port.ConsumerCropCycle, Events: []string{coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened, ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived}, Handler: ev}},
+		{order: 8, consumer: Consumer{Name: port.ConsumerIntegration, Events: []string{syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale}, Handler: ev}},
+		{order: 9, consumer: Consumer{Name: port.ConsumerMRV, Events: []string{mrvport.EventAlertRaised}, Handler: ev}},
+		{order: 11, consumer: Consumer{Name: port.ConsumerEgressAnomaly, Events: []string{meteringport.EventEgressAnomaly}, Handler: ev}},
+		{order: 14, consumer: Consumer{Name: port.ConsumerAccounts, Events: []string{accport.EventUserDormantWarning}, Handler: ev}},
+		{order: 15, consumer: Consumer{Name: port.ConsumerPush, Events: []string{port.EventPushRequested}, Handler: m.svc.HandlePush}},
+		{order: 16, consumer: Consumer{Name: port.ConsumerEmail, Events: []string{port.EventEmailRequested}, Handler: m.svc.HandleEmail}},
 	}
 }
 
@@ -218,13 +205,4 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 			return err
 		},
 	}}
-}
-
-// nativeConsumerNames protects capability subscriptions and their specialized handlers.
-func nativeConsumerNames() map[string]bool {
-	return map[string]bool{
-		port.ConsumerContent: true, port.ConsumerSync: true, port.ConsumerParty: true, port.ConsumerCropCycle: true,
-		port.ConsumerIntegration: true, port.ConsumerMRV: true, port.ConsumerEgressAnomaly: true,
-		port.ConsumerAccounts: true, port.ConsumerPush: true, port.ConsumerEmail: true,
-	}
 }

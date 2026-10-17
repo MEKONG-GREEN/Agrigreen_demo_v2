@@ -1,4 +1,4 @@
-package handler_test
+package notify_test
 
 import (
 	"net/http"
@@ -60,7 +60,7 @@ func TestTaskCreatedNotifiesAssigneeKNUSTASK01(t *testing.T) {
 	off.device(fcmToken)
 	prov := f.user(authz.Scope{Units: []string{prov91, ward1, ward2}}, partyport.RoleKNProvinceAdmin)
 	created := func(assignee *uuid.UUID, rule string) {
-		f.process(port.ConsumerTask, f.event(f.tenant, extport.EventTaskCreated, extport.TaskCreatedV1{TaskID: ids.New(), Source: "htx_app",
+		f.process(extport.NotifyConsumerTask, f.event(f.tenant, extport.EventTaskCreated, extport.TaskCreatedV1{TaskID: ids.New(), Source: "htx_app",
 			CommuneCode: ward1, ProvinceCode: prov91, Category: "sau_benh", Priority: "urgent", Status: "assigned", AssigneeRef: assignee,
 			AssignmentRule: rule, DueAt: f.clk.Now().Add(24 * time.Hour).Format(time.RFC3339), CreatedAt: f.clk.Now().Format(time.RFC3339), Seq: 1}))
 	}

@@ -8,7 +8,7 @@ import (
 // NotificationConsumers declares subscriptions without carrying a tenant or database callback.
 func NotificationConsumers() notifyport.ConsumerRegistration {
 	return notifyport.ConsumerRegistration{Definitions: []notifyport.ConsumerDefinition{
-		{Name: notifyport.ConsumerPrice, Order: 12, Events: []string{
+		{Name: port.NotifyConsumerPrice, Order: 12, Events: []string{
 			port.EventReminderIssued, port.EventAlertRaised, port.EventVerificationRequested, port.EventVerificationResponded,
 			port.EventVerificationDecided, port.EventLockSummarized, port.EventBoardPublished, port.EventBoardReopened, port.EventTicketProxied,
 		}},

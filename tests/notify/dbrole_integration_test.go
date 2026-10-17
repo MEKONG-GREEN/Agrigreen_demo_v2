@@ -1,9 +1,10 @@
-package handler_test
+package notify_test
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"testing"
 
 	"github.com/google/uuid"
@@ -28,7 +29,7 @@ func TestModuleTxRunsAsGroupRole_ADR0028(t *testing.T) {
 	f := newFixture(t)
 	a := f.user(authz.Scope{Units: []string{ward1}}, partyport.RoleKNOfficer)
 	env, _ := f.directive(f.tenant, port.SeverityUrgent, []string{ward1}, a.actor)
-	f.process(port.ConsumerDirective, env)
+	f.process(extport.NotifyConsumerDirective, env)
 	if got := a.inbox(); len(got) != 1 {
 		t.Fatalf("hộp thư qua module trên app_platform: %v", got)
 	}

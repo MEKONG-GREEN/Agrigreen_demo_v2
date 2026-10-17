@@ -14,6 +14,3 @@ const (
 	// KindReportPeriodReopened: mở lại kỳ cho xã/biểu, kèm hạn mở (FN-TI-02.04).
 	KindReportPeriodReopened = "report_period_reopened"
 )
-
-// ConsumerReportCycle: vòng đời báo cáo KN v7.7 (P4) — công việc mới, nhắc, yêu cầu điều chỉnh, mở lại kỳ.
-const ConsumerReportCycle = "pf.notify.report_cycle"

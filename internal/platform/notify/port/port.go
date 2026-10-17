@@ -96,12 +96,10 @@ const (
 
 // Tên consumer trong cmd/worker (-modules), một consumer mỗi nhóm sự kiện.
 const (
-	ConsumerDirective = "pf.notify.directive"
-	ConsumerContent   = "pf.notify.content"
-	ConsumerTask      = "pf.notify.task"
-	ConsumerSync      = "pf.notify.sync"
-	ConsumerParty     = "pf.notify.party"
-	ConsumerPush      = "pf.notify.push"
+	ConsumerContent = "pf.notify.content"
+	ConsumerSync    = "pf.notify.sync"
+	ConsumerParty   = "pf.notify.party"
+	ConsumerPush    = "pf.notify.push"
 	// ConsumerCropCycle: nhật ký chờ duyệt, kết quả duyệt, nông dân mở vụ (App HTX, G2).
 	ConsumerCropCycle = "pf.notify.cropcycle"
 	// ConsumerIntegration: cảnh báo Admin về đồng bộ tích hợp — sự kiện vào DLQ (GIS US-SYNC-02),
@@ -109,13 +107,9 @@ const (
 	ConsumerIntegration = "pf.notify.integration"
 	// ConsumerMRV: cảnh báo MRV (pf.mrv.alert.raised) — nhãn khẩn, bất thường AWD, leo thang quá hạn (G3).
 	ConsumerMRV = "pf.notify.mrv"
-	// ConsumerWorkSchedule: lịch công tác tuần (KN v7.7 P5) — gửi duyệt, kết quả duyệt, nhắc hạn.
-	ConsumerWorkSchedule = "pf.notify.work_schedule"
 	// ConsumerEgressAnomaly: cảnh báo DLP pf.metering.egress.anomaly_detected (G5, ADR-0024) — cùng tên
 	// với meteringport.NotifyEgressAnomalyQueue.
 	ConsumerEgressAnomaly = "pf.notify.egress_anomaly"
-	// ConsumerPrice: nhắc nhập giá Báo giá nông sản (pf.price.reminder.issued, W11.74).
-	ConsumerPrice = "pf.notify.price"
 	// ConsumerAccounts: báo trước khóa tài khoản không hoạt động (pf.accounts.user.dormant_warning, D24).
 	ConsumerAccounts = "pf.notify.accounts"
 )

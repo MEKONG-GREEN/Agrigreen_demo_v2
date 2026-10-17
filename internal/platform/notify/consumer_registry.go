@@ -23,21 +23,19 @@ func cloneConsumer(c Consumer) Consumer {
 	return c
 }
 
-// The base includes temporary legacy subscriptions during the two-step migration. Explicit owners
-// may replace those entries, but cannot replace capability-owned subscriptions or their handlers.
-func newConsumerRegistry(base []Consumer, nativeNames map[string]bool, registrations []port.ConsumerRegistration) *consumerRegistry {
+// Base subscriptions are capability-owned. Extensions can only add source-event subscriptions.
+func newConsumerRegistry(base []orderedConsumer, registrations []port.ConsumerRegistration) *consumerRegistry {
 	result := map[string]orderedConsumer{}
-	nativeOrders, nativeEvents := map[int]bool{}, map[string]bool{}
-	for i, c := range base {
+	nativeNames, nativeOrders, nativeEvents := map[string]bool{}, map[int]bool{}, map[string]bool{}
+	for _, sp := range base {
+		c := sp.consumer
 		if _, ok := result[c.Name]; ok {
 			panic("notify: duplicate base consumer " + c.Name)
 		}
-		result[c.Name] = orderedConsumer{order: i + 1, consumer: cloneConsumer(c)}
-		if nativeNames[c.Name] {
-			nativeOrders[i+1] = true
-			for _, e := range c.Events {
-				nativeEvents[e] = true
-			}
+		result[c.Name] = orderedConsumer{order: sp.order, consumer: cloneConsumer(c)}
+		nativeNames[c.Name], nativeOrders[sp.order] = true, true
+		for _, e := range c.Events {
+			nativeEvents[e] = true
 		}
 	}
 	seen := map[string]bool{}

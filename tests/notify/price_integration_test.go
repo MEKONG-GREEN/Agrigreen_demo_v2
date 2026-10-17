@@ -1,4 +1,4 @@
-package handler_test
+package notify_test
 
 import (
 	"context"
@@ -183,10 +183,10 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 	req := f.event(f.tenant, priceport.EventVerificationRequested, priceport.VerificationRequestedV1{Profile: "kn", Day: day,
 		PointCode: "XBG0001", PointName: "Mỹ Chánh", TicketID: ticket, ItemCodes: []string{"MH00001"},
 		RespondBy: "2026-10-12T06:30:00Z", OfficerRef: &ctv.actor, RequesterRef: owner.actor})
-	if !f.process(port.ConsumerPrice, req) || f.process(port.ConsumerPrice, req) {
+	if !f.process(priceport.NotifyConsumerPrice, req) || f.process(priceport.NotifyConsumerPrice, req) {
 		t.Fatal("lần giao đầu xử lý, giao lặp bị inbox bỏ qua")
 	}
-	if _, err := inbox.Process(context.Background(), f.appDB, port.ConsumerPrice+".replay", req, f.mod.EventHandler()); err != nil {
+	if _, err := inbox.Process(context.Background(), f.appDB, priceport.NotifyConsumerPrice+".replay", req, f.mod.EventHandler()); err != nil {
 		t.Fatal(err)
 	}
 	in := ctv.inbox()
@@ -231,7 +231,7 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 	f.mailer.mu.Unlock()
 	alert := f.event(f.tenant, priceport.EventAlertRaised, priceport.AlertRaisedV1{Profile: "kn", Day: day, PointCode: "XBG0002",
 		PointName: "Bình Đức", TicketID: uuid.New(), ItemCodes: []string{"MH00002"}})
-	f.process(port.ConsumerPrice, alert)
+	f.process(priceport.NotifyConsumerPrice, alert)
 	for name, c := range map[string]caller{"owner": owner, "other": other, "steward": steward} {
 		if k := kindsOf(c.inbox()); len(k) != 1 || k[0] != port.KindPriceAlert {
 			t.Fatalf("%s nhận một cảnh báo: %v", name, k)
@@ -257,7 +257,7 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 	}
 
 	// 3. Xã đã phân công → chỉ người được phân công + QTNV; người phản hồi (CTV) không tự nhận.
-	f.process(port.ConsumerPrice, f.event(f.tenant, priceport.EventVerificationResponded, priceport.VerificationRespondedV1{
+	f.process(priceport.NotifyConsumerPrice, f.event(f.tenant, priceport.EventVerificationResponded, priceport.VerificationRespondedV1{
 		Profile: "kn", Day: day, PointCode: "XBG0001", PointName: "Mỹ Chánh", TicketID: ticket, ItemCode: "MH00001", Choice: "keep",
 		OwnerRef: &owner.actor, ResponderRef: ctv.actor}))
 	if k := kindsOf(owner.inbox()); len(k) != 2 || k[0] != port.KindPriceVerifyReply {
@@ -273,8 +273,8 @@ func TestPriceNotificationsAndEmail_NOTIF(t *testing.T) {
 	// 4. Tổng hợp 12:00 → mọi Cấp Tỉnh + QTNV; giao lặp không trùng.
 	lock := f.event(f.tenant, priceport.EventLockSummarized, priceport.LockSummarizedV1{Profile: "kn", Day: day,
 		LockAt: "2026-10-12T05:00:00Z", Points: 2, Submitted: 1, Missed: 1})
-	f.process(port.ConsumerPrice, lock)
-	f.process(port.ConsumerPrice, lock)
+	f.process(priceport.NotifyConsumerPrice, lock)
+	f.process(priceport.NotifyConsumerPrice, lock)
 	for name, c := range map[string]caller{"owner": owner, "other": other, "steward": steward} {
 		n := 0
 		for _, k := range kindsOf(c.inbox()) {
@@ -308,7 +308,7 @@ func TestPriceDecisionToOfficer_NOTIF(t *testing.T) {
 	ctv := f.user(authz.Scope{Units: []string{ward1}}, authz.KNXa)
 	tinh := f.user(authz.Scope{Units: []string{ward1}}, authz.KNTinh)
 	f.emails.set(ctv.actor, "a.b@mekong.vn")
-	f.process(port.ConsumerPrice, f.event(f.tenant, priceport.EventVerificationDecided, priceport.VerificationDecidedV1{Profile: "kn",
+	f.process(priceport.NotifyConsumerPrice, f.event(f.tenant, priceport.EventVerificationDecided, priceport.VerificationDecidedV1{Profile: "kn",
 		Day: "2026-10-12", PointName: "Mỹ Chánh", TicketID: uuid.New(), ItemCodes: []string{"MH00001"},
 		Decision: priceport.DecisionKept, OfficerRef: &ctv.actor, DeciderRef: tinh.actor}))
 	if k := kindsOf(ctv.inbox()); len(k) != 1 || k[0] != port.KindPriceVerifyDecision {

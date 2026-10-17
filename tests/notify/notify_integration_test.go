@@ -1,4 +1,4 @@
-package handler_test
+package notify_test
 
 import (
 	"bytes"
@@ -17,7 +17,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
@@ -72,7 +74,7 @@ func newFixture(t *testing.T) *fixture {
 	// ADR-0028 (W2.3): module chạy trên vai đăng nhập app_platform (NOINHERIT) — chỉ chạm pf_notify sau SET LOCAL ROLE r_notify.
 	appPool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	f.appDB = db.ForModule(appPool, notify.DBModule)
-	f.mod = notify.New(appPool, f.clk, notify.Deps{Scope: f.scope, Devices: f.devices, Staff: f.staff, Units: fakeUnits{}, Pusher: f.pusher,
+	f.mod = notify.New(appPool, f.clk, notify.Deps{Consumers: []port.ConsumerRegistration{extension.NotificationConsumers(), price.NotificationConsumers()}, Scope: f.scope, Devices: f.devices, Staff: f.staff, Units: fakeUnits{}, Pusher: f.pusher,
 		PriceDesk: f.desk, Emails: f.emails, EmailMailer: f.mailer, LinkBase: "https://kn.example.vn",
 		Log: slog.New(slog.NewTextHandler(f.logs, nil))})
 	ops := env.Pool(t, migrations.PF, "platform_api")
@@ -240,7 +242,7 @@ func TestDirectiveNotifiesTargetOfficersOnly(t *testing.T) {
 	b := f.user(authz.Scope{Units: []string{ward1}}, partyport.RoleKNOfficer)
 	other := f.user(authz.Scope{Units: []string{ward92}}, partyport.RoleKNOfficer)
 	env, dirID := f.directive(f.tenant, port.SeverityUrgent, []string{ward1}, a.actor)
-	f.process(port.ConsumerDirective, env)
+	f.process(extport.NotifyConsumerDirective, env)
 
 	got := a.inbox()
 	if len(got) != 1 || got[0]["kind"] != port.KindDirective || got[0]["severity"] != "urgent" ||
@@ -254,7 +256,7 @@ func TestDirectiveNotifiesTargetOfficersOnly(t *testing.T) {
 	// Không có target_refs → tra danh bạ hiện tại của vùng (cán bộ xã 30292 là b).
 	f.staff.add(f.tenant, port.StaffRef{ActorRef: b.actor, UnitCode: ward1, ProvinceCode: prov91})
 	env2, _ := f.directive(f.tenant, port.SeverityNormal, []string{ward1})
-	f.process(port.ConsumerDirective, env2)
+	f.process(extport.NotifyConsumerDirective, env2)
 	if len(b.inbox()) != 1 || len(other.inbox()) != 0 {
 		t.Fatal("chỉ đạo không có target_refs phải tới cán bộ trong danh bạ của vùng")
 	}
@@ -316,7 +318,7 @@ func TestDuplicateEventDeliveryNoDuplicates(t *testing.T) {
 	a := f.user(authz.Scope{Units: []string{ward1}}, partyport.RoleKNOfficer)
 	a.device(fcmToken)
 	env, _ := f.directive(f.tenant, port.SeverityNormal, []string{ward1}, a.actor)
-	if !f.process(port.ConsumerDirective, env) || f.process(port.ConsumerDirective, env) {
+	if !f.process(extport.NotifyConsumerDirective, env) || f.process(extport.NotifyConsumerDirective, env) {
 		t.Fatal("lần giao thứ hai phải bị inbox bỏ qua")
 	}
 	for range 2 {
@@ -352,7 +354,7 @@ func TestPushDataOnlyAndPerDeviceFailures(t *testing.T) {
 	f.pusher.invalid[bad] = true
 	f.pusher.flaky[flaky] = 1
 	env, _ := f.directive(f.tenant, port.SeverityUrgent, []string{ward1}, a.actor, b.actor, c.actor)
-	f.process(port.ConsumerDirective, env)
+	f.process(extport.NotifyConsumerDirective, env)
 
 	if err := f.flushPush(f.tenant); err == nil {
 		t.Fatal("còn lần gửi lỗi tạm → consumer phải trả lỗi để hàng đợi giao lại")
@@ -386,7 +388,7 @@ func TestPushDataOnlyAndPerDeviceFailures(t *testing.T) {
 	}
 	// Token hỏng đã ngừng dùng: thông báo sau không xếp lần gửi cho b.
 	env2, _ := f.directive(f.tenant, port.SeverityNormal, []string{ward1}, b.actor)
-	f.process(port.ConsumerDirective, env2)
+	f.process(extport.NotifyConsumerDirective, env2)
 	_ = f.flushPush(f.tenant)
 	if len(f.pusher.messages()) != 2 {
 		t.Fatal("token đã báo hỏng vẫn được gửi")
@@ -436,7 +438,7 @@ func TestPushTokenRequiresRegisteredDevice(t *testing.T) {
 	f.process(port.ConsumerSync, f.event(f.tenant, syncport.EventDeviceRevoked, syncport.DeviceRevokedV1{
 		DeviceID: ok, ActorRef: a.actor, RevokedBy: ids.New(), Reason: "Máy bị mất khi đi thực địa", EventTime: f.clk.Now().Format(time.RFC3339)}))
 	env, _ := f.directive(f.tenant, port.SeverityNormal, []string{ward1}, a.actor)
-	f.process(port.ConsumerDirective, env)
+	f.process(extport.NotifyConsumerDirective, env)
 	_ = f.flushPush(f.tenant)
 	if len(f.pusher.messages()) != 0 {
 		t.Fatal("thiết bị đã thu hồi vẫn nhận đẩy")
@@ -502,7 +504,7 @@ func TestNotificationSyncSourceCursor(t *testing.T) {
 	f := newFixture(t)
 	a := f.user(authz.Scope{Units: []string{ward1}}, partyport.RoleKNOfficer)
 	env, _ := f.directive(f.tenant, port.SeverityNormal, []string{ward1}, a.actor)
-	f.process(port.ConsumerDirective, env)
+	f.process(extport.NotifyConsumerDirective, env)
 	f.process(port.ConsumerContent, f.event(f.tenant, contentport.EventAlertPublished, contentport.AlertPublishedV1{
 		DocumentRef: ids.New().String(), VersionNo: 1, Title: "Mặn xâm nhập", Summary: "Trữ nước ngọt",
 		AudienceLevel: "commune", AudienceUnits: []string{ward1}, PublisherRef: ids.New().String(), PublishedAt: f.clk.Now().Format(time.RFC3339)}))
@@ -555,7 +557,7 @@ func TestReadUnreadCountAndReadAll(t *testing.T) {
 	b := f.user(authz.Scope{Units: []string{ward1}}, partyport.RoleKNOfficer)
 	for range 2 {
 		env, _ := f.directive(f.tenant, port.SeverityNormal, []string{ward1}, a.actor)
-		f.process(port.ConsumerDirective, env)
+		f.process(extport.NotifyConsumerDirective, env)
 	}
 	f.process(port.ConsumerContent, f.event(f.tenant, contentport.EventAlertPublished, contentport.AlertPublishedV1{
 		DocumentRef: ids.New().String(), VersionNo: 1, Title: "Rét hại", Summary: "Che phủ mạ",
@@ -598,7 +600,7 @@ func TestTenantIsolation(t *testing.T) {
 	f := newFixture(t)
 	a := f.user(authz.Scope{Units: []string{ward1}}, partyport.RoleKNOfficer)
 	env, _ := f.directive(f.tenant, port.SeverityNormal, []string{ward1}, a.actor)
-	f.process(port.ConsumerDirective, env)
+	f.process(extport.NotifyConsumerDirective, env)
 	f.process(port.ConsumerContent, f.event(f.tenant, contentport.EventAlertPublished, contentport.AlertPublishedV1{
 		DocumentRef: ids.New().String(), VersionNo: 1, Title: "Lũ sớm", Summary: "Thu hoạch sớm",
 		AudienceLevel: "national", PublisherRef: ids.New().String(), PublishedAt: f.clk.Now().Format(time.RFC3339)}))
@@ -622,7 +624,7 @@ func TestIdempotentPOST(t *testing.T) {
 	f := newFixture(t)
 	a := f.user(authz.Scope{Units: []string{ward1}}, partyport.RoleKNOfficer)
 	env, _ := f.directive(f.tenant, port.SeverityNormal, []string{ward1}, a.actor)
-	f.process(port.ConsumerDirective, env)
+	f.process(extport.NotifyConsumerDirective, env)
 	id := a.inbox()[0]["id"].(string)
 	k := key()
 	r1 := a.do(f.app.URL, http.MethodPost, "/v1/notifications/"+id+"/read", k, nil)
@@ -650,7 +652,7 @@ func TestTaskEscalatedRecipients(t *testing.T) {
 			ProvinceCode: province, Reason: extport.EscalationReasonSLA, Status: "assigned", Priority: "high", Category: "sau_benh",
 			AssigneeRef: assigneeRef, DueAt: f.clk.Now().Add(-time.Hour).Format(time.RFC3339), EventTime: f.clk.Now().Format(time.RFC3339), Seq: 3})
 	}
-	f.process(port.ConsumerTask, task(prov91, &assignee.actor))
+	f.process(extport.NotifyConsumerTask, task(prov91, &assignee.actor))
 	if len(assignee.inbox()) != 1 || len(admin.inbox()) != 1 || len(commune.inbox()) != 0 {
 		t.Fatalf("leo thang: giao=%d tỉnh=%d xã khác=%d", len(assignee.inbox()), len(admin.inbox()), len(commune.inbox()))
 	}
@@ -660,7 +662,7 @@ func TestTaskEscalatedRecipients(t *testing.T) {
 	// Cần Thơ chưa có cán bộ tỉnh trong danh bạ → chủ đề.
 	ct := f.user(authz.Scope{Units: []string{prov92, ward92}}, partyport.RoleKNProvinceAdmin)
 	ctOfficer := f.user(authz.Scope{Units: []string{prov92, ward92}}, partyport.RoleKNOfficer)
-	f.process(port.ConsumerTask, task(prov92, nil))
+	f.process(extport.NotifyConsumerTask, task(prov92, nil))
 	if len(ct.inbox()) != 1 || len(ctOfficer.inbox()) != 0 || len(admin.inbox()) != 1 {
 		t.Fatal("chủ đề leo thang chỉ tới vai kn_province_admin của tỉnh")
 	}
@@ -692,7 +694,7 @@ func TestConflictAndOrgDeactivated(t *testing.T) {
 		t.Fatalf("thông báo vô hiệu hóa: %v", got)
 	}
 	env, _ := f.directive(f.tenant, port.SeverityNormal, []string{ward1}, member.actor)
-	f.process(port.ConsumerDirective, env)
+	f.process(extport.NotifyConsumerDirective, env)
 	_ = f.flushPush(f.tenant)
 	for _, m := range f.pusher.messages() {
 		if m.Token == fcmToken {
@@ -711,7 +713,7 @@ func TestUrgentDirectiveEmailDigest(t *testing.T) {
 	urgent, id := f.directive(f.tenant, port.SeverityUrgent, []string{ward1}, a.actor)
 	normal, _ := f.directive(f.tenant, port.SeverityNormal, []string{ward1}, a.actor)
 	for _, e := range []outbox.Envelope{urgent, normal, urgent} {
-		_, _ = inbox.Process(context.Background(), f.pool, port.ConsumerDirective, e, mod.EventHandler())
+		_, _ = inbox.Process(context.Background(), f.pool, extport.NotifyConsumerDirective, e, mod.EventHandler())
 	}
 	all := notify.DigestTenants(env.Pool(t, migrations.PF, dbadmin.OpsJobs))
 	// Chỉ tenant của kiểm thử này (database dùng chung giữa các kiểm thử của gói).

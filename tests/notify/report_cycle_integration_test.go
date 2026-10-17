@@ -1,4 +1,4 @@
-package handler_test
+package notify_test
 
 import (
 	"testing"
@@ -21,9 +21,9 @@ func TestFN_TI_02_03_ReportCycleInbox(t *testing.T) {
 		ProvinceCode: "89", ReportType: "weekly", SeasonLabel: "Thu Đông 2026", FormCodes: []string{"T01"}, PeriodCount: 2, TaskCount: 2,
 		FirstDueAt: "2026-09-15T10:00:00Z", Assignees: []extport.TaskAssigneesV1{{CommuneCode: ward1, OfficerRefs: []string{a.actor.String()}, TaskCount: 2}},
 		IssuedBy: ids.New().String(), EventTime: "2026-09-07T01:00:00Z"})
-	f.process(port.ConsumerReportCycle, issued)
-	f.process(port.ConsumerReportCycle, issued)
-	f.process(port.ConsumerReportCycle, f.event(f.tenant, extport.EventReportTaskReminded, extport.ReportTaskRemindedV1{ReminderID: ids.New().String(),
+	f.process(extport.NotifyConsumerReportCycle, issued)
+	f.process(extport.NotifyConsumerReportCycle, issued)
+	f.process(extport.NotifyConsumerReportCycle, f.event(f.tenant, extport.EventReportTaskReminded, extport.ReportTaskRemindedV1{ReminderID: ids.New().String(),
 		BatchID: ids.New().String(), PeriodID: ids.New().String(), PeriodLabel: "Tuần 1", Mode: extport.ReminderManual, Message: "Đề nghị nộp trước 17:00",
 		DueAt: "2026-09-15T10:00:00Z", Communes: []string{ward1}, RecipientRefs: []string{a.actor.String()}, ActorRef: ids.New().String(),
 		EventTime: "2026-09-14T01:00:00Z"}))

@@ -1,4 +1,4 @@
-package handler_test
+package notify_test
 
 import (
 	"testing"
@@ -27,7 +27,7 @@ func TestCNTSDutyChanged_W1146(t *testing.T) {
 		OfficerRefs: []uuid.UUID{a.actor, b.actor, a.actor, uuid.Nil}, ActorRef: unrelated.actor, Department: partyport.DeptChanNuoiThuySan, EventTime: f.clk.Now().Format(time.RFC3339)})
 	subscribed := false
 	for _, c := range f.mod.Consumers() {
-		if c.Name == port.ConsumerCNTS {
+		if c.Name == extport.NotifyConsumerCNTS {
 			for _, ev := range c.Events {
 				if ev == e.EventType {
 					subscribed = true
@@ -38,7 +38,7 @@ func TestCNTSDutyChanged_W1146(t *testing.T) {
 	if !subscribed {
 		t.Fatal("worker chưa đăng ký consumer đổi ca")
 	}
-	if !f.process(port.ConsumerCNTS, e) || f.process(port.ConsumerCNTS, e) {
+	if !f.process(extport.NotifyConsumerCNTS, e) || f.process(extport.NotifyConsumerCNTS, e) {
 		t.Fatal("giao lại phải bị inbox bỏ qua")
 	}
 	for _, u := range []caller{a, b} {

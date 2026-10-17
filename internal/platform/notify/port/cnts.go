@@ -14,6 +14,3 @@ const (
 	// KindCNTSFormReminder: nhắc nộp biểu kỳ CNTS (trước hạn, khi trễ, nhắc lặp — UR-TINH-08).
 	KindCNTSFormReminder = "cnts_form_reminder"
 )
-
-// ConsumerCNTS: cảnh báo, nhắc nộp biểu kỳ CNTS (W11.43).
-const ConsumerCNTS = "pf.notify.cnts"

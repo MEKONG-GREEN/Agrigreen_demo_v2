@@ -2,7 +2,10 @@ package notifyconsumers_test
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
@@ -36,14 +39,17 @@ func TestOwnedNotificationConsumersMatchLegacy(t *testing.T) {
 	if defs != 6 || events != 22 {
 		t.Fatalf("owner metadata must have6groups/22events: %d/%d", defs, events)
 	}
-	legacy := descriptors(t, notify.New(nil, clock.System{}, notify.Deps{}).Consumers())
+	_, file, _, _ := runtime.Caller(0)
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(file), "../golden/kn-notify-consumers.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var legacy []port.ConsumerDefinition
+	if err := json.Unmarshal(raw, &legacy); err != nil {
+		t.Fatal(err)
+	}
 	owned := descriptors(t, notify.New(nil, clock.System{}, notify.Deps{Consumers: regs}).Consumers())
 	if len(legacy) != 16 || !reflect.DeepEqual(legacy, owned) {
 		t.Fatalf("changed subscription catalog:\nlegacy=%+v\nowner=%+v", legacy, owned)
 	}
-	raw, err := json.Marshal(legacy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("LEGACY_NOTIFY_CONSUMERS=%s", raw)
 }

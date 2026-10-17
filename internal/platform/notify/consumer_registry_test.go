@@ -15,21 +15,18 @@ func sampleConsumerRegistration() port.ConsumerRegistration {
 		{Name: "fixture.owned", Order: 2, Events: []string{"fixture.owned.event"}},
 	}}
 }
-func sampleBaseConsumers() []Consumer {
-	return []Consumer{
-		{Name: "fixture.native", Events: []string{"fixture.native.event"}},
-		{Name: "fixture.owned", Events: []string{"fixture.owned.event"}},
-	}
+func sampleBaseConsumers() []orderedConsumer {
+	return []orderedConsumer{{order: 1, consumer: Consumer{Name: "fixture.native", Events: []string{"fixture.native.event"}}}}
 }
 func TestConsumerRegistryCopiesAndHandlerOwnership(t *testing.T) {
 	var nativeCalls, sourceCalls int
 	native := func(context.Context, pgx.Tx, outbox.Envelope) error { nativeCalls++; return nil }
 	source := func(context.Context, pgx.Tx, outbox.Envelope) error { sourceCalls++; return nil }
 	base := sampleBaseConsumers()
-	base[0].Handler = native
+	base[0].consumer.Handler = native
 	reg := sampleConsumerRegistration()
-	r := newConsumerRegistry(base, map[string]bool{"fixture.native": true}, []port.ConsumerRegistration{reg})
-	base[0].Events[0] = "corrupt"
+	r := newConsumerRegistry(base, []port.ConsumerRegistration{reg})
+	base[0].consumer.Events[0] = "corrupt"
 	reg.Definitions[0].Events[0] = "corrupt"
 	out := r.consumers(source)
 	out[0].Events[0] = "corrupt"
@@ -48,8 +45,8 @@ func TestConsumerRegistryCopiesAndHandlerOwnership(t *testing.T) {
 	if nativeCalls != 1 || sourceCalls != 1 {
 		t.Fatalf("specialized handler overwritten: %d %d", nativeCalls, sourceCalls)
 	}
-	other := newConsumerRegistry(sampleBaseConsumers(), map[string]bool{}, nil).consumers(source)
-	if other[1].Events[0] != "fixture.owned.event" {
+	other := newConsumerRegistry(sampleBaseConsumers(), nil).consumers(source)
+	if len(other) != 1 || other[0].Events[0] != "fixture.native.event" {
 		t.Fatal("registry leaked across instances")
 	}
 }
@@ -92,14 +89,14 @@ func TestConsumerRegistryRejectsInvalid(t *testing.T) {
 					t.Fatal("invalid registration accepted")
 				}
 			}()
-			newConsumerRegistry(base, map[string]bool{"fixture.native": true}, []port.ConsumerRegistration{reg})
+			newConsumerRegistry(base, []port.ConsumerRegistration{reg})
 		})
 	}
 }
 func TestConsumerRegistryAddsOrderedSubscription(t *testing.T) {
 	reg := sampleConsumerRegistration()
 	reg.Definitions = append(reg.Definitions, port.ConsumerDefinition{Name: "fixture.extra", Order: 3, Events: []string{"fixture.extra.event"}})
-	r := newConsumerRegistry(sampleBaseConsumers(), map[string]bool{"fixture.native": true}, []port.ConsumerRegistration{reg})
+	r := newConsumerRegistry(sampleBaseConsumers(), []port.ConsumerRegistration{reg})
 	for i, c := range r.consumers(inbox.Handler(func(context.Context, pgx.Tx, outbox.Envelope) error { return nil })) {
 		if c.Name != []string{"fixture.native", "fixture.owned", "fixture.extra"}[i] {
 			t.Fatalf("unstable order: %+v", c)
