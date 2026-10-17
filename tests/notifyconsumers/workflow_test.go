@@ -1,9 +1,13 @@
 package notifyconsumers_test
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"os"
 	"reflect"
 	"testing"
@@ -74,5 +78,32 @@ func TestWorkflowOwnedRenderersMatchLegacy(t *testing.T) {
 	}
 	if len(all) != 10 {
 		t.Fatalf("assembled owner event count %d", len(all))
+	}
+}
+
+func TestWorkflowRenderersRequireOwnerRegistration(t *testing.T) {
+	for _, mode := range []string{"nil", "empty"} {
+		t.Run(mode, func(t *testing.T) {
+			var registrations []notifyport.EventRendererRegistration
+			if mode == "empty" {
+				registrations = []notifyport.EventRendererRegistration{}
+			}
+			module := notify.New(nil, clock.System{}, notify.Deps{Consumers: []notifyport.ConsumerRegistration{extension.NotificationConsumers()}, Renderers: registrations})
+			for _, registration := range extension.WorkflowNotificationRenderers() {
+				for _, event := range registration.Events {
+					if err := module.EventHandler()(context.Background(), nil, outbox.Envelope{EventType: event, Payload: json.RawMessage("{")}); err != nil {
+						t.Errorf("Workflow legacy fallback without owner renderer for %s: %v", event, err)
+					}
+				}
+			}
+		})
+	}
+	module := notify.New(nil, clock.System{}, notify.Deps{Consumers: []notifyport.ConsumerRegistration{extension.NotificationConsumers()}, Renderers: extension.WorkflowNotificationRenderers()})
+	for _, registration := range extension.WorkflowNotificationRenderers() {
+		for _, event := range registration.Events {
+			if err := module.EventHandler()(context.Background(), nil, outbox.Envelope{EventType: event, Payload: json.RawMessage("{")}); err == nil {
+				t.Errorf("registered Workflow renderer did not reject malformed %s", event)
+			}
+		}
 	}
 }
