@@ -12,3 +12,6 @@ Thêm ca generic datecatalog không có provider KN: CRUD/ngày hiệu lực/RLS
 
 
 Cổng tĩnh đầu trên98de1e3a dừng ở vet (alias public khiến literal hai trường phải ghi tên trường). PG đầu được dừng đúng driver/child và cluster đã cleanup, db-full.exit=-1; không coi các PASS lẻ là hồi quy đủ. Sửa bằng AST chỉ thêm Field/Err hoặc Required/Normalize, giữ nguyên biểu thức/thứ tự ở5file (proofTEMP keyed.json). Script thử đầu lỗi đường dẫn trước khi viết mã, hai tệp tạm của nó đã chuyển về hostTEMP debug .txt; không còn trong repo. Pure-keyed73636.exit0, frozen12/60/170 vẫnkhớp; vet-keyed.exit0. Sắp chạy lại fullcode18+upgrade và static-final trên head cuối, không dùng proofPG bịdừng.
+
+
+Lượt FINAL đầu (e6b50ace) không đạt: static-final lỗi ST1012 tên2biến lỗi riêng; generic HTTP test phát hiện2nhánh list/item vẫn gọi domain.EffectiveDated nên ?at bỏqua registry và trảv2 thayv1. Dừng đúng driver41135/child, cluster56892 cleanup, khôngtínhPASS. Đã nối2nhánh qua Service.CatalogEffectiveDated và bổsungassert listAt; đổi tên2biến errCatalog*. Chạy targeted PG date/RLS/sync +newupgrade trước full18 trênhead đãsửa. Giữ log cũ làm proofFAIL, khôngoverwrite.

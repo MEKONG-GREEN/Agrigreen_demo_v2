@@ -160,7 +160,7 @@ func (h Handler) seed(c *gin.Context) {
 
 func (h Handler) listItems(admin bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Query("at") != "" && domain.EffectiveDated(c.Param("catalog")) {
+		if c.Query("at") != "" && h.Svc.CatalogEffectiveDated(c.Param("catalog")) {
 			h.listItemsAt(c, admin)
 			return
 		}
@@ -192,7 +192,7 @@ func (h Handler) listItems(admin bool) gin.HandlerFunc {
 }
 
 func (h Handler) item(c *gin.Context) {
-	if c.Query("at") != "" && domain.EffectiveDated(c.Param("catalog")) {
+	if c.Query("at") != "" && h.Svc.CatalogEffectiveDated(c.Param("catalog")) {
 		at, err := h.at(c)
 		if err != nil {
 			httpx.Fail(c, err)

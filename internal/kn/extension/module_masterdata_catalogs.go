@@ -130,8 +130,8 @@ func MasterdataCatalogs() mdport.CatalogRegistration {
 
 var catalogItemCodeRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$`)
 var (
-	catalogErrDoses     = errors.New(`danh sách mũi dạng "<mã vaccine>/<lần>@<ngày tuổi>" ngăn cách dấu phẩy, 1–40 mũi, lần 1–20, ngày tuổi 0–3650`)
-	catalogErrStampCode = errors.New("mã mộc dấu dạng số và dấu chấm (vd 91.589.05.1), tối đa 40 ký tự")
+	errCatalogDoses     = errors.New(`danh sách mũi dạng "<mã vaccine>/<lần>@<ngày tuổi>" ngăn cách dấu phẩy, 1–40 mũi, lần 1–20, ngày tuổi 0–3650`)
+	errCatalogStampCode = errors.New("mã mộc dấu dạng số và dấu chấm (vd 91.589.05.1), tối đa 40 ký tự")
 )
 
 func catalogIntRange(lo, hi int) func(string) (string, error) {
@@ -217,7 +217,7 @@ func catalogStampList(s string) (string, error) {
 			continue
 		}
 		if !catalogItemCodeRe.MatchString(c) {
-			return "", catalogErrStampCode
+			return "", errCatalogStampCode
 		}
 		if !slices.Contains(out, c) {
 			out = append(out, c)
@@ -266,16 +266,16 @@ func catalogParseDoses(s string) ([]mdport.Dose, error) {
 		}
 		vs, age, ok := strings.Cut(part, "@")
 		if !ok {
-			return nil, catalogErrDoses
+			return nil, errCatalogDoses
 		}
 		v, shot, ok := strings.Cut(strings.TrimSpace(vs), "/")
 		if !ok || !catalogItemCodeRe.MatchString(strings.TrimSpace(v)) {
-			return nil, catalogErrDoses
+			return nil, errCatalogDoses
 		}
 		n, err1 := strconv.Atoi(strings.TrimSpace(shot))
 		a, err2 := strconv.Atoi(strings.TrimSpace(age))
 		if err1 != nil || err2 != nil || n < 1 || n > 20 || a < 0 || a > 3650 {
-			return nil, catalogErrDoses
+			return nil, errCatalogDoses
 		}
 		d := mdport.Dose{Vaccine: strings.TrimSpace(v), Shot: n, AgeDays: a}
 		for _, o := range out {
@@ -286,7 +286,7 @@ func catalogParseDoses(s string) ([]mdport.Dose, error) {
 		out = append(out, d)
 	}
 	if len(out) == 0 || len(out) > 40 {
-		return nil, catalogErrDoses
+		return nil, errCatalogDoses
 	}
 	slices.SortStableFunc(out, func(a, b mdport.Dose) int {
 		if a.AgeDays != b.AgeDays {

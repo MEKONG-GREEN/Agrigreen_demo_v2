@@ -201,3 +201,6 @@ func (s *Service) invalidCatalogEffectiveDate() string {
 	}
 	return "valid_from: YYYY-MM-DD, chỉ danh mục Chăn nuôi – Thủy sản"
 }
+
+// CatalogEffectiveDated selects the date-aware HTTP path from the same instance registry.
+func (s *Service) CatalogEffectiveDated(c string) bool { return s.catalogEffective(c) }

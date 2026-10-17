@@ -39,6 +39,23 @@ func TestRegisteredCatalogEffectiveDatesAndIsolation(t *testing.T) {
 			t.Fatalf("effective at %s: %d %v", tc.at, code, body)
 		}
 	}
+	code, body = admin.get("/v1/masterdata/catalogs/fixture_catalog?at=2026-01-15")
+	if code != http.StatusOK {
+		t.Fatalf("list at date: %d %v", code, body)
+	}
+	found := false
+	for _, raw := range body["items"].([]any) {
+		item := raw.(map[string]any)
+		if item["code"] == "AA" {
+			found = true
+			if item["attrs"].(map[string]any)["value"] != "v1" {
+				t.Fatalf("list ignored date: %v", item)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("list at date omitted item")
+	}
 	if code, body = admin.get("/v1/masterdata/catalogs/fixture_catalog/AA?at=2025-12-31"); code != http.StatusNotFound {
 		t.Fatalf("before first value: %d %v", code, body)
 	}
