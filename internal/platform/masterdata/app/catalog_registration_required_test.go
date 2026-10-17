@@ -2,11 +2,12 @@ package app
 
 import (
 	"encoding/json"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 )
 
 func TestCatalogsRequireRegistration(t *testing.T) {

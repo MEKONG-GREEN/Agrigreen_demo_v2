@@ -170,8 +170,6 @@ couplings:
   - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/app/cnts.go, to: CNTSPort}
   - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/app/cnts.go, to: checkCNTSRefs}
   - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/domain/cnts.go, to: (tệp)}
-  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/domain/cnts.go, to: CNTSCatalogs}
-  - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/domain/cnts.go, to: normalizeCNTS}
   - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/module.go, to: Module.CNTSCatalogs}
   - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: (tệp)}
   - {rule: kn-symbol-in-shared, from: internal/platform/masterdata/port/cnts.go, to: CNTSCatalogs}

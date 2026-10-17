@@ -1,6 +1,6 @@
 // Kiểm thử tích hợp của pf/masterdata qua HTTP (Application API + Admin API) và qua port,
 // trên PostgreSQL thật (pgtest) với token giả (authztest).
-package handler_test
+package masterdata_test
 
 import (
 	"bytes"
@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -49,7 +50,12 @@ type fixture struct {
 	admin *httptest.Server
 }
 
-func newFixture(t *testing.T) *fixture { return newFixtureWithParams(t) }
+func newFixture(t *testing.T) *fixture {
+	return newFixtureWithDeps(t, masterdata.Deps{
+		Params:   []port.ParamRegistration{extension.MasterdataParams()},
+		Catalogs: []port.CatalogRegistration{extension.MasterdataCatalogs()},
+	})
+}
 
 func newFixtureWithParams(t *testing.T, registrations ...port.ParamRegistration) *fixture {
 	return newFixtureWithDeps(t, masterdata.Deps{Params: registrations})

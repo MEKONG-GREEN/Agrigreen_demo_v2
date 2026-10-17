@@ -115,7 +115,7 @@ func (s *Service) catalogEffective(c string) bool {
 	if d, ok := s.CatalogRegistry.definition(c); ok {
 		return d.EffectiveDated
 	}
-	return domain.EffectiveDated(c)
+	return false
 }
 func (s *Service) normalizeCatalogItem(it domain.Item) (domain.Item, error) {
 	if d, ok := s.CatalogRegistry.definition(it.Catalog); ok {
@@ -142,10 +142,7 @@ func (s *Service) CatalogMetadata() []port.CatalogMetadata {
 	}
 	out := make([]port.CatalogMetadata, 0, len(keys))
 	for _, key := range keys {
-		m := port.CatalogMetadata{Catalog: key, Name: domain.CatalogName(key), Attributes: domain.CatalogAttrs(key), EffectiveDated: domain.EffectiveDated(key), Sync: slices.Contains(domain.SyncCatalogs, key)}
-		if m.EffectiveDated {
-			m.SeedValidFrom = "2000-01-01"
-		}
+		m := port.CatalogMetadata{Catalog: key, Name: domain.CatalogName(key), Attributes: domain.CatalogAttrs(key), EffectiveDated: false, Sync: true}
 		if d, ok := s.CatalogRegistry.definition(key); ok {
 			m.Name = d.Name
 			m.Attributes = make([]string, 0, len(d.Attributes))
@@ -199,7 +196,7 @@ func (s *Service) invalidCatalogEffectiveDate() string {
 	if s.CatalogRegistry != nil && s.CatalogRegistry.invalidEffectiveDateDetail != "" {
 		return s.CatalogRegistry.invalidEffectiveDateDetail
 	}
-	return "valid_from: YYYY-MM-DD, chỉ danh mục Chăn nuôi – Thủy sản"
+	return "valid_from: YYYY-MM-DD, chỉ danh mục có hiệu lực theo ngày"
 }
 
 // CatalogEffectiveDated selects the date-aware HTTP path from the same instance registry.

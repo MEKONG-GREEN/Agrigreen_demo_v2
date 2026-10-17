@@ -27,8 +27,8 @@ const CatalogFormat = "agrigreen.catalogs/v1"
 var baseCatalogs = []string{port.CatalogRiceVariety, port.CatalogFarmStage, port.CatalogMachineType, port.CatalogSeason, port.CatalogPest, port.CatalogVesselClass,
 	port.CatalogCrop, port.CatalogMaterial, port.CatalogProductionModel, port.CatalogReportType}
 
-// Catalogs là các danh mục module quản lý: dùng chung / Trồng trọt rồi CNTS (W11.41).
-var Catalogs = slices.Concat(baseCatalogs, CNTSCatalogs)
+// Catalogs là các danh mục gốc do module dùng chung quản lý.
+var Catalogs = slices.Clone(baseCatalogs)
 
 // Hành động ghi vào sổ lịch sử danh mục.
 const (
@@ -296,8 +296,7 @@ func (it Item) Normalize() (Item, error) {
 	if !KnownCatalog(it.Catalog) {
 		return it, FieldError{Field: "catalog", Err: ErrCatalogUnknown}
 	}
-	return it.NormalizeWith(port.CatalogDefinition{Catalog: it.Catalog, Attributes: attrSpecs[it.Catalog],
-		ValidateAttrs: func(attrs map[string]string) error { return normalizeCNTS(Item{Catalog: it.Catalog, Attrs: attrs}) }})
+	return it.NormalizeWith(port.CatalogDefinition{Catalog: it.Catalog, Attributes: attrSpecs[it.Catalog]})
 }
 
 // NormalizeWith applies an explicitly registered pure schema.
