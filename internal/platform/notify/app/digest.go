@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
