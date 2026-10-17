@@ -23,6 +23,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	scheduleStore "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/store"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
@@ -70,7 +71,7 @@ func (units) Descendants(context.Context, string, time.Time) ([]string, error) {
 func (units) Current(context.Context, string, time.Time) ([]string, error)     { return nil, nil }
 
 type catalogs struct {
-	mdport.CNTSCatalogs
+	knport.CNTSCatalogs
 	multiProvince bool
 }
 
@@ -98,23 +99,23 @@ func (catalogs) ListAt(_ context.Context, catalog string, _ time.Time) ([]mdport
 	return out, nil
 }
 
-func (c catalogs) FacilitiesAt(context.Context, time.Time, []string) ([]mdport.SlaughterFacility, error) {
-	out := []mdport.SlaughterFacility{
-		{Ref: fac1, Code: "CS1", Name: "Lò mổ 1", CommuneCode: "30001", Kind: mdport.FacilityConcentrated, Active: true},
-		{Ref: fac2, Code: "CS2", Name: "Lò mổ 2", CommuneCode: "30002", Kind: mdport.FacilitySmall, Active: true},
+func (c catalogs) FacilitiesAt(context.Context, time.Time, []string) ([]knport.SlaughterFacility, error) {
+	out := []knport.SlaughterFacility{
+		{Ref: fac1, Code: "CS1", Name: "Lò mổ 1", CommuneCode: "30001", Kind: knport.FacilityConcentrated, Active: true},
+		{Ref: fac2, Code: "CS2", Name: "Lò mổ 2", CommuneCode: "30002", Kind: knport.FacilitySmall, Active: true},
 	}
 	if c.multiProvince {
-		out = append(out, mdport.SlaughterFacility{Ref: facProvince92, Code: "CS92", Name: "Cơ sở tỉnh khác", CommuneCode: "31001", Kind: mdport.FacilitySmall, Active: true})
+		out = append(out, knport.SlaughterFacility{Ref: facProvince92, Code: "CS92", Name: "Cơ sở tỉnh khác", CommuneCode: "31001", Kind: knport.FacilitySmall, Active: true})
 	}
 	return out, nil
 }
 
-func (catalogs) ScheduleAt(_ context.Context, code string, _ time.Time) (mdport.VaccinationSchedule, error) {
+func (catalogs) ScheduleAt(_ context.Context, code string, _ time.Time) (knport.VaccinationSchedule, error) {
 	if code != "QT_GA" {
-		return mdport.VaccinationSchedule{}, mdport.ErrCatalogItemNotFound
+		return knport.VaccinationSchedule{}, mdport.ErrCatalogItemNotFound
 	}
-	return mdport.VaccinationSchedule{Code: code, ModelType: "GA_TP", ValidFrom: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
-		Doses: []mdport.Dose{{Vaccine: "VX_ND_F", Shot: 1, AgeDays: 3}, {Vaccine: "VX_GUMBORO", Shot: 1, AgeDays: 7}, {Vaccine: "VX_GUMBORO", Shot: 2, AgeDays: 28}}}, nil
+	return knport.VaccinationSchedule{Code: code, ModelType: "GA_TP", ValidFrom: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+		Doses: []knport.Dose{{Vaccine: "VX_ND_F", Shot: 1, AgeDays: 3}, {Vaccine: "VX_GUMBORO", Shot: 1, AgeDays: 7}, {Vaccine: "VX_GUMBORO", Shot: 2, AgeDays: 28}}}, nil
 }
 
 // xaScopes: danh bạ Cấp Xã CNTS giả (được đặt sau khi tạo người dùng).

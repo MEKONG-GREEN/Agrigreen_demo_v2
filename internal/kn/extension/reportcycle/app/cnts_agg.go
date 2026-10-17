@@ -29,7 +29,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+
+	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -39,7 +40,7 @@ import (
 // CNTSFacilityCatalog là phần cổng danh mục CNTS (pf/masterdata CNTSCatalogs) mà tổng hợp BM-02 cần: tên, mã, loại,
 // mộc dấu của cơ sở giết mổ.
 type CNTSFacilityCatalog interface {
-	FacilitiesAt(ctx context.Context, on time.Time, communeCodes []string) ([]mdport.SlaughterFacility, error)
+	FacilitiesAt(ctx context.Context, on time.Time, communeCodes []string) ([]knport.SlaughterFacility, error)
 }
 
 // Mã lỗi (docs/errors/pf-extension-cnts-agg.md).
@@ -487,7 +488,7 @@ type bm02Data struct {
 	adjs     []store.AdjustmentRow
 	stale    map[uuid.UUID]bool
 	nb       *nameBook
-	fac      map[string]mdport.SlaughterFacility
+	fac      map[string]knport.SlaughterFacility
 	evs      map[string][]store.AggEvent
 	shares   []store.Share
 	basis    string
@@ -549,7 +550,7 @@ func (s *Service) loadBM02(ctx context.Context, a actor, province, periodType, k
 	}
 	d.stale = domain.StaleAdjustments(adjs, auto)
 	d.res = domain.BM02(weeks, days, adjs, auto)
-	d.fac = map[string]mdport.SlaughterFacility{}
+	d.fac = map[string]knport.SlaughterFacility{}
 	if s.CNTSFacilities != nil {
 		if fs, err := s.CNTSFacilities.FacilitiesAt(ctx, to, nil); err == nil {
 			for _, f := range fs {

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 )
 
 // Danh mục Chăn nuôi – Thủy sản (W11.41, BRD CNTS v3.7 FN-06 / UR-ADM-04, D4 CN1; pf 000146). Cùng bảng
@@ -114,9 +116,9 @@ func (d Dose) ExpectedDate(received time.Time, ageAtReceipt int) time.Time {
 // vai (module gọi đã kiểm). Lỗi "không có" bọc ErrCatalogItemNotFound / ErrNotEffective / ErrFacilityNotFound.
 type CNTSCatalogs interface {
 	// ItemAt trả mục với giá trị có hiệu lực tại ngày on (kể cả mục đã ngừng dùng từ sau ngày đó).
-	ItemAt(ctx context.Context, catalog, code string, on time.Time) (CatalogItem, error)
+	ItemAt(ctx context.Context, catalog, code string, on time.Time) (mdport.CatalogItem, error)
 	// ListAt trả các mục đang dùng tại ngày on.
-	ListAt(ctx context.Context, catalog string, on time.Time) ([]CatalogItem, error)
+	ListAt(ctx context.Context, catalog string, on time.Time) ([]mdport.CatalogItem, error)
 	// FacilitiesAt trả cơ sở giết mổ đang dùng tại ngày on, lọc theo xã (rỗng = mọi xã).
 	FacilitiesAt(ctx context.Context, on time.Time, communeCodes []string) ([]SlaughterFacility, error)
 	// Facility trả một cơ sở theo facility_ref tại ngày on.

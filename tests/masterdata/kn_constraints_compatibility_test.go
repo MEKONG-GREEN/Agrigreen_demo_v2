@@ -3,7 +3,10 @@ package masterdata_test
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
@@ -11,16 +14,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 )
 
-// Compare complete HTTP problem contracts with the temporary legacy path, including field order.
-// F will remove the legacy path only after these results and the frozen catalog vectors pass.
-func TestKNConstraintsMatchLegacy(t *testing.T) {
-	run := func(legacy bool) []map[string]any {
+// Compare all thirteen complete HTTP problems with the old path frozen in E, including field order.
+// The contract is read-only; no legacy implementation or expected-data generator remains.
+func TestKNConstraintsMatchFrozenLegacy(t *testing.T) {
+	run := func() []map[string]any {
 		reg := extension.MasterdataCatalogs()
-		if legacy {
-			for i := range reg.Definitions {
-				reg.Definitions[i].Constraints = nil
-			}
-		}
 		f := newFixtureWithDeps(t, masterdata.Deps{Catalogs: []port.CatalogRegistration{reg}})
 		admin := f.caller(f.seeded(), port.RoleMasterdataAdmin)
 		var out []map[string]any
@@ -29,7 +27,7 @@ func TestKNConstraintsMatchLegacy(t *testing.T) {
 			st, b := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/"+catalog+"/items",
 				map[string]any{"code": code, "name": "Mục " + code, "valid_from": "2026-01-01", "attrs": attrs})
 			if st != want {
-				t.Fatalf("legacy=%v %s: %d %v, want %d", legacy, code, st, b, want)
+				t.Fatalf("%s: %d %v, want %d", code, st, b, want)
 			}
 			delete(b, "instance")
 			delete(b, "trace_id")
@@ -40,7 +38,7 @@ func TestKNConstraintsMatchLegacy(t *testing.T) {
 			st, b := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/"+catalog+"/items",
 				map[string]any{"code": code, "name": "Mục " + code, "valid_from": "2026-01-01", "attrs": attrs})
 			if st != 201 {
-				t.Fatalf("legacy=%v valid %s: %d %v", legacy, code, st, b)
+				t.Fatalf("valid %s: %d %v", code, st, b)
 			}
 		}
 		errorCase("cnts_breed", "MISSING_BREED_SPECIES", map[string]string{"species": "MISSING"}, 422)
@@ -63,19 +61,22 @@ func TestKNConstraintsMatchLegacy(t *testing.T) {
 		errorCase("cnts_slaughter_facility", "ORDERED_TOKENS", facility("91.02,91.01", "91.03", "30292", "HEO"), 409)
 		st, b := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/cnts_slaughter_facility/items/OWNER/deactivate", map[string]any{"reason": "Tạm ngừng hoạt động cơ sở"})
 		if st != 200 {
-			t.Fatalf("deactivate legacy=%v: %d %v", legacy, st, b)
+			t.Fatalf("deactivate: %d %v", st, b)
 		}
 		errorCase("cnts_slaughter_facility", "INACTIVE_RESERVATION", facility("", "91.01", "30292", "HEO"), 409)
 		return out
 	}
-	legacy, owned := run(true), run(false)
-	if len(legacy) != 13 || !reflect.DeepEqual(legacy, owned) {
-		t.Fatalf("owner constraints changed legacy problems:\nlegacy=%+v\nowner=%+v", legacy, owned)
-	}
-	// Freeze only results produced by the old path, after the complete owner comparison succeeded.
-	raw, err := json.Marshal(legacy)
+	_, file, _, _ := runtime.Caller(0)
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(file), "../golden/kn-masterdata-constraints.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("LEGACY_CONSTRAINT_CONTRACTS=%s", raw)
+	var legacy []map[string]any
+	if err := json.Unmarshal(raw, &legacy); err != nil {
+		t.Fatal(err)
+	}
+	owned := run()
+	if len(legacy) != 13 || len(owned) != 13 || !reflect.DeepEqual(legacy, owned) {
+		t.Fatalf("owner constraints changed frozen legacy problems:\nlegacy=%+v\nowner=%+v", legacy, owned)
+	}
 }

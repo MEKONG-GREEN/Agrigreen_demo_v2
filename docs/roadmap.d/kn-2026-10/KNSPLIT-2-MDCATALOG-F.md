@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-MDCATALOG-F — CNTScontracts thuộc KN, bỏ legacy constraints/parser; baseline350. Pure4 đạt, chờ static/PG22/helper9 thực.

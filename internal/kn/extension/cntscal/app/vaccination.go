@@ -17,6 +17,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/store"
 	exdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/domain"
+	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -75,8 +76,8 @@ func (s *Service) view(c caller, b store.Batch) BatchView {
 }
 
 func (s *Service) labels(ctx context.Context) map[string]string {
-	return s.catalogNames(ctx, mdport.CatalogCNTSVaccine, mdport.CatalogCNTSModelType, mdport.CatalogCNTSBreed,
-		mdport.CatalogCNTSVaccinationSchedule)
+	return s.catalogNames(ctx, knport.CatalogCNTSVaccine, knport.CatalogCNTSModelType, knport.CatalogCNTSBreed,
+		knport.CatalogCNTSVaccinationSchedule)
 }
 
 // BatchQuery lọc danh sách lứa.
@@ -190,12 +191,12 @@ func (s *Service) itemAt(ctx context.Context, field, catalog, code string, on ti
 
 // pickSchedule chọn quy trình tiêm có hiệu lực tại ngày nhận: ưu tiên quy trình gắn đúng giống, rồi gắn loại mô hình
 // (không gắn giống).
-func (s *Service) pickSchedule(ctx context.Context, in CreateBatchInput) (mdport.VaccinationSchedule, error) {
+func (s *Service) pickSchedule(ctx context.Context, in CreateBatchInput) (knport.VaccinationSchedule, error) {
 	code := strings.TrimSpace(in.Schedule)
 	if code == "" {
-		items, err := s.Catalogs.ListAt(ctx, mdport.CatalogCNTSVaccinationSchedule, in.Received)
+		items, err := s.Catalogs.ListAt(ctx, knport.CatalogCNTSVaccinationSchedule, in.Received)
 		if err != nil {
-			return mdport.VaccinationSchedule{}, err
+			return knport.VaccinationSchedule{}, err
 		}
 		best := -1
 		for _, it := range items {
@@ -212,7 +213,7 @@ func (s *Service) pickSchedule(ctx context.Context, in CreateBatchInput) (mdport
 			}
 		}
 		if code == "" {
-			return mdport.VaccinationSchedule{}, ErrNoSchedule
+			return knport.VaccinationSchedule{}, ErrNoSchedule
 		}
 	}
 	sc, err := s.Catalogs.ScheduleAt(ctx, code, in.Received)
@@ -282,11 +283,11 @@ func (s *Service) CreateBatch(ctx context.Context, in CreateBatchInput) (BatchVi
 	if err != nil {
 		return BatchView{}, err
 	}
-	if _, err := s.itemAt(ctx, "model_type_code", mdport.CatalogCNTSModelType, in.ModelType, in.Received); err != nil {
+	if _, err := s.itemAt(ctx, "model_type_code", knport.CatalogCNTSModelType, in.ModelType, in.Received); err != nil {
 		return BatchView{}, err
 	}
 	if in.Breed != "" {
-		if _, err := s.itemAt(ctx, "breed_code", mdport.CatalogCNTSBreed, in.Breed, in.Received); err != nil {
+		if _, err := s.itemAt(ctx, "breed_code", knport.CatalogCNTSBreed, in.Breed, in.Received); err != nil {
 			return BatchView{}, err
 		}
 	}

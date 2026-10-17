@@ -20,6 +20,7 @@ depends:
   pf/sync: ">=1.0 <2"
 provides:
   ports:
+    - CNTSCatalogs
     - ClosedFigures
     - HTXConfirmationHistory
     - KHTCMetricNames

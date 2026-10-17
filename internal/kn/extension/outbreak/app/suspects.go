@@ -10,7 +10,8 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+
+	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -142,12 +143,12 @@ func (s *Service) ReportSuspect(ctx context.Context, in SuspectInput) (SuspectVi
 		}
 		on := day(su.ObservedAt)
 		if su.DiseaseCode != "" {
-			if _, err := s.catalogItem(ctx, ErrSuspectInvalid, "disease_code", mdport.CatalogCNTSDisease, su.DiseaseCode, on); err != nil {
+			if _, err := s.catalogItem(ctx, ErrSuspectInvalid, "disease_code", knport.CatalogCNTSDisease, su.DiseaseCode, on); err != nil {
 				return store.SuspectRow{}, err
 			}
 		}
 		if su.SpeciesCode != "" {
-			if _, err := s.catalogItem(ctx, ErrSuspectInvalid, "species_code", mdport.CatalogCNTSSpecies, su.SpeciesCode, on); err != nil {
+			if _, err := s.catalogItem(ctx, ErrSuspectInvalid, "species_code", knport.CatalogCNTSSpecies, su.SpeciesCode, on); err != nil {
 				return store.SuspectRow{}, err
 			}
 		}

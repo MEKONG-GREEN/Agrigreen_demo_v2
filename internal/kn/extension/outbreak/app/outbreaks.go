@@ -11,6 +11,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/store"
+	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -34,7 +35,7 @@ func (s *Service) obViews(ctx context.Context, rs []store.OutbreakRow) []Outbrea
 	out := make([]OutbreakView, 0, len(rs))
 	for _, r := range rs {
 		v := OutbreakView{OutbreakRow: r, Status: domain.StatusOf(r.Event), Actor: act(r.ActorRef),
-			DiseaseName: nm[mdport.CatalogCNTSDisease+":"+r.DiseaseCode], SpeciesName: nm[mdport.CatalogCNTSSpecies+":"+r.SpeciesCode]}
+			DiseaseName: nm[knport.CatalogCNTSDisease+":"+r.DiseaseCode], SpeciesName: nm[knport.CatalogCNTSSpecies+":"+r.SpeciesCode]}
 		if v.DiseaseName == "" {
 			v.DiseaseName = r.DiseaseCode
 		}

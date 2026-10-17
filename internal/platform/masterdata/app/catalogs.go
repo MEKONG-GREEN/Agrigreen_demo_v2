@@ -84,14 +84,11 @@ func (s *Service) getItem(ctx context.Context, tid uuid.UUID, catalog, code stri
 }
 
 // checkRefs kiểm tham chiếu trong danh mục: loại máy phải gắn một khâu đang dùng; cây trồng gắn nhóm
-// (cây trồng cấp 1 đang dùng, khác chính nó); sâu bệnh gắn cây trồng bị ảnh hưởng đang dùng (KN v7.7); danh mục
-// CNTS theo checkCNTSRefs (W11.41) với on là ngày áp dụng.
+// (cây trồng cấp 1 đang dùng, khác chính nó); sâu bệnh gắn cây trồng bị ảnh hưởng đang dùng.
+// Danh mục đăng ký dùng constraints của owner, với on là ngày áp dụng.
 func (s *Service) checkRefs(ctx context.Context, tx pgx.Tx, it domain.Item, on time.Time) error {
 	if d, ok := s.CatalogRegistry.definition(it.Catalog); ok && d.Constraints != nil {
 		return s.checkCatalogConstraints(ctx, tx, it, on, *d.Constraints)
-	}
-	if s.catalogEffective(it.Catalog) {
-		return checkCNTSRefs(ctx, tx, it, on)
 	}
 	switch it.Catalog {
 	case port.CatalogCrop:
@@ -135,7 +132,7 @@ func (s *Service) checkRefs(ctx context.Context, tx pgx.Tx, it domain.Item, on t
 	return nil
 }
 
-// writeChange ghi sổ lịch sử (và sổ hiệu lực của danh mục CNTS) rồi bảng hiện trạng trong cùng giao dịch (R-21).
+// writeChange ghi sổ lịch sử (và sổ hiệu lực của danh mục theo ngày) rồi bảng hiện trạng trong cùng giao dịch (R-21).
 func (s *Service) writeChange(ctx context.Context, tx pgx.Tx, tid uuid.UUID, c *domain.Change, it domain.Item) error {
 	if err := store.InsertChange(ctx, tx, tid, c); err != nil {
 		return ledger.Classify(err)

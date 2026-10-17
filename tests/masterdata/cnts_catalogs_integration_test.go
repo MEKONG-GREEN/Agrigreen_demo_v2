@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 )
 
@@ -123,12 +124,12 @@ func TestW1141_CNTSCatalogs(t *testing.T) {
 		contract.check("facility/"+on, facility, lookupErr)
 		schedule, lookupErr := cnts.ScheduleAt(ctx, "QT_GA_THUONG_PHAM", at)
 		contract.check("schedule/"+on, schedule, lookupErr)
-		items, lookupErr := cnts.ListAt(ctx, port.CatalogCNTSSlaughterFacility, at)
+		items, lookupErr := cnts.ListAt(ctx, knport.CatalogCNTSSlaughterFacility, at)
 		contract.check("list/"+on, items, lookupErr)
 		facilities, lookupErr := cnts.FacilitiesAt(ctx, at, []string{"30292"})
 		contract.check("filtered/"+on, facilities, lookupErr)
 	}
-	item, lookupErr := cnts.ItemAt(ctx, port.CatalogCNTSSpecies, "HEO", day("2026-10-01"))
+	item, lookupErr := cnts.ItemAt(ctx, knport.CatalogCNTSSpecies, "HEO", day("2026-10-01"))
 	contract.check("item", item, lookupErr)
 	missing, lookupErr := cnts.Facility(ctx, other, day("2026-10-01"))
 	contract.check("facility-missing", missing, lookupErr)

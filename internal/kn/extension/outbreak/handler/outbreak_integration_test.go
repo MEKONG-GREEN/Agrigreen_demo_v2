@@ -60,7 +60,7 @@ func (units) Descendants(context.Context, string, time.Time) ([]string, error) {
 func (units) Current(context.Context, string, time.Time) ([]string, error)     { return nil, nil }
 
 // catalogs: bệnh dtlcp (heo), cum (gà), vật nuôi heo, ga.
-type catalogs struct{ mdport.CNTSCatalogs }
+type catalogs struct{ port.CNTSCatalogs }
 
 var items = map[string]mdport.CatalogItem{
 	"cnts_disease:dtlcp": {Catalog: "cnts_disease", Code: "dtlcp", Name: "Dịch tả lợn châu Phi", Active: true,

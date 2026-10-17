@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/google/uuid"
 	"regexp"
@@ -24,92 +25,92 @@ func MasterdataCatalogs() mdport.CatalogRegistration {
 	desc := mdport.AttributeSpec{Required: false, Normalize: catalogText(500)}
 	order := mdport.AttributeSpec{Required: false, Normalize: catalogIntRange(0, 999)}
 	cnts := map[string]map[string]mdport.AttributeSpec{
-		mdport.CatalogCNTSSpecies: {
+		knport.CatalogCNTSSpecies: {
 			"group":       {Required: true, Normalize: catalogOneOf("gia_suc", "gia_cam", "thu_cung", "yen", "thuy_san", "khac")},
 			"unit":        {Required: true, Normalize: catalogNonEmpty(20)},
 			"herd_column": {Required: false, Normalize: catalogBoolAttr},
 			"order":       order,
 			"description": desc,
 		},
-		mdport.CatalogCNTSBreed: {
-			mdport.AttrSpecies: {Required: true, Normalize: catalogStageRefNamed("mã loài")},
+		knport.CatalogCNTSBreed: {
+			knport.AttrSpecies: {Required: true, Normalize: catalogStageRefNamed("mã loài")},
 			"description":      desc,
 		},
-		mdport.CatalogCNTSDisease: {
-			mdport.AttrSpecies: {Required: false, Normalize: catalogNormalizeCodes},
+		knport.CatalogCNTSDisease: {
+			knport.AttrSpecies: {Required: false, Normalize: catalogNormalizeCodes},
 			"notifiable":       {Required: false, Normalize: catalogBoolAttr},
 			"description":      desc,
 		},
-		mdport.CatalogCNTSVaccine: {
+		knport.CatalogCNTSVaccine: {
 			"diseases":         {Required: false, Normalize: catalogNormalizeCodes},
-			mdport.AttrSpecies: {Required: true, Normalize: catalogNonEmptyCodeList},
+			knport.AttrSpecies: {Required: true, Normalize: catalogNonEmptyCodeList},
 			"report_group":     {Required: true, Normalize: catalogOneOf("heo", "bo", "cum_gia_cam", "dai", "khac")},
 			"order":            order,
 			"description":      desc,
 		},
-		mdport.CatalogCNTSChemical: {
+		knport.CatalogCNTSChemical: {
 			"unit":        {Required: true, Normalize: catalogNonEmpty(20)},
 			"target":      {Required: false, Normalize: catalogOneOf("gia_suc", "gia_cam", "chung")},
 			"description": desc,
 		},
-		mdport.CatalogCNTSSlaughterFacility: {
-			mdport.AttrFacilityRef:  {Required: true, Normalize: catalogUuidAttr},
-			mdport.AttrCommuneCode:  {Required: true, Normalize: catalogCommuneCode},
-			mdport.AttrFacilityKind: {Required: true, Normalize: catalogOneOf(mdport.FacilityConcentrated, mdport.FacilitySmall)},
-			mdport.AttrStampsGS:     {Required: false, Normalize: catalogStampList},
-			mdport.AttrStampsGC:     {Required: false, Normalize: catalogStampList},
-			mdport.AttrSpecies:      {Required: false, Normalize: catalogNormalizeCodes},
+		knport.CatalogCNTSSlaughterFacility: {
+			knport.AttrFacilityRef:  {Required: true, Normalize: catalogUuidAttr},
+			knport.AttrCommuneCode:  {Required: true, Normalize: catalogCommuneCode},
+			knport.AttrFacilityKind: {Required: true, Normalize: catalogOneOf(knport.FacilityConcentrated, knport.FacilitySmall)},
+			knport.AttrStampsGS:     {Required: false, Normalize: catalogStampList},
+			knport.AttrStampsGC:     {Required: false, Normalize: catalogStampList},
+			knport.AttrSpecies:      {Required: false, Normalize: catalogNormalizeCodes},
 			"address":               {Required: false, Normalize: catalogText(300)},
 			"description":           desc,
 		},
-		mdport.CatalogCNTSAquacultureObject: {
+		knport.CatalogCNTSAquacultureObject: {
 			"scale_unit":  {Required: true, Normalize: catalogOneOf("ha", "long", "veo", "m3")},
 			"description": desc,
 		},
-		mdport.CatalogCNTSFishingGroup: {
+		knport.CatalogCNTSFishingGroup: {
 			"unit":        {Required: false, Normalize: catalogText(20)},
 			"order":       order,
 			"description": desc,
 		},
-		mdport.CatalogCNTSIndicator: {
+		knport.CatalogCNTSIndicator: {
 			"unit":        {Required: false, Normalize: catalogText(20)},
 			"value_type":  {Required: true, Normalize: catalogOneOf("decimal", "integer", "percent")},
 			"description": desc,
 		},
-		mdport.CatalogCNTSModelType: {
+		knport.CatalogCNTSModelType: {
 			"sector":           {Required: true, Normalize: catalogOneOf("chan_nuoi", "thuy_san")},
-			mdport.AttrSpecies: {Required: false, Normalize: catalogNormalizeCodes},
+			knport.AttrSpecies: {Required: false, Normalize: catalogNormalizeCodes},
 			"description":      desc,
 		},
-		mdport.CatalogCNTSDocumentType: {
+		knport.CatalogCNTSDocumentType: {
 			"description": desc,
 		},
-		mdport.CatalogCNTSVaccinationSchedule: {
+		knport.CatalogCNTSVaccinationSchedule: {
 			"model_type":     {Required: false, Normalize: catalogStageRefNamed("mã loại mô hình")},
 			"breed":          {Required: false, Normalize: catalogStageRefNamed("mã giống")},
-			mdport.AttrDoses: {Required: true, Normalize: catalogDosesAttr},
+			knport.AttrDoses: {Required: true, Normalize: catalogDosesAttr},
 			"description":    desc,
 		},
 	}
 	names := map[string]string{
-		mdport.CatalogCNTSSpecies:             "Vật nuôi",
-		mdport.CatalogCNTSBreed:               "Giống vật nuôi",
-		mdport.CatalogCNTSVaccine:             "Vaccine",
-		mdport.CatalogCNTSVaccinationSchedule: "Quy trình tiêm",
-		mdport.CatalogCNTSDisease:             "Bệnh",
-		mdport.CatalogCNTSChemical:            "Hóa chất",
-		mdport.CatalogCNTSSlaughterFacility:   "Cơ sở giết mổ",
-		mdport.CatalogCNTSAquacultureObject:   "Đối tượng nuôi thủy sản",
-		mdport.CatalogCNTSFishingGroup:        "Nhóm khai thác",
-		mdport.CatalogCNTSIndicator:           "Chỉ tiêu theo dõi",
-		mdport.CatalogCNTSModelType:           "Loại mô hình",
-		mdport.CatalogCNTSDocumentType:        "Loại văn bản",
+		knport.CatalogCNTSSpecies:             "Vật nuôi",
+		knport.CatalogCNTSBreed:               "Giống vật nuôi",
+		knport.CatalogCNTSVaccine:             "Vaccine",
+		knport.CatalogCNTSVaccinationSchedule: "Quy trình tiêm",
+		knport.CatalogCNTSDisease:             "Bệnh",
+		knport.CatalogCNTSChemical:            "Hóa chất",
+		knport.CatalogCNTSSlaughterFacility:   "Cơ sở giết mổ",
+		knport.CatalogCNTSAquacultureObject:   "Đối tượng nuôi thủy sản",
+		knport.CatalogCNTSFishingGroup:        "Nhóm khai thác",
+		knport.CatalogCNTSIndicator:           "Chỉ tiêu theo dõi",
+		knport.CatalogCNTSModelType:           "Loại mô hình",
+		knport.CatalogCNTSDocumentType:        "Loại văn bản",
 	}
 
 	keys := []string{
-		mdport.CatalogCNTSSpecies, mdport.CatalogCNTSBreed, mdport.CatalogCNTSVaccine, mdport.CatalogCNTSVaccinationSchedule,
-		mdport.CatalogCNTSDisease, mdport.CatalogCNTSChemical, mdport.CatalogCNTSSlaughterFacility, mdport.CatalogCNTSAquacultureObject,
-		mdport.CatalogCNTSFishingGroup, mdport.CatalogCNTSIndicator, mdport.CatalogCNTSModelType, mdport.CatalogCNTSDocumentType,
+		knport.CatalogCNTSSpecies, knport.CatalogCNTSBreed, knport.CatalogCNTSVaccine, knport.CatalogCNTSVaccinationSchedule,
+		knport.CatalogCNTSDisease, knport.CatalogCNTSChemical, knport.CatalogCNTSSlaughterFacility, knport.CatalogCNTSAquacultureObject,
+		knport.CatalogCNTSFishingGroup, knport.CatalogCNTSIndicator, knport.CatalogCNTSModelType, knport.CatalogCNTSDocumentType,
 	}
 	var seeds []mdport.CatalogSeed
 	if err := json.Unmarshal(masterdataCatalogSeeds, &seeds); err != nil {
@@ -258,8 +259,8 @@ func catalogDosesAttr(s string) (string, error) {
 	return catalogFormatDoses(ds), nil
 }
 
-func catalogParseDoses(s string) ([]mdport.Dose, error) {
-	var out []mdport.Dose
+func catalogParseDoses(s string) ([]knport.Dose, error) {
+	var out []knport.Dose
 	for _, part := range strings.Split(s, ",") {
 		part = strings.TrimSpace(part)
 		if part == "" {
@@ -278,7 +279,7 @@ func catalogParseDoses(s string) ([]mdport.Dose, error) {
 		if err1 != nil || err2 != nil || n < 1 || n > 20 || a < 0 || a > 3650 {
 			return nil, errCatalogDoses
 		}
-		d := mdport.Dose{Vaccine: strings.TrimSpace(v), Shot: n, AgeDays: a}
+		d := knport.Dose{Vaccine: strings.TrimSpace(v), Shot: n, AgeDays: a}
 		for _, o := range out {
 			if o.Vaccine == d.Vaccine && o.Shot == d.Shot {
 				return nil, fmt.Errorf("mũi %s lần %d bị lặp", d.Vaccine, d.Shot)
@@ -289,7 +290,7 @@ func catalogParseDoses(s string) ([]mdport.Dose, error) {
 	if len(out) == 0 || len(out) > 40 {
 		return nil, errCatalogDoses
 	}
-	slices.SortStableFunc(out, func(a, b mdport.Dose) int {
+	slices.SortStableFunc(out, func(a, b knport.Dose) int {
 		if a.AgeDays != b.AgeDays {
 			return a.AgeDays - b.AgeDays
 		}
@@ -301,7 +302,7 @@ func catalogParseDoses(s string) ([]mdport.Dose, error) {
 	return out, nil
 }
 
-func catalogFormatDoses(ds []mdport.Dose) string {
+func catalogFormatDoses(ds []knport.Dose) string {
 	parts := make([]string, len(ds))
 	for i, d := range ds {
 		parts[i] = d.Vaccine + "/" + strconv.Itoa(d.Shot) + "@" + strconv.Itoa(d.AgeDays)
@@ -319,15 +320,15 @@ func catalogNonEmptyCodeList(s string) (string, error) {
 
 func catalogNormalizeCNTS(it mdport.CatalogItem) error {
 	switch it.Catalog {
-	case mdport.CatalogCNTSVaccinationSchedule:
+	case knport.CatalogCNTSVaccinationSchedule:
 		if it.Attrs["model_type"] == "" && it.Attrs["breed"] == "" {
 			return mdport.FieldError{Field: "attrs.model_type", Err: errors.New("quy trình tiêm gắn loại mô hình hoặc giống")}
 		}
-	case mdport.CatalogCNTSSlaughterFacility:
-		gs, gc := catalogCodes(it.Attrs[mdport.AttrStampsGS]), catalogCodes(it.Attrs[mdport.AttrStampsGC])
+	case knport.CatalogCNTSSlaughterFacility:
+		gs, gc := catalogCodes(it.Attrs[knport.AttrStampsGS]), catalogCodes(it.Attrs[knport.AttrStampsGC])
 		for _, c := range gs {
 			if slices.Contains(gc, c) {
-				return mdport.FieldError{Field: "attrs." + mdport.AttrStampsGC, Err: fmt.Errorf("mã mộc dấu %s trùng giữa GS và GC", c)}
+				return mdport.FieldError{Field: "attrs." + knport.AttrStampsGC, Err: fmt.Errorf("mã mộc dấu %s trùng giữa GS và GC", c)}
 			}
 		}
 	}

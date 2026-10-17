@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 )
 
@@ -79,7 +80,7 @@ func (c *lookupContract) snapshot(value any, err error) lookupSnapshot {
 		c.t.Fatal(decodeErr)
 	}
 	out := lookupSnapshot{Value: normalized, NotEffective: errors.Is(err, port.ErrNotEffective),
-		FacilityNotFound: errors.Is(err, port.ErrFacilityNotFound), ItemNotFound: errors.Is(err, port.ErrCatalogItemNotFound)}
+		FacilityNotFound: errors.Is(err, knport.ErrFacilityNotFound), ItemNotFound: errors.Is(err, port.ErrCatalogItemNotFound)}
 	if err != nil {
 		out.Error = c.replace.Replace(err.Error())
 	}

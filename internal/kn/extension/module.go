@@ -142,7 +142,7 @@ func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logge
 
 // UseCNTSCatalogs nối danh mục CNTS theo ngày của pf/masterdata (W11.41) cho Báo cáo dịch bệnh BM-10 (W11.49: bệnh,
 // vật nuôi). Chưa nối → lập/cập nhật ổ dịch, báo nghi dịch trả 503 extension.dependency_unavailable.
-func (m *Module) UseCNTSCatalogs(c mdport.CNTSCatalogs) { m.ob.Catalogs, m.cal.Catalogs = c, c }
+func (m *Module) UseCNTSCatalogs(c port.CNTSCatalogs) { m.ob.Catalogs, m.cal.Catalogs = c, c }
 
 // UseXaScopes (W11.46) nối danh sách cán bộ Cấp Xã CNTS kèm phạm vi (pf/accounts) cho lưới lịch trực KSGM BM-03.
 func (m *Module) UseXaScopes(x accport.XaScopes) { m.cal.Officers = x }

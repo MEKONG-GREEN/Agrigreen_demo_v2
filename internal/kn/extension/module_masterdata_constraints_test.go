@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 )
 
@@ -18,14 +19,14 @@ func TestMasterdataTransactionReferences(t *testing.T) {
 		attrs   map[string]string
 		want    []mdport.CatalogReference
 	}{
-		{mdport.CatalogCNTSVaccine, map[string]string{"species": "BO,HEO", "diseases": "D"},
-			[]mdport.CatalogReference{{Catalog: mdport.CatalogCNTSDisease, Code: "D", Field: "attrs.diseases"},
-				{Catalog: mdport.CatalogCNTSSpecies, Code: "BO", Field: "attrs.species"}, {Catalog: mdport.CatalogCNTSSpecies, Code: "HEO", Field: "attrs.species"}}},
-		{mdport.CatalogCNTSVaccinationSchedule, map[string]string{"breed": "B", "model_type": "M", "doses": "V/1@1,V/2@2,W/1@3"},
-			[]mdport.CatalogReference{{Catalog: mdport.CatalogCNTSBreed, Code: "B", Field: "attrs.breed"},
-				{Catalog: mdport.CatalogCNTSModelType, Code: "M", Field: "attrs.model_type"},
-				{Catalog: mdport.CatalogCNTSVaccine, Code: "V", Field: "attrs.doses"}, {Catalog: mdport.CatalogCNTSVaccine, Code: "W", Field: "attrs.doses"}}},
-		{mdport.CatalogCNTSChemical, map[string]string{}, nil},
+		{knport.CatalogCNTSVaccine, map[string]string{"species": "BO,HEO", "diseases": "D"},
+			[]mdport.CatalogReference{{Catalog: knport.CatalogCNTSDisease, Code: "D", Field: "attrs.diseases"},
+				{Catalog: knport.CatalogCNTSSpecies, Code: "BO", Field: "attrs.species"}, {Catalog: knport.CatalogCNTSSpecies, Code: "HEO", Field: "attrs.species"}}},
+		{knport.CatalogCNTSVaccinationSchedule, map[string]string{"breed": "B", "model_type": "M", "doses": "V/1@1,V/2@2,W/1@3"},
+			[]mdport.CatalogReference{{Catalog: knport.CatalogCNTSBreed, Code: "B", Field: "attrs.breed"},
+				{Catalog: knport.CatalogCNTSModelType, Code: "M", Field: "attrs.model_type"},
+				{Catalog: knport.CatalogCNTSVaccine, Code: "V", Field: "attrs.doses"}, {Catalog: knport.CatalogCNTSVaccine, Code: "W", Field: "attrs.doses"}}},
+		{knport.CatalogCNTSChemical, map[string]string{}, nil},
 	}
 	for _, tc := range cases {
 		got, err := catalogTransactionConstraints(tc.catalog).References(tc.attrs)

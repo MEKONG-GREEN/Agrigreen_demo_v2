@@ -9,10 +9,9 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 )
 
-// Sổ phụ hiệu lực theo ngày của danh mục CNTS (W11.41, pf 000146, FN-06 BR-03).
+// Sổ phụ hiệu lực theo ngày của danh mục (pf 000146).
 
 // InsertEffective ghi một dòng sổ catalog_effective; DB tính seq, chuỗi băm, recorded_at.
 func InsertEffective(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID, v *domain.Version) error {
@@ -124,34 +123,6 @@ func ItemsAt(ctx context.Context, tx pgx.Tx, catalog string, d time.Time) ([]dom
 			return nil, err
 		}
 		out = append(out, it)
-	}
-	return out, rows.Err()
-}
-
-// StampOwners trả mã mộc dấu → mã cơ sở (khác exceptCode) đang giữ mã đó, cho các mã trong stamps. Kiểm theo
-// bảng hiện trạng (giá trị mới nhất) của mọi cơ sở, kể cả đã ngừng dùng: mã mộc dấu là định danh, không tái dùng.
-func StampOwners(ctx context.Context, tx pgx.Tx, stamps []string, exceptCode string) (map[string]string, error) {
-	out := map[string]string{}
-	if len(stamps) == 0 {
-		return out, nil
-	}
-	rows, err := tx.Query(ctx, `
-	  SELECT s, i.code
-	    FROM pf_masterdata.catalog_item i,
-	         unnest(string_to_array(coalesce(i.attrs->>'stamp_codes_gs', ''), ',') || string_to_array(coalesce(i.attrs->>'stamp_codes_gc', ''), ',')) AS s
-	   WHERE i.catalog = $1 AND i.code <> $2
-	     AND (string_to_array(coalesce(i.attrs->>'stamp_codes_gs', ''), ',') || string_to_array(coalesce(i.attrs->>'stamp_codes_gc', ''), ',')) && $3::text[]
-	     AND s = ANY($3::text[])`, port.CatalogCNTSSlaughterFacility, exceptCode, stamps)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var s, code string
-		if err := rows.Scan(&s, &code); err != nil {
-			return nil, err
-		}
-		out[s] = code
 	}
 	return out, rows.Err()
 }

@@ -61,7 +61,7 @@ type Service struct {
 	// Units: danh mục đơn vị hành chính (xã của ổ dịch phải là cấp xã có hiệu lực). nil → ghi trả 503.
 	Units partyport.AdminUnits
 	// Catalogs: danh mục CNTS theo ngày (bệnh, vật nuôi — W11.41). nil → ghi trả 503.
-	Catalogs mdport.CNTSCatalogs
+	Catalogs port.CNTSCatalogs
 	// Names (tùy chọn): tên người thao tác cho lịch sử.
 	Names func() partyport.ActorNames
 }
@@ -202,7 +202,7 @@ func (s *Service) names(ctx context.Context) map[string]string {
 	if s.Catalogs == nil {
 		return out
 	}
-	for _, cat := range []string{mdport.CatalogCNTSDisease, mdport.CatalogCNTSSpecies} {
+	for _, cat := range []string{port.CatalogCNTSDisease, port.CatalogCNTSSpecies} {
 		items, err := s.Catalogs.ListAt(ctx, cat, s.today())
 		if err != nil {
 			continue
@@ -253,14 +253,14 @@ func codeList(s string) []string {
 // checkCatalogs kiểm bệnh, vật nuôi theo ngày diễn biến; bệnh có danh sách loài thì loài phải thuộc danh sách.
 // Trả mục bệnh (cờ notifiable).
 func (s *Service) checkCatalogs(ctx context.Context, base *problem.Problem, disease, species string, on time.Time) (mdport.CatalogItem, error) {
-	d, err := s.catalogItem(ctx, base, "disease_code", mdport.CatalogCNTSDisease, disease, on)
+	d, err := s.catalogItem(ctx, base, "disease_code", port.CatalogCNTSDisease, disease, on)
 	if err != nil {
 		return d, err
 	}
-	if _, err := s.catalogItem(ctx, base, "species_code", mdport.CatalogCNTSSpecies, species, on); err != nil {
+	if _, err := s.catalogItem(ctx, base, "species_code", port.CatalogCNTSSpecies, species, on); err != nil {
 		return d, err
 	}
-	if sp := codeList(d.Attrs[mdport.AttrSpecies]); len(sp) > 0 && !slices.Contains(sp, species) {
+	if sp := codeList(d.Attrs[port.AttrSpecies]); len(sp) > 0 && !slices.Contains(sp, species) {
 		return d, base.WithField("species_code", "bệnh "+d.Name+" không áp dụng cho vật nuôi này (danh mục bệnh)")
 	}
 	return d, nil

@@ -6,7 +6,6 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
 func sampleConstraints() *port.CatalogConstraints {
@@ -88,17 +87,7 @@ func TestCatalogConstraintCallbackCannotMutateItem(t *testing.T) {
 	}
 }
 
-func TestCatalogConstraintIssuesPreserveLegacyContracts(t *testing.T) {
-	for _, old := range []*problem.Problem{ErrStampTaken, ErrCommuneInvalid} {
-		i := port.CatalogConstraintIssue{Status: old.Status, Code: old.Code, Title: old.Title, Field: "attrs.test"}
-		got := problem.From(constraintProblem(i, "reason"))
-		if !reflect.DeepEqual(got, old.WithField("attrs.test", "reason")) {
-			t.Fatalf("changed problem contract: %+v", got)
-		}
-	}
-}
-
-func TestEmptyCatalogConstraintsDisableLegacyIdentity(t *testing.T) {
+func TestEmptyCatalogConstraintsPreserveIdentity(t *testing.T) {
 	in := sampleCatalogRegistration()
 	in.Definitions[0].Constraints = &port.CatalogConstraints{}
 	s := &Service{CatalogRegistry: NewCatalogRegistry(in)}

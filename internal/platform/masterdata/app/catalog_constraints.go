@@ -70,7 +70,7 @@ func (s *Service) prepareCatalogIdentity(in domain.Item) domain.Item {
 		}
 		return in
 	}
-	return prepareFacilityRef(in) // temporary compatibility path, removed after owner proof
+	return in
 }
 
 func (s *Service) keepCatalogIdentity(upd, cur domain.Item) domain.Item {
@@ -80,7 +80,7 @@ func (s *Service) keepCatalogIdentity(upd, cur domain.Item) domain.Item {
 		}
 		return upd
 	}
-	return keepFacilityRef(upd, cur) // temporary compatibility path
+	return upd
 }
 
 func catalogReferences(c port.CatalogConstraints, attrs map[string]string) ([]port.CatalogReference, error) {
@@ -131,4 +131,25 @@ func (s *Service) checkCatalogConstraints(ctx context.Context, tx pgx.Tx, it dom
 		}
 	}
 	return nil
+}
+
+func activeRef(ctx context.Context, tx pgx.Tx, catalog, code, field string) error {
+	ref, err := store.Item(ctx, tx, catalog, code, false)
+	if err != nil {
+		return err
+	}
+	if ref == nil || !ref.Active {
+		return ErrCatalogRef.WithField(field, code)
+	}
+	return nil
+}
+
+// withAttr trả bản sao của attrs có thêm k = v (không sửa map của bên gọi).
+func withAttr(attrs map[string]string, k, v string) map[string]string {
+	out := make(map[string]string, len(attrs)+1)
+	for a, x := range attrs {
+		out[a] = x
+	}
+	out[k] = v
+	return out
 }

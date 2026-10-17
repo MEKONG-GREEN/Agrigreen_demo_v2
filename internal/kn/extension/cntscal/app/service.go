@@ -22,7 +22,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/store"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+
+	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -58,7 +59,7 @@ type Service struct {
 	// Units: danh mục đơn vị hành chính (xã của lứa). nil → ghi lịch tiêm trả 503.
 	Units partyport.AdminUnits
 	// Catalogs: danh mục CNTS theo ngày (cơ sở giết mổ, loại mô hình, giống, quy trình tiêm — W11.41). nil → 503.
-	Catalogs mdport.CNTSCatalogs
+	Catalogs knport.CNTSCatalogs
 	// Officers (tùy chọn): cán bộ Cấp Xã CNTS kèm phạm vi (W11.07) — danh sách viên chức của lưới và cảnh báo "chưa được
 	// cấp quyền cơ sở". nil → lưới không gợi ý viên chức, không cảnh báo quyền.
 	Officers accport.XaScopes
