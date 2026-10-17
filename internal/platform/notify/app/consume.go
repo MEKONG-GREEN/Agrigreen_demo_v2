@@ -60,6 +60,12 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 		}
 		return s.deliver(ctx, tx, env, ns)
 	}
+	if ns, handled, err := s.eventBuilders.build(ctx, env.TenantID, env.EventType, env.Payload, env.OccurredAt); handled {
+		if err != nil || len(ns) == 0 {
+			return err
+		}
+		return s.deliver(ctx, tx, env, ns)
+	}
 	switch env.EventType {
 	case accport.EventUserDormantWarning:
 		// D24: báo trước khóa tài khoản không hoạt động → chính tài khoản (chuông + email).

@@ -7,6 +7,7 @@ kind: capability
 zones: [pf]
 version: 1.0.0
 depends:
+  pf/accounts: ">=1.0 <2"
   pf/notify: ">=1.0 <2"
 provides:
   ports:
@@ -16,6 +17,7 @@ provides:
     - Items
     - Officers
     - Points
+    - PriceDesk
     - ReminderTargets
     - TablePDF
     - Thresholds

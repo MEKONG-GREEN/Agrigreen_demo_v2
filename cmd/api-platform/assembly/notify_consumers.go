@@ -3,6 +3,7 @@ package assembly
 import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
+	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/port"
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 )
 
@@ -14,4 +15,9 @@ func NotificationConsumers() []notifyport.ConsumerRegistration {
 // NotificationRenderers supplies source-owned pure builders to every API/worker constructor.
 func NotificationRenderers() []notifyport.EventRendererRegistration {
 	return extension.NotificationRenderers()
+}
+
+// NotificationBuilders supplies source-owned builders with explicit read-only recipient lookup.
+func NotificationBuilders(directory priceport.PriceDesk) []notifyport.EventBuilderRegistration {
+	return price.NotificationBuilders(directory)
 }

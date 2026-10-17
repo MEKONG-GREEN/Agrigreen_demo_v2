@@ -78,6 +78,7 @@ type Deps struct {
 // Service là use case của module.
 type Service struct {
 	eventRenderers eventRendererRegistry
+	eventBuilders  eventBuilderRegistry
 	DB             tenant.Beginner // pool vai notify_app
 	Clock          clock.Clock
 	Deps

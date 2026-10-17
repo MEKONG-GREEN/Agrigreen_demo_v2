@@ -74,7 +74,7 @@ func newFixture(t *testing.T) *fixture {
 	// ADR-0028 (W2.3): module chạy trên vai đăng nhập app_platform (NOINHERIT) — chỉ chạm pf_notify sau SET LOCAL ROLE r_notify.
 	appPool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	f.appDB = db.ForModule(appPool, notify.DBModule)
-	f.mod = notify.New(appPool, f.clk, notify.Deps{Renderers: extension.NotificationRenderers(), Consumers: []port.ConsumerRegistration{extension.NotificationConsumers(), price.NotificationConsumers()}, Scope: f.scope, Devices: f.devices, Staff: f.staff, Units: fakeUnits{}, Pusher: f.pusher,
+	f.mod = notify.New(appPool, f.clk, notify.Deps{Builders: price.NotificationBuilders(f.desk), Renderers: extension.NotificationRenderers(), Consumers: []port.ConsumerRegistration{extension.NotificationConsumers(), price.NotificationConsumers()}, Scope: f.scope, Devices: f.devices, Staff: f.staff, Units: fakeUnits{}, Pusher: f.pusher,
 		PriceDesk: f.desk, Emails: f.emails, EmailMailer: f.mailer, LinkBase: "https://kn.example.vn",
 		Log: slog.New(slog.NewTextHandler(f.logs, nil))})
 	ops := env.Pool(t, migrations.PF, "platform_api")

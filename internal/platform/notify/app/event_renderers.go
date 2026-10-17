@@ -34,7 +34,7 @@ func (s *Service) RegisterEventRenderers(registrations []port.EventRendererRegis
 			panic("notify: invalid event renderer")
 		}
 		for _, event := range registration.Events {
-			if !rendererEventPattern.MatchString(event) || !allowed[event] || reserved[event] || registry[event] != nil {
+			if !rendererEventPattern.MatchString(event) || !allowed[event] || reserved[event] || registry[event] != nil || s.eventBuilders[event] != nil {
 				panic("notify: invalid, duplicate or reserved renderer event " + event)
 			}
 			registry[event] = registration.Render
@@ -60,8 +60,12 @@ func (r eventRendererRegistry) render(event string, payload json.RawMessage, at 
 	if err != nil {
 		return nil, true, err
 	}
+	return notificationsFromDrafts(drafts), true, nil
+}
+
+func notificationsFromDrafts(drafts []port.NotificationDraft) []domain.Notification {
 	if drafts == nil {
-		return nil, true, nil
+		return nil
 	}
 	notifications := make([]domain.Notification, len(drafts))
 	for i, d := range drafts {
@@ -73,5 +77,5 @@ func (r eventRendererRegistry) render(event string, payload json.RawMessage, at 
 			SubjectRef: copyRendererRef(d.SubjectRef), CreatedAt: d.CreatedAt, Email: d.Email,
 		}
 	}
-	return notifications, true, nil
+	return notifications
 }

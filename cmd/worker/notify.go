@@ -12,6 +12,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	knprice "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
@@ -74,7 +75,8 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	}
 	acc := accounts.New(accPool, clk, accounts.Deps{Directory: kc})
 	farmers := assembly.AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}
-	d := notify.Deps{Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
+	ownedDesk := knprice.NewNotificationDirectory(acc.RoleHolders(), assembly.PriceProfiles())
+	d := notify.Deps{Builders: assembly.NotificationBuilders(ownedDesk), Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
 		EmailMailer: ch.EmailMailer, DigestTo: ch.DigestTo, Log: log, LinkBase: os.Getenv("AG_WEB_OPS_URL"),
 		PriceDesk: assembly.NotifyPriceDesk{Holders: acc.RoleHolders(), Profiles: assembly.PriceProfiles()}}
 	if dir := acc.MailDirectory(); dir != nil {
@@ -90,7 +92,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 func notifyConsumers(log *slog.Logger) []consumer {
 	lazy := &notifyLazy{log: log}
 	// Danh sách consumer và sự kiện lấy từ module (không cần DB để liệt kê).
-	specs := notify.New(nil, clock.System{}, notify.Deps{Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers()}).Consumers()
+	specs := notify.New(nil, clock.System{}, notify.Deps{Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Builders: assembly.NotificationBuilders(nil)}).Consumers()
 	out := make([]consumer, 0, len(specs))
 	for i := range specs {
 		sp := specs[i]
