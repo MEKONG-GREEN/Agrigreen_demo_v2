@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-NOTIFY-DIRECTIVE-A: GenericPlan/digest registry có PGguard;owner52/11/job đang kiểm chứng static/fullPG/helper.
