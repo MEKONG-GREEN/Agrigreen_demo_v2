@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-NOTIFY-PRICE-A: Registry và chín builder KN, đối chiếu118 pipeline/32 lookup; đang hoàn tất static/PG/helper trước dev.

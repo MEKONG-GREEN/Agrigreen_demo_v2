@@ -735,3 +735,16 @@ Khôi phục sau hạn mức tự làm mới 18/10: production4f3e4788 sạch, p
 
 
 Kết quả thật production4f3e4788: pure11783actual0/5package; static1952actual0/fullgates/boundary324/lint0/gofmt2old. PG32381actualexit0 đủ9/9package,0FAIL/SKIP; assembly 176.573s, testsnotify 154.730s. 77workflow+46CNTS giữ, nil/empty×7absence GREEN; hộp thư lịch/báo cáo và generic Tx/RLS/normalization guards PASS. Private50705/c62a6d1d26c0 đã dọn,Go0. Không Gochange sauPG. Năm frozenGitblobs nguyêncf58e84e,8kinddeclcopyexact; baseline330→324 chỉ6entries thực. ProofTEMP agrigreen-codex-knsplit2notifycontentb-proof.json; lệnh nhận cùngprefix-db-full.ps1(privatePG/fullnotify/...+KNroots+assembly/worker+testsnotifyconsumers+testsnotify). Helper9migration/remote còn trướcBdev; G1còn.
+
+
+## KNSPLIT-2-NOTIFY-PRICE-A — Bộ dựng báo giá do KN đăng ký
+
+Nền dev 60a04022, production f4e5322c. Thêm EventBuilderRegistration dùng chung: context, tenant, tên sự kiện, bản sao JSON và thời điểm vào; draft hoặc lỗi ra. Callback không nhận transaction, DB hay quyền cấp ID/source. Registry theo instance, khởi tạo một lần, chặn native/unknown/duplicate và trùng với pure renderer ở cả hai thứ tự. Core vẫn giữ Normalize/Redact, transaction, inbox, provenance và RLS.
+
+KNprice sở hữu chín builder báo giá và NotificationDirectory chỉ đọc RoleHolders/DutyHolders. Cấu hình directory được sao chép ba trường dùng thực tế. Worker nạp directory KN; API/dummy giữ nil directory như trước. A giữ nguyên chín đường legacy, Kind/PriceDesk và adapter assembly để đối chiếu; B mới xóa. Không alias ngược, không thêm cap gọi KN. Native MRV vẫn thuộc HTX/MKG.
+
+118 input cố định và expected lấy từ pipeline cũ PriceMessages → priceTinh → Notifications sau capture36412 actualexit0, gồm mọi trường draft, lỗi, thứ tự lookup, nil/empty, owner/self/exclusion, fallback topic, chế độ nhắc/email, JSON/type/time lỗi và giới hạn danh sách. Owner chỉ đọc expected. Pure81844 actualexit0 đủ năm package có test, thêm KNprice compile. 16 ca chọn profile/directory so trực tiếp adapter cũ với owner (32 thao tác), gồm normal/error/nil holders/empty profiles; kiểm bản sao cấu hình bằng sửa input sau constructor. Directory capture actualexit0 rồi cố định expected riêng. Năm golden Gitblob cũ nguyên nền 60a04022, không sinh expected từ owner.
+
+Impact: generic notification dispatch/constructor, API/worker assembly, KNprice và fixture notify. Full hồi quy trên PostgreSQL riêng: notify/... + KN extension/price roots + API assembly + worker + tests/notifyconsumers + tests/notify (chín package có test). Ca PG mới kiểm lỗi lookup giữ nguyên, rollback, retry cùng event, dedup, tenant và redaction; các ca giá/email/topic/CNTS/workflow hiện hữu chạy qua owner thật. Chưa nhận static/PG/helper cho đến actualexit0, không FAIL/SKIP.
+
+Không SQL/schema/migration/OpenAPI/UI/mobile thay đổi. Static đầy đủ, baseline không tăng (nền324), helper chín migration và xác minh remote trước dev. Mới chuyển nội dung 19/22 sự kiện nguồn KN; directive/task/digest, authz/accounts/party, data products/routes/tenant/client và KHTC reminder vẫn còn. G1 chưa hoàn tất; giữ main, worktrees và quyết định PO.
