@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
@@ -30,15 +29,13 @@ import (
 
 // Vai nhận thông báo chủ đề.
 var (
-	// officerRoles: cán bộ khuyến nông mọi cấp — người nhận chỉ đạo khi không có danh sách.
-	officerRoles = []string{partyport.RoleKNOfficer, partyport.RoleKNProvinceAdmin, partyport.RoleKNNationalAdmin}
 	// orgWatchRoles: người theo dõi tổ chức trong địa bàn.
 	orgWatchRoles = []string{partyport.RoleKNOfficer, partyport.RoleKNProvinceAdmin, partyport.RoleKNNationalAdmin, partyport.RoleRegistryAdmin}
 )
 
 // HandledEvents là mọi sự kiện consumer của module xử lý (trừ pf.notify.push.requested).
 var HandledEvents = []string{
-	extport.EventDirectiveIssued, contentport.EventAlertPublished,
+	contentport.EventAlertPublished,
 	contentport.EventDocumentPublished, syncport.EventConflictOpened, syncport.EventDeviceRevoked,
 	partyport.EventOrgDeactivated, coopport.EventHouseholdRegistered, coopport.EventHouseholdMembershipChanged, coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened,
 	ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived,
@@ -76,8 +73,6 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			return err
 		}
 		return s.deliver(ctx, tx, env, []domain.Notification{n})
-	case extport.EventDirectiveIssued:
-		return s.onDirective(ctx, tx, env)
 	case coopport.EventHouseholdRegistered:
 		var p coopport.HouseholdRegisteredV1
 		if err := decode(env, &p); err != nil {
@@ -269,67 +264,6 @@ func decode(env outbox.Envelope, v any) error {
 		return fmt.Errorf("notify: payload %s hỏng: %w", env.EventType, err)
 	}
 	return nil
-}
-
-// onDirective: người nhận là target_refs (danh bạ chụp lúc ban hành). Không có →
-// tra danh bạ hiện tại theo vùng; vẫn không có → thông báo chủ đề cho cán bộ của vùng.
-// Chỉ đạo khẩn còn được xếp vào email tóm tắt.
-type legacyDirectiveResult struct {
-	Notifications []domain.Notification
-	Digest        *domain.DigestItem
-}
-
-// legacyDirectivePlan is the unchanged source selection and digest intent, separated from writes for capture.
-func (s *Service) legacyDirectivePlan(ctx context.Context, env outbox.Envelope) (legacyDirectiveResult, error) {
-	if env.EventType != extport.EventDirectiveIssued {
-		return legacyDirectiveResult{}, nil
-	}
-	var p extport.DirectiveIssuedV1
-	if err := decode(env, &p); err != nil {
-		return legacyDirectiveResult{}, err
-	}
-	tpl := domain.DirectiveTemplate(p, env.OccurredAt)
-	targets := domain.DedupRefs(p.TargetRefs)
-	units := domain.DedupUnits(p.AudienceUnits)
-	if len(targets) == 0 && s.Staff != nil {
-		staff, err := s.Staff.ActiveStaff(ctx, env.TenantID, units)
-		if err != nil {
-			return legacyDirectiveResult{}, err
-		}
-		for _, st := range staff {
-			targets = append(targets, st.ActorRef)
-		}
-		targets = domain.DedupRefs(targets)
-	}
-	var ns []domain.Notification
-	for _, r := range targets {
-		ns = append(ns, tpl.For(r))
-	}
-	if len(ns) == 0 && len(units) > 0 {
-		exp, err := s.expandUnits(ctx, units, env.OccurredAt)
-		if err != nil {
-			return legacyDirectiveResult{}, err
-		}
-		ns = append(ns, tpl.ForAudience(domain.Audience{Units: exp, Roles: officerRoles}))
-	}
-
-	var digest *domain.DigestItem
-	if p.Severity == port.SeverityUrgent {
-		digest = &domain.DigestItem{DirectiveID: p.DirectiveID, AudienceUnits: units, IssuedAt: tpl.CreatedAt}
-	}
-	return legacyDirectiveResult{Notifications: ns, Digest: digest}, nil
-}
-func (s *Service) onDirective(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
-	plan, err := s.legacyDirectivePlan(ctx, env)
-	if err != nil {
-		return err
-	}
-	if plan.Digest != nil {
-		if err := store.InsertDigestItem(ctx, tx, env.TenantID, *plan.Digest, env.EventID, s.now()); err != nil {
-			return err
-		}
-	}
-	return s.deliver(ctx, tx, env, plan.Notifications)
 }
 
 // onCommuneHousehold: người nhận là cán bộ khuyến nông cấp XÃ của xã có nông hộ

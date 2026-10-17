@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
@@ -56,19 +55,6 @@ func ref(u uuid.UUID) *uuid.UUID {
 		return nil
 	}
 	return &u
-}
-
-// DirectiveTemplate: chỉ đạo mới (KN US-TASK-03). Tiêu đề/nội dung chỉ đạo KHÔNG nằm
-// trong sự kiện — người nhận mở đường dẫn để đọc và xác nhận.
-func DirectiveTemplate(p extport.DirectiveIssuedV1, occurred time.Time) Template {
-	sev, title := port.SeverityNormal, "Chỉ đạo mới từ Trung tâm Khuyến nông"
-	if p.Severity == port.SeverityUrgent {
-		sev, title = port.SeverityUrgent, "Chỉ đạo KHẨN từ Trung tâm Khuyến nông"
-	}
-	return Template{Kind: port.KindDirective, Severity: sev, Title: title,
-		Body:     "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
-		DeepLink: "/extension/directives/" + p.DirectiveID.String(), SubjectRef: ref(p.DirectiveID),
-		CreatedAt: ParseTime(p.IssuedAt, occurred)}
 }
 
 // AlertTemplate: cảnh báo khẩn (HTX US-NEWS-03) — tiêu đề và tóm tắt là nội dung công bố.

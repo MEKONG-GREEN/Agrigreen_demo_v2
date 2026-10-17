@@ -71,7 +71,7 @@ func (s *Service) queueDigestDrafts(ctx context.Context, tx pgx.Tx, env outbox.E
 	}
 	for _, draft := range drafts {
 		// The legacy physical column remains directive_id; policy uses only an opaque reference.
-		if err := store.InsertDigestItem(ctx, tx, env.TenantID, domain.DigestItem{DirectiveID: draft.Reference, AudienceUnits: draft.AudienceUnits, IssuedAt: draft.IssuedAt}, env.EventID, s.now()); err != nil {
+		if err := store.InsertDigestItem(ctx, tx, env.TenantID, domain.DigestItem{Reference: draft.Reference, AudienceUnits: draft.AudienceUnits, IssuedAt: draft.IssuedAt}, env.EventID, s.now()); err != nil {
 			return err
 		}
 	}
@@ -79,11 +79,11 @@ func (s *Service) queueDigestDrafts(ctx context.Context, tx pgx.Tx, env outbox.E
 }
 func (s *Service) formatDigest(items []domain.DigestItem) (string, string) {
 	if s.digests == nil || !s.digests.configured {
-		return DigestMessage(items)
-	} // legacy path retained for adapter step A
+		return "", ""
+	}
 	entries := make([]port.DigestDraft, len(items))
 	for i, item := range items {
-		entries[i] = port.DigestDraft{Reference: item.DirectiveID, AudienceUnits: slices.Clone(item.AudienceUnits), IssuedAt: item.IssuedAt}
+		entries[i] = port.DigestDraft{Reference: item.Reference, AudienceUnits: slices.Clone(item.AudienceUnits), IssuedAt: item.IssuedAt}
 	}
 	return s.digests.format(entries)
 }

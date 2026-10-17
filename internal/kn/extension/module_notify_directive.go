@@ -61,14 +61,14 @@ func sourceDirectivePlan(ctx context.Context, tenantID uuid.UUID, event string, 
 
 // NotificationDigest owns message and job metadata for the existing queue.
 func NotificationDigest() notifyport.DigestRegistration {
-	return notifyport.DigestRegistration{Events: []string{extport.EventDirectiveIssued}, Job: notifyport.DigestJobDefinition{Name: notifyport.JobEmailDigest, Every: time.Hour, Timeout: 10 * time.Minute, RunOnStart: false, LogMessage: "email tóm tắt chỉ đạo khẩn"}, Format: sourceDirectiveDigest}
+	return notifyport.DigestRegistration{Events: []string{extport.EventDirectiveIssued}, Job: notifyport.DigestJobDefinition{Name: extport.JobEmailDigest, Every: time.Hour, Timeout: 10 * time.Minute, RunOnStart: false, LogMessage: "email tóm tắt chỉ đạo khẩn"}, Format: sourceDirectiveDigest}
 }
 func sourceDirectiveTemplate(p extport.DirectiveIssuedV1, occurred time.Time) sourceNotificationTemplate {
 	sev, title := notifyport.SeverityNormal, "Chỉ đạo mới từ Trung tâm Khuyến nông"
 	if p.Severity == notifyport.SeverityUrgent {
 		sev, title = notifyport.SeverityUrgent, "Chỉ đạo KHẨN từ Trung tâm Khuyến nông"
 	}
-	return sourceNotificationTemplate{Kind: notifyport.KindDirective, Severity: sev, Title: title,
+	return sourceNotificationTemplate{Kind: extport.KindDirective, Severity: sev, Title: title,
 		Body:     "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
 		DeepLink: "/extension/directives/" + p.DirectiveID.String(), SubjectRef: sourceNotificationRef(p.DirectiveID),
 		CreatedAt: sourceNotificationTime(p.IssuedAt, occurred)}

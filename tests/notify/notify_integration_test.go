@@ -245,7 +245,7 @@ func TestDirectiveNotifiesTargetOfficersOnly(t *testing.T) {
 	f.process(extport.NotifyConsumerDirective, env)
 
 	got := a.inbox()
-	if len(got) != 1 || got[0]["kind"] != port.KindDirective || got[0]["severity"] != "urgent" ||
+	if len(got) != 1 || got[0]["kind"] != extport.KindDirective || got[0]["severity"] != "urgent" ||
 		got[0]["deep_link"] != "/extension/directives/"+dirID.String() || got[0]["topic"] != false {
 		t.Fatalf("hộp thư người nhận: %v", got)
 	}
@@ -376,7 +376,7 @@ func TestPushDataOnlyAndPerDeviceFailures(t *testing.T) {
 			t.Fatal("không được có khối notification")
 		}
 		data := msg["data"].(map[string]any)
-		if len(data) != 2 || data["kind"] != port.KindDirective || data["notification_id"] == "" {
+		if len(data) != 2 || data["kind"] != extport.KindDirective || data["notification_id"] == "" {
 			t.Fatalf("data chỉ được có kind + notification_id: %v", data)
 		}
 		s := string(body)

@@ -167,9 +167,9 @@ func TestDigestRegistrationCopiesAndValidation(t *testing.T) {
 	if !ok || got != definition || !svc.digests.events["fixture.owned"] || svc.digests.events["corrupt"] {
 		t.Fatal("digest registration aliases input")
 	}
-	items := []domain.DigestItem{{DirectiveID: ref, AudienceUnits: []string{"unit"}, IssuedAt: at}}
+	items := []domain.DigestItem{{Reference: ref, AudienceUnits: []string{"unit"}, IssuedAt: at}}
 	subject, body := svc.formatDigest(items)
-	if subject != "subject" || body != "body" || items[0].DirectiveID != ref || items[0].AudienceUnits[0] != "unit" {
+	if subject != "subject" || body != "body" || items[0].Reference != ref || items[0].AudienceUnits[0] != "unit" {
 		t.Fatal("formatter changed queue state")
 	}
 	other := &Service{}

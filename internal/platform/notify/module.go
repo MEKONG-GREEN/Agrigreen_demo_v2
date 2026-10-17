@@ -1,6 +1,6 @@
 // Package notify là module thông báo pf/notify (ADR-0015): hộp thư trong app theo
 // người nhận, token đẩy gắn với thiết bị pf/sync, thông điệp đẩy CHỈ dữ liệu (FCM,
-// RB-7), email tóm tắt chỉ đạo khẩn (SMTP trong lãnh thổ), đồng bộ ngay theo yêu
+// RB-7), email tóm tắt do nguồn đăng ký (SMTP trong lãnh thổ), đồng bộ ngay theo yêu
 // cầu (US-SYNC-02), entity đồng bộ "notification".
 //
 // Người nhận được tìm không cần dữ liệu cá nhân: danh sách actor_ref trong sự kiện
@@ -197,12 +197,13 @@ func DigestTenants(pool *pgxpool.Pool) app.TenantLister {
 	return func(ctx context.Context) ([]uuid.UUID, error) { return store.PendingDigestTenants(ctx, pool) }
 }
 
-// Jobs trả job định kỳ (chỉ chạy ở leader): email tóm tắt chỉ đạo khẩn mỗi giờ.
+// Jobs returns only explicitly registered digest jobs (leader only).
 func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job {
 	definition, configured := m.svc.DigestJobDefinition()
 	if !configured {
-		definition = port.DigestJobDefinition{Name: port.JobEmailDigest, Every: time.Hour, Timeout: 10 * time.Minute, LogMessage: "email tóm tắt chỉ đạo khẩn"}
-	} // legacy adapter path, removed in step B
+		return nil
+	}
+
 	return []schedule.Job{{
 		Name: definition.Name, Spec: schedule.Every{Interval: definition.Every}, RunOnStart: definition.RunOnStart, Timeout: definition.Timeout,
 		Run: func(ctx context.Context) error {

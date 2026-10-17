@@ -66,9 +66,9 @@ type DeliveryJob struct {
 	Entities []string
 }
 
-// DigestItem là một chỉ đạo khẩn chờ đưa vào email tóm tắt.
+// DigestItem là tham chiếu nguồn chờ đưa vào email tóm tắt đã đăng ký.
 type DigestItem struct {
-	DirectiveID   uuid.UUID
+	Reference     uuid.UUID
 	AudienceUnits []string
 	IssuedAt      time.Time
 }

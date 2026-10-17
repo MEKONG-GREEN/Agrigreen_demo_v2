@@ -18,7 +18,6 @@ const EntityNotification = "notification"
 
 // Loại thông báo (cột kind, trường "kind" của thông điệp đẩy).
 const (
-	KindDirective      = "directive"       // chỉ đạo từ TTKN (KN US-TASK-03)
 	KindAlert          = "alert"           // cảnh báo khẩn (HTX US-NEWS-03)
 	KindDocument       = "document"        // tài liệu/tin mới hoặc cập nhật (US-LIB-06)
 	KindSyncConflict   = "sync_conflict"   // xung đột đồng bộ chờ xử lý (C-8)
@@ -113,9 +112,6 @@ var EgressAnomalyRoles = []string{meteringport.RoleMeteringViewer, authz.RolePla
 type AreaFarmers interface {
 	FarmersInCommunes(ctx context.Context, tenantID uuid.UUID, communes []string) ([]uuid.UUID, error)
 }
-
-// JobEmailDigest là tên job gửi email tóm tắt chỉ đạo khẩn trong cmd/worker (-jobs).
-const JobEmailDigest = "notify_email_digest"
 
 // NotificationCreatedV1 là payload của pf.notify.notification.created: một thông
 // báo đã vào hộp thư. Không có tiêu đề/nội dung (đọc qua API) và không có dữ liệu

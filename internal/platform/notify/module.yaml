@@ -28,7 +28,6 @@ consumes:
     - pf.cropcycle.farm_log.recorded/v1
     - pf.cropcycle.farm_log.reviewed/v1
     - pf.cropcycle.season.opened/v1
-    - pf.extension.directive.issued/v1
     - pf.mechanization.area_feed.stale/v1
     - pf.metering.egress.anomaly_detected/v1
     - pf.mrv.alert.raised/v1

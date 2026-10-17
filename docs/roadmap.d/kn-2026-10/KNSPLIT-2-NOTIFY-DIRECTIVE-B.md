@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-NOTIFY-DIRECTIVE-B: Xóa policy/job legacy và chuyển2hằng;đang kiểm chứng52/11/job/15goldens/static/PG/helper.
