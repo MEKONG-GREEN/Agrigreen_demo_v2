@@ -1,0 +1,1306 @@
+[
+  {
+    "Name": "created-low-assigned",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"low\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-low-unassigned",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"low\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-low-zero-assignee",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"low\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"00000000-0000-0000-0000-000000000000\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-low-sla_overdue",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"low\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-low-manual",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"low\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"manual\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-low-unknown",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"low\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"unknown\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-normal-assigned",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-normal-unassigned",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-normal-zero-assignee",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"00000000-0000-0000-0000-000000000000\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-normal-sla_overdue",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-normal-manual",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"manual\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-normal-unknown",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"unknown\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-high-assigned",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"high\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-high-unassigned",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"high\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-high-zero-assignee",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"high\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"00000000-0000-0000-0000-000000000000\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-high-sla_overdue",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"high\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-high-manual",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"high\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"manual\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-high-unknown",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"high\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"unknown\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-urgent-assigned",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"urgent\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-urgent-unassigned",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"urgent\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-urgent-zero-assignee",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"urgent\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"00000000-0000-0000-0000-000000000000\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-urgent-sla_overdue",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"urgent\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-urgent-manual",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"urgent\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"manual\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-urgent-unknown",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"urgent\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"unknown\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-unknown-assigned",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"unknown\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-unknown-unassigned",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"unknown\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-unknown-zero-assignee",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"unknown\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"00000000-0000-0000-0000-000000000000\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-unknown-sla_overdue",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"unknown\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-unknown-manual",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"unknown\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"manual\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-unknown-unknown",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"unknown\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"unknown\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created--assigned",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created--unassigned",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created--zero-assignee",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"00000000-0000-0000-0000-000000000000\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated--sla_overdue",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated--manual",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"manual\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated--unknown",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"unknown\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-no-province",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-no-unit",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"\",\"province_code\":\"\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-zero-task",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"00000000-0000-0000-0000-000000000000\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-bad-created",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"bad\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-empty-created",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-bad-due",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"bad\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-empty-due",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-other-source",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"other\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-long-commune",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"áááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááá\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-phone-commune",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"0901234567\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-nil-records-assigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": null
+    }
+  },
+  {
+    "Name": "escalated-nil-records-unassigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": null
+    }
+  },
+  {
+    "Name": "escalated-empty-records-assigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": []
+    }
+  },
+  {
+    "Name": "escalated-empty-records-unassigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": []
+    }
+  },
+  {
+    "Name": "escalated-duplicate-admin-assigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        },
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-duplicate-admin-unassigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        },
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-nil-admin-assigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "00000000-0000-0000-0000-000000000000",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-nil-admin-unassigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "00000000-0000-0000-0000-000000000000",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-commune-only-assigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91001",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-commune-only-unassigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91001",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-wrong-province-assigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "92",
+          "ProvinceCode": "92"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-wrong-province-unassigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "92",
+          "ProvinceCode": "92"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-empty-unit-assigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-empty-unit-unassigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-mixed-assigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        },
+        {
+          "ActorRef": "22222222-2222-4222-8222-222222222222",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        },
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91001",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-mixed-unassigned",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        },
+        {
+          "ActorRef": "22222222-2222-4222-8222-222222222222",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        },
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91001",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-no-province",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-no-target",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":null}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-zero-task",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"00000000-0000-0000-0000-000000000000\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-bad-event-time",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"bad\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-empty-event-time",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-bad-due",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"bad\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-empty-due",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-long-commune",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"áááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááá\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-phone-commune",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"0901234567\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-nil-directory",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Nil": true
+    }
+  },
+  {
+    "Name": "escalated-lookup-error",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Error": true
+    }
+  },
+  {
+    "Name": "escalated-lookup-error-no-province",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"reason\":\"sla_overdue\",\"event_time\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Error": true
+    }
+  },
+  {
+    "Name": "created-bad-json",
+    "Event": "pf.extension.task.created",
+    "Payload": "{",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-wrong-type",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":false}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-nil-payload",
+    "Event": "pf.extension.task.created",
+    "Payload": "",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-bad-json",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-wrong-type",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "{\"task_id\":false}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "escalated-nil-payload",
+    "Event": "pf.extension.task.escalated",
+    "Payload": "",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "created-directory-error-unused",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Error": true
+    }
+  },
+  {
+    "Name": "created-nil-directory",
+    "Event": "pf.extension.task.created",
+    "Payload": "{\"task_id\":\"11111111-1111-4111-8111-111111111111\",\"commune_code\":\"91001\",\"province_code\":\"91\",\"priority\":\"normal\",\"due_at\":\"2027-10-14T10:00:00+07:00\",\"source\":\"htx_app\",\"created_at\":\"2027-10-13T10:30:00+07:00\",\"assignee_ref\":\"22222222-2222-4222-8222-222222222222\"}",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Nil": true
+    }
+  },
+  {
+    "Name": "unknown",
+    "Event": "pf.extension.task.unknown",
+    "Payload": "{",
+    "At": "2027-10-13T04:05:06Z",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Lookup": {
+      "Records": [
+        {
+          "ActorRef": "33333333-3333-4333-8333-333333333333",
+          "UnitCode": "91",
+          "ProvinceCode": "91"
+        }
+      ]
+    }
+  }
+]

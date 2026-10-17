@@ -77,12 +77,12 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			return err
 		}
 		return s.onDirective(ctx, tx, env, p)
-	case extport.EventTaskCreated:
-		var p extport.TaskCreatedV1
-		if err := decode(env, &p); err != nil {
+	case extport.EventTaskCreated, extport.EventTaskEscalated:
+		ns, err := s.legacyTaskNotifications(ctx, env)
+		if err != nil {
 			return err
 		}
-		return s.onTaskCreated(ctx, tx, env, p)
+		return s.deliver(ctx, tx, env, ns)
 	case coopport.EventHouseholdRegistered:
 		var p coopport.HouseholdRegisteredV1
 		if err := decode(env, &p); err != nil {
@@ -98,12 +98,6 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			return err
 		}
 		return s.onCommuneHousehold(ctx, tx, env, p.CommuneCode, domain.MembershipChangedTemplate(p, env.OccurredAt))
-	case extport.EventTaskEscalated:
-		var p extport.TaskEscalatedV1
-		if err := decode(env, &p); err != nil {
-			return err
-		}
-		return s.onTaskEscalated(ctx, tx, env, p)
 	case contentport.EventAlertPublished:
 		var p contentport.AlertPublishedV1
 		if err := decode(env, &p); err != nil {
@@ -319,38 +313,6 @@ func (s *Service) onDirective(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 	return s.deliver(ctx, tx, env, ns)
 }
 
-// onTaskEscalated: người được giao (nếu có) + cán bộ cấp tỉnh trong danh bạ của tỉnh
-// nhận leo thang. Tỉnh chưa có cán bộ trong danh bạ → thông báo chủ đề cho vai
-// kn_province_admin của tỉnh.
-func (s *Service) onTaskEscalated(ctx context.Context, tx pgx.Tx, env outbox.Envelope, p extport.TaskEscalatedV1) error {
-	tpl := domain.TaskEscalatedTemplate(p, env.OccurredAt)
-	var recipients []uuid.UUID
-	if p.AssigneeRef != nil {
-		recipients = append(recipients, *p.AssigneeRef)
-	}
-	admins := 0
-	if s.Staff != nil && p.ProvinceCode != "" {
-		staff, err := s.Staff.ActiveStaff(ctx, env.TenantID, []string{p.ProvinceCode})
-		if err != nil {
-			return err
-		}
-		for _, st := range staff {
-			if st.ProvinceLevel() && st.ProvinceCode == p.ProvinceCode {
-				recipients = append(recipients, st.ActorRef)
-				admins++
-			}
-		}
-	}
-	var ns []domain.Notification
-	for _, r := range domain.DedupRefs(recipients) {
-		ns = append(ns, tpl.For(r))
-	}
-	if admins == 0 && p.ProvinceCode != "" {
-		ns = append(ns, tpl.ForAudience(domain.Audience{Units: []string{p.ProvinceCode}, Roles: []string{partyport.RoleKNProvinceAdmin}}))
-	}
-	return s.deliver(ctx, tx, env, ns)
-}
-
 // onCommuneHousehold: người nhận là cán bộ khuyến nông cấp XÃ của xã có nông hộ
 // (danh bạ trực); xã chưa có ai trong danh bạ → thông báo chủ đề cho vai kn_officer của xã.
 func (s *Service) onCommuneHousehold(ctx context.Context, tx pgx.Tx, env outbox.Envelope, commune string, tpl domain.Template) error {
@@ -379,18 +341,57 @@ func (s *Service) onCommuneHousehold(ctx context.Context, tx pgx.Tx, env outbox.
 	return s.deliver(ctx, tx, env, ns)
 }
 
-// onTaskCreated: nhiệm vụ tự sinh từ App HTX (KN US-TASK-01) → người được giao; không
-// ai được giao (admin_queue) → thông báo chủ đề cho quản trị TTKN tỉnh để gán lại.
-func (s *Service) onTaskCreated(ctx context.Context, tx pgx.Tx, env outbox.Envelope, p extport.TaskCreatedV1) error {
-	tpl := domain.TaskAssignedTemplate(p, env.OccurredAt)
-	if p.AssigneeRef != nil && *p.AssigneeRef != uuid.Nil {
-		return s.deliver(ctx, tx, env, []domain.Notification{tpl.For(*p.AssigneeRef)})
+// legacyTaskNotifications isolates the existing task construction from delivery.
+// PRICE-B behavior is retained; TASK-B removes this legacy builder after owner comparison.
+func (s *Service) legacyTaskNotifications(ctx context.Context, env outbox.Envelope) ([]domain.Notification, error) {
+	switch env.EventType {
+	case extport.EventTaskEscalated:
+		var p extport.TaskEscalatedV1
+		if err := decode(env, &p); err != nil {
+			return nil, err
+		}
+		tpl := domain.TaskEscalatedTemplate(p, env.OccurredAt)
+		var recipients []uuid.UUID
+		if p.AssigneeRef != nil {
+			recipients = append(recipients, *p.AssigneeRef)
+		}
+		admins := 0
+		if s.Staff != nil && p.ProvinceCode != "" {
+			staff, err := s.Staff.ActiveStaff(ctx, env.TenantID, []string{p.ProvinceCode})
+			if err != nil {
+				return nil, err
+			}
+			for _, st := range staff {
+				if st.ProvinceLevel() && st.ProvinceCode == p.ProvinceCode {
+					recipients = append(recipients, st.ActorRef)
+					admins++
+				}
+			}
+		}
+		var ns []domain.Notification
+		for _, r := range domain.DedupRefs(recipients) {
+			ns = append(ns, tpl.For(r))
+		}
+		if admins == 0 && p.ProvinceCode != "" {
+			ns = append(ns, tpl.ForAudience(domain.Audience{Units: []string{p.ProvinceCode}, Roles: []string{partyport.RoleKNProvinceAdmin}}))
+		}
+		return ns, nil
+	case extport.EventTaskCreated:
+		var p extport.TaskCreatedV1
+		if err := decode(env, &p); err != nil {
+			return nil, err
+		}
+		tpl := domain.TaskAssignedTemplate(p, env.OccurredAt)
+		if p.AssigneeRef != nil && *p.AssigneeRef != uuid.Nil {
+			return []domain.Notification{tpl.For(*p.AssigneeRef)}, nil
+		}
+		unit := p.ProvinceCode
+		if unit == "" {
+			unit = p.CommuneCode
+		}
+		return []domain.Notification{tpl.ForAudience(domain.Audience{Units: []string{unit}, Roles: []string{partyport.RoleKNProvinceAdmin}})}, nil
 	}
-	unit := p.ProvinceCode
-	if unit == "" {
-		unit = p.CommuneCode
-	}
-	return s.deliver(ctx, tx, env, []domain.Notification{tpl.ForAudience(domain.Audience{Units: []string{unit}, Roles: []string{partyport.RoleKNProvinceAdmin}})})
+	return nil, nil
 }
 
 // contentAudience: national (hoặc không có đơn vị) → toàn quốc; còn lại → các đơn
