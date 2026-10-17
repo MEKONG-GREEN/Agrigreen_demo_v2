@@ -41,7 +41,7 @@ func TestPriceOwnedBuilderLookupRetryTenantAndRedaction(t *testing.T) {
 	a := f.user(authz.Scope{Units: []string{prov91}}, partyport.RoleKNProvinceAdmin)
 	foreign := f.asActor(ids.New(), ids.New(), a.actor, partyport.RoleKNProvinceAdmin)
 	directory := &retryPriceDirectory{fail: true, recipient: a.actor}
-	f.mod = notify.New(f.appDB, f.clk, notify.Deps{Scope: f.scope,
+	f.mod = notify.New(f.appDB, f.clk, notify.Deps{Kinds: []notifyport.KindRegistration{price.NotificationKinds()}, Scope: f.scope,
 		Consumers: []notifyport.ConsumerRegistration{price.NotificationConsumers()}, Builders: price.NotificationBuilders(directory)})
 	e := f.event(f.tenant, priceport.EventAlertRaised, priceport.AlertRaisedV1{Profile: "kn_fixture", Day: "2027-10-13", PointName: "Xã thử 0901234567", TicketID: ids.New(), ItemCodes: []string{"A"}})
 	if _, err := inbox.Process(context.Background(), f.appDB, priceport.NotifyConsumerPrice, e, f.mod.EventHandler()); !errors.Is(err, errFixturePriceLookup) {

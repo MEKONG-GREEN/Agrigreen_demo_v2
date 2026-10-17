@@ -341,6 +341,9 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, env outbox.Envelope, n
 	mail := emailBatch{id: ids.New()}
 	for _, n := range ns {
 		n.ID, n.SourceEventID, n.SourceEventType = ids.New(), env.EventID, env.EventType
+		if !s.kinds[n.Kind] {
+			return fmt.Errorf("notify: %w: kind %q is not registered", ErrDependency, n.Kind)
+		}
 		if !n.Normalize() {
 			return fmt.Errorf("notify: thông báo %s dựng từ %s không hợp lệ", n.Kind, env.EventType)
 		}

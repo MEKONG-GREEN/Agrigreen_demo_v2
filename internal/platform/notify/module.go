@@ -52,6 +52,7 @@ var DBModule = db.Module("pf/notify")
 // thiếu Staff → dùng thông báo chủ đề; thiếu Units → không mở rộng tỉnh ra xã;
 // thiếu Pusher → consumer gửi đẩy lỗi (vào DLQ); thiếu Mailer → tắt email tóm tắt.
 type Deps struct {
+	Kinds     []port.KindRegistration
 	Digests   []port.DigestRegistration
 	Builders  []port.EventBuilderRegistration
 	Renderers []port.EventRendererRegistration
@@ -122,6 +123,7 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		DigestTo: d.DigestTo, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
 		SyncEntities: d.SyncEntities, Emails: d.Emails, EmailMailer: d.EmailMailer, LinkBase: d.LinkBase,
 	})}
+	m.svc.RegisterKinds(d.Kinds, nativeNotificationKinds())
 	m.consumers = newConsumerRegistry(m.nativeConsumers(), d.Consumers)
 	var subscribed, native []string
 	for _, c := range m.Consumers() {

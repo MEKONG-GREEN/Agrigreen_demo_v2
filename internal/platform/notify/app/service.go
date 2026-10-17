@@ -78,6 +78,7 @@ type Service struct {
 	eventRenderers eventRendererRegistry
 	eventBuilders  eventBuilderRegistry
 	digests        *digestRegistry
+	kinds          kindRegistry
 	DB             tenant.Beginner // pool vai notify_app
 	Clock          clock.Clock
 	Deps

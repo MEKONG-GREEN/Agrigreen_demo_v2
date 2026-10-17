@@ -36,7 +36,7 @@ func TestDirectiveOwnedPlanQueuesWithoutAudienceAndRetriesLookup(t *testing.T) {
 	t.Run("no-audience", func(t *testing.T) {
 		f := newFixture(t)
 		mail := &fakeMailer{}
-		f.mod = notify.New(f.appDB, f.clk, notify.Deps{Consumers: []port.ConsumerRegistration{extension.NotificationConsumers()}, Builders: extension.DirectiveNotificationBuilders(nil, nil), Digests: []port.DigestRegistration{extension.NotificationDigest()}, Mailer: mail, DigestTo: []string{"fixture@example.vn"}})
+		f.mod = notify.New(f.appDB, f.clk, notify.Deps{Kinds: []port.KindRegistration{extension.NotificationKinds()}, Consumers: []port.ConsumerRegistration{extension.NotificationConsumers()}, Builders: extension.DirectiveNotificationBuilders(nil, nil), Digests: []port.DigestRegistration{extension.NotificationDigest()}, Mailer: mail, DigestTo: []string{"fixture@example.vn"}})
 		reference := ids.New()
 		event := f.event(f.tenant, extport.EventDirectiveIssued, extport.DirectiveIssuedV1{DirectiveID: reference, Severity: port.SeverityUrgent})
 		if !f.process(extport.NotifyConsumerDirective, event) || f.process(extport.NotifyConsumerDirective, event) {
@@ -75,7 +75,7 @@ func TestDirectiveOwnedPlanQueuesWithoutAudienceAndRetriesLookup(t *testing.T) {
 		f := newFixture(t)
 		actor := f.user(authz.Scope{Units: []string{prov91}}, partyport.RoleKNOfficer)
 		directory := &retryDirectiveDirectory{fail: true, recipient: actor.actor}
-		f.mod = notify.New(f.appDB, f.clk, notify.Deps{Scope: f.scope, Consumers: []port.ConsumerRegistration{extension.NotificationConsumers()}, Builders: extension.DirectiveNotificationBuilders(directory, nil), Digests: []port.DigestRegistration{extension.NotificationDigest()}})
+		f.mod = notify.New(f.appDB, f.clk, notify.Deps{Kinds: []port.KindRegistration{extension.NotificationKinds()}, Scope: f.scope, Consumers: []port.ConsumerRegistration{extension.NotificationConsumers()}, Builders: extension.DirectiveNotificationBuilders(directory, nil), Digests: []port.DigestRegistration{extension.NotificationDigest()}})
 		reference := ids.New()
 		event := f.event(f.tenant, extport.EventDirectiveIssued, extport.DirectiveIssuedV1{DirectiveID: reference, Severity: port.SeverityUrgent, AudienceUnits: []string{prov91}})
 		if _, err := inbox.Process(context.Background(), f.appDB, extport.NotifyConsumerDirective, event, f.mod.EventHandler()); !errors.Is(err, errFixtureDirectiveLookup) {

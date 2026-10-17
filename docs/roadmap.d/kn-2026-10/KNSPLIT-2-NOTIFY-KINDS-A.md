@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-NOTIFY-KINDS-A: OLD43kindcontract vàowner25/native18registry;đang kiểm chứngpure/static/fullPG/helper.

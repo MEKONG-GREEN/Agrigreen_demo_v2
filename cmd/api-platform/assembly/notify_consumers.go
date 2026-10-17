@@ -28,3 +28,8 @@ func NotificationBuilders(directory priceport.PriceDesk, staff notifyport.StaffD
 func NotificationDigests() []notifyport.DigestRegistration {
 	return []notifyport.DigestRegistration{extension.NotificationDigest()}
 }
+
+// NotificationKinds composes source-owned notification keys.
+func NotificationKinds() []notifyport.KindRegistration {
+	return []notifyport.KindRegistration{extension.NotificationKinds(), price.NotificationKinds()}
+}

@@ -3,6 +3,7 @@ package notify_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
@@ -66,7 +67,7 @@ func TestRegisteredRendererKeepsDeliveryGuards(t *testing.T) {
 	foreign := f.asActor(ids.New(), ids.New(), a.actor, partyport.RoleKNOfficer)
 	calls := 0
 	invalid := true
-	f.mod = notify.New(f.appDB, f.clk, notify.Deps{Scope: f.scope,
+	f.mod = notify.New(f.appDB, f.clk, notify.Deps{Kinds: []port.KindRegistration{extension.NotificationKinds()}, Scope: f.scope,
 		Consumers: []port.ConsumerRegistration{{Definitions: []port.ConsumerDefinition{{Name: "fixture.notify", Order: 1, Events: []string{"fixture.notification.rendered"}}}}},
 		Renderers: []port.EventRendererRegistration{{Events: []string{"fixture.notification.rendered"}, Render: func(string, json.RawMessage, time.Time) ([]port.NotificationDraft, error) {
 			calls++

@@ -74,7 +74,7 @@ func newFixture(t *testing.T) *fixture {
 	// ADR-0028 (W2.3): module chạy trên vai đăng nhập app_platform (NOINHERIT) — chỉ chạm pf_notify sau SET LOCAL ROLE r_notify.
 	appPool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	f.appDB = db.ForModule(appPool, notify.DBModule)
-	f.mod = notify.New(appPool, f.clk, notify.Deps{Digests: []port.DigestRegistration{extension.NotificationDigest()}, Builders: append(append(price.NotificationBuilders(f.desk), extension.TaskNotificationBuilders(f.staff)...), extension.DirectiveNotificationBuilders(f.staff, fakeUnits{})...), Renderers: extension.NotificationRenderers(), Consumers: []port.ConsumerRegistration{extension.NotificationConsumers(), price.NotificationConsumers()}, Scope: f.scope, Devices: f.devices, Staff: f.staff, Units: fakeUnits{}, Pusher: f.pusher,
+	f.mod = notify.New(appPool, f.clk, notify.Deps{Kinds: []port.KindRegistration{extension.NotificationKinds(), price.NotificationKinds()}, Digests: []port.DigestRegistration{extension.NotificationDigest()}, Builders: append(append(price.NotificationBuilders(f.desk), extension.TaskNotificationBuilders(f.staff)...), extension.DirectiveNotificationBuilders(f.staff, fakeUnits{})...), Renderers: extension.NotificationRenderers(), Consumers: []port.ConsumerRegistration{extension.NotificationConsumers(), price.NotificationConsumers()}, Scope: f.scope, Devices: f.devices, Staff: f.staff, Units: fakeUnits{}, Pusher: f.pusher,
 		Emails: f.emails, EmailMailer: f.mailer, LinkBase: "https://kn.example.vn",
 		Log: slog.New(slog.NewTextHandler(f.logs, nil))})
 	ops := env.Pool(t, migrations.PF, "platform_api")
@@ -708,7 +708,7 @@ func TestUrgentDirectiveEmailDigest(t *testing.T) {
 	env := pgtest.Get(t)
 	f := newFixture(t)
 	mail := &fakeMailer{}
-	mod := notify.New(f.pool, f.clk, notify.Deps{Scope: f.scope, Consumers: []port.ConsumerRegistration{extension.NotificationConsumers()}, Builders: extension.DirectiveNotificationBuilders(nil, nil), Digests: []port.DigestRegistration{extension.NotificationDigest()}, Mailer: mail, DigestTo: []string{"ttkn.angiang@example.vn"}})
+	mod := notify.New(f.pool, f.clk, notify.Deps{Kinds: []port.KindRegistration{extension.NotificationKinds(), price.NotificationKinds()}, Scope: f.scope, Consumers: []port.ConsumerRegistration{extension.NotificationConsumers()}, Builders: extension.DirectiveNotificationBuilders(nil, nil), Digests: []port.DigestRegistration{extension.NotificationDigest()}, Mailer: mail, DigestTo: []string{"ttkn.angiang@example.vn"}})
 	a := f.user(authz.Scope{Units: []string{ward1}}, partyport.RoleKNOfficer)
 	urgent, id := f.directive(f.tenant, port.SeverityUrgent, []string{ward1}, a.actor)
 	normal, _ := f.directive(f.tenant, port.SeverityNormal, []string{ward1}, a.actor)

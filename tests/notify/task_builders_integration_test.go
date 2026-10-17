@@ -37,7 +37,7 @@ func TestTaskOwnedBuilderLookupRetryTenantAndRedaction(t *testing.T) {
 	actor := f.user(authz.Scope{Units: []string{prov91}}, partyport.RoleKNProvinceAdmin)
 	foreign := f.asActor(ids.New(), ids.New(), actor.actor, partyport.RoleKNProvinceAdmin)
 	directory := &retryTaskDirectory{fail: true, recipient: actor.actor}
-	f.mod = notify.New(f.appDB, f.clk, notify.Deps{Scope: f.scope, Consumers: []notifyport.ConsumerRegistration{extension.NotificationConsumers()}, Builders: extension.TaskNotificationBuilders(directory)})
+	f.mod = notify.New(f.appDB, f.clk, notify.Deps{Kinds: []notifyport.KindRegistration{extension.NotificationKinds()}, Scope: f.scope, Consumers: []notifyport.ConsumerRegistration{extension.NotificationConsumers()}, Builders: extension.TaskNotificationBuilders(directory)})
 	taskID := ids.New()
 	event := f.event(f.tenant, extport.EventTaskEscalated, extport.TaskEscalatedV1{TaskID: taskID, Priority: "high", ProvinceCode: prov91, CommuneCode: "0901234567"})
 	if _, err := inbox.Process(context.Background(), f.appDB, extport.NotifyConsumerTask, event, f.mod.EventHandler()); !errors.Is(err, errFixtureTaskLookup) {
