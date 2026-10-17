@@ -9,6 +9,7 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -64,22 +65,35 @@ func TestRegisteredRendererKeepsDeliveryGuards(t *testing.T) {
 	b := f.user(authz.Scope{Units: []string{ward1}}, partyport.RoleKNOfficer)
 	foreign := f.asActor(ids.New(), ids.New(), a.actor, partyport.RoleKNOfficer)
 	calls := 0
+	invalid := true
 	f.mod = notify.New(f.appDB, f.clk, notify.Deps{Scope: f.scope,
 		Consumers: []port.ConsumerRegistration{{Definitions: []port.ConsumerDefinition{{Name: "fixture.notify", Order: 1, Events: []string{"fixture.notification.rendered"}}}}},
 		Renderers: []port.EventRendererRegistration{{Events: []string{"fixture.notification.rendered"}, Render: func(string, json.RawMessage, time.Time) ([]port.NotificationDraft, error) {
 			calls++
-			return []port.NotificationDraft{
+			drafts := []port.NotificationDraft{
 				{RecipientRef: &a.actor, Kind: port.KindCNTSDutyChanged, Title: "  Liên hệ 0901234567  ", Body: "  Nội dung  ", DeepLink: "/kn/cnts/lich-truc", CreatedAt: f.clk.Now()},
 				{RecipientRef: &b.actor, Kind: port.KindCNTSDutyChanged, Title: "Invalid link", DeepLink: "https://external.invalid", CreatedAt: f.clk.Now()},
-			}, nil
+			}
+			if !invalid {
+				drafts = drafts[:1]
+			}
+			return drafts, nil
 		}}},
 	})
+	bad := f.event(f.tenant, "fixture.notification.rendered", map[string]any{})
+	if _, err := inbox.Process(context.Background(), f.appDB, "fixture.notify", bad, f.mod.EventHandler()); err == nil {
+		t.Fatal("invalid link must reject the entire delivery transaction")
+	}
+	if len(a.inbox()) != 0 || len(b.inbox()) != 0 {
+		t.Fatal("invalid draft did not roll back valid siblings")
+	}
+	invalid = false
 	e := f.event(f.tenant, "fixture.notification.rendered", map[string]any{})
-	if !f.process("fixture.notify", e) || f.process("fixture.notify", e) || calls != 1 {
+	if !f.process("fixture.notify", e) || f.process("fixture.notify", e) || calls != 2 {
 		t.Fatal("renderer bypassed inbox dedup")
 	}
 	got := a.inbox()
-	if len(got) != 1 || got[0]["title"] != "Liên hệ ***" || got[0]["body"] != "Nội dung" || got[0]["severity"] != "normal" || got[0]["id"] == uuid.Nil.String() {
+	if len(got) != 1 || got[0]["title"] != "Liên hệ ***" || got[0]["body"] != "Nội dung" || got[0]["severity"] != "normal" || (got[0]["id"] == uuid.Nil.String() || got[0]["id"] == "" || got[0]["id"] == nil) {
 		t.Fatalf("normalization/identity: %v", got)
 	}
 	if len(b.inbox()) != 0 || len(foreign.inbox()) != 0 {
