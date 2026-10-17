@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-MDCATALOG-D — Bỏlookup/facadelegacy, giữ17golden; cầnPG7/static/helper9. Rules+DTO/constcònE/F.
+- [x] KNSPLIT-2-MDCATALOG-D — Bỏlegacylookup,17goldenread-onlygiữ; PG7/fullstatic0,baseline367. Helper9migrationtrướcdev; rules/DTOconstcònE/F.
