@@ -43,7 +43,7 @@ func TestCNTSDutyChanged_W1146(t *testing.T) {
 	}
 	for _, u := range []caller{a, b} {
 		ns := u.inbox()
-		if len(ns) != 1 || ns[0]["kind"] != port.KindCNTSDutyChanged || ns[0]["deep_link"] != "/kn/cnts/lich-truc" {
+		if len(ns) != 1 || ns[0]["kind"] != extport.KindCNTSDutyChanged || ns[0]["deep_link"] != "/kn/cnts/lich-truc" {
 			t.Fatalf("hộp thư sai: %v", ns)
 		}
 	}
@@ -57,7 +57,7 @@ func TestCNTSDutyChanged_W1146(t *testing.T) {
 		t.Fatal("mỗi thiết bị phải nhận đúng một lần")
 	}
 	for _, msg := range f.pusher.messages() {
-		if len(msg.Data()) != 2 || msg.Data()["kind"] != port.KindCNTSDutyChanged || msg.Data()["notification_id"] == "" {
+		if len(msg.Data()) != 2 || msg.Data()["kind"] != extport.KindCNTSDutyChanged || msg.Data()["notification_id"] == "" {
 			t.Fatalf("push chứa dữ liệu ngoài hợp đồng: %+v", msg)
 		}
 	}

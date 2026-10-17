@@ -32,7 +32,7 @@ func TestCNTSRegisteredAlertAndReminder(t *testing.T) {
 		t.Fatal("registered alert inbox replay")
 	}
 	got := a.inbox()
-	if len(got) != 1 || got[0]["kind"] != port.KindCNTSAlertAssigned || strings.Contains(got[0]["body"].(string), "0901234567") || !strings.Contains(got[0]["body"].(string), "***") {
+	if len(got) != 1 || got[0]["kind"] != extport.KindCNTSAlertAssigned || strings.Contains(got[0]["body"].(string), "0901234567") || !strings.Contains(got[0]["body"].(string), "***") {
 		t.Fatalf("registered alert/redaction: %v", got)
 	}
 	alert.AlertRef = ids.New()
@@ -49,7 +49,7 @@ func TestCNTSRegisteredAlertAndReminder(t *testing.T) {
 	}
 	var emails int
 	if err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
-		return tx.QueryRow(context.Background(), "SELECT count(*) FROM pf_notify.email_delivery WHERE recipient_ref=$1 AND kind IN ($2,$3)", a.actor, port.KindCNTSAlertAssigned, port.KindCNTSFormReminder).Scan(&emails)
+		return tx.QueryRow(context.Background(), "SELECT count(*) FROM pf_notify.email_delivery WHERE recipient_ref=$1 AND kind IN ($2,$3)", a.actor, extport.KindCNTSAlertAssigned, extport.KindCNTSFormReminder).Scan(&emails)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -71,8 +71,8 @@ func TestRegisteredRendererKeepsDeliveryGuards(t *testing.T) {
 		Renderers: []port.EventRendererRegistration{{Events: []string{"fixture.notification.rendered"}, Render: func(string, json.RawMessage, time.Time) ([]port.NotificationDraft, error) {
 			calls++
 			drafts := []port.NotificationDraft{
-				{RecipientRef: &a.actor, Kind: port.KindCNTSDutyChanged, Title: "  Liên hệ 0901234567  ", Body: "  Nội dung  ", DeepLink: "/kn/cnts/lich-truc", CreatedAt: f.clk.Now()},
-				{RecipientRef: &b.actor, Kind: port.KindCNTSDutyChanged, Title: "Invalid link", DeepLink: "https://external.invalid", CreatedAt: f.clk.Now()},
+				{RecipientRef: &a.actor, Kind: extport.KindCNTSDutyChanged, Title: "  Liên hệ 0901234567  ", Body: "  Nội dung  ", DeepLink: "/kn/cnts/lich-truc", CreatedAt: f.clk.Now()},
+				{RecipientRef: &b.actor, Kind: extport.KindCNTSDutyChanged, Title: "Invalid link", DeepLink: "https://external.invalid", CreatedAt: f.clk.Now()},
 			}
 			if !invalid {
 				drafts = drafts[:1]

@@ -46,7 +46,7 @@ func renderCNTSNotifications(eventType string, payload json.RawMessage, occurred
 		if err != nil {
 			return nil, fmt.Errorf("notify: tháng lịch trực: %w", err)
 		}
-		tpl := cntsNotificationTemplate{Kind: notifyport.KindCNTSDutyChanged, Severity: notifyport.SeverityNormal, Title: "Lịch trực KSGM đã thay đổi",
+		tpl := cntsNotificationTemplate{Kind: extport.KindCNTSDutyChanged, Severity: notifyport.SeverityNormal, Title: "Lịch trực KSGM đã thay đổi",
 			Body:     fmt.Sprintf("Lịch trực tháng %s đã cập nhật phiên bản %d. Mở lịch để xem ca của bạn.", month.Format("01/2006"), p.Version),
 			DeepLink: "/kn/cnts/lich-truc", SubjectRef: cntsNotificationRef(p.RosterID), CreatedAt: cntsNotificationTime(p.EventTime, occurred)}
 		out := make([]notifyport.NotificationDraft, 0, len(p.OfficerRefs))
@@ -69,13 +69,13 @@ func renderCNTSNotifications(eventType string, payload json.RawMessage, occurred
 			CreatedAt: cntsNotificationTime(p.EventTime, occurred)}
 		switch p.Action {
 		case extport.CNTSAlertAssigned:
-			tpl.Kind, tpl.Title = notifyport.KindCNTSAlertAssigned, "Được giao xử lý cảnh báo"
+			tpl.Kind, tpl.Title = extport.KindCNTSAlertAssigned, "Được giao xử lý cảnh báo"
 			tpl.Body = fmt.Sprintf("[%s] %s — hạn xử lý %s.", lvl, p.Title, due)
 		case extport.CNTSAlertOverdue:
-			tpl.Kind, tpl.Severity, tpl.Title = notifyport.KindCNTSAlertOverdue, notifyport.SeverityUrgent, "Cảnh báo quá hạn xử lý"
+			tpl.Kind, tpl.Severity, tpl.Title = extport.KindCNTSAlertOverdue, notifyport.SeverityUrgent, "Cảnh báo quá hạn xử lý"
 			tpl.Body = fmt.Sprintf("[%s] %s — quá hạn %s.", lvl, p.Title, due)
 		default:
-			tpl.Kind, tpl.Title, tpl.Body = notifyport.KindCNTSAlert, "Cảnh báo "+lvl, p.Title
+			tpl.Kind, tpl.Title, tpl.Body = extport.KindCNTSAlert, "Cảnh báo "+lvl, p.Title
 		}
 		out := make([]notifyport.NotificationDraft, 0, len(p.RecipientRefs))
 		for _, r := range cntsNotificationRecipients(p.RecipientRefs) {
@@ -99,7 +99,7 @@ func renderCNTSNotifications(eventType string, payload json.RawMessage, occurred
 		case extport.CNTSReminderRepeat:
 			title = "Nhắc lại: báo cáo kỳ CNTS chưa gửi"
 		}
-		tpl := cntsNotificationTemplate{Kind: notifyport.KindCNTSFormReminder, Severity: notifyport.SeverityNormal, Title: title, Body: cntsNotificationTruncate(p.Message, 400),
+		tpl := cntsNotificationTemplate{Kind: extport.KindCNTSFormReminder, Severity: notifyport.SeverityNormal, Title: title, Body: cntsNotificationTruncate(p.Message, 400),
 			DeepLink: cntsNotificationPeriodsLink, SubjectRef: cntsNotificationRef(p.PeriodRef), CreatedAt: cntsNotificationTime(p.EventTime, occurred)}
 		email := slices.Contains(p.Channels, "email")
 		out := make([]notifyport.NotificationDraft, 0, len(p.RecipientRefs))
