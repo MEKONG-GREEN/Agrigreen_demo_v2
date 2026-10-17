@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-NOTIFY-CNTS-A: Đăng ký bộ dựng CNTS tại KN; đối chiếu 46 ca cũ, kiểm tra hộp thư và migration thật trước tích hợp dev.
+- [x] KNSPLIT-2-NOTIFY-CNTS-A: Đăng ký bộ dựng CNTS tại KN; 46 ca khớp legacy, hồi quy 9 gói đạt, chờ helper migration và xác minh dev.
