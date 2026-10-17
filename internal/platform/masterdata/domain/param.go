@@ -73,11 +73,11 @@ func (v ParamVersion) validateKind() error {
 	switch {
 	case sp.Kind == ParamKindColor:
 		if v.Text == nil || !IsHexColor(*v.Text) {
-			return FieldError{"text", ErrHexColor}
+			return FieldError{Field: "text", Err: ErrHexColor}
 		}
 	case IsPercentThreshold(v.Key) && v.Value != nil:
 		if v.Value.IsNegative() || v.Value.GreaterThan(decimal.NewFromInt(100)) {
-			return FieldError{"value", ErrPercentRange}
+			return FieldError{Field: "value", Err: ErrPercentRange}
 		}
 	}
 	return nil
@@ -103,7 +103,7 @@ func IsPercentThreshold(key string) bool {
 // ValidateParamKey kiểm khóa tham số.
 func ValidateParamKey(k string) error {
 	if len(k) > 200 || !paramKeyRe.MatchString(k) {
-		return FieldError{"key", ErrParamKey}
+		return FieldError{Field: "key", Err: ErrParamKey}
 	}
 	return nil
 }
@@ -137,19 +137,19 @@ func (v ParamVersion) ValidateProposal() error {
 	}
 	switch {
 	case (v.Value == nil) == (v.Text == nil):
-		return FieldError{"value", ErrParamValue}
+		return FieldError{Field: "value", Err: ErrParamValue}
 	case v.Value != nil && (v.Value.Exponent() < -8 || v.Value.Abs().GreaterThanOrEqual(maxParamValue)):
-		return FieldError{"value", ErrParamValue}
+		return FieldError{Field: "value", Err: ErrParamValue}
 	case v.Text != nil && (*v.Text == "" || utf8.RuneCountInString(*v.Text) > 1000):
-		return FieldError{"text", ErrParamValue}
+		return FieldError{Field: "text", Err: ErrParamValue}
 	case utf8.RuneCountInString(v.Unit) > 30:
-		return FieldError{"unit", ErrParamUnit}
+		return FieldError{Field: "unit", Err: ErrParamUnit}
 	case v.EffectiveFrom.IsZero():
-		return FieldError{"effective_from", ErrParamEffective}
+		return FieldError{Field: "effective_from", Err: ErrParamEffective}
 	case strings.TrimSpace(v.SourceDoc) == "" || utf8.RuneCountInString(v.SourceDoc) > 300:
-		return FieldError{"source_doc", ErrParamSourceDoc}
+		return FieldError{Field: "source_doc", Err: ErrParamSourceDoc}
 	case v.CorrectionReason != nil && utf8.RuneCountInString(strings.TrimSpace(*v.CorrectionReason)) < 10:
-		return FieldError{"correction_reason", ErrCorrection}
+		return FieldError{Field: "correction_reason", Err: ErrCorrection}
 	}
 	return v.validateKind()
 }
@@ -178,7 +178,7 @@ func (v ParamVersion) CanDecide() error {
 func ValidateDecisionNote(n string) error {
 	c := utf8.RuneCountInString(strings.TrimSpace(n))
 	if c < 10 || c > 500 {
-		return FieldError{"note", ErrDecisionNote}
+		return FieldError{Field: "note", Err: ErrDecisionNote}
 	}
 	return nil
 }

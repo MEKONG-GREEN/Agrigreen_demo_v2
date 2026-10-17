@@ -143,73 +143,73 @@ func FormatDoses(ds []port.Dose) string {
 }
 
 func init() {
-	desc := attrSpec{false, text(500)}
-	order := attrSpec{false, intRange(0, 999)}
+	desc := attrSpec{Required: false, Normalize: text(500)}
+	order := attrSpec{Required: false, Normalize: intRange(0, 999)}
 	cnts := map[string]map[string]attrSpec{
 		port.CatalogCNTSSpecies: {
-			"group":       {true, oneOf("gia_suc", "gia_cam", "thu_cung", "yen", "thuy_san", "khac")},
-			"unit":        {true, nonEmpty(20)},
-			"herd_column": {false, boolAttr},
+			"group":       {Required: true, Normalize: oneOf("gia_suc", "gia_cam", "thu_cung", "yen", "thuy_san", "khac")},
+			"unit":        {Required: true, Normalize: nonEmpty(20)},
+			"herd_column": {Required: false, Normalize: boolAttr},
 			"order":       order,
 			"description": desc,
 		},
 		port.CatalogCNTSBreed: {
-			port.AttrSpecies: {true, stageRefNamed("mã loài")},
+			port.AttrSpecies: {Required: true, Normalize: stageRefNamed("mã loài")},
 			"description":    desc,
 		},
 		port.CatalogCNTSDisease: {
-			port.AttrSpecies: {false, codeList},
-			"notifiable":     {false, boolAttr},
+			port.AttrSpecies: {Required: false, Normalize: codeList},
+			"notifiable":     {Required: false, Normalize: boolAttr},
 			"description":    desc,
 		},
 		port.CatalogCNTSVaccine: {
-			"diseases":       {false, codeList},
-			port.AttrSpecies: {true, nonEmptyCodeList},
-			"report_group":   {true, oneOf("heo", "bo", "cum_gia_cam", "dai", "khac")},
+			"diseases":       {Required: false, Normalize: codeList},
+			port.AttrSpecies: {Required: true, Normalize: nonEmptyCodeList},
+			"report_group":   {Required: true, Normalize: oneOf("heo", "bo", "cum_gia_cam", "dai", "khac")},
 			"order":          order,
 			"description":    desc,
 		},
 		port.CatalogCNTSChemical: {
-			"unit":        {true, nonEmpty(20)},
-			"target":      {false, oneOf("gia_suc", "gia_cam", "chung")},
+			"unit":        {Required: true, Normalize: nonEmpty(20)},
+			"target":      {Required: false, Normalize: oneOf("gia_suc", "gia_cam", "chung")},
 			"description": desc,
 		},
 		port.CatalogCNTSSlaughterFacility: {
-			port.AttrFacilityRef:  {true, uuidAttr},
-			port.AttrCommuneCode:  {true, communeCode},
-			port.AttrFacilityKind: {true, oneOf(port.FacilityConcentrated, port.FacilitySmall)},
-			port.AttrStampsGS:     {false, stampList},
-			port.AttrStampsGC:     {false, stampList},
-			port.AttrSpecies:      {false, codeList},
-			"address":             {false, text(300)},
+			port.AttrFacilityRef:  {Required: true, Normalize: uuidAttr},
+			port.AttrCommuneCode:  {Required: true, Normalize: communeCode},
+			port.AttrFacilityKind: {Required: true, Normalize: oneOf(port.FacilityConcentrated, port.FacilitySmall)},
+			port.AttrStampsGS:     {Required: false, Normalize: stampList},
+			port.AttrStampsGC:     {Required: false, Normalize: stampList},
+			port.AttrSpecies:      {Required: false, Normalize: codeList},
+			"address":             {Required: false, Normalize: text(300)},
 			"description":         desc,
 		},
 		port.CatalogCNTSAquacultureObject: {
-			"scale_unit":  {true, oneOf("ha", "long", "veo", "m3")},
+			"scale_unit":  {Required: true, Normalize: oneOf("ha", "long", "veo", "m3")},
 			"description": desc,
 		},
 		port.CatalogCNTSFishingGroup: {
-			"unit":        {false, text(20)},
+			"unit":        {Required: false, Normalize: text(20)},
 			"order":       order,
 			"description": desc,
 		},
 		port.CatalogCNTSIndicator: {
-			"unit":        {false, text(20)},
-			"value_type":  {true, oneOf("decimal", "integer", "percent")},
+			"unit":        {Required: false, Normalize: text(20)},
+			"value_type":  {Required: true, Normalize: oneOf("decimal", "integer", "percent")},
 			"description": desc,
 		},
 		port.CatalogCNTSModelType: {
-			"sector":         {true, oneOf("chan_nuoi", "thuy_san")},
-			port.AttrSpecies: {false, codeList},
+			"sector":         {Required: true, Normalize: oneOf("chan_nuoi", "thuy_san")},
+			port.AttrSpecies: {Required: false, Normalize: codeList},
 			"description":    desc,
 		},
 		port.CatalogCNTSDocumentType: {
 			"description": desc,
 		},
 		port.CatalogCNTSVaccinationSchedule: {
-			"model_type":   {false, stageRefNamed("mã loại mô hình")},
-			"breed":        {false, stageRefNamed("mã giống")},
-			port.AttrDoses: {true, dosesAttr},
+			"model_type":   {Required: false, Normalize: stageRefNamed("mã loại mô hình")},
+			"breed":        {Required: false, Normalize: stageRefNamed("mã giống")},
+			port.AttrDoses: {Required: true, Normalize: dosesAttr},
 			"description":  desc,
 		},
 	}
@@ -249,13 +249,13 @@ func normalizeCNTS(it Item) error {
 	switch it.Catalog {
 	case port.CatalogCNTSVaccinationSchedule:
 		if it.Attrs["model_type"] == "" && it.Attrs["breed"] == "" {
-			return FieldError{"attrs.model_type", errors.New("quy trình tiêm gắn loại mô hình hoặc giống")}
+			return FieldError{Field: "attrs.model_type", Err: errors.New("quy trình tiêm gắn loại mô hình hoặc giống")}
 		}
 	case port.CatalogCNTSSlaughterFacility:
 		gs, gc := CodeList(it.Attrs[port.AttrStampsGS]), CodeList(it.Attrs[port.AttrStampsGC])
 		for _, c := range gs {
 			if slices.Contains(gc, c) {
-				return FieldError{"attrs." + port.AttrStampsGC, fmt.Errorf("mã mộc dấu %s trùng giữa GS và GC", c)}
+				return FieldError{Field: "attrs." + port.AttrStampsGC, Err: fmt.Errorf("mã mộc dấu %s trùng giữa GS và GC", c)}
 			}
 		}
 	}
@@ -270,7 +270,7 @@ func (it Item) Stamps() []string {
 // ValidateValidFrom kiểm ngày hiệu lực (ngày nghiệp vụ).
 func ValidateValidFrom(d time.Time) error {
 	if d.Before(Day(2000, 1, 1)) || d.After(Day(2100, 12, 31)) {
-		return FieldError{"valid_from", ErrValidFrom}
+		return FieldError{Field: "valid_from", Err: ErrValidFrom}
 	}
 	return nil
 }

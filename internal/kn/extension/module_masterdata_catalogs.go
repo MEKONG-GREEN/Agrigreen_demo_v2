@@ -21,73 +21,73 @@ var masterdataCatalogSeeds []byte
 // MasterdataCatalogs owns schema, validation, dates and initial data for twelve catalogs.
 func MasterdataCatalogs() mdport.CatalogRegistration {
 
-	desc := mdport.AttributeSpec{false, catalogText(500)}
-	order := mdport.AttributeSpec{false, catalogIntRange(0, 999)}
+	desc := mdport.AttributeSpec{Required: false, Normalize: catalogText(500)}
+	order := mdport.AttributeSpec{Required: false, Normalize: catalogIntRange(0, 999)}
 	cnts := map[string]map[string]mdport.AttributeSpec{
 		mdport.CatalogCNTSSpecies: {
-			"group":       {true, catalogOneOf("gia_suc", "gia_cam", "thu_cung", "yen", "thuy_san", "khac")},
-			"unit":        {true, catalogNonEmpty(20)},
-			"herd_column": {false, catalogBoolAttr},
+			"group":       {Required: true, Normalize: catalogOneOf("gia_suc", "gia_cam", "thu_cung", "yen", "thuy_san", "khac")},
+			"unit":        {Required: true, Normalize: catalogNonEmpty(20)},
+			"herd_column": {Required: false, Normalize: catalogBoolAttr},
 			"order":       order,
 			"description": desc,
 		},
 		mdport.CatalogCNTSBreed: {
-			mdport.AttrSpecies: {true, catalogStageRefNamed("mã loài")},
+			mdport.AttrSpecies: {Required: true, Normalize: catalogStageRefNamed("mã loài")},
 			"description":      desc,
 		},
 		mdport.CatalogCNTSDisease: {
-			mdport.AttrSpecies: {false, catalogNormalizeCodes},
-			"notifiable":       {false, catalogBoolAttr},
+			mdport.AttrSpecies: {Required: false, Normalize: catalogNormalizeCodes},
+			"notifiable":       {Required: false, Normalize: catalogBoolAttr},
 			"description":      desc,
 		},
 		mdport.CatalogCNTSVaccine: {
-			"diseases":         {false, catalogNormalizeCodes},
-			mdport.AttrSpecies: {true, catalogNonEmptyCodeList},
-			"report_group":     {true, catalogOneOf("heo", "bo", "cum_gia_cam", "dai", "khac")},
+			"diseases":         {Required: false, Normalize: catalogNormalizeCodes},
+			mdport.AttrSpecies: {Required: true, Normalize: catalogNonEmptyCodeList},
+			"report_group":     {Required: true, Normalize: catalogOneOf("heo", "bo", "cum_gia_cam", "dai", "khac")},
 			"order":            order,
 			"description":      desc,
 		},
 		mdport.CatalogCNTSChemical: {
-			"unit":        {true, catalogNonEmpty(20)},
-			"target":      {false, catalogOneOf("gia_suc", "gia_cam", "chung")},
+			"unit":        {Required: true, Normalize: catalogNonEmpty(20)},
+			"target":      {Required: false, Normalize: catalogOneOf("gia_suc", "gia_cam", "chung")},
 			"description": desc,
 		},
 		mdport.CatalogCNTSSlaughterFacility: {
-			mdport.AttrFacilityRef:  {true, catalogUuidAttr},
-			mdport.AttrCommuneCode:  {true, catalogCommuneCode},
-			mdport.AttrFacilityKind: {true, catalogOneOf(mdport.FacilityConcentrated, mdport.FacilitySmall)},
-			mdport.AttrStampsGS:     {false, catalogStampList},
-			mdport.AttrStampsGC:     {false, catalogStampList},
-			mdport.AttrSpecies:      {false, catalogNormalizeCodes},
-			"address":               {false, catalogText(300)},
+			mdport.AttrFacilityRef:  {Required: true, Normalize: catalogUuidAttr},
+			mdport.AttrCommuneCode:  {Required: true, Normalize: catalogCommuneCode},
+			mdport.AttrFacilityKind: {Required: true, Normalize: catalogOneOf(mdport.FacilityConcentrated, mdport.FacilitySmall)},
+			mdport.AttrStampsGS:     {Required: false, Normalize: catalogStampList},
+			mdport.AttrStampsGC:     {Required: false, Normalize: catalogStampList},
+			mdport.AttrSpecies:      {Required: false, Normalize: catalogNormalizeCodes},
+			"address":               {Required: false, Normalize: catalogText(300)},
 			"description":           desc,
 		},
 		mdport.CatalogCNTSAquacultureObject: {
-			"scale_unit":  {true, catalogOneOf("ha", "long", "veo", "m3")},
+			"scale_unit":  {Required: true, Normalize: catalogOneOf("ha", "long", "veo", "m3")},
 			"description": desc,
 		},
 		mdport.CatalogCNTSFishingGroup: {
-			"unit":        {false, catalogText(20)},
+			"unit":        {Required: false, Normalize: catalogText(20)},
 			"order":       order,
 			"description": desc,
 		},
 		mdport.CatalogCNTSIndicator: {
-			"unit":        {false, catalogText(20)},
-			"value_type":  {true, catalogOneOf("decimal", "integer", "percent")},
+			"unit":        {Required: false, Normalize: catalogText(20)},
+			"value_type":  {Required: true, Normalize: catalogOneOf("decimal", "integer", "percent")},
 			"description": desc,
 		},
 		mdport.CatalogCNTSModelType: {
-			"sector":           {true, catalogOneOf("chan_nuoi", "thuy_san")},
-			mdport.AttrSpecies: {false, catalogNormalizeCodes},
+			"sector":           {Required: true, Normalize: catalogOneOf("chan_nuoi", "thuy_san")},
+			mdport.AttrSpecies: {Required: false, Normalize: catalogNormalizeCodes},
 			"description":      desc,
 		},
 		mdport.CatalogCNTSDocumentType: {
 			"description": desc,
 		},
 		mdport.CatalogCNTSVaccinationSchedule: {
-			"model_type":     {false, catalogStageRefNamed("mã loại mô hình")},
-			"breed":          {false, catalogStageRefNamed("mã giống")},
-			mdport.AttrDoses: {true, catalogDosesAttr},
+			"model_type":     {Required: false, Normalize: catalogStageRefNamed("mã loại mô hình")},
+			"breed":          {Required: false, Normalize: catalogStageRefNamed("mã giống")},
+			mdport.AttrDoses: {Required: true, Normalize: catalogDosesAttr},
 			"description":    desc,
 		},
 	}
@@ -320,13 +320,13 @@ func catalogNormalizeCNTS(it mdport.CatalogItem) error {
 	switch it.Catalog {
 	case mdport.CatalogCNTSVaccinationSchedule:
 		if it.Attrs["model_type"] == "" && it.Attrs["breed"] == "" {
-			return mdport.FieldError{"attrs.model_type", errors.New("quy trình tiêm gắn loại mô hình hoặc giống")}
+			return mdport.FieldError{Field: "attrs.model_type", Err: errors.New("quy trình tiêm gắn loại mô hình hoặc giống")}
 		}
 	case mdport.CatalogCNTSSlaughterFacility:
 		gs, gc := catalogCodes(it.Attrs[mdport.AttrStampsGS]), catalogCodes(it.Attrs[mdport.AttrStampsGC])
 		for _, c := range gs {
 			if slices.Contains(gc, c) {
-				return mdport.FieldError{"attrs." + mdport.AttrStampsGC, fmt.Errorf("mã mộc dấu %s trùng giữa GS và GC", c)}
+				return mdport.FieldError{Field: "attrs." + mdport.AttrStampsGC, Err: fmt.Errorf("mã mộc dấu %s trùng giữa GS và GC", c)}
 			}
 		}
 	}
