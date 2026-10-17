@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/google/uuid"
 	"os"
 	"reflect"
@@ -153,5 +156,46 @@ func TestDirectiveDigestAndJobMatchLegacy(t *testing.T) {
 	def := registration.Job
 	if len(registration.Events) != 1 || registration.Events[0] != "pf.extension.directive.issued" || def.Name != old.Name || int64(def.Every) != old.EveryNS || def.RunOnStart != old.RunOnStart || int64(def.Timeout) != old.TimeoutNS {
 		t.Fatal("digest job/source contract changed")
+	}
+}
+
+func TestDirectivePlannerRequiresOwnerRegistration(t *testing.T) {
+	for _, mode := range []string{"nil", "empty"} {
+		t.Run(mode, func(t *testing.T) {
+			var plans []port.EventBuilderRegistration
+			if mode == "empty" {
+				plans = []port.EventBuilderRegistration{}
+			}
+			module := notify.New(nil, clock.System{}, notify.Deps{Consumers: []port.ConsumerRegistration{extension.NotificationConsumers()}, Builders: plans, Digests: []port.DigestRegistration{extension.NotificationDigest()}})
+			for _, registration := range extension.DirectiveNotificationBuilders(nil, nil) {
+				for _, event := range registration.Events {
+					if err := module.EventHandler()(context.Background(), nil, outbox.Envelope{EventType: event, Payload: json.RawMessage("{")}); err != nil {
+						t.Errorf("Directive legacy fallback without owner planner: %v", err)
+					}
+				}
+			}
+		})
+	}
+	module := notify.New(nil, clock.System{}, notify.Deps{Consumers: []port.ConsumerRegistration{extension.NotificationConsumers()}, Builders: extension.DirectiveNotificationBuilders(nil, nil), Digests: []port.DigestRegistration{extension.NotificationDigest()}})
+	for _, registration := range extension.DirectiveNotificationBuilders(nil, nil) {
+		for _, event := range registration.Events {
+			if err := module.EventHandler()(context.Background(), nil, outbox.Envelope{EventType: event, Payload: json.RawMessage("{")}); err == nil {
+				t.Fatal("registered Directive plan did not reject malformed payload")
+			}
+		}
+	}
+}
+func TestDigestJobRequiresOwnerRegistration(t *testing.T) {
+	for _, mode := range []string{"nil", "empty"} {
+		t.Run(mode, func(t *testing.T) {
+			var policies []port.DigestRegistration
+			if mode == "empty" {
+				policies = []port.DigestRegistration{}
+			}
+			module := notify.New(nil, clock.System{}, notify.Deps{Consumers: []port.ConsumerRegistration{extension.NotificationConsumers()}, Builders: extension.DirectiveNotificationBuilders(nil, nil), Digests: policies})
+			if len(module.Jobs(nil, nil)) != 0 {
+				t.Fatal("Digest legacy job without owner registration")
+			}
+		})
 	}
 }

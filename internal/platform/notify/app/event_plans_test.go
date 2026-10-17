@@ -213,3 +213,16 @@ func TestDigestRegistrationCopiesAndValidation(t *testing.T) {
 		})
 	}
 }
+
+type missingPolicyMailer struct{}
+
+func (missingPolicyMailer) Send(context.Context, []string, string, string) error { return nil }
+func TestDigestJobRequiresPolicyBeforeListingTenants(t *testing.T) {
+	svc := &Service{Deps: Deps{Mailer: missingPolicyMailer{}, DigestTo: []string{"fixture@example.vn"}}}
+	svc.RegisterDigestPolicies(nil, nil, nil)
+	listed := false
+	n, err := svc.RunEmailDigest(context.Background(), func(context.Context) ([]uuid.UUID, error) { listed = true; return nil, nil })
+	if err != nil || n != 0 || listed {
+		t.Fatal("digest job listed tenants without policy")
+	}
+}
