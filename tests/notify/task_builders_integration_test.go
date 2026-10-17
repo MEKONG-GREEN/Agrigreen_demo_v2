@@ -51,7 +51,7 @@ func TestTaskOwnedBuilderLookupRetryTenantAndRedaction(t *testing.T) {
 		t.Fatal("lookup retry/replay not idempotent")
 	}
 	rows := actor.inbox()
-	if len(rows) != 1 || rows[0]["kind"] != notifyport.KindTaskEscalated || rows[0]["deep_link"] != "/extension/tasks/"+taskID.String() || strings.Contains(rows[0]["body"].(string), "0901234567") || !strings.Contains(rows[0]["body"].(string), "***") {
+	if len(rows) != 1 || rows[0]["kind"] != extport.KindTaskEscalated || rows[0]["deep_link"] != "/extension/tasks/"+taskID.String() || strings.Contains(rows[0]["body"].(string), "0901234567") || !strings.Contains(rows[0]["body"].(string), "***") {
 		t.Fatalf("owner delivery/redaction: %v", rows)
 	}
 	if len(foreign.inbox()) != 0 {

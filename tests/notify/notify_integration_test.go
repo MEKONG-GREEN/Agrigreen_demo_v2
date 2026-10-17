@@ -656,7 +656,7 @@ func TestTaskEscalatedRecipients(t *testing.T) {
 	if len(assignee.inbox()) != 1 || len(admin.inbox()) != 1 || len(commune.inbox()) != 0 {
 		t.Fatalf("leo thang: giao=%d tỉnh=%d xã khác=%d", len(assignee.inbox()), len(admin.inbox()), len(commune.inbox()))
 	}
-	if it := admin.inbox()[0]; it["kind"] != port.KindTaskEscalated || it["severity"] != "urgent" || it["topic"] != false {
+	if it := admin.inbox()[0]; it["kind"] != extport.KindTaskEscalated || it["severity"] != "urgent" || it["topic"] != false {
 		t.Fatalf("thông báo leo thang: %v", it)
 	}
 	// Cần Thơ chưa có cán bộ tỉnh trong danh bạ → chủ đề.

@@ -783,3 +783,12 @@ Pureverified93148 actualexit0 đủ năm package có test (+KNprice compile); c�
 
 
 Kết quả thật owner1d1a8626/fix3edde170: pureverified93148actual0/5pkg, static42529actual0/fullgates/boundary320/lint0/gofmt2old. Full9PG30566actualexit0,không FAIL/SKIP; testsnotify159.548s. Hai luồng nhiệm vụ chạy owner thật qua fixture; lookup failure giữ identity/không ghi, retry cùng event/dedup, tenant và redaction PASS; giá/CNTS/workflow/generic guards giữ. Private60377/da601058708f cleanup,Go0; không Gochange sauPG. Capture83 +PGlegacy2 trướcowner đạt, tám oldgolden và hai Taskgolden nguyên. Cầnhelper9migration/remote trước dev.
+
+
+## KNSPLIT-2-NOTIFY-TASK-B — Xóa bộ dựng nhiệm vụ legacy
+
+Nền1c86931a. RED88183 actualexit1 đúng4 fallback nil/empty×2 events. Xóa hai task case/HandledEvents, private legacyTaskNotifications và capture generator; xóa hai domain TaskTemplate và priorityLabel map (không có caller khác). Chuyển hai KindTask về extensionport với cùng identifier, literal và comment; chỉ alignment do gofmt có thể đổi. Owner và các test PG đổi qualifier, giữ assertion. StaffDirectory core vẫn cần cho Directive/native household/MRV nên giữ; các luồng MRV HTX/MKG không đổi.
+
+Giữ nguyên mười golden Gitblob: tám artifact trước Task + hai Task83 input/expected. Owner chỉ đọc83 full draft/lỗi/lookup, giữ nil/empty, assignee nil-vs-zero, adminNil/fallback và time/error-prefix quirks đã capture trên legacy trước khi có owner. Metadata16/41, pure renderers10 và context builders11 (Price9+Task2) không đổi. Không giữ alias hay API cũ để né kiểm tra.
+
+Impact: core notify dispatch/metadata/domain/port, KN extension và test PG trực tiếp. Không SQL/schema/migration/API/UI/mobile đổi; coreNormalize/Redact/Tx/RLS/inbox/provenance giữ. Cần pure5/fullstatic, chỉ prune mục thật từ baseline320 (không ép giảm nếu rule tính theo file còn Directive), full9PG thật khôngFAIL/SKIP và helper9migration/remote trước dev. G1 còn Directive/digest, policy KN trên native events và authz/accounts/party/data/routes/tenant/client/KHTC reminder. Main/worktrees/lịch tự tiếp tục giữ.

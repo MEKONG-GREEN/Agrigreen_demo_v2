@@ -65,13 +65,13 @@ func TestTaskCreatedNotifiesAssigneeKNUSTASK01(t *testing.T) {
 			AssignmentRule: rule, DueAt: f.clk.Now().Add(24 * time.Hour).Format(time.RFC3339), CreatedAt: f.clk.Now().Format(time.RFC3339), Seq: 1}))
 	}
 	created(&off.actor, extport.AssignCommuneOnDuty)
-	if in := off.inbox(); len(in) != 1 || in[0]["kind"] != port.KindTaskAssigned || in[0]["severity"] != "urgent" {
+	if in := off.inbox(); len(in) != 1 || in[0]["kind"] != extport.KindTaskAssigned || in[0]["severity"] != "urgent" {
 		t.Fatalf("người được giao: %v", in)
 	}
 	if err := f.flushPush(f.tenant); err != nil {
 		t.Fatal(err)
 	}
-	if msgs := f.pusher.messages(); len(msgs) != 1 || msgs[0].Kind != port.KindTaskAssigned {
+	if msgs := f.pusher.messages(); len(msgs) != 1 || msgs[0].Kind != extport.KindTaskAssigned {
 		t.Fatalf("đẩy: %v", msgs)
 	}
 	created(nil, extport.AssignAdminQueue)

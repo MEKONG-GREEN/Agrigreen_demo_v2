@@ -83,7 +83,7 @@ func taskNotificationEscalatedTemplate(p extport.TaskEscalatedV1, occurred time.
 	}
 	body := fmt.Sprintf("Xã %s, ưu tiên %s, hạn %s.", p.CommuneCode, taskNotificationPriorityLabel[p.Priority],
 		sourceNotificationVietnamTime(sourceNotificationTime(p.DueAt, occurred)))
-	return sourceNotificationTemplate{Kind: notifyport.KindTaskEscalated, Severity: sev, Title: title, Body: body,
+	return sourceNotificationTemplate{Kind: extport.KindTaskEscalated, Severity: sev, Title: title, Body: body,
 		DeepLink: "/extension/tasks/" + p.TaskID.String(), SubjectRef: sourceNotificationRef(p.TaskID), CreatedAt: sourceNotificationTime(p.EventTime, occurred)}
 }
 
@@ -98,6 +98,6 @@ func taskNotificationAssignedTemplate(p extport.TaskCreatedV1, occurred time.Tim
 		sev = notifyport.SeverityUrgent
 	}
 	body := fmt.Sprintf("Xã %s, ưu tiên %s, hạn %s.", p.CommuneCode, taskNotificationPriorityLabel[p.Priority], sourceNotificationVietnamTime(sourceNotificationTime(p.DueAt, occurred)))
-	return sourceNotificationTemplate{Kind: notifyport.KindTaskAssigned, Severity: sev, Title: title, Body: body,
+	return sourceNotificationTemplate{Kind: extport.KindTaskAssigned, Severity: sev, Title: title, Body: body,
 		DeepLink: "/extension/tasks/" + p.TaskID.String(), SubjectRef: sourceNotificationRef(p.TaskID), CreatedAt: sourceNotificationTime(p.CreatedAt, occurred)}
 }

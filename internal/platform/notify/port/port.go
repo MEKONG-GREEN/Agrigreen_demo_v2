@@ -21,15 +21,12 @@ const (
 	KindDirective      = "directive"       // chỉ đạo từ TTKN (KN US-TASK-03)
 	KindAlert          = "alert"           // cảnh báo khẩn (HTX US-NEWS-03)
 	KindDocument       = "document"        // tài liệu/tin mới hoặc cập nhật (US-LIB-06)
-	KindTaskEscalated  = "task_escalated"  // nhiệm vụ leo thang lên tỉnh (KN US-TASK-02)
 	KindSyncConflict   = "sync_conflict"   // xung đột đồng bộ chờ xử lý (C-8)
 	KindOrgDeactivated = "org_deactivated" // tổ chức bị vô hiệu hóa
 	// KindHouseholdRegistered / KindHouseholdMembershipChanged: nông hộ mới từ App HTX,
 	// nông hộ vào/rời/chuyển HTX → cán bộ khuyến nông của xã (KN US-HTX-05, migration 000028).
 	KindHouseholdRegistered        = "household_registered"
 	KindHouseholdMembershipChanged = "household_membership_changed"
-	// KindTaskAssigned: nhiệm vụ tự sinh từ yêu cầu hỗ trợ App HTX → cán bộ được giao (KN US-TASK-01).
-	KindTaskAssigned = "task_assigned"
 	// KindFarmLogPending: nông dân ghi nhật ký canh tác → quản lý HTX "nhật ký chờ duyệt"
 	// (HTX US-LOG-05; migration 000029).
 	KindFarmLogPending = "farm_log_pending"

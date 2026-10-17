@@ -38,10 +38,9 @@ var (
 
 // HandledEvents là mọi sự kiện consumer của module xử lý (trừ pf.notify.push.requested).
 var HandledEvents = []string{
-	extport.EventDirectiveIssued, extport.EventTaskEscalated, contentport.EventAlertPublished,
+	extport.EventDirectiveIssued, contentport.EventAlertPublished,
 	contentport.EventDocumentPublished, syncport.EventConflictOpened, syncport.EventDeviceRevoked,
-	partyport.EventOrgDeactivated, coopport.EventHouseholdRegistered, coopport.EventHouseholdMembershipChanged,
-	extport.EventTaskCreated, coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened,
+	partyport.EventOrgDeactivated, coopport.EventHouseholdRegistered, coopport.EventHouseholdMembershipChanged, coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened,
 	ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived,
 	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale, mrvport.EventAlertRaised,
 	meteringport.EventEgressAnomaly,
@@ -77,12 +76,6 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			return err
 		}
 		return s.onDirective(ctx, tx, env, p)
-	case extport.EventTaskCreated, extport.EventTaskEscalated:
-		ns, err := s.legacyTaskNotifications(ctx, env)
-		if err != nil {
-			return err
-		}
-		return s.deliver(ctx, tx, env, ns)
 	case coopport.EventHouseholdRegistered:
 		var p coopport.HouseholdRegisteredV1
 		if err := decode(env, &p); err != nil {
@@ -339,59 +332,6 @@ func (s *Service) onCommuneHousehold(ctx context.Context, tx pgx.Tx, env outbox.
 		ns = append(ns, tpl.ForAudience(domain.Audience{Units: []string{commune}, Roles: []string{partyport.RoleKNOfficer}}))
 	}
 	return s.deliver(ctx, tx, env, ns)
-}
-
-// legacyTaskNotifications isolates the existing task construction from delivery.
-// PRICE-B behavior is retained; TASK-B removes this legacy builder after owner comparison.
-func (s *Service) legacyTaskNotifications(ctx context.Context, env outbox.Envelope) ([]domain.Notification, error) {
-	switch env.EventType {
-	case extport.EventTaskEscalated:
-		var p extport.TaskEscalatedV1
-		if err := decode(env, &p); err != nil {
-			return nil, err
-		}
-		tpl := domain.TaskEscalatedTemplate(p, env.OccurredAt)
-		var recipients []uuid.UUID
-		if p.AssigneeRef != nil {
-			recipients = append(recipients, *p.AssigneeRef)
-		}
-		admins := 0
-		if s.Staff != nil && p.ProvinceCode != "" {
-			staff, err := s.Staff.ActiveStaff(ctx, env.TenantID, []string{p.ProvinceCode})
-			if err != nil {
-				return nil, err
-			}
-			for _, st := range staff {
-				if st.ProvinceLevel() && st.ProvinceCode == p.ProvinceCode {
-					recipients = append(recipients, st.ActorRef)
-					admins++
-				}
-			}
-		}
-		var ns []domain.Notification
-		for _, r := range domain.DedupRefs(recipients) {
-			ns = append(ns, tpl.For(r))
-		}
-		if admins == 0 && p.ProvinceCode != "" {
-			ns = append(ns, tpl.ForAudience(domain.Audience{Units: []string{p.ProvinceCode}, Roles: []string{partyport.RoleKNProvinceAdmin}}))
-		}
-		return ns, nil
-	case extport.EventTaskCreated:
-		var p extport.TaskCreatedV1
-		if err := decode(env, &p); err != nil {
-			return nil, err
-		}
-		tpl := domain.TaskAssignedTemplate(p, env.OccurredAt)
-		if p.AssigneeRef != nil && *p.AssigneeRef != uuid.Nil {
-			return []domain.Notification{tpl.For(*p.AssigneeRef)}, nil
-		}
-		unit := p.ProvinceCode
-		if unit == "" {
-			unit = p.CommuneCode
-		}
-		return []domain.Notification{tpl.ForAudience(domain.Audience{Units: []string{unit}, Roles: []string{partyport.RoleKNProvinceAdmin}})}, nil
-	}
-	return nil, nil
 }
 
 // contentAudience: national (hoặc không có đơn vị) → toàn quốc; còn lại → các đơn
