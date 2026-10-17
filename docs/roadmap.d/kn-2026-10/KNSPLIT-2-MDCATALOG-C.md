@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-MDCATALOG-C — Generic effective lookup + KN adapter; cần22PG/cổng tĩnh/helper9 trướcdev; D gỡlegacy sauproof.
+- [x] KNSPLIT-2-MDCATALOG-C — OwnerlookupCNTS,22/22PG0+17frozenDTOcases,fullstatic/followup0/baseline369. Helper9migrationtrướcdev; Dgỡlegacylookup,rules/DTOconstcònphasekế.

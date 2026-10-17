@@ -1,0 +1,480 @@
+{
+  "communes": {
+    "Value": {
+      "00000000-0000-7000-8000-000000000001": "30292"
+    },
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "facility-missing": {
+    "Value": {
+      "Active": false,
+      "Address": "",
+      "Code": "",
+      "CommuneCode": "",
+      "Kind": "",
+      "Name": "",
+      "Ref": "00000000-0000-0000-0000-000000000000",
+      "Species": null,
+      "StampsGC": null,
+      "StampsGS": null,
+      "ValidFrom": "0001-01-01T00:00:00Z"
+    },
+    "Error": "masterdata: không có cơ sở giết mổ",
+    "NotEffective": false,
+    "FacilityNotFound": true,
+    "ItemNotFound": false
+  },
+  "facility/2026-08-31": {
+    "Value": {
+      "Active": false,
+      "Address": "",
+      "Code": "",
+      "CommuneCode": "",
+      "Kind": "",
+      "Name": "",
+      "Ref": "00000000-0000-0000-0000-000000000000",
+      "Species": null,
+      "StampsGC": null,
+      "StampsGS": null,
+      "ValidFrom": "0001-01-01T00:00:00Z"
+    },
+    "Error": "masterdata.catalog_item_not_found",
+    "NotEffective": true,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "facility/2026-09-30": {
+    "Value": {
+      "Active": true,
+      "Address": "",
+      "Code": "CSA",
+      "CommuneCode": "30292",
+      "Kind": "tap_trung",
+      "Name": "Cơ sở CSA",
+      "Ref": "00000000-0000-7000-8000-000000000001",
+      "Species": [
+        "HEO",
+        "TRAU"
+      ],
+      "StampsGC": null,
+      "StampsGS": [
+        "91.589.05",
+        "91.589.05.1"
+      ],
+      "ValidFrom": "2026-09-01T00:00:00Z"
+    },
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "facility/2026-10-01": {
+    "Value": {
+      "Active": true,
+      "Address": "",
+      "Code": "CSA",
+      "CommuneCode": "30292",
+      "Kind": "tap_trung",
+      "Name": "Cơ sở CSA",
+      "Ref": "00000000-0000-7000-8000-000000000001",
+      "Species": [
+        "GA",
+        "HEO",
+        "TRAU"
+      ],
+      "StampsGC": [
+        "91.589.06"
+      ],
+      "StampsGS": [
+        "91.589.05",
+        "91.589.05.1"
+      ],
+      "ValidFrom": "2026-10-01T00:00:00Z"
+    },
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "filtered/2026-08-31": {
+    "Value": [],
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "filtered/2026-09-30": {
+    "Value": [
+      {
+        "Active": true,
+        "Address": "",
+        "Code": "CSA",
+        "CommuneCode": "30292",
+        "Kind": "tap_trung",
+        "Name": "Cơ sở CSA",
+        "Ref": "00000000-0000-7000-8000-000000000001",
+        "Species": [
+          "HEO",
+          "TRAU"
+        ],
+        "StampsGC": null,
+        "StampsGS": [
+          "91.589.05",
+          "91.589.05.1"
+        ],
+        "ValidFrom": "2026-09-01T00:00:00Z"
+      }
+    ],
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "filtered/2026-10-01": {
+    "Value": [
+      {
+        "Active": true,
+        "Address": "",
+        "Code": "CSA",
+        "CommuneCode": "30292",
+        "Kind": "tap_trung",
+        "Name": "Cơ sở CSA",
+        "Ref": "00000000-0000-7000-8000-000000000001",
+        "Species": [
+          "GA",
+          "HEO",
+          "TRAU"
+        ],
+        "StampsGC": [
+          "91.589.06"
+        ],
+        "StampsGS": [
+          "91.589.05",
+          "91.589.05.1"
+        ],
+        "ValidFrom": "2026-10-01T00:00:00Z"
+      }
+    ],
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "item": {
+    "Value": {
+      "Active": true,
+      "Attrs": {
+        "group": "gia_suc",
+        "herd_column": "true",
+        "order": "1",
+        "unit": "con"
+      },
+      "Catalog": "cnts_species",
+      "Code": "HEO",
+      "Name": "Heo"
+    },
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "list/2026-08-31": {
+    "Value": [],
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "list/2026-09-30": {
+    "Value": [
+      {
+        "Active": true,
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "00000000-0000-7000-8000-000000000001",
+          "species": "HEO,TRAU",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSA",
+        "Name": "Cơ sở CSA"
+      }
+    ],
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "list/2026-10-01": {
+    "Value": [
+      {
+        "Active": true,
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "00000000-0000-7000-8000-000000000001",
+          "species": "GA,HEO,TRAU",
+          "stamp_codes_gc": "91.589.06",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSA",
+        "Name": "Cơ sở CSA"
+      }
+    ],
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "schedule/2026-08-31": {
+    "Value": {
+      "Breed": "",
+      "Code": "QT_GA_THUONG_PHAM",
+      "Doses": [
+        {
+          "AgeDays": 3,
+          "Shot": 1,
+          "Vaccine": "VX_ND_F"
+        },
+        {
+          "AgeDays": 7,
+          "Shot": 1,
+          "Vaccine": "VX_GUMBORO"
+        },
+        {
+          "AgeDays": 12,
+          "Shot": 1,
+          "Vaccine": "VX_DAU_GA"
+        },
+        {
+          "AgeDays": 17,
+          "Shot": 1,
+          "Vaccine": "VX_CUM_GIA_CAM"
+        },
+        {
+          "AgeDays": 21,
+          "Shot": 1,
+          "Vaccine": "VX_ND_LASOTA"
+        },
+        {
+          "AgeDays": 28,
+          "Shot": 2,
+          "Vaccine": "VX_GUMBORO"
+        },
+        {
+          "AgeDays": 40,
+          "Shot": 2,
+          "Vaccine": "VX_CUM_GIA_CAM"
+        },
+        {
+          "AgeDays": 47,
+          "Shot": 1,
+          "Vaccine": "VX_THT_GA"
+        },
+        {
+          "AgeDays": 60,
+          "Shot": 1,
+          "Vaccine": "VX_ND_M"
+        }
+      ],
+      "ModelType": "GA_THUONG_PHAM",
+      "Name": "Quy trình tiêm gà thương phẩm",
+      "ValidFrom": "2000-01-01T00:00:00Z"
+    },
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "schedule/2026-09-30": {
+    "Value": {
+      "Breed": "",
+      "Code": "QT_GA_THUONG_PHAM",
+      "Doses": [
+        {
+          "AgeDays": 3,
+          "Shot": 1,
+          "Vaccine": "VX_ND_F"
+        },
+        {
+          "AgeDays": 7,
+          "Shot": 1,
+          "Vaccine": "VX_GUMBORO"
+        },
+        {
+          "AgeDays": 12,
+          "Shot": 1,
+          "Vaccine": "VX_DAU_GA"
+        },
+        {
+          "AgeDays": 17,
+          "Shot": 1,
+          "Vaccine": "VX_CUM_GIA_CAM"
+        },
+        {
+          "AgeDays": 21,
+          "Shot": 1,
+          "Vaccine": "VX_ND_LASOTA"
+        },
+        {
+          "AgeDays": 28,
+          "Shot": 2,
+          "Vaccine": "VX_GUMBORO"
+        },
+        {
+          "AgeDays": 40,
+          "Shot": 2,
+          "Vaccine": "VX_CUM_GIA_CAM"
+        },
+        {
+          "AgeDays": 47,
+          "Shot": 1,
+          "Vaccine": "VX_THT_GA"
+        },
+        {
+          "AgeDays": 60,
+          "Shot": 1,
+          "Vaccine": "VX_ND_M"
+        }
+      ],
+      "ModelType": "GA_THUONG_PHAM",
+      "Name": "Quy trình tiêm gà thương phẩm",
+      "ValidFrom": "2000-01-01T00:00:00Z"
+    },
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "schedule/2026-10-01": {
+    "Value": {
+      "Breed": "",
+      "Code": "QT_GA_THUONG_PHAM",
+      "Doses": [
+        {
+          "AgeDays": 3,
+          "Shot": 1,
+          "Vaccine": "VX_ND_F"
+        },
+        {
+          "AgeDays": 7,
+          "Shot": 1,
+          "Vaccine": "VX_GUMBORO"
+        },
+        {
+          "AgeDays": 12,
+          "Shot": 1,
+          "Vaccine": "VX_DAU_GA"
+        },
+        {
+          "AgeDays": 17,
+          "Shot": 1,
+          "Vaccine": "VX_CUM_GIA_CAM"
+        },
+        {
+          "AgeDays": 21,
+          "Shot": 1,
+          "Vaccine": "VX_ND_LASOTA"
+        },
+        {
+          "AgeDays": 28,
+          "Shot": 2,
+          "Vaccine": "VX_GUMBORO"
+        },
+        {
+          "AgeDays": 40,
+          "Shot": 2,
+          "Vaccine": "VX_CUM_GIA_CAM"
+        },
+        {
+          "AgeDays": 47,
+          "Shot": 1,
+          "Vaccine": "VX_THT_GA"
+        },
+        {
+          "AgeDays": 60,
+          "Shot": 1,
+          "Vaccine": "VX_ND_M"
+        }
+      ],
+      "ModelType": "GA_THUONG_PHAM",
+      "Name": "Quy trình tiêm gà thương phẩm",
+      "ValidFrom": "2000-01-01T00:00:00Z"
+    },
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "unknown": {
+    "Value": [
+      "00000000-0000-7000-8000-000000000002"
+    ],
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  },
+  "vaccine-species": {
+    "Value": {
+      "VX_ASF": [
+        "HEO"
+      ],
+      "VX_CUM_GIA_CAM": [
+        "GA",
+        "VIT"
+      ],
+      "VX_DAI": [
+        "CHO_MEO"
+      ],
+      "VX_DAU_GA": [
+        "GA"
+      ],
+      "VX_DT_THT_HEO": [
+        "HEO"
+      ],
+      "VX_GUMBORO": [
+        "GA"
+      ],
+      "VX_LMLM_BO": [
+        "BO",
+        "TRAU"
+      ],
+      "VX_LMLM_HEO": [
+        "HEO"
+      ],
+      "VX_ND_F": [
+        "GA"
+      ],
+      "VX_ND_LASOTA": [
+        "GA"
+      ],
+      "VX_ND_M": [
+        "GA"
+      ],
+      "VX_TAI_XANH": [
+        "HEO"
+      ],
+      "VX_THT_BO": [
+        "BO",
+        "TRAU"
+      ],
+      "VX_THT_GA": [
+        "GA"
+      ],
+      "VX_VDNC_BO": [
+        "BO",
+        "TRAU"
+      ]
+    },
+    "Error": "",
+    "NotEffective": false,
+    "FacilityNotFound": false,
+    "ItemNotFound": false
+  }
+}

@@ -581,3 +581,6 @@ Static đầu trênbf8c0f30 đạt build/vet/modgen/migrate/archlint/contract/do
 
 
 C22 actualexit0 (session53219), 0FAIL/SKIP trên productionbf8c0f30/testfix3c7f7ea4; cụm62461 đãcleanup, Go0. tests/masterdata180.569s; cntsalert109.532s, cntscal131.305s, outbreak136.742s, accounts-handler135.770s, assembly130.649s, worker2.142s, KN77402.435s, frozen2.519s. Proof codehostTEMP agrigreen-codex-knsplit2mdcatalogc-code-proof.json. Sau khi kết thúc mới bổ sung test-only capture17legacy DTO, canonicalUUID2fixture, erroridentity3sentinels. D sẽ dùng cùnggolden thay legacy. Production không đổi; cần targeted capturePG và vet/lint followup rồi helper9, không suy PASS từ lượt chưa chạy.
+
+
+Kết quả chốt C: đủ22/22PG trên productionbf8c0f30,0FAIL/SKIP; capture-only93037 actualexit0/PASS134.589s trên testhead091019bb, 17legacylookupcases đãghi tests/golden/kn-masterdata-lookups.json, canonical2fixtureUUID+zero , nạplạikhớp. DeltaGo sauproductionchỉ3testfiles (errorlintfix+capturehelper); khôngđổi thuậttoán/SQL sau22. Followup5432 actualexit0: vet/lint0issues/archlint/docs/modgen-check/knboundary369;gofmt2fixturecũ. ProofhostTEMP agrigreen-codex-knsplit2mdcatalogc-proof.json. Đủcode/PG/static; helper9migration và remoteverify còntrướckhitínhđãtíchhợp. D giữ17goldenassertions, gỡcapture vàlookup/facadelegacy; refs/stableUUID/commune/stamp vàDTO/constphasekế,G1chưahoàntất.
