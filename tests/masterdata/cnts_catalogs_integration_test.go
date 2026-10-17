@@ -117,37 +117,38 @@ func TestW1141_CNTSCatalogs(t *testing.T) {
 	}
 
 	// Temporary legacy comparison: every field, slice order and public error identity.
+	contract := newLookupContract(t, ref, other.String())
 	legacy := f.mod.CNTSCatalogs()
 	for _, on := range []string{"2026-08-31", "2026-09-30", "2026-10-01"} {
 		at := day(on)
 		oldFacility, oldErr := legacy.Facility(ctx, uuid.MustParse(ref), at)
 		newFacility, newErr := cnts.Facility(ctx, uuid.MustParse(ref), at)
-		assertCatalogLookupEquivalent(t, "facility/"+on, oldFacility, oldErr, newFacility, newErr)
+		assertCatalogLookupEquivalent(contract, "facility/"+on, oldFacility, oldErr, newFacility, newErr)
 		oldSchedule, oldErr := legacy.ScheduleAt(ctx, "QT_GA_THUONG_PHAM", at)
 		newSchedule, newErr := cnts.ScheduleAt(ctx, "QT_GA_THUONG_PHAM", at)
-		assertCatalogLookupEquivalent(t, "schedule/"+on, oldSchedule, oldErr, newSchedule, newErr)
+		assertCatalogLookupEquivalent(contract, "schedule/"+on, oldSchedule, oldErr, newSchedule, newErr)
 		oldItems, oldErr := legacy.ListAt(ctx, port.CatalogCNTSSlaughterFacility, at)
 		newItems, newErr := cnts.ListAt(ctx, port.CatalogCNTSSlaughterFacility, at)
-		assertCatalogLookupEquivalent(t, "list/"+on, oldItems, oldErr, newItems, newErr)
+		assertCatalogLookupEquivalent(contract, "list/"+on, oldItems, oldErr, newItems, newErr)
 		oldFacilities, oldErr := legacy.FacilitiesAt(ctx, at, []string{"30292"})
 		newFacilities, newErr := cnts.FacilitiesAt(ctx, at, []string{"30292"})
-		assertCatalogLookupEquivalent(t, "filtered/"+on, oldFacilities, oldErr, newFacilities, newErr)
+		assertCatalogLookupEquivalent(contract, "filtered/"+on, oldFacilities, oldErr, newFacilities, newErr)
 	}
 	oldItem, oldErr := legacy.ItemAt(ctx, port.CatalogCNTSSpecies, "HEO", day("2026-10-01"))
 	newItem, newErr := cnts.ItemAt(ctx, port.CatalogCNTSSpecies, "HEO", day("2026-10-01"))
-	assertCatalogLookupEquivalent(t, "item", oldItem, oldErr, newItem, newErr)
+	assertCatalogLookupEquivalent(contract, "item", oldItem, oldErr, newItem, newErr)
 	oldMissing, oldErr := legacy.Facility(ctx, other, day("2026-10-01"))
 	newMissing, newErr := cnts.Facility(ctx, other, day("2026-10-01"))
-	assertCatalogLookupEquivalent(t, "facility-missing", oldMissing, oldErr, newMissing, newErr)
+	assertCatalogLookupEquivalent(contract, "facility-missing", oldMissing, oldErr, newMissing, newErr)
 	oldSpecies, oldErr := legacy.VaccineSpecies(ctx, day("2026-10-01"))
 	newSpecies, newErr := cnts.VaccineSpecies(ctx, day("2026-10-01"))
-	assertCatalogLookupEquivalent(t, "vaccine-species", oldSpecies, oldErr, newSpecies, newErr)
+	assertCatalogLookupEquivalent(contract, "vaccine-species", oldSpecies, oldErr, newSpecies, newErr)
 	oldUnknown, oldErr := legacy.UnknownFacilities(ctx, []uuid.UUID{uuid.MustParse(ref), other})
 	newUnknown, newErr := cnts.UnknownFacilities(ctx, []uuid.UUID{uuid.MustParse(ref), other})
-	assertCatalogLookupEquivalent(t, "unknown", oldUnknown, oldErr, newUnknown, newErr)
+	assertCatalogLookupEquivalent(contract, "unknown", oldUnknown, oldErr, newUnknown, newErr)
 	oldCommunes, oldErr := legacy.FacilityCommunes(ctx, []uuid.UUID{uuid.MustParse(ref), other}, day("2026-10-01"))
 	newCommunes, newErr := cnts.FacilityCommunes(ctx, []uuid.UUID{uuid.MustParse(ref), other}, day("2026-10-01"))
-	assertCatalogLookupEquivalent(t, "communes", oldCommunes, oldErr, newCommunes, newErr)
+	assertCatalogLookupEquivalent(contract, "communes", oldCommunes, oldErr, newCommunes, newErr)
 
 	// valid_from chỉ nhận ở danh mục CNTS.
 	if st, _ := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/material/items", map[string]any{
@@ -157,7 +158,8 @@ func TestW1141_CNTSCatalogs(t *testing.T) {
 	}
 }
 
-func assertCatalogLookupEquivalent[T any](t *testing.T, label string, old T, oldErr error, got T, gotErr error) {
+func assertCatalogLookupEquivalent[T any](contract *lookupContract, label string, old T, oldErr error, got T, gotErr error) {
+	t := contract.t
 	t.Helper()
 	if !reflect.DeepEqual(old, got) {
 		t.Fatalf("%s values differ: old=%+v new=%+v", label, old, got)
@@ -170,4 +172,7 @@ func assertCatalogLookupEquivalent[T any](t *testing.T, label string, old T, old
 			t.Fatalf("%s public error identity changed: %v", label, sentinel)
 		}
 	}
+	contract.recordLegacy(label, old, oldErr)
+	contract.check(label, got, gotErr)
+
 }

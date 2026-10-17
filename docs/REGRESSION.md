@@ -578,3 +578,6 @@ Hồi quy dự kiến22gói: B18 + accounts app/domain/handler/port (consumer ph
 
 
 Static đầu trênbf8c0f30 đạt build/vet/modgen/migrate/archlint/contract/docs/MFA/boundary369, dừng tại errorlint do3negative-test so lỗi bằng !=. Sửa test dùng errors.Is, không đổi production; chạy lại targeted pure và static-repaired. Không coi static ban đầu là đạt; giữ log/exit ban đầu.
+
+
+C22 actualexit0 (session53219), 0FAIL/SKIP trên productionbf8c0f30/testfix3c7f7ea4; cụm62461 đãcleanup, Go0. tests/masterdata180.569s; cntsalert109.532s, cntscal131.305s, outbreak136.742s, accounts-handler135.770s, assembly130.649s, worker2.142s, KN77402.435s, frozen2.519s. Proof codehostTEMP agrigreen-codex-knsplit2mdcatalogc-code-proof.json. Sau khi kết thúc mới bổ sung test-only capture17legacy DTO, canonicalUUID2fixture, erroridentity3sentinels. D sẽ dùng cùnggolden thay legacy. Production không đổi; cần targeted capturePG và vet/lint followup rồi helper9, không suy PASS từ lượt chưa chạy.
