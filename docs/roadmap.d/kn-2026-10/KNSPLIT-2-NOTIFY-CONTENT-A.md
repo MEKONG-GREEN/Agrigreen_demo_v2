@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-NOTIFY-CONTENT-A: Đăng ký bảy bộ dựng workflow tại KN; đối chiếu77OLD và46CNTS, kiểm tra PG và migration trước dev.
