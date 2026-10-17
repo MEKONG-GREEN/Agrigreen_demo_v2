@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-MDCATALOG-A — 12schema/60seed KN đăng ký vào core;170ca frozen đạt, generic date storage3migration, chờPG/static/helper. B mới gỡlegacy; typed lookup/registrykhác/data/tenant/client/reminder còn.

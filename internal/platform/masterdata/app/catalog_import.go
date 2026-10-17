@@ -134,14 +134,14 @@ func (s *Service) ImportCatalogs(ctx context.Context, body io.Reader, key string
 				if err == nil {
 					err = domain.ValidateValidFrom(d)
 				}
-				if err != nil || !domain.EffectiveDated(it.Catalog) {
-					row.Reason = "valid_from: YYYY-MM-DD, chỉ danh mục Chăn nuôi – Thủy sản"
+				if err != nil || !s.catalogEffective(it.Catalog) {
+					row.Reason = s.invalidCatalogEffectiveDate()
 					res.add(row)
 					continue
 				}
 				it.ValidFrom = d
 			}
-			norm, err := prepareFacilityRef(it).Normalize()
+			norm, err := s.normalizeCatalogItem(prepareFacilityRef(it))
 			if err != nil {
 				row.Reason = importReason(err)
 				res.add(row)
@@ -170,7 +170,7 @@ func (s *Service) ImportCatalogs(ctx context.Context, body io.Reader, key string
 				res.add(row)
 				continue
 			}
-			if err := checkRefs(ctx, tx, norm, norm.ValidFrom); err != nil {
+			if err := s.checkRefs(ctx, tx, norm, norm.ValidFrom); err != nil {
 				if pr := problem.From(err); pr.Status == http.StatusUnprocessableEntity {
 					row.Reason = pr.Title
 					res.add(row)

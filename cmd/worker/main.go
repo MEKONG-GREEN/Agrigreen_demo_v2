@@ -97,6 +97,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"log/slog"
 	"os"
@@ -469,7 +470,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			closeFn()
 			return nil, func() {}, err
 		}
-		md := masterdata.New(mdPool, clk, extension.MasterdataParams())
+		md := masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 		pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits()})
 		kn := extension.New(extPool, clk, extension.Deps{
 			Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
@@ -522,7 +523,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			closeFn()
 			return nil, func() {}, err
 		}
-		md := masterdata.New(mdPool, clk, extension.MasterdataParams())
+		md := masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 		rep := reports.New(repPool, clk, reports.Deps{FormSeeds: []reportsport.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Clock: clk}), Catalog: []reportsport.CatalogRegistration{extension.ReportCatalog()}, Policies: []reportsport.Policy{extension.ReportPolicy()}, Params: md.Params(), Log: log})
 		// G5 (ADR-0024): lối "lịch" của xuất báo cáo qua điểm kiểm soát chung (kênh report_export) —
 		// Checkpoint của pf/metering (r_metering); workerEgress ghi đè cho kiểm thử.
@@ -557,7 +558,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			closeFn()
 			return nil, func() {}, err
 		}
-		mech := mechanization.New(mechPool, clk, mechanization.Deps{Params: masterdata.New(mdPool, clk, extension.MasterdataParams()).Params()})
+		mech := mechanization.New(mechPool, clk, mechanization.Deps{Params: masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}}).Params()})
 		js = append(js, mech.Jobs(mechanization.FeedTenants(out.pools[migrations.PF]), log)...)
 	}
 	if selected(jobs, metricsport.JobMetricsSnapshot) {
@@ -590,7 +591,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			closeFn()
 			return nil, func() {}, err
 		}
-		mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Params: masterdata.New(mdPool, clk, extension.MasterdataParams()).Params()})
+		mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Params: masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}}).Params()})
 		js = append(js, mrvMod.Jobs(mrv.PendingTenants(out.pools[migrations.PF]), log)...)
 	}
 	if selected(jobs, extension.JobCNTSAlert) {
@@ -692,7 +693,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		// AG_ACCOUNTS_DORMANT_DRY_RUN=true: chỉ đếm và ghi log (lần chạy đầu ở môi trường thật — runbook keycloak-mfa-d24).
 		dry := os.Getenv("AG_ACCOUNTS_DORMANT_DRY_RUN") == "true"
-		acc := accounts.New(pfPool, clk, accounts.Deps{Directory: dir, Params: masterdata.New(pfPool, clk, extension.MasterdataParams()).Params(), DormantDryRun: dry})
+		acc := accounts.New(pfPool, clk, accounts.Deps{Directory: dir, Params: masterdata.New(pfPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}}).Params(), DormantDryRun: dry})
 		js = append(js, acc.Jobs(accounts.DormantTenants(out.pools[migrations.PF]), log)...)
 	}
 	if len(js) == 0 {

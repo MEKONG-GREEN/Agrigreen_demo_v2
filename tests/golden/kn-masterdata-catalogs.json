@@ -1,0 +1,4833 @@
+{
+  "Metadata": [
+    {
+      "Catalog": "cnts_species",
+      "Name": "Vật nuôi",
+      "Attributes": [
+        "description",
+        "group",
+        "herd_column",
+        "order",
+        "unit"
+      ],
+      "EffectiveDated": true,
+      "Sync": true,
+      "SeedValidFrom": "2000-01-01"
+    },
+    {
+      "Catalog": "cnts_breed",
+      "Name": "Giống vật nuôi",
+      "Attributes": [
+        "description",
+        "species"
+      ],
+      "EffectiveDated": true,
+      "Sync": true,
+      "SeedValidFrom": "2000-01-01"
+    },
+    {
+      "Catalog": "cnts_vaccine",
+      "Name": "Vaccine",
+      "Attributes": [
+        "description",
+        "diseases",
+        "order",
+        "report_group",
+        "species"
+      ],
+      "EffectiveDated": true,
+      "Sync": true,
+      "SeedValidFrom": "2000-01-01"
+    },
+    {
+      "Catalog": "cnts_vaccination_schedule",
+      "Name": "Quy trình tiêm",
+      "Attributes": [
+        "breed",
+        "description",
+        "doses",
+        "model_type"
+      ],
+      "EffectiveDated": true,
+      "Sync": true,
+      "SeedValidFrom": "2000-01-01"
+    },
+    {
+      "Catalog": "cnts_disease",
+      "Name": "Bệnh",
+      "Attributes": [
+        "description",
+        "notifiable",
+        "species"
+      ],
+      "EffectiveDated": true,
+      "Sync": true,
+      "SeedValidFrom": "2000-01-01"
+    },
+    {
+      "Catalog": "cnts_chemical",
+      "Name": "Hóa chất",
+      "Attributes": [
+        "description",
+        "target",
+        "unit"
+      ],
+      "EffectiveDated": true,
+      "Sync": true,
+      "SeedValidFrom": "2000-01-01"
+    },
+    {
+      "Catalog": "cnts_slaughter_facility",
+      "Name": "Cơ sở giết mổ",
+      "Attributes": [
+        "address",
+        "commune_code",
+        "description",
+        "facility_kind",
+        "facility_ref",
+        "species",
+        "stamp_codes_gc",
+        "stamp_codes_gs"
+      ],
+      "EffectiveDated": true,
+      "Sync": true,
+      "SeedValidFrom": "2000-01-01"
+    },
+    {
+      "Catalog": "cnts_aquaculture_object",
+      "Name": "Đối tượng nuôi thủy sản",
+      "Attributes": [
+        "description",
+        "scale_unit"
+      ],
+      "EffectiveDated": true,
+      "Sync": true,
+      "SeedValidFrom": "2000-01-01"
+    },
+    {
+      "Catalog": "cnts_fishing_group",
+      "Name": "Nhóm khai thác",
+      "Attributes": [
+        "description",
+        "order",
+        "unit"
+      ],
+      "EffectiveDated": true,
+      "Sync": true,
+      "SeedValidFrom": "2000-01-01"
+    },
+    {
+      "Catalog": "cnts_indicator",
+      "Name": "Chỉ tiêu theo dõi",
+      "Attributes": [
+        "description",
+        "unit",
+        "value_type"
+      ],
+      "EffectiveDated": true,
+      "Sync": true,
+      "SeedValidFrom": "2000-01-01"
+    },
+    {
+      "Catalog": "cnts_model_type",
+      "Name": "Loại mô hình",
+      "Attributes": [
+        "description",
+        "sector",
+        "species"
+      ],
+      "EffectiveDated": true,
+      "Sync": true,
+      "SeedValidFrom": "2000-01-01"
+    },
+    {
+      "Catalog": "cnts_document_type",
+      "Name": "Loại văn bản",
+      "Attributes": [
+        "description"
+      ],
+      "EffectiveDated": true,
+      "Sync": true,
+      "SeedValidFrom": "2000-01-01"
+    }
+  ],
+  "Seeds": [
+    {
+      "catalog": "cnts_species",
+      "code": "HEO",
+      "name": "Heo",
+      "attrs": {
+        "group": "gia_suc",
+        "herd_column": "true",
+        "order": "1",
+        "unit": "con"
+      }
+    },
+    {
+      "catalog": "cnts_species",
+      "code": "DE",
+      "name": "Dê",
+      "attrs": {
+        "group": "gia_suc",
+        "herd_column": "true",
+        "order": "2",
+        "unit": "con"
+      }
+    },
+    {
+      "catalog": "cnts_species",
+      "code": "TRAU",
+      "name": "Trâu",
+      "attrs": {
+        "group": "gia_suc",
+        "herd_column": "true",
+        "order": "3",
+        "unit": "con"
+      }
+    },
+    {
+      "catalog": "cnts_species",
+      "code": "BO",
+      "name": "Bò",
+      "attrs": {
+        "group": "gia_suc",
+        "herd_column": "true",
+        "order": "4",
+        "unit": "con"
+      }
+    },
+    {
+      "catalog": "cnts_species",
+      "code": "VIT",
+      "name": "Vịt",
+      "attrs": {
+        "group": "gia_cam",
+        "herd_column": "true",
+        "order": "5",
+        "unit": "con"
+      }
+    },
+    {
+      "catalog": "cnts_species",
+      "code": "GA",
+      "name": "Gà",
+      "attrs": {
+        "group": "gia_cam",
+        "herd_column": "true",
+        "order": "6",
+        "unit": "con"
+      }
+    },
+    {
+      "catalog": "cnts_species",
+      "code": "CHO_MEO",
+      "name": "Chó, mèo",
+      "attrs": {
+        "group": "thu_cung",
+        "herd_column": "true",
+        "order": "7",
+        "unit": "con"
+      }
+    },
+    {
+      "catalog": "cnts_species",
+      "code": "YEN",
+      "name": "Yến",
+      "attrs": {
+        "description": "Tổng đàn tính theo số nhà yến",
+        "group": "yen",
+        "herd_column": "true",
+        "order": "8",
+        "unit": "nhà"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "ASF",
+      "name": "Dịch tả heo Châu Phi",
+      "attrs": {
+        "notifiable": "true",
+        "species": "HEO"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "CSF",
+      "name": "Dịch tả heo cổ điển",
+      "attrs": {
+        "notifiable": "true",
+        "species": "HEO"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "THT_HEO",
+      "name": "Tụ huyết trùng heo",
+      "attrs": {
+        "species": "HEO"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "PRRS",
+      "name": "Tai xanh (PRRS)",
+      "attrs": {
+        "notifiable": "true",
+        "species": "HEO"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "LMLM",
+      "name": "Lở mồm long móng",
+      "attrs": {
+        "notifiable": "true",
+        "species": "BO,DE,HEO,TRAU"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "VDNC",
+      "name": "Viêm da nổi cục",
+      "attrs": {
+        "notifiable": "true",
+        "species": "BO,TRAU"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "THT_TRAU_BO",
+      "name": "Tụ huyết trùng trâu bò",
+      "attrs": {
+        "species": "BO,TRAU"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "CUM_GIA_CAM",
+      "name": "Cúm gia cầm",
+      "attrs": {
+        "notifiable": "true",
+        "species": "GA,VIT"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "DAI",
+      "name": "Dại",
+      "attrs": {
+        "notifiable": "true",
+        "species": "CHO_MEO"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "NEWCASTLE",
+      "name": "Newcastle",
+      "attrs": {
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "GUMBORO",
+      "name": "Gumboro",
+      "attrs": {
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "DAU_GA",
+      "name": "Đậu gà",
+      "attrs": {
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "THT_GIA_CAM",
+      "name": "Tụ huyết trùng gia cầm",
+      "attrs": {
+        "species": "GA,VIT"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_ASF",
+      "name": "Tả heo Châu Phi",
+      "attrs": {
+        "diseases": "ASF",
+        "order": "1",
+        "report_group": "heo",
+        "species": "HEO"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_DT_THT_HEO",
+      "name": "Dịch tả – THT heo",
+      "attrs": {
+        "description": "Một cột chung như mẫu 2026, không tách",
+        "diseases": "CSF,THT_HEO",
+        "order": "2",
+        "report_group": "heo",
+        "species": "HEO"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_LMLM_HEO",
+      "name": "LMLM heo",
+      "attrs": {
+        "diseases": "LMLM",
+        "order": "3",
+        "report_group": "heo",
+        "species": "HEO"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_TAI_XANH",
+      "name": "Tai xanh heo",
+      "attrs": {
+        "diseases": "PRRS",
+        "order": "4",
+        "report_group": "heo",
+        "species": "HEO"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_VDNC_BO",
+      "name": "Viêm da nổi cục bò",
+      "attrs": {
+        "diseases": "VDNC",
+        "order": "5",
+        "report_group": "bo",
+        "species": "BO,TRAU"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_THT_BO",
+      "name": "THT bò",
+      "attrs": {
+        "diseases": "THT_TRAU_BO",
+        "order": "6",
+        "report_group": "bo",
+        "species": "BO,TRAU"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_LMLM_BO",
+      "name": "LMLM bò",
+      "attrs": {
+        "diseases": "LMLM",
+        "order": "7",
+        "report_group": "bo",
+        "species": "BO,TRAU"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_CUM_GIA_CAM",
+      "name": "Cúm gia cầm (H5N1)",
+      "attrs": {
+        "diseases": "CUM_GIA_CAM",
+        "order": "8",
+        "report_group": "cum_gia_cam",
+        "species": "GA,VIT"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_DAI",
+      "name": "Dại chó, mèo",
+      "attrs": {
+        "diseases": "DAI",
+        "order": "9",
+        "report_group": "dai",
+        "species": "CHO_MEO"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_ND_F",
+      "name": "Newcastle chủng F",
+      "attrs": {
+        "diseases": "NEWCASTLE",
+        "order": "20",
+        "report_group": "khac",
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_ND_LASOTA",
+      "name": "Newcastle Lasota",
+      "attrs": {
+        "diseases": "NEWCASTLE",
+        "order": "21",
+        "report_group": "khac",
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_ND_M",
+      "name": "Newcastle chủng M",
+      "attrs": {
+        "diseases": "NEWCASTLE",
+        "order": "22",
+        "report_group": "khac",
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_GUMBORO",
+      "name": "Gumboro",
+      "attrs": {
+        "diseases": "GUMBORO",
+        "order": "23",
+        "report_group": "khac",
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_DAU_GA",
+      "name": "Đậu gà",
+      "attrs": {
+        "diseases": "DAU_GA",
+        "order": "24",
+        "report_group": "khac",
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_THT_GA",
+      "name": "Tụ huyết trùng gà",
+      "attrs": {
+        "diseases": "THT_GIA_CAM",
+        "order": "25",
+        "report_group": "khac",
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_model_type",
+      "code": "GA_THUONG_PHAM",
+      "name": "Gà thương phẩm",
+      "attrs": {
+        "sector": "chan_nuoi",
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_model_type",
+      "code": "HEO_THIT",
+      "name": "Heo thịt",
+      "attrs": {
+        "sector": "chan_nuoi",
+        "species": "HEO"
+      }
+    },
+    {
+      "catalog": "cnts_model_type",
+      "code": "BO_THIT",
+      "name": "Bò thịt",
+      "attrs": {
+        "sector": "chan_nuoi",
+        "species": "BO"
+      }
+    },
+    {
+      "catalog": "cnts_model_type",
+      "code": "NUOI_THUY_SAN",
+      "name": "Nuôi thủy sản",
+      "attrs": {
+        "sector": "thuy_san"
+      }
+    },
+    {
+      "catalog": "cnts_vaccination_schedule",
+      "code": "QT_GA_THUONG_PHAM",
+      "name": "Quy trình tiêm gà thương phẩm",
+      "attrs": {
+        "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+        "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+        "model_type": "GA_THUONG_PHAM"
+      }
+    },
+    {
+      "catalog": "cnts_chemical",
+      "code": "HC_GIA_SUC",
+      "name": "Hóa chất khử trùng – gia súc",
+      "attrs": {
+        "target": "gia_suc",
+        "unit": "lít"
+      }
+    },
+    {
+      "catalog": "cnts_chemical",
+      "code": "HC_GIA_CAM",
+      "name": "Hóa chất khử trùng – gia cầm",
+      "attrs": {
+        "target": "gia_cam",
+        "unit": "lít"
+      }
+    },
+    {
+      "catalog": "cnts_aquaculture_object",
+      "code": "CA_TRA",
+      "name": "Cá tra",
+      "attrs": {
+        "scale_unit": "ha"
+      }
+    },
+    {
+      "catalog": "cnts_aquaculture_object",
+      "code": "TOM",
+      "name": "Tôm",
+      "attrs": {
+        "scale_unit": "ha"
+      }
+    },
+    {
+      "catalog": "cnts_aquaculture_object",
+      "code": "CA_LONG_BE",
+      "name": "Cá nuôi lồng bè",
+      "attrs": {
+        "scale_unit": "long"
+      }
+    },
+    {
+      "catalog": "cnts_aquaculture_object",
+      "code": "CA_VEO",
+      "name": "Cá nuôi vèo",
+      "attrs": {
+        "scale_unit": "veo"
+      }
+    },
+    {
+      "catalog": "cnts_fishing_group",
+      "code": "CA",
+      "name": "Cá",
+      "attrs": {
+        "order": "1",
+        "unit": "tấn"
+      }
+    },
+    {
+      "catalog": "cnts_fishing_group",
+      "code": "TOM",
+      "name": "Tôm",
+      "attrs": {
+        "order": "2",
+        "unit": "tấn"
+      }
+    },
+    {
+      "catalog": "cnts_fishing_group",
+      "code": "MUC",
+      "name": "Mực",
+      "attrs": {
+        "order": "3",
+        "unit": "tấn"
+      }
+    },
+    {
+      "catalog": "cnts_fishing_group",
+      "code": "KHAC",
+      "name": "Khác",
+      "attrs": {
+        "order": "4",
+        "unit": "tấn"
+      }
+    },
+    {
+      "catalog": "cnts_indicator",
+      "code": "PH",
+      "name": "pH",
+      "attrs": {
+        "description": "Ngưỡng mặc định 7,5–8,5 (tham số cnts.indicator_min/max:PH)",
+        "value_type": "decimal"
+      }
+    },
+    {
+      "catalog": "cnts_indicator",
+      "code": "DO",
+      "name": "Oxy hòa tan",
+      "attrs": {
+        "description": "Ngưỡng mặc định ≥ 4 mg/l",
+        "unit": "mg/l",
+        "value_type": "decimal"
+      }
+    },
+    {
+      "catalog": "cnts_indicator",
+      "code": "NHIET_DO",
+      "name": "Nhiệt độ nước",
+      "attrs": {
+        "unit": "°C",
+        "value_type": "decimal"
+      }
+    },
+    {
+      "catalog": "cnts_indicator",
+      "code": "TRONG_LUONG",
+      "name": "Trọng lượng bình quân",
+      "attrs": {
+        "unit": "kg",
+        "value_type": "decimal"
+      }
+    },
+    {
+      "catalog": "cnts_indicator",
+      "code": "TY_LE_CHET",
+      "name": "Tỷ lệ chết",
+      "attrs": {
+        "unit": "%",
+        "value_type": "percent"
+      }
+    },
+    {
+      "catalog": "cnts_document_type",
+      "code": "QUY_TRINH",
+      "name": "Quy trình kỹ thuật",
+      "attrs": {}
+    },
+    {
+      "catalog": "cnts_document_type",
+      "code": "HUONG_DAN",
+      "name": "Hướng dẫn",
+      "attrs": {}
+    },
+    {
+      "catalog": "cnts_document_type",
+      "code": "CONG_VAN",
+      "name": "Công văn",
+      "attrs": {}
+    },
+    {
+      "catalog": "cnts_document_type",
+      "code": "KE_HOACH",
+      "name": "Kế hoạch",
+      "attrs": {}
+    }
+  ],
+  "Cases": [
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "HEO",
+        "Name": "Heo",
+        "Attrs": {
+          "group": "gia_suc",
+          "herd_column": "true",
+          "order": "1",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "HEO",
+        "Name": "Heo",
+        "Attrs": {
+          "group": "gia_suc",
+          "herd_column": "true",
+          "order": "1",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "DE",
+        "Name": "Dê",
+        "Attrs": {
+          "group": "gia_suc",
+          "herd_column": "true",
+          "order": "2",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "DE",
+        "Name": "Dê",
+        "Attrs": {
+          "group": "gia_suc",
+          "herd_column": "true",
+          "order": "2",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "TRAU",
+        "Name": "Trâu",
+        "Attrs": {
+          "group": "gia_suc",
+          "herd_column": "true",
+          "order": "3",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "TRAU",
+        "Name": "Trâu",
+        "Attrs": {
+          "group": "gia_suc",
+          "herd_column": "true",
+          "order": "3",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "BO",
+        "Name": "Bò",
+        "Attrs": {
+          "group": "gia_suc",
+          "herd_column": "true",
+          "order": "4",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "BO",
+        "Name": "Bò",
+        "Attrs": {
+          "group": "gia_suc",
+          "herd_column": "true",
+          "order": "4",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "VIT",
+        "Name": "Vịt",
+        "Attrs": {
+          "group": "gia_cam",
+          "herd_column": "true",
+          "order": "5",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "VIT",
+        "Name": "Vịt",
+        "Attrs": {
+          "group": "gia_cam",
+          "herd_column": "true",
+          "order": "5",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "GA",
+        "Name": "Gà",
+        "Attrs": {
+          "group": "gia_cam",
+          "herd_column": "true",
+          "order": "6",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "GA",
+        "Name": "Gà",
+        "Attrs": {
+          "group": "gia_cam",
+          "herd_column": "true",
+          "order": "6",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "CHO_MEO",
+        "Name": "Chó, mèo",
+        "Attrs": {
+          "group": "thu_cung",
+          "herd_column": "true",
+          "order": "7",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "CHO_MEO",
+        "Name": "Chó, mèo",
+        "Attrs": {
+          "group": "thu_cung",
+          "herd_column": "true",
+          "order": "7",
+          "unit": "con"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "ASF",
+        "Name": "Dịch tả heo Châu Phi",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "ASF",
+        "Name": "Dịch tả heo Châu Phi",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "CSF",
+        "Name": "Dịch tả heo cổ điển",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "CSF",
+        "Name": "Dịch tả heo cổ điển",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_HEO",
+        "Name": "Tụ huyết trùng heo",
+        "Attrs": {
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_HEO",
+        "Name": "Tụ huyết trùng heo",
+        "Attrs": {
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "PRRS",
+        "Name": "Tai xanh (PRRS)",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "PRRS",
+        "Name": "Tai xanh (PRRS)",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "LMLM",
+        "Name": "Lở mồm long móng",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "BO,DE,HEO,TRAU"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "LMLM",
+        "Name": "Lở mồm long móng",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "BO,DE,HEO,TRAU"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "VDNC",
+        "Name": "Viêm da nổi cục",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "BO,TRAU"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "VDNC",
+        "Name": "Viêm da nổi cục",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "BO,TRAU"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_TRAU_BO",
+        "Name": "Tụ huyết trùng trâu bò",
+        "Attrs": {
+          "species": "BO,TRAU"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_TRAU_BO",
+        "Name": "Tụ huyết trùng trâu bò",
+        "Attrs": {
+          "species": "BO,TRAU"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "CUM_GIA_CAM",
+        "Name": "Cúm gia cầm",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "CUM_GIA_CAM",
+        "Name": "Cúm gia cầm",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "DAI",
+        "Name": "Dại",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "CHO_MEO"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "DAI",
+        "Name": "Dại",
+        "Attrs": {
+          "notifiable": "true",
+          "species": "CHO_MEO"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "NEWCASTLE",
+        "Name": "Newcastle",
+        "Attrs": {
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "NEWCASTLE",
+        "Name": "Newcastle",
+        "Attrs": {
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "GUMBORO",
+        "Name": "Gumboro",
+        "Attrs": {
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "GUMBORO",
+        "Name": "Gumboro",
+        "Attrs": {
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "DAU_GA",
+        "Name": "Đậu gà",
+        "Attrs": {
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "DAU_GA",
+        "Name": "Đậu gà",
+        "Attrs": {
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_ASF",
+        "Name": "Tả heo Châu Phi",
+        "Attrs": {
+          "diseases": "ASF",
+          "order": "1",
+          "report_group": "heo",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_ASF",
+        "Name": "Tả heo Châu Phi",
+        "Attrs": {
+          "diseases": "ASF",
+          "order": "1",
+          "report_group": "heo",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_DT_THT_HEO",
+        "Name": "Dịch tả – THT heo",
+        "Attrs": {
+          "description": "Một cột chung như mẫu 2026, không tách",
+          "diseases": "CSF,THT_HEO",
+          "order": "2",
+          "report_group": "heo",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_DT_THT_HEO",
+        "Name": "Dịch tả – THT heo",
+        "Attrs": {
+          "description": "Một cột chung như mẫu 2026, không tách",
+          "diseases": "CSF,THT_HEO",
+          "order": "2",
+          "report_group": "heo",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_LMLM_HEO",
+        "Name": "LMLM heo",
+        "Attrs": {
+          "diseases": "LMLM",
+          "order": "3",
+          "report_group": "heo",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_LMLM_HEO",
+        "Name": "LMLM heo",
+        "Attrs": {
+          "diseases": "LMLM",
+          "order": "3",
+          "report_group": "heo",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_TAI_XANH",
+        "Name": "Tai xanh heo",
+        "Attrs": {
+          "diseases": "PRRS",
+          "order": "4",
+          "report_group": "heo",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_TAI_XANH",
+        "Name": "Tai xanh heo",
+        "Attrs": {
+          "diseases": "PRRS",
+          "order": "4",
+          "report_group": "heo",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_VDNC_BO",
+        "Name": "Viêm da nổi cục bò",
+        "Attrs": {
+          "diseases": "VDNC",
+          "order": "5",
+          "report_group": "bo",
+          "species": "BO,TRAU"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_VDNC_BO",
+        "Name": "Viêm da nổi cục bò",
+        "Attrs": {
+          "diseases": "VDNC",
+          "order": "5",
+          "report_group": "bo",
+          "species": "BO,TRAU"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_BO",
+        "Name": "THT bò",
+        "Attrs": {
+          "diseases": "THT_TRAU_BO",
+          "order": "6",
+          "report_group": "bo",
+          "species": "BO,TRAU"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_BO",
+        "Name": "THT bò",
+        "Attrs": {
+          "diseases": "THT_TRAU_BO",
+          "order": "6",
+          "report_group": "bo",
+          "species": "BO,TRAU"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_LMLM_BO",
+        "Name": "LMLM bò",
+        "Attrs": {
+          "diseases": "LMLM",
+          "order": "7",
+          "report_group": "bo",
+          "species": "BO,TRAU"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_LMLM_BO",
+        "Name": "LMLM bò",
+        "Attrs": {
+          "diseases": "LMLM",
+          "order": "7",
+          "report_group": "bo",
+          "species": "BO,TRAU"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_CUM_GIA_CAM",
+        "Name": "Cúm gia cầm (H5N1)",
+        "Attrs": {
+          "diseases": "CUM_GIA_CAM",
+          "order": "8",
+          "report_group": "cum_gia_cam",
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_CUM_GIA_CAM",
+        "Name": "Cúm gia cầm (H5N1)",
+        "Attrs": {
+          "diseases": "CUM_GIA_CAM",
+          "order": "8",
+          "report_group": "cum_gia_cam",
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_DAI",
+        "Name": "Dại chó, mèo",
+        "Attrs": {
+          "diseases": "DAI",
+          "order": "9",
+          "report_group": "dai",
+          "species": "CHO_MEO"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_DAI",
+        "Name": "Dại chó, mèo",
+        "Attrs": {
+          "diseases": "DAI",
+          "order": "9",
+          "report_group": "dai",
+          "species": "CHO_MEO"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_ND_F",
+        "Name": "Newcastle chủng F",
+        "Attrs": {
+          "diseases": "NEWCASTLE",
+          "order": "20",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_ND_F",
+        "Name": "Newcastle chủng F",
+        "Attrs": {
+          "diseases": "NEWCASTLE",
+          "order": "20",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_ND_LASOTA",
+        "Name": "Newcastle Lasota",
+        "Attrs": {
+          "diseases": "NEWCASTLE",
+          "order": "21",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_ND_LASOTA",
+        "Name": "Newcastle Lasota",
+        "Attrs": {
+          "diseases": "NEWCASTLE",
+          "order": "21",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_ND_M",
+        "Name": "Newcastle chủng M",
+        "Attrs": {
+          "diseases": "NEWCASTLE",
+          "order": "22",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_ND_M",
+        "Name": "Newcastle chủng M",
+        "Attrs": {
+          "diseases": "NEWCASTLE",
+          "order": "22",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_GUMBORO",
+        "Name": "Gumboro",
+        "Attrs": {
+          "diseases": "GUMBORO",
+          "order": "23",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_GUMBORO",
+        "Name": "Gumboro",
+        "Attrs": {
+          "diseases": "GUMBORO",
+          "order": "23",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_DAU_GA",
+        "Name": "Đậu gà",
+        "Attrs": {
+          "diseases": "DAU_GA",
+          "order": "24",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_DAU_GA",
+        "Name": "Đậu gà",
+        "Attrs": {
+          "diseases": "DAU_GA",
+          "order": "24",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_model_type",
+        "Code": "GA_THUONG_PHAM",
+        "Name": "Gà thương phẩm",
+        "Attrs": {
+          "sector": "chan_nuoi",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_model_type",
+        "Code": "GA_THUONG_PHAM",
+        "Name": "Gà thương phẩm",
+        "Attrs": {
+          "sector": "chan_nuoi",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_model_type",
+        "Code": "HEO_THIT",
+        "Name": "Heo thịt",
+        "Attrs": {
+          "sector": "chan_nuoi",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_model_type",
+        "Code": "HEO_THIT",
+        "Name": "Heo thịt",
+        "Attrs": {
+          "sector": "chan_nuoi",
+          "species": "HEO"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_model_type",
+        "Code": "BO_THIT",
+        "Name": "Bò thịt",
+        "Attrs": {
+          "sector": "chan_nuoi",
+          "species": "BO"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_model_type",
+        "Code": "BO_THIT",
+        "Name": "Bò thịt",
+        "Attrs": {
+          "sector": "chan_nuoi",
+          "species": "BO"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "sector": "thuy_san"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "sector": "thuy_san"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_SUC",
+        "Name": "Hóa chất khử trùng – gia súc",
+        "Attrs": {
+          "target": "gia_suc",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_SUC",
+        "Name": "Hóa chất khử trùng – gia súc",
+        "Attrs": {
+          "target": "gia_suc",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": "gia_cam",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": "gia_cam",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_TRA",
+        "Name": "Cá tra",
+        "Attrs": {
+          "scale_unit": "ha"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_TRA",
+        "Name": "Cá tra",
+        "Attrs": {
+          "scale_unit": "ha"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "TOM",
+        "Name": "Tôm",
+        "Attrs": {
+          "scale_unit": "ha"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "TOM",
+        "Name": "Tôm",
+        "Attrs": {
+          "scale_unit": "ha"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_LONG_BE",
+        "Name": "Cá nuôi lồng bè",
+        "Attrs": {
+          "scale_unit": "long"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_LONG_BE",
+        "Name": "Cá nuôi lồng bè",
+        "Attrs": {
+          "scale_unit": "long"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {
+          "scale_unit": "veo"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {
+          "scale_unit": "veo"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "CA",
+        "Name": "Cá",
+        "Attrs": {
+          "order": "1",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "CA",
+        "Name": "Cá",
+        "Attrs": {
+          "order": "1",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "TOM",
+        "Name": "Tôm",
+        "Attrs": {
+          "order": "2",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "TOM",
+        "Name": "Tôm",
+        "Attrs": {
+          "order": "2",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "MUC",
+        "Name": "Mực",
+        "Attrs": {
+          "order": "3",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "MUC",
+        "Name": "Mực",
+        "Attrs": {
+          "order": "3",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "Khác",
+        "Attrs": {
+          "order": "4",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "Khác",
+        "Attrs": {
+          "order": "4",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "PH",
+        "Name": "pH",
+        "Attrs": {
+          "description": "Ngưỡng mặc định 7,5–8,5 (tham số cnts.indicator_min/max:PH)",
+          "value_type": "decimal"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "PH",
+        "Name": "pH",
+        "Attrs": {
+          "description": "Ngưỡng mặc định 7,5–8,5 (tham số cnts.indicator_min/max:PH)",
+          "value_type": "decimal"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "DO",
+        "Name": "Oxy hòa tan",
+        "Attrs": {
+          "description": "Ngưỡng mặc định ≥ 4 mg/l",
+          "unit": "mg/l",
+          "value_type": "decimal"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "DO",
+        "Name": "Oxy hòa tan",
+        "Attrs": {
+          "description": "Ngưỡng mặc định ≥ 4 mg/l",
+          "unit": "mg/l",
+          "value_type": "decimal"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "NHIET_DO",
+        "Name": "Nhiệt độ nước",
+        "Attrs": {
+          "unit": "°C",
+          "value_type": "decimal"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "NHIET_DO",
+        "Name": "Nhiệt độ nước",
+        "Attrs": {
+          "unit": "°C",
+          "value_type": "decimal"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "TRONG_LUONG",
+        "Name": "Trọng lượng bình quân",
+        "Attrs": {
+          "unit": "kg",
+          "value_type": "decimal"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "TRONG_LUONG",
+        "Name": "Trọng lượng bình quân",
+        "Attrs": {
+          "unit": "kg",
+          "value_type": "decimal"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unit": "%",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unit": "%",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_document_type",
+        "Code": "QUY_TRINH",
+        "Name": "Quy trình kỹ thuật",
+        "Attrs": {},
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_document_type",
+        "Code": "QUY_TRINH",
+        "Name": "Quy trình kỹ thuật",
+        "Attrs": {},
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_document_type",
+        "Code": "HUONG_DAN",
+        "Name": "Hướng dẫn",
+        "Attrs": {},
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_document_type",
+        "Code": "HUONG_DAN",
+        "Name": "Hướng dẫn",
+        "Attrs": {},
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_document_type",
+        "Code": "CONG_VAN",
+        "Name": "Công văn",
+        "Attrs": {},
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_document_type",
+        "Code": "CONG_VAN",
+        "Name": "Công văn",
+        "Attrs": {},
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_document_type",
+        "Code": "KE_HOACH",
+        "Name": "Kế hoạch",
+        "Attrs": {},
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_document_type",
+        "Code": "KE_HOACH",
+        "Name": "Kế hoạch",
+        "Attrs": {},
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "BAD CODE",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "BAD CODE",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Error": "code: mã mục 1–40 ký tự [A-Za-z0-9_.-]"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": " ",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Error": "name: tên bắt buộc, tối đa 200 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unexpected": "x",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unexpected": "x",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unexpected: thuộc tính không có trong danh mục cnts_species"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Error": "attrs.group: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": " invalid,?? ",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": " invalid,?? ",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Error": "attrs.group: phải là một trong gia_suc, gia_cam, thu_cung, yen, thuy_san, khac"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": " invalid,?? ",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": " invalid,?? ",
+          "order": "8",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Error": "attrs.herd_column: phải là một trong true, false"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": " invalid,?? ",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": " invalid,?? ",
+          "unit": "nhà"
+        },
+        "Active": false
+      },
+      "Error": "attrs.order: phải là số nguyên 0–999"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unit: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unit": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_species",
+        "Code": "YEN",
+        "Name": "Yến",
+        "Attrs": {
+          "description": "Tổng đàn tính theo số nhà yến",
+          "group": "yen",
+          "herd_column": "true",
+          "order": "8",
+          "unit": "invalid,??"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_breed",
+        "Code": "GIONG_A",
+        "Name": "Giống thử",
+        "Attrs": {
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_breed",
+        "Code": "GIONG_A",
+        "Name": "Giống thử",
+        "Attrs": {
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_breed",
+        "Code": "BAD CODE",
+        "Name": "Giống thử",
+        "Attrs": {
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_breed",
+        "Code": "BAD CODE",
+        "Name": "Giống thử",
+        "Attrs": {
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": "code: mã mục 1–40 ký tự [A-Za-z0-9_.-]"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_breed",
+        "Code": "GIONG_A",
+        "Name": " ",
+        "Attrs": {
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_breed",
+        "Code": "GIONG_A",
+        "Name": "",
+        "Attrs": {
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": "name: tên bắt buộc, tối đa 200 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_breed",
+        "Code": "GIONG_A",
+        "Name": "Giống thử",
+        "Attrs": {
+          "species": "GA",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_breed",
+        "Code": "GIONG_A",
+        "Name": "Giống thử",
+        "Attrs": {
+          "species": "GA",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unexpected: thuộc tính không có trong danh mục cnts_breed"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_breed",
+        "Code": "GIONG_A",
+        "Name": "Giống thử",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_breed",
+        "Code": "GIONG_A",
+        "Name": "Giống thử",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_breed",
+        "Code": "GIONG_A",
+        "Name": "Giống thử",
+        "Attrs": {},
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_breed",
+        "Code": "GIONG_A",
+        "Name": "Giống thử",
+        "Attrs": {},
+        "Active": false
+      },
+      "Error": "attrs.species: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_breed",
+        "Code": "GIONG_A",
+        "Name": "Giống thử",
+        "Attrs": {
+          "species": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_breed",
+        "Code": "GIONG_A",
+        "Name": "Giống thử",
+        "Attrs": {
+          "species": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Error": "attrs.species: phải là mã loài"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "BAD CODE",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "BAD CODE",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": "code: mã mục 1–40 ký tự [A-Za-z0-9_.-]"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": " ",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": "name: tên bắt buộc, tối đa 200 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unexpected: thuộc tính không có trong danh mục cnts_vaccine"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": " invalid,?? ",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": " invalid,?? ",
+          "order": "25",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": "attrs.diseases: mã \"??\" không hợp lệ"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": " invalid,?? ",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": " invalid,?? ",
+          "report_group": "khac",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": "attrs.order: phải là số nguyên 0–999"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": "attrs.report_group: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": " invalid,?? ",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": " invalid,?? ",
+          "species": "GA"
+        },
+        "Active": false
+      },
+      "Error": "attrs.report_group: phải là một trong heo, bo, cum_gia_cam, dai, khac"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac"
+        },
+        "Active": false
+      },
+      "Error": "attrs.species: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccine",
+        "Code": "VX_THT_GA",
+        "Name": "Tụ huyết trùng gà",
+        "Attrs": {
+          "diseases": "THT_GIA_CAM",
+          "order": "25",
+          "report_group": "khac",
+          "species": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Error": "attrs.species: mã \"??\" không hợp lệ"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "BAD CODE",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "BAD CODE",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": "code: mã mục 1–40 ký tự [A-Za-z0-9_.-]"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": " ",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": "name: tên bắt buộc, tối đa 200 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unexpected: thuộc tính không có trong danh mục cnts_vaccination_schedule"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "breed": " invalid,?? ",
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "breed": " invalid,?? ",
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": "attrs.breed: phải là mã giống"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": "attrs.doses: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": " invalid,?? ",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": " invalid,?? ",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": "attrs.doses: danh sách mũi dạng \"\u003cmã vaccine\u003e/\u003clần\u003e@\u003cngày tuổi\u003e\" ngăn cách dấu phẩy, 1–40 mũi, lần 1–20, ngày tuổi 0–3650"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
+          "model_type": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Error": "attrs.model_type: phải là mã loại mô hình"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "BAD CODE",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "BAD CODE",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Error": "code: mã mục 1–40 ký tự [A-Za-z0-9_.-]"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": " ",
+        "Attrs": {
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "",
+        "Attrs": {
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Error": "name: tên bắt buộc, tối đa 200 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "species": "GA,VIT",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "species": "GA,VIT",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unexpected: thuộc tính không có trong danh mục cnts_disease"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "notifiable": " invalid,?? ",
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "notifiable": " invalid,?? ",
+          "species": "GA,VIT"
+        },
+        "Active": false
+      },
+      "Error": "attrs.notifiable: phải là một trong true, false"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "species": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_disease",
+        "Code": "THT_GIA_CAM",
+        "Name": "Tụ huyết trùng gia cầm",
+        "Attrs": {
+          "species": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Error": "attrs.species: mã \"??\" không hợp lệ"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": "gia_cam",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": "gia_cam",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_chemical",
+        "Code": "BAD CODE",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": "gia_cam",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_chemical",
+        "Code": "BAD CODE",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": "gia_cam",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Error": "code: mã mục 1–40 ký tự [A-Za-z0-9_.-]"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": " ",
+        "Attrs": {
+          "target": "gia_cam",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "",
+        "Attrs": {
+          "target": "gia_cam",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Error": "name: tên bắt buộc, tối đa 200 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": "gia_cam",
+          "unexpected": "x",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": "gia_cam",
+          "unexpected": "x",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unexpected: thuộc tính không có trong danh mục cnts_chemical"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "target": "gia_cam",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "target": "gia_cam",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": " invalid,?? ",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": " invalid,?? ",
+          "unit": "lít"
+        },
+        "Active": false
+      },
+      "Error": "attrs.target: phải là một trong gia_suc, gia_cam, chung"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": "gia_cam"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": "gia_cam"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unit: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": "gia_cam",
+          "unit": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_chemical",
+        "Code": "HC_GIA_CAM",
+        "Name": "Hóa chất khử trùng – gia cầm",
+        "Attrs": {
+          "target": "gia_cam",
+          "unit": "invalid,??"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "BAD CODE",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "BAD CODE",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": "code: mã mục 1–40 ký tự [A-Za-z0-9_.-]"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": " ",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": "name: tên bắt buộc, tối đa 200 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unexpected: thuộc tính không có trong danh mục cnts_slaughter_facility"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "address": " invalid,?? ",
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "address": " invalid,?? ",
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": "attrs.commune_code: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": " invalid,?? ",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": " invalid,?? ",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": "attrs.commune_code: phải là mã xã/phường/đặc khu"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "description": " invalid,?? ",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "description": " invalid,?? ",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": "attrs.facility_kind: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": " invalid,?? ",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": " invalid,?? ",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": "attrs.facility_kind: phải là một trong tap_trung, nho_le"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": "attrs.facility_ref: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": " invalid,?? ",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": " invalid,?? ",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": "attrs.facility_ref: phải là UUID"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "species": " invalid,?? ",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "species": " invalid,?? ",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": "attrs.species: mã \"??\" không hợp lệ"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gc": " invalid,?? ",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gc": " invalid,?? ",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": "attrs.stamp_codes_gc: mã mộc dấu dạng số và dấu chấm (vd 91.589.05.1), tối đa 40 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gs": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Error": "attrs.stamp_codes_gs: mã mộc dấu dạng số và dấu chấm (vd 91.589.05.1), tối đa 40 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {
+          "scale_unit": "veo"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {
+          "scale_unit": "veo"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "BAD CODE",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {
+          "scale_unit": "veo"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "BAD CODE",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {
+          "scale_unit": "veo"
+        },
+        "Active": false
+      },
+      "Error": "code: mã mục 1–40 ký tự [A-Za-z0-9_.-]"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": " ",
+        "Attrs": {
+          "scale_unit": "veo"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "",
+        "Attrs": {
+          "scale_unit": "veo"
+        },
+        "Active": false
+      },
+      "Error": "name: tên bắt buộc, tối đa 200 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {
+          "scale_unit": "veo",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {
+          "scale_unit": "veo",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unexpected: thuộc tính không có trong danh mục cnts_aquaculture_object"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "scale_unit": "veo"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "scale_unit": "veo"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {},
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {},
+        "Active": false
+      },
+      "Error": "attrs.scale_unit: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {
+          "scale_unit": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_aquaculture_object",
+        "Code": "CA_VEO",
+        "Name": "Cá nuôi vèo",
+        "Attrs": {
+          "scale_unit": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Error": "attrs.scale_unit: phải là một trong ha, long, veo, m3"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "Khác",
+        "Attrs": {
+          "order": "4",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "Khác",
+        "Attrs": {
+          "order": "4",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "BAD CODE",
+        "Name": "Khác",
+        "Attrs": {
+          "order": "4",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "BAD CODE",
+        "Name": "Khác",
+        "Attrs": {
+          "order": "4",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Error": "code: mã mục 1–40 ký tự [A-Za-z0-9_.-]"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": " ",
+        "Attrs": {
+          "order": "4",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "",
+        "Attrs": {
+          "order": "4",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Error": "name: tên bắt buộc, tối đa 200 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "Khác",
+        "Attrs": {
+          "order": "4",
+          "unexpected": "x",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "Khác",
+        "Attrs": {
+          "order": "4",
+          "unexpected": "x",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unexpected: thuộc tính không có trong danh mục cnts_fishing_group"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "Khác",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "order": "4",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "Khác",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "order": "4",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "Khác",
+        "Attrs": {
+          "order": " invalid,?? ",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "Khác",
+        "Attrs": {
+          "order": " invalid,?? ",
+          "unit": "tấn"
+        },
+        "Active": false
+      },
+      "Error": "attrs.order: phải là số nguyên 0–999"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "Khác",
+        "Attrs": {
+          "order": "4",
+          "unit": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_fishing_group",
+        "Code": "KHAC",
+        "Name": "Khác",
+        "Attrs": {
+          "order": "4",
+          "unit": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unit": "%",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unit": "%",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "BAD CODE",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unit": "%",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "BAD CODE",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unit": "%",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Error": "code: mã mục 1–40 ký tự [A-Za-z0-9_.-]"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": " ",
+        "Attrs": {
+          "unit": "%",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "",
+        "Attrs": {
+          "unit": "%",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Error": "name: tên bắt buộc, tối đa 200 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unexpected": "x",
+          "unit": "%",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unexpected": "x",
+          "unit": "%",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unexpected: thuộc tính không có trong danh mục cnts_indicator"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "unit": "%",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "unit": "%",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unit": " invalid,?? ",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unit": " invalid,?? ",
+          "value_type": "percent"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unit": "%"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unit": "%"
+        },
+        "Active": false
+      },
+      "Error": "attrs.value_type: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unit": "%",
+          "value_type": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_indicator",
+        "Code": "TY_LE_CHET",
+        "Name": "Tỷ lệ chết",
+        "Attrs": {
+          "unit": "%",
+          "value_type": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Error": "attrs.value_type: phải là một trong decimal, integer, percent"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "sector": "thuy_san"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "sector": "thuy_san"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_model_type",
+        "Code": "BAD CODE",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "sector": "thuy_san"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_model_type",
+        "Code": "BAD CODE",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "sector": "thuy_san"
+        },
+        "Active": false
+      },
+      "Error": "code: mã mục 1–40 ký tự [A-Za-z0-9_.-]"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": " ",
+        "Attrs": {
+          "sector": "thuy_san"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "",
+        "Attrs": {
+          "sector": "thuy_san"
+        },
+        "Active": false
+      },
+      "Error": "name: tên bắt buộc, tối đa 200 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "sector": "thuy_san",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "sector": "thuy_san",
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unexpected: thuộc tính không có trong danh mục cnts_model_type"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "sector": "thuy_san"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "description": " invalid,?? ",
+          "sector": "thuy_san"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {},
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {},
+        "Active": false
+      },
+      "Error": "attrs.sector: bắt buộc"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "sector": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "sector": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Error": "attrs.sector: phải là một trong chan_nuoi, thuy_san"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "sector": "thuy_san",
+          "species": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_model_type",
+        "Code": "NUOI_THUY_SAN",
+        "Name": "Nuôi thủy sản",
+        "Attrs": {
+          "sector": "thuy_san",
+          "species": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Error": "attrs.species: mã \"??\" không hợp lệ"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_document_type",
+        "Code": "KE_HOACH",
+        "Name": "Kế hoạch",
+        "Attrs": {},
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_document_type",
+        "Code": "KE_HOACH",
+        "Name": "Kế hoạch",
+        "Attrs": {},
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_document_type",
+        "Code": "BAD CODE",
+        "Name": "Kế hoạch",
+        "Attrs": {},
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_document_type",
+        "Code": "BAD CODE",
+        "Name": "Kế hoạch",
+        "Attrs": {},
+        "Active": false
+      },
+      "Error": "code: mã mục 1–40 ký tự [A-Za-z0-9_.-]"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_document_type",
+        "Code": "KE_HOACH",
+        "Name": " ",
+        "Attrs": {},
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_document_type",
+        "Code": "KE_HOACH",
+        "Name": "",
+        "Attrs": {},
+        "Active": false
+      },
+      "Error": "name: tên bắt buộc, tối đa 200 ký tự"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_document_type",
+        "Code": "KE_HOACH",
+        "Name": "Kế hoạch",
+        "Attrs": {
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_document_type",
+        "Code": "KE_HOACH",
+        "Name": "Kế hoạch",
+        "Attrs": {
+          "unexpected": "x"
+        },
+        "Active": false
+      },
+      "Error": "attrs.unexpected: thuộc tính không có trong danh mục cnts_document_type"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_document_type",
+        "Code": "KE_HOACH",
+        "Name": "Kế hoạch",
+        "Attrs": {
+          "description": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_document_type",
+        "Code": "KE_HOACH",
+        "Name": "Kế hoạch",
+        "Attrs": {
+          "description": " invalid,?? "
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60"
+        },
+        "Active": false
+      },
+      "Error": "attrs.model_type: quy trình tiêm gắn loại mô hình hoặc giống"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": " VX_B/2@28,VX_A/1@3,VX_B/1@7 ",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX_A/1@3,VX_B/1@7,VX_B/2@28",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": ""
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": "attrs.doses: danh sách mũi dạng \"\u003cmã vaccine\u003e/\u003clần\u003e@\u003cngày tuổi\u003e\" ngăn cách dấu phẩy, 1–40 mũi, lần 1–20, ngày tuổi 0–3650"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX/0@1",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX/0@1",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": "attrs.doses: danh sách mũi dạng \"\u003cmã vaccine\u003e/\u003clần\u003e@\u003cngày tuổi\u003e\" ngăn cách dấu phẩy, 1–40 mũi, lần 1–20, ngày tuổi 0–3650"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX/1@4000",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX/1@4000",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": "attrs.doses: danh sách mũi dạng \"\u003cmã vaccine\u003e/\u003clần\u003e@\u003cngày tuổi\u003e\" ngăn cách dấu phẩy, 1–40 mũi, lần 1–20, ngày tuổi 0–3650"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX/1@3,VX/1@4",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_vaccination_schedule",
+        "Code": "QT_GA_THUONG_PHAM",
+        "Name": "Quy trình tiêm gà thương phẩm",
+        "Attrs": {
+          "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
+          "doses": "VX/1@3,VX/1@4",
+          "model_type": "GA_THUONG_PHAM"
+        },
+        "Active": false
+      },
+      "Error": "attrs.doses: mũi VX lần 1 bị lặp"
+    },
+    {
+      "Input": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gc": "91.589.05",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Output": {
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CS_A",
+        "Name": "Cơ sở thử",
+        "Attrs": {
+          "commune_code": "30292",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-000000000001",
+          "stamp_codes_gc": "91.589.05",
+          "stamp_codes_gs": "91.589.05,91.589.05.1"
+        },
+        "Active": false
+      },
+      "Error": "attrs.stamp_codes_gc: mã mộc dấu 91.589.05 trùng giữa GS và GC"
+    }
+  ]
+}

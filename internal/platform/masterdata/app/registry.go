@@ -71,12 +71,11 @@ func (s *Service) ListCatalogs(ctx context.Context) ([]CatalogSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := make([]CatalogSummary, 0, len(domain.Catalogs))
-	for _, c := range domain.Catalogs {
-		n := counts[c]
-		out = append(out, CatalogSummary{
-			Catalog: c, Name: domain.CatalogName(c), ItemCount: n[0], InactiveCount: n[1], AttrsSchema: domain.CatalogAttrs(c),
-		})
+	metadata := s.CatalogMetadata()
+	out := make([]CatalogSummary, 0, len(metadata))
+	for _, def := range metadata {
+		n := counts[def.Catalog]
+		out = append(out, CatalogSummary{Catalog: def.Catalog, Name: def.Name, ItemCount: n[0], InactiveCount: n[1], AttrsSchema: def.Attributes})
 	}
 	return out, nil
 }

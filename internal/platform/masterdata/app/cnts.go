@@ -132,7 +132,7 @@ func (s *Service) effectiveFrom(it domain.Item) time.Time {
 
 // writeVersion ghi dòng sổ hiệu lực cùng giao dịch với dòng catalog_change (chỉ danh mục CNTS).
 func (s *Service) writeVersion(ctx context.Context, tx pgx.Tx, tid uuid.UUID, c *domain.Change, it domain.Item) error {
-	if !domain.EffectiveDated(it.Catalog) {
+	if !s.catalogEffective(it.Catalog) {
 		return nil
 	}
 	v := &domain.Version{ID: ids.New(), Catalog: it.Catalog, Code: it.Code, ChangeID: c.ID, ValidFrom: s.effectiveFrom(it),
@@ -142,9 +142,9 @@ func (s *Service) writeVersion(ctx context.Context, tx pgx.Tx, tid uuid.UUID, c 
 }
 
 // itemAt đọc mục với giá trị có hiệu lực tại ngày d (danh mục CNTS); mục chưa có sổ hiệu lực → bảng hiện trạng.
-func itemAt(ctx context.Context, tx pgx.Tx, catalog, code string, d time.Time) (*domain.Item, error) {
+func (s *Service) itemAt(ctx context.Context, tx pgx.Tx, catalog, code string, d time.Time) (*domain.Item, error) {
 	code = domain.CanonicalCode(catalog, code)
-	if domain.EffectiveDated(catalog) {
+	if s.catalogEffective(catalog) {
 		v, err := store.EffectiveAt(ctx, tx, catalog, code, d)
 		if err != nil {
 			return nil, err
@@ -166,13 +166,13 @@ func (s *Service) ItemAt(ctx context.Context, catalog, code string, at time.Time
 	if err != nil {
 		return domain.Item{}, err
 	}
-	if err := knownCatalog(catalog); err != nil {
+	if err := s.knownCatalog(catalog); err != nil {
 		return domain.Item{}, err
 	}
 	var it *domain.Item
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		it, e = itemAt(ctx, tx, catalog, code, domain.DayOf(at))
+		it, e = s.itemAt(ctx, tx, catalog, code, domain.DayOf(at))
 		return e
 	})
 	if err != nil {
@@ -191,7 +191,7 @@ func (s *Service) ListItemsAt(ctx context.Context, catalog string, at time.Time,
 	if err != nil {
 		return nil, err
 	}
-	if err := knownCatalog(catalog); err != nil {
+	if err := s.knownCatalog(catalog); err != nil {
 		return nil, err
 	}
 	return s.listAt(ctx, p.TenantID, catalog, domain.DayOf(at), includeInactive)
@@ -216,7 +216,7 @@ func (s *Service) ItemVersions(ctx context.Context, catalog, code string) ([]dom
 	if err != nil {
 		return nil, err
 	}
-	if err := knownCatalog(catalog); err != nil {
+	if err := s.knownCatalog(catalog); err != nil {
 		return nil, err
 	}
 	var vs []domain.Version
@@ -247,13 +247,13 @@ func (p CNTSPort) itemAt(ctx context.Context, catalog, code string, on time.Time
 	if err != nil {
 		return domain.Item{}, err
 	}
-	if !domain.KnownCatalog(catalog) {
+	if !p.Svc.catalogKnown(catalog) {
 		return domain.Item{}, ErrCatalogNotFound
 	}
 	var it *domain.Item
 	err = p.Svc.tx(ctx, tid, func(tx pgx.Tx) error {
 		var e error
-		it, e = itemAt(ctx, tx, catalog, code, domain.DayOf(on))
+		it, e = p.Svc.itemAt(ctx, tx, catalog, code, domain.DayOf(on))
 		return e
 	})
 	if err != nil {
@@ -279,7 +279,7 @@ func (p CNTSPort) listAt(ctx context.Context, catalog string, on time.Time) ([]d
 	if err != nil {
 		return nil, err
 	}
-	if !domain.KnownCatalog(catalog) {
+	if !p.Svc.catalogKnown(catalog) {
 		return nil, ErrCatalogNotFound
 	}
 	return p.Svc.listAt(ctx, tid, catalog, domain.DayOf(on), false)

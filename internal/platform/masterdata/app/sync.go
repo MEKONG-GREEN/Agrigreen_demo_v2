@@ -83,7 +83,7 @@ func (s Sync) Changes(ctx context.Context, scope authz.Scope, entity string, aft
 	err = s.Svc.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		switch entity {
 		case port.SyncEntityCatalogItem:
-			rows, err := store.SyncItems(ctx, tx, domain.SyncCatalogs, after, limit)
+			rows, err := store.SyncItems(ctx, tx, s.Svc.catalogSyncKeys(), after, limit)
 			if err != nil {
 				return err
 			}

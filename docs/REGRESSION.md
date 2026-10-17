@@ -528,3 +528,11 @@ Test points: TestParametersRequireRegistration nil/empty RED exit1 on A (1.855s)
 
 
 Kết quả thực trên production8f5d7a93: PG24588.exit0 đủ17/17 package có test, 0FAIL/SKIP (masterdata/handler:159.806s, extension/handler:67.702s, cntsalert/handler:78.176s, cntscal/handler:72.681s, outbreak/handler:76.644s, api-platform/assembly:65.727s, cmd/worker:2.088s, tests/kn77:195.757s). Static40483.exit0 đủ build/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary371/lint0issues; gofmt chỉ2fixturecũ. Red→green nil/empty, owner frozen16spec/13seed, native JSON/MRV nguyên dữ liệu, 11-key/helper nguyên source block. ProofTEMP agrigreen-codex-knsplit2mdparamsb-proof.json. Helper còn8migrationgate trướcdev; phần catalog/registry khác/data/tenant/client/KHTCreminder còn.
+
+## KNSPLIT-2-MDCATALOG-A — Schema/seed registry (nền c9a9674d)
+
+Downstream: masterdata create/update/import/seed/metadata/at/sync, KN typed catalog consumers (reportcycle/cntsalert/cntscal/outbreak), API/worker/KN77, new pure composition tests/masterdatacatalogs. Evidence: rg knownCatalog/itemAt/EffectiveDated/Normalize/SyncCatalogs within masterdata/app;12 schema/60 seed actualinventory;10 KN constructor calls+sharedfixture. Core FieldError alias preserves error identity; validators get no principal/tenant/SQL.
+
+Acceptance: private PG, full B17-package scope + ./tests/masterdatacatalogs (18 test packages), then go test -v -count=1 -p 1 -timeout 55m -run '^TestCatalogRegistryConstraintUpgrade$' ./migrations; full static CODEX-G1 + helper migration8mandatory and newupgrade test. Web/mobile exempt because wire/UI/fixtures unchanged. New generic datecatalog is tested without KN provider; upgrade on synthetic1000 preexisting ledger rows, checksum and verify_chain. No production-size claim.
+
+Related test points: TestCaptureLegacyCatalogContract (temporarycapture, remove inB), TestOwnedCatalogsMatchLegacyContract (12schemas/60seeds/170cases), CatalogRegistryCopiesAndIsolation/RejectsInvalid, RegisteredCatalogEffectiveDatesAndIsolation, CatalogRegistryConstraintUpgrade. Prior pure-contract exit0; compile errors importspace and missingcheckRefs receiver corrected before fullPG. Existing assertions retained.

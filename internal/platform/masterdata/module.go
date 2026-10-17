@@ -34,10 +34,30 @@ type Module struct {
 	svc *app.Service
 }
 
-// New tạo module với pool của vai masterdata_app.
-func New(db tenant.Beginner, clk clock.Clock, registrations ...port.ParamRegistration) *Module {
+// Deps contains optional, application-owned registrations.
+type Deps struct {
+	Params   []port.ParamRegistration
+	Catalogs []port.CatalogRegistration
+}
+
+// New creates a capability instance; authentication and storage stay in the capability.
+func New(db tenant.Beginner, clk clock.Clock, deps ...Deps) *Module {
 	db = forModule(db)
-	return &Module{svc: &app.Service{DB: db, Clock: clk, ParamRegistry: app.NewParamRegistry(registrations...)}}
+	var parameters []port.ParamRegistration
+	var catalogs []port.CatalogRegistration
+	for _, d := range deps {
+		parameters = append(parameters, d.Params...)
+		catalogs = append(catalogs, d.Catalogs...)
+	}
+	return &Module{svc: &app.Service{DB: db, Clock: clk, ParamRegistry: app.NewParamRegistry(parameters...), CatalogRegistry: app.NewCatalogRegistry(catalogs...)}}
+}
+
+// CatalogMetadata exposes pure schema metadata, without database counts.
+func (m *Module) CatalogMetadata() []port.CatalogMetadata { return m.svc.CatalogMetadata() }
+
+// NormalizeCatalogItem applies the same pure normalization used by writes and imports.
+func (m *Module) NormalizeCatalogItem(it port.CatalogItem) (port.CatalogItem, error) {
+	return m.svc.NormalizeCatalogItem(it)
 }
 
 // RegisterApp gắn route chỉ đọc của Application API.

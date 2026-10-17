@@ -131,7 +131,7 @@ func (p CatalogsPort) Get(ctx context.Context, catalog, code string) (port.Catal
 
 // List thực hiện port.Catalogs: mọi mục ĐANG DÙNG của danh mục, theo mã.
 func (p CatalogsPort) List(ctx context.Context, catalog string) ([]port.CatalogItem, error) {
-	if err := knownCatalog(catalog); err != nil {
+	if err := p.Svc.knownCatalog(catalog); err != nil {
 		return nil, err
 	}
 	var out []port.CatalogItem

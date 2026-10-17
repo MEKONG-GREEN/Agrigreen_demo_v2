@@ -52,10 +52,13 @@ type fixture struct {
 func newFixture(t *testing.T) *fixture { return newFixtureWithParams(t) }
 
 func newFixtureWithParams(t *testing.T, registrations ...port.ParamRegistration) *fixture {
+	return newFixtureWithDeps(t, masterdata.Deps{Params: registrations})
+}
+func newFixtureWithDeps(t *testing.T, deps masterdata.Deps) *fixture {
 	t.Helper()
 	env := pgtest.Get(t)
 	iss := authztest.New(t)
-	mod := masterdata.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, registrations...)
+	mod := masterdata.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, deps)
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	log := telemetry.NewLogger("test", io.Discard)
 

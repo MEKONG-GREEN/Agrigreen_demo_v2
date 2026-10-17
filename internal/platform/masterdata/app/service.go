@@ -59,9 +59,10 @@ var (
 
 // Service là use case của module.
 type Service struct {
-	ParamRegistry *ParamRegistry
-	DB            tenant.Beginner // pool vai masterdata_app
-	Clock         clock.Clock
+	CatalogRegistry *CatalogRegistry
+	ParamRegistry   *ParamRegistry
+	DB              tenant.Beginner // pool vai masterdata_app
+	Clock           clock.Clock
 	// Staff (tùy chọn): danh bạ cán bộ của pf/extension — tên người đặt/duyệt tham số (G-07).
 	Staff staffDirectory
 	// Forms (tùy chọn, P3): số mẫu báo cáo đang dùng mỗi mục — cột "biểu đang dùng" (FN-AD-04.05).

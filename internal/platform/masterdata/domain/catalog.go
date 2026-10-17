@@ -116,10 +116,7 @@ func ValidateReason(r string) error {
 	return nil
 }
 
-type attrSpec struct {
-	required bool
-	check    func(string) (string, error) // trả giá trị đã chuẩn hóa
-}
+type attrSpec = port.AttributeSpec
 
 func intRange(lo, hi int) func(string) (string, error) {
 	return func(s string) (string, error) {
@@ -299,6 +296,15 @@ func (it Item) Normalize() (Item, error) {
 	if !KnownCatalog(it.Catalog) {
 		return it, FieldError{"catalog", ErrCatalogUnknown}
 	}
+	return it.NormalizeWith(port.CatalogDefinition{Catalog: it.Catalog, Attributes: attrSpecs[it.Catalog],
+		ValidateAttrs: func(attrs map[string]string) error { return normalizeCNTS(Item{Catalog: it.Catalog, Attrs: attrs}) }})
+}
+
+// NormalizeWith applies an explicitly registered pure schema.
+func (it Item) NormalizeWith(def port.CatalogDefinition) (Item, error) {
+	if def.Catalog != it.Catalog {
+		return it, FieldError{"catalog", ErrCatalogUnknown}
+	}
 	it.Code = CanonicalCode(it.Catalog, it.Code)
 	if !itemCodeRe.MatchString(it.Code) {
 		return it, FieldError{"code", ErrItemCode}
@@ -307,7 +313,7 @@ func (it Item) Normalize() (Item, error) {
 	if it.Name == "" || utf8.RuneCountInString(it.Name) > 200 {
 		return it, FieldError{"name", ErrItemName}
 	}
-	spec := attrSpecs[it.Catalog]
+	spec := def.Attributes
 	out := make(map[string]string, len(it.Attrs))
 	keys := make([]string, 0, len(it.Attrs))
 	for k := range it.Attrs {
@@ -319,19 +325,21 @@ func (it Item) Normalize() (Item, error) {
 		if !ok {
 			return it, FieldError{"attrs." + k, errors.New("thuộc tính không có trong danh mục " + it.Catalog)}
 		}
-		v, err := s.check(it.Attrs[k])
+		v, err := s.Normalize(it.Attrs[k])
 		if err != nil {
 			return it, FieldError{"attrs." + k, err}
 		}
 		out[k] = v
 	}
 	for k, s := range spec {
-		if _, ok := out[k]; s.required && !ok {
+		if _, ok := out[k]; s.Required && !ok {
 			return it, FieldError{"attrs." + k, errors.New("bắt buộc")}
 		}
 	}
-	if err := normalizeCNTS(Item{Catalog: it.Catalog, Attrs: out}); err != nil {
-		return it, err
+	if def.ValidateAttrs != nil {
+		if err := def.ValidateAttrs(out); err != nil {
+			return it, err
+		}
 	}
 	if it.Catalog == port.CatalogSeason {
 		_, a := out["start_month"]
@@ -356,3 +364,6 @@ func (it Item) SameContent(o Item) bool {
 	}
 	return true
 }
+
+// NativeCatalog protects the schemas owned by this capability from replacement.
+func NativeCatalog(c string) bool { return slices.Contains(baseCatalogs, c) }
