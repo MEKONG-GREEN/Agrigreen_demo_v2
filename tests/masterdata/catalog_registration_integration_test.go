@@ -76,4 +76,39 @@ func TestRegisteredCatalogEffectiveDatesAndIsolation(t *testing.T) {
 	if err != nil || !strings.Contains(string(raw), "fixture_catalog") {
 		t.Fatalf("registered sync catalog missing: %s %v", raw, err)
 	}
+	// The generic port must use the same date and tenant rules, without KN.
+	catalogs := f.mod.EffectiveCatalogs()
+	value, err := catalogs.ItemAt(admin.ctx(), "fixture_catalog", "AA", day("2026-01-15"))
+	if err != nil || value.Item.Attrs["value"] != "v1" || value.ValidFrom.Format("2006-01-02") != "2026-01-01" {
+		t.Fatalf("generic item at date: %+v %v", value, err)
+	}
+	values, err := catalogs.ListAt(admin.ctx(), "fixture_catalog", day("2026-01-15"))
+	if err != nil || len(values) != 2 {
+		t.Fatalf("generic list at date: %+v %v", values, err)
+	}
+	for _, v := range values {
+		if v.Item.Code == "AA" && v.Item.Attrs["value"] != "v1" {
+			t.Fatalf("generic list ignored date: %+v", v)
+		}
+	}
+	if _, err := catalogs.ItemAt(admin.ctx(), "fixture_catalog", "AA", day("2025-12-31")); !errors.Is(err, port.ErrNotEffective) {
+		t.Fatalf("generic before first value: %v", err)
+	}
+	if code, err := catalogs.CodeByAttribute(admin.ctx(), "fixture_catalog", "value", "v2"); err != nil || code != "AA" {
+		t.Fatalf("generic attribute lookup: %s %v", code, err)
+	}
+	if code, err := catalogs.CodeByAttribute(admin.ctx(), "fixture_catalog", "value", "v2' OR true --"); err != nil || code != "" {
+		t.Fatalf("attribute value must be bound: %s %v", code, err)
+	}
+	other := f.caller(ids.New(), port.RoleMasterdataAdmin)
+	if _, err := catalogs.ItemAt(other.ctx(), "fixture_catalog", "AA", day("2026-02-01")); !errors.Is(err, port.ErrNotEffective) {
+		t.Fatalf("generic cross tenant item: %v", err)
+	}
+	if code, err := catalogs.CodeByAttribute(other.ctx(), "fixture_catalog", "value", "v2"); err != nil || code != "" {
+		t.Fatalf("generic cross tenant identity: %s %v", code, err)
+	}
+	if _, err := catalogs.CodeByAttribute(admin.ctx(), "fixture_catalog", "undeclared", "v2"); err == nil {
+		t.Fatal("undeclared attribute accepted")
+	}
+
 }

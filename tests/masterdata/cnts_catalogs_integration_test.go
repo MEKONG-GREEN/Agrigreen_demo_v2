@@ -3,7 +3,11 @@ package masterdata_test
 import (
 	"errors"
 	"net/http"
+	"reflect"
 	"testing"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 
 	"github.com/google/uuid"
 
@@ -18,7 +22,7 @@ func TestW1141_CNTSCatalogs(t *testing.T) {
 	tid := f.seeded()
 	admin := f.caller(tid, port.RoleMasterdataAdmin)
 	reader := knOfficer(t, f, tid)
-	cnts := f.mod.CNTSCatalogs()
+	cnts := extension.NewCNTSCatalogs(f.mod.EffectiveCatalogs(), clock.System{})
 	ctx := admin.ctx()
 
 	// Nạp sẵn: 9 cột tiêm phòng CN-02 kèm ánh xạ vaccine–loài; quy trình gà thương phẩm.
@@ -112,10 +116,58 @@ func TestW1141_CNTSCatalogs(t *testing.T) {
 		t.Fatalf("ref lạ: %v %v", unknown, err)
 	}
 
+	// Temporary legacy comparison: every field, slice order and public error identity.
+	legacy := f.mod.CNTSCatalogs()
+	for _, on := range []string{"2026-08-31", "2026-09-30", "2026-10-01"} {
+		at := day(on)
+		oldFacility, oldErr := legacy.Facility(ctx, uuid.MustParse(ref), at)
+		newFacility, newErr := cnts.Facility(ctx, uuid.MustParse(ref), at)
+		assertCatalogLookupEquivalent(t, "facility/"+on, oldFacility, oldErr, newFacility, newErr)
+		oldSchedule, oldErr := legacy.ScheduleAt(ctx, "QT_GA_THUONG_PHAM", at)
+		newSchedule, newErr := cnts.ScheduleAt(ctx, "QT_GA_THUONG_PHAM", at)
+		assertCatalogLookupEquivalent(t, "schedule/"+on, oldSchedule, oldErr, newSchedule, newErr)
+		oldItems, oldErr := legacy.ListAt(ctx, port.CatalogCNTSSlaughterFacility, at)
+		newItems, newErr := cnts.ListAt(ctx, port.CatalogCNTSSlaughterFacility, at)
+		assertCatalogLookupEquivalent(t, "list/"+on, oldItems, oldErr, newItems, newErr)
+		oldFacilities, oldErr := legacy.FacilitiesAt(ctx, at, []string{"30292"})
+		newFacilities, newErr := cnts.FacilitiesAt(ctx, at, []string{"30292"})
+		assertCatalogLookupEquivalent(t, "filtered/"+on, oldFacilities, oldErr, newFacilities, newErr)
+	}
+	oldItem, oldErr := legacy.ItemAt(ctx, port.CatalogCNTSSpecies, "HEO", day("2026-10-01"))
+	newItem, newErr := cnts.ItemAt(ctx, port.CatalogCNTSSpecies, "HEO", day("2026-10-01"))
+	assertCatalogLookupEquivalent(t, "item", oldItem, oldErr, newItem, newErr)
+	oldMissing, oldErr := legacy.Facility(ctx, other, day("2026-10-01"))
+	newMissing, newErr := cnts.Facility(ctx, other, day("2026-10-01"))
+	assertCatalogLookupEquivalent(t, "facility-missing", oldMissing, oldErr, newMissing, newErr)
+	oldSpecies, oldErr := legacy.VaccineSpecies(ctx, day("2026-10-01"))
+	newSpecies, newErr := cnts.VaccineSpecies(ctx, day("2026-10-01"))
+	assertCatalogLookupEquivalent(t, "vaccine-species", oldSpecies, oldErr, newSpecies, newErr)
+	oldUnknown, oldErr := legacy.UnknownFacilities(ctx, []uuid.UUID{uuid.MustParse(ref), other})
+	newUnknown, newErr := cnts.UnknownFacilities(ctx, []uuid.UUID{uuid.MustParse(ref), other})
+	assertCatalogLookupEquivalent(t, "unknown", oldUnknown, oldErr, newUnknown, newErr)
+	oldCommunes, oldErr := legacy.FacilityCommunes(ctx, []uuid.UUID{uuid.MustParse(ref), other}, day("2026-10-01"))
+	newCommunes, newErr := cnts.FacilityCommunes(ctx, []uuid.UUID{uuid.MustParse(ref), other}, day("2026-10-01"))
+	assertCatalogLookupEquivalent(t, "communes", oldCommunes, oldErr, newCommunes, newErr)
+
 	// valid_from chỉ nhận ở danh mục CNTS.
 	if st, _ := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/material/items", map[string]any{
 		"code": "VT_X", "name": "Vật tư X", "attrs": map[string]string{"unit": "kg"}, "valid_from": "2026-10-01",
 	}); st != http.StatusUnprocessableEntity {
 		t.Fatalf("valid_from ở danh mục không theo hiệu lực: %d", st)
+	}
+}
+
+func assertCatalogLookupEquivalent[T any](t *testing.T, label string, old T, oldErr error, got T, gotErr error) {
+	t.Helper()
+	if !reflect.DeepEqual(old, got) {
+		t.Fatalf("%s values differ: old=%+v new=%+v", label, old, got)
+	}
+	if (oldErr == nil) != (gotErr == nil) || oldErr != nil && oldErr.Error() != gotErr.Error() {
+		t.Fatalf("%s errors differ: old=%v new=%v", label, oldErr, gotErr)
+	}
+	for _, sentinel := range []error{port.ErrNotEffective, port.ErrFacilityNotFound, port.ErrCatalogItemNotFound} {
+		if errors.Is(oldErr, sentinel) != errors.Is(gotErr, sentinel) {
+			t.Fatalf("%s public error identity changed: %v", label, sentinel)
+		}
 	}
 }

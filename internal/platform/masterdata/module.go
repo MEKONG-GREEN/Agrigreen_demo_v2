@@ -79,6 +79,11 @@ func (m *Module) Params() params.Params { return app.ParamsPort{Svc: m.svc} }
 // Catalogs cho module khác: danh mục dùng chung.
 func (m *Module) Catalogs() port.Catalogs { return app.CatalogsPort{Svc: m.svc} }
 
+// EffectiveCatalogs supplies date-aware values without interpreting application attributes.
+func (m *Module) EffectiveCatalogs() port.EffectiveCatalogs {
+	return app.EffectiveCatalogsPort{Svc: m.svc}
+}
+
 // CNTSCatalogs cho module khác: danh mục Chăn nuôi – Thủy sản tra theo ngày của sự việc (W11.41, FN-06 BR-03) —
 // cơ sở giết mổ (facility_ref, mã mộc dấu), quy trình tiêm, ánh xạ vaccine–loài; kiểm phạm vi Cấp Xã theo cơ sở.
 func (m *Module) CNTSCatalogs() port.CNTSCatalogs { return app.CNTSPort{Svc: m.svc} }

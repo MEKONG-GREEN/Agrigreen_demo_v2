@@ -67,8 +67,6 @@ const (
 
 // Lỗi tra danh mục CNTS.
 var (
-	// ErrNotEffective: mục chưa có hiệu lực (hoặc đã ngừng dùng) tại ngày tra.
-	ErrNotEffective = errors.New("masterdata: mục danh mục không có hiệu lực tại ngày tra")
 	// ErrFacilityNotFound: không có cơ sở giết mổ với facility_ref.
 	ErrFacilityNotFound = errors.New("masterdata: không có cơ sở giết mổ")
 )

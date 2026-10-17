@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-MDCATALOG-C — Generic effective lookup + KN adapter; cần22PG/cổng tĩnh/helper9 trướcdev; D gỡlegacy sauproof.

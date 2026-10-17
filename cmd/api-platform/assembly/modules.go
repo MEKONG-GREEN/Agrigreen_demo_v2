@@ -209,7 +209,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	mrvMod.UseValveGrants(pty.ValveGrants())
 	kn.UseGpsLog(g.GpsLog()) // HTX US-GPS-03: log GPS yêu cầu hỗ trợ (pf.extension.gps_log)
 
-	kn.UseCNTSCatalogs(md.CNTSCatalogs()) // W11.49: bệnh, vật nuôi của Báo cáo dịch bệnh BM-10 (danh mục CNTS theo ngày)
+	cntsCatalogs := extension.NewCNTSCatalogs(md.EffectiveCatalogs(), clk)
+	kn.UseCNTSCatalogs(cntsCatalogs) // W11.49: bệnh, vật nuôi của Báo cáo dịch bệnh BM-10 (danh mục CNTS theo ngày)
 
 	// pf/notify cần sổ thiết bị của pf/sync (gắn token đẩy) và là Source của pf/sync:
 	// dùng cổng thiết bị độc lập (syncmod.NewDevices) để không vòng phụ thuộc. API chỉ
@@ -227,11 +228,11 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Consent: pty.ConsentChecker()}, coop.Resolve())
 	// W6.2: cap/forms (/v1/forms/*), KN v1 ghi song song chốt/mở lại kỳ; W11.42: dựng trước pf/sync — biểu kỳ CNTS đồng bộ
 	// ngoại tuyến (forms_task, forms_submission).
-	fm, err := wireForms(unit, clk, wf, kn, md.CNTSCatalogs())
+	fm, err := wireForms(unit, clk, wf, kn, cntsCatalogs)
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	kn.UseCNTSFacilities(md.CNTSCatalogs())  // W11.44: tên, mộc dấu cơ sở giết mổ của bảng BM-02
+	kn.UseCNTSFacilities(cntsCatalogs)       // W11.44: tên, mộc dấu cơ sở giết mổ của bảng BM-02
 	kn.UseKHTCDepartments(pty.Departments()) // W11.62: phòng tham gia mặc định + tên phòng của Kỳ KHTC
 	snc := syncmod.New(unit, clk, syncmod.Deps{
 		Scope: pty.ScopeResolver(), Params: md.Params(), Vault: ext.Vault,
@@ -256,7 +257,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Modules: pty.ModuleEnablement()}) // W1.4: vai của module đã tắt không cấp được
 	// KN v7.7 P1 ↔ P2: menu theo ngữ cảnh phiên, số tài khoản theo phòng ban (mở khóa "xóa" phòng ban),
 	// dòng tài khoản của bảng Ảnh hưởng, tên người thao tác trong Log (Keycloak, dự phòng danh bạ cán bộ).
-	acc.UseFacilityCatalog(md.CNTSCatalogs()) // W11.41: phạm vi Cấp Xã theo cơ sở giết mổ của danh mục CNTS
+	acc.UseFacilityCatalog(cntsCatalogs) // W11.41: phạm vi Cấp Xã theo cơ sở giết mổ của danh mục CNTS
 	pty.UseSessionContext(acc.SessionContext())
 	pty.UseDepartmentUsage(acc.DepartmentUsage())
 	pty.UseOrgImpact(acc.OrgImpact())

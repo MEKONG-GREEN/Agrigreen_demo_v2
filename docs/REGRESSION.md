@@ -564,3 +564,14 @@ Chưa xong toàn masterdata: typed CNTSCatalogs/ref/commune/stamp/FacilityCodeBy
 
 
 Kết quả thật trên production105096ef: PGfull session25699 actualexit0 đủ18/18gói có test, 0FAIL/SKIP; cụm riêng58874 đã dừng và gỡ. tests/masterdata165.227s; KNhandler114.777s, cntsalert106.466s, cntscal96.173s, outbreak111.974s, assembly106.800s, worker2.277s, KN77240.719s, frozencomposition2.231s. Fullstatic40443.exit0/lint0issues/boundary369; gofmt chỉ2fixturecũ. Pure4đạt, giữ nguyên25hàmTestHTTP và55seednative, frozen12/60/170. ProofhostTEMP agrigreen-codex-knsplit2mdcatalogb-proof.json. Cầnhelper9migration0 và xác nhận remote trước khi mở gói tiếp. Không sửa main/xóa worktree/đổi quyết định PO.
+
+
+## KNSPLIT-2-MDCATALOG-C — KN sở hữu cách tra danh mục CNTS
+
+Nền 55d424cf. Thêm port EffectiveCatalogs dùng chung: ItemAt/ListAt trả mục và ngày hiệu lực UTC DATE; CodeByAttribute tra mã hiện trạng theo thuộc tính đã khai báo. Tenant từ context, known-catalog/attribute check và giao dịch r_masterdata nằm trong capability; SQL bind cả tên thuộc tính và giá trị, không nội suy. Giữ nguyên sentinel ErrNotEffective (chuyển vị trí khai báo cùng package).
+
+Adapter extension.NewCNTSCatalogs sở hữu phép chuyển cơ sở giết mổ, lọc xã, phạm vi cơ sở đang dùng hôm nay, tra lịch tiêm/danh sách mũi và ánh xạ vaccine–loài. Dùng parser/CodeList thuộc KN đã có ở A. Bốn consumer production API (KN outbreak/cal, forms, CNTS aggregate, accounts facility scope) nối qua adapter owner. Không gọi HTX, không đưa import KN vào module dùng chung. Interface/DTO CNTS cũ còn tạm ở masterdata/port; rules ghi refs/stableUUID/commune/stamp còn core để tách ở các bước sau. D mới gỡ implementation/facade lookup cũ; không tuyên bố masterdata/G1 hoàn tất.
+
+Pure4 package đạt. TestW1141_CNTSCatalogs chạy đường owner thật và giữ các assertion trước; thêm 17 phép so sánh đầy đủ giá trị/thứ tự/lỗi với legacy trên cùng DB (3 ngày ×4 lookup + ItemAt, missing facility, vaccine, unknown refs, communes). Test generic không có provider KN kiểm ItemAt/ListAt/date/lookup, SQL values, cross-tenant/undeclared attr; pure negative unknown schemas chặn trước storage. Golden12/60/170 và params16/13 giữ nguyên byte.
+
+Hồi quy dự kiến22gói: B18 + accounts app/domain/handler/port (consumer phạm vi cơ sở). Suite tests/masterdata chạy đầu để fail fast, sau đó21package cùng cụm PG riêng; không chạy song song hay chỉnh Go trong khi test. Toàn bộ cổng tĩnh, baseline không tăng, helper9migration (8mandatory+upgrade) trước dev. Không đổi HTTP/OpenAPI/UI/mobile hay migration; không cần chạy web/mobile. Giữ D2 hồ sơ KN, tenant mỗi Trung tâm tỉnh, MRV HTX/MKG và M1–M7.
