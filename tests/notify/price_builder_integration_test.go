@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-var fixturePriceLookupFailure = errors.New("fixture price directory unavailable")
+var errFixturePriceLookup = errors.New("fixture price directory unavailable")
 
 type retryPriceDirectory struct {
 	fail      bool
@@ -27,7 +27,7 @@ type retryPriceDirectory struct {
 func (d *retryPriceDirectory) ProvinceOfficers(_ context.Context, tid uuid.UUID, _ string) ([]uuid.UUID, error) {
 	d.tenants = append(d.tenants, tid)
 	if d.fail {
-		return nil, fixturePriceLookupFailure
+		return nil, errFixturePriceLookup
 	}
 	return []uuid.UUID{d.recipient, d.recipient, uuid.Nil}, nil
 }
@@ -44,7 +44,7 @@ func TestPriceOwnedBuilderLookupRetryTenantAndRedaction(t *testing.T) {
 	f.mod = notify.New(f.appDB, f.clk, notify.Deps{Scope: f.scope,
 		Consumers: []notifyport.ConsumerRegistration{price.NotificationConsumers()}, Builders: price.NotificationBuilders(directory)})
 	e := f.event(f.tenant, priceport.EventAlertRaised, priceport.AlertRaisedV1{Profile: "kn_fixture", Day: "2027-10-13", PointName: "Xã thử 0901234567", TicketID: ids.New(), ItemCodes: []string{"A"}})
-	if _, err := inbox.Process(context.Background(), f.appDB, priceport.NotifyConsumerPrice, e, f.mod.EventHandler()); !errors.Is(err, fixturePriceLookupFailure) {
+	if _, err := inbox.Process(context.Background(), f.appDB, priceport.NotifyConsumerPrice, e, f.mod.EventHandler()); !errors.Is(err, errFixturePriceLookup) {
 		t.Fatalf("lookup error identity: %v", err)
 	}
 	if len(a.inbox()) != 0 {
