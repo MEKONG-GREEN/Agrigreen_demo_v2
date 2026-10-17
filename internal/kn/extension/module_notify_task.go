@@ -23,7 +23,7 @@ func taskNotificationDrafts(ctx context.Context, tenantID uuid.UUID, event strin
 	case extport.EventTaskEscalated:
 		var p extport.TaskEscalatedV1
 		if err := json.Unmarshal(payload, &p); err != nil {
-			return nil, fmt.Errorf("notify: payload %s: %w", event, err)
+			return nil, fmt.Errorf("notify: payload %s hỏng: %w", event, err)
 		}
 		tpl := taskNotificationEscalatedTemplate(p, occurred)
 		var recipients []uuid.UUID
@@ -54,7 +54,7 @@ func taskNotificationDrafts(ctx context.Context, tenantID uuid.UUID, event strin
 	case extport.EventTaskCreated:
 		var p extport.TaskCreatedV1
 		if err := json.Unmarshal(payload, &p); err != nil {
-			return nil, fmt.Errorf("notify: payload %s: %w", event, err)
+			return nil, fmt.Errorf("notify: payload %s hỏng: %w", event, err)
 		}
 		tpl := taskNotificationAssignedTemplate(p, occurred)
 		if p.AssigneeRef != nil && *p.AssigneeRef != uuid.Nil {
