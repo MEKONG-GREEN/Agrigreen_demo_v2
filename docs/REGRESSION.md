@@ -865,3 +865,6 @@ Rollback ứng dụng giữ ba migration tiến; không khôi phục CHECK cũ v
 Impact: DDL pf_notify và hai nhóm test, không đổi code production Go/API/UI/mobile. Bắt buộc pure5, static đầy đủ/boundary318 không tăng, full9PG không FAIL/SKIP và helper có 10 migration PASS (giữ 9 cũ + NotificationKindConstraintUpgrade), rồi xác minh remote dev. Chưa kiểm thử thì không đánh dấu tích hợp. G1 còn native KN policies, dữ liệu/rights/routes/tenant/client/KHTC; main, worktrees và lịch tự tiếp tục giữ.
 
 Pure61588actual0/5pkg.16goldenGitblobs/baseline318/rules/oldmigrations/runtimeGo nguyên aff0f755. Trước static, khóa SQL collation C để ASCII không phụ thuộc locale; bổ sung ca newline/Unicode trong test upgrade. Các pure package không đổi, chưa chạy PG/helper10/dev.
+
+
+Kết quả thật: pure61588actual0/5pkg, static87585actual0/toàn cổng/boundary318/lint0/gofmt2old. Full9PG24163actualexit0/không FAIL-SKIP: assembly152.348s/testsnotify156.797s. FutureKindEmailAndUnknownAtomicRetry PASS0.14s, 43 loại cũ vẫn lưu được. Private58456/6f98d006511b đã dọn,Go0; không sửa Go/SQL sauPG.16goldens/rules/baseline/runtimeGo/oldmigrations nguyên aff0f755. Còn kiểm thử nâng cấp 1.000 dòng và 9 cổng migration trong helper10 trước remote dev.
