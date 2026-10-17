@@ -584,3 +584,14 @@ C22 actualexit0 (session53219), 0FAIL/SKIP trên productionbf8c0f30/testfix3c7f7
 
 
 Kết quả chốt C: đủ22/22PG trên productionbf8c0f30,0FAIL/SKIP; capture-only93037 actualexit0/PASS134.589s trên testhead091019bb, 17legacylookupcases đãghi tests/golden/kn-masterdata-lookups.json, canonical2fixtureUUID+zero , nạplạikhớp. DeltaGo sauproductionchỉ3testfiles (errorlintfix+capturehelper); khôngđổi thuậttoán/SQL sau22. Followup5432 actualexit0: vet/lint0issues/archlint/docs/modgen-check/knboundary369;gofmt2fixturecũ. ProofhostTEMP agrigreen-codex-knsplit2mdcatalogc-proof.json. Đủcode/PG/static; helper9migration và remoteverify còntrướckhitínhđãtíchhợp. D giữ17goldenassertions, gỡcapture vàlookup/facadelegacy; refs/stableUUID/commune/stamp vàDTO/constphasekế,G1chưahoàntất.
+
+
+## KNSPLIT-2-MDCATALOG-D — Bỏ lookup CNTS legacy
+
+Nền78d9c470. Xóa CNTSPort và root Module.CNTSCatalogs, store.FacilityCodeByRef, domain.ToFacility đã không còn production caller từ C. NormalizeCatalogItem dùng ToPortItem generic đang có thay helper private trong phần xóa (cùng DTO, thêm clone map; 170 ca chuẩn hóa đóng băng kiểm lại). Không đổi adapter KN, generic EffectiveCatalogs, schema/migration/wire/quyền/RLS hay lắp ghép đã kiểm trên22gói ở C.
+
+TestW1141_CNTSCatalogs giữ assertion HTTP và9callsite/17runtimecase đối chiếu trực tiếp golden legacy đã chụp ở C. Helper chỉ đọc golden, canonicalUUID và kiểm seen17; xóa generator/env ghi đè expected và mọi runtime legacy comparison. Giữ nguyên byte golden17lookup,12schema/60seed/170normalization vàparams16/13; adapter owner cũng nguyên byte. Native MRV/HTX/MKG không đổi.
+
+Impact: chỉ lookup dead paths bị xóa, root façade không còn consumer (rg); owner implementation và wiring không đổi. Vì vậy D kiểm pure4 + PostgreSQL tests/masterdata (golden default mode, date/RLS/CRUD), API assembly (wiring), KN77 (nghiệm thu/KHTC), tổng7package cótest; không lặp22gói consumer khi algorithms/wiring không thay. Full build/vet/archlint/contracts/docs/modgen/migrate/MFA/boundary/lint và helper9migration vẫn bắt buộc. Nếu phát hiện runtime change khác, mở rộng scope trước tích hợp. Không cần web/mobile do UI/wire không đổi.
+
+Chưa xong masterdata: interface/DTO/const CNTS, ParseDoses/Stamps, refs/stableUUID/commune/stamp write rules vẫn ở core tới E/F. Chưa đổi tên file để che coupling, baseline chỉ bỏ symbol thực sự xóa. Pure4 đạt. Cần PG7+static/helper9 thật trước dev. G1 còn các registry/data/routes/tenant/client/KHTCreminder, giữ toàn bộ quyết định PO, main và worktrees.

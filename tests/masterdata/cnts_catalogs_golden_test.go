@@ -25,8 +25,6 @@ type lookupSnapshot struct {
 
 type lookupContract struct {
 	t       *testing.T
-	capture bool
-	path    string
 	replace *strings.Replacer
 	cases   map[string]lookupSnapshot
 	seen    map[string]bool
@@ -52,13 +50,10 @@ func newLookupContract(t *testing.T, known, missing string) *lookupContract {
 	t.Helper()
 	_, file, _, _ := runtime.Caller(0)
 	c := &lookupContract{
-		t: t, capture: os.Getenv("AG_CAPTURE_LEGACY_CATALOG_LOOKUPS") == "1",
-		path:    filepath.Join(filepath.Dir(file), "../golden/kn-masterdata-lookups.json"),
+		t:       t,
 		replace: strings.NewReplacer(known, "00000000-0000-7000-8000-000000000001", missing, "00000000-0000-7000-8000-000000000002"),
-		cases:   map[string]lookupSnapshot{}, seen: map[string]bool{},
-	}
-	if !c.capture {
-		c.cases = readLookupContract(t, c.path)
+		cases:   readLookupContract(t, filepath.Join(filepath.Dir(file), "../golden/kn-masterdata-lookups.json")),
+		seen:    map[string]bool{},
 	}
 	t.Cleanup(func() {
 		if t.Failed() {
@@ -68,22 +63,7 @@ func newLookupContract(t *testing.T, known, missing string) *lookupContract {
 			t.Errorf("lookup cases lost: expected=%d observed=%d", len(c.cases), len(c.seen))
 			return
 		}
-		if c.capture {
-			raw, err := json.MarshalIndent(c.cases, "", "  ")
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			if err := os.WriteFile(c.path, append(raw, '\n'), 0644); err != nil {
-				t.Error(err)
-				return
-			}
-			// Exercise the normal loader too; values were recorded from legacy.
-			if got := readLookupContract(t, c.path); !reflect.DeepEqual(got, c.cases) {
-				t.Error("saved legacy contract does not round-trip")
-			}
-			t.Logf("captured %d legacy lookup cases; fixture UUIDs canonicalized", len(c.cases))
-		}
+
 	})
 	return c
 }
@@ -104,16 +84,6 @@ func (c *lookupContract) snapshot(value any, err error) lookupSnapshot {
 		out.Error = c.replace.Replace(err.Error())
 	}
 	return out
-}
-
-func (c *lookupContract) recordLegacy(label string, value any, err error) {
-	if !c.capture {
-		return
-	}
-	if _, exists := c.cases[label]; exists {
-		c.t.Fatalf("duplicate legacy case %s", label)
-	}
-	c.cases[label] = c.snapshot(value, err)
 }
 
 func (c *lookupContract) check(label string, value any, err error) {

@@ -111,13 +111,3 @@ type Version struct {
 func (v Version) Item() Item {
 	return Item{Catalog: v.Catalog, Code: v.Code, Name: v.After.Name, Attrs: v.After.Attrs, Active: v.After.Active, ValidFrom: v.ValidFrom}
 }
-
-// ToFacility chuyển mục cơ sở giết mổ sang DTO công khai.
-func ToFacility(it Item) port.SlaughterFacility {
-	ref, _ := uuid.Parse(it.Attrs[port.AttrFacilityRef])
-	return port.SlaughterFacility{
-		Ref: ref, Code: it.Code, Name: it.Name, CommuneCode: it.Attrs[port.AttrCommuneCode], Kind: it.Attrs[port.AttrFacilityKind],
-		StampsGS: CodeList(it.Attrs[port.AttrStampsGS]), StampsGC: CodeList(it.Attrs[port.AttrStampsGC]),
-		Species: CodeList(it.Attrs[port.AttrSpecies]), Address: it.Attrs["address"], Active: it.Active, ValidFrom: it.ValidFrom,
-	}
-}

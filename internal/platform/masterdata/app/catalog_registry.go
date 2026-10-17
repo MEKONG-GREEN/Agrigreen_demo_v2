@@ -127,7 +127,7 @@ func (s *Service) normalizeCatalogItem(it domain.Item) (domain.Item, error) {
 // NormalizeCatalogItem is a pure schema operation, without access to user authority or storage.
 func (s *Service) NormalizeCatalogItem(in port.CatalogItem) (port.CatalogItem, error) {
 	it, err := s.normalizeCatalogItem(domain.Item{Catalog: in.Catalog, Code: in.Code, Name: in.Name, Attrs: in.Attrs, Active: in.Active})
-	return toPortItem(it), err
+	return ToPortItem(it), err
 }
 
 // CatalogMetadata returns fresh maps/slices without exposing validators.

@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -127,17 +126,6 @@ func ItemsAt(ctx context.Context, tx pgx.Tx, catalog string, d time.Time) ([]dom
 		out = append(out, it)
 	}
 	return out, rows.Err()
-}
-
-// FacilityCodeByRef trả mã cơ sở giết mổ theo facility_ref ("" khi không có).
-func FacilityCodeByRef(ctx context.Context, tx pgx.Tx, ref uuid.UUID) (string, error) {
-	var code string
-	err := tx.QueryRow(ctx, `SELECT code FROM pf_masterdata.catalog_item WHERE catalog = $1 AND attrs->>'facility_ref' = $2`,
-		port.CatalogCNTSSlaughterFacility, ref.String()).Scan(&code)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil
-	}
-	return code, err
 }
 
 // StampOwners trả mã mộc dấu → mã cơ sở (khác exceptCode) đang giữ mã đó, cho các mã trong stamps. Kiểm theo

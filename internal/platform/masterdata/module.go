@@ -84,10 +84,6 @@ func (m *Module) EffectiveCatalogs() port.EffectiveCatalogs {
 	return app.EffectiveCatalogsPort{Svc: m.svc}
 }
 
-// CNTSCatalogs cho module khác: danh mục Chăn nuôi – Thủy sản tra theo ngày của sự việc (W11.41, FN-06 BR-03) —
-// cơ sở giết mổ (facility_ref, mã mộc dấu), quy trình tiêm, ánh xạ vaccine–loài; kiểm phạm vi Cấp Xã theo cơ sở.
-func (m *Module) CNTSCatalogs() port.CNTSCatalogs { return app.CNTSPort{Svc: m.svc} }
-
 // SyncSource cho pf/sync: entity "catalog_item" và "admin_unit" chiều xuống.
 func (m *Module) SyncSource() syncport.Source { return app.Sync{Svc: m.svc} }
 

@@ -3,7 +3,6 @@ package masterdata_test
 import (
 	"errors"
 	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
@@ -116,39 +115,29 @@ func TestW1141_CNTSCatalogs(t *testing.T) {
 		t.Fatalf("ref lạ: %v %v", unknown, err)
 	}
 
-	// Temporary legacy comparison: every field, slice order and public error identity.
+	// Compare against all 17 legacy results frozen independently in package C.
 	contract := newLookupContract(t, ref, other.String())
-	legacy := f.mod.CNTSCatalogs()
 	for _, on := range []string{"2026-08-31", "2026-09-30", "2026-10-01"} {
 		at := day(on)
-		oldFacility, oldErr := legacy.Facility(ctx, uuid.MustParse(ref), at)
-		newFacility, newErr := cnts.Facility(ctx, uuid.MustParse(ref), at)
-		assertCatalogLookupEquivalent(contract, "facility/"+on, oldFacility, oldErr, newFacility, newErr)
-		oldSchedule, oldErr := legacy.ScheduleAt(ctx, "QT_GA_THUONG_PHAM", at)
-		newSchedule, newErr := cnts.ScheduleAt(ctx, "QT_GA_THUONG_PHAM", at)
-		assertCatalogLookupEquivalent(contract, "schedule/"+on, oldSchedule, oldErr, newSchedule, newErr)
-		oldItems, oldErr := legacy.ListAt(ctx, port.CatalogCNTSSlaughterFacility, at)
-		newItems, newErr := cnts.ListAt(ctx, port.CatalogCNTSSlaughterFacility, at)
-		assertCatalogLookupEquivalent(contract, "list/"+on, oldItems, oldErr, newItems, newErr)
-		oldFacilities, oldErr := legacy.FacilitiesAt(ctx, at, []string{"30292"})
-		newFacilities, newErr := cnts.FacilitiesAt(ctx, at, []string{"30292"})
-		assertCatalogLookupEquivalent(contract, "filtered/"+on, oldFacilities, oldErr, newFacilities, newErr)
+		facility, lookupErr := cnts.Facility(ctx, uuid.MustParse(ref), at)
+		contract.check("facility/"+on, facility, lookupErr)
+		schedule, lookupErr := cnts.ScheduleAt(ctx, "QT_GA_THUONG_PHAM", at)
+		contract.check("schedule/"+on, schedule, lookupErr)
+		items, lookupErr := cnts.ListAt(ctx, port.CatalogCNTSSlaughterFacility, at)
+		contract.check("list/"+on, items, lookupErr)
+		facilities, lookupErr := cnts.FacilitiesAt(ctx, at, []string{"30292"})
+		contract.check("filtered/"+on, facilities, lookupErr)
 	}
-	oldItem, oldErr := legacy.ItemAt(ctx, port.CatalogCNTSSpecies, "HEO", day("2026-10-01"))
-	newItem, newErr := cnts.ItemAt(ctx, port.CatalogCNTSSpecies, "HEO", day("2026-10-01"))
-	assertCatalogLookupEquivalent(contract, "item", oldItem, oldErr, newItem, newErr)
-	oldMissing, oldErr := legacy.Facility(ctx, other, day("2026-10-01"))
-	newMissing, newErr := cnts.Facility(ctx, other, day("2026-10-01"))
-	assertCatalogLookupEquivalent(contract, "facility-missing", oldMissing, oldErr, newMissing, newErr)
-	oldSpecies, oldErr := legacy.VaccineSpecies(ctx, day("2026-10-01"))
-	newSpecies, newErr := cnts.VaccineSpecies(ctx, day("2026-10-01"))
-	assertCatalogLookupEquivalent(contract, "vaccine-species", oldSpecies, oldErr, newSpecies, newErr)
-	oldUnknown, oldErr := legacy.UnknownFacilities(ctx, []uuid.UUID{uuid.MustParse(ref), other})
-	newUnknown, newErr := cnts.UnknownFacilities(ctx, []uuid.UUID{uuid.MustParse(ref), other})
-	assertCatalogLookupEquivalent(contract, "unknown", oldUnknown, oldErr, newUnknown, newErr)
-	oldCommunes, oldErr := legacy.FacilityCommunes(ctx, []uuid.UUID{uuid.MustParse(ref), other}, day("2026-10-01"))
-	newCommunes, newErr := cnts.FacilityCommunes(ctx, []uuid.UUID{uuid.MustParse(ref), other}, day("2026-10-01"))
-	assertCatalogLookupEquivalent(contract, "communes", oldCommunes, oldErr, newCommunes, newErr)
+	item, lookupErr := cnts.ItemAt(ctx, port.CatalogCNTSSpecies, "HEO", day("2026-10-01"))
+	contract.check("item", item, lookupErr)
+	missing, lookupErr := cnts.Facility(ctx, other, day("2026-10-01"))
+	contract.check("facility-missing", missing, lookupErr)
+	species, lookupErr := cnts.VaccineSpecies(ctx, day("2026-10-01"))
+	contract.check("vaccine-species", species, lookupErr)
+	frozenUnknown, lookupErr := cnts.UnknownFacilities(ctx, []uuid.UUID{uuid.MustParse(ref), other})
+	contract.check("unknown", frozenUnknown, lookupErr)
+	communes, lookupErr := cnts.FacilityCommunes(ctx, []uuid.UUID{uuid.MustParse(ref), other}, day("2026-10-01"))
+	contract.check("communes", communes, lookupErr)
 
 	// valid_from chỉ nhận ở danh mục CNTS.
 	if st, _ := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/material/items", map[string]any{
@@ -156,23 +145,4 @@ func TestW1141_CNTSCatalogs(t *testing.T) {
 	}); st != http.StatusUnprocessableEntity {
 		t.Fatalf("valid_from ở danh mục không theo hiệu lực: %d", st)
 	}
-}
-
-func assertCatalogLookupEquivalent[T any](contract *lookupContract, label string, old T, oldErr error, got T, gotErr error) {
-	t := contract.t
-	t.Helper()
-	if !reflect.DeepEqual(old, got) {
-		t.Fatalf("%s values differ: old=%+v new=%+v", label, old, got)
-	}
-	if (oldErr == nil) != (gotErr == nil) || oldErr != nil && oldErr.Error() != gotErr.Error() {
-		t.Fatalf("%s errors differ: old=%v new=%v", label, oldErr, gotErr)
-	}
-	for _, sentinel := range []error{port.ErrNotEffective, port.ErrFacilityNotFound, port.ErrCatalogItemNotFound} {
-		if errors.Is(oldErr, sentinel) != errors.Is(gotErr, sentinel) {
-			t.Fatalf("%s public error identity changed: %v", label, sentinel)
-		}
-	}
-	contract.recordLegacy(label, old, oldErr)
-	contract.check(label, got, gotErr)
-
 }
