@@ -1,0 +1,1574 @@
+[
+  {
+    "Name": "normal-snapshot",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": null,
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "normal-staff",
+    "Drafts": [
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": null,
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001"
+    ]
+  },
+  {
+    "Name": "normal-topic",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91",
+            "91001",
+            "91002"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": null,
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001",
+      "desc|91|2027-10-13T04:05:06Z",
+      "desc|91001|2027-10-13T04:05:06Z"
+    ]
+  },
+  {
+    "Name": "normal-no-audience",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "urgent-snapshot",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "urgent-staff",
+    "Drafts": [
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001"
+    ]
+  },
+  {
+    "Name": "urgent-topic",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91",
+            "91001",
+            "91002"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001",
+      "desc|91|2027-10-13T04:05:06Z",
+      "desc|91001|2027-10-13T04:05:06Z"
+    ]
+  },
+  {
+    "Name": "urgent-no-audience",
+    "Drafts": null,
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "unknown-snapshot",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": null,
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "unknown-staff",
+    "Drafts": [
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": null,
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001"
+    ]
+  },
+  {
+    "Name": "unknown-topic",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91",
+            "91001",
+            "91002"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": null,
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001",
+      "desc|91|2027-10-13T04:05:06Z",
+      "desc|91001|2027-10-13T04:05:06Z"
+    ]
+  },
+  {
+    "Name": "unknown-no-audience",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "-snapshot",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": null,
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "-staff",
+    "Drafts": [
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": null,
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001"
+    ]
+  },
+  {
+    "Name": "-topic",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91",
+            "91001",
+            "91002"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": null,
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001",
+      "desc|91|2027-10-13T04:05:06Z",
+      "desc|91001|2027-10-13T04:05:06Z"
+    ]
+  },
+  {
+    "Name": "-no-audience",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "URGENT-snapshot",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": null,
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "URGENT-staff",
+    "Drafts": [
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": null,
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001"
+    ]
+  },
+  {
+    "Name": "URGENT-topic",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91",
+            "91001",
+            "91002"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "normal",
+        "Title": "Chỉ đạo mới từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": null,
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001",
+      "desc|91|2027-10-13T04:05:06Z",
+      "desc|91001|2027-10-13T04:05:06Z"
+    ]
+  },
+  {
+    "Name": "URGENT-no-audience",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "zero-targets",
+    "Drafts": [
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001"
+    ]
+  },
+  {
+    "Name": "nil-staff",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91",
+            "91001",
+            "91002"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "desc|91|2027-10-13T04:05:06Z",
+      "desc|91001|2027-10-13T04:05:06Z"
+    ]
+  },
+  {
+    "Name": "empty-staff",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91",
+            "91001",
+            "91002"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001",
+      "desc|91|2027-10-13T04:05:06Z",
+      "desc|91001|2027-10-13T04:05:06Z"
+    ]
+  },
+  {
+    "Name": "duplicate-staff",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001"
+    ]
+  },
+  {
+    "Name": "only-zero-staff",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91",
+            "91001",
+            "91002"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001",
+      "desc|91|2027-10-13T04:05:06Z",
+      "desc|91001|2027-10-13T04:05:06Z"
+    ]
+  },
+  {
+    "Name": "foreign-unit-staff",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001"
+    ]
+  },
+  {
+    "Name": "nil-units-directory",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "91",
+            "91001"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001"
+    ]
+  },
+  {
+    "Name": "empty-units",
+    "Drafts": null,
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|"
+    ]
+  },
+  {
+    "Name": "blank-units",
+    "Drafts": null,
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|"
+    ]
+  },
+  {
+    "Name": "ignored-province-codes",
+    "Drafts": null,
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "unknown-unit",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "unknown"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "unknown"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|unknown",
+      "desc|unknown|2027-10-13T04:05:06Z"
+    ]
+  },
+  {
+    "Name": "mixed-unit-notfound",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "unknown",
+            "91",
+            "91001",
+            "91002"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "unknown",
+          "91"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|unknown,91",
+      "desc|unknown|2027-10-13T04:05:06Z",
+      "desc|91|2027-10-13T04:05:06Z"
+    ]
+  },
+  {
+    "Name": "unit-error-first",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "fixture units failure",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001",
+      "desc|91|2027-10-13T04:05:06Z"
+    ]
+  },
+  {
+    "Name": "unit-error-second",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "fixture units failure",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001",
+      "desc|91|2027-10-13T04:05:06Z",
+      "desc|91001|2027-10-13T04:05:06Z"
+    ]
+  },
+  {
+    "Name": "unit-error-not-used",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "staff-error",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "fixture staff failure",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001"
+    ]
+  },
+  {
+    "Name": "staff-error-without-units",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "fixture staff failure",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|"
+    ]
+  },
+  {
+    "Name": "staff-error-not-used",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "zero-document",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/00000000-0000-0000-0000-000000000000",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/00000000-0000-0000-0000-000000000000",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "00000000-0000-0000-0000-000000000000",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "invalid-issued-time",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T04:05:06Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T04:05:06Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T04:05:06Z"
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "empty-issued-time",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T04:05:06Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T04:05:06Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T04:05:06Z"
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "utc-issued-time",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-12T23:00:00Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-12T23:00:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-12T23:00:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "nil-target-field",
+    "Drafts": [
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001"
+    ]
+  },
+  {
+    "Name": "empty-target-field",
+    "Drafts": [
+      {
+        "RecipientRef": "33333333-3333-4333-8333-333333333333",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "91",
+          "91001"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": [
+      "staff|44444444-4444-4444-8444-444444444444|91,91001"
+    ]
+  },
+  {
+    "Name": "long-units",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "áááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááá"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "áááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááááá"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "phone-shaped-unit",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "0901234567"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer",
+            "kn_province_admin",
+            "kn_national_admin"
+          ]
+        },
+        "Kind": "directive",
+        "Severity": "urgent",
+        "Title": "Chỉ đạo KHẨN từ Trung tâm Khuyến nông",
+        "Body": "Mở để đọc nội dung chỉ đạo và xác nhận đã đọc.",
+        "DeepLink": "/extension/directives/11111111-1111-4111-8111-111111111111",
+        "SubjectRef": "11111111-1111-4111-8111-111111111111",
+        "CreatedAt": "2027-10-13T03:30:00Z",
+        "Email": false
+      }
+    ],
+    "Digests": [
+      {
+        "Reference": "11111111-1111-4111-8111-111111111111",
+        "AudienceUnits": [
+          "0901234567"
+        ],
+        "IssuedAt": "2027-10-13T03:30:00Z"
+      }
+    ],
+    "Error": "",
+    "Calls": null
+  },
+  {
+    "Name": "bad-json",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "notify: payload pf.extension.directive.issued hỏng: unexpected end of JSON input",
+    "Calls": null
+  },
+  {
+    "Name": "nil-payload",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "notify: payload pf.extension.directive.issued hỏng: unexpected end of JSON input",
+    "Calls": null
+  },
+  {
+    "Name": "bad-id",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "notify: payload pf.extension.directive.issued hỏng: json: cannot unmarshal bool into Go struct field DirectiveIssuedV1.directive_id of type uuid.UUID: JSON value must be string type",
+    "Calls": null
+  },
+  {
+    "Name": "bad-units",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "notify: payload pf.extension.directive.issued hỏng: json: cannot unmarshal bool into Go struct field DirectiveIssuedV1.audience_units of type []string",
+    "Calls": null
+  },
+  {
+    "Name": "bad-target",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "notify: payload pf.extension.directive.issued hỏng: invalid UUID length: 8",
+    "Calls": null
+  },
+  {
+    "Name": "unknown-event",
+    "Drafts": null,
+    "Digests": null,
+    "Error": "",
+    "Calls": null
+  }
+]
