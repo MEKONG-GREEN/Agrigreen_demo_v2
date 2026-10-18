@@ -1067,3 +1067,12 @@ Source5 thực tế24160 exit0, noFAIL/SKIP: platformdata11-161.256s, HTX14/dash
 
 
 Bằng chứng trước tích hợp: coreabaa48f1 giữ nguyên Go/SQL/metadata sau source5 actual0 (platform11-161.256s/HTX14-106.502s/handler91.123s/reports79.924s/notify80.548s). Pure/static90002=0/lint0/boundary314/fmt2old. Full5PG59989actual0: {"internal/shared/dbadmin": 1.188, "internal/platform/metrics/handler": 90.465, "tests/kn77": 217.393, "cmd/api-platform/assembly": 89.406, "cmd/worker": 2.01}; khôngFAIL/SKIP. Cụm59175/b9356f983d25 và51244/53c7445190f3 đã dọn/Go0.34golden nền e6a nguyên theoGitdiff, ACL26flags59SELECT24membership không đổi; khôngDDL/RLS/query/DTO/API mới. Fetchdev vẫn e6a, main27 sạch. Chờhelper11 với latestplatform/HTX/handler; reports/notify full đã actual0 trên cùng nguồn và khôngrebasecode, không cần lặp trừ source/upstream đổi.
+
+
+PLATFORM-READERS-B đã tích hợp e895c4d9129869e0c84f8f0145be7ee5197b7b63. Helper63113actual0/11migration443.993s/platform11-87.956s/HTX14-125.970s/handler124.337s; noFAIL/SKIP/private61781-69904dd7f60a removed/Go0.34goldens nền e6a giữ, main27 sạch.
+
+## G1-DEV-SYNC-20261018
+Downstream consumers: dbadmin migration runner/role setup, migrator, notify owned contracts/golden, realm validation and published KN readers.
+Dependency evidence: git diff --name-only e895c4d9 a724411e; git diff e895c4d9 a724411e -- internal/shared/dbadmin tests/golden cmd/api-platform/realm_test.go. Code/goldens này do PR15 nguồn khác, không phải các thay đổi wire KN.
+Regression acceptance command: privatePG go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./tests/notifyconsumers ./cmd/api-platform ./internal/shared/migrator ./tests/platformdata ./tests/htxdata; staticfull.
+Propagation rule: chỉ nhận baseline mới khi kiểm thực sự, không tái ghi goldens để né sai lệch runtime. Nếu sửa mã mới phải thêm affected consumer/full gates/helper trước dev. Không claim web/mobile của upstream đã chạy trong audit Go này; không sửa main/worktree. Scope được G1 cho phép, privatePG/fail-on-SKIP/GoALLfreeze.
