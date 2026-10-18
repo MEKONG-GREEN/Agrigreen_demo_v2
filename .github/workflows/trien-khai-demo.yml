@@ -183,6 +183,19 @@ jobs:
             fi
             grep '^AG_TAG=' "$E"
 
+            # May demo bo kiem MFA o Admin API (quyet dinh PO). docker-compose.vps.yml mac dinh TAT co nay;
+            # api-platform chi nhan khi co ca AG_DEPLOY_ENV=demo va AG_ENV khac production
+            # (authz.DemoMFABypassAllowed, docs/dev/sync-main-2026-10-13.md).
+            for kv in AG_DEPLOY_ENV=demo AG_MFA_DISABLED=1; do
+              k=${kv%%=*}
+              if grep -q "^$k=" "$E"; then
+                sed -i "s|^$k=.*|$kv|" "$E"
+              else
+                echo "$kv" >> "$E"
+              fi
+            done
+            grep -E '^(AG_ENV|AG_DEPLOY_ENV|AG_MFA_DISABLED)=' "$E"
+
             docker compose $C config --quiet
 
             # Kho goi cua repo rieng tu nen phai dang nhap moi keo duoc anh.
