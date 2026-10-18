@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-PLATFORM-DATA-A: hai hợp đồng nền tảng; đã khóa 111 kết quả cũ, chưa DDL/metadata/tích hợp.

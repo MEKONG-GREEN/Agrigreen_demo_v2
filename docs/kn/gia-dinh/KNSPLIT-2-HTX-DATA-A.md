@@ -38,3 +38,6 @@ Hồi quy tiêu thụ 99925 đã đạt cả năm gói, exit 0, không SKIP/FAIL
 Cổng tĩnh xác minh 21079 đạt build/vet/modgen/migratecheck/archlint/contractcheck/docscheck/MFA/knboundary; ranh giới 318, lint 0. Chốt định dạng sau lượt Go đã xong cũng đạt: PubSchema chỉ đổi CRLF sang LF, byte sau chuẩn hóa bằng nhau; modgen-check và diff-check đạt; chỉ còn đúng hai fixture archlint cũ. Git xác nhận tệp Go không đổi nội dung so với commit.
 
 Giữ 28 golden trên nền 49278bd7 và 38 kết quả nguồn đã khóa ở 7d790109. Chỉ có migration schema công bố mới, hợp đồng mới và phần quyền bổ sung được rà soát. Dev vẫn 49278bd7 trước helper. Chưa tích hợp; cổng helper còn phải đối chiếu chính xác OLD cộng 8 cặp SELECT/2 membership mới và chạy tests/htxdata trên PostgreSQL thật.
+
+
+HTX-DATA-A đã tích hợp dev4e16ec6f4d718924e1e32c47f62184933a5cb94a. Helper50094 exit0, 11 migration PASS/470.082s và 5 ca nguồn/view PASS/194.442s, không SKIP/FAIL; cụm51970/050fba846055 đã dọn. ACL thực tế giữ26cờvai và đúng OLD41+8=49 SELECT, OLD15+2=17 membership. Full5PG99925/static21079/format0/pure78301/meta51751/localPG25069 đều đạt. Main27afd593 nguyên sạch; worktree giữ. Không lặp gói.

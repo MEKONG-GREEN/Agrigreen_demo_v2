@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-HTX-DATA-A: công bố4view HTX v1; đã chụp OLD, chưa DDL/metadata/tích hợp.
+- [x] KNSPLIT-2-HTX-DATA-A: bốn hợp đồng HTX chỉ đọc; dev4e16ec6f/helper50094 đủ11migration+5sourcePG PASS.

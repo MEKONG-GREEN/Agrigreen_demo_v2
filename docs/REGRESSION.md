@@ -955,3 +955,15 @@ Hồi quy tiêu thụ 99925 đã đạt cả năm gói, exit 0, không SKIP/FAIL
 Cổng tĩnh xác minh 21079 đạt build/vet/modgen/migratecheck/archlint/contractcheck/docscheck/MFA/knboundary; ranh giới 318, lint 0. Chốt định dạng sau lượt Go đã xong cũng đạt: PubSchema chỉ đổi CRLF sang LF, byte sau chuẩn hóa bằng nhau; modgen-check và diff-check đạt; chỉ còn đúng hai fixture archlint cũ. Git xác nhận tệp Go không đổi nội dung so với commit.
 
 Giữ 28 golden trên nền 49278bd7 và 38 kết quả nguồn đã khóa ở 7d790109. Chỉ có migration schema công bố mới, hợp đồng mới và phần quyền bổ sung được rà soát. Dev vẫn 49278bd7 trước helper. Chưa tích hợp; cổng helper còn phải đối chiếu chính xác OLD cộng 8 cặp SELECT/2 membership mới và chạy tests/htxdata trên PostgreSQL thật.
+
+
+HTX-DATA-A đã tích hợp dev4e16ec6f4d718924e1e32c47f62184933a5cb94a. Helper50094 exit0, 11 migration PASS/470.082s và 5 ca nguồn/view PASS/194.442s, không SKIP/FAIL; cụm51970/050fba846055 đã dọn. ACL thực tế giữ26cờvai và đúng OLD41+8=49 SELECT, OLD15+2=17 membership. Full5PG99925/static21079/format0/pure78301/meta51751/localPG25069 đều đạt. Main27afd593 nguyên sạch; worktree giữ. Không lặp gói.
+## KNSPLIT-2-PLATFORM-DATA-A — Hợp đồng đơn vị hành chính và cây tổ chức
+
+Nền dev 4e16ec6f. Gói thêm hai view chỉ đọc, chưa đổi KN wiring: pf_masterdata_pub.v1_admin_units do pf/masterdata sở hữu và pf_party_pub.v1_org_tree do pf/party sở hữu. Giữ schema/bảng nguồn, lịch sử hiệu lực, trạng thái và các port hiện hành. Chỉ hai vai phân tích hiện hành nhận quyền công bố; KN chưa được cấp quyền mới.
+
+Capture native 36163 đạt trên PostgreSQL thật: exit 0, 111 kết quả, không SKIP, 135.622 giây. Dữ liệu gồm hai tenant dùng cùng code/ref và tenant trống; 9 phiên bản đơn vị, hai ranh giới đổi ngày theo giờ Việt Nam, mã tách/kế thừa/đổi tên, Get/Current/Descendants/Children; tổ chức lọc loại/đơn vị/trạng thái và tra mã theo lô. Golden platform-read-native.json được khóa từ kết quả thật, mã kiểm thử bỏ cờ ghi lại. Cụm tạm 52444/125e8c38b24d đã dọn. Lượt đầu 82420 lỗi fixture nạp con trước cha (23503), đã sửa riêng thứ tự seed, giữ log.
+
+Hai migration mới, mỗi tệp một schema công bố, SET LOCAL lock_timeout='5s', không DML/đổi RLS/cột/sổ hay cấp quyền bảng nội bộ. View giữ toàn bộ phiên bản đơn vị, cận valid_to loại trừ; ngày truy vấn thuộc giờ Việt Nam. Cây tổ chức cung cấp cạnh parent_ref và trạng thái hiện hành; không công bố representative_ref, actor hoặc ghi chú. Tên tổ chức là tên đơn vị, không tên cá nhân. Dùng pubview và hợp đồng JSON nội bộ; không đăng ký Public API G5.
+
+Giữ OLD ACL và tệp bổ sung HTX bất biến. Tệp bổ sung nền tảng phải khai đúng 4 SELECT và 4 membership cho r_metrics/r_agg; cổng đối chiếu đòi tập tổng chính xác. Dự kiến tổng 9 chủ công bố, 22 view, 11 hợp đồng JSON; không giảm cổng kiểm hay sửa alias. G1 còn KN readers/HTX imports/policy/accounts/party/routes/tenant/client/KHTC; lịch tự tiếp tục giữ hoạt động.

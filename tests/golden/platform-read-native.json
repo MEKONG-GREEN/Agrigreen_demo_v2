@@ -1,0 +1,876 @@
+{
+  "children/0/": [
+    {
+      "Code": "89",
+      "Name": "Province A",
+      "Level": "province",
+      "ParentCode": "",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    },
+    {
+      "Code": "92",
+      "Name": "Province B",
+      "Level": "province",
+      "ParentCode": "",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    }
+  ],
+  "children/0/89": [
+    {
+      "Code": "89001",
+      "Name": "Old commune",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": "2025-06-30T17:00:00Z",
+      "SuccessorCodes": [
+        "89011",
+        "89012"
+      ]
+    },
+    {
+      "Code": "89100",
+      "Name": "Previous name",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": "2023-12-31T17:00:00Z",
+      "SuccessorCodes": [
+        "89100"
+      ]
+    }
+  ],
+  "children/0/99999": null,
+  "children/1/": [
+    {
+      "Code": "89",
+      "Name": "Province A",
+      "Level": "province",
+      "ParentCode": "",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    },
+    {
+      "Code": "92",
+      "Name": "Province B",
+      "Level": "province",
+      "ParentCode": "",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    }
+  ],
+  "children/1/89": [
+    {
+      "Code": "89001",
+      "Name": "Old commune",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": "2025-06-30T17:00:00Z",
+      "SuccessorCodes": [
+        "89011",
+        "89012"
+      ]
+    },
+    {
+      "Code": "89100",
+      "Name": "Current name",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2023-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    }
+  ],
+  "children/1/99999": null,
+  "children/2/": [
+    {
+      "Code": "89",
+      "Name": "Province A",
+      "Level": "province",
+      "ParentCode": "",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    },
+    {
+      "Code": "92",
+      "Name": "Province B",
+      "Level": "province",
+      "ParentCode": "",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    }
+  ],
+  "children/2/89": [
+    {
+      "Code": "89011",
+      "Name": "Commune one",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2025-06-30T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    },
+    {
+      "Code": "89012",
+      "Name": "Commune two old",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2025-06-30T17:00:00Z",
+      "ValidTo": "2026-06-30T17:00:00Z",
+      "SuccessorCodes": [
+        "89013"
+      ]
+    },
+    {
+      "Code": "89100",
+      "Name": "Current name",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2023-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    }
+  ],
+  "children/2/99999": null,
+  "children/3/": [
+    {
+      "Code": "89",
+      "Name": "Province A",
+      "Level": "province",
+      "ParentCode": "",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    },
+    {
+      "Code": "92",
+      "Name": "Province B",
+      "Level": "province",
+      "ParentCode": "",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    }
+  ],
+  "children/3/89": [
+    {
+      "Code": "89011",
+      "Name": "Commune one",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2025-06-30T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    },
+    {
+      "Code": "89012",
+      "Name": "Commune two old",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2025-06-30T17:00:00Z",
+      "ValidTo": "2026-06-30T17:00:00Z",
+      "SuccessorCodes": [
+        "89013"
+      ]
+    },
+    {
+      "Code": "89100",
+      "Name": "Current name",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2023-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    }
+  ],
+  "children/3/99999": null,
+  "children/4/": [
+    {
+      "Code": "89",
+      "Name": "Province A",
+      "Level": "province",
+      "ParentCode": "",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    },
+    {
+      "Code": "92",
+      "Name": "Province B",
+      "Level": "province",
+      "ParentCode": "",
+      "ValidFrom": "2019-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    }
+  ],
+  "children/4/89": [
+    {
+      "Code": "89011",
+      "Name": "Commune one",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2025-06-30T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    },
+    {
+      "Code": "89013",
+      "Name": "Commune two current",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2026-06-30T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    },
+    {
+      "Code": "89100",
+      "Name": "Current name",
+      "Level": "commune",
+      "ParentCode": "89",
+      "ValidFrom": "2023-12-31T17:00:00Z",
+      "ValidTo": null,
+      "SuccessorCodes": []
+    }
+  ],
+  "children/4/99999": null,
+  "current/0/89001": [
+    "89001"
+  ],
+  "current/0/89100": [
+    "89100"
+  ],
+  "current/0/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "current/1/89001": [
+    "89001"
+  ],
+  "current/1/89100": [
+    "89100"
+  ],
+  "current/1/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "current/2/89001": [
+    "89011",
+    "89012"
+  ],
+  "current/2/89100": [
+    "89100"
+  ],
+  "current/2/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "current/3/89001": [
+    "89011",
+    "89012"
+  ],
+  "current/3/89100": [
+    "89100"
+  ],
+  "current/3/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "current/4/89001": [
+    "89011",
+    "89013"
+  ],
+  "current/4/89100": [
+    "89100"
+  ],
+  "current/4/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "desc/0/89": [
+    "89",
+    "89001",
+    "89100"
+  ],
+  "desc/0/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "desc/1/89": [
+    "89",
+    "89001",
+    "89100"
+  ],
+  "desc/1/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "desc/2/89": [
+    "89",
+    "89011",
+    "89012",
+    "89100"
+  ],
+  "desc/2/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "desc/3/89": [
+    "89",
+    "89011",
+    "89012",
+    "89100"
+  ],
+  "desc/3/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "desc/4/89": [
+    "89",
+    "89011",
+    "89013",
+    "89100"
+  ],
+  "desc/4/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/0/89": {
+    "Code": "89",
+    "Name": "Province A",
+    "Level": "province",
+    "ParentCode": "",
+    "ValidFrom": "2019-12-31T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/0/89001": {
+    "Code": "89001",
+    "Name": "Old commune",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2019-12-31T17:00:00Z",
+    "ValidTo": "2025-06-30T17:00:00Z",
+    "SuccessorCodes": [
+      "89011",
+      "89012"
+    ]
+  },
+  "get/0/89011": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/0/89012": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/0/89013": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/0/89100": {
+    "Code": "89100",
+    "Name": "Previous name",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2019-12-31T17:00:00Z",
+    "ValidTo": "2023-12-31T17:00:00Z",
+    "SuccessorCodes": [
+      "89100"
+    ]
+  },
+  "get/0/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/1/89": {
+    "Code": "89",
+    "Name": "Province A",
+    "Level": "province",
+    "ParentCode": "",
+    "ValidFrom": "2019-12-31T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/1/89001": {
+    "Code": "89001",
+    "Name": "Old commune",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2019-12-31T17:00:00Z",
+    "ValidTo": "2025-06-30T17:00:00Z",
+    "SuccessorCodes": [
+      "89011",
+      "89012"
+    ]
+  },
+  "get/1/89011": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/1/89012": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/1/89013": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/1/89100": {
+    "Code": "89100",
+    "Name": "Current name",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2023-12-31T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/1/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/2/89": {
+    "Code": "89",
+    "Name": "Province A",
+    "Level": "province",
+    "ParentCode": "",
+    "ValidFrom": "2019-12-31T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/2/89001": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/2/89011": {
+    "Code": "89011",
+    "Name": "Commune one",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2025-06-30T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/2/89012": {
+    "Code": "89012",
+    "Name": "Commune two old",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2025-06-30T17:00:00Z",
+    "ValidTo": "2026-06-30T17:00:00Z",
+    "SuccessorCodes": [
+      "89013"
+    ]
+  },
+  "get/2/89013": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/2/89100": {
+    "Code": "89100",
+    "Name": "Current name",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2023-12-31T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/2/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/3/89": {
+    "Code": "89",
+    "Name": "Province A",
+    "Level": "province",
+    "ParentCode": "",
+    "ValidFrom": "2019-12-31T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/3/89001": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/3/89011": {
+    "Code": "89011",
+    "Name": "Commune one",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2025-06-30T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/3/89012": {
+    "Code": "89012",
+    "Name": "Commune two old",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2025-06-30T17:00:00Z",
+    "ValidTo": "2026-06-30T17:00:00Z",
+    "SuccessorCodes": [
+      "89013"
+    ]
+  },
+  "get/3/89013": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/3/89100": {
+    "Code": "89100",
+    "Name": "Current name",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2023-12-31T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/3/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/4/89": {
+    "Code": "89",
+    "Name": "Province A",
+    "Level": "province",
+    "ParentCode": "",
+    "ValidFrom": "2019-12-31T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/4/89001": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/4/89011": {
+    "Code": "89011",
+    "Name": "Commune one",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2025-06-30T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/4/89012": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "get/4/89013": {
+    "Code": "89013",
+    "Name": "Commune two current",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2026-06-30T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/4/89100": {
+    "Code": "89100",
+    "Name": "Current name",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2023-12-31T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "get/4/99999": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "orgs/emptyTenant/all/false": [],
+  "orgs/emptyTenant/all/true": [],
+  "orgs/emptyTenant/empty/false": [],
+  "orgs/emptyTenant/empty/true": [],
+  "orgs/emptyTenant/old/false": [],
+  "orgs/emptyTenant/old/true": [],
+  "orgs/emptyTenant/one/false": [],
+  "orgs/emptyTenant/one/true": [],
+  "orgs/emptyTenant/unknown/false": [],
+  "orgs/emptyTenant/unknown/true": [],
+  "orgs/main/all/false": [
+    {
+      "Ref": "00000000-0000-7000-8000-000000000103",
+      "Kind": "cooperative",
+      "Code": "O103",
+      "Name": "Org 103",
+      "AdminUnitCode": "89011",
+      "ParentRef": "00000000-0000-7000-8000-000000000102",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    },
+    {
+      "Ref": "00000000-0000-7000-8000-000000000104",
+      "Kind": "cooperative",
+      "Code": "O104",
+      "Name": "Org 104",
+      "AdminUnitCode": "89012",
+      "ParentRef": "00000000-0000-7000-8000-000000000102",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": false
+    },
+    {
+      "Ref": "00000000-0000-7000-8000-000000000105",
+      "Kind": "cooperative",
+      "Code": "O105",
+      "Name": "Org 105",
+      "AdminUnitCode": "",
+      "ParentRef": "00000000-0000-0000-0000-000000000000",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    },
+    {
+      "Ref": "00000000-0000-7000-8000-000000000107",
+      "Kind": "cooperative",
+      "Code": "O107",
+      "Name": "Org 107",
+      "AdminUnitCode": "92001",
+      "ParentRef": "00000000-0000-7000-8000-000000000106",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    }
+  ],
+  "orgs/main/all/true": [
+    {
+      "Ref": "00000000-0000-7000-8000-000000000103",
+      "Kind": "cooperative",
+      "Code": "O103",
+      "Name": "Org 103",
+      "AdminUnitCode": "89011",
+      "ParentRef": "00000000-0000-7000-8000-000000000102",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    },
+    {
+      "Ref": "00000000-0000-7000-8000-000000000105",
+      "Kind": "cooperative",
+      "Code": "O105",
+      "Name": "Org 105",
+      "AdminUnitCode": "",
+      "ParentRef": "00000000-0000-0000-0000-000000000000",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    },
+    {
+      "Ref": "00000000-0000-7000-8000-000000000107",
+      "Kind": "cooperative",
+      "Code": "O107",
+      "Name": "Org 107",
+      "AdminUnitCode": "92001",
+      "ParentRef": "00000000-0000-7000-8000-000000000106",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    }
+  ],
+  "orgs/main/empty/false": [],
+  "orgs/main/empty/true": [],
+  "orgs/main/old/false": [
+    {
+      "Ref": "00000000-0000-7000-8000-000000000104",
+      "Kind": "cooperative",
+      "Code": "O104",
+      "Name": "Org 104",
+      "AdminUnitCode": "89012",
+      "ParentRef": "00000000-0000-7000-8000-000000000102",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": false
+    }
+  ],
+  "orgs/main/old/true": [],
+  "orgs/main/one/false": [
+    {
+      "Ref": "00000000-0000-7000-8000-000000000103",
+      "Kind": "cooperative",
+      "Code": "O103",
+      "Name": "Org 103",
+      "AdminUnitCode": "89011",
+      "ParentRef": "00000000-0000-7000-8000-000000000102",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    }
+  ],
+  "orgs/main/one/true": [
+    {
+      "Ref": "00000000-0000-7000-8000-000000000103",
+      "Kind": "cooperative",
+      "Code": "O103",
+      "Name": "Org 103",
+      "AdminUnitCode": "89011",
+      "ParentRef": "00000000-0000-7000-8000-000000000102",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    }
+  ],
+  "orgs/main/unknown/false": [],
+  "orgs/main/unknown/true": [],
+  "orgs/other/all/false": [
+    {
+      "Ref": "00000000-0000-7000-8000-000000000103",
+      "Kind": "cooperative",
+      "Code": "O103",
+      "Name": "Other Org 103",
+      "AdminUnitCode": "92001",
+      "ParentRef": "00000000-0000-7000-8000-000000000106",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": false
+    },
+    {
+      "Ref": "00000000-0000-7000-8000-000000000104",
+      "Kind": "cooperative",
+      "Code": "O104",
+      "Name": "Other Org 104",
+      "AdminUnitCode": "89012",
+      "ParentRef": "00000000-0000-7000-8000-000000000102",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": false
+    },
+    {
+      "Ref": "00000000-0000-7000-8000-000000000105",
+      "Kind": "cooperative",
+      "Code": "O105",
+      "Name": "Other Org 105",
+      "AdminUnitCode": "",
+      "ParentRef": "00000000-0000-0000-0000-000000000000",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    },
+    {
+      "Ref": "00000000-0000-7000-8000-000000000107",
+      "Kind": "cooperative",
+      "Code": "O107",
+      "Name": "Other Org 107",
+      "AdminUnitCode": "92001",
+      "ParentRef": "00000000-0000-7000-8000-000000000106",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    }
+  ],
+  "orgs/other/all/true": [
+    {
+      "Ref": "00000000-0000-7000-8000-000000000105",
+      "Kind": "cooperative",
+      "Code": "O105",
+      "Name": "Other Org 105",
+      "AdminUnitCode": "",
+      "ParentRef": "00000000-0000-0000-0000-000000000000",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    },
+    {
+      "Ref": "00000000-0000-7000-8000-000000000107",
+      "Kind": "cooperative",
+      "Code": "O107",
+      "Name": "Other Org 107",
+      "AdminUnitCode": "92001",
+      "ParentRef": "00000000-0000-7000-8000-000000000106",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    }
+  ],
+  "orgs/other/empty/false": [],
+  "orgs/other/empty/true": [],
+  "orgs/other/old/false": [
+    {
+      "Ref": "00000000-0000-7000-8000-000000000104",
+      "Kind": "cooperative",
+      "Code": "O104",
+      "Name": "Other Org 104",
+      "AdminUnitCode": "89012",
+      "ParentRef": "00000000-0000-7000-8000-000000000102",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": false
+    }
+  ],
+  "orgs/other/old/true": [],
+  "orgs/other/one/false": [],
+  "orgs/other/one/true": [],
+  "orgs/other/unknown/false": [],
+  "orgs/other/unknown/true": [],
+  "refs/emptyTenant": {},
+  "refs/main": {
+    "00000000-0000-7000-8000-000000000101": {
+      "Ref": "00000000-0000-7000-8000-000000000101",
+      "Kind": "ttkn_national",
+      "Code": "O101",
+      "Name": "Org 101",
+      "AdminUnitCode": "",
+      "ParentRef": "00000000-0000-0000-0000-000000000000",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    },
+    "00000000-0000-7000-8000-000000000103": {
+      "Ref": "00000000-0000-7000-8000-000000000103",
+      "Kind": "cooperative",
+      "Code": "O103",
+      "Name": "Org 103",
+      "AdminUnitCode": "89011",
+      "ParentRef": "00000000-0000-7000-8000-000000000102",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    },
+    "00000000-0000-7000-8000-000000000104": {
+      "Ref": "00000000-0000-7000-8000-000000000104",
+      "Kind": "cooperative",
+      "Code": "O104",
+      "Name": "Org 104",
+      "AdminUnitCode": "89012",
+      "ParentRef": "00000000-0000-7000-8000-000000000102",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": false
+    },
+    "00000000-0000-7000-8000-000000000105": {
+      "Ref": "00000000-0000-7000-8000-000000000105",
+      "Kind": "cooperative",
+      "Code": "O105",
+      "Name": "Org 105",
+      "AdminUnitCode": "",
+      "ParentRef": "00000000-0000-0000-0000-000000000000",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    }
+  },
+  "refs/other": {
+    "00000000-0000-7000-8000-000000000101": {
+      "Ref": "00000000-0000-7000-8000-000000000101",
+      "Kind": "ttkn_national",
+      "Code": "O101",
+      "Name": "Other Org 101",
+      "AdminUnitCode": "",
+      "ParentRef": "00000000-0000-0000-0000-000000000000",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    },
+    "00000000-0000-7000-8000-000000000103": {
+      "Ref": "00000000-0000-7000-8000-000000000103",
+      "Kind": "cooperative",
+      "Code": "O103",
+      "Name": "Other Org 103",
+      "AdminUnitCode": "92001",
+      "ParentRef": "00000000-0000-7000-8000-000000000106",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": false
+    },
+    "00000000-0000-7000-8000-000000000104": {
+      "Ref": "00000000-0000-7000-8000-000000000104",
+      "Kind": "cooperative",
+      "Code": "O104",
+      "Name": "Other Org 104",
+      "AdminUnitCode": "89012",
+      "ParentRef": "00000000-0000-7000-8000-000000000102",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": false
+    },
+    "00000000-0000-7000-8000-000000000105": {
+      "Ref": "00000000-0000-7000-8000-000000000105",
+      "Kind": "cooperative",
+      "Code": "O105",
+      "Name": "Other Org 105",
+      "AdminUnitCode": "",
+      "ParentRef": "00000000-0000-0000-0000-000000000000",
+      "RepresentativeRef": "00000000-0000-0000-0000-000000000000",
+      "Active": true
+    }
+  },
+  "tenantUnit/emptyTenant": {
+    "error": "masterdata.admin_unit_not_found"
+  },
+  "tenantUnit/main": {
+    "Code": "89011",
+    "Name": "Commune one",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2025-06-30T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  },
+  "tenantUnit/other": {
+    "Code": "89011",
+    "Name": "Other tenant Commune one",
+    "Level": "commune",
+    "ParentCode": "89",
+    "ValidFrom": "2025-06-30T17:00:00Z",
+    "ValidTo": null,
+    "SuccessorCodes": []
+  }
+}
