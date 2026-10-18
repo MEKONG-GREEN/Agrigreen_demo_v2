@@ -23,3 +23,11 @@ Kiểm tra thuần 78301 đã đạt: 7 gói thuần cùng các unit DBadmin đ�
 
 
 Cổng static 67089 dừng với exit 1 tại migratecheck: ADR-0028 cấm SET/RESET mức phiên. Migration mới chưa tích hợp được sửa riêng sang SET LOCAL lock_timeout='5s' và bỏ RESET, đúng mẫu đang dùng của repo. Giữ nguyên view, dữ liệu, assertion và golden; không sửa cổng. Log static cũ được giữ. Phải xác minh PostgreSQL lại trên DDL mới rồi chạy static-verified trước hồi quy bên tiêu thụ và helper.
+
+
+Lượt PostgreSQL 25069 đã đạt cả 5 ca trên migration SET LOCAL; exit 0, không SKIP/FAIL. Cụm tạm 63663/1072194a0332 đã dọn. Kết quả này thay mốc 30117 cho DDL hiện hành.
+
+Rà soát quy ước registry xác nhận //ag:dataproduct dành cho Public API G5 (contracts/dataproduct và OpenAPI công khai). Bốn hợp đồng G1 ở đây dùng //ag:pubview và JSON trong contracts/pubview; bỏ bốn chú thích dataproduct đã đặt nhầm trên hằng PubSchema. Đây chỉ là sửa mô tả cung cấp, không đổi view, DDL hay quyền runtime; catalog vai công bố phải giữ nguyên sau modgen. Tên logic cooperatives_v1/plots_v1/seasons_v1/confirmations_v1 vẫn là bốn hợp đồng view trong đặc tả này.
+
+
+Sửa annotation đã qua 3 gói kiểm tra liên quan (contracts/pubview, tools/modgen, tests/pubreaders), phiên 51751 exit 0, không SKIP. Catalog runtime và bốn khai báo pubview giữ nguyên; chỉ data_products trở lại rỗng để không khai nhầm Public API G5. Mốc PostgreSQL DDL hiện hành là 25069, đủ 5 ca PASS; timeout dùng SET LOCAL. Chờ cổng static-verified và hồi quy các bên tiêu thụ.

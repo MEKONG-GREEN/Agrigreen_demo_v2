@@ -51,7 +51,7 @@ provides:
     - pf_cooperative_pub.cooperatives/v1
     - pf_cooperative_pub.plots/v1
     - pf_cooperative_pub.seasons/v1
-  data_products: [confirmations_v1, cooperatives_v1, plots_v1, seasons_v1]
+  data_products: []
 consumes:
   events: []
 permissions: [coop_manager, farmer, plot_editor, plot_viewer, sop_admin]

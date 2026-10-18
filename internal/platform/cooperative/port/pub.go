@@ -7,8 +7,4 @@ package port
 //ag:pubview pf_cooperative_pub.plots v1
 //ag:pubview pf_cooperative_pub.seasons v1
 //ag:pubview pf_cooperative_pub.confirmations v1
-//ag:dataproduct cooperatives_v1
-//ag:dataproduct plots_v1
-//ag:dataproduct seasons_v1
-//ag:dataproduct confirmations_v1
 const PubSchema = "pf_cooperative_pub"
