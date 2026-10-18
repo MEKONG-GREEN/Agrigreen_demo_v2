@@ -1220,7 +1220,7 @@
   {
     "Name": "duty-wrong-field-type",
     "Drafts": null,
-    "Error": "notify: payload pf.extension.cnts_duty.changed: json: cannot unmarshal number into Go struct field CNTSDutyChangedV1.roster_id of type uuid.UUID: JSON value must be string type"
+    "Error": "notify: payload pf.extension.cnts_duty.changed: json: cannot unmarshal number into Go struct field CNTSDutyChangedV1.roster_id of type uuid.UUID"
   },
   {
     "Name": "unknown-event",

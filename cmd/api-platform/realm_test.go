@@ -268,3 +268,36 @@ func TestKeycloakRealmCoversRolesAndClaims(t *testing.T) {
 		t.Error("realm thiếu client agrigreen-web-internal (apps/web-internal)")
 	}
 }
+
+// Keycloak lưu description của vai/client trong cột VARCHAR(255): mô tả dài hơn làm --import-realm hỏng và
+// Keycloak không khởi động (Compose: "Value too long for column DESCRIPTION"). Đếm theo ký tự, không theo byte.
+func TestKeycloakRealmDescriptionsFitColumn(t *testing.T) {
+	for _, name := range []string{"agrigreen-realm.json", "agrigreen-kn-admin-realm.json"} {
+		raw, err := os.ReadFile(filepath.Join(repoRoot, "deploy", "compose", "keycloak", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var realm struct {
+			Roles struct {
+				Realm []struct{ Name, Description string } `json:"realm"`
+			} `json:"roles"`
+			Clients []struct {
+				ClientID    string `json:"clientId"`
+				Description string `json:"description"`
+			} `json:"clients"`
+		}
+		if err := json.Unmarshal(raw, &realm); err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range realm.Roles.Realm {
+			if n := len([]rune(r.Description)); n > 255 {
+				t.Errorf("%s: vai %s có description %d ký tự (tối đa 255)", name, r.Name, n)
+			}
+		}
+		for _, c := range realm.Clients {
+			if n := len([]rune(c.Description)); n > 255 {
+				t.Errorf("%s: client %s có description %d ký tự (tối đa 255)", name, c.ClientID, n)
+			}
+		}
+	}
+}

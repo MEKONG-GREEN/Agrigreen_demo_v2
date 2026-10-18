@@ -38,8 +38,14 @@ jobs:
         run: go run ./tools/archlint ./...
       - name: migratecheck — R-23/R-25, tên tệp mốc UTC + không xếp trước nhánh đích (WH-B)
         run: |
+          # Quy tắc tên mốc UTC (WH-B) áp ở cửa vào dev. PR vào main đi qua dev nên so với origin/dev — số tuần tự
+          # đã được dev chấp nhận không bị coi là tệp mới.
           BASE=""
-          if [ "${{ github.event_name }}" = "pull_request" ]; then BASE="-base origin/${{ github.base_ref }}"; fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            REF="${{ github.base_ref }}"
+            if [ "$REF" = "main" ]; then REF=dev; fi
+            BASE="-base origin/$REF"
+          fi
           go run ./tools/migratecheck $BASE migrations
       - name: knboundary — ranh giới hệ thống Khuyến nông, baseline chỉ co lại (KNSPLIT-0, ADR-0055)
         run: |
@@ -91,7 +97,9 @@ jobs:
       - name: PostgreSQL 17 + PostGIS + pgRouting
         run: |
           docker build -q -t agrigreen/postgres:ci deploy/compose/postgres
-          docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=ci-superuser agrigreen/postgres:ci -c max_locks_per_transaction=256
+          # max_connections: các gói kiểm thử chạy song song, mỗi gói DB riêng + pool theo vai qua PgBouncer (10 kết nối
+          # máy chủ mỗi cặp DB/vai) — mặc định 100 cạn ("remaining connection slots are reserved", SQLSTATE 53300).
+          docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=ci-superuser agrigreen/postgres:ci -c max_locks_per_transaction=256 -c max_connections=400
           for i in $(seq 1 60); do
             docker exec pg pg_isready -h 127.0.0.1 -U postgres > /dev/null 2>&1 && break
             sleep 2
@@ -145,7 +153,14 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - run: npm run build
+      # Bản build production thật (next.config.ts chặn khi thiếu NEXT_PUBLIC_* https) — URL giữ chỗ, không gọi tới.
+      - name: npm run build (production, URL giữ chỗ)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_DEPLOY_ENV: production
+          NEXT_PUBLIC_API_BASE_URL: https://api.ci.invalid
+          NEXT_PUBLIC_ADMIN_API_BASE: https://admin.ci.invalid
+          NEXT_PUBLIC_OIDC_ISSUER: https://auth.ci.invalid/realms/agrigreen
       - name: Giấy phép npm (RB-4)
         run: npx --yes license-checker-rseidelsohn --production --excludePrivatePackages --excludePackages "sharp;@img/sharp-libvips-linux-x64;@img/sharp-libvips-linuxmusl-x64" --onlyAllow "MIT;BSD-2-Clause;BSD-3-Clause;Apache-2.0;ISC;MPL-2.0;0BSD;BlueOak-1.0.0;CC0-1.0;Python-2.0;CC-BY-4.0"
 
@@ -274,11 +289,23 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - run: npm run build
+      # Bản build production thật (next.config.ts chặn khi thiếu NEXT_PUBLIC_* https) — URL giữ chỗ, không gọi tới.
+      - name: npm run build (production, URL giữ chỗ)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_DEPLOY_ENV: production
+          NEXT_PUBLIC_API_BASE_URL: https://api.ci.invalid
+          NEXT_PUBLIC_ADMIN_API_BASE: https://admin.ci.invalid
+          NEXT_PUBLIC_OIDC_ISSUER: https://auth.ci.invalid/realms/agrigreen
       - name: Giấy phép npm (RB-4)
         run: npx --yes license-checker-rseidelsohn --production --excludePrivatePackages --excludePackages "sharp;@img/sharp-libvips-linux-x64;@img/sharp-libvips-linuxmusl-x64" --onlyAllow "MIT;BSD-2-Clause;BSD-3-Clause;Apache-2.0;ISC;MPL-2.0;0BSD;BlueOak-1.0.0;CC0-1.0;Python-2.0;CC-BY-4.0"
       - name: Docker image (build thử)
-        run: docker build -t agrigreen/web-internal:ci .
+        run: >-
+          docker build -t agrigreen/web-internal:ci
+          --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.ci.invalid
+          --build-arg NEXT_PUBLIC_ADMIN_API_BASE=https://admin.ci.invalid
+          --build-arg NEXT_PUBLIC_OIDC_ISSUER=https://auth.ci.invalid/realms/agrigreen
+          .
 
   web-internal-e2e:
     name: Web nội bộ MKG — E2E (Playwright, dữ liệu giả lập)
@@ -578,6 +605,15 @@ jobs:
       COMPOSE_FILE: deploy/compose/docker-compose.yml
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Giải phóng dung lượng runner (build song song ~12 image Go + 2 web)
+        run: |
+          # Mỗi image Go dựng cả module trong stage riêng; runner chuẩn hết đĩa giữa chừng ("no space left on device").
+          # Job chỉ dùng docker/sh nên xoá được cả hostedtoolcache.
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache \
+            /usr/share/swift /usr/local/share/powershell /usr/local/share/chromium /usr/local/lib/node_modules \
+            /opt/microsoft /opt/google /opt/az
+          sudo docker image prune -af > /dev/null || true
+          df -h /
       - name: Sinh bí mật dev (deploy/compose/.env, không commit)
         run: sh scripts/gen-dev-secrets.sh --force
       - name: docker compose config (kiểm cú pháp và biến)
@@ -627,7 +663,8 @@ jobs:
           wid=$(docker compose -f "$COMPOSE_FILE" ps -q worker-internal)
           test "$(docker inspect -f '{{.State.Health.Status}}' "$wid")" = healthy
           # Cổng Internal 8084 KHÔNG được publish ra máy chủ.
-          if docker compose -f "$COMPOSE_FILE" port api-platform 8084 2>/dev/null | grep -q .; then
+          # Compose v5 in ":0" cho cổng chỉ expose — chỉ cổng máy chủ khác 0 mới là đã publish.
+          if docker compose -f "$COMPOSE_FILE" port api-platform 8084 2>/dev/null | grep -qE ':[1-9][0-9]*$'; then
             echo "8084 (Internal) bị publish ra máy chủ" >&2; exit 1
           fi
           # Trong mạng compose: không chứng thư client → bắt tay TLS hỏng; chứng thư optimizer → 200.
@@ -649,7 +686,7 @@ jobs:
           dc exec -T ingest /app -healthcheck http://127.0.0.1:8091/readyz
           # 8443 chỉ publish trên 127.0.0.1; 8091 không publish.
           test "$(dc port ingest 8443)" = "127.0.0.1:8443"
-          if dc port ingest 8091 2>/dev/null | grep -q .; then echo "8091 (ops ingest) bị publish ra máy chủ" >&2; exit 1; fi
+          if dc port ingest 8091 2>/dev/null | grep -qE ':[1-9][0-9]*$'; then echo "8091 (ops ingest) bị publish ra máy chủ" >&2; exit 1; fi
           # mTLS bắt buộc: không chứng thư client → bắt tay hỏng.
           if curl -fsS --max-time 5 --cacert deploy/compose/.certs/ca.crt -o /dev/null -X POST https://localhost:8443/v1/ingest/batches; then
             echo "ingest nhận kết nối không có chứng thư client" >&2; exit 1
@@ -757,6 +794,8 @@ jobs:
         with:
           context: deploy/compose/postgres
           push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          # Không push (PR, nhánh khác) thì nạp vào docker cục bộ để bước Trivy còn ảnh mà quét.
+          load: ${{ !(github.ref == 'refs/heads/main' && github.event_name == 'push') }}
           tags: ghcr.io/${{ env.OWNER }}/agrigreen-postgres:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

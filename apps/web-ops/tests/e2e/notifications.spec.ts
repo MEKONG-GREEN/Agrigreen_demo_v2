@@ -4,7 +4,9 @@ import { loginAs } from "./helpers";
 test("chuông thông báo: số chưa đọc → mở chỉ đạo qua deep link → xác nhận đã đọc", async ({ page }) => {
   await loginAs(page, "xa", "/nhiem-vu");
   const count = page.getByTestId("bell-count");
-  await expect(count).toHaveText("3");
+  // Số chưa đọc phụ thuộc dữ liệu giả lập của mọi gói (Báo giá thêm thông báo) — kiểm giảm đúng 1 khi mở chỉ đạo.
+  await expect(count).toHaveText(/^[1-9]\d*$/);
+  const unread = Number(await count.textContent());
   await page.getByTestId("bell").click();
   const panel = page.getByRole("dialog", { name: "Hộp thư thông báo" });
   await panel.getByRole("button", { name: /Chỉ đạo/ }).first().click();
@@ -12,7 +14,7 @@ test("chuông thông báo: số chưa đọc → mở chỉ đạo qua deep link
   await expect(page).toHaveURL(/\/chi-dao\?id=/);
   const detail = page.getByTestId("directive-detail");
   await expect(detail.getByRole("heading", { name: /rầy nâu/ })).toBeVisible();
-  await expect(count).toHaveText("2");
+  await expect(count).toHaveText(String(unread - 1));
   await detail.getByRole("button", { name: "Xác nhận đã đọc" }).click();
   await expect(detail).toContainText("Đã xác nhận");
 });
