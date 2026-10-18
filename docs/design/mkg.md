@@ -2,7 +2,7 @@
 
 **Cổng:** G2 (31/03/2027) — "Thiết kế chi tiết `mkg/*` chứng minh tuân thủ bảy ràng buộc" (tài liệu kiến trúc v3.0, Phụ lục A)
 **Ngày:** 29/09/2026 · **Trạng thái:** đề xuất; `mkg/hub` và van `hub_facility`/`hub_capacity` đã hiện thực ở đợt 1 G2
-**Đọc cùng:** tài liệu kiến trúc v3.0 (mục 3, 5, 6, 8, 9, 12, 13, 16), [ADR-0003](../adr/0003-event-sourcing-muc-b.md) (mức B), [ADR-0005](../adr/0005-rls-mot-policy-moi-bang.md), [ADR-0009](../adr/0009-mo-hinh-tenant.md), [ADR-0012](../adr/0012-duy-nhat-tren-bang-so-phan-vung.md), [g1-conventions](../dev/g1-conventions.md), [g2-conventions](../dev/g2-conventions.md), [contracts/publication/README.md](../../contracts/publication/README.md).
+**Đọc cùng:** tài liệu kiến trúc v3.0 (mục 3, 5, 6, 8, 9, 12, 13, 16), [ADR-0003](../adr/0003-event-sourcing-muc-b.md) (mức B), [ADR-0005](../adr/0005-rls-mot-policy-moi-bang.md), [ADR-0009](../adr/0009-mo-hinh-tenant.md), [ADR-0012](../adr/0012-duy-nhat-tren-bang-so-phan-vung.md), [g1-conventions](../dev/g1-conventions.md), [g2-conventions](../dev/g2-conventions.md), [contracts/publication/README.md](../../contracts/publication/README.md). Tính năng, lộ trình và cổng kết nối của ERP, TMS và bộ mô phỏng theo kiến trúc v4.3 và vùng nội bộ v1.4: [erp-tms-sim.md](erp-tms-sim.md).
 **Đặc tả nghiệp vụ tham chiếu:** prototype `mekong-green/src/erp/warehouse/service.ts` (lô là nguồn sự thật duy nhất, `stock_movements` bất biến, xuất theo rủi ro xuống cấp — không FEFO), cùng kiểm thử `tests/arch-review-2026-09-24.test.ts` (R3/A03). Mã story kho ghi tiền tố `WH` (BRD AgriGreen v1.1 — Warehouse & Inventory, FN-01..39).
 
 ---
