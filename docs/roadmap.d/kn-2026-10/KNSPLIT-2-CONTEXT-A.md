@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-CONTEXT-A: 268native vectors/1072giao dịchPG, sharedDB W24/FD và HTX14, staticfull đã đạt; chờhelper11 trướcdev, production khôngđổi.
