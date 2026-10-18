@@ -638,6 +638,8 @@ services:
       dockerfile: Dockerfile
       # NEXT_PUBLIC_* nhúng lúc build (địa chỉ trình duyệt gọi, không phải tên container).
       args:
+        # http://localhost chỉ hợp lệ ở bản dev (Dockerfile mặc định production, đòi https — src/deployEnv.ts).
+        NEXT_PUBLIC_DEPLOY_ENV: dev
         NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
         NEXT_PUBLIC_ADMIN_API_BASE: http://localhost:8082
         NEXT_PUBLIC_OIDC_ISSUER: http://localhost:8180/realms/agrigreen
@@ -664,6 +666,8 @@ services:
       dockerfile: Dockerfile
       # NEXT_PUBLIC_* nhúng lúc build: web nội bộ MKG CHỈ gọi api-internal (vùng mkg).
       args:
+        # http://localhost chỉ hợp lệ ở bản dev (Dockerfile mặc định production, đòi https — src/deployEnv.ts).
+        NEXT_PUBLIC_DEPLOY_ENV: dev
         NEXT_PUBLIC_API_BASE_URL: http://localhost:8081
         NEXT_PUBLIC_ADMIN_API_BASE: http://localhost:8083
         NEXT_PUBLIC_OIDC_ISSUER: http://localhost:8180/realms/agrigreen

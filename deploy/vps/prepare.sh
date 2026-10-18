@@ -38,10 +38,13 @@ mkdir -p "$out"
 sed -e "s#http://localhost:3000#https://app.$domain#g" \
     -e "s#http://127.0.0.1:3000#https://app.$domain#g" \
     -e "s#http://localhost:8082#https://admin.$domain#g" \
+    -e "s#http://localhost:3001#https://web-internal.invalid#g" \
+    -e "s#http://127.0.0.1:3001#https://web-internal.invalid#g" \
     "$root/deploy/compose/keycloak/agrigreen-realm.json" > "$out/agrigreen-realm.json.tmp"
-# Tắt client ROPC chỉ-dev: dòng "enabled" ngay sau clientId agrigreen-seed.
-awk '/"clientId": "agrigreen-seed"/ { seed = 1 }
-     seed && /"enabled": true/ { sub(/"enabled": true/, "\"enabled\": false"); seed = 0 }
+# Tắt client chỉ-dev: ROPC agrigreen-seed, và agrigreen-web-internal (VPS không phục vụ web nội bộ MKG — Caddy chỉ
+# có app/api/admin/auth; URL 3001 đổi sang .invalid ở trên). Dòng "enabled" ngay sau clientId.
+awk '/"clientId": "agrigreen-(seed|web-internal)"/ { off = 1 }
+     off && /"enabled": true/ { sub(/"enabled": true/, "\"enabled\": false"); off = 0 }
      { print }' "$out/agrigreen-realm.json.tmp" > "$out/agrigreen-realm.json"
 rm -f "$out/agrigreen-realm.json.tmp"
 # D24/D25: realm quản trị riêng của hệ KN (mật khẩu 14 ký tự/không trùng 10, TOTP bắt buộc).

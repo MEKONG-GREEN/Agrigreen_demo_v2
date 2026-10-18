@@ -53,3 +53,16 @@ f4c09dce1f46d6294b1cbf601d9642cdb054dc92:apps/web-internal/src/api/mock/db.ts:ge
 # chuỗi định danh dài. Dùng vân tay chứ KHÔNG allowlist cả docs/: tài liệu là đúng chỗ một
 # bí mật dễ bị dán nhầm vào, nên đèn ở đó phải giữ.
 7f73faaa8ccbb07bbca547ee16391b372d13da2b:docs/runbooks/integration-batches.md:generic-api-key:103
+
+# Khóa mục menu Khuyến nông "tinh.cnts.phu_luc_2" (Thủy sản — Phụ lục 2) trong danh mục menu, dữ liệu
+# giả lập web-ops và fixture. Định danh tuyến, không phải bí mật — quy tắc trúng vì tên trường là "key".
+e1ed8b3cc21a60b72102aafd1941ad64a6b36723:apps/web-ops/src/api/mock/kn.ts:generic-api-key:526
+e1ed8b3cc21a60b72102aafd1941ad64a6b36723:internal/platform/extension/menus/base.json:generic-api-key:601
+43a6fcdf1d15d5be9a26030e6a690e5e7370046c:apps/web-ops/src/api/mock/fixtures/kn-menu.json:generic-api-key:1028
+b3e05bd1a6928689875bcff44f887e687ae3d419:apps/web-ops/src/api/mock/kn.ts:generic-api-key:230
+b3e05bd1a6928689875bcff44f887e687ae3d419:internal/platform/party/domain/menu_departments.go:generic-api-key:92
+
+# Văn xuôi nhật ký hồi quy: "Pure-keyed73636.exit0, frozen12/60/170" là số ca kiểm và mã thoát, không có giá trị
+# bí mật — quy tắc trúng vì chữ "keyed" đứng trước một chuỗi dài.
+e6b50acee68dbfc3b0640fe1e95ec9a8d76bf149:docs/REGRESSION.md:generic-api-key:541
+e6b50acee68dbfc3b0640fe1e95ec9a8d76bf149:docs/kn/gia-dinh/KNSPLIT-2-MDCATALOG-A.md:generic-api-key:14

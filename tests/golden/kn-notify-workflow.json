@@ -1552,7 +1552,7 @@
   {
     "Name": "reviewed-wrong-type",
     "Drafts": null,
-    "Error": "notify: payload pf.extension.work_schedule.reviewed: json: cannot unmarshal number into Go struct field WorkScheduleReviewedV1.owner_ref of type uuid.UUID: JSON value must be string type"
+    "Error": "notify: payload pf.extension.work_schedule.reviewed: json: cannot unmarshal number into Go struct field WorkScheduleReviewedV1.owner_ref of type uuid.UUID"
   },
   {
     "Name": "work-reminded-bad-json",

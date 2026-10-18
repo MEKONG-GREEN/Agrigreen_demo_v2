@@ -13,6 +13,8 @@ deploy/compose/.certs/
 /dist/
 *.exe
 *.test
+# Driver kiểm thử giả lập cho archlint (TestGeneratedDriverSelfImportOnly).
+!tools/archlint/testdata/src/example.com/ag/internal/kn/*.test/
 *.out
 /coverage.out
 /coverage.html

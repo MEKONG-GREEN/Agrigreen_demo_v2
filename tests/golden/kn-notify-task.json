@@ -2492,7 +2492,7 @@
   {
     "Name": "created-wrong-type",
     "Drafts": null,
-    "Error": "notify: payload pf.extension.task.created hỏng: json: cannot unmarshal bool into Go struct field TaskCreatedV1.task_id of type uuid.UUID: JSON value must be string type",
+    "Error": "notify: payload pf.extension.task.created hỏng: json: cannot unmarshal bool into Go struct field TaskCreatedV1.task_id of type uuid.UUID",
     "Calls": null
   },
   {
@@ -2510,7 +2510,7 @@
   {
     "Name": "escalated-wrong-type",
     "Drafts": null,
-    "Error": "notify: payload pf.extension.task.escalated hỏng: json: cannot unmarshal bool into Go struct field TaskEscalatedV1.task_id of type uuid.UUID: JSON value must be string type",
+    "Error": "notify: payload pf.extension.task.escalated hỏng: json: cannot unmarshal bool into Go struct field TaskEscalatedV1.task_id of type uuid.UUID",
     "Calls": null
   },
   {

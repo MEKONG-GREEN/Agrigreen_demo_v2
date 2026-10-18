@@ -74,7 +74,7 @@
       { "name": "kn_province_admin", "description": "Cán bộ TTKN tỉnh — đọc/ghi, phân công, chỉ đạo trong tỉnh", "composite": true, "composites": { "realm": ["login_totp_required"] } },
       { "name": "kn_officer", "description": "Cán bộ khuyến nông xã / Tổ KNCĐ — đọc/ghi trong xã phụ trách", "composite": true, "composites": { "realm": ["login_totp_required"] } },
       { "name": "coop_manager", "description": "Quản lý HTX/THT — nông hộ, thửa của chính HTX mình" },
-      { "name": "kn_user", "description": "KN v7.7: cổng vào bề mặt KN Phòng Trồng trọt — vai nghiệp vụ (Cấp Quốc gia/Tỉnh/Xã/Admin), Nút, phòng ban, xã phụ trách nằm ở sổ gán vai trò pf/accounts và chọn theo ngữ cảnh phiên (X-AG-Context), không trong token. W11.23: chứa vault_directory để mọi cán bộ KN tra được Contact (FN-13)", "composite": true, "composites": { "realm": ["login_totp_required", "vault_directory"] } },
+      { "name": "kn_user", "description": "KN v7.7: cổng vào bề mặt KN Phòng Trồng trọt — vai nghiệp vụ, Nút, phòng ban, xã phụ trách ở sổ gán vai trò pf/accounts, chọn theo ngữ cảnh phiên (X-AG-Context), không trong token. W11.23: chứa vault_directory để tra Contact (FN-13)", "composite": true, "composites": { "realm": ["login_totp_required", "vault_directory"] } },
       { "name": "farmer", "description": "Nông dân App HTX — tên đăng nhập là SĐT; phạm vi = nông hộ liên kết với tài khoản (pf/accounts farmer_link), không org_ref; kích hoạt bằng QR/liên kết một lần" },
       { "name": "sop_admin", "description": "Soạn quy trình SOP, nhân bản, gắn giống ↔ SOP (pf/cropcycle, Admin API); phát hành cần param_approver khác người soạn" },
       { "name": "cgh_viewer", "description": "Cục KTHT — xem bản đồ cơ giới hóa, chỉ đọc hồ sơ HTX" },
@@ -128,7 +128,7 @@
       { "name": "billing_approver", "description": "G5 (pf/metering, Admin API — MFA): duyệt bảng kê sử dụng và tham số giá — không duyệt bảng kê do chính mình yêu cầu (R-56)" },
       { "name": "map_consumer", "description": "Ứng dụng tiêu thụ (TMS — mkg/logistics) đọc bản đồ chuẩn hóa GET /v1/geo/standard-map bằng tài khoản dịch vụ (GIS US-INT-02). Chỉ lớp nền không định danh, không có thửa" },
       { "name": "mkg_sync", "description": "Tài khoản dịch vụ tenant MKG (client agrigreen-mkg-sync): đọc bề mặt đối tác /v1/partner/* (danh bạ HTX, thửa, ngày thu hoạch, phản hồi HTX) — chỉ khi tenant chương trình đã duyệt cấp quyền chia sẻ loại đó (ADR-0020)" },
-      { "name": "login_totp_required", "description": "D24 (CEO 13/10/2026): vai ĐÁNH DẤU, không cấp trực tiếp — mọi vai cán bộ KN và mọi vai quản trị bắt MFA là vai tổng hợp chứa vai này; luồng đăng nhập \"agrigreen browser\" (Condition - user role) bắt nhập TOTP và tự mở đăng ký TOTP ở lần đăng nhập đầu (accounts/port.LoginTOTPRoles)" },
+      { "name": "login_totp_required", "description": "D24 (CEO 13/10/2026): vai ĐÁNH DẤU, không cấp trực tiếp — vai cán bộ KN và vai quản trị bắt MFA là vai tổng hợp chứa vai này; luồng \"agrigreen browser\" bắt TOTP, tự mở đăng ký ở lần đầu (accounts/port.LoginTOTPRoles)" },
       { "name": "offline_access", "description": "Refresh token ngoại tuyến (app hiện trường, tối đa 72 giờ không trực tuyến — mục 15)" },
       { "name": "default-roles-agrigreen", "description": "Vai mặc định của realm — KHÔNG gồm vai nghiệp vụ nào", "composite": true, "composites": { "realm": ["offline_access"] } }
     ]
@@ -409,7 +409,7 @@
     {
       "clientId": "agrigreen-mkg-sync",
       "name": "MKG (api-internal, mkg/fieldops) — tài khoản dịch vụ đọc bề mặt đối tác của nền tảng (ADR-0020)",
-      "description": "Client credentials, không đăng nhập người dùng. Thuộc tính tenant_id của service-account-agrigreen-mkg-sync đặt theo tenant MKG (tenant riêng, khác tenant chương trình — ADR-0020). Chỉ vai mkg_sync: bề mặt đối tác /v1/partner/* của Application API, đọc được khi tenant chương trình đã duyệt cấp quyền chia sẻ (POST /v1/share-grants, Admin API).",
+      "description": "Client credentials, không đăng nhập người dùng. tenant_id của service account là tenant MKG (ADR-0020). Chỉ vai mkg_sync: /v1/partner/* của Application API, đọc khi tenant chương trình đã cấp quyền chia sẻ (POST /v1/share-grants).",
       "enabled": true,
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
