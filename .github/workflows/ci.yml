@@ -794,6 +794,8 @@ jobs:
         with:
           context: deploy/compose/postgres
           push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          # Không push (PR, nhánh khác) thì nạp vào docker cục bộ để bước Trivy còn ảnh mà quét.
+          load: ${{ !(github.ref == 'refs/heads/main' && github.event_name == 'push') }}
           tags: ghcr.io/${{ env.OWNER }}/agrigreen-postgres:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
