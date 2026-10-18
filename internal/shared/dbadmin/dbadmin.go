@@ -166,19 +166,35 @@ func Bootstrap(ctx context.Context, adminURL, dbSuffix string) error {
 // RB-5): vai nhóm NOLOGIN không gắn cụm (ag_shared_user, chủ hàm giám sát — đích MemberOf của vai khác) và mọi vai
 // được CONNECT ít nhất một cụm đã chọn. Giữ thứ tự của Roles (vai nhóm trước thành viên).
 func RolesFor(clusters []migrations.Cluster) []Role {
+	return rolesFor(Roles, clusters)
+}
+
+func rolesFor(roles []Role, clusters []migrations.Cluster) []Role {
 	want := map[migrations.Cluster]bool{}
 	for _, c := range clusters {
 		want[c] = true
 	}
+	managed := make(map[string]bool, len(roles))
+	included := make(map[string]bool, len(roles))
 	var out []Role
-	for _, r := range Roles {
+	for _, r := range roles {
+		managed[r.Name] = true
 		keep := len(r.Clusters) == 0
 		for _, c := range r.Clusters {
 			keep = keep || want[c]
 		}
 		if keep {
+			r.MemberOf = slices.Clone(r.MemberOf)
 			out = append(out, r)
+			included[r.Name] = true
 		}
+	}
+	// Chỉ cấp membership tới vai được dựng. Vai bên ngoài danh mục (vd vai PostgreSQL)
+	// giữ nguyên; không sửa danh mục toàn cục hay thu hồi quyền của lần bootstrap trước.
+	for i := range out {
+		out[i].MemberOf = slices.DeleteFunc(out[i].MemberOf, func(parent string) bool {
+			return managed[parent] && !included[parent]
+		})
 	}
 	return out
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -44,6 +45,56 @@ func TestRolesForSelectedClusters_G4(t *testing.T) {
 	// Thứ tự giữ nguyên: vai nhóm trước vai thành viên.
 	if slices.Index(mkg, SharedUser) > slices.Index(mkg, "costing_app") {
 		t.Error("ag_shared_user phải tạo trước vai thành viên")
+	}
+}
+
+// Cold bootstrap phải giữ đủ vai cha được quản lý mà không tạo vai của cụm khác.
+func TestRolesForMembershipClosure(t *testing.T) {
+	managed := roleNames(Roles)
+	for _, cluster := range migrations.Clusters {
+		t.Run(string(cluster), func(t *testing.T) {
+			selected := RolesFor([]migrations.Cluster{cluster})
+			names := roleNames(selected)
+			for _, r := range selected {
+				for _, parent := range r.MemberOf {
+					if slices.Contains(managed, parent) && !slices.Contains(names, parent) {
+						t.Errorf("%s tham gia vai %s không được dựng", r.Name, parent)
+					}
+				}
+			}
+		})
+	}
+	if got := RolesFor(migrations.Clusters); !reflect.DeepEqual(got, Roles) {
+		t.Fatal("dựng mọi cụm phải giữ nguyên toàn bộ vai và membership")
+	}
+}
+
+func TestRolesForMemberOfIsCloned(t *testing.T) {
+	migrator := slices.IndexFunc(Roles, func(r Role) bool { return r.Name == Migrator })
+	before := slices.Clone(Roles[migrator].MemberOf)
+	selected := RolesFor(migrations.Clusters)
+	selected[migrator].MemberOf[0] = "changed"
+	if !slices.Equal(Roles[migrator].MemberOf, before) {
+		t.Fatal("sửa kết quả làm thay đổi Roles toàn cục")
+	}
+}
+
+func TestRolesForPreservesExternalParents(t *testing.T) {
+	roles := []Role{
+		{Name: "pf_owner", Clusters: []migrations.Cluster{migrations.PF}},
+		{Name: "ts_owner", Clusters: []migrations.Cluster{migrations.TS}},
+		{Name: "migrator", Clusters: migrations.Clusters,
+			MemberOf: []string{"pf_owner", "pg_read_all_stats", "ts_owner"}},
+	}
+	got := rolesFor(roles, []migrations.Cluster{migrations.TS})
+	if want := []string{"ts_owner", "migrator"}; !slices.Equal(roleNames(got), want) {
+		t.Fatalf("vai được chọn = %v, muốn %v", roleNames(got), want)
+	}
+	if want := []string{"pg_read_all_stats", "ts_owner"}; !slices.Equal(got[1].MemberOf, want) {
+		t.Fatalf("membership = %v, muốn %v", got[1].MemberOf, want)
+	}
+	if want := []string{"pf_owner", "pg_read_all_stats", "ts_owner"}; !slices.Equal(roles[2].MemberOf, want) {
+		t.Fatal("lọc membership làm thay đổi đầu vào")
 	}
 }
 

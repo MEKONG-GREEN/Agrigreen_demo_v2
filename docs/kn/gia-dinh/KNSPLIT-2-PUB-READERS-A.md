@@ -12,3 +12,7 @@ Khi gói sau bổ sung data product hợp lệ, phải giữ ảnh chụp OLD v�
 
 
 Pure2292exit0 nhưng có1SKIP TestBootstrapClustersOnlySelected_G4 do thiếuPGenv; chỉ7purepackages đủPASS,nativeDBadminunitPASS nhưng CHƯAfullDBadmin. ToànDBadmin chuyểnthêmvào full5PG đểrequiredca chạy thật,nofail/skip; khôngsửamã/assertion. 27existinggoldenGitblobs/baseline318/rules/SQLmigrations/DBadminbootstrap giữ9df8d64d. Chỉextension.module.yaml thêmconsumes.publications; dependsnguyên. Productionc10fed41;OLD26/41/15capture99143actual0. Chưa static/full5PG/helper11/dev.
+
+
+Phát hiện và sửa lỗi nền khi kiểm DBadmin thật: baseline 9df8d64d trên PostgreSQL mới (48780exit1) cũng lỗi SQLSTATE42704 own_acctbridge khi chỉ dựng TS. RolesFor trước đây lọc danh sách vai nhưng giữ MemberOf của các cụm chưa dựng. Nay chỉ bỏ parent do Roles quản lý mà không thuộc tập vai đã chọn; giữ parent PostgreSQL/bên ngoài, thứ tự và clone MemberOf. Không tạo vai cụm khác, không thu hồi quyền của lượt bootstrap trước. Unit kiểm closure PF/MKG/TS/Vault, toàn cụm DeepEqual, clone không sửa global, giữ external parent. Legacy PubReaders và chính sách _pub chưa đổi.
+Cold-fixed17510actualexit0/khôngFAIL-SKIP, toàn packageDBadminPASS1.376s, coldTS0.36s; private54262/611f9373a98e đãdọn. Log thấtbại full75296 và baseline48780 giữ nguyên; static/full5PG dùng hậu tố verified sau bản sửa, cần helper11 trước tích hợp. Golden/DDL/rules/baseline318 giữ.
