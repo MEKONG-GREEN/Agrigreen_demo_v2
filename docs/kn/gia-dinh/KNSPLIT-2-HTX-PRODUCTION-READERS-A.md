@@ -1,4 +1,4 @@
-# KNSPLIT-2-HTX-PRODUCTION-READERS-A — Bộ đọc sản lượng công bố cho KN
+## KNSPLIT-2-HTX-PRODUCTION-READERS-A — Bộ đọc sản lượng công bố cho KN
 
 Nền dev880ba924. Thêm bộ đọc do KN sở hữu, trả hợp đồng cropcyclesrc.ReportData của năng lực reports tầng dưới. SQL chỉ dùng pf_cooperative_pub.v1_seasons, production_present và production_*; không gọi hay import HTX/cropcycle/mechanization, không đọc bảng riêng. Công bố NewPublishedHTXProduction tại gốc extension để lắp ráp; A chưa thay wiring báo cáo hiện hành. B sau phải đảo đường báo cáo KN, giữ đường native HTX/MKG.
 
@@ -7,3 +7,9 @@ Bộ đọc chỉ SELECT trong giao dịch read-only/r_extension. Tenant truy v�
 Khai báo readpubview seasons/v1. Quyền owner-level của gói READERS-A đã cấp SELECT seasons; không thêm ACL/role/schema/migration hay đổi RLS. Giữ33golden nền880,38native HTX và111platform. Không đổi HTTP/OpenAPI/menu/web/mobile. Baseline314 không tăng, kn-import-htx vẫn0. Giữ tenant theo từng Trung tâm tỉnh, MRV HTX/MKG, D2 G1 chỉ hồ sơ KN, mẫu KHTC nạp sẵn và M1–M7.
 
 Kiểm tra dự kiến: đối chiếu từng trường/derived ratios/native totals trên3tenant ×8nhóm ×phạm vi/bộ lọc; khác biệt giữa hai projection và thiếu một bên; actual0/NULL/distinct hộ; node-closure/RLS thật với vai KN; thiếu context/tenant mismatch/mất DB fail closed. Đầu vào test được tạo tại tests/htxdata, không đặt SQL nguồn ngoại trong KN. Chạy source HTX/platform, thuần/metadata/static, full5 downstream PG, helper11 migration trước dev; giữ log/exit lỗi và không báo xanh khi SKIP. Tại mốc viết đặc tả chưa chạy.
+
+
+Cổng static ban đầu86890: pure0, build/vet/modgen/migratecheck/archlint/contractcheck đạt; docscheck từ chối mức tiêu đề của đặc tả mới (# thay vì ## theo convention). Chỉ sửa Markdown, giữ nguyên Go/SQL/catalog/test/golden; nguồn PG76851 vẫn chạy. Giữ static.log/.exit1. Cần static-verified chạy từ docscheck trở đi (MFA/boundary/lint/gofmt/diff); các cổng đầu đã đạt trên cùng nguồn. Full waiter ban đầu sẽ dừng trước PG vì static1; lượt full verified phải dùng static-verified0.
+
+
+Bằng chứng trước tích hợp: core d5a98bcd giữ nguyên Go/SQL/metadata sau kiểm nguồn. Source76851 exit0/HTX14-187.005s/platform4-143.537s, không SKIP/FAIL;432query+152projection+288RLS so native, cùng fixed totals/NULL/zero/precision,38native/111platform giữ. Cụm64881/a60e4d253f1a đã dọn. Pure86890exit0; static đầu dừng ở mức tiêu đề Markdown, các cổng build/vet/modgen/migratecheck/archlint/contract đã đạt; docs/MFA/boundary314/lint0/gofmt2old/diff của26138 đạt. Full verified99796 exit0: {"internal/shared/dbadmin": 1.781, "internal/platform/metrics/handler": 131.26, "tests/kn77": 425.962, "cmd/api-platform/assembly": 122.487, "cmd/worker": 2.97}; không SKIP/FAIL, private55210/e11135000682 đã dọn/Go0.33golden nền880 giữ theoGitblob; ACL26flags58SELECT23membership nguyên. Fetchdev vẫn880, main27afd593 giữ. Chờ helper11 và xác minh remote; A chưa nối runtime reports.

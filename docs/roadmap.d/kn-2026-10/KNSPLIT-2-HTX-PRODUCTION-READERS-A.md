@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-HTX-PRODUCTION-READERS-A: reader sản lượng pub riêng, chưa wiring; chờ bằng chứng source/static/downstream/helper.
+- [ ] KNSPLIT-2-HTX-PRODUCTION-READERS-A: source14+platform4/pure/static/full5PG đạt,33goldens/ACL giữ; chờ helper11 và tích hợp dev. Chưa wiring reports.
