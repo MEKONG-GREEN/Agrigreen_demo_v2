@@ -661,7 +661,8 @@ jobs:
           wid=$(docker compose -f "$COMPOSE_FILE" ps -q worker-internal)
           test "$(docker inspect -f '{{.State.Health.Status}}' "$wid")" = healthy
           # Cổng Internal 8084 KHÔNG được publish ra máy chủ.
-          if docker compose -f "$COMPOSE_FILE" port api-platform 8084 2>/dev/null | grep -q .; then
+          # Compose v5 in ":0" cho cổng chỉ expose — chỉ cổng máy chủ khác 0 mới là đã publish.
+          if docker compose -f "$COMPOSE_FILE" port api-platform 8084 2>/dev/null | grep -qE ':[1-9][0-9]*$'; then
             echo "8084 (Internal) bị publish ra máy chủ" >&2; exit 1
           fi
           # Trong mạng compose: không chứng thư client → bắt tay TLS hỏng; chứng thư optimizer → 200.
