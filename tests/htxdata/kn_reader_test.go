@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/htxread"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	kn "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -20,7 +20,7 @@ import (
 
 func TestKNPublishedHTXStatisticsReconcileNative(t *testing.T) {
 	f := newFixture(t)
-	r := htxread.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform))
+	r := extension.NewPublishedHTXData(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform))
 	for _, tid := range []uuid.UUID{f.tid, f.other, ids.New()} {
 		ctx := tenant.WithID(context.Background(), tid)
 		for _, units := range [][]string{nil, {}, {"89001"}, {"92001"}, {"89001", "92001"}, {"unknown"}, {"89001", "89001"}} {
@@ -56,7 +56,7 @@ func TestKNPublishedHTXStatisticsReconcileNative(t *testing.T) {
 
 func TestKNPublishedHTXConfirmationsReconcileNative(t *testing.T) {
 	f := newFixture(t)
-	r := htxread.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform))
+	r := extension.NewPublishedHTXData(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform))
 	historic := f.native.HTXConfirmations().(interface {
 		ConfirmationsAt(context.Context, []uuid.UUID, time.Time) (map[uuid.UUID]string, error)
 	})
@@ -93,7 +93,7 @@ func (b unavailableDB) BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error) {
 
 func TestKNPublishedHTXReadsFailClosed(t *testing.T) {
 	failure := errors.New("reader database unavailable")
-	r := htxread.New(unavailableDB{failure})
+	r := extension.NewPublishedHTXData(unavailableDB{failure})
 	ctx := tenant.WithID(context.Background(), ids.New())
 	c, e := r.ByUnit(ctx, nil)
 	if !errors.Is(e, failure) || c != nil {

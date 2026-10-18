@@ -24,3 +24,12 @@ type CommunePlots struct {
 	Plots       int64
 	AreaHa      decimal.Decimal
 }
+
+// HTXData is the KN-owned read contract exposed at the module composition boundary.
+// It offers no write operation or HTX implementation handle.
+type HTXData interface {
+	CooperativeStatistics
+	PlotStatistics
+	HTXConfirmations
+	HTXConfirmationHistory
+}

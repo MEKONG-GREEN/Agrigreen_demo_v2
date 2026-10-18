@@ -24,6 +24,7 @@ provides:
     - ClosedFigures
     - CooperativeStatistics
     - HTXConfirmationHistory
+    - HTXData
     - KHTCMetricNames
     - KHTCPlanDepartments
     - KHTCPlanVersions
