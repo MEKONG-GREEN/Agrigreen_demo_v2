@@ -159,6 +159,7 @@ func TestKNPublishedHTXPrincipalScopesReconcileNative(t *testing.T) {
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNAdmin, Scope: authz.Scope{All: true}}},
 		}
 		for _, p := range principals {
+			p.TenantID = tid
 			ctx := authz.WithPrincipal(tenant.WithID(context.Background(), tid), p)
 			for _, units := range [][]string{nil, {}, {"89001"}, {"92001"}, {"unknown"}} {
 				native, e := f.native.Cooperatives().ByUnit(ctx, units)

@@ -8,3 +8,6 @@ Chỉ giảm baseline theo import đã gỡ bằng -prune, không sửa quy tắ
 
 
 Lượt prune ban đầu đã giảm đúng318→314 do gỡ4import, nhưng từ chối5SQL foreign mới trong fixture HTTP đặt dưới internal/kn/extension/handler. Không thêm baseline hay ngoại lệ: chuyển test HTTP sang tests/htxdata, nơi dựng dữ liệu đối chứng/lắp ráp; gọi gốc module và port, giữ ranh giới mã KN. Reader và wiring không đổi. Test ngoài dùng dữ liệu HTX native đã khóa38kết quả, danh mục đơn vị thật và HTTP có token xác thực; không ghi bảng ngoại từ mã KN.
+
+
+Source đầu79279 exit1: tests/htxdata chưa dựng được vì test HTTP import nhầm shared/authztest; package có sẵn ở shared/authz/authztest. Sửa đúng đường dẫn, không cài thư viện hay đổi go.mod/go.sum. Handler cùng lượt đã PASS180.980s, nhưng toàn lệnh đỏ nên không báo source xanh; cụm64248/a5e1637cb22b đã dọn. Static83732 exit1 ở vet cùng lỗi import, fullwait1540 exit1 trước PG. Giữ mọi log/exit cũ. Principal của ca RLS bổ sung TenantID trùng context cho dữ liệu người dùng đầy đủ. Phải chạy source-pg-verified cả hai gói và static-verified; pure0 trước đó trên mã production không đổi còn giá trị.
