@@ -31,3 +31,10 @@ Rà soát quy ước registry xác nhận //ag:dataproduct dành cho Public API 
 
 
 Sửa annotation đã qua 3 gói kiểm tra liên quan (contracts/pubview, tools/modgen, tests/pubreaders), phiên 51751 exit 0, không SKIP. Catalog runtime và bốn khai báo pubview giữ nguyên; chỉ data_products trở lại rỗng để không khai nhầm Public API G5. Mốc PostgreSQL DDL hiện hành là 25069, đủ 5 ca PASS; timeout dùng SET LOCAL. Chờ cổng static-verified và hồi quy các bên tiêu thụ.
+
+
+Hồi quy tiêu thụ 99925 đã đạt cả năm gói, exit 0, không SKIP/FAIL: DBadmin 1.709s; metrics/handler 161.245s (20 view, cột hợp đồng và RLS/quyền); KN77 300.740s; API assembly 117.602s; worker 2.107s. Cụm tạm 64740/e6ea98ea2477 đã dọn.
+
+Cổng tĩnh xác minh 21079 đạt build/vet/modgen/migratecheck/archlint/contractcheck/docscheck/MFA/knboundary; ranh giới 318, lint 0. Chốt định dạng sau lượt Go đã xong cũng đạt: PubSchema chỉ đổi CRLF sang LF, byte sau chuẩn hóa bằng nhau; modgen-check và diff-check đạt; chỉ còn đúng hai fixture archlint cũ. Git xác nhận tệp Go không đổi nội dung so với commit.
+
+Giữ 28 golden trên nền 49278bd7 và 38 kết quả nguồn đã khóa ở 7d790109. Chỉ có migration schema công bố mới, hợp đồng mới và phần quyền bổ sung được rà soát. Dev vẫn 49278bd7 trước helper. Chưa tích hợp; cổng helper còn phải đối chiếu chính xác OLD cộng 8 cặp SELECT/2 membership mới và chạy tests/htxdata trên PostgreSQL thật.
