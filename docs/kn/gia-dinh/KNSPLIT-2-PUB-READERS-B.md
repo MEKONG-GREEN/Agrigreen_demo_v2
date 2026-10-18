@@ -11,3 +11,6 @@ Production3f76d556; pure66799actualexit0/noskip:7purepackages+DBadminselecteduni
 
 
 Full5PG93513actualexit0/0FAIL-SKIP: [('github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin', '2.374s'), ('github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/handler', '122.074s'), ('github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/kn77', '338.746s'), ('github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly', '107.074s'), ('github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/worker', '2.804s')]; private61426/a5f1a0bf6856đãdọn. Pure66799actual0/7pure+DBadminselectedunit; static86232actual0/boundary318/lint0/gofmt2old.28oldgoldens/4decl/registry/DDL/contracts/rulesgiữ14f266a2, legacyPubReadersmapđãxóa. Chưahelper11/dev. Remotevẫn14f266a2 trướchelper.
+
+
+PUB-READERS-B hoàn tất: helper6470actualexit0/11migrationPASS/noFAIL-SKIP454.351s/ACL0.12s,private58428/495c0afcda8ecleanup/Go0,localHEAD=remoteDev49278bd7c7018373c8524fdc4f70e9d2a90287f1/main27afd593nguyênsạch. Pure66799/static86232/full5PG93513actual0;28goldens/boundary318/rules/DDLgiữ. B khôngcònKNhardcodePubReaders, khônglặp.

@@ -908,3 +908,18 @@ Production3f76d556; pure66799actualexit0/noskip:7purepackages+DBadminselecteduni
 
 
 Full5PG93513actualexit0/0FAIL-SKIP: [('github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin', '2.374s'), ('github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/handler', '122.074s'), ('github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/kn77', '338.746s'), ('github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly', '107.074s'), ('github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/worker', '2.804s')]; private61426/a5f1a0bf6856đãdọn. Pure66799actual0/7pure+DBadminselectedunit; static86232actual0/boundary318/lint0/gofmt2old.28oldgoldens/4decl/registry/DDL/contracts/rulesgiữ14f266a2, legacyPubReadersmapđãxóa. Chưahelper11/dev. Remotevẫn14f266a2 trướchelper.
+
+
+PUB-READERS-B hoàn tất: helper6470actualexit0/11migrationPASS/noFAIL-SKIP454.351s/ACL0.12s,private58428/495c0afcda8ecleanup/Go0,localHEAD=remoteDev49278bd7c7018373c8524fdc4f70e9d2a90287f1/main27afd593nguyênsạch. Pure66799/static86232/full5PG93513actual0;28goldens/boundary318/rules/DDLgiữ. B khôngcònKNhardcodePubReaders, khônglặp.
+
+## KNSPLIT-2-HTX-DATA-A — Sản phẩm dữ liệu HTX v1
+
+Nền49278bd7. Chỉ mở công bố đọc của owner pf/cooperative; không thay KN wiring/port hoặc luồng D2. Bốn sản phẩm: cooperatives_v1 (hồ sơ có hay không + số hộ đang là thành viên; danh tính/trạng thái hoạt động tổ chức do platform org_tree cung cấp ở gói kế), plots_v1 (thửa + xã/HTX/trạng thái/diện tích, không tên/hình học), seasons_v1 (chiếu vụ và tổng hợp sản lượng theo season_ref; giữ riêng trạng thái hai nguồn, không loại nhầm vụ thiếu một bảng chiếu), confirmations_v1 (bí danh đã nhận quyền + thời điểm claimed_at cho M6). Views versioned trong pf_coop_pub, JSON contracts; owner chỉ đọc bảng nội bộ do chính mình sở hữu. Chưa cấp quyền mới cho KN.
+
+Capture OLD41966actualexit0/khôngSKIP117.421s,38vectornative từ PostgreSQL thật:2tenant cùngrefs +tenanttrống; HTX noProfile/0members/inactive, hộ inactive/closed membership; thửa draft/retired/decimal14,4; D2alias + trước/ngay/saucutoffVN;8groupingproduction/scope/filter/tenant, Codes/Progress. NativeFixtures chỉ projection synthetic dành cho kiểm đọc, không thay nghiệp vụ. Private56805/23fd759f0232đãdọn/Go0. Freeze tests/golden/htx-read-native.json từ actual; xóa cờ capture, sau đây strict compare không viết lại.
+
+Mốc: xã89001 có2HTX/3hộ,3thửa/6.5679ha;92001 có1HTX/0hộ,1thửa/0.0001ha. Tổng production3vụ (1open/2completed),1hộ phân biệt,6.2345ha/5hađãcókhai,Expected3703.500kg/Actual1000.125kg; ratio giữ quy tắc native. Không cộng số hộ giữa các nhóm. M6: ref101/102 cùngneo claimed trước cutoff đềuconfirmed,ref103 claimedngàyhôm sauchỉconfirmed hiện tại; unknownunconfirmed.
+
+Quyền OLD tests/golden/pub-reader-access.json bất biến26roles/41access/15memberships. Công bố4view mới chỉ mở thêm8SELECT pairs +2memberships cho native r_metrics/r_agg theo chính sách hiện hành; phải có tệp additions rà soát riêng và test OLD+additions đúng chính xác, không ghi đè OLD. KN r_extension/r_price/r_hrm/r_contact không tự được đọc schema mới. Role pub NOLOGIN/NOBYPASSRLS; view owner ag_migrator NOBYPASSRLS/FORCE RLS qua bảng gốc. Không sửa chính sách RLS/cấp quyền share trong A; khác tenant chưa cấp phép phải rỗng. Metadata r_cooperative_pub theo own_schema, khônghardcode shared.
+
+DDL thêm mới chỉschema pf_coop_pub, lock_timeout5s, khôngDML/đổisổ/cột/RLS/tableprivateACL. Bản lùi ứng dụng dùng đường cũ còn nguyên; nếu cần gỡ views dùng migration tiến mới sau gỡ reader, không chạy down production. G1tenant perCenter/MRVHTX-MKG/D2ownKNrecordsafterG1proposal/M1–M7 giữ. ChưaDDL/metadata/fulltest/helper/dev ở mốc capture.

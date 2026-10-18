@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-PUB-READERS-B: bootstrap theo khai báo module, xóa cấu hình KN cố định; đang kiểm thử, chưa tích hợp.
+- [x] KNSPLIT-2-PUB-READERS-B: bootstrap dùng khai báo module, legacyMap đãxóa; dev49278bd7/helper6470 đủ11migrationPASS.

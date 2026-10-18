@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-HTX-DATA-A: công bố4view HTX v1; đã chụp OLD, chưa DDL/metadata/tích hợp.
