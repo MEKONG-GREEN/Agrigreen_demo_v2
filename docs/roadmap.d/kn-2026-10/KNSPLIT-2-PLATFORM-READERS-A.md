@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-PLATFORM-READERS-A: adapters metadata qua pub, ACLdelta1/1; chưa wiring, chờ source/static/fullPG/helper.

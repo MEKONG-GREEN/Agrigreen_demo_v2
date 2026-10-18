@@ -479,14 +479,14 @@ func pubReader(reader, pub string) bool {
 // module có schema _pub.
 func TestPubReaders_PFPUB(t *testing.T) {
 	r, ri := roleByName(t, "r_extension")
-	for _, pub := range []string{"r_cooperative_pub", "r_extension_pub", "r_forms_pub", "r_party_pub", "r_price_pub"} {
+	for _, pub := range []string{"r_cooperative_pub", "r_extension_pub", "r_forms_pub", "r_masterdata_pub", "r_party_pub", "r_price_pub"} {
 		p, pi := roleByName(t, pub)
 		if !slices.Contains(r.MemberOf, pub) || pi > ri || p.BypassRLS {
 			t.Errorf("r_extension phải là thành viên %s (tạo trước): %+v", pub, r.MemberOf)
 		}
 	}
 	for _, m := range r.MemberOf {
-		if m != SharedUser && m != "r_extension_pub" && m != "r_forms_pub" && m != "r_price_pub" && m != "r_cooperative_pub" && m != "r_party_pub" {
+		if m != SharedUser && m != "r_extension_pub" && m != "r_forms_pub" && m != "r_price_pub" && m != "r_cooperative_pub" && m != "r_party_pub" && m != "r_masterdata_pub" {
 			t.Errorf("r_extension thành viên thừa %s", m)
 		}
 	}

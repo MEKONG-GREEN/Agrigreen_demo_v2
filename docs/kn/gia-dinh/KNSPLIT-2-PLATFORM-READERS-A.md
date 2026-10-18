@@ -1,0 +1,11 @@
+## KNSPLIT-2-PLATFORM-READERS-A — Bộ đọc địa bàn và tổ chức công bố cho KN
+
+Nền devcaa824d2. Thêm hai adapter KN trả các cổng chỉ đọc k/orgtree (party/port): AdminUnits/AdminUnitTree và Orgs/OrgCodes/OrgDirectory. SQL chỉ dùng pf_masterdata_pub.v1_admin_units và pf_party_pub.v1_org_tree; giao dịch read-only r_extension, tenant từ context tin cậy, không đổi tenant/không tạo Principal. A chưa thay Deps/wiring; B sau mới thay đường KN, giữ Native HTX/MKG.
+
+Giữ hiệu lực theo ngày Việt Nam, valid_to không bao gồm; DTO ngày là UTC instant bắt đầu ngày VN đúng native. Get/Descendants/Current thiếu mã giữ mã lỗi/cause public; Children parent không có trả danh sách nil như native port. Current giữ chuỗi kế thừa/split/version, BFS giới hạn64 và seen(code,validfrom), kết quả sort. Descendants gốc trước, depth<8; mọi JOIN pub dùng tenant+key. Tổ chức giữ inactive, nil/empty unit filters, missing refs, thứ tự ref và mã lỗi public. RepresentativeRef không được công bố; adapter luôn để nil UUID, KN không đọc trường này (scan ghi trong ledger); thử bằng dữ liệu canary riêng. Không đọc PII, private SQL, không ghi nguồn.
+
+Thêm readpubview admin_units/v1; party org_tree đã được khai báo. Quyền mới đúng r_extension→r_masterdata_pub, SELECT đúng pf_masterdata_pub.v1_admin_units: tệp additions riêng 1SELECT/1membership, không đổi33golden cũ/role flags/private/RLS/DML. Snapshot actual dự kiến26flags/59SELECT/24membership, native9pubowners/22views/11contracts không đổi. Không migration mới. Không đổi HTTP/OpenAPI/menu/web/mobile, baseline314/directHTXimports0 giữ.
+
+Kiểm đối chiếu tất cả hành vi native111 và nguồn theo3tenant/ngày biên VN/nil-empty filters, Current nối tiếp, lỗi public, không lẫn tenant, lọc nhiều loại tổ chức, >500children, dữ liệu đại diện không lộ; lỗi DB/thiếu tenant failclosed. Native111/HTX38/golden33 giữ byte. Source realPG platformdata+htxdata, pure/static, full5consumer và helper11 có ACL thật trước dev; fail-on-SKIP. Chưa chạy tại mốc viết.
+
+Giữ tenant mỗi Trung tâm tỉnh, MRV HTX/MKG, D2 G1 chỉ hồ sơ KN, mẫu KHTC nạp sẵn, M1–M7. ProductionReader A đã tích hợp, chưa nối luồng report; binding phải đóng băng owner trong job/lịch để không gọi NativeHTX hoặc đổi đường MKG. G1 chưa hoàn tất, lịch tự tiếp tục giữ.

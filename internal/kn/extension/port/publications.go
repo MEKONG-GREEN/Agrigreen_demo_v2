@@ -13,3 +13,5 @@ package port
 //ag:readpubview pf_party_pub.org_tree v1
 
 //ag:readpubview pf_cooperative_pub.seasons v1
+
+//ag:readpubview pf_masterdata_pub.admin_units v1

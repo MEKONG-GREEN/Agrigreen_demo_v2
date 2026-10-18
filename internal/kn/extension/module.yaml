@@ -19,6 +19,7 @@ depends:
   pf/sync: ">=1.0 <2"
 provides:
   ports:
+    - AdministrativeUnits
     - CNTSCatalogs
     - ClosedFigures
     - CooperativeStatistics
@@ -33,6 +34,7 @@ provides:
     - KHTCReportStates
     - KHTCSourceCrosswalk
     - KHTCSources
+    - OrganizationData
     - PlotStatistics
     - ReportData
     - TablePDF
@@ -73,6 +75,7 @@ consumes:
     - pf_cooperative_pub.seasons/v1
     - pf_extension_pub.closed_figures/v1
     - pf_forms_pub.closed_figures/v1
+    - pf_masterdata_pub.admin_units/v1
     - pf_party_pub.org_tree/v1
     - pf_price_pub.board_daily/v1
     - pf_price_pub.ticket_week/v1
