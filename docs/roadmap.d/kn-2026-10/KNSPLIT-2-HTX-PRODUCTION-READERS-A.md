@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-HTX-PRODUCTION-READERS-A: reader sản lượng pub riêng, chưa wiring; chờ bằng chứng source/static/downstream/helper.

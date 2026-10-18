@@ -11,3 +11,5 @@ package port
 //ag:readpubview pf_cooperative_pub.plots v1
 //ag:readpubview pf_cooperative_pub.confirmations v1
 //ag:readpubview pf_party_pub.org_tree v1
+
+//ag:readpubview pf_cooperative_pub.seasons v1

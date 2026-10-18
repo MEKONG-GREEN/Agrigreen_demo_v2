@@ -1022,3 +1022,12 @@ Source xác minh51601 exit0: HTX10PASS158.238s (HTTP0.58s, 120 đối chiếu sc
 
 
 Full5 PostgreSQL xác minh86206 exit0, không FAIL/SKIP: dbadmin0.855s, metrics107.683s, KN77/KHTC427.138s, API assembly134.817s, worker2.870s; cụm64848/f67cf3022caf đã dọn/Go0. Mã hiện tại c9aa03c8, phần cleanup test chỉ tường minh bỏ qua CloseError cùng ngữ nghĩa; phần production đã được đối chiếu source51601 exit0/HTX10-158.238s/handler124.707s. Staticfinal27940 exit0/lint0/boundary314/gofmt2old; pure83732 exit0. Giữ33golden nền945 và quyền26flags/58SELECT/23membership không đổi. Fetchdev vẫn945, không rebase mã mới. Chờ helper11, có HTX10/handler/platform4 PG thật trên mã cuối trước dev.
+
+
+HTX-READERS-B đã tích hợp dev880ba924b04a0559c4ff431d723d4df11d65722a. Helper99344 exit0:11migration509.204s, HTX10-137.047s/platform4-130.606s/handler151.165s, noFAIL/SKIP; private59761/aaf57a313ebd removed/Go0;33oldgoldens và main27afd593 sạch nguyên. Không lặp gói.
+
+## KNSPLIT-2-HTX-PRODUCTION-READERS-A
+Downstream consumers: tests/htxdata (root published reader), platformdata/ACL/catalog, extension hiện hành, metrics, KN77, API assembly và worker; reports chưa nối reader mới trong A.
+Dependency evidence: rg -n 'NewPublishedHTXData|ReportData|CropCycle|Production' internal/kn/extension cmd internal/platform/reports tests/htxdata; rg -n 'readpubview|PubReadOwners' internal/kn/extension/port internal/shared/modreg.
+Regression acceptance command: privatePG go test -v -count=1 -p 1 -timeout 55m ./tests/htxdata ./tests/platformdata; pure metadata/pubreader/closedfig/extension; staticfull; privatePG go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker; helper11 migration có exact ACL26flags58SELECT23membership.
+Propagation rule: A additive chưa đổi runtime wiring nên native HTX HTTP và reports full miễn ở bước này; native38 và reconciliation production vẫn chạy thật, nguồn HTX/private/Go giữ nguyên. B wiring phải chạy reports + HTTP/export + worker theo đường job thật. Không đổi HTTP/OpenAPI/web/mobile nên miễn web/mobile. Lệnh trong ủy quyền hoàn thiện G1, privatePG/không shared5432/SMTP, timeout55m/p1/fail-on-SKIP; GoALLfreeze trong mọi job. Evidence chưa chạy ở mốc viết.

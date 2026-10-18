@@ -70,6 +70,7 @@ consumes:
     - pf_cooperative_pub.confirmations/v1
     - pf_cooperative_pub.cooperatives/v1
     - pf_cooperative_pub.plots/v1
+    - pf_cooperative_pub.seasons/v1
     - pf_extension_pub.closed_figures/v1
     - pf_forms_pub.closed_figures/v1
     - pf_party_pub.org_tree/v1
