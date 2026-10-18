@@ -7,10 +7,6 @@
 # khỏi module dùng chung), KNSPLIT-3 (app web KN riêng).
 couplings:
   - {rule: import-into-kn, from: internal/platform/accounts/app/kn_extension_test.go, to: internal/kn/extension/port}
-  - {rule: kn-import-htx, from: internal/kn/extension/app/service.go, to: internal/platform/cooperative/port}
-  - {rule: kn-import-htx, from: internal/kn/extension/handler/unified_integration_test.go, to: internal/platform/cooperative/port}
-  - {rule: kn-import-htx, from: internal/kn/extension/module.go, to: internal/platform/cooperative/port}
-  - {rule: kn-import-htx, from: internal/kn/extension/port/closedfig.go, to: internal/platform/cooperative/port}
   - {rule: kn-sql-foreign, from: internal/kn/extension/cntsalert/app/lifecycle.go, to: pf_forms.period}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/dormant.go, to: (kiểm kê)}
   - {rule: kn-symbol-in-shared, from: internal/platform/accounts/app/internal_unit.go, to: (kiểm kê)}

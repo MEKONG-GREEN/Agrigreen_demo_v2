@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
-	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 )
 
 // ClosedFigures là bộ đọc "số liệu đã chốt" thống nhất cho KHTC (ADR-0053, gói PFPUB): đọc họ hợp đồng
@@ -164,16 +162,18 @@ type ClosedFiguresQuery struct {
 
 // Trạng thái xác nhận của đơn vị/dòng (D2: HTX do TTKN tạo "Chưa xác nhận" — số vẫn vào báo cáo, ghi nhãn).
 const (
-	ConfirmationConfirmed   = coopport.HTXConfirmed
-	ConfirmationUnconfirmed = coopport.HTXUnconfirmed
+	ConfirmationConfirmed   = "confirmed"
+	ConfirmationUnconfirmed = "unconfirmed"
 )
 
 // UnitKindCooperative là loại đơn vị của dòng HTX (unit = mã Nút HTX) — trạng thái xác nhận lấy từ HTXConfirmations.
 const UnitKindCooperative = "cooperative"
 
-// HTXConfirmations là cổng trạng thái xác nhận HTX của gói D2 (ADR-0052): cooperative.Module.HTXConfirmations().
+// HTXConfirmations là cổng đọc xác nhận do KN sở hữu; gốc lắp ráp nối publication v1.
 // Nút HTX là bí danh của neo đã nhận quyền → confirmed; HTX tạm/chưa neo → unconfirmed (tenant của ctx).
-type HTXConfirmations = coopport.HTXConfirmations
+type HTXConfirmations interface {
+	Confirmations(context.Context, []uuid.UUID) (map[uuid.UUID]string, error)
+}
 
 // Nguồn của dòng (cột source) — chỉ để chẩn đoán, KHTC không rẽ nhánh theo nguồn.
 const (

@@ -31,7 +31,6 @@ import (
 	rcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/app"
 	rchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/handler"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
@@ -64,10 +63,9 @@ type Deps struct {
 	Units    partyport.AdminUnits    // tỉnh của xã
 	Params   params.Params           // extension.task_sla_hours, extension.duty_status_ttl_hours
 	Catalogs mdport.Catalogs         // giống lúa, vụ, sâu bệnh (FR-01 BR-01)
-	// Plots, Coops (tùy chọn): thống kê thửa và HTX của pf/cooperative (W3.2; dữ liệu còn ở pf/geo,
-	// pf/party đến W3.3) cho GET /v1/dashboard (G-02).
-	Plots coopport.Plots
-	Coops coopport.Cooperatives
+	// Plots, Coops (tùy chọn): cổng thống kê hẹp do KN sở hữu; gốc lắp ráp nối bộ đọc publication v1.
+	Plots port.PlotStatistics
+	Coops port.CooperativeStatistics
 }
 
 // Module là pf/extension đã nối.

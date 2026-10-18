@@ -9,7 +9,6 @@ zones: [pf]
 version: 1.0.0
 depends:
   pf/accounts: ">=1.0 <2"
-  pf/cooperative: ">=1.0 <2"
   pf/forms: ">=1.0 <2"
   pf/geo: ">=2.0 <3"
   pf/masterdata: ">=1.0 <2"
@@ -24,6 +23,7 @@ provides:
     - ClosedFigures
     - CooperativeStatistics
     - HTXConfirmationHistory
+    - HTXConfirmations
     - HTXData
     - KHTCMetricNames
     - KHTCPlanDepartments

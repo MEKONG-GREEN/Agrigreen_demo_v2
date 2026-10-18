@@ -184,13 +184,14 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 
 	cnt := content.New(unit, clk, content.Deps{Scope: pty.ScopeResolver(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Store: store})
 
+	knHTXData := extension.NewPublishedHTXData(unit)
 	kn := extension.New(unit, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
-		Plots: coop.Plots(), Coops: coop.Cooperatives()})
+		Plots: knHTXData, Coops: knHTXData})
 	md.UseStaffDirectory(kn.StaffNames()) // G-07: tên người đặt/duyệt tham số
 	pty.UseActorNames(kn.StaffNames())    // KN v7.7 P2: tên người thao tác trong Log phòng ban/khu vực
 
 	// PFPUB/D2 (ADR-0053 §8): nhãn "Chưa xác nhận" của dòng HTX trong số đã chốt cho KHTC.
-	kn.UseHTXConfirmations(coop.HTXConfirmations())
+	kn.UseHTXConfirmations(knHTXData)
 
 	mech := mechanization.New(unit, clk, mechanization.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Vault: ext.Vault,

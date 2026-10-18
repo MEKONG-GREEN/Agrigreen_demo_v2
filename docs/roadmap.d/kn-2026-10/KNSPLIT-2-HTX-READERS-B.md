@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-HTX-READERS-B: gắn reader vào API, gỡ import HTX trực tiếp; chờ cổng/PG/hồi quy/helper trước tích hợp.

@@ -16,7 +16,7 @@ func (m *Module) ClosedFigures() port.ClosedFigures { return closedfig.Reader{DB
 // KHTCSources là port duy nhất phía KHTC (ADR-0053 §7): số đã chốt của Trồng trọt, CNTS, Báo giá theo từng kỳ KHTC.
 func (m *Module) KHTCSources() port.KHTCSources { return closedfig.Reader{DB: m.rc.DB, HTX: m.htx} }
 
-// UseHTXConfirmations nối cổng trạng thái xác nhận HTX của gói D2 (gốc lắp ráp nối cooperative.Module.HTXConfirmations()).
+// UseHTXConfirmations nối cổng trạng thái xác nhận HTX từ publication v1 (gốc lắp ráp nối NewPublishedHTXData).
 // Chưa nối → dòng HTX trong số đã chốt là "Chưa xác nhận".
 func (m *Module) UseHTXConfirmations(h port.HTXConfirmations) { m.htx = h }
 

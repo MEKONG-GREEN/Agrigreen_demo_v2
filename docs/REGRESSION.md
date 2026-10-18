@@ -1001,3 +1001,15 @@ Pure-verified và static-verified phiên70605 đều exit0: build/vet/modgen/mig
 
 
 Full5 PostgreSQL phiên32600 đã đạt, exit0, không FAIL/SKIP: DBadmin2.052s, metrics163.043s, KN77/KHTC510.999s, API assembly152.724s, worker3.234s. Cụm58658/52c1d3f07b4d đã dọn, Go0 trước hoàn thiện tài liệu. Giữ32golden trên nền b0eeae11, chỉ thêm tệp quyền5SELECT/2membership đã nêu. Source root API17571/8ca185.455s, platform69177/4ca154.445s, pure/staticverified70605 đều0, boundary318/lint0/đúng2fixture cũ. Fetchdev vẫn b0eeae11, không rebase mã tại mốc kiểm thử. Chờ helper11 và exactACL58SELECT/23membership/26flags; chưa tích hợp tại mốc này.
+
+
+HTX-READERS-A đã tích hợp dev945ec7b11160041f0670b079848168e6183f3158. Helper19007 exit0/11migration601.692s; HTX8PASS165.118s/platform4PASS152.794s, exactACL26flags58SELECT23membership, khôngFAIL/SKIP. Cụm65383/81c59652625a đã dọn/Go0; 32oldgoldens giữ. Main27afd593 nguyên sạch, worktrees giữ. Không lặp gói.
+
+## KNSPLIT-2-HTX-READERS-B
+Downstream consumers: extension/handler dashboard; closedfig và KHTC; HTX/publication reader conformance; metrics, KN77, API assembly và worker; modgen/pubreaders/catalog và migration11.
+Dependency evidence: rg -n 'Coops|Plots|UseHTXConfirmations|NewPublishedHTXData' internal/kn/extension cmd/api-platform/assembly cmd/worker; rg -n 'internal/platform/(cooperative|cropcycle|mechanization)' internal/kn; go run ./tools/knboundary -list.
+Regression acceptance commands: go test -v -count=1 -p 1 -timeout 55m ./tests/htxdata ./internal/kn/extension/handler; go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker.
+Propagation rule: wiring đổi phải chạy handler/KHTC/assembly/worker thực sự trên PostgreSQL17/PostGIS private. Native HTX HTTP routes miễn vì HTX source Go/DDL/RLS/private grants và cổng còn nguyên; HTX conformance giữ38nguồn và đối chiếu với người dùng/nút. Không thêm quyền nên snapshot33goldens/ACL58-23 phải bất biến. No shared5432/SMTP; timeout55m/p1/fail-on-SKIP; phạm vi lệnh nằm trong ủy quyền G1 hiện hành. Helper vẫn chạy lại nguồn/handler và đủ11migration trước dev.
+
+
+Lượt prune ban đầu đã giảm đúng318→314 do gỡ4import, nhưng từ chối5SQL foreign mới trong fixture HTTP đặt dưới internal/kn/extension/handler. Không thêm baseline hay ngoại lệ: chuyển test HTTP sang tests/htxdata, nơi dựng dữ liệu đối chứng/lắp ráp; gọi gốc module và port, giữ ranh giới mã KN. Reader và wiring không đổi. Test ngoài dùng dữ liệu HTX native đã khóa38kết quả, danh mục đơn vị thật và HTTP có token xác thực; không ghi bảng ngoại từ mã KN.

@@ -20,3 +20,6 @@ Pure-verified và static-verified phiên70605 đều exit0: build/vet/modgen/mig
 
 
 Full5 PostgreSQL phiên32600 đã đạt, exit0, không FAIL/SKIP: DBadmin2.052s, metrics163.043s, KN77/KHTC510.999s, API assembly152.724s, worker3.234s. Cụm58658/52c1d3f07b4d đã dọn, Go0 trước hoàn thiện tài liệu. Giữ32golden trên nền b0eeae11, chỉ thêm tệp quyền5SELECT/2membership đã nêu. Source root API17571/8ca185.455s, platform69177/4ca154.445s, pure/staticverified70605 đều0, boundary318/lint0/đúng2fixture cũ. Fetchdev vẫn b0eeae11, không rebase mã tại mốc kiểm thử. Chờ helper11 và exactACL58SELECT/23membership/26flags; chưa tích hợp tại mốc này.
+
+
+HTX-READERS-A đã tích hợp dev945ec7b11160041f0670b079848168e6183f3158. Helper19007 exit0/11migration601.692s; HTX8PASS165.118s/platform4PASS152.794s, exactACL26flags58SELECT23membership, khôngFAIL/SKIP. Cụm65383/81c59652625a đã dọn/Go0; 32oldgoldens giữ. Main27afd593 nguyên sạch, worktrees giữ. Không lặp gói.

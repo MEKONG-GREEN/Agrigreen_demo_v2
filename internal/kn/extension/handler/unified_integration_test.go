@@ -8,11 +8,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
-	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
@@ -23,46 +22,23 @@ import (
 
 type fakeGeoStats map[string]int64 // xã → số thửa (diện tích = số thửa × 1,5 ha)
 
-func (f fakeGeoStats) DigitizedByCommune(_ context.Context, communes []string) ([]coopport.PlotStat, error) {
-	var out []coopport.PlotStat
+func (f fakeGeoStats) DigitizedByCommune(_ context.Context, communes []string) ([]port.CommunePlots, error) {
+	var out []port.CommunePlots
 	for c, n := range f {
 		if communes == nil || slices.Contains(communes, c) {
-			out = append(out, coopport.PlotStat{CommuneCode: c, Plots: n, AreaHa: decimal.NewFromInt(n).Mul(decimal.RequireFromString("1.5"))})
+			out = append(out, port.CommunePlots{CommuneCode: c, Plots: n, AreaHa: decimal.NewFromInt(n).Mul(decimal.RequireFromString("1.5"))})
 		}
 	}
 	return out, nil
 }
 
-func (f fakeGeoStats) DigitizedByCooperative(context.Context, []uuid.UUID) (map[uuid.UUID]coopport.PlotStat, error) {
-	return map[uuid.UUID]coopport.PlotStat{}, nil
-}
-
-// Cổng khác của coopport.Plots không dùng ở bảng điều hành gộp.
-func (fakeGeoStats) Get(context.Context, uuid.UUID) (coopport.Plot, error) {
-	return coopport.Plot{}, coopport.ErrPlotNotFound
-}
-
-func (fakeGeoStats) DistanceM(context.Context, uuid.UUID, decimal.Decimal, decimal.Decimal) (decimal.Decimal, error) {
-	return decimal.Zero, coopport.ErrPlotNotFound
-}
-
-func (fakeGeoStats) Facts(context.Context, []uuid.UUID) (map[uuid.UUID]coopport.Plot, error) {
-	return map[uuid.UUID]coopport.Plot{}, nil
-}
-
 type fakeCoopStats map[string][2]int64
 
-func (fakeCoopStats) Active(context.Context) ([]coopport.CooperativeSite, error) { return nil, nil }
-
-func (fakeCoopStats) Centroids(context.Context, []uuid.UUID) (map[uuid.UUID]coopport.CoopCentroid, error) {
-	return map[uuid.UUID]coopport.CoopCentroid{}, nil
-}
-
-func (f fakeCoopStats) ByUnit(_ context.Context, units []string) ([]coopport.UnitCooperatives, error) {
-	var out []coopport.UnitCooperatives
+func (f fakeCoopStats) ByUnit(_ context.Context, units []string) ([]port.UnitCooperatives, error) {
+	var out []port.UnitCooperatives
 	for u, v := range f {
 		if units == nil || slices.Contains(units, u) {
-			out = append(out, coopport.UnitCooperatives{UnitCode: u, Cooperatives: v[0], Households: v[1]})
+			out = append(out, port.UnitCooperatives{UnitCode: u, Cooperatives: v[0], Households: v[1]})
 		}
 	}
 	return out, nil
@@ -70,8 +46,12 @@ func (f fakeCoopStats) ByUnit(_ context.Context, units []string) ([]coopport.Uni
 
 // withStats dựng bản module nối pf/geo, pf/party giả (bảng điều hành gộp G-02) trên cùng DB.
 func (f *fixture) withStats() *fixture {
+	return f.withStatsPorts(fakeGeoStats{"30001": 4, "30002": 2, "31001": 3}, fakeCoopStats{"30001": {2, 10}, "31001": {1, 5}})
+}
+
+func (f *fixture) withStatsPorts(plots port.PlotStatistics, coops port.CooperativeStatistics) *fixture {
 	mod := extension.New(pgtest.Get(f.t).Pool(f.t, migrations.PF, dbadmin.AppPlatform), f.clk, extension.Deps{Scope: f.org, Orgs: f.org, Units: newFakeUnits(), Params: f.params, Catalogs: fakeCatalogs{},
-		Plots: fakeGeoStats{"30001": 4, "30002": 2, "31001": 3}, Coops: fakeCoopStats{"30001": {2, 10}, "31001": {1, 5}}})
+		Plots: plots, Coops: coops})
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	mod.RegisterApp(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), idempotency.Middleware(f.env.Pool(f.t, migrations.PF, "platform_api"))))
 	srv := httptest.NewServer(eng)

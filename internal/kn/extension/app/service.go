@@ -17,7 +17,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -74,9 +73,9 @@ type Service struct {
 	Units    partyport.AdminUnits
 	Params   params.Params
 	Catalogs mdport.Catalogs
-	// Plots, Coops (tùy chọn): thống kê thửa và HTX của pf/cooperative cho bảng điều hành gộp (G-02).
-	Plots coopport.Plots
-	Coops coopport.Cooperatives
+	// Plots, Coops (tùy chọn): cổng thống kê hẹp của KN, đọc publication v1 cho bảng điều hành gộp.
+	Plots port.PlotStatistics
+	Coops port.CooperativeStatistics
 	// Contacts (tùy chọn): số điện thoại cán bộ ở pf/accounts cho "gọi/nhắn 1 chạm" (US-DIR-02).
 	Contacts accport.StaffContacts
 	// Farmers: liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) cho yêu cầu hỗ trợ
