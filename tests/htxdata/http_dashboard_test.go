@@ -69,7 +69,7 @@ func TestKNHTTPDashboardPublishedHTXData(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		var body map[string]any
 		if e := json.NewDecoder(res.Body).Decode(&body); e != nil {
 			t.Fatal(e)

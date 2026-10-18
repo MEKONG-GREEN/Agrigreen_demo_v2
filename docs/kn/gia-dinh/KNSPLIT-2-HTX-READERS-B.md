@@ -11,3 +11,6 @@ Lượt prune ban đầu đã giảm đúng318→314 do gỡ4import, nhưng từ
 
 
 Source đầu79279 exit1: tests/htxdata chưa dựng được vì test HTTP import nhầm shared/authztest; package có sẵn ở shared/authz/authztest. Sửa đúng đường dẫn, không cài thư viện hay đổi go.mod/go.sum. Handler cùng lượt đã PASS180.980s, nhưng toàn lệnh đỏ nên không báo source xanh; cụm64248/a5e1637cb22b đã dọn. Static83732 exit1 ở vet cùng lỗi import, fullwait1540 exit1 trước PG. Giữ mọi log/exit cũ. Principal của ca RLS bổ sung TenantID trùng context cho dữ liệu người dùng đầy đủ. Phải chạy source-pg-verified cả hai gói và static-verified; pure0 trước đó trên mã production không đổi còn giá trị.
+
+
+Source xác minh51601 exit0: HTX10PASS158.238s (HTTP0.58s, 120 đối chiếu scope0.94s), handler toàn bộ124.707s; không FAIL/SKIP, cụm63017/223e865fd9e7 đã dọn/Go0. Cổng static-verified57508 chỉ còn errcheck ở lệnh đóng response của test HTTP; sửa riêng defer sang hàm bỏ qua lỗi Close một cách tường minh, giữ nguyên việc đóng cùng response/cùng lúc, không đổi request/assertion/logic/SQL/wiring hay metadata. Không cần lặp lại lệnh PG đã đạt chỉ vì cleanup giữ cùng ngữ nghĩa; helper bắt buộc chạy lại HTX10/handler trên mã cuối. Pure83732=0 trên mã production không đổi. Static-final vẫn phải qua đầy đủ cổng, formatter; fullwait23871 exit1 trước PG do staticverified1. Giữ logs cũ, chưa tích hợp.
