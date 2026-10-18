@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-NOTIFY-KINDS-A: registry owner25/native18 đã dev aff0f755; pure48851/static57288/full9PG42658/helper77313 actual0, 9 migration PASS.

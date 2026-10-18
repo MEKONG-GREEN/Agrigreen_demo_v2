@@ -231,5 +231,16 @@ export function toInput(it: WsItem | WsItemInput): WsItemInput {
     location: it.location ?? null,
     participants: it.participants ?? null,
     note: it.note ?? null,
+    place: it.place ?? null,
   };
+}
+
+/** Lỗi tọa độ địa điểm công tác (W11.46, CV-06): trống cả hai = không có; có thì phải trong Việt Nam. */
+export function placeError(lat: string, lon: string): string | null {
+  const a = lat.trim(), b = lon.trim();
+  if (!a && !b) return null;
+  if (!a || !b) return "Nhập đủ vĩ độ và kinh độ của địa điểm, hoặc để trống cả hai.";
+  const x = Number(a), y = Number(b);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || x < 8 || x > 24 || y < 102 || y > 118) return "Tọa độ phải trong Việt Nam (vĩ độ 8–24, kinh độ 102–118).";
+  return null;
 }

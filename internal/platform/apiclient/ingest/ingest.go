@@ -33,6 +33,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/integration"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -59,7 +60,7 @@ const DefaultRetryAfter = 30 * time.Second
 // Mã lỗi (docs/errors.md mục "Cổng tích hợp — nạp theo lô").
 var (
 	ErrContractUnknown      = problem.New(http.StatusNotFound, "integration.contract_unknown", "Không có hợp đồng nạp với tên và phiên bản này")
-	ErrContractNotServable  = problem.New(http.StatusForbidden, "integration.contract_not_servable", "Hợp đồng nạp không phục vụ ở môi trường này")
+	ErrContractNotServable  = port.ErrContractNotServable // một định nghĩa cho feed và lô (port/feed.go)
 	ErrBatchInvalid         = problem.New(http.StatusBadRequest, "integration.batch_invalid", "Lô không đúng phong bì ingest_batch.v1")
 	ErrBatchTooLarge        = problem.New(http.StatusRequestEntityTooLarge, "integration.batch_too_large", "Lô vượt max_batch của hợp đồng")
 	ErrQueueSaturated       = problem.New(http.StatusTooManyRequests, "integration.queue_saturated", "Hàng đợi nạp của đối tác đã đầy — gửi lại sau Retry-After")

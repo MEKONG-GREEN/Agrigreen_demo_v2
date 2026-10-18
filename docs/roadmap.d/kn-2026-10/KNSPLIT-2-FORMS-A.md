@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-FORMS-A: cổng phân giải ngữ cảnh biểu mẫu theo profile; KN tự đăng ký cấu hình/quy tắc, giữ đường tương thích trong bước đầu. Đã kiểm8/8 gói, cổng tĩnh và ca âm; tích hợp qua helper với migration PostgreSQL thật. Bước B còn gỡ legacy. [Giả định](../../kn/gia-dinh/KNSPLIT-2-FORMS-A.md).

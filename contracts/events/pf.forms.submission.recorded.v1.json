@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.forms.submission.recorded/v1",
+  "title": "pf.forms.submission.recorded — payload",
+  "description": "cap/forms (W11.43): một phiên bản bài nộp đã ghi cùng giao dịch nộp (kỳ đang nhận bài của đơn vị; bài giữ \"Chờ mở kỳ\" không phát). Không mang số liệu — bên dùng (KN CNTS: quy tắc liên biểu + cảnh báo, pf/extension) đọc qua cổng SubmissionFeed. late do DB tính theo giờ máy chủ nhận bài (D8).",
+  "x-event-type": "pf.forms.submission.recorded",
+  "x-schema-version": 1,
+  "x-producer": "pf/forms",
+  "type": "object",
+  "required": ["submission_id", "period_ref", "profile", "template_code", "unit", "version", "nil_report", "late", "actor_ref", "event_time"],
+  "properties": {
+    "submission_id": { "type": "string", "format": "uuid", "description": "Mã phiên bản bài nộp (pf_forms.submission)" },
+    "period_ref":    { "type": "string", "format": "uuid" },
+    "profile":       { "type": "string", "description": "Bên dùng (kn, kn_cnts, kn_khtc…)" },
+    "template_code": { "type": "string", "description": "Mã biểu, vd CNTS-BM04" },
+    "unit":          { "type": "string", "description": "Đơn vị lá (mã xã, facility_ref, mã phòng ban…)" },
+    "version":       { "type": "integer", "minimum": 1, "description": "Số phiên bản bài nộp của đơn vị trong kỳ" },
+    "nil_report":    { "type": "boolean", "description": "Báo không phát sinh" },
+    "late":          { "type": "boolean", "description": "Gửi sau hạn nộp hiệu lực của kỳ" },
+    "actor_ref":     { "type": "string", "format": "uuid", "description": "Người nộp" },
+    "event_time":    { "type": "string", "format": "date-time" }
+  }
+}

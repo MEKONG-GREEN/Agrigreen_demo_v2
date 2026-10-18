@@ -13,6 +13,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // g3Ledgers là các sổ G3 có kiểm idem_key trước khi ghi (consumer: lỗi trong
@@ -374,7 +375,7 @@ func oneComparison(ctx context.Context, tx pgx.Tx, where string, args ...any) (*
 
 // ComparisonByIdem tìm dòng đối chiếu đã ghi với idem_key.
 func ComparisonByIdem(ctx context.Context, tx pgx.Tx, key string) (*ComparisonRow, error) {
-	return oneComparison(ctx, tx, "idem_key = $1::text", key)
+	return oneComparison(ctx, tx, "idem_key = $1::text"+ledger.NewestByIdem(""), key)
 }
 
 // ComparisonByID đọc một dòng đối chiếu.

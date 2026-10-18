@@ -71,12 +71,11 @@ func (s *Service) ListCatalogs(ctx context.Context) ([]CatalogSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := make([]CatalogSummary, 0, len(domain.Catalogs))
-	for _, c := range domain.Catalogs {
-		n := counts[c]
-		out = append(out, CatalogSummary{
-			Catalog: c, Name: domain.CatalogName(c), ItemCount: n[0], InactiveCount: n[1], AttrsSchema: domain.CatalogAttrs(c),
-		})
+	metadata := s.CatalogMetadata()
+	out := make([]CatalogSummary, 0, len(metadata))
+	for _, def := range metadata {
+		n := counts[def.Catalog]
+		out = append(out, CatalogSummary{Catalog: def.Catalog, Name: def.Name, ItemCount: n[0], InactiveCount: n[1], AttrsSchema: def.Attributes})
 	}
 	return out, nil
 }
@@ -132,7 +131,7 @@ func (s *Service) ListParams(ctx context.Context, q ParamsQuery) (Page[ParamEntr
 	for k := range stats {
 		keys[k] = true
 	}
-	for _, sp := range domain.ParamRegistry {
+	for _, sp := range s.parameterSpecs() {
 		if !sp.Dimensional && strings.HasPrefix(sp.Key, q.Prefix) {
 			keys[sp.Key] = true
 		}
@@ -153,7 +152,7 @@ func (s *Service) ListParams(ctx context.Context, q ParamsQuery) (Page[ParamEntr
 	pg.Items = make([]ParamEntry, 0, len(sorted))
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		for _, k := range sorted {
-			e := ParamEntry{ParamSpec: domain.SpecOf(k), Key: k, SubmittedCount: stats[k].Submitted}
+			e := ParamEntry{ParamSpec: s.parameterSpec(k), Key: k, SubmittedCount: stats[k].Submitted}
 			if e.Name == k && stats[k].HasText {
 				e.Kind = domain.ParamKindText
 			}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // ---------------------------------------------------------------------------
@@ -69,7 +70,7 @@ func InsertVersion(ctx context.Context, tx pgx.Tx, tid uuid.UUID, v *domain.Vers
 
 // VersionByIdemKey tìm phiên bản đã ghi với idem_key (gọi lặp).
 func VersionByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*domain.Version, error) {
-	return scanVersion(tx.QueryRow(ctx, `SELECT `+versionCols+` FROM pf_content.document_version WHERE idem_key = $1`, key))
+	return scanVersion(tx.QueryRow(ctx, `SELECT `+versionCols+` FROM pf_content.document_version WHERE idem_key = $1`+ledger.NewestByIdem(""), key))
 }
 
 // Version đọc một phiên bản của tài liệu.
@@ -131,7 +132,7 @@ func InsertEvent(ctx context.Context, tx pgx.Tx, tid uuid.UUID, e *domain.Event)
 
 // EventByIdemKey tìm chuyển trạng thái đã ghi với idem_key (gọi lặp).
 func EventByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*domain.Event, error) {
-	return scanEvent(tx.QueryRow(ctx, `SELECT `+eventCols+` FROM pf_content.document_event WHERE idem_key = $1`, key))
+	return scanEvent(tx.QueryRow(ctx, `SELECT `+eventCols+` FROM pf_content.document_event WHERE idem_key = $1`+ledger.NewestByIdem(""), key))
 }
 
 // Events đọc mọi chuyển trạng thái của tài liệu theo thứ tự.

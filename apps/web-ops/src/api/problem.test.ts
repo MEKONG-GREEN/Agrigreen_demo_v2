@@ -48,6 +48,12 @@ describe("thông báo tiếng Việt", () => {
     expect(problemMessage({ code: "mfa_required", status: 403, title: "" })).toMatch(/hai yếu tố/);
   });
 
+  it("xuất báo cáo HCTH bị chặn vẫn giữ quy tắc cụ thể để người dùng sửa số liệu", () => {
+    const blocked = { code: "hrm.report_blocked", status: 422, title: "Report blocked" };
+    const detail = "R2: Tổng NS05 không khớp số viên chức NS01 tại ngày chốt.";
+    expect(problemMessage({ ...blocked, detail })).toBe(detail);
+    expect(problemMessage(blocked)).toMatch(/quy tắc kiểm tra/);
+  });
   it("mã lạ của module → dùng detail của server", () => {
     expect(problemMessage({ code: "geo.plot_overlap", status: 409, title: "Overlap", detail: "Thửa chồng lấn thửa khác" })).toBe(
       "Thửa chồng lấn thửa khác",

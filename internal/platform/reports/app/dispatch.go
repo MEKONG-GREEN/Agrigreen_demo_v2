@@ -23,12 +23,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/render"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -53,55 +50,49 @@ var (
 	ErrValveBlocked       = problem.New(http.StatusUnprocessableEntity, "reports.gsheet_valve_blocked", "Van chặn: mẫu có trường không được phép đưa ra ngoài lãnh thổ")
 )
 
-// knActor là người gọi KN v7.7 (ngữ cảnh phiên P1) kèm tỉnh của Nút.
-type knActor struct {
+// sessionActor keeps authenticated identity separate from the registered scope.
+type sessionActor struct {
 	p        authz.Principal
-	k        authz.KNContext
+	scope    port.SessionActor
 	province string
 }
 
-func (s *Service) kn(ctx context.Context, write bool) (knActor, error) {
-	roles := []string{authz.KNTinh, authz.KNTW, authz.KNAdmin}
+func (s *Service) resolveSessionActor(ctx context.Context, write bool) (sessionActor, error) {
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return sessionActor{}, problem.Unauthenticated
+	}
+	if s.ResolveSession == nil {
+		return sessionActor{}, problem.Forbidden
+	}
+	operation := port.SessionReadDispatch
 	if write {
-		roles = []string{authz.KNTinh}
+		operation = port.SessionWriteDispatch
 	}
-	p, k, err := authz.RequireKN(ctx, roles...)
+	scope, handled, err := s.ResolveSession(ctx, p, operation)
 	if err != nil {
-		return knActor{}, err
+		return sessionActor{}, err
 	}
-	a := knActor{p: p, k: k}
-	if k.Role == authz.KNTW || k.Role == authz.KNAdmin || k.OrgRef == uuid.Nil {
-		return a, nil
+	if !handled || !scope.Allowed || scope.AllowsDepartment == nil || (!scope.AllDepartments && (scope.Department == "" || !scope.AllowsDepartment(scope.Department))) || (scope.Province == "" && !scope.AllProvinces) {
+		return sessionActor{}, problem.Forbidden
 	}
-	if s.Orgs == nil {
-		return a, ErrDependency.WithDetail("chưa nối cây tổ chức (pf/party)")
-	}
-	org, err := s.Orgs.Get(ctx, k.OrgRef)
-	if err != nil {
-		return a, err
-	}
-	if org.Kind != partyport.OrgTTKNNational {
-		a.province = org.AdminUnitCode
-	}
-	return a, nil
+	return sessionActor{p: p, scope: scope, province: scope.Province}, nil
 }
 
-func (a knActor) dept() string {
-	if a.k.Role == authz.KNAdmin {
+func (a sessionActor) dept() string {
+	if a.scope.AllDepartments {
 		return ""
 	}
-	return a.k.Department
+	return a.scope.Department
 }
-
-func (a knActor) allows(province, dept string) bool {
-	return a.k.AllowsDepartment(dept) && (a.province == "" || a.province == province)
+func (a sessionActor) allows(province, dept string) bool {
+	return a.scope.AllowsDepartment != nil && a.scope.AllowsDepartment(dept) && (a.province == "" || a.province == province)
 }
-
-func (a knActor) onBehalf() *uuid.UUID {
-	if a.k.Support == nil || a.k.Support.OnBehalfOf == uuid.Nil {
+func (a sessionActor) onBehalf() *uuid.UUID {
+	if a.scope.OnBehalfOf == nil || *a.scope.OnBehalfOf == uuid.Nil {
 		return nil
 	}
-	v := a.k.Support.OnBehalfOf
+	v := *a.scope.OnBehalfOf
 	return &v
 }
 
@@ -119,7 +110,7 @@ type RecipientInput struct {
 
 // ListDispatchRecipients trả danh bạ (Cấp Tỉnh thấy đủ địa chỉ; Cấp Quốc gia thấy địa chỉ đã che).
 func (s *Service) ListDispatchRecipients(ctx context.Context, province string) ([]store.DispatchRecipient, bool, error) {
-	a, err := s.kn(ctx, false)
+	a, err := s.resolveSessionActor(ctx, false)
 	if err != nil {
 		return nil, false, err
 	}
@@ -129,14 +120,14 @@ func (s *Service) ListDispatchRecipients(ctx context.Context, province string) (
 	if province == "" {
 		return nil, false, problem.Validation.WithField("province", "chọn tỉnh")
 	}
-	dept := a.k.Department
+	dept := a.scope.Department
 	var out []store.DispatchRecipient
 	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
 		var err error
 		out, err = store.Recipients(ctx, tx, province, dept, false)
 		return err
 	})
-	masked := a.k.Role != authz.KNTinh
+	masked := !a.scope.UnmaskRecipients
 	if masked {
 		for i := range out {
 			if out[i].Address != nil {
@@ -150,7 +141,7 @@ func (s *Service) ListDispatchRecipients(ctx context.Context, province string) (
 
 // AddDispatchRecipient thêm hộp thư đơn vị của Chi cục (người nhận/CC).
 func (s *Service) AddDispatchRecipient(ctx context.Context, in RecipientInput, idem string) (store.DispatchRecipient, error) {
-	a, err := s.kn(ctx, true)
+	a, err := s.resolveSessionActor(ctx, true)
 	if err != nil {
 		return store.DispatchRecipient{}, err
 	}
@@ -164,7 +155,7 @@ func (s *Service) AddDispatchRecipient(ctx context.Context, in RecipientInput, i
 		return store.DispatchRecipient{}, problem.Validation.WithField("kind", "to | cc")
 	}
 	now := s.now()
-	r := store.DispatchRecipient{ID: ids.New(), Department: a.k.Department, Province: a.province, Label: in.Label, Address: &in.Address, Kind: in.Kind,
+	r := store.DispatchRecipient{ID: ids.New(), Department: a.scope.Department, Province: a.province, Label: in.Label, Address: &in.Address, Kind: in.Kind,
 		IsDefault: in.IsDefault, Active: true, CreatedBy: a.p.ActorRef, CreatedAt: now, UpdatedAt: now}
 	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
 		existing, err := store.Recipients(ctx, tx, r.Province, r.Department, true)
@@ -188,7 +179,7 @@ func (s *Service) AddDispatchRecipient(ctx context.Context, in RecipientInput, i
 
 // DeactivateDispatchRecipient ngừng dùng một người nhận (không xóa, lý do bắt buộc).
 func (s *Service) DeactivateDispatchRecipient(ctx context.Context, id uuid.UUID, why, idem string) (store.DispatchRecipient, error) {
-	a, err := s.kn(ctx, true)
+	a, err := s.resolveSessionActor(ctx, true)
 	if err != nil {
 		return store.DispatchRecipient{}, err
 	}
@@ -239,9 +230,9 @@ type DispatchView struct {
 }
 
 // gridRows sắp dòng xã theo khu vực, sau mỗi khu vực là dòng "Cộng khu vực", cuối là "Toàn tỉnh" (đúng mẫu).
-func gridRows(v extensionsrc.ConsolidationView) []render.GridRow {
+func gridRows(v port.ConsolidationView) []render.GridRow {
 	var regions []string
-	byRegion := map[string][]extensionsrc.ConsolidationRow{}
+	byRegion := map[string][]port.ConsolidationRow{}
 	for _, r := range v.Rows {
 		if _, ok := byRegion[r.Region]; !ok {
 			regions = append(regions, r.Region)
@@ -275,7 +266,11 @@ func gridRows(v extensionsrc.ConsolidationView) []render.GridRow {
 
 // CreateDispatch dựng tệp toàn tỉnh của kỳ từ lần tổng hợp gần nhất ("số trong file = số tổng hợp của kỳ").
 func (s *Service) CreateDispatch(ctx context.Context, in DispatchInput, idem string) (DispatchView, error) {
-	a, err := s.kn(ctx, true)
+	a, err := s.resolveSessionActor(ctx, true)
+	if err != nil {
+		return DispatchView{}, err
+	}
+	profile, err := s.dispatchProfile()
 	if err != nil {
 		return DispatchView{}, err
 	}
@@ -303,7 +298,7 @@ func (s *Service) CreateDispatch(ctx context.Context, in DispatchInput, idem str
 	}
 	tid := a.p.TenantID
 	info, err := s.Consolidations.Period(ctx, tid, in.PeriodID)
-	if errors.Is(err, extensionsrc.ErrConsolidationNotFound) {
+	if errors.Is(err, port.ErrConsolidationNotFound) {
 		return DispatchView{}, ErrDispatchNoData
 	}
 	if err != nil {
@@ -406,7 +401,7 @@ func (s *Service) CreateDispatch(ctx context.Context, in DispatchInput, idem str
 			return err
 		}
 		for _, b := range files {
-			if err := s.egress(ctx, tx, Egress{Kind: EgressDispatch, TenantID: tid, ActorRef: a.p.ActorRef, TemplateKey: "kn." + strings.ToLower(b.f.FormCode),
+			if err := s.egress(ctx, tx, Egress{Kind: EgressDispatch, TenantID: tid, ActorRef: a.p.ActorRef, TemplateKey: dispatchFileKey(profile, b.f.FormCode),
 				Format: b.f.Format, JobID: d.ID}); err != nil {
 				return err
 			}
@@ -415,7 +410,7 @@ func (s *Service) CreateDispatch(ctx context.Context, in DispatchInput, idem str
 			}
 		}
 		for _, u := range links {
-			if err := s.egress(ctx, tx, Egress{Kind: EgressDispatch, TenantID: tid, ActorRef: a.p.ActorRef, TemplateKey: "kn.gsheet", Format: "gsheet", JobID: d.ID}); err != nil {
+			if err := s.egress(ctx, tx, Egress{Kind: EgressDispatch, TenantID: tid, ActorRef: a.p.ActorRef, TemplateKey: profile.SheetTemplateKey, Format: "gsheet", JobID: d.ID}); err != nil {
 				return err
 			}
 			if err := store.InsertGSheetLink(ctx, tx, tid, ids.New(), d.ID, strings.Join(d.Forms, ","), u, s.GSheet.ShareMode, now); err != nil {
@@ -440,7 +435,7 @@ func (s *Service) CreateDispatch(ctx context.Context, in DispatchInput, idem str
 
 // GetDispatch trả lần xuất/gửi kèm tệp và nhật ký.
 func (s *Service) GetDispatch(ctx context.Context, id uuid.UUID) (DispatchView, error) {
-	a, err := s.kn(ctx, false)
+	a, err := s.resolveSessionActor(ctx, false)
 	if err != nil {
 		return DispatchView{}, err
 	}
@@ -465,7 +460,7 @@ func (s *Service) GetDispatch(ctx context.Context, id uuid.UUID) (DispatchView, 
 
 // ListDispatches trả lịch sử xuất/gửi.
 func (s *Service) ListDispatches(ctx context.Context, province string, periodID, before *uuid.UUID, limit int) ([]store.Dispatch, error) {
-	a, err := s.kn(ctx, false)
+	a, err := s.resolveSessionActor(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +481,7 @@ func (s *Service) ListDispatches(ctx context.Context, province string, periodID,
 
 // DispatchFileURL cấp URL tải một tệp ("chỉ tải file, không gửi") — qua điểm kiểm soát (download).
 func (s *Service) DispatchFileURL(ctx context.Context, dispatchID, fileID uuid.UUID) (string, error) {
-	a, err := s.kn(ctx, false)
+	a, err := s.resolveSessionActor(ctx, false)
 	if err != nil {
 		return "", err
 	}
@@ -509,7 +504,11 @@ func (s *Service) DispatchFileURL(ctx context.Context, dispatchID, fileID uuid.U
 		for _, f := range fs {
 			if f.ID == fileID {
 				key = f.ObjectKey
-				return s.egress(ctx, tx, Egress{Kind: EgressDownload, TenantID: a.p.TenantID, ActorRef: a.p.ActorRef, TemplateKey: "kn." + strings.ToLower(f.FormCode),
+				profile, err := s.dispatchProfile()
+				if err != nil {
+					return err
+				}
+				return s.egress(ctx, tx, Egress{Kind: EgressDownload, TenantID: a.p.TenantID, ActorRef: a.p.ActorRef, TemplateKey: dispatchFileKey(profile, f.FormCode),
 					Format: f.Format, JobID: dispatchID})
 			}
 		}
@@ -531,7 +530,7 @@ type SendInput struct {
 
 // SendDispatch xếp gửi email (worker gửi SMTP, 202). Gửi lại khi "Gửi lỗi" hoặc đã gửi.
 func (s *Service) SendDispatch(ctx context.Context, id uuid.UUID, in SendInput, idem string) (DispatchView, error) {
-	a, err := s.kn(ctx, true)
+	a, err := s.resolveSessionActor(ctx, true)
 	if err != nil {
 		return DispatchView{}, err
 	}
@@ -573,9 +572,13 @@ func (s *Service) SendDispatch(ctx context.Context, id uuid.UUID, in SendInput, 
 				return ErrRecipientNotFound.WithField("recipient_ids", x.String())
 			}
 		}
+		profile, err := s.dispatchProfile()
+		if err != nil {
+			return err
+		}
 		subj := strings.TrimSpace(in.Subject)
 		if subj == "" {
-			subj = dispatch.Subject("Phòng Trồng trọt", d.PeriodLabel, strings.Join(d.Forms, ", "), d.Provisional)
+			subj = dispatch.Subject(profile.SubjectDepartment, d.PeriodLabel, strings.Join(d.Forms, ", "), d.Provisional)
 		}
 		if strings.ContainsAny(subj, "\r\n") || len([]rune(subj)) > 300 {
 			return problem.Validation.WithField("subject", "tối đa 300 ký tự, không xuống dòng")
@@ -638,6 +641,10 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	if d.Status != dispatch.StatusSending || d.Attempts != p.Attempt {
 		return nil // đã xử lý hoặc đã có lần gửi lại mới hơn
 	}
+	profile, err := s.dispatchProfile()
+	if err != nil {
+		return err
+	}
 	now := s.now()
 	fail := func(msg string) error {
 		d.Status, d.LastError, d.UpdatedAt = dispatch.StatusFailed, &msg, now
@@ -673,7 +680,7 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	if err != nil {
 		return err
 	}
-	limitMB, err := s.paramInt(ctx, extport.ParamAttachmentLimitMB, now, decimalInt(dispatch.DefaultAttachmentLimitMB))
+	limitMB, err := s.attachmentLimit(ctx, now)
 	if err != nil {
 		return err
 	}
@@ -725,10 +732,10 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 			body = *d.Body
 		}
 		if body == "" {
-			return dispatch.Body(d.PeriodLabel, "", d.Forms, d.Provisional, d.Missing, links)
+			return dispatch.BodyFor(profile, d.PeriodLabel, "", d.Forms, d.Provisional, d.Missing, links)
 		}
 		if len(links) > 0 {
-			body += "\n\n" + dispatch.Body(d.PeriodLabel, "", d.Forms, false, nil, links)
+			body += "\n\n" + dispatch.BodyFor(profile, d.PeriodLabel, "", d.Forms, false, nil, links)
 		}
 		return body
 	}
@@ -826,6 +833,6 @@ func (h DispatchHistory) SentForPeriod(ctx context.Context, tid, periodID uuid.U
 	return ok, err
 }
 
-var _ extensionsrc.DispatchHistory = DispatchHistory{}
+var _ port.DispatchHistory = DispatchHistory{}
 
 func decimalInt(n int64) decimal.Decimal { return decimal.NewFromInt(n) }

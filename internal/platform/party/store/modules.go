@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // ModuleEvent là một dòng sổ module_enablement_event.
@@ -65,7 +66,7 @@ func scanModuleEvent(row pgx.Row) (ModuleEvent, error) {
 
 // ModuleEventByIdem đọc dòng sổ đã ghi với idem_key.
 func ModuleEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*ModuleEvent, error) {
-	return noRows(scanModuleEvent(tx.QueryRow(ctx, "SELECT "+moduleEventCols+" FROM pf_party.module_enablement_event WHERE idem_key = $1::text", key)))
+	return noRows(scanModuleEvent(tx.QueryRow(ctx, "SELECT "+moduleEventCols+" FROM pf_party.module_enablement_event WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key)))
 }
 
 // ModuleEvents trả sổ của một module, seq > after, tăng dần.

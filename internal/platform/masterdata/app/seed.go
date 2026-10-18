@@ -37,27 +37,15 @@ type SeedResult struct {
 }
 
 type catalogFile struct {
-	Format string `json:"format"`
-	Source string `json:"source"`
-	Items  []struct {
-		Catalog string            `json:"catalog"`
-		Code    string            `json:"code"`
-		Name    string            `json:"name"`
-		Attrs   map[string]string `json:"attrs"`
-	} `json:"items"`
+	Format string             `json:"format"`
+	Source string             `json:"source"`
+	Items  []port.CatalogSeed `json:"items"`
 }
 
 type paramFile struct {
-	Format string `json:"format"`
-	Source string `json:"source"`
-	Params []struct {
-		Key           string  `json:"key"`
-		Value         *string `json:"value"`
-		Text          *string `json:"text"`
-		Unit          string  `json:"unit"`
-		EffectiveFrom string  `json:"effective_from"`
-		SourceDoc     string  `json:"source_doc"`
-	} `json:"params"`
+	Format string           `json:"format"`
+	Source string           `json:"source"`
+	Params []port.ParamSeed `json:"params"`
 }
 
 func decodeStrict(raw []byte, v any) error {
@@ -86,16 +74,13 @@ func (s *Service) Seed(ctx context.Context, tid uuid.UUID) (SeedResult, error) {
 	if err != nil {
 		return res, fmt.Errorf("masterdata: dữ liệu nhúng admin_units lỗi: %w", err)
 	}
-	var cf catalogFile
-	if err := decodeStrict(seeddata.Catalogs, &cf); err != nil {
-		return res, fmt.Errorf("masterdata: dữ liệu nhúng catalogs lỗi: %w", err)
+	catalogSeeds, err := s.catalogSeeds()
+	if err != nil {
+		return res, err
 	}
-	var pf paramFile
-	if err := decodeStrict(seeddata.Params, &pf); err != nil {
-		return res, fmt.Errorf("masterdata: dữ liệu nhúng params lỗi: %w", err)
-	}
-	if cf.Format != domain.CatalogFormat || pf.Format != domain.ParamFormat {
-		return res, fmt.Errorf("masterdata: dữ liệu nhúng sai định dạng (%q, %q)", cf.Format, pf.Format)
+	paramSeeds, err := s.parameterSeeds()
+	if err != nil {
+		return res, err
 	}
 	now := s.Clock.Now()
 	err = s.tx(ctx, tid, func(tx pgx.Tx) error {
@@ -103,8 +88,8 @@ func (s *Service) Seed(ctx context.Context, tid uuid.UUID) (SeedResult, error) {
 		if res.Units, e = s.importUnits(ctx, tx, tid, SeedSetterRef, source, units); e != nil {
 			return e
 		}
-		for _, raw := range cf.Items {
-			it, e := domain.Item{Catalog: raw.Catalog, Code: raw.Code, Name: raw.Name, Attrs: raw.Attrs}.Normalize()
+		for _, raw := range catalogSeeds {
+			it, e := s.normalizeCatalogItem(domain.Item{Catalog: raw.Catalog, Code: raw.Code, Name: raw.Name, Attrs: raw.Attrs})
 			if e != nil {
 				return fmt.Errorf("masterdata: mục nhúng %s/%s: %w", raw.Catalog, raw.Code, e)
 			}
@@ -113,7 +98,13 @@ func (s *Service) Seed(ctx context.Context, tid uuid.UUID) (SeedResult, error) {
 			} else if cur != nil {
 				continue
 			}
-			if e := checkRefs(ctx, tx, it); e != nil {
+			if s.catalogEffective(it.Catalog) {
+				it.ValidFrom, e = domain.ParseDay(s.catalogSeedFrom(it.Catalog))
+				if e != nil {
+					return e
+				}
+			}
+			if e := s.checkRefs(ctx, tx, it, domain.DayOf(now)); e != nil {
 				return e
 			}
 			it.Active, it.Revision, it.UpdatedBy, it.UpdatedAt = true, 1, SeedSetterRef, now
@@ -124,7 +115,7 @@ func (s *Service) Seed(ctx context.Context, tid uuid.UUID) (SeedResult, error) {
 			}
 			res.Items++
 		}
-		for _, raw := range pf.Params {
+		for _, raw := range paramSeeds {
 			created, e := s.seedParam(ctx, tx, tid, raw.Key, raw.Value, raw.Text, raw.Unit, raw.EffectiveFrom, raw.SourceDoc)
 			if e != nil {
 				return e
@@ -165,7 +156,7 @@ func (s *Service) seedParam(ctx context.Context, tx pgx.Tx, tid uuid.UUID, key s
 		}
 		v.Value = &d
 	}
-	if err := v.ValidateProposal(); err != nil {
+	if err := s.validateParameterProposal(v); err != nil {
 		return false, fmt.Errorf("masterdata: tham số nhúng %s: %w", key, err)
 	}
 	if err := store.InsertVersion(ctx, tx, &v); err != nil {

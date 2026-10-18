@@ -1,0 +1,7 @@
+## KNSPLIT-2-REPORTS-B — Gỡ adapter phiên cũ
+
+Nền dev18dd40f9 đã đăng ký ReportSessionResolver tại assembly, worker và KN77. Bước B bỏ legacyDispatchActor/RequireKN và fallback Principal.KN trong formReader. Dispatch chỉ nhận scope từ resolver đã đăng ký; không có resolver hoặc không xử lý thì Forbidden, thiếu Principal thì Unauthenticated. Identity actor/tenant vẫn lấy context, không cho callback thay thế. Native realm đọc form giữ nguyên, role groups KN/HTX/CGH và source ports chưa thuộc bước B.
+
+Test âm trước sửa: TestReportSessionRequiresRegistration đỏ cả hai trường hợp missing/unhandled, đọc/ghi dispatch và đọc mẫu đều từng suy quyền từ KNContext. Sau sửa pure.exit0, gồm anonymous không tới resolver, identity/phòng/tỉnh/mask/on-behalf, denial/error không fallback, native realm. Cần đầy đủ PG/consumer và gates/helper trước tích hợp. Không thay API/SQL/UI, không bật Google Sheet hoặc gửi SMTP thật. Không đổi tenant/D2, MRV, M1–M7 và phạm vi G1 đã chốt.
+
+Kết quả thực: PGfull53656.exit0 đủ13/13package,0FAIL/SKIP: handler90.414s, assembly66.971s, worker2.088s, KN77196.436s. Production65054726 không đổi. Staticfirst87115.exit1 chỉ docscheck sai định dạng hai tài liệu; build/vet/modgen-check/migrate-base/archlint/contractcheck đã đạt. Sau sửa docs, staticresume44281.exit0: docscheck/MFA/boundary390/lint0issues/diffcheck. Gofmt toàn repo chỉ2fixture cũ được cho phép. ProofJSON hostTEMP agrigreen-codex-knsplit2reportsb-proof.json. Helper còn kiểm8migrationgate trước tích hợp.

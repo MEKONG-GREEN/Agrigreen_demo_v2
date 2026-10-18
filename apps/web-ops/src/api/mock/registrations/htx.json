@@ -1,0 +1,16 @@
+{
+  "id": "htx",
+  "source": "./htx",
+  "app": [
+    {
+      "export": "htxAppRoutes",
+      "order": 54
+    }
+  ],
+  "admin": [
+    {
+      "export": "htxAdminRoutes",
+      "order": 20
+    }
+  ]
+}

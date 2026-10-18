@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/pubview"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -45,6 +46,14 @@ func pubViews(t *testing.T) map[string][]modreg.PubView {
 	return out
 }
 
+func countViews(views map[string][]modreg.PubView) int {
+	n := 0
+	for _, vs := range views {
+		n += len(vs)
+	}
+	return n
+}
+
 // W6.3 (R-DB-10, ADR-0031 §2, §14): mọi view khai trong provides.publications tồn tại; schema _pub chỉ chứa view đã
 // khai; vai r_<module>_pub có USAGE + SELECT, r_metrics (cap/analytics) đọc được qua membership nhưng KHÔNG có quyền
 // nào trên bảng nội bộ của module nguồn; view chạy bằng chủ không vượt RLS trên bảng gốc FORCE RLS.
@@ -53,8 +62,14 @@ func TestPubViewsDeclaredAndPrivileges_W63(t *testing.T) {
 	admin := env.AdminPool(t, migrations.PF)
 	ctx := context.Background()
 	views := pubViews(t)
-	if len(views) != 4 {
+	if len(views) != 9 { // HTX-DATA-A: + pf/cooperative; W11.76: + pf/price; PFPUB: + pf/forms (pf_forms_pub)
 		t.Fatalf("module công bố view _pub: %v", views)
+	}
+	// W6.3: 11 view (pf 000124); W11.10: + pf_extension_pub.v1_consolidation_closed (pf 000144); W11.76: +
+	// pf_price_pub.v1_board_daily, v1_ticket_week (pf 000152); PFPUB (ADR-0053): + họ closed_figures/v1 —
+	// pf_forms_pub.v1_closed_figures, pf_extension_pub.v1_closed_figures (pf 20261013150108, 20261013150110).
+	if n := countViews(views); n != 22 { // HTX-DATA-A: +4 published views
+		t.Fatalf("số view _pub đã khai: %d", n)
 	}
 	declared := map[string]bool{}
 	for mod, vs := range views {
@@ -89,6 +104,34 @@ func TestPubViewsDeclaredAndPrivileges_W63(t *testing.T) {
 	}
 	if len(rels) != len(declared) {
 		t.Errorf("số view _pub %d, đã khai %d", len(rels), len(declared))
+	}
+
+	// W11.10: view có hợp đồng cột (contracts/pubview, status published) — tên, kiểu, thứ tự cột trùng hợp đồng.
+	cs, err := pubview.All()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cs {
+		if c.Status != pubview.StatusPublished {
+			continue
+		}
+		rows, err := admin.Query(ctx, `SELECT a.attname::text, format_type(a.atttypid, a.atttypmod) FROM pg_attribute a
+		    WHERE a.attrelid = to_regclass($1) AND a.attnum > 0 AND NOT a.attisdropped ORDER BY a.attnum`, c.View)
+		if err != nil {
+			t.Fatal(err)
+		}
+		type col struct{ Name, Type string }
+		got, err := pgx.CollectRows(rows, pgx.RowToStructByPos[col])
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := make([]col, 0, len(c.Columns))
+		for _, x := range c.Columns {
+			want = append(want, col{x.Name, x.Type})
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s: cột view %v, hợp đồng %v", c.View, got, want)
+		}
 	}
 
 	// Không vai nào ngoài r_<module>_pub (và chủ) có quyền trực tiếp trên schema/view _pub; r_metrics không có
@@ -209,9 +252,23 @@ func TestMetricsReadsOnlyDeclaredPubViews_W63(t *testing.T) {
 	}
 	slices.Sort(used)
 	used = slices.Compact(used)
+	// W11.10: view có bên đọc khác pf/metrics (hợp đồng contracts/pubview — vd nguồn module của KHTC) không bắt buộc
+	// pf/metrics đọc; pf/metrics vẫn chỉ được đọc view đã khai.
+	others := map[string]bool{}
+	cs, err := pubview.All()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cs {
+		if c.Status == pubview.StatusPublished {
+			others[c.View] = true
+		}
+	}
 	want := make([]string, 0, len(declared))
 	for v := range declared {
-		want = append(want, v)
+		if !others[v] || slices.Contains(used, v) {
+			want = append(want, v)
+		}
 	}
 	sort.Strings(want)
 	if !slices.Equal(used, want) {

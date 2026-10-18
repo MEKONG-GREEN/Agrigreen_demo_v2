@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-NOTIFY-DIRECTIVE-A: Owner52/11/job/15goldens,pure/static/full9PG đạt;chờhelper9/remote.

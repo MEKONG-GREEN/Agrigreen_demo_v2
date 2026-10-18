@@ -65,9 +65,12 @@ jobs:
 
       - name: Chon ma commit
         id: chon
+        # Dau vao di qua env, khong noi thang bieu thuc vao script (chong chen lenh qua o nhap).
+        env:
+          VAO: ${{ inputs.commit }}
         run: |
           set -euo pipefail
-          vao="${{ inputs.commit }}"
+          vao="$VAO"
           if [ -z "$vao" ]; then
             # Bam nut tu nhanh main -> github.sha la dau main.
             # Day the demo-*   -> github.sha la commit duoc gan the.
@@ -245,6 +248,21 @@ jobs:
           check "https://api.$D/readyz" 200
           check "https://app.$D/login"  200
           check "https://auth.$D/realms/agrigreen/.well-known/openid-configuration" 200
+
+      # Anh Go xay tu ci.yml mang AG_BUILD_SHA; /healthz cua api-platform tra "commit".
+      - name: api dang chay dung commit (healthz)
+        run: |
+          set -eu
+          D="${{ vars.AG_DEMO_DOMAIN }}"
+          SHA='${{ needs.chon-ban.outputs.sha }}'
+          got=$(curl -fsS --max-time 10 "https://api.$D/healthz" | jq -r '.commit // empty')
+          echo "healthz commit = ${got:-<khong co>}"
+          if [ -z "$got" ]; then
+            echo "::warning::/healthz chua tra commit (anh xay truoc khi co AG_BUILD_SHA)"
+          elif [ "$got" != "$SHA" ]; then
+            echo "::error::api dang chay $got, khong phai $SHA"
+            exit 1
+          fi
 
       - name: issuer phai la https va dung ten mien
         run: |

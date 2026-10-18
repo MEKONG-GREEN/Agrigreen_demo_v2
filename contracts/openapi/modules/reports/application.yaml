@@ -1,0 +1,746 @@
+paths:
+# @ag-order: 184
+  /v1/public/report-links/{token}:
+    get:
+      summary: "Tải tệp báo cáo Chi cục qua liên kết trong email (A4) — KHÔNG đăng nhập; mã thông báo là quyền truy cập"
+      description: >-
+        Quyết định A4 (03/10/2026, FN-TI-02.06): email Chi cục vượt giới hạn đính kèm mang liên kết do api-platform phục vụ
+        (trong lãnh thổ), hạn theo tham số reports.dispatch_link_ttl_hours (mặc định 168 giờ = 7 ngày). Mỗi lần mở ghi
+        một dòng sổ pf_reports.dispatch_link_access (mã người nhận, thời điểm, IP đã băm HMAC, kết quả) và đi qua điểm
+        kiểm soát xuất (export_audit kind download + pf/metering kênh report_export, ADR-0024). Mã sai/bị sửa → 404;
+        hết hạn → 410 reports.link_expired; Admin thu hồi → 410 reports.link_revoked; điểm kiểm soát (enforce) từ chối
+        → 429 metering.egress_quota_exceeded. Phản hồi Cache-Control no-store, Referrer-Policy no-referrer.
+      operationId: openReportLink
+      tags: [reports]
+      security: []
+      parameters:
+        - {name: token, in: path, required: true, description: "Mã thông báo base64url 86 ký tự (tenant + liên kết + bí mật 32 byte; DB chỉ giữ SHA-256)", schema: {type: string, pattern: "^[A-Za-z0-9_-]{86}$"}}
+      responses:
+        "200":
+          description: Tệp (Excel hoặc PDF), Content-Disposition attachment
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+            application/pdf:
+              schema: {type: string, format: binary}
+        "404": {description: "reports.link_not_found", $ref: "#/components/responses/Problem"}
+        "410": {description: "reports.link_expired | reports.link_revoked", $ref: "#/components/responses/Problem"}
+        "429": {description: "metering.egress_quota_exceeded (AG_EGRESS_MODE=enforce)", $ref: "#/components/responses/Problem"}
+# @ag-order: 185
+  /v1/reports/templates:
+    get:
+      summary: Mẫu báo cáo đang dùng mà vai của người gọi được xuất (mẫu hệ thống = phiên bản 0)
+      operationId: listReportTemplates
+      tags: [reports]
+      responses:
+        "200":
+          description: Danh sách mẫu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ReportTemplate"}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 186
+  /v1/reports/exports:
+    get:
+      summary: Lịch sử xuất của CHÍNH người gọi (kể cả việc của lịch gửi họ sở hữu), mới nhất trước
+      description: Phân trang cursor (R-53). downloadable = true khi việc đã xong và có tệp — tải qua GET /v1/reports/exports/{id}/download.
+      operationId: listMyReportExports
+      tags: [reports]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: "#/components/schemas/ReportExport"
+                        - type: object
+                          required: [downloadable]
+                          properties:
+                            downloadable: {type: boolean}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Yêu cầu xuất báo cáo (Excel/PDF) — 202 + việc xuất; worker dựng tệp. Phạm vi giải lúc yêu cầu (ADR-0009)
+      description: >-
+        Mẫu htx.production (nguồn cropcycle.production — HTX US-DASH-02): sản lượng dự kiến – thực tế, diện tích, số nông hộ,
+        tiến độ SOP theo HTX × vụ × giống, cùng số liệu bảng điều hành GET /v1/cropcycle/dashboard. Quản lý HTX chỉ xuất HTX
+        của mình (params.cooperative_ref được gán); cán bộ KN theo phạm vi xã/tỉnh; platform_admin toàn bộ.
+      operationId: requestReportExport
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [template_key, format]
+              properties:
+                template_key: {type: string, examples: [kn.sowing_progress, cgh.shortage_by_coop]}
+                format: {type: string, enum: [xlsx, pdf]}
+                params: {$ref: "#/components/schemas/ReportParams"}
+      responses:
+        "202":
+          description: Đã nhận; theo dõi tại Location
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportExport"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "429": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 187
+  /v1/reports/exports/{id}:
+    get:
+      summary: Trạng thái việc xuất (người yêu cầu, hoặc người có phạm vi bao trọn)
+      operationId: getReportExport
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Việc xuất
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportExport"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 188
+  /v1/reports/exports/{id}/download:
+    get:
+      summary: URL tải tệp có hạn (10 phút; không ghi log) — qua điểm kiểm soát xuất dữ liệu
+      operationId: downloadReportExport
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: URL có chữ ký
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [export_id, url, expires_at, file_name, content_type, sha256]
+                properties:
+                  export_id: {type: string, format: uuid}
+                  url: {type: string}
+                  expires_at: {type: string, format: date-time}
+                  file_name: {type: string}
+                  content_type: {type: string}
+                  sha256: {type: string}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 189
+  /v1/reports/recipients:
+    get:
+      summary: Người nhận chọn được cho lịch báo cáo của quản lý HTX — tài khoản đang bật, email đã xác minh, thuộc HTX của người gọi (HTX US-DASH-03)
+      description: "Chỉ quản lý HTX (coop_manager, không kèm vai KN). Email đã che; địa chỉ đầy đủ chỉ tra lúc gửi. Cache-Control no-store."
+      operationId: listReportRecipients
+      tags: [reports]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [actor_ref, display_name, masked_email]
+                      properties:
+                        actor_ref: {type: string, format: uuid}
+                        display_name: {type: string}
+                        masked_email: {type: string, examples: ["ke•••@htx.vn"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 190
+  /v1/reports/schedules:
+    get:
+      summary: Lịch gửi báo cáo HTX của quản lý HTX (HTX US-DASH-03) — chỉ HTX của mình
+      description: Chỉ quản lý HTX; cán bộ KN, Admin CGH, quản trị dùng Admin API (MFA) → 403 ở đây.
+      operationId: listCoopReportSchedules
+      tags: [reports]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/ReportSchedule"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Quản lý HTX lập lịch gửi báo cáo HTX (tuần/tháng, giờ Việt Nam) tới tài khoản của HTX (HTX US-DASH-03)
+      description: |
+        Mẫu HTX (vd htx.production); params.cooperative_ref luôn là HTX của người lập. `recipients` phải thuộc
+        `GET /v1/reports/recipients` — khác → 422 reports.recipient_not_in_cooperative
+        ("Email đăng ký nhận báo cáo không hợp lệ hoặc gửi thất bại, vui lòng kiểm tra lại."). Mẫu không phải HTX → 403.
+      operationId: createCoopReportSchedule
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ReportScheduleInput"}
+      responses:
+        "201":
+          description: Đã lập lịch
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportSchedule"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportSchedule"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 191
+  /v1/reports/schedules/{id}/deactivate:
+    post:
+      summary: Quản lý HTX ngừng lịch kèm lý do (không xóa; lịch sử chạy giữ nguyên)
+      operationId: deactivateCoopReportSchedule
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10, maxLength: 500}}}
+      responses:
+        "200":
+          description: Lịch
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportSchedule"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 192
+  /v1/reports/schedules/{id}/runs:
+    get:
+      summary: Các lần chạy của lịch HTX kèm kết quả gửi email (AC-2 — người lập thấy lần gửi bị bỏ/thiếu email)
+      operationId: listCoopReportScheduleRuns
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Lần chạy
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/ReportScheduleRun"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  # --- pf/reports: mẫu báo cáo dạng lưới KN v7.7 (FN-AD-04.06, FN-XA-03.02, FN-TI-02.02) — thiết kế/phát hành ở admin.yaml ---
+# @ag-order: 193
+  /v1/reports/forms/available:
+    get:
+      summary: Mẫu đã gán cho (phòng ban, cấp, loại báo cáo) kèm phiên bản ĐÃ PHÁT HÀNH áp dụng tại ngày at — Cấp Tỉnh chọn khi phát hành biểu
+      description: Vai KN (kn_officer, kn_province_admin, kn_national_admin), reports_admin, platform_admin. Mẫu chưa có phiên bản phát hành áp dụng tại at không có trong danh sách.
+      operationId: listAvailableForms
+      tags: [reports]
+      parameters:
+        - {name: department, in: query, required: true, schema: {type: string, examples: [trong_trot]}}
+        - {name: level, in: query, schema: {type: string, enum: [commune, province]}}
+        - {name: report_type, in: query, schema: {$ref: "#/components/schemas/FormReportType"}}
+        - {name: at, in: query, description: "Ngày bắt đầu kỳ (mặc định hôm nay giờ Việt Nam)", schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Mẫu khả dụng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [template, report_type, version]
+                      properties:
+                        template: {$ref: "#/components/schemas/FormTemplate"}
+                        report_type: {$ref: "#/components/schemas/FormReportType"}
+                        version: {$ref: "#/components/schemas/FormVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 194
+  /v1/reports/forms/{id}/versions/{v}/layout:
+    get:
+      summary: Lưới JSON của một phiên bản mẫu để dựng màn nhập/xem (web, app) — hợp đồng form-template.v1
+      description: |
+        Tiêu đề cột theo kỳ đặt theo nhãn kỳ của đợt (period_label lặp lại theo thứ tự khe); khe vượt số kỳ → inactive = true
+        (giữ chữ cái cột như tệp Excel). {season} trong tiêu đề thay bằng season. Người không phải Admin chỉ đọc được phiên
+        bản published/retired (nháp → 404 reports.form_version_not_found).
+      operationId: getFormLayout
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: v, in: path, required: true, schema: {type: integer, minimum: 1}}
+        - {name: period_label, in: query, style: form, explode: true, schema: {type: array, items: {type: string}, maxItems: 200}}
+        - {name: season, in: query, schema: {type: string, examples: ["THU ĐÔNG 2026"]}}
+      responses:
+        "200":
+          description: Lưới
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [template, version, definition]
+                properties:
+                  template: {$ref: "#/components/schemas/FormTemplate"}
+                  version: {$ref: "#/components/schemas/FormVersion"}
+                  definition: {$ref: "#/components/schemas/FormDefinition"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 195
+  /v1/reports/forms/{id}/versions/{v}/template.xlsx:
+    get:
+      summary: Tải mẫu Excel đúng bố cục (tiêu đề gộp, hàng chữ cái, dòng loại cột, công thức) — không có số liệu
+      operationId: downloadFormTemplateXlsx
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: v, in: path, required: true, schema: {type: integer, minimum: 1}}
+        - {name: season, in: query, schema: {type: string}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 196
+  /v1/reports/form-versions/{id}/evaluate:
+    post:
+      summary: Kiểm và tính thử một lưới theo phiên bản mẫu (ô nhập, kỳ đang mở, công thức, ràng buộc của mẫu, dòng tổng) — server là nguồn đúng
+      description: |
+        Không lưu gì (bài nộp do P4). Vấn đề báo tại ô (row_key + letter); valid = false khi có vấn đề mức error (không cho gửi).
+        Số dạng chuỗi decimal (không float). Người không phải Admin chỉ tính được trên phiên bản published/retired.
+      operationId: evaluateFormVersion
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FormEvalInput"}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormEvalResult"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/reports ---
+
+  # --- pf/waterway: lớp đường thủy đã phát hành và định tuyến theo tải trọng (GIS US-WATER-01, FN-09 BR-37/38; mục 16) ---
+components:
+  schemas:
+# @ag-order: 702
+    FormDefinition:
+      type: object
+      description: |
+        Định nghĩa lưới của một phiên bản mẫu, đúng bố cục sheet Excel (FN-AD-04.06, FN-XA-03.02). Cột theo chữ cái
+        Excel liên tục từ A; tiêu đề nhiều tầng có vùng gộp (dòng tính từ 1 trong khung tiêu đề); công thức chạy trên
+        một dòng, tham chiếu "F#" = cột F cùng dòng. Hiển thị: xám = fixed, trắng viền = input, viền xanh đậm = cột theo kỳ
+        đang mở, xám nhạt = kỳ khác, xanh lá nhạt = formula; cố định cột tới freeze_through; nhóm cột cho "Đi tới".
+        Phần chưa biết từ tệp gốc: cột placeholder = true và mục pending (chờ khách Q-01).
+      required: [schema, code, title, sheet_name, requirements, columns, header, period_blocks, rows, totals, groups, freeze_through, rules, pending, completeness]
+      properties:
+        schema: {type: string, const: form-template.v1}
+        code: {type: string, pattern: "^[A-Z0-9][A-Z0-9_.-]{1,31}$"}
+        title: {type: string, maxLength: 300, description: "Có thể chứa {season} — thay theo vụ khi dựng layout"}
+        sheet_name: {type: string, maxLength: 100}
+        requirements: {type: string, maxLength: 4000, description: "“Yêu cầu biểu mẫu” nguyên văn"}
+        columns: {type: array, minItems: 1, maxItems: 2000, items: {$ref: "#/components/schemas/FormColumn"}}
+        header:
+          type: object
+          required: [rows, cells, merges]
+          properties:
+            rows: {type: integer, minimum: 1, maximum: 20}
+            cells: {type: array, items: {$ref: "#/components/schemas/FormHeaderCell"}}
+            merges: {type: array, items: {type: string, pattern: "^[A-Z]{1,3}[1-9][0-9]*:[A-Z]{1,3}[1-9][0-9]*$"}, examples: [["F1:L1", "A1:A2"]]}
+        period_blocks: {type: array, items: {$ref: "#/components/schemas/FormPeriodBlock"}}
+        rows:
+          type: object
+          required: [kind, indicators]
+          properties:
+            kind: {type: string, enum: [per_commune]}
+            indicators:
+              type: array
+              description: "Rỗng: mỗi xã một dòng. Có: mỗi xã × mỗi chỉ tiêu một dòng (vd T05: 20 đối tượng sâu bệnh)"
+              items:
+                type: object
+                required: [code, label]
+                properties:
+                  code: {type: string, maxLength: 64}
+                  label: {type: string}
+                  catalog: {type: string}
+                  placeholder: {type: boolean}
+        totals:
+          type: array
+          items:
+            type: object
+            required: [kind, label, label_letter]
+            properties:
+              kind: {type: string, enum: [region, province]}
+              label: {type: string, description: "“Cộng {region}”, “Toàn tỉnh”"}
+              label_letter: {type: string}
+        groups:
+          type: array
+          items:
+            type: object
+            required: [id, title, from, to]
+            properties:
+              id: {type: string}
+              title: {type: string}
+              from: {type: string}
+              to: {type: string}
+        freeze_through: {type: string, description: "Cố định tới cột này (vd J); rỗng = không"}
+        rules: {type: array, maxItems: 200, items: {$ref: "#/components/schemas/FormRule"}}
+        pending:
+          type: array
+          items:
+            type: object
+            required: [part, detail, question]
+            properties:
+              part: {type: string}
+              detail: {type: string}
+              question: {type: string, examples: [Q-01]}
+        completeness: {type: string, enum: [complete, partial, placeholder]}
+        source:
+          type: object
+          properties:
+            kind: {type: string, enum: [seed, import, designer]}
+            file: {type: string}
+            sheet: {type: string}
+            sha256: {type: string}
+            data_row: {type: integer}
+            seed_note: {type: string}
+# @ag-order: 703
+    FormColumn:
+      type: object
+      required: [letter, title, kind, dtype]
+      properties:
+        letter: {type: string, pattern: "^[A-Z]{1,3}$"}
+        key: {type: string}
+        title: {type: string, maxLength: 500}
+        kind: {type: string, enum: [fixed, provincial, input, per_period, formula], description: "Cố định / Tỉnh giao / Nhập / Cột theo kỳ / Công thức"}
+        dtype: {type: string, enum: [number, integer, text, date, catalog]}
+        unit: {type: string, examples: [ha, tấn, tấn/ha, "%"]}
+        required: {type: boolean}
+        catalog: {type: string}
+        formula: {type: string, description: "Tập con Excel: + - * / ^ & % so sánh, SUM MIN MAX AVERAGE COUNT ROUND ROUNDUP ROUNDDOWN ABS IF IFERROR AND OR NOT ISBLANK ISNUMBER; tham chiếu F#, dải F#:L#", examples: ["SUM(F#:L#)", "IF(G#=0,0,I#/G#)"]}
+        fixed_source: {type: string, description: "row_no | region_name | commune_name | indicator_label | none | xref:<mẫu>:<cột>"}
+        period_block: {type: string}
+        period_slot: {type: integer, minimum: 1}
+        total: {type: string, enum: [sum, formula, none], description: "Dòng tổng: rỗng = sum cho cột số, formula cho cột công thức"}
+        min: {type: string, description: "decimal"}
+        max: {type: string, description: "decimal"}
+        decimals: {type: integer, minimum: 0, maximum: 10}
+        group: {type: string}
+        placeholder: {type: boolean, description: "Chưa biết từ tệp gốc — chờ khách Q-01"}
+        note: {type: string}
+        inactive: {type: boolean, description: "Chỉ ở layout: khe kỳ vượt số kỳ của đợt"}
+# @ag-order: 704
+    FormHeaderCell:
+      type: object
+      required: [row, letter, text]
+      properties:
+        row: {type: integer, minimum: 1}
+        letter: {type: string}
+        text: {type: string}
+        period_block: {type: string}
+        period_slot: {type: integer}
+# @ag-order: 705
+    FormPeriodBlock:
+      type: object
+      required: [id, first_letter, width, slots, title_pattern]
+      properties:
+        id: {type: string}
+        first_letter: {type: string}
+        width: {type: integer, minimum: 1, description: "Số cột mỗi kỳ (PL 07: 4)"}
+        slots: {type: integer, minimum: 1, description: "Số kỳ tối đa"}
+        title_pattern: {type: string, examples: ["Tuần {n}"]}
+# @ag-order: 706
+    FormRule:
+      type: object
+      required: [id, expr, message, severity, letters]
+      properties:
+        id: {type: string}
+        expr: {type: string, description: "Biểu thức logic trên dòng; được dùng XREF(\"T01\",\"M\") (liên biểu cùng xã cùng kỳ)", examples: ["J#=XREF(\"T01\",\"M\")"]}
+        when: {type: string}
+        message: {type: string}
+        severity: {type: string, enum: [error, warning]}
+        letters: {type: array, items: {type: string}}
+# @ag-order: 707
+    FormTemplate:
+      type: object
+      required: [id, code, name, department_code, entry_level, status, retired_reason, created_by, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        department_code: {type: string, examples: [trong_trot]}
+        entry_level: {type: string, enum: [commune, province]}
+        status: {type: string, enum: [active, retired]}
+        retired_reason: {type: [string, "null"]}
+        created_by: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 708
+    FormVersion:
+      type: object
+      required: [id, template_id, version, status, effective_from, effective_label, origin, origin_version_id, import_id, definition_sha256, completeness, pending_count, column_count, created_by, created_at, updated_by, updated_at, proposed_by, proposed_at, published_by, published_at, retired_by, retired_at, retire_reason]
+      properties:
+        id: {type: string, format: uuid, description: "P4 ghim id này vào công việc khi phát hành biểu"}
+        template_id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        status: {type: string, enum: [draft, proposed, published, retired]}
+        effective_from: {type: [string, "null"], format: date, description: "Áp dụng từ kỳ (ngày bắt đầu kỳ)"}
+        effective_label: {type: [string, "null"], examples: ["Tuần 37/2026"]}
+        origin: {type: string, enum: [blank, clone, restore, import, seed]}
+        origin_version_id: {type: [string, "null"], format: uuid}
+        import_id: {type: [string, "null"], format: uuid}
+        definition_sha256: {type: string}
+        completeness: {type: string, enum: [complete, partial, placeholder]}
+        pending_count: {type: integer}
+        column_count: {type: integer}
+        created_by: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+        updated_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+        proposed_by: {type: [string, "null"], format: uuid}
+        proposed_at: {type: [string, "null"], format: date-time}
+        published_by: {type: [string, "null"], format: uuid, description: "≠ proposed_by và ≠ updated_by (R-56)"}
+        published_at: {type: [string, "null"], format: date-time}
+        retired_by: {type: [string, "null"], format: uuid}
+        retired_at: {type: [string, "null"], format: date-time}
+        retire_reason: {type: [string, "null"]}
+        definition: {$ref: "#/components/schemas/FormDefinition"}
+# @ag-order: 710
+    FormReportType:
+      type: string
+      enum: [weekly, monthly, seasonal, annual, adhoc, dispatch]
+      description: "Báo cáo tuần / tháng / hàng vụ / năm (Q-07) / đột xuất / gửi Chi cục (Q-08) — tạm, chờ danh mục report_type của P2"
+# @ag-order: 711
+    FormEvalInput:
+      type: object
+      required: [mode, rows]
+      properties:
+        mode: {type: string, enum: [draft, submit], description: "draft bỏ kiểm bắt buộc"}
+        open_slots: {type: [array, "null"], items: {type: integer}, description: "Khe kỳ đang mở; null = không kiểm (xem trước)"}
+        rows:
+          type: array
+          maxItems: 5000
+          items:
+            type: object
+            required: [commune, input]
+            properties:
+              key: {type: string, description: "Mặc định <mã xã> hoặc <mã xã>/<mã chỉ tiêu>"}
+              commune: {type: string}
+              region: {type: string}
+              indicator: {type: string}
+              input: {type: object, additionalProperties: {type: string}, description: "Ô người nhập: chữ cái → giá trị (số dạng chuỗi decimal, ngày YYYY-MM-DD)"}
+              system: {type: object, additionalProperties: {type: string}, description: "Ô hệ thống: cố định + Tỉnh giao"}
+              xrefs: {type: object, additionalProperties: {type: object, additionalProperties: {type: string}}, description: "Mã mẫu → cột → giá trị (cùng xã cùng kỳ)"}
+# @ag-order: 712
+    FormEvalResult:
+      type: object
+      required: [valid, rows, issues, totals]
+      properties:
+        valid: {type: boolean, description: "Không có vấn đề mức error — được gửi"}
+        rows:
+          type: array
+          items:
+            type: object
+            required: [key, commune, cells]
+            properties:
+              key: {type: string}
+              commune: {type: string}
+              region: {type: string}
+              indicator: {type: string}
+              cells: {type: object, additionalProperties: {type: string}}
+        issues:
+          type: array
+          items:
+            type: object
+            required: [row_key, code, message, severity]
+            properties:
+              row_key: {type: string}
+              letter: {type: string}
+              code: {type: string, enum: [reports.row_invalid, reports.cell_unknown_column, reports.cell_not_editable, reports.cell_period_closed, reports.cell_invalid_type, reports.cell_out_of_range, reports.cell_required, reports.formula_error, reports.rule_failed, reports.rule_error, reports.form_invalid]}
+              message: {type: string}
+              severity: {type: string, enum: [error, warning]}
+              rule_id: {type: string}
+        totals:
+          type: array
+          items:
+            type: object
+            required: [key, kind, members, cells]
+            properties:
+              key: {type: string, examples: ["region:KV1", province, "province/SB01"]}
+              kind: {type: string, enum: [region, province]}
+              region: {type: string}
+              indicator: {type: string}
+              members: {type: integer}
+              cells: {type: object, additionalProperties: {type: string}}
+    # --- pf/reports ---
+# @ag-order: 713
+    ReportColumn:
+      type: object
+      required: [key, title]
+      properties:
+        key: {type: string, description: "Khóa cột của nguồn dữ liệu"}
+        title: {type: string}
+# @ag-order: 714
+    ReportDefinition:
+      type: object
+      required: [title, source, grouping, columns, formats]
+      properties:
+        title: {type: string, minLength: 5, maxLength: 200}
+        source:
+          type: string
+          enum: [extension.sowing, extension.growth_pest, extension.program_progress, extension.tasks_sla, extension.period_summary, mechanization.summary, mechanization.shortage_by_coop, mechanization.season_compare, cropcycle.production]
+        grouping: {type: string, enum: [national, province, commune, cooperative]}
+        columns: {type: array, minItems: 1, maxItems: 40, items: {$ref: "#/components/schemas/ReportColumn"}}
+        formats: {type: array, items: {type: string, enum: [xlsx, pdf]}}
+        provisional_layout: {type: boolean, description: "Bố cục tạm — BRD chưa có mẫu biểu chính thức của Bộ NN&MT/NN&PTNT"}
+        form_note: {type: string, maxLength: 500}
+# @ag-order: 715
+    ReportTemplate:
+      type: object
+      required: [key, version, builtin, status, definition]
+      properties:
+        key: {type: string}
+        version: {type: integer, minimum: 0}
+        builtin: {type: boolean}
+        status: {type: string, enum: [active, retired]}
+        definition: {$ref: "#/components/schemas/ReportDefinition"}
+        reason: {type: [string, "null"]}
+        created_by: {type: [string, "null"], format: uuid}
+        created_at: {type: [string, "null"], format: date-time}
+# @ag-order: 716
+    ReportParams:
+      type: object
+      properties:
+        level: {type: string, enum: [national, province, commune, cooperative], description: "Mặc định: cấp của mẫu"}
+        unit_code: {type: string, description: "Tỉnh/xã trong phạm vi; rỗng = toàn phạm vi"}
+        period: {type: string, description: "KN: YYYY-MM | YYYY-Qn | YYYY (FR-05); mặc định tháng hiện tại"}
+        season_code: {type: string, description: "FR-03, CGH; với đối chiếu là Vụ A"}
+        season_year: {type: integer}
+        season_code_b: {type: string, description: "CGH tab đối chiếu: Vụ B (khác Vụ A)"}
+        season_year_b: {type: integer}
+        run_id: {type: string, format: uuid, description: "CGH: lần cân đối đã lưu; rỗng = mới nhất của vụ"}
+        machine_type: {type: string}
+        cooperative_ref: {type: string, format: uuid, description: "HTX US-DASH-02 (cropcycle.production): lọc HTX. Quản lý HTX luôn là HTX của mình (HTX khác → 403 reports.out_of_scope)"}
+        variety_code: {type: string, description: "HTX US-DASH-02 (cropcycle.production): lọc giống lúa"}
+# @ag-order: 717
+    ReportExport:
+      type: object
+      required: [id, template_key, template_version, title, format, params, status, trigger, requested_by, requested_at]
+      properties:
+        id: {type: string, format: uuid}
+        template_key: {type: string}
+        template_version: {type: integer}
+        title: {type: string}
+        format: {type: string, enum: [xlsx, pdf]}
+        params: {$ref: "#/components/schemas/ReportParams"}
+        status: {type: string, enum: [queued, completed, failed]}
+        trigger: {type: string, enum: [api, schedule]}
+        schedule_id: {type: [string, "null"], format: uuid}
+        requested_by: {type: string, format: uuid}
+        requested_at: {type: string, format: date-time}
+        row_count: {type: [integer, "null"]}
+        provisional: {type: [boolean, "null"], description: "Số liệu tạm tính"}
+        size_bytes: {type: [integer, "null"]}
+        sha256: {type: [string, "null"]}
+        error_code: {type: [string, "null"]}
+        completed_at: {type: [string, "null"], format: date-time}
+# @ag-order: 718
+    ReportScheduleInput:
+      type: object
+      required: [template_key, format, frequency, hour, recipients]
+      properties:
+        template_key: {type: string}
+        format: {type: string, enum: [xlsx, pdf]}
+        unit_code: {type: string}
+        params: {$ref: "#/components/schemas/ReportParams"}
+        frequency: {type: string, enum: [weekly, monthly]}
+        weekday: {type: integer, minimum: 1, maximum: 7, description: "weekly: 1 = thứ Hai"}
+        day_of_month: {type: integer, minimum: 1, maximum: 28, description: "monthly"}
+        hour: {type: integer, minimum: 0, maximum: 23, description: "Giờ Việt Nam"}
+        recipients: {type: array, minItems: 1, maxItems: 50, items: {type: string, format: uuid}}
+# @ag-order: 719
+    ReportSchedule:
+      type: object
+      required: [id, template_key, format, params, frequency, hour, recipients, owner_ref, active, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        template_key: {type: string}
+        format: {type: string, enum: [xlsx, pdf]}
+        unit_code: {type: [string, "null"]}
+        params: {type: object}
+        frequency: {type: string, enum: [weekly, monthly]}
+        weekday: {type: [integer, "null"]}
+        day_of_month: {type: [integer, "null"]}
+        hour: {type: integer}
+        recipients: {type: array, items: {type: string, format: uuid}}
+        owner_ref: {type: string, format: uuid}
+        active: {type: boolean}
+        deactivated_reason: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 720
+    ReportScheduleRun:
+      type: object
+      required: [slot_key, slot_at, status, fired_at]
+      properties:
+        slot_key: {type: string, examples: [2026-W40, 2026-10]}
+        slot_at: {type: string, format: date-time}
+        status: {type: string, enum: [queued, skipped]}
+        skip_reason: {type: [string, "null"]}
+        job_id: {type: [string, "null"], format: uuid}
+        fired_at: {type: string, format: date-time}
+        delivery_status: {type: [string, "null"], enum: [sent, skipped, failed, null]}
+        delivery_note: {type: [string, "null"]}
+        sent_count: {type: [integer, "null"]}
+        delivered_at: {type: [string, "null"], format: date-time}
+    # --- hết pf/reports ---
+
+    # --- pf/waterway ---

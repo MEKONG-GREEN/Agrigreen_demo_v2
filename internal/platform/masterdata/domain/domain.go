@@ -6,17 +6,12 @@ package domain
 import (
 	"time"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 )
 
 // FieldError gắn lỗi với tên trường — handler ánh xạ sang problem theo trường.
-type FieldError struct {
-	Field string
-	Err   error
-}
-
-func (e FieldError) Error() string { return e.Field + ": " + e.Err.Error() }
-func (e FieldError) Unwrap() error { return e.Err }
+type FieldError = port.FieldError
 
 // Day là ngày nghiệp vụ (giờ Việt Nam) biểu diễn bằng time.Time 00:00 UTC — đúng
 // với cách PostgreSQL trả cột date. Không mang ý nghĩa thời điểm.

@@ -55,14 +55,17 @@ type fixture struct {
 	national, p91, team30292, coop30292, coop30301, p92, coop31120 uuid.UUID
 }
 
-func newFixture(t *testing.T) *fixture {
+func newFixture(t *testing.T) *fixture { return newFixtureAt(t, clock.System{}) }
+
+// newFixtureAt dựng fixture với đồng hồ clk cho module (job accounts_dormant — D24).
+func newFixtureAt(t *testing.T, clk clock.Clock) *fixture {
 	env := pgtest.Get(t)
 	iss := authztest.New(t)
 	pool := env.Pool(t, migrations.PF, accounts.DBRole)
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	dir := keycloak.NewMemory()
 	pty := newFakeParty()
-	mod := accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: dir, Scope: pty, Orgs: pty})
+	mod := accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clk, accounts.Deps{Directory: dir, Scope: pty, Orgs: pty})
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(iss.Verifier()), httpx.RequireMFA(), idempotency.Middleware(ops)))
 	srv := httptest.NewServer(eng)
@@ -209,7 +212,8 @@ func TestCreateUserUSADM01(t *testing.T) {
 	if err != nil || u.TenantID != f.tenant || u.OrgRef != f.team30292 || u.Phone != "0912345678" || u.FirstName != "An" || u.LastName != "Nguyễn Văn" {
 		t.Fatalf("thuộc tính Keycloak: %+v %v", u.ID, err)
 	}
-	if !slices.Equal(u.RequiredActions, []string{port.ActionVerifyEmail, port.ActionUpdatePassword}) {
+	// D24: cán bộ KN đăng ký TOTP ngay trong liên kết kích hoạt.
+	if !slices.Equal(u.RequiredActions, []string{port.ActionVerifyEmail, port.ActionUpdatePassword, port.ActionConfigureTOTP}) {
 		t.Fatalf("required actions: %v", u.RequiredActions)
 	}
 	sent := f.dir.Sent()
@@ -223,6 +227,11 @@ func TestCreateUserUSADM01(t *testing.T) {
 	mfaID := nat.create(person(f.national, "registry_admin"))
 	if u, _ := f.dir.GetUser(context.Background(), mfaID); !slices.Contains(u.RequiredActions, port.ActionConfigureTOTP) {
 		t.Fatalf("vai [MFA] phải bắt TOTP: %v", u.RequiredActions)
+	}
+	// Quản lý HTX không thuộc D24 → không bắt TOTP.
+	htxID := nat.create(person(f.coop30292, "coop_manager"))
+	if u, _ := f.dir.GetUser(context.Background(), htxID); slices.Contains(u.RequiredActions, port.ActionConfigureTOTP) {
+		t.Fatalf("quản lý HTX không bắt TOTP: %v", u.RequiredActions)
 	}
 	// Trùng email / SĐT.
 	dup := person(f.team30292, "kn_officer")

@@ -54,11 +54,19 @@ const AnalyticsModule = "pf/metrics"
 
 // AggRole là vai tổng hợp vượt đơn vị (W6.4, ADR-0031 §3, R-DB-11): NOLOGIN, BYPASSRLS, INHERIT, thành viên mọi
 // r_<module>_pub (chỉ SELECT view công bố); không thuộc ag_shared_user; migration pf 000129 cấp thêm đúng
-// SELECT (tenant_id) trên k_ref.org (liệt kê tenant). Vai đăng nhập của đơn vị chạy job (LoginUnit.Agg — app_worker)
-// là thành viên NOINHERIT, SET TRUE: chỉ có quyền r_agg sau SET LOCAL ROLE trong db.WithAggTx (shared/db), sau khi
-// job đã khai được kiểm là đã duyệt bốn mắt. Lệch ADR-0031 §3 (vai đăng nhập riêng app_agg): chưa tách — bí mật
-// thêm và pg_hba riêng chờ bật production (C-4); xem docs/runbooks/agg-jobs.md.
+// SELECT (tenant_id) trên k_ref.org (liệt kê tenant). Thành viên DUY NHẤT là vai đăng nhập riêng AppAgg.
 const AggRole = "r_agg"
+
+// AppAgg là vai đăng nhập riêng của bộ chạy job tổng hợp (ADR-0031 §3, gói FC): LOGIN NOINHERIT, chỉ là thành viên
+// r_agg (INHERIT FALSE, SET TRUE) — không r_* nào khác, không ag_shared_user. Chỉ có quyền r_agg sau SET LOCAL ROLE
+// trong db.WithAggTx (shared/db), sau khi job đã khai được kiểm là đã duyệt bốn mắt (giao dịch riêng trên pool
+// app_worker → r_metrics). Mặc định của vai: giao dịch chỉ đọc, statement_timeout (AggRoleSettings). Pool nhỏ của
+// cmd/worker (-agg-run); pg_hba chỉ cho kết nối từ đơn vị worker (docs/runbooks/agg-jobs.md).
+const AppAgg = "app_agg"
+
+// AggRoleSettings là tham số mặc định của AppAgg (ALTER ROLE … SET, bootstrap): chạy trên cụm chính khi chưa có
+// bản sao chỉ đọc (ADR-0031 §3). WithAggTx vẫn đặt cục bộ — đây là lớp chặn thứ hai.
+var AggRoleSettings = map[string]string{"default_transaction_read_only": "on", "statement_timeout": "10min"}
 
 // LoginUnit là vai đăng nhập của một đơn vị triển khai.
 type LoginUnit struct {
@@ -74,9 +82,7 @@ type LoginUnit struct {
 	// hoặc đơn vị chưa ghép module trong tiến trình nhưng ADR-0028 gán (engine đồng bộ).
 	Extra []string
 	// Ops: đơn vị cần r_ops (idempotency HTTP, consumer không thuộc module).
-	Ops bool
-	// Agg: đơn vị chạy job tổng hợp đã khai (W6.4) — thành viên r_agg.
-	Agg      bool
+	Ops      bool
 	Clusters []migrations.Cluster
 }
 
@@ -91,9 +97,11 @@ var (
 var LoginUnits = []LoginUnit{
 	{Role: AppPlatform, Unit: "api-platform", Ops: true, Clusters: pfOnly},
 	// worker chạy consumer liên module của cmd/api-platform/assembly.Consumers (gói không thuộc cmd/internal nên modgen
-	// không thấy): van thu gom pf/cropcycle (r_cropcycle) và van hub pf/geo (r_geo) — W3.3 bỏ import trực tiếp hai
-	// module này khỏi cmd/worker (vụ, thửa sang pf/cooperative), nên khai Extra để giữ membership.
-	{Role: AppWorker, Unit: "worker", Tools: []string{"drill", "formimport"}, Extra: []string{"pf/cropcycle", "pf/geo"}, Ops: true, Agg: true, Clusters: pfOnly},
+	// không thấy): van thu gom pf/cropcycle (r_cropcycle), van hub pf/geo (r_geo) và ảnh chụp pf/simulation
+	// (r_simulation, consumer pf.simulation.snapshot — thiếu từ trước W3.3, gói FC) — khai Extra để có membership.
+	// Kiểm thử cmd/worker TestConsumerModulesInUnitLogin: mọi consumer của worker có vai module trong app_worker.
+	// Job tổng hợp (r_agg) KHÔNG chạy trên vai này — vai đăng nhập riêng AppAgg (ADR-0031 §3).
+	{Role: AppWorker, Unit: "worker", Tools: []string{"drill", "formimport"}, Extra: []string{"pf/cropcycle", "pf/geo", "pf/simulation"}, Ops: true, Clusters: pfOnly},
 	// Cổng tích hợp (W5.2, ADR-0033 §1: vai app_public, không thêm vai) mở pool party theo tên
 	// (cmd/integration-gateway/assembly: không import gốc pf/party). api-public là bí danh một kỳ.
 	{Role: AppPublic, Unit: "integration-gateway", Aliases: []string{"api-public"}, Extra: []string{"pf/party"}, Ops: true, Clusters: pfOnly},
@@ -185,18 +193,39 @@ func UnitGroupRoles(u LoginUnit) []string {
 	if u.Ops {
 		out = append(out, OpsGroup)
 	}
-	if u.Agg {
-		out = append(out, AggRole)
-	}
 	slices.Sort(out)
 	return out
 }
 
-// LoginRoles trả tên mọi vai đăng nhập theo đơn vị.
+// LoginRoles trả tên mọi vai đăng nhập theo đơn vị, cộng vai đăng nhập riêng của job tổng hợp (AppAgg).
 func LoginRoles() []string {
-	out := make([]string, 0, len(LoginUnits))
+	out := make([]string, 0, len(LoginUnits)+1)
 	for _, u := range LoginUnits {
 		out = append(out, u.Role)
+	}
+	return append(out, AppAgg)
+}
+
+// ExclusiveMembers: vai nhóm đặc quyền → thành viên DUY NHẤT được phép. Bootstrap thu hồi (REVOKE) mọi thành viên
+// khác đang có trong pg_auth_members — gỡ grant cũ khi danh mục đổi (gói FC: r_agg rời app_worker sang app_agg)
+// mà không cần migration (ag_migrator không có CREATEROLE).
+var ExclusiveMembers = map[string][]string{AggRole: {AppAgg}}
+
+// pubReaderRoles cấp vai _pub theo hợp đồng module đọc tự khai (consumes.publications).
+// Registry kiểm nguồn/phiên bản/cụm trước khi modgen sinh PubReadOwners; không có mặc định nghiệp vụ.
+func pubReaderRoles(module string, groups []ModuleGroup) []string {
+	reader, _ := modreg.Entry(module)
+	return declaredPubReaderRoles(reader, groups)
+}
+
+func declaredPubReaderRoles(reader modreg.CatalogEntry, groups []ModuleGroup) []string {
+	var out []string
+	for _, owner := range reader.PubReadOwners {
+		for _, g := range groups {
+			if g.Module == owner && g.Pub != "" {
+				out = append(out, g.Pub)
+			}
+		}
 	}
 	return out
 }
@@ -226,6 +255,7 @@ func buildRoles() []Role {
 		if g.Module == AnalyticsModule {
 			member = append(member, pubs...)
 		}
+		member = append(member, pubReaderRoles(g.Module, groups)...)
 		out = append(out, Role{Name: g.Role, MemberOf: member, Clusters: g.Clusters})
 	}
 	out = append(out, Role{Name: OpsGroup, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF, migrations.MKG}})
@@ -251,6 +281,10 @@ func buildRoles() []Role {
 	for _, u := range LoginUnits {
 		// Không thuộc ag_shared_user: tự vai đăng nhập không có quyền bảng nào (kể cả shared.*).
 		out = append(out, Role{Name: u.Role, Login: true, NoInherit: true, MemberOf: UnitGroupRoles(u), Clusters: u.Clusters})
+	}
+	if len(pubs) > 0 {
+		// app_agg (ADR-0031 §3): chỉ r_agg, không thuộc ag_shared_user; tham số mặc định chỉ đọc + statement_timeout.
+		out = append(out, Role{Name: AppAgg, Login: true, NoInherit: true, MemberOf: []string{AggRole}, Settings: AggRoleSettings, Clusters: pfOnly})
 	}
 	return out
 }

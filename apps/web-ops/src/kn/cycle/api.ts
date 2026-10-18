@@ -36,15 +36,42 @@ export type DispRecipient = A["DispRecipient"];
 export type DispView = A["DispView"];
 export type Dispatch = A["Dispatch"];
 
+/** Kết quả nạp Tỉnh giao từ tệp (POST /v1/extension/report-batches/provincial-import). */
+export interface RcProvincialImport {
+  provincial_source: "excel";
+  provincial_values: Record<string, Record<string, Record<string, string>>>;
+  columns: { header: string; template_id: string; form_code: string; letter: string }[];
+  ignored_columns: string[];
+  accepted: number;
+  rejected: number;
+  rows: { row: number; commune_code: string; status: "accepted" | "rejected"; reason: string | null }[];
+}
+
 /** RcPreview với các phần tử đã khai (Go handler/dto.go). */
 export interface RcPreview {
   report_type: string;
   period_type: string;
   period_rule: string;
+  /** D8: lịch tuần của phòng — mã phòng, phiên bản (1 v1, 2 Thứ Tư–Thứ Ba, 3 CNTS Thứ Ba–Thứ Hai), nguồn. */
+  calendar_id: string;
+  calendar_version: number;
+  calendar_source: "department_param" | "builtin" | "global_param" | "legacy";
   deadline: { offset_days: number; time: string };
   close_after_days: number;
   forms: { template_id: string; version_id: string; code: string; name: string; version: number; period_block: boolean; slots: number }[];
-  periods: { slot: number; label: string; range_label: string; from_date: string; to_date: string; due_at: string; auto_close_at: string }[];
+  periods: {
+    slot: number;
+    label: string;
+    range_label: string;
+    from_date: string;
+    to_date: string;
+    due_at: string;
+    auto_close_at: string;
+    /** Khóa kỳ theo lịch kỳ hệ thống (W11.05b) — null với vụ/đột xuất. */
+    period_key: string | null;
+    iso_week: number | null;
+    week_year: number | null;
+  }[];
   communes: { commune_code: string; region_code: string; region_name: string; officer_count: number }[];
   communes_without_officer: string[];
   provincial_columns: { template_id: string; form_code: string; letter: string; title: string; unit: string }[];
@@ -167,6 +194,14 @@ function qs(q?: Q): string {
   return s ? `?${s}` : "";
 }
 
+/** Thân request là tệp nguyên văn (CSV/.xlsx) thay cho JSON — các đường nạp tệp (shared/tabular). */
+export class RawFile {
+  constructor(
+    readonly data: Blob | ArrayBuffer | Uint8Array | string,
+    readonly contentType: string,
+  ) {}
+}
+
 export function knHttp(opts: KnHttpOptions) {
   const base = opts.baseUrl.replace(/\/+$/, "");
   const doFetch = opts.fetch ?? ((r: Request) => fetch(r));
@@ -177,12 +212,12 @@ export function knHttp(opts: KnHttpOptions) {
     const ctx = opts.getContextId();
     if (ctx) headers.set(CONTEXT_HEADER, ctx);
     if (method !== "GET") {
-      headers.set("Content-Type", "application/json");
+      headers.set("Content-Type", body instanceof RawFile ? body.contentType : "application/json");
       headers.set("Idempotency-Key", idem ?? uuidv7());
       const r = supportReason?.trim();
       if (r) headers.set(REASON_HEADER, encodeURIComponent(r));
     }
-    const req = new Request(`${base}${path}${qs(query)}`, { method, headers, body: method === "GET" ? undefined : JSON.stringify(body ?? {}) });
+    const req = new Request(`${base}${path}${qs(query)}`, { method, headers, body: method === "GET" ? undefined : body instanceof RawFile ? (body.data as BodyInit) : JSON.stringify(body ?? {}) });
     let res: Response;
     try {
       res = await doFetch(req);
@@ -209,6 +244,9 @@ export function createCycleApi(opts: KnHttpOptions) {
   return {
     reportForms: (report_type: string, from_date?: string) => call<{ items: RcFormItem[] }>("GET", `${X}/report-forms`, undefined, { report_type, from_date }),
     preview: (b: RcBatchInput) => call<RcPreview>("POST", `${X}/report-batches/preview`, b),
+    /** UR-TI-02: đọc tệp Tỉnh giao (CSV UTF-8/.xlsx) — không ghi; kết quả đưa vào provincial_values khi phát hành. */
+    provincialImport: (q: { report_type: string; from_date?: string; template_ids: string[] }, file: RawFile) =>
+      call<RcProvincialImport>("POST", `${X}/report-batches/provincial-import`, file, { report_type: q.report_type, from_date: q.from_date, template_ids: q.template_ids.join(",") }),
     issue: (b: RcBatchInput, idem?: string) => call<{ batch: RcBatch; periods: RcPeriod[]; warnings: string[]; communes_without_officer: string[] }>("POST", `${X}/report-batches`, b, undefined, idem),
     batches: (q: { report_type?: string; province?: string } = {}) => call<{ items: RcBatch[]; next_cursor: string | null }>("GET", `${X}/report-batches`, undefined, q),
     batch: (id: string) => call<{ batch: RcBatch; periods: RcPeriod[] }>("GET", `${X}/report-batches/${id}`),
@@ -254,13 +292,65 @@ export function createCycleApi(opts: KnHttpOptions) {
 
 export type KnAdminApi = ReturnType<typeof createKnAdminApi>;
 
+// W11.07 — phân quyền trong vai + đơn vị nội bộ (admin.yaml KNAssignmentAttrs, KNDelegation, InternalUnit).
+export type KnAssignmentAttrs = D["KNAssignmentAttrs"];
+export type KnDelegation = D["KNDelegation"];
+export type InternalUnit = D["InternalUnit"];
+export type KnCatalogItem = D["KNCatalogItem"];
+export interface KnAttrsInput {
+  province_group?: string;
+  duties?: string[];
+  internal_unit_code?: string;
+  facility_refs?: string[];
+  household_refs?: string[];
+  reason?: string;
+}
+
 /** Quản trị KN (Admin API, MFA). */
+/** Kết quả POST /v1/accounts/kn-users/import. */
+export interface KnUserImport {
+  accounts_created: number;
+  created: number;
+  rejected: number;
+  rows: { row: number; status: "created" | "rejected"; reason: string | null; user_id: string | null; activation_email_sent: boolean }[];
+}
+
+/** GET /v1/accounts/users/{id}/sessions. */
+export interface KnUserSessions {
+  available: boolean;
+  active: { id: string; ip_address: string; started_at: string | null; last_access_at: string | null; clients: string[] }[];
+  history: { at: string | null; type: string; ip_address: string; client: string; error: string | null }[];
+}
+
 export function createKnAdminApi(opts: KnHttpOptions) {
   const call = knHttp(opts);
   return {
     users: () => call<{ items: AccountsUser[]; next_cursor: string | null }>("GET", "/v1/accounts/users", undefined, { limit: 100 }),
+    /** W11.02 UR-AD-04: nạp Excel tài khoản nhiều vai trò (mỗi dòng một lần gán, cùng Email = một tài khoản). */
+    importKnUsers: (file: RawFile, idem?: string) => call<KnUserImport>("POST", "/v1/accounts/kn-users/import", file, undefined, idem),
+    /** W11.02 FN-AD-04.04: tab Phiên đang hoạt động / Lịch sử đăng nhập (Keycloak Admin REST). */
+    sessions: (id: string) => call<KnUserSessions>("GET", `/v1/accounts/users/${id}/sessions`, undefined, { limit: 50 }),
     user: (id: string) => call<AccountsUser>("GET", `/v1/accounts/users/${id}`),
-    mgmtLevels: () => call<{ items: { code: string; label: string }[]; provisional: boolean }>("GET", "/v1/accounts/mgmt-levels"),
+    mgmtLevels: () =>
+      call<{
+        items: { code: string; label: string; manager?: boolean; reads_all_departments?: boolean }[];
+        provisional: boolean;
+        province_groups?: KnCatalogItem[];
+        duties?: KnCatalogItem[];
+        powers?: KnCatalogItem[];
+        delegation_max_days?: number;
+      }>("GET", "/v1/accounts/mgmt-levels"),
+    // W11.07: phân quyền trong vai, ủy quyền có hạn, đơn vị nội bộ.
+    setAttrs: (id: string, aid: string, body: KnAttrsInput) =>
+      call<{ assignment_id: string; attributes: KnAssignmentAttrs; seq: number }>("PUT", `/v1/accounts/users/${id}/assignments/${aid}/attributes`, body),
+    delegations: (id: string) => call<{ items: KnDelegation[] }>("GET", `/v1/accounts/users/${id}/delegations`),
+    revokeDelegation: (did: string, reason: string) => call<KnDelegation>("POST", `/v1/accounts/delegations/${did}/revoke`, { reason }),
+    internalUnits: (includeInactive = false) => call<{ org_ref: string; items: InternalUnit[]; kinds: KnCatalogItem[] }>("GET", "/v1/accounts/internal-units", undefined, includeInactive ? { include_inactive: "true" } : {}),
+    createInternalUnit: (body: { org_ref: string; code: string; kind: string; name: string; department_code?: string; sort_order?: number }) =>
+      call<InternalUnit>("POST", "/v1/accounts/internal-units", body),
+    seedInternalUnits: (org_ref: string) => call<{ created: InternalUnit[]; existing: number; status: string }>("POST", "/v1/accounts/internal-units/seed", { org_ref }),
+    setInternalUnitActive: (uid: string, active: boolean, reason?: string) =>
+      call<InternalUnit>("POST", `/v1/accounts/internal-units/${uid}/${active ? "reactivate" : "deactivate"}`, reason ? { reason } : {}),
     createKnUser: (body: { full_name: string; email: string; phone?: string; assignments: KnAssignmentInput[] }) =>
       call<{ user: AccountsUser; assignments: KnAssignment[]; activation_email_sent: boolean; warnings: { code: string; message: string }[] }>("POST", "/v1/accounts/kn-users", body),
     assignments: (id: string) => call<{ items: KnAssignment[] }>("GET", `/v1/accounts/users/${id}/assignments`),
@@ -272,6 +362,8 @@ export function createKnAdminApi(opts: KnHttpOptions) {
     lock: (id: string, reason: string) => call<unknown>("POST", `/v1/accounts/users/${id}/lock`, { reason }),
     unlock: (id: string, reason: string) => call<unknown>("POST", `/v1/accounts/users/${id}/unlock`, { reason }),
     resend: (id: string) => call<unknown>("POST", `/v1/accounts/users/${id}/resend-actions`, {}),
+    // D24: đặt lại TOTP (mất/đổi điện thoại) — lý do ≥ 20 ký tự.
+    resetTotp: (id: string, reason: string) => call<unknown>("POST", `/v1/accounts/users/${id}/reset-totp`, { reason }),
     startSupport: (body: { target_assignment_id?: string; role?: "kn_tw" | "kn_tinh" | "kn_xa"; org_ref?: string; commune_codes?: string[]; department_code: string; reason: string }) =>
       call<KnSessionContext>("POST", "/v1/accounts/support-sessions", body),
     endSupport: (id: string) => call<{ support_session_id: string; ended_at: string | null }>("POST", `/v1/accounts/support-sessions/${id}/end`),
@@ -283,6 +375,9 @@ export function createKnAdminApi(opts: KnHttpOptions) {
     regions: (province_code: string) => call<{ province_code: string; items: KnRegion[]; assigned_communes: number }>("GET", "/v1/regions", undefined, { province_code }),
     orgTree: () => call<{ items: KnOrgTreeNode[] }>("GET", "/v1/orgs/tree"),
     assignRegion: (ref: string, region_code: string | null, reason?: string) => call<unknown>("POST", `/v1/orgs/${ref}/region`, { region_code, ...(reason ? { reason } : {}) }),
+    /** FN-AD-04.02 B3: di chuyển Nút xã sang Nút tỉnh khác (Admin API /v1/orgs/{ref}/move, lý do bắt buộc, giữ lịch sử). */
+    moveOrg: (ref: string, new_parent_ref: string, reason: string, new_admin_unit_code?: string) =>
+      call<unknown>("POST", `/v1/orgs/${ref}/move`, { new_parent_ref, reason, ...(new_admin_unit_code ? { new_admin_unit_code } : {}) }),
     impact: (ref: string) => call<{ org: { name: string }; communes: string[]; rows: { key?: string; label?: string; count?: number }[]; warnings: string[]; movable: boolean }>("GET", `/v1/orgs/${ref}/impact`),
   };
 }

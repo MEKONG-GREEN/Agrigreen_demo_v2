@@ -41,7 +41,7 @@ var ManagedRoles = []string{
 	"content_editor_national", "content_editor_province", "content_reviewer",
 	"mrv_collector", "mrv_reviewer", "mrv_viewer", "mrv_exporter",
 	"device_admin", "sync_conflict_resolver",
-	"vault_registrar", "vault_display", "vault_evidence_viewer", "vault_eraser", "vault_pubkey_sync",
+	"vault_registrar", "vault_display", "vault_directory", "vault_evidence_viewer", "vault_eraser", "vault_pubkey_sync",
 }
 
 // MFARoles là vai đánh dấu [MFA] trong realm: người giữ vai phải cấu hình TOTP
@@ -50,6 +50,30 @@ var MFARoles = []string{
 	"platform_admin", "param_setter", "param_approver", "masterdata_admin", "registry_admin", "reports_admin",
 	"cgh_admin", "geo_admin", "device_admin", "sync_conflict_resolver", "vault_eraser",
 	RoleAccountAdmin, RoleAccountAdminProvince,
+}
+
+// RoleLoginTOTP là vai ĐÁNH DẤU của realm (D24): mọi vai trong LoginTOTPRoles là vai tổng hợp chứa vai này,
+// và luồng đăng nhập "agrigreen browser" bắt nhập TOTP khi người dùng có nó (Condition - user role). Không
+// cấp trực tiếp, không nằm trong ManagedRoles.
+const RoleLoginTOTP = "login_totp_required"
+
+// KNOfficerRoles là vai cán bộ KN phải dùng TOTP khi đăng nhập từ G1 (D24, CEO 13/10/2026 — QĐ-4 c). Khác
+// MFARoles: đó là vai [MFA] mà Admin API còn kiểm amr ở backend (httpx.RequireMFA).
+var KNOfficerRoles = []string{"kn_national_admin", "kn_province_admin", "kn_officer", RoleKNUser}
+
+// LoginTOTPRoles là vai mà realm bắt TOTP lúc đăng nhập: cán bộ KN + mọi vai [MFA]. Phải khớp đúng các vai
+// tổng hợp chứa RoleLoginTOTP trong realm (cmd/api-platform realm_test.go).
+var LoginTOTPRoles = append(slices.Clone(KNOfficerRoles), MFARoles...)
+
+// NeedsLoginTOTP cho biết người giữ roles phải đăng ký TOTP (tạo tài khoản / cấp vai gắn CONFIGURE_TOTP vào
+// liên kết kích hoạt; realm cũng tự mở đăng ký ở lần đăng nhập đầu).
+func NeedsLoginTOTP(roles []string) bool {
+	for _, r := range roles {
+		if slices.Contains(LoginTOTPRoles, r) {
+			return true
+		}
+	}
+	return false
 }
 
 // RoleOrgKinds: vai chỉ gắn được cho người thuộc tổ chức có loại tương ứng (giá trị

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/acctbridge/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // MappingEvent là một dòng sổ mapping_event.
@@ -66,7 +67,7 @@ func scanMappingEvent(row pgx.Row) (MappingEvent, error) {
 
 // MappingEventByIdem tìm sự kiện ánh xạ theo idem_key (gọi lặp).
 func MappingEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*MappingEvent, error) {
-	e, err := scanMappingEvent(tx.QueryRow(ctx, "SELECT "+mappingEventCols+" FROM mkg_acctbridge.mapping_event WHERE idem_key = $1", key))
+	e, err := scanMappingEvent(tx.QueryRow(ctx, "SELECT "+mappingEventCols+" FROM mkg_acctbridge.mapping_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // OrderStream là khóa chuỗi băm của lệnh gom.
@@ -92,7 +93,7 @@ func parseUUIDs(xs []string) ([]uuid.UUID, error) {
 
 // OrderEventByIdem tìm sự kiện lệnh gom đã ghi với idem_key.
 func OrderEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*OrderEvent, error) {
-	e, err := scanOrderEvent(tx.QueryRow(ctx, "SELECT "+orderEventCols+" FROM mkg_fieldops.collection_order_event WHERE idem_key = $1", key))
+	e, err := scanOrderEvent(tx.QueryRow(ctx, "SELECT "+orderEventCols+" FROM mkg_fieldops.collection_order_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

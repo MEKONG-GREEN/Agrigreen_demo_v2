@@ -22,12 +22,12 @@ var ErrRecipientNotInCoop = problem.New(http.StatusUnprocessableEntity, "reports
 
 // coopManager: lịch trên Application API chỉ dành cho quản lý HTX thuần (coopOnly) có
 // org_ref — cán bộ KN, Admin CGH, quản trị dùng Admin API (MFA).
-func coopManager(ctx context.Context) (authz.Principal, error) {
+func (s *Service) coopManager(ctx context.Context) (authz.Principal, error) {
 	p, err := authz.Require(ctx, ccport.RoleCoopManager)
 	if err != nil {
 		return p, err
 	}
-	if !coopOnly(p) || p.OrgRef == uuid.Nil {
+	if !s.coopOnly(p) || p.OrgRef == uuid.Nil {
 		return p, problem.Forbidden.WithDetail("lập lịch trên Application API chỉ dành cho quản lý HTX; cán bộ và quản trị dùng Admin API")
 	}
 	return p, nil
@@ -36,7 +36,7 @@ func coopManager(ctx context.Context) (authz.Principal, error) {
 // CoopRecipients liệt kê người nhận chọn được cho lịch của quản lý HTX: tài khoản đang
 // bật, email đã xác minh, thuộc HTX của người gọi (HTX US-DASH-03).
 func (s *Service) CoopRecipients(ctx context.Context) ([]accountsport.Recipient, error) {
-	p, err := coopManager(ctx)
+	p, err := s.coopManager(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (s *Service) CoopRecipients(ctx context.Context) ([]accountsport.Recipient,
 // Application API. Người nhận phải là tài khoản của HTX (CoopRecipients); phạm vi của
 // lịch luôn là HTX của người lập (CreateSchedule ghi cooperative_ref).
 func (s *Service) CreateCoopSchedule(ctx context.Context, in ScheduleInput) (domain.Schedule, bool, error) {
-	if _, err := coopManager(ctx); err != nil {
+	if _, err := s.coopManager(ctx); err != nil {
 		return domain.Schedule{}, false, err
 	}
 	if len(in.Schedule.Recipients) > 0 {
@@ -73,7 +73,7 @@ func (s *Service) CreateCoopSchedule(ctx context.Context, in ScheduleInput) (dom
 
 // CoopSchedules liệt kê lịch HTX của quản lý HTX (Application API).
 func (s *Service) CoopSchedules(ctx context.Context) ([]domain.Schedule, error) {
-	if _, err := coopManager(ctx); err != nil {
+	if _, err := s.coopManager(ctx); err != nil {
 		return nil, err
 	}
 	return s.ListSchedules(ctx)
@@ -81,7 +81,7 @@ func (s *Service) CoopSchedules(ctx context.Context) ([]domain.Schedule, error) 
 
 // DeactivateCoopSchedule ngừng lịch HTX của quản lý HTX, kèm lý do (không xóa).
 func (s *Service) DeactivateCoopSchedule(ctx context.Context, id uuid.UUID, reason string) (domain.Schedule, error) {
-	if _, err := coopManager(ctx); err != nil {
+	if _, err := s.coopManager(ctx); err != nil {
 		return domain.Schedule{}, err
 	}
 	return s.DeactivateSchedule(ctx, id, reason)
@@ -89,7 +89,7 @@ func (s *Service) DeactivateCoopSchedule(ctx context.Context, id uuid.UUID, reas
 
 // CoopScheduleRuns trả các lần chạy (kèm trạng thái gửi email) của lịch HTX.
 func (s *Service) CoopScheduleRuns(ctx context.Context, id uuid.UUID) ([]store.Run, error) {
-	if _, err := coopManager(ctx); err != nil {
+	if _, err := s.coopManager(ctx); err != nil {
 		return nil, err
 	}
 	return s.ScheduleRuns(ctx, id)

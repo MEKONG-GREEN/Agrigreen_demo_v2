@@ -11,34 +11,10 @@ const ModuleEnablementRuleVersion = "pf.party.module_enablement/v1"
 // menuModules ánh xạ tiền tố đường dẫn màn (web-ops) → module per_tenant sở hữu màn. Khớp tiền tố DÀI
 // NHẤT; đường dẫn không khớp thuộc module lõi (pf/party, pf/accounts — luôn hiện). Màn Admin theo phòng
 // ban (/kn/phong-ban/<mã>/<màn>) tra ở menuDeptModules theo phần <màn>.
-var menuModules = map[string]string{
-	"/kn/dashboard":                  "pf/extension",
-	"/kn/nhiem-vu":                   "pf/extension",
-	"/kn/bao-cao":                    "pf/extension",
-	"/kn/bao-cao/chi-cuc":            "pf/reports", // gửi báo cáo Chi cục (dispatch)
-	"/kn/du-lieu/may-moc":            "pf/mechanization",
-	"/kn/du-lieu/ve-thua":            "pf/geo",
-	"/kn/du-lieu/vat-tu":             "pf/extension",
-	"/kn/quan-tri/don-vi-hanh-chinh": "pf/masterdata",
-	"/quan-tri/tham-so":              "pf/masterdata",
-	"/quan-tri/mau-bao-cao":          "pf/reports",
-	"/quan-tri/xung-dot":             "pf/sync",
-	"/quan-tri/giam-sat-dong-bo":     "pf/sync",
-	"/dong-bo":                       "pf/sync",
-	"/quan-tri/su-dung-api":          "pf/metering",
-	"/quan-tri/bang-ke":              "pf/metering",
-	"/quan-tri/nhat-ky-xuat":         "pf/metering",
-}
+var menuModules = catalogValue[map[string]string]("menuModules")
 
 // menuDeptModules: màn Admin theo phòng ban (/kn/phong-ban/{department}/<màn>) → module.
-var menuDeptModules = map[string]string{
-	"/theo-doi-nop":    "pf/extension",
-	"/tong-hop":        "pf/extension",
-	"/du-lieu-bao-cao": "pf/extension",
-	"/thu-thap":        "pf/extension",
-	"/danh-muc":        "pf/masterdata",
-	"/mau-bao-cao":     "pf/reports",
-}
+var menuDeptModules = catalogValue[map[string]string]("menuDeptModules")
 
 // MenuModule trả module per_tenant sở hữu màn route ("" = lõi, luôn hiện).
 func MenuModule(route string) string {

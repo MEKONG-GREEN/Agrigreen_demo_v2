@@ -28,13 +28,24 @@ type CoopProfile struct {
 	Lat, Lon      *decimal.Decimal // numeric(10,7)
 	Address       string           // trụ sở (head_office)
 	UpdatedAt     time.Time        // chỉ đọc
+	// Confirmed (D2 — ADR-0052, chỉ đọc): HTX thật đã nhận quyền neo theo MST. false = "Chưa xác nhận" (HTX tạm do
+	// KN/MKG lập): dữ liệu vẫn vào mọi danh sách, báo cáo và tổng — chỉ mang nhãn.
+	Confirmed bool
 }
+
+// Trạng thái xác nhận HTX (D2) — giá trị của bộ lọc CoopProfileFilter.Confirmation và trường confirmation_status.
+const (
+	CoopConfirmed   = "confirmed"
+	CoopUnconfirmed = "unconfirmed"
+)
 
 // CoopProfileFilter lọc hồ sơ HTX (tìm theo mã số thuế, lọc diện tích của màn danh sách). Trường rỗng/nil = không lọc.
 type CoopProfileFilter struct {
 	TaxPrefix string
 	AreaMin   *decimal.Decimal
 	AreaMax   *decimal.Decimal
+	// Confirmation (D2): CoopConfirmed | CoopUnconfirmed | rỗng = không lọc.
+	Confirmation string
 }
 
 // Loại chủ thể của sổ hồ sơ KN (kn_profile_event, KN v7.7 FN-XA-03.03).

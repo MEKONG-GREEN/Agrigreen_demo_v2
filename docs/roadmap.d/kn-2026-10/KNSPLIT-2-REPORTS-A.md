@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-REPORTS-A — Đăng ký session policy thuộc KN cho reports, giữ adapter legacy đến bước B; 13package PG/consumer và cổng tĩnh đạt, helper kiểm migration trước tích hợp dev.

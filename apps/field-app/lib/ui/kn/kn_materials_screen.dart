@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/kn_collection_service.dart';
 import 'kn_common.dart';
 import 'kn_providers.dart';
+import '../../domain/pii_hint.dart';
 
 class _MLine {
   String? code;
@@ -273,8 +274,13 @@ class _MaterialsState extends ConsumerState<KnMaterialsScreen> {
                         Expanded(
                           child: TextField(
                             controller: _lines[i].note,
-                            decoration: const InputDecoration(
+                            onChanged: (_) => setState(() {}),
+                            decoration: InputDecoration(
                               labelText: 'Ghi chú',
+                              helperText: piiWarning(
+                                _lines[i].note.text,
+                              ), // X-02
+                              helperMaxLines: 3,
                             ),
                           ),
                         ),

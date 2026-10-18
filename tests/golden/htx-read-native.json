@@ -1,0 +1,855 @@
+{
+  "confirm/before": {
+    "00000000-0000-7000-8000-000000000101": "unconfirmed",
+    "00000000-0000-7000-8000-000000000102": "unconfirmed",
+    "00000000-0000-7000-8000-000000000103": "unconfirmed",
+    "00000000-0000-7000-8000-000000000104": "unconfirmed",
+    "00000000-0000-7000-8000-000000000105": "unconfirmed",
+    "00000000-0000-7000-8000-000000000999": "unconfirmed"
+  },
+  "confirm/current": {
+    "00000000-0000-7000-8000-000000000101": "confirmed",
+    "00000000-0000-7000-8000-000000000102": "confirmed",
+    "00000000-0000-7000-8000-000000000103": "confirmed",
+    "00000000-0000-7000-8000-000000000104": "unconfirmed",
+    "00000000-0000-7000-8000-000000000105": "unconfirmed",
+    "00000000-0000-7000-8000-000000000999": "unconfirmed"
+  },
+  "confirm/cutoff": {
+    "00000000-0000-7000-8000-000000000101": "confirmed",
+    "00000000-0000-7000-8000-000000000102": "confirmed",
+    "00000000-0000-7000-8000-000000000103": "unconfirmed",
+    "00000000-0000-7000-8000-000000000104": "unconfirmed",
+    "00000000-0000-7000-8000-000000000105": "unconfirmed",
+    "00000000-0000-7000-8000-000000000999": "unconfirmed"
+  },
+  "confirm/emptyTenant": {
+    "00000000-0000-7000-8000-000000000101": "unconfirmed",
+    "00000000-0000-7000-8000-000000000102": "unconfirmed",
+    "00000000-0000-7000-8000-000000000103": "unconfirmed",
+    "00000000-0000-7000-8000-000000000104": "unconfirmed",
+    "00000000-0000-7000-8000-000000000105": "unconfirmed",
+    "00000000-0000-7000-8000-000000000999": "unconfirmed"
+  },
+  "confirm/nextDay": {
+    "00000000-0000-7000-8000-000000000101": "confirmed",
+    "00000000-0000-7000-8000-000000000102": "confirmed",
+    "00000000-0000-7000-8000-000000000103": "confirmed",
+    "00000000-0000-7000-8000-000000000104": "unconfirmed",
+    "00000000-0000-7000-8000-000000000105": "unconfirmed",
+    "00000000-0000-7000-8000-000000000999": "unconfirmed"
+  },
+  "confirm/other": {
+    "00000000-0000-7000-8000-000000000101": "unconfirmed",
+    "00000000-0000-7000-8000-000000000102": "unconfirmed",
+    "00000000-0000-7000-8000-000000000103": "unconfirmed",
+    "00000000-0000-7000-8000-000000000104": "unconfirmed",
+    "00000000-0000-7000-8000-000000000105": "unconfirmed",
+    "00000000-0000-7000-8000-000000000999": "unconfirmed"
+  },
+  "coops/all": [
+    {
+      "UnitCode": "89001",
+      "Cooperatives": 2,
+      "Households": 3
+    },
+    {
+      "UnitCode": "92001",
+      "Cooperatives": 1,
+      "Households": 0
+    }
+  ],
+  "coops/empty": [],
+  "coops/emptyTenant": [],
+  "coops/one": [
+    {
+      "UnitCode": "89001",
+      "Cooperatives": 2,
+      "Households": 3
+    }
+  ],
+  "coops/other": [
+    {
+      "UnitCode": "89001",
+      "Cooperatives": 1,
+      "Households": 1
+    }
+  ],
+  "coops/second": [
+    {
+      "UnitCode": "92001",
+      "Cooperatives": 1,
+      "Households": 0
+    }
+  ],
+  "coops/unknown": [],
+  "plots/all": [
+    {
+      "CommuneCode": "89001",
+      "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+      "Plots": 3,
+      "AreaHa": "6.5679"
+    },
+    {
+      "CommuneCode": "92001",
+      "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+      "Plots": 1,
+      "AreaHa": "0.0001"
+    }
+  ],
+  "plots/empty": [],
+  "plots/emptyTenant": [],
+  "plots/one": [
+    {
+      "CommuneCode": "89001",
+      "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+      "Plots": 3,
+      "AreaHa": "6.5679"
+    }
+  ],
+  "plots/other": [
+    {
+      "CommuneCode": "89001",
+      "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+      "Plots": 1,
+      "AreaHa": "99.9999"
+    }
+  ],
+  "plots/second": [
+    {
+      "CommuneCode": "92001",
+      "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+      "Plots": 1,
+      "AreaHa": "0.0001"
+    }
+  ],
+  "plots/unknown": [],
+  "production/commune": {
+    "Rows": [
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000101",
+        "SeasonCode": "DT",
+        "SeasonYear": 2026,
+        "VarietyCode": "OM1",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "2",
+        "HarvestedAreaHa": "2",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "1000.125",
+        "ActualYieldTPerHa": "0.5001",
+        "SOPSteps": 4,
+        "SOPStepsDone": 4,
+        "SOPProgressPct": "100"
+      },
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000101",
+        "SeasonCode": "HT",
+        "SeasonYear": 2026,
+        "VarietyCode": "OM1",
+        "Seasons": 1,
+        "OpenSeasons": 1,
+        "CompletedSeasons": 0,
+        "Households": 1,
+        "AreaHa": "1.2345",
+        "HarvestedAreaHa": "0",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": null,
+        "SOPSteps": 3,
+        "SOPStepsDone": 1,
+        "SOPProgressPct": "33.3"
+      }
+    ],
+    "Totals": {
+      "Seasons": 2,
+      "OpenSeasons": 1,
+      "CompletedSeasons": 1,
+      "Households": 1,
+      "AreaHa": "3.2345",
+      "HarvestedAreaHa": "2",
+      "ExpectedKg": "2469.000",
+      "ActualKg": "1000.125",
+      "ActualYieldTPerHa": "0.5001",
+      "SOPSteps": 7,
+      "SOPStepsDone": 5,
+      "SOPProgressPct": "71.4"
+    }
+  },
+  "production/emptyTenant": {
+    "Rows": [],
+    "Totals": {
+      "Seasons": 0,
+      "OpenSeasons": 0,
+      "CompletedSeasons": 0,
+      "Households": 0,
+      "AreaHa": "0",
+      "HarvestedAreaHa": "0",
+      "ExpectedKg": "0.000",
+      "ActualKg": "0.000",
+      "ActualYieldTPerHa": null,
+      "SOPSteps": 0,
+      "SOPStepsDone": 0,
+      "SOPProgressPct": null
+    }
+  },
+  "production/filter": {
+    "Rows": [
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000101",
+        "SeasonCode": "DT",
+        "SeasonYear": 2026,
+        "VarietyCode": "OM1",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "2",
+        "HarvestedAreaHa": "2",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "1000.125",
+        "ActualYieldTPerHa": "0.5001",
+        "SOPSteps": 4,
+        "SOPStepsDone": 4,
+        "SOPProgressPct": "100"
+      }
+    ],
+    "Totals": {
+      "Seasons": 1,
+      "OpenSeasons": 0,
+      "CompletedSeasons": 1,
+      "Households": 1,
+      "AreaHa": "2",
+      "HarvestedAreaHa": "2",
+      "ExpectedKg": "1234.500",
+      "ActualKg": "1000.125",
+      "ActualYieldTPerHa": "0.5001",
+      "SOPSteps": 4,
+      "SOPStepsDone": 4,
+      "SOPProgressPct": "100"
+    }
+  },
+  "production/group0": {
+    "Rows": [
+      {
+        "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+        "SeasonCode": "",
+        "SeasonYear": 0,
+        "VarietyCode": "",
+        "Seasons": 3,
+        "OpenSeasons": 1,
+        "CompletedSeasons": 2,
+        "Households": 1,
+        "AreaHa": "6.2345",
+        "HarvestedAreaHa": "5",
+        "ExpectedKg": "3703.500",
+        "ActualKg": "1000.125",
+        "ActualYieldTPerHa": "0.2",
+        "SOPSteps": 7,
+        "SOPStepsDone": 5,
+        "SOPProgressPct": "71.4"
+      }
+    ],
+    "Totals": {
+      "Seasons": 3,
+      "OpenSeasons": 1,
+      "CompletedSeasons": 2,
+      "Households": 1,
+      "AreaHa": "6.2345",
+      "HarvestedAreaHa": "5",
+      "ExpectedKg": "3703.500",
+      "ActualKg": "1000.125",
+      "ActualYieldTPerHa": "0.2",
+      "SOPSteps": 7,
+      "SOPStepsDone": 5,
+      "SOPProgressPct": "71.4"
+    }
+  },
+  "production/group1": {
+    "Rows": [
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000101",
+        "SeasonCode": "",
+        "SeasonYear": 0,
+        "VarietyCode": "",
+        "Seasons": 2,
+        "OpenSeasons": 1,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "3.2345",
+        "HarvestedAreaHa": "2",
+        "ExpectedKg": "2469.000",
+        "ActualKg": "1000.125",
+        "ActualYieldTPerHa": "0.5001",
+        "SOPSteps": 7,
+        "SOPStepsDone": 5,
+        "SOPProgressPct": "71.4"
+      },
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000103",
+        "SeasonCode": "",
+        "SeasonYear": 0,
+        "VarietyCode": "",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "3",
+        "HarvestedAreaHa": "3",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": "0",
+        "SOPSteps": 0,
+        "SOPStepsDone": 0,
+        "SOPProgressPct": null
+      }
+    ],
+    "Totals": {
+      "Seasons": 3,
+      "OpenSeasons": 1,
+      "CompletedSeasons": 2,
+      "Households": 1,
+      "AreaHa": "6.2345",
+      "HarvestedAreaHa": "5",
+      "ExpectedKg": "3703.500",
+      "ActualKg": "1000.125",
+      "ActualYieldTPerHa": "0.2",
+      "SOPSteps": 7,
+      "SOPStepsDone": 5,
+      "SOPProgressPct": "71.4"
+    }
+  },
+  "production/group2": {
+    "Rows": [
+      {
+        "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+        "SeasonCode": "HT",
+        "SeasonYear": 2025,
+        "VarietyCode": "",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "3",
+        "HarvestedAreaHa": "3",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": "0",
+        "SOPSteps": 0,
+        "SOPStepsDone": 0,
+        "SOPProgressPct": null
+      },
+      {
+        "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+        "SeasonCode": "DT",
+        "SeasonYear": 2026,
+        "VarietyCode": "",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "2",
+        "HarvestedAreaHa": "2",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "1000.125",
+        "ActualYieldTPerHa": "0.5001",
+        "SOPSteps": 4,
+        "SOPStepsDone": 4,
+        "SOPProgressPct": "100"
+      },
+      {
+        "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+        "SeasonCode": "HT",
+        "SeasonYear": 2026,
+        "VarietyCode": "",
+        "Seasons": 1,
+        "OpenSeasons": 1,
+        "CompletedSeasons": 0,
+        "Households": 1,
+        "AreaHa": "1.2345",
+        "HarvestedAreaHa": "0",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": null,
+        "SOPSteps": 3,
+        "SOPStepsDone": 1,
+        "SOPProgressPct": "33.3"
+      }
+    ],
+    "Totals": {
+      "Seasons": 3,
+      "OpenSeasons": 1,
+      "CompletedSeasons": 2,
+      "Households": 1,
+      "AreaHa": "6.2345",
+      "HarvestedAreaHa": "5",
+      "ExpectedKg": "3703.500",
+      "ActualKg": "1000.125",
+      "ActualYieldTPerHa": "0.2",
+      "SOPSteps": 7,
+      "SOPStepsDone": 5,
+      "SOPProgressPct": "71.4"
+    }
+  },
+  "production/group3": {
+    "Rows": [
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000101",
+        "SeasonCode": "DT",
+        "SeasonYear": 2026,
+        "VarietyCode": "",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "2",
+        "HarvestedAreaHa": "2",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "1000.125",
+        "ActualYieldTPerHa": "0.5001",
+        "SOPSteps": 4,
+        "SOPStepsDone": 4,
+        "SOPProgressPct": "100"
+      },
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000101",
+        "SeasonCode": "HT",
+        "SeasonYear": 2026,
+        "VarietyCode": "",
+        "Seasons": 1,
+        "OpenSeasons": 1,
+        "CompletedSeasons": 0,
+        "Households": 1,
+        "AreaHa": "1.2345",
+        "HarvestedAreaHa": "0",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": null,
+        "SOPSteps": 3,
+        "SOPStepsDone": 1,
+        "SOPProgressPct": "33.3"
+      },
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000103",
+        "SeasonCode": "HT",
+        "SeasonYear": 2025,
+        "VarietyCode": "",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "3",
+        "HarvestedAreaHa": "3",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": "0",
+        "SOPSteps": 0,
+        "SOPStepsDone": 0,
+        "SOPProgressPct": null
+      }
+    ],
+    "Totals": {
+      "Seasons": 3,
+      "OpenSeasons": 1,
+      "CompletedSeasons": 2,
+      "Households": 1,
+      "AreaHa": "6.2345",
+      "HarvestedAreaHa": "5",
+      "ExpectedKg": "3703.500",
+      "ActualKg": "1000.125",
+      "ActualYieldTPerHa": "0.2",
+      "SOPSteps": 7,
+      "SOPStepsDone": 5,
+      "SOPProgressPct": "71.4"
+    }
+  },
+  "production/group4": {
+    "Rows": [
+      {
+        "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+        "SeasonCode": "",
+        "SeasonYear": 0,
+        "VarietyCode": "OM1",
+        "Seasons": 2,
+        "OpenSeasons": 1,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "3.2345",
+        "HarvestedAreaHa": "2",
+        "ExpectedKg": "2469.000",
+        "ActualKg": "1000.125",
+        "ActualYieldTPerHa": "0.5001",
+        "SOPSteps": 7,
+        "SOPStepsDone": 5,
+        "SOPProgressPct": "71.4"
+      },
+      {
+        "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+        "SeasonCode": "",
+        "SeasonYear": 0,
+        "VarietyCode": "OM2",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "3",
+        "HarvestedAreaHa": "3",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": "0",
+        "SOPSteps": 0,
+        "SOPStepsDone": 0,
+        "SOPProgressPct": null
+      }
+    ],
+    "Totals": {
+      "Seasons": 3,
+      "OpenSeasons": 1,
+      "CompletedSeasons": 2,
+      "Households": 1,
+      "AreaHa": "6.2345",
+      "HarvestedAreaHa": "5",
+      "ExpectedKg": "3703.500",
+      "ActualKg": "1000.125",
+      "ActualYieldTPerHa": "0.2",
+      "SOPSteps": 7,
+      "SOPStepsDone": 5,
+      "SOPProgressPct": "71.4"
+    }
+  },
+  "production/group5": {
+    "Rows": [
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000101",
+        "SeasonCode": "",
+        "SeasonYear": 0,
+        "VarietyCode": "OM1",
+        "Seasons": 2,
+        "OpenSeasons": 1,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "3.2345",
+        "HarvestedAreaHa": "2",
+        "ExpectedKg": "2469.000",
+        "ActualKg": "1000.125",
+        "ActualYieldTPerHa": "0.5001",
+        "SOPSteps": 7,
+        "SOPStepsDone": 5,
+        "SOPProgressPct": "71.4"
+      },
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000103",
+        "SeasonCode": "",
+        "SeasonYear": 0,
+        "VarietyCode": "OM2",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "3",
+        "HarvestedAreaHa": "3",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": "0",
+        "SOPSteps": 0,
+        "SOPStepsDone": 0,
+        "SOPProgressPct": null
+      }
+    ],
+    "Totals": {
+      "Seasons": 3,
+      "OpenSeasons": 1,
+      "CompletedSeasons": 2,
+      "Households": 1,
+      "AreaHa": "6.2345",
+      "HarvestedAreaHa": "5",
+      "ExpectedKg": "3703.500",
+      "ActualKg": "1000.125",
+      "ActualYieldTPerHa": "0.2",
+      "SOPSteps": 7,
+      "SOPStepsDone": 5,
+      "SOPProgressPct": "71.4"
+    }
+  },
+  "production/group6": {
+    "Rows": [
+      {
+        "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+        "SeasonCode": "HT",
+        "SeasonYear": 2025,
+        "VarietyCode": "OM2",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "3",
+        "HarvestedAreaHa": "3",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": "0",
+        "SOPSteps": 0,
+        "SOPStepsDone": 0,
+        "SOPProgressPct": null
+      },
+      {
+        "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+        "SeasonCode": "DT",
+        "SeasonYear": 2026,
+        "VarietyCode": "OM1",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "2",
+        "HarvestedAreaHa": "2",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "1000.125",
+        "ActualYieldTPerHa": "0.5001",
+        "SOPSteps": 4,
+        "SOPStepsDone": 4,
+        "SOPProgressPct": "100"
+      },
+      {
+        "CooperativeRef": "00000000-0000-0000-0000-000000000000",
+        "SeasonCode": "HT",
+        "SeasonYear": 2026,
+        "VarietyCode": "OM1",
+        "Seasons": 1,
+        "OpenSeasons": 1,
+        "CompletedSeasons": 0,
+        "Households": 1,
+        "AreaHa": "1.2345",
+        "HarvestedAreaHa": "0",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": null,
+        "SOPSteps": 3,
+        "SOPStepsDone": 1,
+        "SOPProgressPct": "33.3"
+      }
+    ],
+    "Totals": {
+      "Seasons": 3,
+      "OpenSeasons": 1,
+      "CompletedSeasons": 2,
+      "Households": 1,
+      "AreaHa": "6.2345",
+      "HarvestedAreaHa": "5",
+      "ExpectedKg": "3703.500",
+      "ActualKg": "1000.125",
+      "ActualYieldTPerHa": "0.2",
+      "SOPSteps": 7,
+      "SOPStepsDone": 5,
+      "SOPProgressPct": "71.4"
+    }
+  },
+  "production/group7": {
+    "Rows": [
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000101",
+        "SeasonCode": "DT",
+        "SeasonYear": 2026,
+        "VarietyCode": "OM1",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "2",
+        "HarvestedAreaHa": "2",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "1000.125",
+        "ActualYieldTPerHa": "0.5001",
+        "SOPSteps": 4,
+        "SOPStepsDone": 4,
+        "SOPProgressPct": "100"
+      },
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000101",
+        "SeasonCode": "HT",
+        "SeasonYear": 2026,
+        "VarietyCode": "OM1",
+        "Seasons": 1,
+        "OpenSeasons": 1,
+        "CompletedSeasons": 0,
+        "Households": 1,
+        "AreaHa": "1.2345",
+        "HarvestedAreaHa": "0",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": null,
+        "SOPSteps": 3,
+        "SOPStepsDone": 1,
+        "SOPProgressPct": "33.3"
+      },
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000103",
+        "SeasonCode": "HT",
+        "SeasonYear": 2025,
+        "VarietyCode": "OM2",
+        "Seasons": 1,
+        "OpenSeasons": 0,
+        "CompletedSeasons": 1,
+        "Households": 1,
+        "AreaHa": "3",
+        "HarvestedAreaHa": "3",
+        "ExpectedKg": "1234.500",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": "0",
+        "SOPSteps": 0,
+        "SOPStepsDone": 0,
+        "SOPProgressPct": null
+      }
+    ],
+    "Totals": {
+      "Seasons": 3,
+      "OpenSeasons": 1,
+      "CompletedSeasons": 2,
+      "Households": 1,
+      "AreaHa": "6.2345",
+      "HarvestedAreaHa": "5",
+      "ExpectedKg": "3703.500",
+      "ActualKg": "1000.125",
+      "ActualYieldTPerHa": "0.2",
+      "SOPSteps": 7,
+      "SOPStepsDone": 5,
+      "SOPProgressPct": "71.4"
+    }
+  },
+  "production/none": {
+    "Rows": [],
+    "Totals": {
+      "Seasons": 0,
+      "OpenSeasons": 0,
+      "CompletedSeasons": 0,
+      "Households": 0,
+      "AreaHa": "0",
+      "HarvestedAreaHa": "0",
+      "ExpectedKg": "0.000",
+      "ActualKg": "0.000",
+      "ActualYieldTPerHa": null,
+      "SOPSteps": 0,
+      "SOPStepsDone": 0,
+      "SOPProgressPct": null
+    }
+  },
+  "production/other": {
+    "Rows": [
+      {
+        "CooperativeRef": "00000000-0000-7000-8000-000000000101",
+        "SeasonCode": "HT",
+        "SeasonYear": 2026,
+        "VarietyCode": "OM1",
+        "Seasons": 1,
+        "OpenSeasons": 1,
+        "CompletedSeasons": 0,
+        "Households": 1,
+        "AreaHa": "50",
+        "HarvestedAreaHa": "0",
+        "ExpectedKg": "90000.000",
+        "ActualKg": "0.000",
+        "ActualYieldTPerHa": null,
+        "SOPSteps": 3,
+        "SOPStepsDone": 1,
+        "SOPProgressPct": "33.3"
+      }
+    ],
+    "Totals": {
+      "Seasons": 1,
+      "OpenSeasons": 1,
+      "CompletedSeasons": 0,
+      "Households": 1,
+      "AreaHa": "50",
+      "HarvestedAreaHa": "0",
+      "ExpectedKg": "90000.000",
+      "ActualKg": "0.000",
+      "ActualYieldTPerHa": null,
+      "SOPSteps": 3,
+      "SOPStepsDone": 1,
+      "SOPProgressPct": "33.3"
+    }
+  },
+  "production/province": {
+    "Rows": [],
+    "Totals": {
+      "Seasons": 0,
+      "OpenSeasons": 0,
+      "CompletedSeasons": 0,
+      "Households": 0,
+      "AreaHa": "0",
+      "HarvestedAreaHa": "0",
+      "ExpectedKg": "0.000",
+      "ActualKg": "0.000",
+      "ActualYieldTPerHa": null,
+      "SOPSteps": 0,
+      "SOPStepsDone": 0,
+      "SOPProgressPct": null
+    }
+  },
+  "production/unknown": {
+    "Rows": [],
+    "Totals": {
+      "Seasons": 0,
+      "OpenSeasons": 0,
+      "CompletedSeasons": 0,
+      "Households": 0,
+      "AreaHa": "0",
+      "HarvestedAreaHa": "0",
+      "ExpectedKg": "0.000",
+      "ActualKg": "0.000",
+      "ActualYieldTPerHa": null,
+      "SOPSteps": 0,
+      "SOPStepsDone": 0,
+      "SOPProgressPct": null
+    }
+  },
+  "season/codes": {
+    "00000000-0000-7000-8000-000000000401": {
+      "SeasonCode": "HT",
+      "SeasonYear": 2026
+    },
+    "00000000-0000-7000-8000-000000000402": {
+      "SeasonCode": "DT",
+      "SeasonYear": 2026
+    },
+    "00000000-0000-7000-8000-000000000403": {
+      "SeasonCode": "HT",
+      "SeasonYear": 2025
+    },
+    "00000000-0000-7000-8000-000000000404": {
+      "SeasonCode": "HT",
+      "SeasonYear": 2026
+    }
+  },
+  "season/progress/all": [
+    {
+      "CommuneCode": "89001",
+      "SeasonCode": "HT",
+      "SeasonYear": 2026,
+      "HouseholdRef": "00000000-0000-7000-8000-000000000201",
+      "AreaHa": "1.2345",
+      "Completed": false,
+      "ExpectedHarvestDate": "2026-10-15T00:00:00Z"
+    },
+    {
+      "CommuneCode": "89001",
+      "SeasonCode": "DT",
+      "SeasonYear": 2026,
+      "HouseholdRef": "00000000-0000-7000-8000-000000000201",
+      "AreaHa": "2",
+      "Completed": true,
+      "ExpectedHarvestDate": "2026-10-15T00:00:00Z"
+    },
+    {
+      "CommuneCode": "92001",
+      "SeasonCode": "HT",
+      "SeasonYear": 2025,
+      "HouseholdRef": "00000000-0000-7000-8000-000000000201",
+      "AreaHa": "3",
+      "Completed": true,
+      "ExpectedHarvestDate": "2026-10-15T00:00:00Z"
+    }
+  ],
+  "season/progress/before": []
+}

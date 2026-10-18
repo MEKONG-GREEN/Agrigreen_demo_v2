@@ -167,6 +167,11 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       },
       { href: "/quan-tri/to-chuc", label: "Cơ cấu tổ chức", icon: "org", roles: [ROLES.platformAdmin, ROLES.registryAdmin] },
       { href: "/quan-tri/nhap-nong-ho", label: "Nhập nông hộ từ tệp", icon: "coop", roles: [ROLES.platformAdmin, ROLES.registryAdmin] },
+      {
+        // D2 (ADR-0052): neo HTX theo MST — HTX tạm (Chưa xác nhận), gắn MST, nhận quyền có chạy thử.
+        href: "/quan-tri/neo-htx", module: "pf/cooperative", label: "Neo HTX theo mã số thuế", icon: "coop",
+        roles: [ROLES.platformAdmin, ROLES.registryAdmin],
+      },
       { href: "/quan-tri/bai-viet", module: "pf/content", label: "Soạn bài viết", icon: "library", roles: [ROLES.contentEditorNational, ROLES.contentEditorProvince] },
       { href: "/quan-tri/nhap-thua", module: "pf/geo", label: "Nhập ranh giới thửa", icon: "upload", roles: [ROLES.platformAdmin, ROLES.geoAdmin] },
       { href: "/quan-tri/ban-do", module: "pf/geo", label: "Biên tập bản đồ", icon: "map", roles: [ROLES.platformAdmin, ROLES.geoAdmin] },

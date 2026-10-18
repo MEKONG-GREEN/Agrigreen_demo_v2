@@ -17,6 +17,7 @@ Mọi lỗi trả về `application/problem+json` theo RFC 9457. Mỗi lỗi có
 | 403 | `mfa_required` | Bề mặt Admin khi token chưa qua yếu tố thứ hai |
 | 403 | `self_approval_forbidden` | Tự phê duyệt thay đổi do chính mình đặt (R-56) |
 | 403 | `module_not_enabled` | Route của một module `enable: per_tenant` đã tắt cho đơn vị (tenant) người gọi (R-MOD-08, W1.4). Thân có `module` (vd `pf/geo`). Module lõi/`always` không bao giờ trả mã này |
+| 403 | `node_scope_required` | Người dùng có vai/cấp gắn Nút — quản lý HTX (`coop_manager`), cán bộ KN (`kn_officer`) không kèm vai tỉnh/quốc gia/`platform_admin`, ngữ cảnh phiên Cấp Xã (`kn_xa`) — mà không có đơn vị công tác (`org_ref`/Nút của lần gán). `db.ForModule` không mở giao dịch của module (FD, rủi ro R-5 của RLS `p_scope`, docs/design/cooperative.md §18.4). Cấp Tỉnh/Quốc gia/Admin và consumer/job không bị xét |
 | 404 | `not_found` | Đường dẫn không tồn tại |
 | 405 | `method_not_allowed` | Phương thức HTTP không được hỗ trợ |
 | 409 | `idempotency_in_progress` | Yêu cầu cùng khóa đang chạy |
@@ -32,6 +33,8 @@ Mọi lỗi trả về `application/problem+json` theo RFC 9457. Mỗi lỗi có
 
 Mã lỗi của module có dạng `<module>.<lỗi>`.
 
+**Module mới (từ 13/10/2026):** ghi mã vào tệp riêng `docs/errors/<cụm>-<module>.md` (vd `docs/errors/pf-price.md`), không thêm mục vào tệp này — tránh xung đột gộp giữa các gói song song. Quy ước và danh sách: [errors/README.md](errors/README.md). Các mục dưới đây giữ nguyên chỗ cũ (kiểm thử web đọc chúng).
+
 | HTTP | code | Module |
 |---|---|---|
 | 404 | `party.consent_not_found` | pf/party |
@@ -42,6 +45,8 @@ Mã lỗi của module có dạng `<module>.<lỗi>`.
 | 410 | `vault.erased` | vault/identity: chủ thể đã bị xóa định danh (RB-3); khóa bí mật đã hủy |
 | 422 | `vault.unwrap_failed` | vault/identity: `wrapped_dek` không mở được bằng khóa của chủ thể |
 | 429 | `vault.quota_exceeded` | vault/identity: người yêu cầu vượt hạn mức Lookup/Resolve (`AG_VAULT_QUOTA_PER_HOUR`/`_BURST`); problem có `retry_after_s`. Mục đích ngoài danh mục của thao tác → 422 `validation_failed` (trường `purpose`); Resolve/Unwrap thiếu MFA khi `AG_VAULT_REQUIRE_MFA` bật → 403 `mfa_required` |
+| 422 | `vault.section_invalid` | vault/identity (W11.22, vault 000004): ngăn hồ sơ không có, mục đích không phải mục đích của ngăn (`hrm.profile` ↔ ngăn `hrm.profile`, `hrm.sensitive` ↔ ngăn `hrm.sensitive`), trường không thuộc ngăn hoặc quá dài |
+| 503 | `vault.profiles_unsupported` | client của kho: hiện thực được nối không có phần mở rộng hồ sơ (`client.Profiles`) — lỗi cấu hình |
 | 502/503 | `vault.unavailable` | client của kho: kho định danh không phản hồi hoặc lỗi hệ thống |
 | 404 | `masterdata.admin_unit_not_found` | pf/masterdata: không có đơn vị hành chính với mã đó tại thời điểm tra (hoặc đã bãi bỏ không có kế thừa) |
 | 409 | `masterdata.admin_unit_conflict` | pf/masterdata: nhập danh mục có phiên bản `(code, valid_from)` đã có với nội dung khác — chỉ được đóng hiệu lực phiên bản đang mở |
@@ -54,6 +59,8 @@ Mã lỗi của module có dạng `<module>.<lỗi>`.
 | 422 | `masterdata.farm_stage_invalid` | pf/masterdata: loại máy gắn khâu sản xuất không có hoặc đã ngừng dùng |
 | 409 | `masterdata.catalog_item_name_taken` | pf/masterdata (KN v7.7 FN-AD-04.05): danh mục đã có mục khác cùng tên (không phân biệt hoa/thường tiếng Việt) |
 | 422 | `masterdata.catalog_ref_invalid` | pf/masterdata (KN v7.7 FN-AD-04.05): cây trồng gắn nhóm không phải nhóm cấp 1 đang dùng (hoặc chính nó); sâu bệnh gắn cây trồng bị ảnh hưởng không có/đã ngừng dùng |
+| 409 | `masterdata.cnts_stamp_taken` | pf/masterdata (W11.41, BRD CNTS FN-06): mã số khắc mộc dấu GS/GC đã thuộc cơ sở giết mổ khác (kể cả cơ sở đã ngừng dùng — mã là định danh, không tái dùng); `field` chỉ mã → cơ sở đang giữ |
+| 422 | `masterdata.cnts_commune_invalid` | pf/masterdata (W11.41, FN-06 BR-02): cơ sở giết mổ trỏ mã không phải xã/phường/đặc khu có hiệu lực tại ngày áp dụng (`valid_from`) |
 | 404 | `masterdata.param_not_found` | pf/masterdata: không có phiên bản tham số ĐÃ PHÊ DUYỆT có hiệu lực tại thời điểm tra |
 | 404 | `masterdata.param_version_not_found` | pf/masterdata: không có phiên bản tham số |
 | 409 | `masterdata.param_invalid_transition` | pf/masterdata: trạng thái không cho phép (gửi duyệt khi không phải nháp; duyệt/từ chối khi chưa gửi hoặc đã quyết định) |
@@ -207,6 +214,7 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `extension.form_not_assigned` | pf/extension: mẫu chưa gán cho loại báo cáo của phòng ban (FN-AD-04.06) hoặc chưa có phiên bản phát hành áp dụng tại kỳ đầu |
 | 422 | `extension.form_no_structure` | pf/extension: mẫu chưa có cột nhập liệu — chặn phát hành (FN-TI-02.02) |
 | 422 | `extension.period_slots_exceeded` | pf/extension: số kỳ của đợt vượt số khe kỳ trên một dòng của mẫu nhiều kỳ (PL 01, 01B, 02, 07; tạm theo seed, chờ khách Q-01) |
+| 422 | `extension.provincial_import_invalid` | pf/extension: tệp nạp Tỉnh giao (`POST /v1/extension/report-batches/provincial-import`, W11.02) không đọc được (không phải CSV UTF-8/.xlsx, ô công thức, quá 500 dòng/2 MB), thiếu cột "Mã xã", không nhận ra cột Tỉnh giao nào hoặc hai cột trùng một cột Tỉnh giao — từ chối cả tệp; dòng lỗi riêng lẻ trả trong `rows` |
 | 422 | `extension.no_communes` | pf/extension: chưa chọn xã nhận, hoặc mã xã không phải Nút xã đang hoạt động của tỉnh |
 | 409 | `extension.batch_has_submissions` | pf/extension: thu hồi đợt khi đã có xã gửi báo cáo |
 | 409 | `extension.batch_withdrawn` | pf/extension: đợt đã thu hồi |
@@ -445,7 +453,7 @@ Tài khoản cán bộ quản lý trong Keycloak qua Admin REST (KN US-ADM-01..0
 | 409 | `accounts.state_conflict` | pf/accounts: khóa tài khoản đã khóa, mở tài khoản đang hoạt động, gửi liên kết cho tài khoản đang khóa |
 | 409 | `accounts.org_inactive` | pf/accounts: gán tài khoản vào tổ chức đã vô hiệu hóa, hoặc mở khóa khi tổ chức của tài khoản đang vô hiệu hóa (kích hoạt lại tổ chức sẽ tự mở) |
 | 422 | `accounts.org_invalid` | pf/accounts: không có tổ chức với `org_ref` trong tenant |
-| 422 | `accounts.import_invalid` | pf/accounts: tệp nhập không phải CSV/XLSX đọc được, thiếu cột bắt buộc (`email`, `org_ref`, `roles`, `full_name` hoặc `first_name`/`last_name`), không có dòng dữ liệu hoặc quá 200 dòng — từ chối cả tệp |
+| 422 | `accounts.import_invalid` | pf/accounts: tệp nhập không phải CSV/XLSX đọc được, thiếu cột bắt buộc (`email`, `org_ref`, `roles`, `full_name` hoặc `first_name`/`last_name`), không có dòng dữ liệu hoặc quá 200 dòng — từ chối cả tệp. Cũng dùng cho nạp tài khoản KN nhiều vai trò (`POST /v1/accounts/kn-users/import`, W11.02): thiếu cột Họ tên/Email/Vai trò/Mã Nút, ô công thức, quá 300 dòng |
 | 422 | `accounts.household_invalid` | pf/accounts: tài khoản nông dân — nông hộ không có, đã ngừng, chưa là thành viên HTX đang hoạt động, hoặc SĐT không khớp nông hộ nào |
 | 422 | `accounts.phone_household_mismatch` | pf/accounts: SĐT không phải SĐT chủ hộ của `household_ref` đã chọn (tra chỉ mục mù kho định danh) |
 | 409 | `accounts.farmer_exists` | pf/accounts: nông hộ đã có tài khoản nông dân đang dùng |
@@ -481,6 +489,19 @@ KN v7.7 gói P1 — gán vai trò nhiều vai × Nút × phòng ban × xã (FN-A
 | 422 | `accounts.support_reason_required` | thao tác ghi trong chế độ hỗ trợ thiếu header `X-AG-Reason` (≥ 10 ký tự, UTF-8 mã hóa phần trăm) |
 | 404 | `accounts.support_session_not_found` | phiên hỗ trợ không có hoặc của Admin khác |
 | 409 | `accounts.support_session_ended` | thoát phiên hỗ trợ đã kết thúc |
+| 403 | `accounts.context_read_only` | W11.07: thao tác ghi trong ngữ cảnh chỉ xem (Lãnh đạo đơn vị ở phòng ban ngoài lần gán, nhóm Ban Giám đốc) — chặn ở middleware cho mọi route; đổi ngữ cảnh vẫn được |
+| 422 | `accounts.internal_unit_invalid` | W11.07: thuộc tính vai trỏ đơn vị nội bộ không có trong đơn vị của lần gán hoặc đã ngừng |
+| 422 | `accounts.facility_invalid` | W11.41: `facility_refs` của phạm vi Cấp Xã trỏ ref không phải cơ sở giết mổ đang dùng của danh mục CNTS (pf/masterdata) |
+| 422 | `accounts.facility_commune_mismatch` | W11.42: cơ sở giết mổ trong `facility_refs` của lần gán Cấp Xã không thuộc xã phụ trách nào của lần gán (xã của cơ sở theo danh mục CNTS hôm nay) |
+| 404 | `accounts.internal_unit_not_found` | W11.07: đơn vị nội bộ không có |
+| 409 | `accounts.internal_unit_code_taken` | W11.07: mã đơn vị nội bộ đã có trong đơn vị (mã không tái sử dụng) |
+| 409 | `accounts.internal_unit_state` | W11.07: ngừng đơn vị đã ngừng / dùng lại đơn vị đang dùng |
+| 422 | `accounts.internal_unit_org_invalid` | W11.07: đơn vị nội bộ chỉ khai cho Nút cấp 1/2 (TTKNQG, TTKN tỉnh) đang hoạt động |
+| 422 | `accounts.internal_unit_department_invalid` | W11.07: phòng ban của đơn vị loại phòng không phải phòng ban (chưa xóa) của cùng đơn vị |
+| 404 | `accounts.delegation_not_found` | W11.07: ủy quyền không có, hoặc người thu hồi không phải người giao (không lộ ủy quyền của người khác) |
+| 403 | `accounts.delegation_forbidden` | W11.07: người ủy quyền không phải lãnh đạo phòng Cấp Tỉnh, ngữ cảnh chỉ xem/hỗ trợ, hoặc phòng ban khác phòng ban của phiên |
+| 422 | `accounts.delegation_grantee_invalid` | W11.07: người nhận không có vai Cấp Tỉnh còn hiệu lực (tới hết hạn ủy quyền) cùng đơn vị, cùng phòng ban |
+| 409 | `accounts.delegation_state` | W11.07: thu hồi ủy quyền đã thu hồi hoặc đã hết hạn |
 
 Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định dạng Email", "Sai định dạng vai trò", "SĐT đã tồn tại", "Tên đăng nhập hoặc Email đã tồn tại", "Trùng với dòng N trong tệp", "Tổ chức ngoài phạm vi phụ trách", "Vai trò vượt quyền cấp của bạn". Thao tác loạt trả `code` của từng tài khoản trong `items[]`.
 
@@ -843,7 +864,8 @@ Mã `error_code` của job `failed` (không phải phản hồi HTTP): `apiclien
 | HTTP | Mã | Khi nào |
 |---|---|---|
 | 404 | `integration.unknown_feed` | Không có hợp đồng feed hợp lệ (`contracts/integration/feeds/`) với tên/`contract_version` này — mặc định từ chối |
-| 403 | `integration.contract_not_servable` | Hợp đồng feed chưa `approved` (`proposed`/`draft`/`retired`): production không bao giờ phục vụ; ngoài production cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`. Cũng trả cho feed lớp `partner`/`bilateral` (chưa phục vụ ở cổng — W5.5/W5.6) |
+| 403 | `integration.contract_not_servable` | Hợp đồng feed chưa `approved` (`proposed`/`draft`/`retired`): production không bao giờ phục vụ; ngoài production cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`. Feed lớp `partner` (W5.5) và feed cặp song phương (W5.6) áp cùng quy tắc; mã riêng của chúng ở `party.share_grant_missing` (bảng pf/party) và mục luồng song phương dưới |
+| 403 | `integration.contract_not_servable` | **Mục duy nhất của mã này** (một định nghĩa `apiclient/port.ErrContractNotServable`, dùng lại ở `ingest` và App HTX song phương). Hợp đồng tích hợp không phục vụ ở môi trường này. **Feed:** hợp đồng chưa `approved` (`proposed`/`draft`/`retired`) — production không bao giờ phục vụ; ngoài production cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`. **Nạp theo lô / kênh tệp:** hợp đồng `retired`, `approved` còn `pending`, hoặc `proposed`/`draft` mà cổng không bật `AG_GATEWAY_INGEST_ALLOW_PROPOSED=1` (cổng không khởi động nếu đặt cờ ở production); trong kết quả từng bản ghi (`results[].problem_code`): hợp đồng bị thu hồi giữa lúc nhận và lúc xử lý — mọi bản ghi của lô bị từ chối. **Song phương:** feed cặp khi không hợp đồng song phương nào phục vụ được; App HTX khi `htx_roll_confirmation` chưa phục vụ |
 | 400 | `integration.invalid_cursor` | `cursor` sai dạng hoặc vượt đầu feed |
 | 410 | `integration.cursor_expired` | `cursor` trỏ vào phần đã quá hạn giữ 30 ngày — thân có `snapshot` (`href` của phiên bản mới nhất): đồng bộ lại từ ảnh chụp rồi đọc từ đầu phần còn giữ |
 | 404 | `integration.snapshot_not_found` | Phiên bản không có hoặc không có ảnh chụp (kho đối tượng chưa cấu hình lúc dựng) |
@@ -857,12 +879,11 @@ Khóa API **không bao giờ** xuất hiện trong lỗi, log, URL, sự kiện 
 
 ### Cổng tích hợp — nạp theo lô (W5.4, `POST /v1/batches/{contract}`, `GET /v1/batches/{id}`; ADR-0033 §3)
 
-Cổng `cmd/integration-gateway`, module `pf/apiclient` (gói `ingest`), hợp đồng `contracts/integration/ingest/`. Thiếu scope `ingest:<hợp đồng>:write` → `403 apiclient.forbidden` (không nói thiếu điều kiện nào); thiếu `Idempotency-Key` → `400 idempotency_key_required`; cùng khóa khác thân → `422 idempotency_key_reused`.
+Cổng `cmd/integration-gateway`, module `pf/apiclient` (gói `ingest`), hợp đồng `contracts/integration/ingest/`. Thiếu scope `ingest:<hợp đồng>:write` → `403 apiclient.forbidden` (không nói thiếu điều kiện nào); thiếu `Idempotency-Key` → `400 idempotency_key_required`; cùng khóa khác thân → `422 idempotency_key_reused`; hợp đồng không phục vụ ở môi trường này → `403 integration.contract_not_servable` (mục duy nhất ở bảng Feed phía trên).
 
 | HTTP | Mã | Khi nào |
 |---|---|---|
 | 404 | `integration.contract_unknown` | Không có hợp đồng nạp hợp lệ với tên của path, hoặc `contract_version` của thân không có (kể cả tên là hợp đồng feed) — mặc định từ chối |
-| 403 | `integration.contract_not_servable` | Hợp đồng `retired`, `approved` còn `pending`, hoặc `proposed`/`draft` mà cổng không bật cờ dev/test `AG_GATEWAY_INGEST_ALLOW_PROPOSED=1` — production luôn từ chối (cổng không khởi động nếu đặt cờ ở production) |
 | 403 | `integration.no_owner_port` | Hợp đồng chưa nối port của module chủ ở gốc lắp ráp của cổng — mặc định từ chối |
 | 400 | `integration.batch_invalid` | Thân không đúng phong bì `ingest_batch.v1` (khóa lạ, thiếu trường, sai kiểu), `contract` khác path, `batch_ref` ≠ `Idempotency-Key`, `items` rỗng, `contract_version` không phải số nguyên ≥ 1 |
 | 413 | `integration.batch_too_large` | Số phần tử vượt `ingest.max_batch` của hợp đồng |
@@ -878,7 +899,7 @@ Mã `problem_code` trong kết quả từng bản ghi (`results[].problem_code`,
 | `integration.record_invalid` | Bản ghi không đúng lược đồ hợp đồng (trường ngoài hợp đồng, thiếu bắt buộc, sai kiểu/định dạng) hoặc thiếu trường khóa nghiệp vụ; `detail` chỉ có đường dẫn trường, không có giá trị |
 | `integration.entity_key_mismatch` | `items[].entity_key` khác giá trị các trường `entity_key` của bản ghi |
 | `integration.business_key_conflict` | Khóa nghiệp vụ (`ingest.business_key`, vd `statement_ref:revision`) đã nhận với nội dung khác — bản bù phải tăng `revision` |
-| `integration.contract_not_servable`, `integration.no_owner_port` | Hợp đồng bị thu hồi / mất port chủ giữa lúc nhận và lúc xử lý — mọi bản ghi của lô bị từ chối |
+| `integration.no_owner_port` | Mất port chủ giữa lúc nhận và lúc xử lý — mọi bản ghi của lô bị từ chối (hợp đồng bị thu hồi: `integration.contract_not_servable`, mục Feed ở trên) |
 
 Kết cục lô `dead_lettered` (`problem_code` của lô): `integration.owner_unavailable` — port của module chủ lỗi tạm quá `inbox.DeliveryLimit` lần giao; thông điệp ở DLQ riêng của đối tác `pf.apiclient.ingest.<client_id>.dlq` ([runbook](runbooks/integration-batches.md)). Đối tác gửi lại bằng `batch_ref` mới.
 
@@ -897,6 +918,7 @@ Tệp được tách thành lô `ingest_batch.v1` và đi qua CHÍNH đường �
 | 409 | `integration.file_results_pending` | `GET /v1/files/{id}/results` khi còn lô `queued` hoặc chưa gửi (`incomplete` — tải lại cùng tệp) — kèm `Retry-After` |
 
 Môi trường thử của đối tác (`AG_PARTNER_SANDBOX=1`): khóa thử `agks_…` trình cho cổng thật, hoặc khóa thật `agk_…` trình cho cổng thử → `401 apiclient.unauthenticated` (log `apiclient.sandbox_key_refused`). Đặt cờ ở production → `api-platform` / `integration-gateway` không khởi động.
+
 ### Cổng tích hợp — webhook mỏng, ngắt mạch, đối soát (W5.7; ADR-0033 §4)
 
 Đăng ký ở Admin API (`/v1/api-clients/{id}/webhooks…`, MFA, `api_client_admin`); trạng thái ở `GET /v1/webhooks` (cổng); đối soát `GET /v1/feeds/{feed}/checksums` (cổng). Bí mật webhook **không bao giờ** xuất hiện trong lỗi, log, danh sách — chỉ trong phản hồi đăng ký/xoay, một lần. [Runbook](runbooks/integration-webhooks.md).
@@ -916,12 +938,11 @@ Lớp lỗi của một lần giao (`error_class` ở sổ `webhook_delivery`, `
 
 ### Cổng tích hợp và pf/cooperative — luồng song phương MKG ↔ HTX (W5.6; ADR-0034, Đề xuất — bật production chờ C-12)
 
-Sổ song phương `pf_coop.bilateral_record` / `bilateral_pair_event` (`pf/cooperative`, pf 000135). Cổng: nạp theo lô `collection_schedule`, `roll_count_statement` (bên a), feed của cặp `GET /v1/feeds/bilateral?pair=<htx_ref>`, tổng kiểm `GET /v1/feeds/{hợp đồng}/checksums?pair=`. App HTX: `/v1/bilateral/*` (Application API, chỉ bật với `AG_BILATERAL_ALLOW_PROPOSED=1` ngoài production). [Runbook](runbooks/integration-batches.md#8-luồng-song-phương-w56-adr-0034).
+Sổ song phương `pf_coop.bilateral_record` / `bilateral_pair_event` (`pf/cooperative`, pf 000135). Cổng: nạp theo lô `collection_schedule`, `roll_count_statement` (bên a), feed của cặp `GET /v1/feeds/bilateral?pair=<htx_ref>`, tổng kiểm `GET /v1/feeds/{hợp đồng}/checksums?pair=`. App HTX: `/v1/bilateral/*` (Application API, chỉ bật với `AG_BILATERAL_ALLOW_PROPOSED=1` ngoài production). Hợp đồng song phương không phục vụ → `403 integration.contract_not_servable` (mục duy nhất ở bảng Feed phía trên). [Runbook](runbooks/integration-batches.md#8-luồng-song-phương-w56-adr-0034).
 
 | HTTP | Mã | Khi nào |
 |---|---|---|
 | 403 | `integration.pair_missing` | Không có cặp song phương ĐANG HIỆU LỰC giữa tenant bên gọi và HTX (`pair`): chưa lập / đã chấm dứt / HTX của tenant khác. Feed cặp, tổng kiểm với `pair` lạ, App HTX đọc cặp không phải của mình, HTX xác nhận khi cặp đã chấm dứt. Trong kết quả lô (`results[].problem_code`): bản ghi bên a gửi tới HTX chưa có cặp với tenant gửi |
-| 403 | `integration.contract_not_servable` | Feed cặp: không hợp đồng song phương nào phục vụ được (proposed mà cổng không đặt `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`, hoặc production); App HTX: hợp đồng `htx_roll_confirmation` chưa phục vụ |
 | 403 | `apiclient.forbidden` | Feed cặp: khách hàng không có scope `ingest:<tên>:write` hoặc `feed:<tên>:read` của hợp đồng song phương nào |
 | 403 | `integration.no_owner_port` | `POST /v1/batches/htx_roll_confirmation` — bên b không ghi qua cổng (chờ gắn khách hàng API ↔ Nút HTX, W7.2) |
 | 503 | `integration.bilateral_unavailable` | Cổng / worker chưa nối sổ song phương (`Ports.Bilateral`) |
@@ -983,11 +1004,18 @@ Route `/v1/forms/*` (Application API). Route v1 cũ của KN (`/v1/extension/rep
 | 409 | `forms.submission_superseded` | Rà soát phiên bản không còn là bản cuối |
 | 409 | `forms.already_reviewed` | Phiên bản đã được rà soát |
 | 409 | `forms.pending_review` | Chốt khi còn bài chờ rà soát và bên dùng bật `require_reviewed_before_close` |
+| 409 | `forms.period_cancelled` | W11.05: nộp, rà soát, chốt, mở lại hoặc hủy lại kỳ đã hủy (`POST /v1/forms/periods/{id}/cancel`); kỳ đã hủy là trạng thái cuối |
+| 409 | `forms.submission_limit` | W11.05: đơn vị đã gửi đủ `max_submissions` lần của kỳ (KHTC: 3, Q-081) — nộp thêm, hoặc trả lại phiên bản cuối cho phép; DB từ chối phiên bản vượt giới hạn (SQLSTATE AGF03, `trg_submission_limit`, pf 000140) |
+| 409 | `forms.submission_conflict` | W11.42 khóa lạc quan (CNTS III.3.0 "Hai người cùng sửa"): `base_version` gửi kèm khác phiên bản bài nộp hiện tại của đơn vị — "Đã có người cập nhật lúc …", tải bản mới rồi sửa lại, không ghi đè; DB kiểm lại `base_version = seq − 1` (SQLSTATE AGF04, `trg_bind_meta`, pf 000149). Đồng bộ ngoại tuyến trả `rejected` với mã này |
+| 422 | `forms.late_reason_required` | W11.42: profile `require_late_reason` (kn_cnts) — gửi sau hạn nộp của kỳ phải có `explanation` (H09 lý do trễ). D8: "sau hạn" = giờ máy chủ nhận bài, kể cả bản offline có `captured_at` trước hạn |
+| 422 | `forms.facility_invalid` | W11.42: đơn vị lá cơ sở giết mổ (BM-01) không phải `facility_ref` đang dùng của danh mục CNTS tại ngày đầu kỳ, hoặc `unit_parents` khác xã của cơ sở |
 | 409 | `conflict` | Trạng thái kỳ đổi giữa chừng (máy trạng thái ở DB, SQLSTATE AGF01); ghi song song vào mã kỳ native |
 | 422 | `forms.template_invalid` | Định nghĩa biểu sai (mã, tiêu đề, trường: khóa, kiểu `text`/`integer`/`decimal`/`date`/`choice`, lựa chọn) — `field` chỉ chỗ sai |
 | 422 | `forms.values_invalid` | Số liệu không khớp biểu: khóa lạ, thiếu trường bắt buộc, sai kiểu (thập phân là chuỗi, tối đa 6 chữ số lẻ) |
 | 422 | `forms.unit_not_in_period` | Đơn vị không thuộc kỳ, hoặc ngoài phạm vi mở lại của kỳ mở lại một phần |
-| 422 | `validation_failed` | Thiếu nhãn/hạn nộp/đơn vị khi phát hành; trả lại không ghi chú; lý do mở lại ngoài 10–500 ký tự |
+| 422 | `validation_failed` | Thiếu nhãn/hạn nộp/đơn vị khi phát hành; trả lại không ghi chú; lý do mở lại/hủy ngoài 10–500 ký tự; W11.05: `unit_kind` ngoài cấu hình bên dùng, `unit_parents` thiếu/thừa (bắt buộc với `facility`/`household`), mã phòng ban sai dạng, `max_submissions` ngoài 0–20, khóa kỳ (`period.*`) sai; `captured_at` không phải RFC 3339 |
+
+Bản offline (`captured_at`) nộp vào kỳ đã chốt với đơn vị KHÔNG lỗi: trả `202` với `status = awaiting_reopen` (Chờ mở kỳ, sổ `pf_forms.held_submission`). Phiên chọn phòng ban không thuộc `departments` của bên dùng (vd `kn_cnts` chỉ Phòng CNTS) → `forbidden`.
 
 ### pf/evidence (`cap/evidence` — tệp minh chứng, R-DB-07, W6.5)
 
@@ -997,3 +1025,86 @@ Route `/v1/forms/*` (Application API). Route v1 cũ của KN (`/v1/extension/rep
 |---|---|---|
 | 422 | `evidence.subject_unresolved` | `POST /v1/files` có bộ ba `subject_module`/`subject_type`/`subject_id` mà module chủ không phân giải được: module chưa nối `Resolver`, thực thể không có (hoặc ngoài tenant), loại không cho tham chiếu |
 | 403 | `evidence.subject_forbidden` | `GET /v1/files/{ref}[/content]`: tệp có chủ thể mà người gọi không thấy (mã xã của chủ thể ngoài phạm vi, không qua cấp phép chia sẻ) hoặc chủ thể không còn phân giải được. Quyết định vẫn ghi sổ `pf_files.access_log` |
+
+### pf/hrm (`dom/hrm` — danh mục nhân sự Phòng HCTH, W11.21, ADR-0050)
+
+Route `/v1/hrm/*` (Application API). Lỗi chung: `unauthenticated` (401), `forbidden` (403 — không phải Admin hoặc Cấp Tỉnh của Phòng Hành chính – Tổng hợp; ghi mà không phải Admin; ngữ cảnh chỉ xem), `validation_failed` (422 — mã sai dạng, tên rỗng, thuộc tính không thuộc loại, hệ số không tăng dần hoặc quá 2 chữ số thập phân, tham số sai, `at`/`valid_from` không phải ngày), `conflict` (409 — ghi đồng thời trùng khóa), `module_not_enabled` (403 — module tắt cho tenant).
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 404 | `hrm.kind_unknown` | Loại danh mục ở đường dẫn không thuộc danh sách FN-19 |
+| 404 | `hrm.item_not_found` | Sửa/xem lịch sử mục (hoặc bảng hệ số của ngạch) chưa có |
+| 409 | `hrm.item_exists` | Thêm mục có mã (đã chuẩn hóa) đã có trong danh mục, kể cả mục đã ngừng sử dụng (FN-19: trùng mã → chặn) |
+| 422 | `hrm.item_reference` | Tham chiếu tới mục không có hoặc đã ngừng: nhóm chuyên ngành → trình độ, chuyên ngành → nhóm của đúng trình độ, bảng hệ số → ngạch, tham số → mã kỷ luật/khen thưởng |
+| 404 | `hrm.rule_unknown` | Khóa tham số không phải `promotion` hoặc `achievement_conversion` |
+| 403 | `hrm.records_disabled` | W11.22: hồ sơ nhân sự chưa bật cho dữ liệu thật — cờ `AG_HRM_RECORDS` vắng ở production (Q-005) hoặc `"0"`; danh mục không bị ảnh hưởng. `GET /v1/hrm/access` không lỗi mà trả `enabled=false` |
+| 404 | `hrm.staff_not_found` | W11.22: không có hồ sơ, hoặc hồ sơ ngoài phạm vi xem của người gọi (không lộ sự tồn tại) |
+| 404 | `hrm.event_not_found` | W11.22: sửa/hủy một dòng quá trình không có, đã bị thay/hủy, hoặc thuộc hồ sơ khác |
+| 409 | `hrm.duplicate_person` | W11.22: SĐT đã thuộc một chủ thể khác ở kho định danh (quy tắc V.2.0 mục 4: trùng SĐT → chặn) |
+| 422 | `hrm.step_out_of_range` | W11.22: bậc vượt số bậc của ngạch tại ngày hiệu lực, ngạch chưa có bảng hệ số, hoặc nâng bậc khi chưa có ngạch hiệu lực |
+| 422 | `hrm.not_applicable` | W11.22: thẻ Thống kê BC Sở (TK-01..06) với cán bộ khuyến nông cấp xã |
+| 422 | `hrm.permission_locked` | W11.22: sửa dòng ma trận của nhóm Admin (FN-20: chặn gỡ quyền Admin) |
+
+W11.22 lỗi chung thêm: `forbidden` (403 — ma trận FN-20 không cho nhóm quyền cần, ngoài phạm vi sửa, ngữ cảnh chỉ xem ghi, thẻ TK cấp cho nhóm khác HCTH), `validation_failed` (422 — họ tên chứa ghi chú/số, ngày sinh sau hôm nay, thiếu đơn vị/chức vụ khi tạo, chức vụ lãnh đạo thiếu ngày bổ nhiệm, cán bộ xã thiếu xã/đơn vị quản lý, đơn vị nội bộ không có/đã ngừng, ngày nghỉ việc trước ngày vào làm hoặc thiếu lý do, sửa/hủy dòng quá trình thiếu lý do 10–500 ký tự, xuất quá 5.000 hồ sơ). Lỗi của kho định danh đi thẳng qua: `mfa_required` (đọc thẻ TK hoặc định danh đầy đủ khi kho bật MFA), `vault.quota_exceeded`, `vault.unavailable`, `vault.profiles_unsupported`.
+
+### pf/price (`cap/price` — khung giá, W11.71, ADR-0049)
+
+Route `/v1/price/*` (Application API). Lỗi chung: `unauthenticated` (401), `forbidden` (403 — vai không thuộc cấu hình giá, ghi danh mục/xã báo giá/phân công mà không có vai quản trị, hoặc cấu hình lịch/ngưỡng/mặt hàng mà không là Quản trị nghiệp vụ báo giá — W11.72), `node_scope_required` (403 — Cấp Xã không có Nút), `validation_failed` (422 — `at` không phải ngày), `conflict` (409 — ghi danh mục đồng thời trùng khóa), `module_not_enabled` (403 — module tắt cho tenant).
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 404 | `price.profile_not_found` | Tham số `profile` không có trong cấu hình của gốc lắp ráp (KN = `kn`) |
+| 422 | `price.respond_before_lock` | W11.74 `POST /v1/price/calendar/schedule`: hạn phản hồi xác minh không sau giờ khóa (FN-AD-04.04 AC-05) |
+| 422 | `price.remind_order` | W11.74: giờ nhắc lần 1 không trước lần 2, hoặc lần 2 không trước giờ khóa (FN-AD-04.05 AC-01) |
+| 422 | `price.template_var` | W11.74: nội dung mẫu nhắc có biến ngoài `{ngày}`, `{xã}`, `{giờ khóa}` — chi tiết nêu biến lỗi |
+| 422 | `price.valid_from` | W11.74: ngày áp dụng lịch trong quá khứ, hoặc hôm nay là ngày báo giá (chỉ áp dụng từ ngày mai); thêm/xóa ngoại lệ cho hôm nay hoặc ngày đã qua. W11.72: ngày hiệu lực của thay đổi xã báo giá/phân công đã qua |
+| 422 | `price.exception_mismatch` | W11.74: ngày nghỉ rơi vào ngày vốn không báo giá, hoặc ngày bổ sung rơi vào ngày vốn đã báo giá |
+| 409 | `price.exception_exists` | W11.74: ngày đã có ngoại lệ đang hiệu lực — xóa ngoại lệ cũ trước |
+| 404 | `price.exception_not_found` | W11.74: xóa ngoại lệ của ngày không có ngoại lệ |
+| 422 | `price.default_threshold` | W11.74: xóa ngưỡng mặc định (FN-AD-04.06 AC-04) |
+| 404 | `price.threshold_not_found` | W11.74: xóa ngưỡng nhóm/mặt hàng chưa có hoặc đã xóa |
+| 404 | `price.item_not_found` | W11.73: mã mặt hàng không có (sửa, ngưng, đổi thứ tự, gán xã, "thay thế cho", bộ theo vụ, ngưỡng theo mặt hàng `POST /v1/price/thresholds` scope `item`) |
+| 409 | `price.item_duplicate` | W11.73: trùng tên + giống/phẩm cấp + quy cách trong cùng nhóm hàng (không phân biệt hoa thường, khoảng trắng thừa) với mặt hàng đang hoặc sắp hiệu lực |
+| 409 | `price.item_locked` | W11.73: mặt hàng đã có giá — không sửa giống/phẩm cấp, đơn vị tính, quy cách, nhóm hàng, loại (BR-04); dùng "thay thế cho" |
+| 409 | `price.item_retired` | W11.73: mặt hàng đã ngưng tại ngày hiệu lực của thao tác (sửa, ngưng lại, đổi thứ tự, gán xã) |
+| 422 | `price.item_date_invalid` | W11.73: ngày hiệu lực trong quá khứ, là hôm nay khi đã có phiếu gửi, trước ngày hiệu lực của mặt hàng, hoặc hiệu lực đến trước hiệu lực từ |
+| 422 | `price.item_basic_not_assignable` | W11.73: gán/bỏ gán riêng từng xã cho mặt hàng Cơ bản (BR-03 — Cơ bản áp dụng mọi xã) |
+| 404 | `price.group_not_found` | W11.73: sửa/xóa nhóm hàng không có hoặc đã xóa |
+| 409 | `price.group_not_empty` | W11.73: xóa nhóm hàng còn mặt hàng đang hoặc sắp hiệu lực |
+| 404 | `price.proposal_not_found` | W11.73: đề xuất mặt hàng không có |
+| 409 | `price.proposal_decided` | W11.73: duyệt/từ chối đề xuất đã xử lý |
+| 404 | `price.item_set_not_found` | W11.73: sửa bộ mặt hàng theo vụ không có |
+| 409 | `price.item_set_exists` | W11.73: tạo bộ mặt hàng trùng mã đã có |
+| 404 | `price.point_not_found` | W11.72: mã xã báo giá không có — sửa/ngưng/phân công xã; W11.73 gán mặt hàng, "Thêm mặt hàng" có xã áp dụng, đề xuất (Cấp Tỉnh), danh sách mặt hàng của xã (`point_code` nay phải là xã báo giá có thật) |
+| 422 | `price.point_inactive` | W11.72: xã báo giá chưa hoạt động hoặc đã ngưng tại ngày hiệu lực của thao tác (gán mặt hàng, phân công, sửa xã) |
+| 422 | `price.admin_unit_invalid` | W11.72: mã ĐVHC không phải xã hoặc không có hiệu lực tại ngày hiệu lực (ADR-0032 — "ĐVHC hết hiệu lực không chọn được") |
+| 409 | `price.admin_unit_taken` | W11.72: mã ĐVHC đã gắn với xã báo giá khác đang hoặc sắp hoạt động (FN-AD-04.02 AC-02) |
+| 422 | `price.region_not_found` | W11.72: nhóm vùng không có hiệu lực tại ngày hiệu lực (thêm/sửa xã, sửa/ngưng nhóm vùng) |
+| 409 | `price.region_in_use` | W11.72: ngưng nhóm vùng còn xã báo giá đang hoặc sắp hoạt động |
+| 422 | `price.officer_invalid` | W11.72: người được phân công không phải cán bộ đúng cấp (Cấp Xã cho vai `xa`, Cấp Tỉnh cho vai `tinh`) của phòng ban báo giá (danh bạ pf/accounts) |
+| 403 | `price.point_not_assigned` | W11.72: Cấp Xã đề xuất mặt hàng cho xã báo giá mình không phụ trách chính hôm nay; W11.75: Cấp Xã xem / nhập phiếu, phản hồi xác minh của xã mình không phụ trách chính tại ngày báo giá |
+| 404 | `price.ticket_not_found` | W11.75: mã phiếu báo giá không có (chi tiết, nhật ký, hiệu chỉnh, sửa ngày, xóa, in) |
+| 409 | `price.ticket_stale` | W11.75: phiếu đã được người khác cập nhật sau khi đọc (`version` khác phiên bản hiện hành — một phiếu một người sửa, BR-06 FN-TI-02.04) |
+| 409 | `price.ticket_locked` | W11.75: Cấp Xã lưu / gửi phiếu khi đã qua giờ khóa của ngày báo giá (kiểm theo đồng hồ máy chủ, đúng giờ khóa — AC-04 FN-XA-03.01) |
+| 422 | `price.not_quote_day` | W11.75: ngày không phải ngày báo giá theo lịch, hoặc Cấp Xã nhập cho ngày khác hôm nay; sửa ngày / nhập thay sang ngày không phải ngày báo giá |
+| 422 | `price.ticket_incomplete` | W11.75: gửi phiếu còn mặt hàng chưa có giá / "Không có hàng", hoặc dòng bất thường chưa có ghi chú biến động (BR-03, BR-04 FN-XA-03.01); lưu nháp được |
+| 422 | `price.price_invalid` | W11.75: giá không phải số dương, thấp nhất > cao nhất, quá 2 số lẻ, thiếu một trong hai giá, "Không có hàng" kèm giá, mặt hàng không thuộc danh sách của xã (nhập, hiệu chỉnh, giá đề xuất của Xã) |
+| 409 | `price.ticket_not_locked` | W11.75: Cấp Tỉnh nhập thay / hiệu chỉnh / sửa ngày / xóa / chốt cảnh báo khi chưa qua giờ khóa của ngày |
+| 409 | `price.ticket_exists` | W11.75: nhập thay đè phiếu đã gửi (BR-01 FN-TI-02.09), sửa ngày sang ngày xã đã có phiếu (AC-04 FN-TI-02.04), Xã ghi đè phiếu nhập thay |
+| 409 | `price.board_approved` | W11.75: bảng giá của ngày đã duyệt / đang duyệt (W11.76) — mở duyệt trước khi sửa, nhập thay, xác minh |
+| 403 | `price.board_steward_required` | W11.76 (D11 — CEO quyết): cán bộ Cấp Tỉnh không có cờ Quản trị nghiệp vụ báo giá (`qtnv_bao_gia`, `Profile.StewardDuty`) khóa / hủy khóa / duyệt / mở duyệt / hủy mở duyệt bảng giá |
+| 409 | `price.board_busy` | W11.76: bảng giá của ngày đang được cán bộ khác duyệt (khóa "Đang duyệt" còn hạn) — chi tiết "Đang duyệt bởi …" (FN-TI-02.05 AC-03, FN-TI-02.06) |
+| 409 | `price.board_state` | W11.76: trạng thái bảng giá không cho phép thao tác (vd duyệt bảng giá đã duyệt, mở duyệt bảng giá chưa duyệt, hủy khóa không phải Đang duyệt) |
+| 409 | `price.board_stale` | W11.76: `seq` gửi lên khác phiên bản sổ bảng giá hiện hành — tải lại rồi thao tác |
+| 409 | `price.board_not_locked` | W11.76: chưa qua giờ khóa nhập của ngày báo giá — chưa duyệt được |
+| 409 | `price.board_open_alerts` | W11.76: còn cảnh báo biến động chưa xử lý (BR-03 FN-TI-02.03, AC-01 FN-TI-02.05) — chi tiết số cảnh báo |
+| 422 | `price.board_empty` | W11.76: ngày không có dòng giá nào để công bố — không duyệt được |
+| 422 | `price.reopen_expired` | W11.76: ngày báo giá quá giới hạn mở duyệt (mặc định 30 ngày — BR-06 FN-TI-02.06, Q-086 tạm) |
+| 409 | `price.board_changed` | W11.76: "Hủy mở duyệt" khi số liệu ngày đã sửa sau lúc mở duyệt — duyệt lại thay vì hủy |
+| 404 | `price.alert_not_found` | W11.75: không có cảnh báo cho phiếu + mặt hàng |
+| 409 | `price.alert_state` | W11.75: trạng thái cảnh báo không cho phép thao tác (yêu cầu xác minh khi quá hạn / đã xử lý; phản hồi khi không ở "Đã yêu cầu xác minh"; giữ nguyên / loại khi chưa khóa hoặc đã xử lý; mở lại khi bảng giá không đang mở duyệt) |
+| 409 | `price.respond_overdue` | W11.75: Xã phản hồi sau hạn phản hồi (AC-02 FN-XA-03.05) |
+| 422 | `price.reason_required` | W11.75: thiếu lý do nộp muộn / hiệu chỉnh / sửa ngày / xóa phiếu, nội dung yêu cầu xác minh, giải trình của Xã, ghi chú giữ nguyên / lý do loại |
+| 403 | `price.point_not_handled` | W11.75: cán bộ Cấp Tỉnh thao tác trên xã không được phân công cho mình (xã đã phân công cho cán bộ khác) |
+| 503 | `price.pdf_unavailable` | W11.75: "Tải PDF" phiếu khi gốc lắp ráp chưa nối bộ dựng PDF (pf/reports) — dùng Excel hoặc in từ trình duyệt |
+

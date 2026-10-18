@@ -9,8 +9,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,6 +34,8 @@ type Role struct {
 	// chỉ có quyền sau SET LOCAL ROLE r_<module>). Membership được cấp WITH INHERIT FALSE, SET TRUE.
 	NoInherit bool
 	MemberOf  []string
+	// Settings: tham số mặc định của vai (ALTER ROLE … SET), vd app_agg chỉ đọc (ADR-0031 §3).
+	Settings map[string]string
 	// Clusters là các database vai được CONNECT.
 	Clusters []migrations.Cluster
 }
@@ -163,19 +167,35 @@ func Bootstrap(ctx context.Context, adminURL, dbSuffix string) error {
 // RB-5): vai nhóm NOLOGIN không gắn cụm (ag_shared_user, chủ hàm giám sát — đích MemberOf của vai khác) và mọi vai
 // được CONNECT ít nhất một cụm đã chọn. Giữ thứ tự của Roles (vai nhóm trước thành viên).
 func RolesFor(clusters []migrations.Cluster) []Role {
+	return rolesFor(Roles, clusters)
+}
+
+func rolesFor(roles []Role, clusters []migrations.Cluster) []Role {
 	want := map[migrations.Cluster]bool{}
 	for _, c := range clusters {
 		want[c] = true
 	}
+	managed := make(map[string]bool, len(roles))
+	included := make(map[string]bool, len(roles))
 	var out []Role
-	for _, r := range Roles {
+	for _, r := range roles {
+		managed[r.Name] = true
 		keep := len(r.Clusters) == 0
 		for _, c := range r.Clusters {
 			keep = keep || want[c]
 		}
 		if keep {
+			r.MemberOf = slices.Clone(r.MemberOf)
 			out = append(out, r)
+			included[r.Name] = true
 		}
+	}
+	// Chỉ cấp membership tới vai được dựng. Vai bên ngoài danh mục (vd vai PostgreSQL)
+	// giữ nguyên; không sửa danh mục toàn cục hay thu hồi quyền của lần bootstrap trước.
+	for i := range out {
+		out[i].MemberOf = slices.DeleteFunc(out[i].MemberOf, func(parent string) bool {
+			return managed[parent] && !included[parent]
+		})
 	}
 	return out
 }
@@ -204,6 +224,9 @@ func BootstrapClusters(ctx context.Context, adminURL, dbSuffix string, clusters 
 		if err := ensureRole(ctx, conn, r); err != nil {
 			return err
 		}
+	}
+	if err := revokeStrayMembers(ctx, conn, roles); err != nil {
+		return err
 	}
 	for _, c := range clusters {
 		name := DatabaseName(c, dbSuffix)
@@ -313,6 +336,44 @@ func ensureRole(ctx context.Context, conn *pgx.Conn, r Role) error {
 			return fmt.Errorf("dbadmin: GRANT %s TO %s: %w", m, r.Name, err)
 		}
 	}
+	keys := make([]string, 0, len(r.Settings))
+	for k := range r.Settings {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	for _, k := range keys {
+		if _, err := conn.Exec(ctx, fmt.Sprintf("ALTER ROLE %s SET %s = %s", ident(r.Name), ident(k), quoteLiteral(r.Settings[k]))); err != nil {
+			return fmt.Errorf("dbadmin: ALTER ROLE %s SET %s: %w", r.Name, k, err)
+		}
+	}
+	return nil
+}
+
+// revokeStrayMembers thu hồi thành viên không được phép của vai nhóm đặc quyền (ExclusiveMembers) — chỉ khi vai
+// nhóm thuộc các vai đang dựng. Chạy lặp an toàn.
+func revokeStrayMembers(ctx context.Context, conn *pgx.Conn, roles []Role) error {
+	for grp, allowed := range ExclusiveMembers {
+		if !slices.ContainsFunc(roles, func(r Role) bool { return r.Name == grp }) {
+			continue
+		}
+		rows, err := conn.Query(ctx, `SELECT m.rolname FROM pg_auth_members a JOIN pg_roles g ON g.oid = a.roleid
+		    JOIN pg_roles m ON m.oid = a.member WHERE g.rolname = $1 ORDER BY 1`, grp)
+		if err != nil {
+			return err
+		}
+		members, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		if err != nil {
+			return err
+		}
+		for _, m := range members {
+			if slices.Contains(allowed, m) {
+				continue
+			}
+			if _, err := conn.Exec(ctx, fmt.Sprintf("REVOKE %s FROM %s", ident(grp), ident(m))); err != nil {
+				return fmt.Errorf("dbadmin: REVOKE %s FROM %s: %w", grp, m, err)
+			}
+		}
+	}
 	return nil
 }
 
@@ -365,6 +426,15 @@ func MigrateV2(ctx context.Context, baseURL string, c migrations.Cluster, dbSuff
 	if err != nil {
 		return err
 	}
+	if c == migrations.PF {
+		repaired, err := repairMainPF151(ctx, dsn)
+		if err != nil {
+			return err
+		}
+		if repaired {
+			log("%s: schema_migrations_pf 151 (tệp của main) → 136 để áp pf 137–151 của dev", DatabaseName(c, dbSuffix))
+		}
+	}
 	if _, err := migrator.Up(ctx, dsn, c, migrator.Options{Log: log}); err != nil {
 		return fmt.Errorf("dbadmin: migration v2 → %s: %w", DatabaseName(c, dbSuffix), err)
 	}
@@ -376,6 +446,17 @@ func MigrateV1(baseURL string, c migrations.Cluster, dbSuffix string) error {
 	dsn, err := RoleURL(baseURL, c, dbSuffix, Migrator)
 	if err != nil {
 		return err
+	}
+	if c == migrations.PF {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		repaired, err := repairMainPF151(ctx, dsn)
+		cancel()
+		if err != nil {
+			return err
+		}
+		if repaired {
+			slog.Info("schema_migrations_pf 151 (tệp của main) → 136 để áp pf 137–151 của dev", "database", DatabaseName(c, dbSuffix))
+		}
 	}
 	for _, step := range []struct{ dir, table string }{
 		{"shared", "schema_migrations_shared"},

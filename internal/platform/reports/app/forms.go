@@ -1,9 +1,8 @@
 package app
 
-// Mẫu báo cáo dạng lưới KN v7.7 (FN-AD-04.06; kn-v7.7-plan P3): tạo mẫu, nháp, thao tác
-// lưới, đề nghị → phát hành (người phát hành ≠ người đề nghị và ≠ người sửa cuối, R-56),
-// phiên bản đã phát hành bất biến, gán loại báo cáo, nạp Excel, nhật ký, seed 14 mẫu
-// Phòng Trồng trọt, cổng FormEngine cho P4.
+// Capability mẫu lưới: nháp, thao tác, đề nghị và phát hành bốn mắt (R-56),
+// phiên bản bất biến, gán loại, nhập Excel và nhật ký. Bộ seed thuộc đăng ký
+// của ứng dụng; FormEngine cung cấp thao tác chung cho bên dùng.
 
 import (
 	"bytes"
@@ -52,29 +51,34 @@ var (
 
 // Vai của mẫu báo cáo KN v7.7: Admin (platform_admin) và reports_admin thiết kế, đề nghị và
 // phát hành — người phát hành phải KHÁC người đề nghị/sửa cuối (R-56).
-var (
-	formAdmins  = []string{port.RoleReportsAdmin, authz.RolePlatformAdmin}
-	formReaders = append(append([]string{}, knRoles...), port.RoleReportsAdmin)
-)
+var formAdmins = []string{port.RoleReportsAdmin, authz.RolePlatformAdmin}
 
-// formReader cho đọc mẫu (layout, mẫu Excel, tính thử, mẫu đã gán) khi người gọi có vai realm đọc mẫu HOẶC
-// một ngữ cảnh phiên KN hợp lệ (header X-AG-Context đã được middleware P1 giải): tài khoản KN v7.7 chỉ có vai
-// cổng kn_user, vai nghiệp vụ nằm trong ngữ cảnh — màn nhập báo cáo của Cấp Xã cần đọc layout (FN-XA-03.02).
-// Trả kn = true khi được nhận nhờ ngữ cảnh KN (để lọc theo phòng ban của ngữ cảnh).
-func formReader(ctx context.Context, extra ...string) (authz.Principal, bool, error) {
-	p, err := authz.Require(ctx, append(append([]string{}, formReaders...), extra...)...)
+// formReader retains native realm roles; applications register their session
+// policy separately. A resolver error or explicit denial never falls back.
+func (s *Service) formReader(ctx context.Context, extra ...string) (authz.Principal, *port.SessionActor, error) {
+	p, err := authz.Require(ctx, append(append([]string{}, s.formReaderRoles()...), extra...)...)
 	if err == nil {
-		return p, false, nil
+		return p, nil, nil
 	}
-	if q, ok := authz.FromContext(ctx); ok && q.KN != nil {
-		return q, true, nil
+	if q, ok := authz.FromContext(ctx); ok {
+		if s.ResolveSession != nil {
+			actor, handled, e := s.ResolveSession(ctx, q, port.SessionReadForms)
+			if e != nil {
+				return q, nil, e
+			}
+			if handled {
+				if !actor.Allowed || actor.AllowsDepartment == nil {
+					return q, nil, problem.Forbidden
+				}
+				return q, &actor, nil
+			}
+		}
 	}
-	return p, false, err
+	return p, nil, err
 }
 
-// knDeptAllows: người đọc nhờ ngữ cảnh KN chỉ thấy mẫu của phòng ban ngữ cảnh (Admin: mọi phòng ban).
-func knDeptAllows(p authz.Principal, viaKN bool, dept string) bool {
-	return !viaKN || p.KN.AllowsDepartment(dept)
+func formDeptAllows(actor *port.SessionActor, dept string) bool {
+	return actor == nil || (actor.AllowsDepartment != nil && actor.AllowsDepartment(dept))
 }
 
 // FormSummary là một mẫu kèm phiên bản đang soạn và phiên bản phát hành mới nhất.
@@ -1056,29 +1060,32 @@ func (s *Service) ImportForm(ctx context.Context, data []byte, in ImportInput, i
 	return res, nil
 }
 
-// SeedResult là kết quả khởi tạo 14 mẫu.
+// SeedResult là kết quả khởi tạo bộ mẫu đã đăng ký.
 type SeedResult struct {
 	Created []string
 	Skipped []string
 }
 
-// SeedTrongTrot khởi tạo 14 mẫu Phòng Trồng trọt (T01–T07, M01, V01–V06) thành nháp v1 và gán
-// loại báo cáo (tuần/tháng/hàng vụ, cấp Xã). Mẫu đã có (cùng mã, phòng ban) giữ nguyên.
-// Phát hành vẫn qua đề nghị → người khác duyệt (R-56).
-func (s *Service) SeedTrongTrot(ctx context.Context, dept, idem string) (SeedResult, error) {
+// SeedForms creates draft v1 and assignments from trusted application registration.
+// Existing codes are preserved; publication still requires a second person (R-56).
+func (s *Service) SeedForms(ctx context.Context, dept, idem string) (SeedResult, error) {
 	p, err := authz.Require(ctx, formAdmins...)
 	if err != nil {
 		return SeedResult{}, err
 	}
+	set, err := s.formSeedSet()
+	if err != nil {
+		return SeedResult{}, err
+	}
 	if dept == "" {
-		dept = port.DefaultDepartment
+		dept = set.DefaultDepartment
 	}
 	if !deptRe(dept) {
 		return SeedResult{}, problem.Validation.WithField("department_code", "mã phòng ban chữ thường, số, gạch dưới")
 	}
 	res := SeedResult{Created: []string{}, Skipped: []string{}}
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
-		for _, sd := range form.TrongTrotSeeds() {
+		for _, sd := range set.Templates {
 			if dup, err := store.FormTemplateByCode(ctx, tx, dept, sd.Code); err != nil {
 				return err
 			} else if dup != nil {
@@ -1095,7 +1102,7 @@ func (s *Service) SeedTrongTrot(ctx context.Context, dept, idem string) (SeedRes
 				return err
 			}
 			if err := s.formEvent(ctx, tx, p.TenantID, p.ActorRef, t.ID, &v, "seeded",
-				[]Change{{"seed", nil, form.SeedVersion}, {"completeness", nil, sd.Def.Completeness}, {"pending", nil, len(sd.Def.Pending)}}, nil, idemOr(idem, sd.Code)); err != nil {
+				[]Change{{"seed", nil, set.Version}, {"completeness", nil, sd.Def.Completeness}, {"pending", nil, len(sd.Def.Pending)}}, nil, idemOr(idem, sd.Code)); err != nil {
 				return err
 			}
 			if _, err := s.assign(ctx, tx, p, t.ID, sd.ReportType, idemOr(idem, sd.Code+":asg")); err != nil {
@@ -1122,14 +1129,14 @@ type AvailableForm struct {
 // AvailableForms trả mẫu đã gán cho (phòng ban, cấp, loại báo cáo) có phiên bản đã phát hành
 // áp dụng tại ngày at (Cấp Tỉnh chọn khi phát hành biểu — FN-TI-02.02).
 func (s *Service) AvailableForms(ctx context.Context, dept, level, reportType string, at time.Time) ([]AvailableForm, error) {
-	p, viaKN, err := formReader(ctx)
+	p, viaKN, err := s.formReader(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if !deptRe(dept) {
 		return nil, problem.Validation.WithField("department", "bắt buộc")
 	}
-	if !knDeptAllows(p, viaKN, dept) {
+	if !formDeptAllows(viaKN, dept) {
 		return []AvailableForm{}, nil
 	}
 	var out []AvailableForm
@@ -1171,7 +1178,7 @@ func availableForms(ctx context.Context, tx pgx.Tx, dept, level, reportType stri
 // FormLayout trả phiên bản kèm định nghĩa đã đặt nhãn kỳ/vụ cho màn nhập/xem. Người đọc
 // (không phải Admin) chỉ thấy phiên bản đã phát hành hoặc đã ngừng dùng.
 func (s *Service) FormLayout(ctx context.Context, templateID uuid.UUID, n int, o form.LayoutOptions) (store.FormTemplate, store.FormVersion, error) {
-	p, viaKN, err := formReader(ctx, authz.RolePlatformAdmin)
+	p, viaKN, err := s.formReader(ctx, authz.RolePlatformAdmin)
 	if err != nil {
 		return store.FormTemplate{}, store.FormVersion{}, err
 	}
@@ -1191,7 +1198,7 @@ func (s *Service) FormLayout(ctx context.Context, templateID uuid.UUID, n int, o
 	if !hasAny(p, formAdmins) && v.Status != port.FormPublished && v.Status != port.FormRetired {
 		return store.FormTemplate{}, store.FormVersion{}, ErrFormVersionNotFound
 	}
-	if !knDeptAllows(p, viaKN, t.DepartmentCode) {
+	if !formDeptAllows(viaKN, t.DepartmentCode) {
 		return store.FormTemplate{}, store.FormVersion{}, ErrFormNotFound
 	}
 	v.Def = form.Layout(v.Def, o)
@@ -1201,7 +1208,7 @@ func (s *Service) FormLayout(ctx context.Context, templateID uuid.UUID, n int, o
 // EvaluateFormVersion kiểm và tính thử một lưới theo phiên bản (xem trước của trình thiết kế,
 // tính tạm trên web/app — server là nguồn đúng).
 func (s *Service) EvaluateFormVersion(ctx context.Context, versionID uuid.UUID, in port.EvalInput) (port.EvalResult, []port.TotalRowResult, error) {
-	p, _, err := formReader(ctx, authz.RolePlatformAdmin)
+	p, _, err := s.formReader(ctx, authz.RolePlatformAdmin)
 	if err != nil {
 		return port.EvalResult{}, nil, err
 	}

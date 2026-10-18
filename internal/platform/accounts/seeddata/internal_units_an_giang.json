@@ -1,0 +1,13 @@
+{
+ "format": "agrigreen.internal-units/v1",
+ "status": "tạm, chờ khách (Q-068)",
+ "source": "W11.07: BRD HCTH v3.0 (HS-16 đơn vị công tác, HS-37 đơn vị quản lý cán bộ xã, NS05: BGĐ, phòng, trạm, trại, Tăng cường). Ban Giám đốc + 5 phòng có module (gắn mã phòng ban P2, docs/kn/phong-ban-seed.md). Trạm, trại, văn phòng, Tăng cường: Admin thêm khi khách gửi danh sách.",
+ "units": [
+  {"code": "ban_giam_doc", "kind": "ban_giam_doc", "name": "Ban Giám đốc", "department_code": "", "sort_order": 0},
+  {"code": "trong_trot", "kind": "phong", "name": "Phòng Trồng trọt", "department_code": "trong_trot", "sort_order": 10},
+  {"code": "chan_nuoi_thuy_san", "kind": "phong", "name": "Phòng Chăn nuôi - Thủy sản", "department_code": "chan_nuoi_thuy_san", "sort_order": 20},
+  {"code": "ke_hoach_tai_chinh", "kind": "phong", "name": "Phòng Kế hoạch - Tài chính", "department_code": "ke_hoach_tai_chinh", "sort_order": 30},
+  {"code": "thong_tin_truyen_thong", "kind": "phong", "name": "Phòng Thông tin Tuyên truyền", "department_code": "thong_tin_truyen_thong", "sort_order": 40},
+  {"code": "hanh_chinh_tong_hop", "kind": "phong", "name": "Phòng Hành chính - Tổng hợp", "department_code": "hanh_chinh_tong_hop", "sort_order": 50}
+ ]
+}

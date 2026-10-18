@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -50,7 +51,7 @@ func scanEgress(r pgx.Row) (EgressRow, error) {
 
 // EgressByIdem đọc dòng sổ xuất theo idem_key; nil khi chưa có.
 func EgressByIdem(ctx context.Context, tx pgx.Tx, idem string) (*EgressRow, error) {
-	e, err := scanEgress(tx.QueryRow(ctx, `SELECT `+egressCols+` FROM pf_metering.egress_event WHERE idem_key = $1`, idem))
+	e, err := scanEgress(tx.QueryRow(ctx, `SELECT `+egressCols+` FROM pf_metering.egress_event WHERE idem_key = $1`+ledger.NewestByIdem(""), idem))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

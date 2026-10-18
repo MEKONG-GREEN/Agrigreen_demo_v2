@@ -17,6 +17,7 @@ import { Greeting } from "@/kn/ui";
 import type { ChangedCell, PendingItem, RcChange, RcRun, SnapRow, SnapTotal } from "../api";
 import { LoadState, ReadOnlyNotice, dt, ddmm, num, toLog, useAction, useCommuneNames, useCycleReadOnly, useLoad } from "../common";
 import { useBatchPeriod } from "./TinhScreens";
+import { PiiHint } from "@/kn/pii";
 
 const KIND_LABEL: Record<RcChange["kind"], string> = { new: "Gửi mới", resubmit: "Gửi lại", adjusted: "Điều chỉnh theo yêu cầu", computed: "Tự tính" };
 const KIND_TONE = { new: "info", resubmit: "neutral", adjusted: "warn", computed: "ok" } as const;
@@ -541,6 +542,7 @@ export function DispatchScreen() {
               <label className="field">
                 <span>Nội dung</span>
                 <textarea className="textarea" value={body} onChange={(e) => setBody(e.target.value)} />
+                <PiiHint text={body} />
               </label>
               <button
                 type="button"

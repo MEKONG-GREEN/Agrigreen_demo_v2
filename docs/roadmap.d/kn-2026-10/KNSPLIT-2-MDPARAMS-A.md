@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-MDPARAMS-A — Registry immutable, KN sở hữu16metadata/13seed;16/16PGnoSKIP/static đạt, boundary382. Helper8migration trướcdev; B mới gỡlegacy. G1 chưa hoàn tất.

@@ -1,0 +1,314 @@
+paths:
+# @ag-order: 251
+  /v1/partner/grants:
+    get:
+      summary: Cấp quyền chia sẻ đang hiệu lực mà tenant người gọi nhận (ADR-0020)
+      operationId: listPartnerGrants
+      tags: [partner]
+      responses:
+        "200":
+          description: Cấp quyền đang hiệu lực
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/PartnerGrant"}}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 252
+  /v1/partner/cooperatives:
+    get:
+      summary: Danh bạ HTX của tenant bên cấp (loại cooperative_directory, ADR-0020)
+      description: Không người đại diện, không mã số thuế, không nông hộ. Con trỏ theo `ref`.
+      operationId: listPartnerCooperatives
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 200}}
+      responses:
+        "200":
+          description: Một trang danh bạ
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/PartnerCooperative"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 253
+  /v1/partner/cooperatives/{ref}:
+    get:
+      summary: Một HTX của tenant bên cấp (loại cooperative_directory, ADR-0020)
+      operationId: getPartnerCooperative
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: HTX
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PartnerCooperative"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 254
+  /v1/partner/plots:
+    get:
+      summary: Danh bạ thửa của tenant bên cấp (loại plot_directory, ADR-0020)
+      description: Hình học, diện tích, xã, HTX, trạng thái — không nông hộ, không tên thửa. Con trỏ theo `ref`.
+      operationId: listPartnerPlots
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 200}}
+      responses:
+        "200":
+          description: Một trang danh bạ thửa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/PartnerPlot"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 255
+  /v1/partner/plots/{ref}:
+    get:
+      summary: Một thửa của tenant bên cấp (loại plot_directory, ADR-0020)
+      operationId: getPartnerPlot
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PartnerPlot"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 256
+  /v1/partner/season-harvest-dates:
+    get:
+      summary: Ngày gieo / thu hoạch của vụ ở tenant bên cấp (loại season_harvest_dates, proto FM-01/02, ADR-0020)
+      description: Không nông hộ, không sản lượng. Con trỏ `after` = `cursor` cuối (đổi khi vụ đổi).
+      operationId: listPartnerSeasonHarvestDates
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: plot_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: after, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 200}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/PartnerSeasonDates"}}
+                  next_cursor: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 257
+  /v1/partner/htx-collection/responses:
+    get:
+      summary: Luồng phản hồi của HTX cho MKG kéo về (loại htx_collection_responses, RB-6 chiều mua, ADR-0020)
+      description: |
+        Đọc ở tenant bên cấp; chỉ phản hồi thuộc bảng kê do chính tenant người gọi gửi qua van (`source_tenant_id`); không có
+        người phản hồi. Con trỏ `after` = `cursor` cuối (tăng dần, không bỏ sót dòng commit muộn). MKG ghi mỗi dòng thành
+        `mkg_fieldops.htx_confirmation` kênh `platform` (idempotent).
+      operationId: listPartnerHtxCollectionResponses
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: after, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 200}}
+      responses:
+        "200":
+          description: Một trang luồng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HtxCollectionResponseFeedPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 258
+  /v1/partner/waterway/route:
+    get:
+      summary: Định tuyến đường thủy trên mạng đã phát hành của tenant bên cấp (loại waterway_routes, proto FM-05, ADR-0020)
+      description: |
+        Cho mkg/logistics (G4): chuyến vận tải thủy của MKG định tuyến trên mạng pf/waterway CÓ PHIÊN BẢN của tenant chương
+        trình. Kiểm cấp quyền `waterway_routes` rồi mới định tuyến ở tenant bên cấp (RLS, không BYPASSRLS); tham số (bán kính
+        tiếp cận, hệ số Haversine #10) là của bên cấp. Ghi một dòng `partner_read_log` trước khi trả (lỗi → 503). Chỉ hạ tầng:
+        hình học, km, nguồn tính, phiên bản mạng, đoạn, ràng buộc tải trọng — không dữ liệu cá nhân. MKG lưu bền vững kết quả
+        đã dùng vào chặng (mục 16). Không có đường thủy → `found = false`, Haversine × hệ số kèm `reason`.
+      operationId: routePartnerWaterway
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: from, in: query, required: true, description: "lat,lng", schema: {type: string}}
+        - {name: to, in: query, required: true, description: "lat,lng", schema: {type: string}}
+        - {name: min_load_tons, in: query, schema: {type: string, pattern: "^[0-9]+(\\.[0-9]+)?$"}}
+        - {name: version, in: query, description: "Ghim phiên bản mạng; vắng = phiên bản đang phát hành", schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: Kết quả định tuyến (một chặng)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PartnerWaterwayRoute"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Định tuyến đường thủy qua dãy điểm (chuyến nhiều điểm dừng) ở tenant bên cấp (loại waterway_routes, ADR-0020)
+      description: |
+        Chỉ đọc, nhưng là POST (thân có dãy điểm) nên bắt buộc `Idempotency-Key` (R-51): gọi lặp cùng khóa trả lại đúng kết quả
+        đầu. Một chặng cho mỗi cặp điểm liên tiếp, cùng một phiên bản mạng. 2–25 điểm.
+      operationId: routePartnerWaterwayPoints
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/PartnerGrantor"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PartnerWaterwayRouteRequest"}
+      responses:
+        "200":
+          description: Kết quả định tuyến (mỗi cặp điểm một chặng)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PartnerWaterwayRoute"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 761
+    PartnerGrant:
+      type: object
+      required: [id, grantor_tenant_id, kinds, valid_from, valid_to]
+      properties:
+        id: {type: string, format: uuid}
+        grantor_tenant_id: {type: string, format: uuid}
+        kinds:
+          type: array
+          items: {type: string, enum: [cooperative_directory, plot_directory, season_harvest_dates, htx_collection_responses, waterway_routes, valve_hub, valve_collection, valve_mrv_evidence, dp_collection_volume, dp_hub_capacity, dp_mrv_package_status]}
+        valid_from: {type: string, format: date-time}
+        valid_to: {type: string, format: date-time}
+# @ag-order: 762
+    PartnerWaterwayPoint:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: {type: number, minimum: -90, maximum: 90}
+        lng: {type: number, minimum: -180, maximum: 180}
+# @ag-order: 763
+    PartnerWaterwayRouteRequest:
+      type: object
+      required: [points]
+      properties:
+        points: {type: array, minItems: 2, maxItems: 25, items: {$ref: "#/components/schemas/PartnerWaterwayPoint"}}
+        min_load_tons: {type: [string, "null"], pattern: "^[0-9]+(\\.[0-9]+)?$"}
+        version: {type: [integer, "null"], minimum: 1, description: "Ghim phiên bản mạng; vắng = phiên bản đang phát hành"}
+# @ag-order: 764
+    PartnerWaterwayLeg:
+      type: object
+      required: [from, to, found, distance_km, access_km, source, geometry, segment_refs, limiting, reason]
+      properties:
+        from: {$ref: "#/components/schemas/PartnerWaterwayPoint"}
+        to: {$ref: "#/components/schemas/PartnerWaterwayPoint"}
+        found: {type: boolean}
+        distance_km: {type: string, description: "km, 3 chữ số thập phân, gồm chặng tiếp cận"}
+        access_km: {type: string}
+        source: {type: string, enum: [routed, digitised, haversine]}
+        geometry: {oneOf: [{$ref: "#/components/schemas/WaterwayLine"}, {type: "null"}]}
+        segment_refs: {type: array, items: {type: string, format: uuid}}
+        limiting: {oneOf: [{$ref: "#/components/schemas/WaterwayLimiting"}, {type: "null"}]}
+        reason: {type: [string, "null"]}
+# @ag-order: 765
+    PartnerWaterwayRoute:
+      type: object
+      description: Kết quả định tuyến cho bên nhận (ADR-0020) — hạ tầng, không dữ liệu cá nhân. MKG lưu nguyên văn vào chặng (mục 16).
+      required: [grantor_tenant_id, network_version, found, distance_km, source, limiting, legs]
+      properties:
+        grantor_tenant_id: {type: string, format: uuid}
+        network_version: {type: [integer, "null"], description: "null = bên cấp chưa phát hành mạng (mọi chặng Haversine)"}
+        found: {type: boolean, description: "mọi chặng đều có đường thủy"}
+        distance_km: {type: string}
+        source: {type: string, enum: [routed, digitised, haversine], description: "nguồn yếu nhất trong các chặng"}
+        limiting: {oneOf: [{$ref: "#/components/schemas/WaterwayLimiting"}, {type: "null"}]}
+        legs: {type: array, items: {$ref: "#/components/schemas/PartnerWaterwayLeg"}}
+# @ag-order: 766
+    PartnerCooperative:
+      type: object
+      description: HTX cho bên nhận — không người đại diện, không mã số thuế, không nông hộ
+      required: [ref, code, name, commune_code, active, lon, lat, updated_at]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        commune_code: {type: [string, "null"]}
+        active: {type: boolean}
+        lon: {type: [string, "null"], description: "Độ, 7 chữ số thập phân (vị trí hồ sơ HTX)"}
+        lat: {type: [string, "null"]}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 767
+    PartnerPlot:
+      type: object
+      description: Thửa cho bên nhận — không nông hộ, không tên thửa, không người tạo
+      required: [ref, code, commune_code, cooperative_ref, status, area_ha, geometry, revision, updated_at]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        commune_code: {type: string}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        status: {type: string, enum: [draft, active, retired]}
+        area_ha: {type: string, description: "Decimal dạng chuỗi"}
+        geometry: {type: object, description: "GeoJSON MultiPolygon (EPSG:4326)"}
+        revision: {type: integer}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 768
+    PartnerSeasonDates:
+      type: object
+      required: [season_ref, plot_ref, cooperative_ref, commune_code, season_code, season_year, sowing_date, expected_harvest_date, harvest_open_date, status, completed_at, cursor]
+      properties:
+        season_ref: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        season_code: {type: string}
+        season_year: {type: integer}
+        sowing_date: {type: string, format: date}
+        expected_harvest_date: {type: string, format: date}
+        harvest_open_date: {type: string, format: date}
+        status: {type: string, enum: [open, completed, cancelled]}
+        completed_at: {type: [string, "null"], format: date-time}
+        cursor: {type: integer}

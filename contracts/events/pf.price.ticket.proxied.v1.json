@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.price.ticket.proxied/v1",
+  "title": "pf.price.ticket.proxied — payload",
+  "description": "Cấp Tỉnh nhập thay phiếu báo giá Nộp muộn cho xã 'Không nộp' (W11.77; BRD Báo giá v1.3 FN-TI-02.09 hậu điều kiện 'cán bộ Xã nhận thông báo'). Bên phát: SaveProxy — lần lưu chính thức đầu tiên của phiếu nhập thay. pf/notify gửi chuông cho cán bộ Xã phụ trách chính của xã tại ngày báo giá. Không có lý do nộp muộn (văn bản tự do); không dữ liệu cá nhân ngoài mã tham chiếu.",
+  "x-event-type": "pf.price.ticket.proxied",
+  "x-schema-version": 1,
+  "x-producer": "pf/price",
+  "type": "object",
+  "required": [
+    "profile",
+    "day",
+    "point_code",
+    "point_name",
+    "ticket_id",
+    "items",
+    "officer_ref",
+    "actor_ref"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "description": "Bên dùng của cap/price (KN = kn)"
+    },
+    "day": {
+      "type": "string",
+      "format": "date",
+      "description": "Ngày báo giá (giờ VN)"
+    },
+    "point_code": {
+      "type": "string",
+      "description": "Mã xã báo giá (XBG####)"
+    },
+    "point_name": {
+      "type": "string",
+      "description": "Tên xã theo ĐVHC"
+    },
+    "ticket_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "items": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Số mặt hàng của phiếu"
+    },
+    "officer_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "Cán bộ Xã phụ trách chính tại ngày báo giá; null = Chưa có cán bộ Xã (không ai nhận)"
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Cán bộ Cấp Tỉnh nhập thay"
+    }
+  }
+}

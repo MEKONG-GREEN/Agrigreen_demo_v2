@@ -23,13 +23,11 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/formimport"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/mail"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/render"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -50,16 +48,20 @@ const JobSchedules = "reports_schedules"
 // Deps là phụ thuộc của module. Thiếu cổng nào thì thao tác cần nó trả 503
 // reports.dependency_unavailable; thiếu Directory/Mailer thì bỏ gửi email kèm cảnh báo.
 type Deps struct {
-	Scope         partyport.ScopeResolver
-	Orgs          partyport.Orgs
-	Units         partyport.AdminUnits
-	Params        params.Params // reports.daily_export_quota, reports.export_anomaly_threshold
-	Catalogs      mdport.Catalogs
-	Store         objstore.Store // reports/<tenant>/<job>.<định dạng>
-	Extension     extensionsrc.ReportData
-	Mechanization mechanizationsrc.ReportData
-	CropCycle     cropcyclesrc.ReportData    // pf/cropcycle: báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03)
-	Directory     accountsport.MailDirectory // pf/accounts hiện thực; nil → bỏ gửi email
+	FormSeeds      []port.FormSeedRegistration
+	Builders       []port.SourceBuilderRegistration
+	Catalog        []port.CatalogRegistration
+	Policies       []port.Policy
+	ResolveSession port.SessionResolver
+	Scope          partyport.ScopeResolver
+	Orgs           partyport.Orgs
+	Units          partyport.AdminUnits
+	Params         params.Params // reports.daily_export_quota, reports.export_anomaly_threshold
+	Catalogs       mdport.Catalogs
+	Store          objstore.Store // reports/<tenant>/<job>.<định dạng>
+	Mechanization  mechanizationsrc.ReportData
+	CropCycle      cropcyclesrc.ReportData    // pf/cropcycle: báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03)
+	Directory      accountsport.MailDirectory // pf/accounts hiện thực; nil → bỏ gửi email
 	// Recipients: tài khoản của HTX để quản lý HTX chọn người nhận lịch (HTX US-DASH-03); nil → 503.
 	Recipients accountsport.RecipientDirectory
 	Mailer     port.Mailer
@@ -69,7 +71,7 @@ type Deps struct {
 	Log              *slog.Logger
 	// KN v7.7 P4 — báo cáo Chi cục: lần tổng hợp của pf/extension (nối sau bằng UseConsolidations nếu cần) và biến môi
 	// trường của cờ Google Sheet (nil → TẮT; ADR-0026 "Đề xuất").
-	Consolidations extensionsrc.Consolidations
+	Consolidations port.Consolidations
 	Getenv         func(string) string
 }
 
@@ -81,9 +83,22 @@ type Module struct{ svc *app.Service }
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	db = forModule(db)
 	svc := &app.Service{
-		DB: db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
-		Store: d.Store, Extension: d.Extension, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,
+		ResolveSession: d.ResolveSession,
+		DB:             db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
+		Store: d.Store, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,
 		LinkBase: d.LinkBase, LinkDownloadBase: d.LinkDownloadBase, Consolidations: d.Consolidations,
+	}
+	if d.FormSeeds != nil {
+		svc.FormSeeds = app.NewFormSeedRegistry(d.FormSeeds...)
+	}
+	if d.Builders != nil {
+		svc.Builders = app.NewSourceBuilderRegistry(d.Builders...)
+	}
+	if d.Catalog != nil {
+		svc.Catalog = app.NewCatalogRegistry(d.Catalog...)
+	}
+	if d.Policies != nil {
+		svc.Policies = app.NewPolicyRegistry(d.Policies...)
 	}
 	if d.Getenv != nil {
 		svc.GSheet = dispatch.GSheetConfigFromEnv(d.Getenv)
@@ -92,7 +107,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 }
 
 // UseConsolidations nối cổng lần tổng hợp của pf/extension (báo cáo Chi cục, KN v7.7 P4).
-func (m *Module) UseConsolidations(c extensionsrc.Consolidations) { m.svc.Consolidations = c }
+func (m *Module) UseConsolidations(c port.Consolidations) { m.svc.Consolidations = c }
 
 // UseLinkDownloadBase đặt URL gốc công khai của api-platform cho liên kết tải Chi cục (A4; worker: AG_REPORT_LINK_BASE).
 func (m *Module) UseLinkDownloadBase(base string) { m.svc.LinkDownloadBase = base }
@@ -107,7 +122,7 @@ func (m *Module) UseMailer(ml port.Mailer) { m.svc.Mailer = ml }
 func (m *Module) DispatchHandler() inbox.Handler { return m.svc.HandleDispatchRequested }
 
 // DispatchHistory cho pf/extension biết kỳ đã gửi Chi cục (cảnh báo khi mở lại kỳ).
-func (m *Module) DispatchHistory() extensionsrc.DispatchHistory {
+func (m *Module) DispatchHistory() port.DispatchHistory {
 	return app.DispatchHistory{Svc: m.svc}
 }
 
@@ -118,6 +133,9 @@ func (m *Module) FormAvailability() partyport.FormAvailability {
 
 // FormUsage cho pf/masterdata (P2): cột "biểu đang dùng" của danh mục nông nghiệp.
 func (m *Module) FormUsage() mdport.FormUsage { return app.FormUsage{Svc: m.svc} }
+
+// DepartmentUsage cho pf/party (W11.02): số mẫu báo cáo và lần gửi Chi cục theo phòng ban (FN-AD-04.03).
+func (m *Module) DepartmentUsage() partyport.DepartmentUsage { return app.DepartmentUsage{Svc: m.svc} }
 
 // UseEgress (G5, ADR-0024 mục 3) nối điểm kiểm soát xuất dùng chung (pf/metering, kênh
 // report_export) sau điểm kiểm soát cục bộ ở ba lối (yêu cầu, lịch, tải). cp nil → hành vi cũ.
@@ -155,16 +173,6 @@ func ImportFormXLSX(r io.Reader, o port.FormImportOptions) (port.FormDefinition,
 
 // ExportFormXLSX dựng tệp mẫu Excel đúng bố cục của một định nghĩa.
 func ExportFormXLSX(def port.FormDefinition) ([]byte, error) { return formimport.Export(def) }
-
-// TrongTrotSeedDefinitions trả 14 định nghĩa mẫu Phòng Trồng trọt khởi tạo (T01–T07, M01, V01–V06).
-func TrongTrotSeedDefinitions() []port.FormDefinition {
-	seeds := form.TrongTrotSeeds()
-	out := make([]port.FormDefinition, 0, len(seeds))
-	for _, s := range seeds {
-		out = append(out, s.Def)
-	}
-	return out
-}
 
 // ExportHandler là inbox.Handler cho pf.reports.export.requested (consumer port.ExportConsumer).
 func (m *Module) ExportHandler() inbox.Handler { return m.svc.HandleExportRequested }

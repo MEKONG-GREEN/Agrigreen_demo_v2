@@ -80,6 +80,19 @@ type Service struct {
 	Names       partyport.ActorNames
 	// W1.4 (R-MOD-08): trạng thái bật module theo đơn vị (pf/party) — chặn cấp vai của module đã tắt.
 	Modules partyport.ModuleEnablement
+	// Facilities (tùy chọn, W11.41): danh mục cơ sở giết mổ CNTS (pf/masterdata CNTSCatalogs) — kiểm phạm vi Cấp
+	// Xã theo cơ sở (facility_refs). Nil → chỉ kiểm dạng UUID như W11.07.
+	Facilities FacilityCatalog
+	// DormantDryRun (D24): job accounts_dormant chỉ đếm tài khoản sẽ báo trước / khóa, không ghi gì (chạy thử lần đầu
+	// ở môi trường thật — docs/runbooks/keycloak-mfa-d24.md).
+	DormantDryRun bool
+}
+
+// FacilityCatalog là phần cổng danh mục CNTS pf/accounts cần (masterdata/port.CNTSCatalogs thỏa mãn): ref không
+// phải cơ sở giết mổ đang dùng; mã xã của cơ sở (W11.42 — cơ sở của lần gán Cấp Xã phải thuộc xã phụ trách).
+type FacilityCatalog interface {
+	UnknownFacilities(ctx context.Context, refs []uuid.UUID) ([]uuid.UUID, error)
+	FacilityCommunes(ctx context.Context, refs []uuid.UUID, on time.Time) (map[uuid.UUID]string, error)
 }
 
 // KNModule là module sở hữu nghiệp vụ của vai trò KN (kn_tw, kn_tinh, kn_xa).
@@ -340,6 +353,13 @@ func enqueue(ctx context.Context, tx pgx.Tx, e domain.Event) error {
 		prev, _ := e.Details["prev_cause"].(string)
 		ev.Type = port.EventUserUnlocked
 		ev.Payload = port.UserUnlockedV1{UserRef: e.Account.UserRef, OrgRef: e.Account.OrgRef, PrevCause: prev, ActorRef: e.ActorRef, EventTime: at, Seq: e.Seq}
+	case domain.ActionDormantWarned:
+		last, _ := e.Details["last_activity_at"].(string)
+		disableAt, _ := e.Details["disable_at"].(string)
+		idle, _ := e.Details["idle_days"].(int)
+		ev.Type = port.EventUserDormantWarning
+		ev.Payload = port.DormantWarningV1{UserRef: e.Account.UserRef, OrgRef: e.Account.OrgRef, LastActivityAt: last, DisableAt: disableAt,
+			IdleDays: idle, EventTime: at, Seq: e.Seq}
 	default:
 		return nil
 	}

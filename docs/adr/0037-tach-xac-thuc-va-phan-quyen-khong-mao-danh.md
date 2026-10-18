@@ -60,9 +60,10 @@
 | Gói | Việc | Migration |
 |---|---|---|
 | KN P1 (đã có) | Sổ gán vai, `session_context`, middleware `X-AG-Context`, chế độ hỗ trợ, nhật ký | pf 000060, 000061 |
-| W2.3 | `WithContextTx` đặt biến ngữ cảnh cùng `SET LOCAL ROLE` | pf 000090, shared 000007 |
-| W2.5 | Bảng chiếu `k_ref` mà RLS đọc theo ngữ cảnh | pf 000091–000092, mkg 000022 |
-| W7.2 | `k/access` hợp nhất: một ngữ cảnh cho mọi app (thay `ScopeResolver`), epoch, quyền module × lớp | pf 000111–000112 |
+| W2.3 | `WithContextTx` đặt biến ngữ cảnh cùng `SET LOCAL ROLE` | pf 000090 (biến ngữ cảnh ở pf 000091, W2.4) |
+| W2.5 | Bảng chiếu `k_ref` mà RLS đọc theo ngữ cảnh | pf 000092, mkg 000022 |
+| W7.2 | `k/access` hợp nhất: một ngữ cảnh cho mọi app (thay `ScopeResolver`), epoch, quyền module × lớp | pf 000111–000112 (tạm, cấp lại khi gộp) |
+| W11.07 | Phân quyền **trong** vai: sổ phụ thuộc tính vai (nhóm Cấp Tỉnh, cờ QTNV/người phụ trách biểu, đơn vị nội bộ, phạm vi Cấp Xã theo cơ sở/hộ), ủy quyền có hạn, danh mục đơn vị nội bộ; `ResolveContext` đưa vào `authz.KNContext` (`Manager`, `Duties`, `InternalUnit`, `Powers`, `ViewOnly`) mỗi request — vẫn không có trường nào từ client. Ngữ cảnh chỉ xem bị chặn ghi ở middleware; chặn Nút FD (`db.RequiresNode`) không đổi | pf 000142 |
 
 ## Liên quan
 

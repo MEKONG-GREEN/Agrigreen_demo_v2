@@ -91,6 +91,7 @@ func (m *mcFix) user(tid uuid.UUID, role string, communes []string, sup *authz.K
 	switch role {
 	case authz.KNXa:
 		kc.Scope = authz.Scope{Units: communes}
+		kc.OrgRef = ids.New() // như P1: lần gán Cấp Xã luôn có Nút (db.ForModule đòi Nút — FD)
 	case authz.KNTinh:
 		kc.Scope = authz.Scope{Units: []string{"89", "30001", "30002"}}
 	default:

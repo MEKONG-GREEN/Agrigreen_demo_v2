@@ -97,35 +97,33 @@ func TestTemplateValidate(t *testing.T) {
 	if err := d.Validate(); err == nil {
 		t.Fatal("cột không thuộc nguồn phải bị từ chối")
 	}
-	d = Definition{Title: "Báo cáo thử", Source: port.SourceSowing, Grouping: LevelCooperative, Columns: []Column{{Key: "sown_area_ha"}}, Formats: []string{"xlsx"}}
+	d = Definition{Title: "Báo cáo thử", Source: port.SourceCGHSummary, Grouping: LevelCooperative, Columns: []Column{{Key: "required"}}, Formats: []string{"xlsx"}}
 	if err := d.Validate(); err == nil {
-		t.Fatal("cấp HTX không hỗ trợ cho gieo sạ")
+		t.Fatal("cấp HTX không hỗ trợ cho tổng hợp CGH")
 	}
-	d = Definition{Title: "Báo cáo thử", Source: port.SourceSowing, Columns: []Column{{Key: "sown_area_ha"}}, Formats: []string{"docx"}}
+	d = Definition{Title: "Báo cáo thử", Source: port.SourceCGHSummary, Columns: []Column{{Key: "required"}}, Formats: []string{"docx"}}
 	if err := d.Validate(); err == nil {
 		t.Fatal("định dạng lạ")
 	}
-	d = Definition{Title: "Báo cáo thử", Source: port.SourceSowing, Columns: []Column{{Key: "sown_area_ha"}}, Formats: []string{"pdf"}}
-	if err := d.Validate(); err != nil || d.Columns[0].Title != "Diện tích đã sạ (ha)" || d.Grouping != LevelProvince {
+	d = Definition{Title: "Báo cáo thử", Source: port.SourceCGHSummary, Columns: []Column{{Key: "required"}}, Formats: []string{"pdf"}}
+	if err := d.Validate(); err != nil || d.Columns[0].Title != "Nhu cầu (số máy cần)" || d.Grouping != LevelProvince {
 		t.Fatalf("tiêu đề/cấp mặc định: %+v %v", d, err)
 	}
 }
 
-// Cột theo cấp: tên xã ẩn ở cấp tỉnh; mục tiêu tỉnh ẩn ở cấp xã.
+// Column visibility is a generic capability rule, independent of an application.
 func TestBuildColumnsByLevel(t *testing.T) {
-	b, _ := Builtin("kn.program_progress")
-	def := b.Def
-	def.Columns = append(def.Columns, Column{Key: "commune_name", Title: "Xã"})
-	ds := Build(def, LevelCommune, nil, nil)
-	for _, c := range ds.Columns {
-		if c.Key == "target_ha" || c.Key == "registered_pct" {
-			t.Fatal("mục tiêu tỉnh không hiện ở cấp xã")
-		}
+	sources := map[string]SourceSpec{"example.measure": {Key: "example.measure", Module: "example", Columns: []ColumnSpec{
+		{Key: "province_target", Kind: KindDecimal, MaxLevel: LevelProvince},
+		{Key: "commune_name", Kind: KindText, MinLevel: LevelCommune},
+	}}}
+	def := Definition{Source: "example.measure", Columns: []Column{{Key: "province_target"}, {Key: "commune_name"}}}
+	commune := BuildWithSources(def, LevelCommune, nil, nil, sources)
+	if len(commune.Columns) != 1 || commune.Columns[0].Key != "commune_name" {
+		t.Fatal("commune column visibility")
 	}
-	ds = Build(def, LevelProvince, nil, nil)
-	for _, c := range ds.Columns {
-		if c.Key == "commune_name" {
-			t.Fatal("tên xã không hiện ở cấp tỉnh")
-		}
+	province := BuildWithSources(def, LevelProvince, nil, nil, sources)
+	if len(province.Columns) != 1 || province.Columns[0].Key != "province_target" {
+		t.Fatal("province column visibility")
 	}
 }

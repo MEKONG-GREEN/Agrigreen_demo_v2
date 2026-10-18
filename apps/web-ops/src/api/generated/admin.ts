@@ -218,6 +218,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/masterdata/catalogs/{catalog}/items/{code}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalog: components["parameters"]["Catalog"];
+                code: components["parameters"]["ItemCode"];
+            };
+            cookie?: never;
+        };
+        /** W11.41 (BRD CNTS FN-06 BR-03): các giá trị có hiệu lực từ ngày của một mục danh mục cnts_* (sổ catalog_effective) */
+        get: operations["catalogItemVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/masterdata/params/versions": {
         parameters: {
             query?: never;
@@ -342,7 +362,12 @@ export interface paths {
         /** G-08: liệt kê cây tổ chức cho quản trị (toàn quốc thấy mọi tổ chức; quản trị tỉnh thấy trong tỉnh) */
         get: operations["partyAdminListOrgs"];
         put?: never;
-        /** Tạo tổ chức trong cây TW → Tỉnh → Xã; kind = cooperative kèm hồ sơ HTX, Mã HTX tự sinh */
+        /**
+         * Tạo tổ chức trong cây TW → Tỉnh → Xã (HTX tạo qua Neo)
+         * @description Chỉ platform_admin hoặc registry_admin tạo tổ chức. Vai KN nhận 403 với mọi loại.
+         *     kind=cooperative nhận 422 party.cooperative_requires_anchor và redirect=/quan-tri/neo-htx;
+         *     dùng POST /v1/htx-anchors với new_cooperative để tạo Nút, hồ sơ và Neo.
+         */
         post: operations["partyCreateOrg"];
         delete?: never;
         options?: never;
@@ -384,7 +409,9 @@ export interface paths {
          * Nhập cây tổ chức từ Excel .xlsx hoặc CSV UTF-8 (KN US-ADM-08), tối đa 500 dòng; kết quả theo từng dòng
          * @description Cùng cột với tệp xuất (tiêu đề có/không dấu; bắt buộc Mã tổ chức, Loại, Tên). Mã chưa có → tạo (CreateOrg);
          *     mã đã có → di chuyển nếu cấp trên/đơn vị khác (MoveOrg, ghi sổ với lý do `reason`), đổi tên nếu tên khác (RenameOrg).
-         *     Dòng được xử lý cha trước con bất kể thứ tự trong tệp. HTX mới: để trống Mã tổ chức (Mã HTX do hệ thống sinh, CGH BR-01).
+         *     Dòng được xử lý cha trước con bất kể thứ tự trong tệp. Dòng HTX mới (mã trống hoặc chưa có) bị loại theo dòng:
+         *     HTX tạo qua Neo HTX theo MST (D2, ADR-0052). Tạo Nút không phải HTX chỉ platform_admin/registry_admin (gói ORGUI);
+         *     vai KN chỉ di chuyển/đổi tên.
          *     Tệp không vô hiệu hóa tổ chức vắng mặt; cột Trạng thái chỉ để xem. Ô công thức, tệp .xls cũ, thiếu cột bắt buộc →
          *     từ chối cả tệp (party.import_invalid). Idem_key từng thao tác = Idempotency-Key + ":org:" + số dòng.
          */
@@ -460,6 +487,92 @@ export interface paths {
         get: operations["partyCooperativeDeactivationPreview"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/htx-anchors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** D2 (ADR-0052): danh sách neo HTX theo mã số thuế (HTX tạm / đã nhận quyền) */
+        get: operations["coopListHTXAnchors"];
+        put?: never;
+        /** D2: Khuyến nông hoặc MKG lập HTX TẠM — gắn neo cho Nút HTX (MST hoặc mã tạm). MST trùng → 409 cooperative.htx_anchor_mst_taken (kèm existing_anchor_id) */
+        post: operations["coopCreateHTXAnchor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/htx-anchors/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** D2: neo HTX có trước D2 (HTX tạm do KN lập; khóa = MST hồ sơ hoặc mã tạm), có chạy thử */
+        post: operations["coopBackfillHTXAnchors"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/htx-anchors/{anchor_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** D2: chi tiết neo kèm sổ (vết kiểm toán: lập, gắn MST, nhận quyền) */
+        get: operations["coopGetHTXAnchor"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/htx-anchors/{anchor_id}/mst": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** D2: gắn mã số thuế cho neo mã tạm (sự kiện mst_attached) */
+        post: operations["coopAttachHTXAnchorMST"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/htx-anchors/{anchor_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** D2: HTX thật nhận quyền (MST đã xác minh, tài khoản HTX đã kích hoạt) — một lần mỗi neo, lũy đẳng, nguyên tử; dry_run trả báo cáo không ghi; Nút đích có dữ liệu → 409 cooperative.htx_anchor_claim_conflict kèm conflict_report */
+        post: operations["coopClaimHTXAnchor"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1876,6 +1989,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/users/{id}/reset-totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** D24 — Đặt lại TOTP (mất/đổi điện thoại): xóa TOTP trong Keycloak, thêm CONFIGURE_TOTP (đăng ký lại ở lần đăng nhập sau), thu hồi mọi phiên; lý do ≥ 20 ký tự; ghi sổ totp_reset. Không tự đặt lại của chính mình (403 accounts.self_action); tài khoản đang khóa hoặc không có TOTP để đặt lại → 409 accounts.state_conflict */
+        post: operations["accountsResetTOTP"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/accounts/users/{id}/resend-actions": {
         parameters: {
             query?: never;
@@ -2013,6 +2145,175 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/users/{id}/assignments/{aid}/attributes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                aid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** W11.07 Đặt thuộc tính phân quyền trong vai (nhóm Cấp Tỉnh, QTNV báo giá, người phụ trách biểu, đơn vị nội bộ, phạm vi Cấp Xã theo cơ sở/hộ) — sổ phụ, có hiệu lực ở request kế tiếp */
+        put: operations["accountsSetAssignmentAttrs"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** W11.07 Ủy quyền có hạn tài khoản đã giao hoặc đã nhận */
+        get: operations["accountsUserDelegations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/delegations/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** W11.07 Admin thu hồi ủy quyền còn hiệu lực (lý do ≥ 10 ký tự) */
+        post: operations["accountsRevokeDelegation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/internal-units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.07 Danh mục đơn vị nội bộ (BGĐ, văn phòng, phòng, trạm, trại, tăng cường — Q-068) */
+        get: operations["adminListInternalUnits"];
+        put?: never;
+        /** W11.07 Khai báo đơn vị nội bộ (mã không tái sử dụng; chỉ loại phong gắn phòng ban) */
+        post: operations["createInternalUnit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/internal-units/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** W11.07 Sửa loại, tên, phòng ban, thứ tự (mã không đổi) */
+        put: operations["updateInternalUnit"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/internal-units/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** W11.07 Ngừng đơn vị nội bộ (lý do ≥ 10 ký tự) — người đã gán giữ nguyên, không chọn được cho lần gán mới */
+        post: operations["deactivateInternalUnit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/internal-units/{id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** W11.07 Dùng lại đơn vị nội bộ */
+        post: operations["reactivateInternalUnit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/internal-units/{id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** W11.07 Khung Log của đơn vị nội bộ */
+        get: operations["internalUnitLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/internal-units/seed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** W11.07 Nạp đơn vị nội bộ mặc định (Ban Giám đốc + 5 phòng gắn phòng ban) — chạy lặp an toàn */
+        post: operations["seedInternalUnits"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/accounts/users/{id}/profile": {
         parameters: {
             query?: never;
@@ -2043,6 +2344,56 @@ export interface paths {
         };
         /** Khung Log của màn Detail (định dạng Log chung P2): tạo, khóa/mở, gửi lại liên kết, thêm/sửa/xóa vai trò (cũ → mới), sửa thông tin */
         get: operations["accountsUserLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/kn-users/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nạp Excel tài khoản KN nhiều vai trò (FN-AD-04.04 "Nạp Excel", UR-AD-04, W11.02) — kết quả theo từng dòng
+         * @description Thân request là tệp CSV UTF-8/.xlsx (shared/tabular; ô công thức → từ chối cả tệp). Mỗi dòng là MỘT lần gán vai trò; các dòng
+         *     cùng Email gộp thành một tài khoản nhiều vai (vd Cấp Xã 2 xã + Cấp Quốc gia). Cột: Họ tên, Email (bắt buộc), SĐT, Vai trò
+         *     (kn_tw | kn_tinh | kn_xa hoặc "Cấp Quốc gia" / "Cấp Tỉnh" / "Cấp Xã"; vai Admin không nạp qua tệp), Mã Nút (mã tổ chức hoặc
+         *     UUID), Phòng ban (mã, phân tách ";"), Cấp quản lý (mã hoặc nhãn), Xã phụ trách (mã, phân tách ";"). Mỗi tài khoản tạo như
+         *     POST /v1/accounts/kn-users (tiên quyết Nút + phòng ban, liên kết kích hoạt, không mật khẩu tạm). Tài khoản có dòng lỗi bị
+         *     loại cả nhóm; tài khoản khác vẫn tạo. Khóa idem của tài khoản = Idempotency-Key + ":acc:" + dòng đầu (gửi lại cùng khóa phát
+         *     lại). Lý do không chứa dữ liệu nhập. Tối đa 300 dòng, 2 MB.
+         */
+        post: operations["accountsImportKNUsers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Tab "Phiên đang hoạt động" và "Lịch sử đăng nhập" của màn Detail tài khoản (FN-AD-04.04, W11.02) — đọc Keycloak Admin REST
+         * @description Phiên: GET /users/{id}/sessions; lịch sử: GET /events?user=…&type=LOGIN|LOGIN_ERROR|LOGOUT|CODE_TO_TOKEN_ERROR (realm phải bật
+         *     eventsEnabled; tài khoản dịch vụ cần view-events). Không ghi gì, không lưu IP ở pf. available = false khi bản cài không đọc
+         *     được phiên. Cùng phạm vi như khung Log.
+         */
+        get: operations["accountsUserSessions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3277,7 +3628,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Nạp 6 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng) — TẠM, chờ khách Q-02; chạy lặp an toàn */
+        /** Nạp 5 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng; W11.06, chờ khách Q-051); xóa mã tạm phong_ban_5/6 chưa dùng; chạy lặp an toàn */
         post: operations["knSeedDepartments"];
         delete?: never;
         options?: never;
@@ -4022,6 +4373,110 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description D2 (ADR-0052): neo HTX — định danh ổn định khóa theo MST; đồng sở hữu MKG + HTX */
+        HTXAnchor: {
+            /** Format: uuid */
+            anchor_id: string;
+            /** @description MST chính tắc (NNNNNNNNNN hoặc NNNNNNNNNN-NNN) hoặc mã tạm TMP-XXXXXXXXXXXX */
+            anchor_key: string;
+            mst: string | null;
+            /** @description true = chưa có MST (mã tạm) */
+            temporary: boolean;
+            /** @enum {string} */
+            status: "provisional" | "claimed";
+            /** @enum {string} */
+            created_by: "kn" | "mkg";
+            /** Format: uuid */
+            provisional_org_ref: string;
+            /**
+             * Format: uuid
+             * @description Nút hiện hành
+             */
+            org_ref: string;
+            /** @description Mọi Nút của neo (Nút tạm, Nút nhận quyền) */
+            aliases: string[];
+            /** Format: uuid */
+            htx_account_ref: string | null;
+            agreement_ref: string | null;
+            co_owners: ("mkg" | "htx")[];
+            /** @enum {string} */
+            confirmation_status: "confirmed" | "unconfirmed";
+            /** @enum {string} */
+            confirmation_label: "Đã xác nhận" | "Chưa xác nhận";
+            /** Format: date-time */
+            claimed_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        HTXAnchorEvent: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            /** @enum {string} */
+            action: "provisional_created" | "legacy_backfilled" | "mst_attached" | "claimed";
+            anchor_key: string;
+            mst: string | null;
+            /** Format: uuid */
+            org_ref: string;
+            verification_ref: string | null;
+            details: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HTXDataCounts: {
+            plots: number;
+            memberships: number;
+            seasons: number;
+            farm_logs: number;
+            season_areas: number;
+        };
+        HTXClaimReport: {
+            /** Format: uuid */
+            anchor_id: string;
+            dry_run: boolean;
+            would_succeed: boolean;
+            replayed: boolean;
+            from: components["schemas"]["HTXClaimParty"];
+            to: components["schemas"]["HTXClaimParty"];
+            /** @description Số dòng chuyển chủ (không sao chép) theo Nút */
+            moved: {
+                /** Format: uuid */
+                org_ref: string;
+                counts: components["schemas"]["HTXDataCounts"];
+            }[];
+            /** Format: uuid */
+            alias_added?: string;
+            conflicts: {
+                /** Format: uuid */
+                org_ref: string;
+                /** @enum {string} */
+                reason: "target_has_data" | "target_has_other_anchor" | "tax_code_differs";
+                counts: components["schemas"]["HTXDataCounts"];
+            }[];
+            confirmation: {
+                before: string;
+                after: string;
+            };
+            data_copied: boolean;
+            /** Format: uuid */
+            event_id?: string;
+        };
+        HTXClaimParty: {
+            /** @enum {string} */
+            party: "provisional" | "htx";
+            /** @enum {string} */
+            created_by?: "kn" | "mkg";
+            /** Format: uuid */
+            account_ref?: string;
+            /** Format: uuid */
+            org_ref: string;
+        };
         ReportDefinition: {
             title: string;
             /** @enum {string} */
@@ -4124,10 +4579,21 @@ export interface components {
             /**
              * @description Theo danh mục — rice_variety: growth_days, expected_yield_t_per_ha (decimal); farm_stage: pilot (true|false, cờ thí điểm CGH), description;
              *     machine_type: farm_stage (mã khâu đang dùng); season: start_month, end_month; pest: kind (sau_hai|benh_hai|dong_vat_hai|co_dai).
+             *     W11.41 CNTS — cnts_species: group, unit, herd_column, order; cnts_breed: species; cnts_disease: species (danh sách), notifiable;
+             *     cnts_vaccine: species (loài so sánh, bắt buộc), diseases, report_group (heo|bo|cum_gia_cam|dai|khac), order; cnts_chemical: unit, target;
+             *     cnts_slaughter_facility: commune_code, facility_kind (tap_trung|nho_le), stamp_codes_gs, stamp_codes_gc (nhiều mã, ngăn cách dấu phẩy),
+             *     species, address — facility_ref do hệ thống cấp và giữ cố định (giá trị gửi lên bị bỏ qua); cnts_aquaculture_object: scale_unit (ha|long|veo|m3);
+             *     cnts_fishing_group: unit, order; cnts_indicator: unit, value_type (decimal|integer|percent); cnts_model_type: sector (chan_nuoi|thuy_san), species;
+             *     cnts_vaccination_schedule: model_type và/hoặc breed, doses ("<vaccine>/<lần>@<ngày tuổi>" ngăn cách dấu phẩy).
              */
             attrs?: {
                 [key: string]: string;
             };
+            /**
+             * Format: date
+             * @description W11.41 — chỉ danh mục cnts_*: ngày áp dụng giá trị mới (FN-06 BR-03); trống = hôm nay
+             */
+            valid_from?: string;
         };
         CatalogItem: {
             catalog: string;
@@ -4143,6 +4609,30 @@ export interface components {
             updated_at: string;
             /** @description KN v7.7 FN-AD-04.05: số mẫu báo cáo đang dùng mục (vắng khi chưa nối P3) */
             forms_in_use?: number;
+            /**
+             * Format: date
+             * @description W11.41 (danh mục cnts_*): ngày bắt đầu hiệu lực của giá trị trả về (đọc theo at hoặc vừa ghi)
+             */
+            valid_from?: string;
+        };
+        CatalogEffectiveVersion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            valid_from: string;
+            /** Format: date */
+            valid_to: string | null;
+            after: components["schemas"]["CatalogSnapshot"];
+            /**
+             * Format: uuid
+             * @description Dòng sổ catalog_change cùng giao dịch
+             */
+            change_id: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: uuid */
+            actor_ref: string;
+            seq: number;
         };
         ReasonInput: {
             reason?: string;
@@ -4956,13 +5446,26 @@ export interface components {
             org_ref: string | null;
             /** @description Vai do pf/accounts quản lý; null ở danh sách nếu tài khoản tạo ngoài nền tảng */
             roles: string[] | null;
-            /** @enum {string|null} */
-            lock_cause: "manual" | "org_deactivated" | null;
+            /**
+             * @description dormant_45d — job accounts_dormant khóa vì không hoạt động (D24)
+             * @enum {string|null}
+             */
+            lock_cause: "manual" | "org_deactivated" | "dormant_45d" | null;
             required_actions: string[];
             /** Format: date-time */
             created_at: string | null;
             /** @description Có trong pf_accounts (tạo hoặc thao tác qua nền tảng) */
             tracked: boolean;
+            mfa?: components["schemas"]["AccountsMFA"];
+        };
+        /** @description D24 — trạng thái TOTP; chỉ có ở GET /v1/accounts/users/{id} */
+        AccountsMFA: {
+            /** @description Vai của tài khoản bắt TOTP khi đăng nhập (cán bộ KN, vai [MFA]) */
+            required: boolean;
+            /** @description Đã có TOTP trong Keycloak */
+            configured: boolean;
+            /** @description Đang chờ người dùng đăng ký (required action CONFIGURE_TOTP) */
+            enrollment_pending: boolean;
         };
         AccountsAccount: {
             /** Format: uuid */
@@ -4972,12 +5475,15 @@ export interface components {
             roles: string[];
             enabled: boolean;
             /** @enum {string|null} */
-            lock_cause: "manual" | "org_deactivated" | null;
+            lock_cause: "manual" | "org_deactivated" | "dormant_45d" | null;
         };
         AccountsEvent: {
             seq: number;
-            /** @enum {string} */
-            action: "created" | "locked" | "unlocked" | "assignment_changed" | "actions_sent";
+            /**
+             * @description dormant_warned, locked/dormant_45d do job accounts_dormant (actor_ref = tác nhân hệ thống); totp_reset do quản trị viên (D24)
+             * @enum {string}
+             */
+            action: "created" | "locked" | "unlocked" | "assignment_changed" | "actions_sent" | "dormant_warned" | "totp_reset";
             /** Format: date-time */
             event_time: string;
             /** Format: date-time */
@@ -5019,6 +5525,8 @@ export interface components {
             description: string | null;
             /** @enum {string} */
             status: "active" | "not_open" | "suspended";
+            /** @description W11.07: phòng ban ngoài lần gán, chọn được ở chế độ chỉ xem (Lãnh đạo đơn vị, Ban Giám đốc) */
+            read_only?: boolean;
         };
         KNAssignment: {
             /** Format: uuid */
@@ -5049,6 +5557,7 @@ export interface components {
             updated_by: string;
             /** Format: date-time */
             updated_at: string;
+            attributes?: components["schemas"]["KNAssignmentAttrs"];
         };
         KNWarning: {
             /** @enum {string} */
@@ -5084,12 +5593,108 @@ export interface components {
             support_session_id: string | null;
             /** Format: uuid */
             on_behalf_of: string | null;
+            /** @description W11.07: ngữ cảnh chỉ xem (Cấp TW, Lãnh đạo đơn vị ở phòng ban khác, Ban Giám đốc) — mọi thao tác ghi 403 accounts.context_read_only */
+            read_only?: boolean;
+            mgmt_level_code?: string | null;
+            /** @description Lãnh đạo (≥ phó phòng/phụ trách/lãnh đạo đơn vị, hoặc nhóm Lãnh đạo phòng) */
+            manager?: boolean;
+            province_group?: string | null;
+            duties?: string[];
+            internal_unit_code?: string | null;
+            /** @description Quyền nhận qua ủy quyền có hạn còn hiệu lực (đầy đủ ở GET /v1/me/context) */
+            powers?: string[];
+        };
+        /** @description Thuộc tính phân quyền trong vai (sổ phụ pf_accounts.assignment_attr_event, W11.07) */
+        KNAssignmentAttrs: {
+            /**
+             * @description Nhóm Cấp Tỉnh (chỉ kn_tinh; tạm Q-059)
+             * @enum {string|null}
+             */
+            province_group: "vien_chuc" | "tong_hop" | "chu_nhiem" | "lanh_dao_phong" | "ban_giam_doc" | null;
+            province_group_label: string | null;
+            /** @description Cờ nhiệm vụ (chỉ kn_tinh) */
+            duties: ("qtnv_bao_gia" | "phu_trach_bieu")[];
+            /** @description Đơn vị nội bộ; Cấp Xã: đơn vị quản lý (HS-37) */
+            internal_unit_code: string | null;
+            /** @description Cấp Xã: giới hạn cơ sở (rỗng = cả xã) */
+            facility_refs: string[];
+            /** @description Cấp Xã: giới hạn hộ (rỗng = cả xã) */
+            household_refs: string[];
+        };
+        KNDelegation: {
+            /** Format: uuid */
+            delegation_id: string;
+            /** Format: uuid */
+            grantor_ref: string;
+            /** Format: uuid */
+            grantee_ref: string;
+            department_code: string;
+            /** @enum {string} */
+            power: "mo_lai_ky" | "duyet_bao_cao";
+            power_label: string;
+            /** Format: date-time */
+            valid_from: string;
+            /** Format: date-time */
+            valid_to: string;
+            revoked: boolean;
+            /** @enum {string} */
+            status: "active" | "scheduled" | "expired" | "revoked";
+            reason: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        KNDelegationList: {
+            items: components["schemas"]["KNDelegation"][];
+        };
+        InternalUnit: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            org_ref: string;
+            code: string;
+            /** @enum {string} */
+            kind: "ban_giam_doc" | "van_phong" | "phong" | "tram" | "trai" | "tang_cuong";
+            kind_label: string;
+            name: string;
+            /** @description kind = phong: mã phòng ban P2 */
+            department_code: string | null;
+            sort_order: number;
+            active: boolean;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        InternalUnitList: {
+            /** Format: uuid */
+            org_ref: string;
+            items: components["schemas"]["InternalUnit"][];
+            kinds: {
+                code: string;
+                label: string;
+            }[];
+        };
+        InternalUnitInput: {
+            /**
+             * Format: uuid
+             * @description Tạo: bắt buộc (Nút cấp 1/2)
+             */
+            org_ref?: string;
+            /** @description Sửa: bỏ qua (mã không đổi) */
+            code: string;
+            /** @enum {string} */
+            kind: "ban_giam_doc" | "van_phong" | "phong" | "tram" | "trai" | "tang_cuong";
+            name: string;
+            department_code?: string;
+            sort_order?: number;
+        };
+        KNCatalogItem: {
+            code: string;
+            label: string;
         };
         KNAccountLogEntry: {
             /** @description Thứ tự trong Log hợp nhất của tài khoản */
             seq: number;
             /** @enum {string} */
-            event: "account.created" | "account.locked" | "account.unlocked" | "account.activation_sent" | "account.assignment_changed" | "account.profile_updated" | "assignment.granted" | "assignment.changed" | "assignment.revoked";
+            event: "account.created" | "account.locked" | "account.unlocked" | "account.activation_sent" | "account.assignment_changed" | "account.profile_updated" | "account.dormant_warned" | "account.totp_reset" | "assignment.granted" | "assignment.changed" | "assignment.revoked" | "assignment.attributes_changed";
             /**
              * Format: uuid
              * @description assignment_id với sự kiện assignment.*
@@ -5543,10 +6148,10 @@ export interface components {
             status: "active" | "not_open" | "suspended";
             status_label: string;
             /**
-             * @description Bộ menu dựng sẵn trong mã (kn.menu/v2)
+             * @description Bộ menu dựng sẵn trong mã (kn.menu/v3); generic + mã có khuôn riêng → khuôn riêng
              * @enum {string}
              */
-            menu_profile: "trong_trot" | "generic";
+            menu_profile: "trong_trot" | "generic" | "chan_nuoi_thuy_san" | "ke_hoach_tai_chinh" | "thong_tin_truyen_thong" | "hanh_chinh_tong_hop";
             /** @description Đã xóa (sự kiện retired) — mã không tái sử dụng */
             retired: boolean;
             /** @description Chọn được ở bước 2 đăng nhập (Đang áp dụng, chưa xóa) */
@@ -6493,7 +7098,7 @@ export interface components {
     };
     parameters: {
         IdempotencyKey: string;
-        Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest" | "vessel_class" | "crop" | "material" | "production_model" | "report_type";
+        Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest" | "vessel_class" | "crop" | "material" | "production_model" | "report_type" | "cnts_species" | "cnts_breed" | "cnts_vaccine" | "cnts_vaccination_schedule" | "cnts_disease" | "cnts_chemical" | "cnts_slaughter_facility" | "cnts_aquaculture_object" | "cnts_fishing_group" | "cnts_indicator" | "cnts_model_type" | "cnts_document_type";
         ItemCode: string;
         VersionID: string;
         Cursor: string;
@@ -6727,6 +7332,8 @@ export interface operations {
         parameters: {
             query?: {
                 include_inactive?: boolean;
+                /** @description W11.41 — chỉ danh mục cnts_*: giá trị có hiệu lực tại ngày (YYYY-MM-DD hoặc RFC 3339, giờ Việt Nam); có at thì không phân trang (next_cursor null) */
+                at?: string;
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["Limit"];
             };
@@ -6783,9 +7390,9 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description masterdata.catalog_not_found */
             404: components["responses"]["Problem"];
-            /** @description masterdata.catalog_item_exists */
+            /** @description masterdata.catalog_item_exists | masterdata.catalog_item_name_taken | masterdata.cnts_stamp_taken */
             409: components["responses"]["Problem"];
-            /** @description validation_failed | masterdata.farm_stage_invalid */
+            /** @description validation_failed | masterdata.farm_stage_invalid | masterdata.catalog_ref_invalid | masterdata.cnts_commune_invalid */
             422: components["responses"]["Problem"];
         };
     };
@@ -6816,6 +7423,8 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            /** @description masterdata.catalog_item_name_taken | masterdata.cnts_stamp_taken */
+            409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
     };
@@ -6907,6 +7516,33 @@ export interface operations {
                     "application/json": {
                         items: components["schemas"]["CatalogChange"][];
                         next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    catalogItemVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalog: components["parameters"]["Catalog"];
+                code: components["parameters"]["ItemCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Theo valid_from tăng dần; valid_to = valid_from của giá trị kế tiếp (null = đang hiệu lực / mới nhất) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CatalogEffectiveVersion"][];
                     };
                 };
             };
@@ -7399,6 +8035,270 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    coopListHTXAnchors: {
+        parameters: {
+            query?: {
+                status?: "provisional" | "claimed";
+                /** @description Tiền tố mã số thuế (chuẩn hóa: bỏ khoảng trắng, gạch) hoặc mã tạm TMP- */
+                q?: string;
+                after?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HTXAnchor"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    coopCreateHTXAnchor: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Nút HTX (kind=cooperative, đã có hồ sơ)
+                     */
+                    org_ref?: string;
+                    /** @description Tạo Nút + hồ sơ ngay trong luồng Neo; chỉ platform_admin/registry_admin. Gửi lại cùng Idempotency-Key hoàn tất các bước còn thiếu, không tạo Nút thứ hai. MST lấy từ trường mst bên ngoài. */
+                    new_cooperative?: {
+                        name: string;
+                        /** @description Mã xã còn hiệu lực */
+                        admin_unit_code: string;
+                        /**
+                         * Format: uuid
+                         * @description Nút xã cấp trên (tùy chọn)
+                         */
+                        parent_ref?: string;
+                        /** Format: uuid */
+                        representative_ref?: string;
+                        /** @description Chuyển thẳng vào kho định danh, không lưu trong sổ Neo */
+                        representative?: {
+                            full_name: string;
+                            phone: string;
+                        };
+                        profile?: {
+                            /** @description Decimal dạng chuỗi */
+                            area_ha?: string;
+                            /** Format: date */
+                            established_on?: string;
+                            address?: string;
+                            location?: {
+                                lat: string;
+                                lon: string;
+                            };
+                        };
+                    };
+                    /**
+                     * @description mkg cần platform_admin
+                     * @enum {string}
+                     */
+                    created_by: "kn" | "mkg";
+                    /** @description Mã số thuế (10 số hoặc 10 + 3 số chi nhánh; khoảng trắng/gạch được bỏ). Vắng = mã tạm */
+                    mst?: string;
+                    /** @description Thỏa thuận HTX — basis_ref của share_grant cho Khuyến nông */
+                    agreement_ref?: string;
+                } & (unknown | unknown);
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTXAnchor"];
+                };
+            };
+            /** @description Đã lập */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTXAnchor"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    coopBackfillHTXAnchors: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @default false */
+                    dry_run?: boolean;
+                    /** @default 500 */
+                    limit?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dry_run: boolean;
+                        created: number;
+                        with_mst: number;
+                        temp_code: number;
+                        items: {
+                            [key: string]: unknown;
+                        }[];
+                        skipped: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    coopGetHTXAnchor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                anchor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Neo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTXAnchor"] & {
+                        events: components["schemas"]["HTXAnchorEvent"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    coopAttachHTXAnchorMST: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                anchor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    mst: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Neo sau khi gắn */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTXAnchor"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    coopClaimHTXAnchor: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                anchor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Tài khoản HTX đã kích hoạt
+                     */
+                    account_ref: string;
+                    verified_mst: string;
+                    /** @description Chứng cứ xác minh MST */
+                    verification_ref: string;
+                    /**
+                     * Format: uuid
+                     * @description Nút HTX thật; vắng = Nút tạm của neo
+                     */
+                    target_org_ref?: string;
+                    /** @default false */
+                    dry_run?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Báo cáo nhận quyền (cũng là details của dòng sổ claimed) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTXClaimReport"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     partyDeactivateCooperative: {
@@ -9960,6 +10860,27 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    accountsResetTOTP: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["AccountsReason"];
+        responses: {
+            200: components["responses"]["AccountsChanged"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     accountsResendActions: {
         parameters: {
             query?: never;
@@ -10045,8 +10966,18 @@ export interface operations {
                         items: {
                             code: string;
                             label: string;
+                            /** @description W11.07: có quyền của lãnh đạo */
+                            manager?: boolean;
+                            /** @description W11.07: Lãnh đạo đơn vị — chọn mọi phòng ban ở chế độ chỉ xem */
+                            reads_all_departments?: boolean;
                         }[];
                         provisional: boolean;
+                        /** @description W11.07: phiên bản danh mục (accounts.kn-roles/2) */
+                        version?: string;
+                        province_groups?: components["schemas"]["KNCatalogItem"][];
+                        duties?: components["schemas"]["KNCatalogItem"][];
+                        powers?: components["schemas"]["KNCatalogItem"][];
+                        delegation_max_days?: number;
                     };
                 };
             };
@@ -10197,6 +11128,321 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    accountsSetAssignmentAttrs: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    province_group?: string;
+                    duties?: string[];
+                    internal_unit_code?: string;
+                    facility_refs?: string[];
+                    household_refs?: string[];
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Thuộc tính hiện hành (không đổi → không ghi sổ) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        assignment_id: string;
+                        attributes: components["schemas"]["KNAssignmentAttrs"];
+                        seq: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description accounts.assignment_state */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed, accounts.internal_unit_invalid, accounts.facility_invalid (W11.41) */
+            422: components["responses"]["Problem"];
+        };
+    };
+    accountsUserDelegations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mới nhất trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNDelegationList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    accountsRevokeDelegation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["AccountsReason"];
+        responses: {
+            /** @description Đã thu hồi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNDelegation"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description accounts.delegation_not_found */
+            404: components["responses"]["Problem"];
+            /** @description accounts.delegation_state */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    adminListInternalUnits: {
+        parameters: {
+            query?: {
+                org_ref?: string;
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Theo thứ tự hiển thị */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InternalUnitList"];
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    createInternalUnit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InternalUnitInput"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InternalUnit"];
+                };
+            };
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InternalUnit"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description accounts.internal_unit_code_taken */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed, accounts.internal_unit_org_invalid, accounts.internal_unit_department_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    updateInternalUnit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InternalUnitInput"];
+            };
+        };
+        responses: {
+            /** @description Đã sửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InternalUnit"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    deactivateInternalUnit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ngừng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InternalUnit"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            /** @description accounts.internal_unit_state */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    reactivateInternalUnit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đang dùng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InternalUnit"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    internalUnitLog: {
+        parameters: {
+            query?: {
+                cursor?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Theo seq */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: Record<string, never>[];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    seedInternalUnits: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    org_ref: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: components["schemas"]["InternalUnit"][];
+                        existing: number;
+                        status: string;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
     accountsUpdateProfile: {
         parameters: {
             query?: never;
@@ -10272,6 +11518,97 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    accountsImportKNUsers: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Kết quả từng dòng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Số tài khoản đã tạo */
+                        accounts_created: number;
+                        /** @description Số dòng (lần gán) đã ghi */
+                        created: number;
+                        rejected: number;
+                        rows: {
+                            row: number;
+                            /** @enum {string} */
+                            status: "created" | "rejected";
+                            reason: string | null;
+                            /** Format: uuid */
+                            user_id: string | null;
+                            activation_email_sent: boolean;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    accountsUserSessions: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên đang hoạt động (mới truy cập trước) và lịch sử đăng nhập (mới nhất trước) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        available: boolean;
+                        active: {
+                            id: string;
+                            ip_address: string;
+                            /** Format: date-time */
+                            started_at: string | null;
+                            /** Format: date-time */
+                            last_access_at: string | null;
+                            clients: string[];
+                        }[];
+                        history: {
+                            /** Format: date-time */
+                            at: string | null;
+                            type: string;
+                            ip_address: string;
+                            client: string;
+                            error: string | null;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
     accountsStartSupport: {
@@ -12854,6 +14191,10 @@ export interface operations {
                         created: components["schemas"]["KNDepartment"][];
                         existing: number;
                         status: string;
+                        /** @description Mã tạm (phong_ban_5/6) đã xóa trong lần nạp này — chưa mở, không có tài khoản/dữ liệu */
+                        legacy_retired: string[];
+                        /** @description Mã tạm còn giữ (đang áp dụng, có tài khoản/dữ liệu hoặc chưa nối nguồn đếm) — Admin xử lý; tra cứu mã cũ vẫn trả dòng này */
+                        legacy_kept: string[];
                     };
                 };
             };

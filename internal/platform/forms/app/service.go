@@ -36,8 +36,11 @@ type Service struct {
 	DB        tenant.Beginner // đã bọc db.ForModule(…, DBModule); nil → chỉ dùng được Freezer
 	Clock     clock.Clock
 	Approvals wfport.Approvals // cap/workflow: rà soát bốn mắt (nil → chỉ CHECK review_four_eyes ở DB)
-	profiles  map[string]port.Profile
-	order     []string
+	// W11.42: danh mục cơ sở (đơn vị lá UnitFacility — kiểm cơ sở thuộc xã) và quy tắc nghiệp vụ theo profile.
+	Facilities port.FacilityDirectory
+	Validators map[string]port.Validator
+	profiles   map[string]port.Profile
+	order      []string
 }
 
 var _ port.Freezer = (*Service)(nil)
@@ -75,15 +78,18 @@ func (s *Service) Profiles() []port.Profile {
 
 // actor là người gọi đối với MỘT profile.
 type actor struct {
-	ref, tenant uuid.UUID
-	role, level string
-	scope       authz.Scope
-	node        uuid.UUID
-	define      bool
+	ref, tenant  uuid.UUID
+	role, level  string
+	dept         string // phòng ban do ứng dụng cung cấp (rỗng: vai realm)
+	leaf         bool   // cấp của người gọi là cấp lá (cấp nộp bài)
+	scope        authz.Scope
+	node         uuid.UUID
+	define       bool
+	targetFilter func(string, uuid.UUID) bool
 }
 
-// resolve tìm profile và cấp của người gọi: ngữ cảnh phiên KN (vai, phạm vi, Nút) nếu có, không thì vai realm
-// (chỉ cấp cao nhất có phạm vi toàn quốc; cấp khác không có phạm vi đơn vị → chỉ thao tác không cần phạm vi).
+// resolve uses the registered application session, otherwise the configured realm roles.
+// Application policy and target restrictions are supplied by the profile resolver.
 func (s *Service) resolve(ctx context.Context, name string) (port.Profile, actor, error) {
 	p, ok := authz.FromContext(ctx)
 	if !ok {
@@ -94,11 +100,21 @@ func (s *Service) resolve(ctx context.Context, name string) (port.Profile, actor
 		return port.Profile{}, actor{}, port.ErrProfileNotFound
 	}
 	a := actor{ref: p.ActorRef, tenant: p.TenantID, node: p.OrgRef}
-	if p.KN != nil {
-		a.role, a.scope, a.node = p.KN.Role, p.KN.Scope, p.KN.OrgRef
-		a.level = prof.Roles[a.role]
-		a.define = slices.Contains(prof.DefineBy, a.role)
-	} else {
+	handled := false
+	if prof.ResolveActor != nil {
+		subject, applies, err := prof.ResolveActor(ctx, p, prof)
+		if err != nil {
+			return prof, a, err
+		}
+		handled = applies
+		if applies {
+			a.role, a.scope, a.node, a.dept = subject.Role, subject.Scope, subject.Node, subject.Department
+			a.targetFilter = subject.AllowsTarget
+			a.level = prof.LevelOf(a.role, a.dept)
+			a.define = slices.Contains(prof.DefineBy, a.role)
+		}
+	}
+	if !handled {
 		for _, r := range p.Roles {
 			if l, ok := prof.Roles[r]; ok && a.level == "" {
 				a.role, a.level = r, l
@@ -114,7 +130,25 @@ func (s *Service) resolve(ctx context.Context, name string) (port.Profile, actor
 	if a.level == "" && !a.define {
 		return prof, a, problem.Forbidden.WithDetail("vai của người gọi không thuộc cấu hình biểu " + name)
 	}
+	a.leaf = a.level != "" && a.level == prof.Leaf()
 	return prof, a, nil
+}
+
+// allowsUnit: người gọi được thao tác/thấy đơn vị u (thuộc danh sách units của kỳ có đặc tả spec) — W11.05:
+//   - xã: phạm vi phiên chứa mã xã; cơ sở/hộ: phạm vi phiên chứa mã xã CHA của đơn vị;
+//   - phòng ban: cấp lá chỉ phòng ban của phiên; cấp trên (phát hành, rà soát, chốt) mọi phòng ban của tenant.
+func (a actor) allowsUnit(spec domain.Spec, units []string, u string) bool {
+	if spec.UnitKind == port.UnitDepartment {
+		return a.scope.All || (a.leaf && a.dept == u) || (!a.leaf && a.level != "")
+	}
+	if !a.scope.Allows(spec.Parent(units, u)) {
+		return false
+	}
+	if a.targetFilter != nil && (spec.UnitKind == port.UnitFacility || spec.UnitKind == port.UnitHousehold) {
+		ref, _ := uuid.Parse(u)
+		return a.targetFilter(spec.UnitKind, ref)
+	}
+	return true
 }
 
 func (a actor) need(level, what string) error {
@@ -149,6 +183,10 @@ func classify(err error) error {
 		return problem.Conflict.WithDetail("trạng thái kỳ đã đổi").WithCause(err)
 	case pg.Code == "AGF02":
 		return port.ErrPeriodClosed.WithCause(err)
+	case pg.Code == "AGF03":
+		return port.ErrSubmissionLimit.WithCause(err)
+	case pg.Code == "AGF04":
+		return port.ErrVersionConflict.WithCause(err)
 	case pg.Code == "23514" && pg.ConstraintName == "review_four_eyes":
 		return problem.SelfApproval.WithCause(err)
 	case pg.Code == "23505":

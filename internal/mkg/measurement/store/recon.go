@@ -13,6 +13,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 )
 
@@ -127,7 +128,7 @@ func LatestReconciliation(ctx context.Context, tx pgx.Tx, lot uuid.UUID) (*Recon
 
 // ReconciliationByIdem trả lần đối soát đã ghi với idem_key.
 func ReconciliationByIdem(ctx context.Context, tx pgx.Tx, key string) (*Reconciliation, error) {
-	r, err := scanRecon(tx.QueryRow(ctx, "SELECT "+reconCols+" FROM mkg_measurement.reconciliation WHERE idem_key = $1", key))
+	r, err := scanRecon(tx.QueryRow(ctx, "SELECT "+reconCols+" FROM mkg_measurement.reconciliation WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

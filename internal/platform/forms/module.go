@@ -11,6 +11,10 @@
 //   - Freezer: lối ghi song song chốt/mở lại kỳ + ảnh chụp cho bên dùng có vòng đời riêng (KN extension/reportcycle,
 //     route v1 cũ giữ nguyên — nguyên tắc 3), trong giao dịch của bên dùng (hàm pf_forms.mirror).
 //   - HTTP: /v1/forms/* (Application API).
+//   - W11.05 (pf 000140): đơn vị lá tổng quát — loại đơn vị (xã, cơ sở GM, hộ/điểm, phòng ban; người và luồng nhiều
+//     bước của HCTH CHỪA CHỖ), giới hạn số lần gửi, khóa kỳ theo lịch kỳ hệ thống (sổ phụ period_spec); hủy kỳ
+//     (sự kiện cancelled); trạng thái lúc chốt Không nộp / Đã chốt – chưa điều chỉnh / Chờ mở kỳ (bài offline đến sau
+//     chốt giữ ở held_submission). Profile KN: kn, kn_cnts, kn_khtc (cmd/api-platform/assembly/forms.go).
 //
 // 14 biểu thật của KN (câu hỏi Q-01) chưa có: chỉ có biểu mẫu thử (fixture); profile production không phát hành
 // được kỳ trên biểu fixture — bật production chờ Q-01.
@@ -24,6 +28,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
+	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	wfport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/workflow/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
@@ -39,6 +44,10 @@ type Deps struct {
 	Approvals wfport.Approvals
 	// Profiles: cấu hình của từng bên dùng (KN: hierarchy [TW, TINH, XA], publish_by/close_by TINH).
 	Profiles []port.Profile
+	// W11.42: danh mục cơ sở giết mổ (đơn vị lá cơ sở — kiểm cơ sở thuộc xã; nil → không kiểm) và quy tắc nghiệp vụ
+	// theo profile (vd kn_cnts: số liều tiêm ≤ tổng đàn).
+	Facilities port.FacilityDirectory
+	Validators map[string]port.Validator
 }
 
 // Module là pf/forms đã nối.
@@ -55,8 +64,39 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) (*Module, error) {
 	if err != nil {
 		return nil, err
 	}
+	svc.Facilities, svc.Validators = d.Facilities, d.Validators
 	return &Module{svc: svc}, nil
 }
+
+// UseValidator nối quy tắc nghiệp vụ của bên dùng cho profile (gốc lắp ráp — bên cài quy tắc có thể dựng sau module).
+func (m *Module) UseValidator(profile string, v port.Validator) {
+	if m.svc.Validators == nil {
+		m.svc.Validators = map[string]port.Validator{}
+	}
+	m.svc.Validators[profile] = v
+}
+
+// Publisher là cổng phát hành kỳ native cho module nghiệp vụ (W11.42 — KN CNTS).
+func (m *Module) Publisher() port.Publisher { return app.Publisher{Svc: m.svc} }
+
+// SyncSource/SyncSink: đồng bộ ngoại tuyến forms_task / forms_submission (W11.42).
+func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc} }
+
+// SyncSink trả Sink chiều lên forms_submission.
+func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
+
+// Control là cổng điều khiển kỳ native (tiến độ, chốt, hủy) cho module nghiệp vụ (W11.62 — KN Kỳ KHTC).
+func (m *Module) Control() port.PeriodControl { return app.Control{Svc: m.svc} }
+
+// Figures là cổng đọc số liệu kỳ native theo lô (bài nộp cuối + ảnh chụp mới nhất) cho tổng hợp của module nghiệp vụ
+// (W11.44 — KN CNTS BM-02, BM-18).
+func (m *Module) Figures() port.FiguresReader { return app.Figures{Svc: m.svc} }
+
+// Entry là cổng nhập/rà soát bài nộp cho module nghiệp vụ có màn nhập riêng (W11.63 — KN phiếu Báo cáo cho KHTC).
+func (m *Module) Entry() port.Entry { return app.Entry{Svc: m.svc} }
+
+// SubmissionFeed là cổng đọc bài nộp của hệ thống cho quy tắc liên biểu + cảnh báo (W11.43 — KN CNTS).
+func (m *Module) SubmissionFeed() port.SubmissionFeed { return app.Feed{Svc: m.svc} }
 
 // Freezer cho bên dùng có vòng đời kỳ riêng: ghi chốt/mở lại + ảnh chụp trong giao dịch của bên dùng.
 func (m *Module) Freezer() port.Freezer { return m.svc }

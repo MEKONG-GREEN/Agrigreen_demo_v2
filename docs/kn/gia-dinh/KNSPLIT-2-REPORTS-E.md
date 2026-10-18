@@ -1,0 +1,13 @@
+## KNSPLIT-2-REPORTS-E — Registry catalog theo ứng dụng
+
+Nền devdf2ba484 đã gỡ suy quyền realm/config KN. Gói E thêm port.CatalogRegistration (DTO), CatalogRegistry trong reports/app, copy metadata bất biến và registry theo Service. KN sở hữu ReportCatalog với5source/5builtin đúng dữ liệu cũ. Module New nhận Catalog, API/hai worker/KN77 đăng ký thật. Nil catalog còn adapter Sources/Builtins cũ trong E; explicit registry chỉ có native CGH/HTX và đóng góp được cấp, F mới gỡ legacy.
+
+Nguồn, kiểm cột/cấp, chuẩn hóa định nghĩa, template fallback, phân quyền theo module, snapshot lịch và dựng cột xuất đều lấy cùng catalog của Service. Không mutate global Sources khi đăng ký. Registry chặn source/template trùng, sai schema/nguồn không tồn tại; nguồn không có builder trả dependency error hiện hành thay vì thành công với tệp rỗng. Không thay query/aggregation của nguồn KN trong E: bộ dựng riêng còn gói tiếp theo.
+
+Golden tests/golden/kn-report-catalog.json chụp từ adapter cũ (5source/5layout) qua TestLegacyReportCatalogContract với cờ update chủ đích; owner KN phải khớp từng byte ở TestReportCatalogMatchesLegacyContract. TestRegisteredCatalogMatchesLegacy kiểm toàn bộ9source/9layout, validate và column/value build, cùng clone/collision/nguồn chưa nối. Pure-first compile lỗi import domain không còn dùng, đã bỏ; không tính businessproof. Pure-second90371.exit0 app2.209s/domain0.836s/extension1.712s,0FAIL/SKIP.
+
+Bảy file suite integration được chuyển nguyên các assertion từ reports/handler sang tests/reports (package reportstest), vì test lắp ráp KN+capability cần gọi provider KN thật mà không thêm coupling shared. Đã kiểm không có testdata/relative path repo phụ thuộc vị trí cũ (chỉ có temp object path). Fixture đăng ký ReportPolicy và ReportCatalog thật. REGRESSION command phải bao gồm tests/reports; handler cũ không còn test không được dùng để tuyên bố suite đã chạy.
+
+Không đổi API/SQL/frontend/tenant/D2/MRV/M1–M7. Catalog KN chưa đủ để coi xong reports: bộ dựng số KN và bộ14gridseed còn phải chuyển owner/registry. Phải đủ PG/consumer/cổng/helper trước dev, không sửa main/xóa worktree.
+
+Kết quả thực: PG70172.exit0 đủ13/13package,0FAIL/SKIP (assembly:116.892s, worker:2.050s, reports:115.207s, kn77:289.793s); production67c70932 không đổi. Static60148.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary383/lint0issues. Gofmt toàn repo chỉ2fixture cũ được phép. Đối chiếu gitdf2ba484 xác nhận7file/19testfunction và assertion counts giữ nguyên sau chuyển tests/reports. Golden cũ và provider KN khớpbyte. ProofJSON hostTEMP agrigreen-codex-knsplit2reportse-proof.json. Helper còn kiểm8migrationgate trước tích hợp; F mới gỡ legacy catalog, data-builder/14gridseed còn gói sau.

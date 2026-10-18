@@ -1,0 +1,11 @@
+{
+  "id": "simulation",
+  "source": "./simulation",
+  "app": [
+    {
+      "export": "simulationRoutes",
+      "order": 52
+    }
+  ],
+  "admin": []
+}

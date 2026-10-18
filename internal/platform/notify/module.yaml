@@ -10,13 +10,17 @@ depends:
   pf/party: ">=2.0 <3"
   pf/sync: ">=1.0 <2"
 provides:
-  ports: [AreaFarmers, StaffDirectory]
-  events: [pf.notify.notification.created/v1, pf.notify.push.requested/v1]
+  ports: [AreaFarmers, EmailDirectory, StaffDirectory]
+  events:
+    - pf.notify.email.requested/v1
+    - pf.notify.notification.created/v1
+    - pf.notify.push.requested/v1
   internal_events: []
   publications: []
   data_products: []
 consumes:
   events:
+    - pf.accounts.user.dormant_warning/v1
     - pf.content.alert.published/v1
     - pf.content.document.published/v1
     - pf.cropcycle.collection_schedule.received/v1
@@ -24,16 +28,6 @@ consumes:
     - pf.cropcycle.farm_log.recorded/v1
     - pf.cropcycle.farm_log.reviewed/v1
     - pf.cropcycle.season.opened/v1
-    - pf.extension.directive.issued/v1
-    - pf.extension.period.reopened/v1
-    - pf.extension.report_batch.issued/v1
-    - pf.extension.report_task.reminded/v1
-    - pf.extension.submission.adjustment_requested/v1
-    - pf.extension.task.created/v1
-    - pf.extension.task.escalated/v1
-    - pf.extension.work_schedule.reminded/v1
-    - pf.extension.work_schedule.reviewed/v1
-    - pf.extension.work_schedule.submitted/v1
     - pf.mechanization.area_feed.stale/v1
     - pf.metering.egress.anomaly_detected/v1
     - pf.mrv.alert.raised/v1

@@ -15,7 +15,7 @@ import (
 
 // resolveTemplate trả phiên bản hiện hành của mẫu: phiên bản mới nhất của tenant,
 // nếu chưa có thì mẫu hệ thống (phiên bản 0).
-func resolveTemplate(ctx context.Context, tx pgx.Tx, key string) (domain.Template, error) {
+func (s *Service) resolveTemplate(ctx context.Context, tx pgx.Tx, key string) (domain.Template, error) {
 	t, err := store.LatestTemplate(ctx, tx, key)
 	if err != nil {
 		return domain.Template{}, err
@@ -23,20 +23,20 @@ func resolveTemplate(ctx context.Context, tx pgx.Tx, key string) (domain.Templat
 	if t != nil {
 		return *t, nil
 	}
-	if b, ok := domain.Builtin(key); ok {
+	if b, ok := s.builtinTemplate(key); ok {
 		return b, nil
 	}
 	return domain.Template{}, ErrTemplateNotFound
 }
 
 // effectiveTemplates gộp mẫu hệ thống và phiên bản mới nhất của tenant.
-func effectiveTemplates(ctx context.Context, tx pgx.Tx) ([]domain.Template, error) {
+func (s *Service) effectiveTemplates(ctx context.Context, tx pgx.Tx) ([]domain.Template, error) {
 	latest, err := store.LatestTemplates(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 	byKey := map[string]domain.Template{}
-	for _, b := range domain.Builtins() {
+	for _, b := range s.builtinTemplates() {
 		byKey[b.Key] = b
 	}
 	for _, t := range latest {
@@ -52,21 +52,21 @@ func effectiveTemplates(ctx context.Context, tx pgx.Tx) ([]domain.Template, erro
 
 // ListTemplates (Application API) trả mẫu đang dùng mà người gọi được xuất.
 func (s *Service) ListTemplates(ctx context.Context) ([]domain.Template, error) {
-	p, err := authz.Require(ctx, allReaders...)
+	p, err := authz.Require(ctx, s.readerRoles()...)
 	if err != nil {
 		return nil, err
 	}
 	var all []domain.Template
 	if err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		all, e = effectiveTemplates(ctx, tx)
+		all, e = s.effectiveTemplates(ctx, tx)
 		return e
 	}); err != nil {
 		return nil, err
 	}
 	out := []domain.Template{}
 	for _, t := range all {
-		if t.Status == domain.TemplateActive && hasAny(p, rolesFor(t.Def.Source)) {
+		if t.Status == domain.TemplateActive && hasAny(p, s.sourceRoles(t.Def.Source)) {
 			out = append(out, t)
 		}
 	}
@@ -82,7 +82,7 @@ func (s *Service) AdminTemplates(ctx context.Context) ([]domain.Template, error)
 	var out []domain.Template
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		out, e = effectiveTemplates(ctx, tx)
+		out, e = s.effectiveTemplates(ctx, tx)
 		return e
 	})
 	return out, err
@@ -103,7 +103,7 @@ func (s *Service) TemplateVersions(ctx context.Context, key string) ([]domain.Te
 	if err != nil {
 		return nil, err
 	}
-	if b, ok := domain.Builtin(key); ok {
+	if b, ok := s.builtinTemplate(key); ok {
 		out = append(out, b)
 	}
 	if len(out) == 0 {
@@ -122,7 +122,7 @@ func (s *Service) SaveTemplate(ctx context.Context, key string, def domain.Defin
 	if !domain.ValidKey(key) {
 		return domain.Template{}, problem.Validation.WithField("key", "chữ thường, số, dấu chấm hoặc gạch dưới; 3–64 ký tự")
 	}
-	if err := def.Validate(); err != nil {
+	if err := def.ValidateWithSources(s.sourceSpecs()); err != nil {
 		return domain.Template{}, fieldProblem(err)
 	}
 	t := domain.Template{Key: key, Status: domain.TemplateActive, Def: def, CreatedBy: p.ActorRef, CreatedAt: s.now()}
@@ -142,7 +142,7 @@ func (s *Service) RetireTemplate(ctx context.Context, key, reason string) (domai
 	}
 	var t domain.Template
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
-		cur, err := resolveTemplate(ctx, tx, key)
+		cur, err := s.resolveTemplate(ctx, tx, key)
 		if err != nil {
 			return err
 		}

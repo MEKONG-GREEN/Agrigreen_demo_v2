@@ -2,12 +2,29 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"os"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 )
+
+// mfaPolicyFromEnv đọc chính sách yếu tố thứ hai (authz.MFAPolicyFromEnv). Gọi NGAY đầu run, trước khi mở DB:
+// AG_MFA_DISABLED bật ngoài máy demo (AG_DEPLOY_ENV=demo và AG_ENV khác production) → lỗi, tiến trình từ chối
+// khởi động. Bật hợp lệ → cảnh báo lớn có event riêng để luật log/alert bắt được.
+func mfaPolicyFromEnv(getenv func(string) string, log *slog.Logger) (authz.MFAPolicy, error) {
+	p, err := authz.MFAPolicyFromEnv(getenv)
+	if err != nil {
+		return authz.MFAPolicy{}, err
+	}
+	if p.Disabled {
+		log.Warn("!!! DEMO: Admin API KHÔNG kiểm yếu tố thứ hai ("+authz.EnvMFADisabled+"=1, "+authz.EnvDeployEnv+"=demo). "+
+			"Chỉ chấp nhận trên máy demo; đăng nhập TOTP của Keycloak (D24) vẫn áp dụng theo realm !!!",
+			"event", "security.mfa_disabled", "outcome", "degraded")
+	}
+	return p, nil
+}
 
 // verifierFromEnv dựng bộ xác minh token.
 //
@@ -18,12 +35,8 @@ import (
 // Khóa tải lười khi có token đầu tiên, nên Keycloak chưa sẵn sàng không làm hỏng
 // khởi động.
 //
-// Chính sách yếu tố thứ hai đọc từ AG_MFA_* (authz.MFAPolicyFromEnv); AG_MFA_DISABLED=1 chỉ dành cho demo.
-func verifierFromEnv(ctx context.Context, issuer, audience string) (*authz.Verifier, error) {
-	policy, err := authz.MFAPolicyFromEnv(os.Getenv)
-	if err != nil {
-		return nil, err
-	}
+// Chính sách yếu tố thứ hai lấy từ mfaPolicyFromEnv (AG_MFA_*).
+func verifierFromEnv(ctx context.Context, issuer, audience string, policy authz.MFAPolicy) (*authz.Verifier, error) {
 	if jwks := os.Getenv("AG_OIDC_JWKS_URL"); jwks != "" {
 		return authz.NewVerifierWithKeys(issuer, audience, oidc.NewRemoteKeySet(context.WithoutCancel(ctx), jwks)).WithMFAPolicy(policy), nil
 	}

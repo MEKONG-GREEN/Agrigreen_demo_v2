@@ -11,6 +11,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 )
 
@@ -94,7 +95,7 @@ func LotByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Lot, error) 
 
 // LotByIdem tìm lô đã ghi với idem_key.
 func LotByIdem(ctx context.Context, tx pgx.Tx, key string) (*domain.Lot, error) {
-	return oneLot(ctx, tx, "idem_key = $1", key)
+	return oneLot(ctx, tx, "idem_key = $1"+ledger.NewestByIdem(""), key)
 }
 
 // ---------------------------------------------------------------------------
@@ -274,7 +275,7 @@ func MovementByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Movemen
 
 // MovementByIdem tìm dịch chuyển đã ghi với idem_key.
 func MovementByIdem(ctx context.Context, tx pgx.Tx, key string) (*domain.Movement, error) {
-	return oneMovement(ctx, tx, "idem_key = $1", key)
+	return oneMovement(ctx, tx, "idem_key = $1"+ledger.NewestFirst(""), key)
 }
 
 // CorrectionOf tìm dòng bù đã trỏ về dịch chuyển id (mỗi dòng chỉ bù một lần).
@@ -321,7 +322,7 @@ func BatchByIdem(ctx context.Context, tx pgx.Tx, key string) (*domain.Batch, err
 	var b domain.Batch
 	var kind, in, out, inKg, outKg, loss string
 	err := tx.QueryRow(ctx, `SELECT id, tenant_id, facility_id, seq, kind, inputs::text, outputs::text, input_kg::text,
-	    output_kg::text, loss_kg::text, event_time, recorded_at, actor_ref, idem_key FROM mkg_hub.batch WHERE idem_key = $1`, key).
+	    output_kg::text, loss_kg::text, event_time, recorded_at, actor_ref, idem_key FROM mkg_hub.batch WHERE idem_key = $1`+ledger.NewestByIdem(""), key).
 		Scan(&b.ID, &b.TenantID, &b.FacilityID, &b.Seq, &kind, &in, &out, &inKg, &outKg, &loss, &b.EventTime, &b.RecordedAt,
 			&b.ActorRef, &b.IdemKey)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -384,7 +385,7 @@ func DispatchByIdem(ctx context.Context, tx pgx.Tx, key string) (*Dispatch, erro
 	var d Dispatch
 	var m, al string
 	err := tx.QueryRow(ctx, `SELECT id, tenant_id, facility_id, seq, mass_kg::text, destination_ref, allocations::text,
-	    strategy, rule_version, event_time, actor_ref, idem_key FROM mkg_hub.dispatch WHERE idem_key = $1`, key).
+	    strategy, rule_version, event_time, actor_ref, idem_key FROM mkg_hub.dispatch WHERE idem_key = $1`+ledger.NewestByIdem(""), key).
 		Scan(&d.ID, &d.TenantID, &d.FacilityID, &d.Seq, &m, &d.DestinationRef, &al, &d.Strategy, &d.RuleVersion, &d.EventTime,
 			&d.ActorRef, &d.IdemKey)
 	if errors.Is(err, pgx.ErrNoRows) {

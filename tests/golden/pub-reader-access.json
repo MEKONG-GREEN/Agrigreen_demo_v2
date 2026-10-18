@@ -1,0 +1,388 @@
+{
+  "Roles": [
+    {
+      "Role": "r_accounts",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_agg",
+      "Inherit": true,
+      "BypassRLS": true,
+      "Login": false
+    },
+    {
+      "Role": "r_apiclient",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_contact",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_content",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_cooperative",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_cropcycle",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_evidence",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_extension",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_forms",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_geo",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_hrm",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_kref",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_masterdata",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_mechanization",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_metering",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_metrics",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_mrv",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_notify",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_party",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_price",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_reports",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_simulation",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_sync",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_waterway",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
+      "Role": "r_workflow",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    }
+  ],
+  "Access": [
+    {
+      "Reader": "r_agg",
+      "View": "pf_cropcycle_pub.v1_harvest_declaration"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_cropcycle_pub.v1_season_event"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_extension_pub.v1_closed_figures"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_extension_pub.v1_consolidation_closed"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_extension_pub.v1_directive_target_ack"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_extension_pub.v1_field_report"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_extension_pub.v1_task"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_extension_pub.v1_task_event"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_forms_pub.v1_closed_figures"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_geo_pub.v1_layer_geometry"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_geo_pub.v1_plot_boundary"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_geo_pub.v1_plot_event"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_mechanization_pub.v1_balance_run"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_mechanization_pub.v1_coop_coverage"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_price_pub.v1_board_daily"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_price_pub.v1_ticket_week"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_extension_pub.v1_closed_figures"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_extension_pub.v1_consolidation_closed"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_extension_pub.v1_directive_target_ack"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_extension_pub.v1_field_report"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_extension_pub.v1_task"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_extension_pub.v1_task_event"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_forms_pub.v1_closed_figures"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_price_pub.v1_board_daily"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_price_pub.v1_ticket_week"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_cropcycle_pub.v1_harvest_declaration"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_cropcycle_pub.v1_season_event"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_extension_pub.v1_closed_figures"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_extension_pub.v1_consolidation_closed"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_extension_pub.v1_directive_target_ack"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_extension_pub.v1_field_report"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_extension_pub.v1_task"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_extension_pub.v1_task_event"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_forms_pub.v1_closed_figures"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_geo_pub.v1_layer_geometry"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_geo_pub.v1_plot_boundary"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_geo_pub.v1_plot_event"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_mechanization_pub.v1_balance_run"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_mechanization_pub.v1_coop_coverage"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_price_pub.v1_board_daily"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_price_pub.v1_ticket_week"
+    }
+  ],
+  "Memberships": [
+    {
+      "Reader": "r_agg",
+      "Granted": "r_cropcycle_pub"
+    },
+    {
+      "Reader": "r_agg",
+      "Granted": "r_extension_pub"
+    },
+    {
+      "Reader": "r_agg",
+      "Granted": "r_forms_pub"
+    },
+    {
+      "Reader": "r_agg",
+      "Granted": "r_geo_pub"
+    },
+    {
+      "Reader": "r_agg",
+      "Granted": "r_mechanization_pub"
+    },
+    {
+      "Reader": "r_agg",
+      "Granted": "r_price_pub"
+    },
+    {
+      "Reader": "r_extension",
+      "Granted": "r_extension_pub"
+    },
+    {
+      "Reader": "r_extension",
+      "Granted": "r_forms_pub"
+    },
+    {
+      "Reader": "r_extension",
+      "Granted": "r_price_pub"
+    },
+    {
+      "Reader": "r_metrics",
+      "Granted": "r_cropcycle_pub"
+    },
+    {
+      "Reader": "r_metrics",
+      "Granted": "r_extension_pub"
+    },
+    {
+      "Reader": "r_metrics",
+      "Granted": "r_forms_pub"
+    },
+    {
+      "Reader": "r_metrics",
+      "Granted": "r_geo_pub"
+    },
+    {
+      "Reader": "r_metrics",
+      "Granted": "r_mechanization_pub"
+    },
+    {
+      "Reader": "r_metrics",
+      "Granted": "r_price_pub"
+    }
+  ]
+}

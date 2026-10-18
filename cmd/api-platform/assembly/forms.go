@@ -3,11 +3,10 @@ package assembly
 import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/workflow"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 )
 
@@ -18,25 +17,33 @@ import (
 // /v1/forms/*; ghi song song của KN chạy trong giao dịch của pf/extension.
 // ---------------------------------------------------------------------------
 
-// KNProfile là cấu hình cap/forms của App Khuyến nông: TW → Tỉnh → Xã, Tỉnh phát hành, rà soát, chốt/mở lại; Xã nộp.
-// Vai là vai ngữ cảnh phiên KN (authz.KN*); Admin KN và reports_admin định nghĩa biểu. Không cho biểu mẫu thử:
-// 14 biểu thật (Q-01) phải được định nghĩa trước khi Tỉnh phát hành kỳ trên /v1/forms (bật production chờ Q-01).
-var KNProfile = formsport.Profile{
-	Name:      "kn",
-	Hierarchy: []string{"TW", "TINH", "XA"},
-	Roles:     map[string]string{authz.KNTW: "TW", authz.KNTinh: "TINH", authz.KNXa: "XA"},
-	PublishBy: "TINH",
-	CloseBy:   "TINH",
-	ReviewBy:  "TINH",
-	DefineBy:  []string{authz.KNAdmin, "reports_admin"},
-}
+// Compatibility names for composition/tests during the two-step registry migration.
+// Configuration and session policy are owned by the application module.
+var (
+	KNProfiles    = extension.FormProfiles()
+	KNProfile     = KNProfiles[0]
+	KNCNTSProfile = KNProfiles[1]
+	KNKHTCProfile = KNProfiles[2]
+)
 
-// wireForms dựng pf/forms (rà soát bốn mắt qua cap/workflow) và nối ghi song song vào vòng đời báo cáo KN.
-func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extension.Module) (*forms.Module, error) {
-	fm, err := forms.New(p, clk, forms.Deps{Approvals: wf.Approvals(), Profiles: []formsport.Profile{KNProfile}})
+// wireForms dựng pf/forms (rà soát bốn mắt qua cap/workflow) và nối ghi song song vào vòng đời báo cáo KN. W11.42: danh
+// mục cơ sở giết mổ (đơn vị lá BM-01), quy tắc chặn biểu kỳ CNTS, cổng phát hành kỳ native cho pf/extension.
+func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extension.Module, facilities formsport.FacilityDirectory) (*forms.Module, error) {
+	fm, err := forms.New(p, clk, forms.Deps{Approvals: wf.Approvals(), Profiles: KNProfiles, Facilities: facilities,
+		Validators: map[string]formsport.Validator{KNCNTSProfile.Name: kn.CNTSValidator(), KNKHTCProfile.Name: kn.KHTCFormValidator()}})
 	if err != nil {
 		return nil, err
 	}
 	kn.UseFormsFreezer(fm.Freezer())
+	kn.UseFormsPublisher(fm.Publisher())
+	kn.UseFormsFigures(fm.Figures()) // W11.44: tổng hợp CNTS BM-02, BM-18 đọc số liệu kỳ native theo lô
+	// W11.62: Kỳ KHTC — kỳ native kn_khtc (một phiếu mỗi phòng), tối đa KNKHTCProfile.MaxSubmissions lần gửi (tham số
+	// extension.khtc_max_submissions ghi đè). Kế hoạch năm (W11.61) nối trong pf/extension; bộ quy đổi kỳ nguồn (PFPUB) nối
+	// ngay dưới. W11.63: phiếu Báo cáo cho KHTC — nhập/rà soát qua cổng Entry; bài nộp kn_khtc phải mang bảng số liệu đã
+	// niêm phong (KHTCFormValidator ở trên).
+	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), Entry: fm.Entry(),
+		MaxSubmissions: KNKHTCProfile.MaxSubmissions})
+	// PFPUB (ADR-0053 §7): kỳ KHTC mở kèm kỳ nguồn quy đổi theo lịch D8; "Đủ dữ liệu" theo cờ chốt của nguồn.
+	kn.UseKHTCSourceCrosswalk(kn.KHTCSourceCrosswalk())
 	return fm, nil
 }

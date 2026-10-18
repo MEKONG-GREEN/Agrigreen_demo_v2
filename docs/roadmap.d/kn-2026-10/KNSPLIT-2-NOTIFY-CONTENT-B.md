@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-NOTIFY-CONTENT-B: Xóa7fallback, chuyển8kind vềKN;77+46golden vàfullPG9 đạt, chờhelper9migration/remote.

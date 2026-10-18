@@ -55,8 +55,14 @@ func TestRolesAndActions(t *testing.T) {
 	if _, err := NormalizeRoles(nil); err == nil {
 		t.Fatal("thiếu vai")
 	}
-	if a := RequiredActions([]string{"kn_officer"}); slices.Contains(a, port.ActionConfigureTOTP) {
-		t.Fatalf("vai thường không bắt TOTP: %v", a)
+	// D24 (CEO 13/10/2026): cán bộ KN dùng TOTP từ G1; vai HTX/nông hộ không bắt.
+	if a := RequiredActions([]string{"kn_officer"}); !slices.Contains(a, port.ActionConfigureTOTP) {
+		t.Fatalf("D24: cán bộ KN phải đăng ký TOTP: %v", a)
+	}
+	for _, r := range []string{"coop_manager", "plot_viewer", "consent_writer"} {
+		if a := RequiredActions([]string{r}); slices.Contains(a, port.ActionConfigureTOTP) {
+			t.Fatalf("vai %s không bắt TOTP: %v", r, a)
+		}
 	}
 	if a := RequiredActions([]string{"registry_admin"}); !slices.Equal(a, []string{port.ActionVerifyEmail, port.ActionUpdatePassword, port.ActionConfigureTOTP}) {
 		t.Fatalf("vai [MFA] phải bắt TOTP: %v", a)

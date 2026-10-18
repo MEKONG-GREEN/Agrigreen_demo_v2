@@ -23,9 +23,12 @@ const CatalogRuleVersion = "pf.masterdata.catalog/v1"
 // CatalogFormat là định dạng tệp danh mục nhúng.
 const CatalogFormat = "agrigreen.catalogs/v1"
 
-// Catalogs là các danh mục module quản lý.
-var Catalogs = []string{port.CatalogRiceVariety, port.CatalogFarmStage, port.CatalogMachineType, port.CatalogSeason, port.CatalogPest, port.CatalogVesselClass,
+// baseCatalogs là danh mục dùng chung / Trồng trọt (trước W11.41).
+var baseCatalogs = []string{port.CatalogRiceVariety, port.CatalogFarmStage, port.CatalogMachineType, port.CatalogSeason, port.CatalogPest, port.CatalogVesselClass,
 	port.CatalogCrop, port.CatalogMaterial, port.CatalogProductionModel, port.CatalogReportType}
+
+// Catalogs là các danh mục gốc do module dùng chung quản lý.
+var Catalogs = slices.Clone(baseCatalogs)
 
 // Hành động ghi vào sổ lịch sử danh mục.
 const (
@@ -42,7 +45,7 @@ var itemCodeRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$`)
 
 // Lỗi kiểm dữ liệu danh mục.
 var (
-	ErrCatalogUnknown = errors.New("danh mục không tồn tại; dùng rice_variety, farm_stage, machine_type, season, pest, vessel_class, crop, material, production_model hoặc report_type")
+	ErrCatalogUnknown = errors.New("danh mục không tồn tại (xem GET /v1/masterdata/catalogs)")
 	ErrItemCode       = errors.New("mã mục 1–40 ký tự [A-Za-z0-9_.-]")
 	ErrItemName       = errors.New("tên bắt buộc, tối đa 200 ký tự")
 	ErrReason         = fmt.Errorf("lý do bắt buộc, %d–500 ký tự", MinReasonLen)
@@ -62,6 +65,9 @@ type Item struct {
 	Revision           int
 	UpdatedBy          uuid.UUID
 	UpdatedAt          time.Time
+	// ValidFrom (chỉ danh mục CNTS, W11.41): ngày bắt đầu hiệu lực của giá trị — khi ghi là ngày áp dụng (zero =
+	// hôm nay), khi đọc theo ngày là valid_from của phiên bản có hiệu lực. Không lưu ở bảng hiện trạng.
+	ValidFrom time.Time
 }
 
 // Snapshot là trạng thái của mục ghi vào sổ lịch sử (trước → sau).
@@ -105,15 +111,12 @@ func CatalogStreamKey(catalog, code string) string { return "catalog:" + catalog
 func ValidateReason(r string) error {
 	n := utf8.RuneCountInString(strings.TrimSpace(r))
 	if n < MinReasonLen || n > 500 {
-		return FieldError{"reason", ErrReason}
+		return FieldError{Field: "reason", Err: ErrReason}
 	}
 	return nil
 }
 
-type attrSpec struct {
-	required bool
-	check    func(string) (string, error) // trả giá trị đã chuẩn hóa
-}
+type attrSpec = port.AttributeSpec
 
 func intRange(lo, hi int) func(string) (string, error) {
 	return func(s string) (string, error) {
@@ -222,57 +225,57 @@ func stageRef(s string) (string, error) {
 
 var attrSpecs = map[string]map[string]attrSpec{
 	port.CatalogRiceVariety: {
-		"growth_days":             {true, intRange(1, 365)},
-		"expected_yield_t_per_ha": {true, yield},
-		"description":             {false, text(500)},
+		"growth_days":             {Required: true, Normalize: intRange(1, 365)},
+		"expected_yield_t_per_ha": {Required: true, Normalize: yield},
+		"description":             {Required: false, Normalize: text(500)},
 	},
 	port.CatalogFarmStage: {
-		"pilot":       {true, oneOf("true", "false")}, // cờ thí điểm CGH (BR-06)
-		"description": {false, text(500)},
+		"pilot":       {Required: true, Normalize: oneOf("true", "false")}, // cờ thí điểm CGH (BR-06)
+		"description": {Required: false, Normalize: text(500)},
 	},
 	port.CatalogMachineType: {
-		"farm_stage":  {true, stageRef}, // khâu tự gán theo chủng loại (CGH BR-02)
-		"description": {false, text(500)},
+		"farm_stage":  {Required: true, Normalize: stageRef}, // khâu tự gán theo chủng loại (CGH BR-02)
+		"description": {Required: false, Normalize: text(500)},
 	},
 	port.CatalogSeason: {
-		"start_month": {false, intRange(1, 12)},
-		"end_month":   {false, intRange(1, 12)},
-		"description": {false, text(500)},
+		"start_month": {Required: false, Normalize: intRange(1, 12)},
+		"end_month":   {Required: false, Normalize: intRange(1, 12)},
+		"description": {Required: false, Normalize: text(500)},
 	},
 	port.CatalogPest: {
-		"kind":                      {true, oneOf("sau_hai", "benh_hai", "dong_vat_hai", "co_dai")},
-		"description":               {false, text(500)},
-		port.AttrAffectedCrops:      {false, codeList},  // KN v7.7 FN-AD-04.05: cây trồng bị ảnh hưởng
-		port.AttrSeverityThresholds: {false, text(500)}, // không bắt buộc, điền sau
+		"kind":                      {Required: true, Normalize: oneOf("sau_hai", "benh_hai", "dong_vat_hai", "co_dai")},
+		"description":               {Required: false, Normalize: text(500)},
+		port.AttrAffectedCrops:      {Required: false, Normalize: codeList},  // KN v7.7 FN-AD-04.05: cây trồng bị ảnh hưởng
+		port.AttrSeverityThresholds: {Required: false, Normalize: text(500)}, // không bắt buộc, điền sau
 	},
 	port.CatalogCrop: {
-		port.AttrParentCode: {false, stageRefNamed("mã nhóm cây trồng")},
-		"is_group":          {false, oneOf("true", "false")},
-		"unit":              {false, text(20)},
-		"description":       {false, text(500)},
+		port.AttrParentCode: {Required: false, Normalize: stageRefNamed("mã nhóm cây trồng")},
+		"is_group":          {Required: false, Normalize: oneOf("true", "false")},
+		"unit":              {Required: false, Normalize: text(20)},
+		"description":       {Required: false, Normalize: text(500)},
 	},
 	port.CatalogMaterial: {
-		"unit":        {true, nonEmpty(20)},
-		"group":       {false, text(100)},
-		"description": {false, text(500)},
+		"unit":        {Required: true, Normalize: nonEmpty(20)},
+		"group":       {Required: false, Normalize: text(100)},
+		"description": {Required: false, Normalize: text(500)},
 	},
 	port.CatalogProductionModel: {
-		"description": {false, text(500)},
+		"description": {Required: false, Normalize: text(500)},
 	},
 	port.CatalogReportType: {
-		"period":      {true, oneOf("week", "month", "season", "year", "ad_hoc", "dispatch")},
-		"level":       {false, oneOf("province", "commune", "both")},
-		"description": {false, text(500)},
+		"period":      {Required: true, Normalize: oneOf("week", "month", "season", "year", "ad_hoc", "dispatch")},
+		"level":       {Required: false, Normalize: oneOf("province", "commune", "both")},
+		"description": {Required: false, Normalize: text(500)},
 	},
 	port.CatalogVesselClass: {
-		"capacity_t":      {true, positiveDec(100000)},
-		"beam_m":          {true, positiveDec(100)},
-		"draft_m":         {true, positiveDec(50)},
-		"air_draft_m":     {true, positiveDec(100)},
-		"min_width_m":     {true, positiveDec(500)},
-		"min_depth_m":     {true, positiveDec(50)},
-		"min_clearance_m": {true, positiveDec(100)},
-		"description":     {false, text(500)},
+		"capacity_t":      {Required: true, Normalize: positiveDec(100000)},
+		"beam_m":          {Required: true, Normalize: positiveDec(100)},
+		"draft_m":         {Required: true, Normalize: positiveDec(50)},
+		"air_draft_m":     {Required: true, Normalize: positiveDec(100)},
+		"min_width_m":     {Required: true, Normalize: positiveDec(500)},
+		"min_depth_m":     {Required: true, Normalize: positiveDec(50)},
+		"min_clearance_m": {Required: true, Normalize: positiveDec(100)},
+		"description":     {Required: false, Normalize: text(500)},
 	},
 }
 
@@ -291,17 +294,25 @@ func CanonicalCode(catalog, code string) string {
 // danh mục (thiếu thuộc tính bắt buộc hoặc có thuộc tính lạ đều bị từ chối).
 func (it Item) Normalize() (Item, error) {
 	if !KnownCatalog(it.Catalog) {
-		return it, FieldError{"catalog", ErrCatalogUnknown}
+		return it, FieldError{Field: "catalog", Err: ErrCatalogUnknown}
+	}
+	return it.NormalizeWith(port.CatalogDefinition{Catalog: it.Catalog, Attributes: attrSpecs[it.Catalog]})
+}
+
+// NormalizeWith applies an explicitly registered pure schema.
+func (it Item) NormalizeWith(def port.CatalogDefinition) (Item, error) {
+	if def.Catalog != it.Catalog {
+		return it, FieldError{Field: "catalog", Err: ErrCatalogUnknown}
 	}
 	it.Code = CanonicalCode(it.Catalog, it.Code)
 	if !itemCodeRe.MatchString(it.Code) {
-		return it, FieldError{"code", ErrItemCode}
+		return it, FieldError{Field: "code", Err: ErrItemCode}
 	}
 	it.Name = strings.TrimSpace(it.Name)
 	if it.Name == "" || utf8.RuneCountInString(it.Name) > 200 {
-		return it, FieldError{"name", ErrItemName}
+		return it, FieldError{Field: "name", Err: ErrItemName}
 	}
-	spec := attrSpecs[it.Catalog]
+	spec := def.Attributes
 	out := make(map[string]string, len(it.Attrs))
 	keys := make([]string, 0, len(it.Attrs))
 	for k := range it.Attrs {
@@ -311,24 +322,29 @@ func (it Item) Normalize() (Item, error) {
 	for _, k := range keys {
 		s, ok := spec[k]
 		if !ok {
-			return it, FieldError{"attrs." + k, errors.New("thuộc tính không có trong danh mục " + it.Catalog)}
+			return it, FieldError{Field: "attrs." + k, Err: errors.New("thuộc tính không có trong danh mục " + it.Catalog)}
 		}
-		v, err := s.check(it.Attrs[k])
+		v, err := s.Normalize(it.Attrs[k])
 		if err != nil {
-			return it, FieldError{"attrs." + k, err}
+			return it, FieldError{Field: "attrs." + k, Err: err}
 		}
 		out[k] = v
 	}
 	for k, s := range spec {
-		if _, ok := out[k]; s.required && !ok {
-			return it, FieldError{"attrs." + k, errors.New("bắt buộc")}
+		if _, ok := out[k]; s.Required && !ok {
+			return it, FieldError{Field: "attrs." + k, Err: errors.New("bắt buộc")}
+		}
+	}
+	if def.ValidateAttrs != nil {
+		if err := def.ValidateAttrs(out); err != nil {
+			return it, err
 		}
 	}
 	if it.Catalog == port.CatalogSeason {
 		_, a := out["start_month"]
 		_, b := out["end_month"]
 		if a != b {
-			return it, FieldError{"attrs.end_month", errors.New("start_month và end_month đi cùng nhau")}
+			return it, FieldError{Field: "attrs.end_month", Err: errors.New("start_month và end_month đi cùng nhau")}
 		}
 	}
 	it.Attrs = out
@@ -347,3 +363,6 @@ func (it Item) SameContent(o Item) bool {
 	}
 	return true
 }
+
+// NativeCatalog protects the schemas owned by this capability from replacement.
+func NativeCatalog(c string) bool { return slices.Contains(baseCatalogs, c) }

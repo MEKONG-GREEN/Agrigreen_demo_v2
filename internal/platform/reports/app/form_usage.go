@@ -7,8 +7,10 @@ package app
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -99,4 +101,25 @@ func (f FormUsage) FormsUsing(ctx context.Context, catalog string, codes []strin
 		return nil
 	})
 	return out, err
+}
+
+// DepartmentUsage hiện thực party/port.DepartmentUsage (W11.02, FN-AD-04.03 "không xóa phòng ban đã có dữ liệu"):
+// số mẫu báo cáo (mọi trạng thái) và lần gửi Chi cục mang department_code của phòng ban.
+type DepartmentUsage struct{ Svc *Service }
+
+var _ partyport.DepartmentUsage = DepartmentUsage{}
+
+// DepartmentUsage đếm bản ghi (tenant từ Principal; đơn vị không dùng — mã phòng ban duy nhất trong tenant).
+func (d DepartmentUsage) DepartmentUsage(ctx context.Context, _ uuid.UUID, code string) (partyport.Usage, error) {
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return partyport.Usage{}, nil
+	}
+	var n int
+	err := d.Svc.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT
+		    (SELECT count(*) FROM pf_reports.form_template WHERE department_code = $1)
+		  + (SELECT count(*) FROM pf_reports.dispatch WHERE department_code = $1)`, code).Scan(&n)
+	})
+	return partyport.Usage{Records: n}, err
 }

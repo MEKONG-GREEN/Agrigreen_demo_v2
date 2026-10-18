@@ -1,0 +1,11 @@
+{
+  "id": "orgs-create",
+  "source": "./orgs-create",
+  "app": [],
+  "admin": [
+    {
+      "export": "orgCreateRoutes",
+      "order": 14
+    }
+  ]
+}

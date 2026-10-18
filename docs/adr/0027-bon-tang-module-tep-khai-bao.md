@@ -53,7 +53,10 @@ KN v7.7 (D2) coi **phòng ban là module**: `pf_party.department` bật theo tr�
 | `pf/metrics` | `cap/analytics` | capability | Chỉ đọc `_pub` (W6.3) |
 | `pf/evidence` (mới, W6.5) — schema `pf_files` | `cap/evidence` | capability | Chuyển `pf_files` từ `pf/sync` (pf 000123) |
 | `pf/workflow` (mới, W6.1) | `cap/workflow` | capability | Duyệt bốn mắt dùng chung (pf 000118) |
-| — | `cap/task`, `cap/price` | — | Chưa có module. `cap/task` khai `hosts` ở `pf/extension` (W6.6) |
+| — | `cap/task` | — | Chưa có module. `cap/task` khai `hosts` ở `pf/extension` (W6.6) |
+| `pf/price` (mới, W11.71) | `cap/price` | capability | [ADR-0049](0049-cap-price-pf-price.md); khung pf 000138, nghiệp vụ Báo giá ở W11.72–W11.76 |
+| `pf/contact` (mới, W11.23) | `cap/directory` | capability | [ADR-0054](0054-cap-directory-pf-contact.md); Contact FN-13 dùng chung (pf 20261013230912), PII qua thẻ danh bạ của kho định danh |
+| `pf/hrm` (mới, W11.21) | `dom/hrm` | domain | [ADR-0050](0050-dom-hrm-pf-hrm.md); khung + danh mục nhân sự pf 000147, hồ sơ và nghiệp vụ HCTH ở W11.22–W11.28 |
 | `pf/extdata` | — | chốt ở W1.1 | Không có tên v4.1 tương ứng |
 | `pf/metering` | `dom/metering` | domain | ADR-0023 |
 | `pf/extension` | `dom/extension` | domain | |
@@ -130,6 +133,7 @@ Giữ cả hai cơ chế, tách nghĩa:
 | W6.5 | `pf/evidence` (`cap/evidence`, capability, pf 000123) — **module mới** thay vì mở rộng `pf/sync`: bảng mục 2 gán `pf_files` cho `cap/evidence`, `Open(purpose)` là năng lực dùng chung. Sở hữu `pf_files` (mã SQL chuyển khỏi `pf/sync`, `pf/sync` giữ route `/v1/files` và gọi `evidence/port.Files`); bộ ba R-DB-07 NULL được trên `pf_files.file`, sổ `pf_files.access_log`. Module chủ phân giải chủ thể qua `evidence/port.Resolver` — interface bên tiêu thụ, gốc lắp ráp nối `cooperativeport.Resolve` (capability không import domain, mẫu W6.1); phạm vi/đồng ý cũng là interface tự khai để không thêm cạnh vào chu trình `pf/party ↔ pf/sync` |
 | W6.6 | `cap/import`, `cap/task`, `cap/export` **chưa tách** (R-MOD-09): trường tay mới `hosts` trong `module.yaml` khai năng lực `cap/*` chưa tách mà module đang cài (`modreg`: dạng `cap/<tên>`, không trùng `aka`, lỗi nếu năng lực đã có module mang `aka` đó; `Registry.Hosts`). Kiểm kê: `cap/import` 8 module (đọc tệp đã là thư viện `shared/tabular`, phần còn lại là ánh xạ cột của module chủ), `cap/export` 3 việc xuất bất đồng bộ (`pf/reports`, `pf/mrv`, `pf/apiclient` — khung chung đã ở `shared/outbox`/`objstore`, khác nhau ở lõi DLP/băm/ngưỡng k) + 5 tải đồng bộ, `cap/task` 1 (`pf/extension`). Tách `cap/export` cần schema mới và dời ba sổ chỉ ghi thêm — không làm trong gói không migration. Điều kiện kích hoạt tách ghi ở [modules.md](../dev/modules.md#năng-lực-chưa-tách-capimport-captask-capexport-w66) |
 | W9.1 | Lint cấm so sánh tên ứng dụng trong module `capability` |
+| W11.05 | `cap/forms` tổng quát đơn vị lá (pf 000140): sổ phụ `pf_forms.period_spec` (loại đơn vị lá, đơn vị cha, giới hạn lần gửi, khóa kỳ), `held_submission` (Chờ mở kỳ), sự kiện `cancelled`; `forms/port.Profile` thêm `UnitKinds`, `Departments`, `MaxSubmissions`, khóa vai `vai@phòng_ban`. Gốc lắp ráp truyền ba Profile KN (`kn`, `kn_cnts`, `kn_khtc`). Không đổi đồ thị module, không ngoại lệ mới |
 
 ## Liên quan
 

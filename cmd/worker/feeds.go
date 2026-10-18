@@ -5,11 +5,13 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/grantlookup"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
@@ -47,7 +49,7 @@ func apiclientFeedJobs(ctx context.Context, direct string, closeFn *func(), log 
 		return nil, err
 	}
 	clk := clock.System{}
-	md := masterdata.New(pool, clk)
+	md := masterdata.New(pool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 	cc := cropcycle.New(pool, clk, cropcycle.Deps{})
 	coop := cooperative.New(pool, clk, cooperative.Deps{}) // W3.3: dữ kiện thửa và vụ ở pf_coop (r_cooperative)
 	cc.UseCollectionVolume(coop.Plots(), coop.Seasons(), md.AdminUnits())

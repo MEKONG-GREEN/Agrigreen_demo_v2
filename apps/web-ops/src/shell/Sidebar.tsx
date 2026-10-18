@@ -44,12 +44,14 @@ function Leaf({
   sub?: boolean;
 }) {
   const n = badgeOf(node, badges ?? null);
-  if (node.status === "not_open" || !node.href) {
+  if (node.status === "not_open" || node.status === "coming_soon" || !node.href) {
+    // kn.menu/v3: "Sắp có" = mục của module chưa có; "Chưa mở" = phòng ban chưa mở.
+    const tag = node.status === "coming_soon" ? "Sắp có" : node.status === "not_open" ? "Chưa mở" : null;
     return (
-      <span className={`nav-item is-disabled${sub ? " nav-sub-item" : ""}`} aria-disabled="true" title={collapsed ? `${node.label} — Chưa mở` : undefined}>
+      <span className={`nav-item is-disabled${sub ? " nav-sub-item" : ""}`} aria-disabled="true" title={collapsed && tag ? `${node.label} — ${tag}` : undefined}>
         <Icon name={node.icon} />
         <span className="nav-text">{node.label}</span>
-        {node.status === "not_open" ? <span className="nav-tag">Chưa mở</span> : null}
+        {tag ? <span className="nav-tag">{tag}</span> : null}
       </span>
     );
   }
@@ -134,7 +136,7 @@ export function Sidebar({ menu, pathname, badges, collapsed = false, onToggleCol
                 const hasActive = activeParent === item.key;
                 const subId = `${base}-sub-${item.key}`;
                 const showFly = collapsed && flyout === item.key;
-                const disabled = item.status === "not_open";
+                const disabled = item.status === "not_open" || item.status === "coming_soon";
                 return (
                   <li
                     key={item.key}

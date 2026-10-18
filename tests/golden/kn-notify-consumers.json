@@ -1,0 +1,139 @@
+[
+  {
+    "Name": "pf.notify.directive",
+    "Order": 1,
+    "Events": [
+      "pf.extension.directive.issued"
+    ]
+  },
+  {
+    "Name": "pf.notify.content",
+    "Order": 2,
+    "Events": [
+      "pf.content.alert.published",
+      "pf.content.document.published"
+    ]
+  },
+  {
+    "Name": "pf.notify.task",
+    "Order": 3,
+    "Events": [
+      "pf.extension.task.escalated",
+      "pf.extension.task.created"
+    ]
+  },
+  {
+    "Name": "pf.notify.sync",
+    "Order": 4,
+    "Events": [
+      "pf.sync.conflict.opened",
+      "pf.sync.device.revoked"
+    ]
+  },
+  {
+    "Name": "pf.notify.party",
+    "Order": 5,
+    "Events": [
+      "pf.party.org.deactivated",
+      "pf.party.household.registered",
+      "pf.party.household.membership_changed"
+    ]
+  },
+  {
+    "Name": "pf.notify.cropcycle",
+    "Order": 6,
+    "Events": [
+      "pf.cropcycle.farm_log.recorded",
+      "pf.cropcycle.farm_log.reviewed",
+      "pf.cropcycle.season.opened",
+      "pf.cropcycle.collection_schedule.received",
+      "pf.cropcycle.collection_statement.received"
+    ]
+  },
+  {
+    "Name": "pf.notify.report_cycle",
+    "Order": 7,
+    "Events": [
+      "pf.extension.report_batch.issued",
+      "pf.extension.report_task.reminded",
+      "pf.extension.submission.adjustment_requested",
+      "pf.extension.period.reopened"
+    ]
+  },
+  {
+    "Name": "pf.notify.integration",
+    "Order": 8,
+    "Events": [
+      "pf.sync.integration.dead_lettered",
+      "pf.mechanization.area_feed.stale"
+    ]
+  },
+  {
+    "Name": "pf.notify.mrv",
+    "Order": 9,
+    "Events": [
+      "pf.mrv.alert.raised"
+    ]
+  },
+  {
+    "Name": "pf.notify.work_schedule",
+    "Order": 10,
+    "Events": [
+      "pf.extension.work_schedule.submitted",
+      "pf.extension.work_schedule.reviewed",
+      "pf.extension.work_schedule.reminded"
+    ]
+  },
+  {
+    "Name": "pf.notify.egress_anomaly",
+    "Order": 11,
+    "Events": [
+      "pf.metering.egress.anomaly_detected"
+    ]
+  },
+  {
+    "Name": "pf.notify.price",
+    "Order": 12,
+    "Events": [
+      "pf.price.reminder.issued",
+      "pf.price.alert.raised",
+      "pf.price.verification.requested",
+      "pf.price.verification.responded",
+      "pf.price.verification.decided",
+      "pf.price.lock.summarized",
+      "pf.price.board.published",
+      "pf.price.board.reopened",
+      "pf.price.ticket.proxied"
+    ]
+  },
+  {
+    "Name": "pf.notify.cnts",
+    "Order": 13,
+    "Events": [
+      "pf.extension.cnts_alert.changed",
+      "pf.extension.cnts_form.reminded",
+      "pf.extension.cnts_duty.changed"
+    ]
+  },
+  {
+    "Name": "pf.notify.accounts",
+    "Order": 14,
+    "Events": [
+      "pf.accounts.user.dormant_warning"
+    ]
+  },
+  {
+    "Name": "pf.notify.push",
+    "Order": 15,
+    "Events": [
+      "pf.notify.push.requested"
+    ]
+  },
+  {
+    "Name": "pf.notify.email",
+    "Order": 16,
+    "Events": [
+      "pf.notify.email.requested"
+    ]
+  }
+]

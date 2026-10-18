@@ -34,10 +34,19 @@ type Handler struct {
 func (h Handler) Register(rg *gin.RouterGroup) {
 	rg.POST("/subjects", h.Idem, h.create)
 	rg.POST("/subjects/lookup", h.lookup)
+	// W11.23: thẻ danh bạ theo lô (pf/contact) — POST vì thân mang danh sách ref; phản hồi no-store, không qua Idem.
+	rg.POST("/subjects/cards", h.cards)
 	rg.GET("/subjects/:ref/display", h.display)
 	rg.POST("/subjects/:ref/resolve", h.resolve)
 	rg.POST("/subjects/:ref/unwrap", h.unwrap)
 	rg.POST("/subjects/:ref/erasure", h.Idem, h.erase)
+	// W11.22 (vault 000004): hồ sơ nhân sự — sửa định danh, ghi/đọc ngăn có khóa riêng. Đọc ngăn là POST (thân mang mục
+	// đích, phản hồi no-store) và KHÔNG qua Idem (phản hồi chứa định danh, R-40).
+	rg.POST("/subjects/:ref/amend", h.Idem, h.amend)
+	rg.POST("/subjects/:ref/sections/:section", h.Idem, h.putSection)
+	rg.POST("/subjects/:ref/sections/:section/read", h.getSection)
+	// W11.28: đọc hồ sơ nhân sự theo lô (báo cáo Sở, dashboard) — phản hồi no-store, không qua Idem (R-40).
+	rg.POST("/subjects/batch-read", h.batchRead)
 	rg.GET("/pubkeys", h.pubkeys)
 	rg.GET("/pubkeys/households", h.householdPubkeys)
 }
@@ -234,4 +243,88 @@ func (h Handler) pubkeys(c *gin.Context) {
 		resp.NextCursor = &s
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h Handler) amend(c *gin.Context) {
+	ref, ok := refOf(c)
+	if !ok {
+		return
+	}
+	var req client.AmendRequest
+	if !bind(c, &req) {
+		return
+	}
+	if err := h.Svc.Amend(c.Request.Context(), purposeOf(c, req.Purpose), ref,
+		client.Identity{FullName: req.FullName, Phone: req.Phone, Address: req.Address}); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, client.WriteResponse{Ref: ref.String()})
+}
+
+func (h Handler) putSection(c *gin.Context) {
+	ref, ok := refOf(c)
+	if !ok {
+		return
+	}
+	var req client.SectionRequest
+	if !bind(c, &req) {
+		return
+	}
+	if err := h.Svc.PutSection(c.Request.Context(), purposeOf(c, req.Purpose), ref, c.Param("section"), req.Fields); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, client.WriteResponse{Ref: ref.String()})
+}
+
+func (h Handler) getSection(c *gin.Context) {
+	ref, ok := refOf(c)
+	if !ok {
+		return
+	}
+	var req client.PurposeRequest
+	if c.Request.ContentLength != 0 && !bind(c, &req) {
+		return
+	}
+	section := c.Param("section")
+	out, err := h.Svc.GetSection(c.Request.Context(), purposeOf(c, req.Purpose), ref, section)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, client.SectionResponse{Ref: ref.String(), Section: section, Fields: out})
+}
+
+func (h Handler) cards(c *gin.Context) {
+	var req client.CardsRequest
+	if !bind(c, &req) {
+		return
+	}
+	if len(req.Refs) > client.MaxCardRefs {
+		httpx.Fail(c, problem.Validation.WithField("refs", "tối đa 200 chủ thể mỗi lần"))
+		return
+	}
+	refs := make([]uuid.UUID, 0, len(req.Refs))
+	for _, r := range req.Refs {
+		ref, err := uuid.Parse(r)
+		if err != nil {
+			httpx.Fail(c, problem.Validation.WithField("refs", "mã tham chiếu không hợp lệ"))
+			return
+		}
+		refs = append(refs, ref)
+	}
+	out, err := h.Svc.Cards(c.Request.Context(), purposeOf(c, req.Purpose), refs, req.Fields)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	items := make([]client.CardItem, 0, len(out))
+	for _, x := range out {
+		items = append(items, client.CardItem{Ref: x.Ref.String(), FullName: x.FullName, Phone: x.Phone, BirthYear: x.BirthYear,
+			Email: x.Email, Erased: x.Erased})
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, client.CardsResponse{Items: items})
 }

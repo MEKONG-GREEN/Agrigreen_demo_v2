@@ -64,7 +64,7 @@ func TestFilterMenuGroups(t *testing.T) {
 // Mọi module mà bảng menu tham chiếu là module per_tenant có thật (modreg).
 func TestMenuModulesArePerTenant(t *testing.T) {
 	routes := []string{"/kn/dashboard", "/kn/bao-cao/chi-cuc", "/kn/du-lieu/may-moc", "/kn/du-lieu/ve-thua", "/kn/phong-ban/x/danh-muc",
-		"/kn/phong-ban/x/mau-bao-cao", "/quan-tri/tham-so", "/quan-tri/xung-dot", "/quan-tri/bang-ke", "/dong-bo"}
+		"/kn/phong-ban/x/mau-bao-cao", "/kn/bao-gia/xa-bao-gia", "/kn/phong-ban/x/bao-gia-lich", "/quan-tri/tham-so", "/quan-tri/xung-dot", "/quan-tri/bang-ke", "/dong-bo"}
 	for _, r := range routes {
 		m := domain.MenuModule(r)
 		if !modreg.PerTenant(m) {
@@ -76,7 +76,8 @@ func TestMenuModulesArePerTenant(t *testing.T) {
 			t.Fatalf("%s là màn lõi, nhận %q", r, m)
 		}
 	}
-	if domain.MenuModule("/kn/bao-cao/chi-cuc") != "pf/reports" || domain.MenuModule("/kn/bao-cao/tuan") != "pf/extension" {
+	if domain.MenuModule("/kn/bao-cao/chi-cuc") != "pf/reports" || domain.MenuModule("/kn/bao-cao/tuan") != "pf/extension" ||
+		domain.MenuModule("/kn/bao-cao-khtc/da-gui") != "pf/extension" || domain.MenuModule("/kn/phong-ban/trong_trot/bao-cao-khtc") != "pf/extension" { // W11.11
 		t.Fatal("khớp tiền tố dài nhất")
 	}
 }

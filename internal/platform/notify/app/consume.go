@@ -10,10 +10,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
@@ -29,22 +29,17 @@ import (
 
 // Vai nhận thông báo chủ đề.
 var (
-	// officerRoles: cán bộ khuyến nông mọi cấp — người nhận chỉ đạo khi không có danh sách.
-	officerRoles = []string{partyport.RoleKNOfficer, partyport.RoleKNProvinceAdmin, partyport.RoleKNNationalAdmin}
 	// orgWatchRoles: người theo dõi tổ chức trong địa bàn.
 	orgWatchRoles = []string{partyport.RoleKNOfficer, partyport.RoleKNProvinceAdmin, partyport.RoleKNNationalAdmin, partyport.RoleRegistryAdmin}
 )
 
 // HandledEvents là mọi sự kiện consumer của module xử lý (trừ pf.notify.push.requested).
 var HandledEvents = []string{
-	extport.EventDirectiveIssued, extport.EventTaskEscalated, contentport.EventAlertPublished,
+	contentport.EventAlertPublished,
 	contentport.EventDocumentPublished, syncport.EventConflictOpened, syncport.EventDeviceRevoked,
-	partyport.EventOrgDeactivated, coopport.EventHouseholdRegistered, coopport.EventHouseholdMembershipChanged,
-	extport.EventTaskCreated, coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened,
-	extport.EventReportBatchIssued, extport.EventReportTaskReminded, extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened,
+	partyport.EventOrgDeactivated, coopport.EventHouseholdRegistered, coopport.EventHouseholdMembershipChanged, coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened,
 	ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived,
 	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale, mrvport.EventAlertRaised,
-	extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed, extport.EventWorkScheduleReminded,
 	meteringport.EventEgressAnomaly,
 }
 
@@ -52,28 +47,32 @@ var HandledEvents = []string{
 // đẩy, trong CÙNG giao dịch với dòng shared.inbox (R-61). Giao lặp → inbox bỏ qua;
 // kể cả gọi thẳng hai lần, chỉ mục duy nhất (sự kiện, người nhận) chặn trùng.
 func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
-	switch env.EventType {
-	case extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed, extport.EventWorkScheduleReminded:
-		ns, err := domain.WorkScheduleNotifications(env.EventType, env.Payload, env.OccurredAt)
+	if ns, handled, err := s.eventRenderers.render(env.EventType, env.Payload, env.OccurredAt); handled {
+		if err != nil || len(ns) == 0 {
+			return err
+		}
+		return s.deliver(ctx, tx, env, ns)
+	}
+	if ns, digests, handled, err := s.eventBuilders.build(ctx, env.TenantID, env.EventType, env.Payload, env.OccurredAt); handled {
 		if err != nil {
+			return err
+		}
+		if err := s.queueDigestDrafts(ctx, tx, env, digests); err != nil {
 			return err
 		}
 		if len(ns) == 0 {
 			return nil
 		}
 		return s.deliver(ctx, tx, env, ns)
-	case extport.EventDirectiveIssued:
-		var p extport.DirectiveIssuedV1
-		if err := decode(env, &p); err != nil {
+	}
+	switch env.EventType {
+	case accport.EventUserDormantWarning:
+		// D24: báo trước khóa tài khoản không hoạt động → chính tài khoản (chuông + email).
+		n, err := domain.DormantWarningNotification(env.Payload, env.OccurredAt)
+		if err != nil {
 			return err
 		}
-		return s.onDirective(ctx, tx, env, p)
-	case extport.EventTaskCreated:
-		var p extport.TaskCreatedV1
-		if err := decode(env, &p); err != nil {
-			return err
-		}
-		return s.onTaskCreated(ctx, tx, env, p)
+		return s.deliver(ctx, tx, env, []domain.Notification{n})
 	case coopport.EventHouseholdRegistered:
 		var p coopport.HouseholdRegisteredV1
 		if err := decode(env, &p); err != nil {
@@ -89,12 +88,6 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			return err
 		}
 		return s.onCommuneHousehold(ctx, tx, env, p.CommuneCode, domain.MembershipChangedTemplate(p, env.OccurredAt))
-	case extport.EventTaskEscalated:
-		var p extport.TaskEscalatedV1
-		if err := decode(env, &p); err != nil {
-			return err
-		}
-		return s.onTaskEscalated(ctx, tx, env, p)
 	case contentport.EventAlertPublished:
 		var p contentport.AlertPublishedV1
 		if err := decode(env, &p); err != nil {
@@ -198,16 +191,6 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 		}
 		a := domain.Audience{National: true, Roles: []string{mechport.RoleCGHAdmin}}
 		return s.deliver(ctx, tx, env, []domain.Notification{domain.AreaFeedStaleTemplate(p, env.OccurredAt).ForAudience(a)})
-	case extport.EventReportBatchIssued, extport.EventReportTaskReminded, extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened:
-		// KN v7.7 P4: công việc mới, nhắc, yêu cầu điều chỉnh, mở lại kỳ → cán bộ phụ trách (đẩy chỉ dữ liệu, < 1 phút).
-		ns, err := domain.ReportCycleNotifications(env.EventType, env.Payload, env.OccurredAt)
-		if err != nil {
-			return err
-		}
-		if len(ns) == 0 {
-			return nil
-		}
-		return s.deliver(ctx, tx, env, ns)
 	case meteringport.EventEgressAnomaly:
 		// G5 (ADR-0024, mục 18 DLP): tenant phong bì = CHỦ DỮ LIỆU → chủ đề toàn tenant theo vai người
 		// nhận DLP (port.EgressAnomalyRoles — tạm, chờ khách Q5-5). Idempotent: inbox + (sự kiện, người nhận).
@@ -283,75 +266,6 @@ func decode(env outbox.Envelope, v any) error {
 	return nil
 }
 
-// onDirective: người nhận là target_refs (danh bạ chụp lúc ban hành). Không có →
-// tra danh bạ hiện tại theo vùng; vẫn không có → thông báo chủ đề cho cán bộ của vùng.
-// Chỉ đạo khẩn còn được xếp vào email tóm tắt.
-func (s *Service) onDirective(ctx context.Context, tx pgx.Tx, env outbox.Envelope, p extport.DirectiveIssuedV1) error {
-	tpl := domain.DirectiveTemplate(p, env.OccurredAt)
-	targets := domain.DedupRefs(p.TargetRefs)
-	units := domain.DedupUnits(p.AudienceUnits)
-	if len(targets) == 0 && s.Staff != nil {
-		staff, err := s.Staff.ActiveStaff(ctx, env.TenantID, units)
-		if err != nil {
-			return err
-		}
-		for _, st := range staff {
-			targets = append(targets, st.ActorRef)
-		}
-		targets = domain.DedupRefs(targets)
-	}
-	var ns []domain.Notification
-	for _, r := range targets {
-		ns = append(ns, tpl.For(r))
-	}
-	if len(ns) == 0 && len(units) > 0 {
-		exp, err := s.expandUnits(ctx, units, env.OccurredAt)
-		if err != nil {
-			return err
-		}
-		ns = append(ns, tpl.ForAudience(domain.Audience{Units: exp, Roles: officerRoles}))
-	}
-	if p.Severity == port.SeverityUrgent {
-		if err := store.InsertDigestItem(ctx, tx, env.TenantID, domain.DigestItem{DirectiveID: p.DirectiveID,
-			AudienceUnits: units, IssuedAt: tpl.CreatedAt}, env.EventID, s.now()); err != nil {
-			return err
-		}
-	}
-	return s.deliver(ctx, tx, env, ns)
-}
-
-// onTaskEscalated: người được giao (nếu có) + cán bộ cấp tỉnh trong danh bạ của tỉnh
-// nhận leo thang. Tỉnh chưa có cán bộ trong danh bạ → thông báo chủ đề cho vai
-// kn_province_admin của tỉnh.
-func (s *Service) onTaskEscalated(ctx context.Context, tx pgx.Tx, env outbox.Envelope, p extport.TaskEscalatedV1) error {
-	tpl := domain.TaskEscalatedTemplate(p, env.OccurredAt)
-	var recipients []uuid.UUID
-	if p.AssigneeRef != nil {
-		recipients = append(recipients, *p.AssigneeRef)
-	}
-	admins := 0
-	if s.Staff != nil && p.ProvinceCode != "" {
-		staff, err := s.Staff.ActiveStaff(ctx, env.TenantID, []string{p.ProvinceCode})
-		if err != nil {
-			return err
-		}
-		for _, st := range staff {
-			if st.ProvinceLevel() && st.ProvinceCode == p.ProvinceCode {
-				recipients = append(recipients, st.ActorRef)
-				admins++
-			}
-		}
-	}
-	var ns []domain.Notification
-	for _, r := range domain.DedupRefs(recipients) {
-		ns = append(ns, tpl.For(r))
-	}
-	if admins == 0 && p.ProvinceCode != "" {
-		ns = append(ns, tpl.ForAudience(domain.Audience{Units: []string{p.ProvinceCode}, Roles: []string{partyport.RoleKNProvinceAdmin}}))
-	}
-	return s.deliver(ctx, tx, env, ns)
-}
-
 // onCommuneHousehold: người nhận là cán bộ khuyến nông cấp XÃ của xã có nông hộ
 // (danh bạ trực); xã chưa có ai trong danh bạ → thông báo chủ đề cho vai kn_officer của xã.
 func (s *Service) onCommuneHousehold(ctx context.Context, tx pgx.Tx, env outbox.Envelope, commune string, tpl domain.Template) error {
@@ -378,20 +292,6 @@ func (s *Service) onCommuneHousehold(ctx context.Context, tx pgx.Tx, env outbox.
 		ns = append(ns, tpl.ForAudience(domain.Audience{Units: []string{commune}, Roles: []string{partyport.RoleKNOfficer}}))
 	}
 	return s.deliver(ctx, tx, env, ns)
-}
-
-// onTaskCreated: nhiệm vụ tự sinh từ App HTX (KN US-TASK-01) → người được giao; không
-// ai được giao (admin_queue) → thông báo chủ đề cho quản trị TTKN tỉnh để gán lại.
-func (s *Service) onTaskCreated(ctx context.Context, tx pgx.Tx, env outbox.Envelope, p extport.TaskCreatedV1) error {
-	tpl := domain.TaskAssignedTemplate(p, env.OccurredAt)
-	if p.AssigneeRef != nil && *p.AssigneeRef != uuid.Nil {
-		return s.deliver(ctx, tx, env, []domain.Notification{tpl.For(*p.AssigneeRef)})
-	}
-	unit := p.ProvinceCode
-	if unit == "" {
-		unit = p.CommuneCode
-	}
-	return s.deliver(ctx, tx, env, []domain.Notification{tpl.ForAudience(domain.Audience{Units: []string{unit}, Roles: []string{partyport.RoleKNProvinceAdmin}})})
 }
 
 // contentAudience: national (hoặc không có đơn vị) → toàn quốc; còn lại → các đơn
@@ -438,8 +338,12 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, env outbox.Envelope, n
 	now := s.now()
 	var specs []sendSpec
 	kind := ""
+	mail := emailBatch{id: ids.New()}
 	for _, n := range ns {
 		n.ID, n.SourceEventID, n.SourceEventType = ids.New(), env.EventID, env.EventType
+		if !s.kinds[n.Kind] {
+			return fmt.Errorf("notify: %w: kind %q is not registered", ErrDependency, n.Kind)
+		}
 		if !n.Normalize() {
 			return fmt.Errorf("notify: thông báo %s dựng từ %s không hợp lệ", n.Kind, env.EventType)
 		}
@@ -470,6 +374,12 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, env outbox.Envelope, n
 		}
 		id := n.ID
 		specs = append(specs, sendSpec{tokens: toks, notificationID: &id, urgent: n.Urgent()})
+		if err := s.queueEmail(ctx, tx, env.TenantID, &mail, n, now); err != nil {
+			return err
+		}
+	}
+	if err := s.flushEmail(ctx, tx, env.TenantID, mail, now, env.TraceID); err != nil {
+		return err
 	}
 	return s.queueDeliveries(ctx, tx, env.TenantID, ids.New(), kind, now, specs...)
 }

@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-NOTIFY-TASK-A: Hai builder KN khớp83OLD; pure/static/full9PG đạt, chờhelper9/remote.

@@ -521,7 +521,7 @@ func (h Handler) seedForms(c *gin.Context) {
 	if !bind(c, &req) {
 		return
 	}
-	res, err := h.Svc.SeedTrongTrot(c.Request.Context(), req.DepartmentCode, idem(c))
+	res, err := h.Svc.SeedForms(c.Request.Context(), req.DepartmentCode, idem(c))
 	if err != nil {
 		httpx.Fail(c, err)
 		return

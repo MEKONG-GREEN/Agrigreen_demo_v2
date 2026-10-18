@@ -95,7 +95,7 @@ WITH CHECK (
 ## Hệ quả
 
 - Nền tảng giữ bản ghi có giá (khi có `household_payment`) — lần đầu. Cần đánh giá dữ liệu cá nhân và thương mại trước khi bật (pháp chế, C-12).
-- `p_pair` là hình chính sách thứ tư; `v_missing_rls` và cổng `EXPLAIN` chấp nhận tên này.
+- `p_pair` là hình chính sách thứ tư; `v_missing_rls` và cổng `EXPLAIN` chấp nhận tên này. (Hiện thực W5.6 tạm giữ tên `p_tenant` với biểu thức hai bên — mục Hiện thực; duyệt lệch: [H-18](../cau-hoi-ton-dong.md#h-kiến-trúc-v41).)
 - Feed cặp là ngoại lệ duy nhất của "không lọc từng hàng" (R-INT-05); khối lượng §38.3: 10.000–13.000 bản ghi/ngày, độ tươi ≤ 15 phút.
 - Khi có giao dịch giữa bên thứ ba (cuối 2028), cùng cơ chế dùng lại với cặp khác.
 
@@ -107,7 +107,7 @@ WITH CHECK (
 | W5.1 | Hợp đồng `collection_schedule`, `roll_count_statement`, `htx_roll_confirmation` (`flow: bilateral`) | — |
 | W5.4 | Bộ xử lý lô gọi port module chủ với tenant bên gọi | pf 000125 |
 | W5.6 | Sổ song phương, `p_pair`, feed cặp, quy tắc CI không tổng hợp; bật production chờ C-12 | pf 000135, mkg 000038 (000103/000025 lỗi thời) |
-| W5.7 | Tổng kiểm hằng ngày theo cặp | pf 000104 |
+| W5.7 | Tổng kiểm hằng ngày theo cặp (W5.6 chuyển sang sổ thật) | pf 000130 (000104 cũ bỏ) |
 | W5.10 | Gỡ consumer `pf.cropcycle.htx_collection_valve` và `/v1/partner/htx-collection/responses` | — |
 
 **W5.1 (08/10/2026):** ba hợp đồng `contracts/integration/ingest/` (`flow: bilateral`, khối `bilateral` có `party_a`, `party_b`, `author_side`, `pair_key: [htx_ref]`, `pair_feed: bilateral`), `status: proposed`, `pending: [A7, C-12]`; `contractcheck` cấm `aggregation` trên hợp đồng song phương. Chi tiết ở [ADR-0033 Hiện thực](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md#hiện-thực).

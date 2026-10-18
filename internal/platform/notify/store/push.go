@@ -228,12 +228,12 @@ func InsertNudge(ctx context.Context, tx pgx.Tx, tid, id, actor uuid.UUID, kind,
 // Email tóm tắt chỉ đạo khẩn
 // ---------------------------------------------------------------------------
 
-// InsertDigestItem xếp một chỉ đạo khẩn vào email tóm tắt (trùng → bỏ qua).
+// InsertDigestItem xếp một tham chiếu nguồn vào email tóm tắt (trùng → bỏ qua).
 func InsertDigestItem(ctx context.Context, tx pgx.Tx, tid uuid.UUID, it domain.DigestItem, eventID uuid.UUID, now time.Time) error {
 	_, err := tx.Exec(ctx, `INSERT INTO pf_notify.email_digest_item
 	    (tenant_id, directive_id, source_event_id, audience_units, issued_at, queued_at)
 	  VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING`,
-		tid, it.DirectiveID, eventID, strs(it.AudienceUnits), it.IssuedAt.UTC(), now.UTC())
+		tid, it.Reference, eventID, strs(it.AudienceUnits), it.IssuedAt.UTC(), now.UTC())
 	return err
 }
 
@@ -248,7 +248,7 @@ func PendingDigest(ctx context.Context, tx pgx.Tx, limit int) ([]domain.DigestIt
 	var out []domain.DigestItem
 	for rows.Next() {
 		var it domain.DigestItem
-		if err := rows.Scan(&it.DirectiveID, &it.AudienceUnits, &it.IssuedAt); err != nil {
+		if err := rows.Scan(&it.Reference, &it.AudienceUnits, &it.IssuedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, it)

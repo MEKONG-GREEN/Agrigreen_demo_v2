@@ -19,6 +19,7 @@ import (
 	"log/slog"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/app"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
@@ -48,7 +49,7 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		clk = clock.System{}
 	}
 	svc := &app.Service{Clock: clk, Deps: app.Deps{Store: d.Store, Vault: d.Vault, Scope: d.Scope, Consent: d.Consent,
-		Log: d.Log, Resolvers: map[string]port.Resolver{}}}
+		Log: d.Log, Resolvers: map[string]port.Resolver{}, Purposes: map[string]port.PurposePolicy{}}}
 	if b != nil {
 		svc.DB = db.ForModule(b, DBModule)
 	}
@@ -57,6 +58,18 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
 
 // UseResolver nối Resolver của module chủ (subject_module = tên module.yaml). Gọi lúc lắp ráp, trước khi phục vụ.
 func (m *Module) UseResolver(module string, r port.Resolver) { m.svc.Resolvers[module] = r }
+
+// UsePurpose đăng ký mục đích của module chủ; không cho ghi đè mục đích đã có.
+// Cấu hình thiếu ràng buộc chủ thể làm dừng lắp ráp, không mở rộng quyền ngầm.
+func (m *Module) UsePurpose(purpose string, policy port.PurposePolicy) {
+	if purpose == "" || domain.Purposes[purpose] || policy.SubjectModule == "" || policy.SubjectType == "" {
+		panic("evidence: đăng ký mục đích không hợp lệ")
+	}
+	if _, exists := m.svc.Purposes[purpose]; exists {
+		panic("evidence: mục đích đã đăng ký")
+	}
+	m.svc.Purposes[purpose] = policy
+}
 
 // Files trả cổng tệp minh chứng.
 func (m *Module) Files() port.Files { return m.svc }

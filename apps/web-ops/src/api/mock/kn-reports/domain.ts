@@ -3,28 +3,162 @@
 // (fixtures/rc-golden.json, TestWebReportCycleFixture) ở domain.test.ts — sửa ở Go trước, rồi sinh lại ca vàng.
 import { Decimal } from "@/kn/grid/decimal";
 
-export type PeriodType = "week" | "month" | "season" | "year" | "adhoc";
+export type PeriodType = "day" | "week" | "ksgm_week" | "month" | "quarter" | "season" | "year" | "adhoc";
 export type ReportType = "weekly" | "monthly" | "seasonal" | "annual" | "adhoc";
 
 export const REPORT_PERIOD_TYPE: Record<ReportType, PeriodType> = { weekly: "week", monthly: "month", seasonal: "season", annual: "year", adhoc: "adhoc" };
 
-export const RULE_VERSION = "kn.period_rule/v1-tam";
-export type WeekNumbering = "season" | "iso";
-export const ruleTag = (numbering: WeekNumbering) => `${RULE_VERSION};week=${numbering}`;
+/** Như domain.ReportPeriodTypes (W11.05b): loại kỳ chọn được theo loại báo cáo, phần tử đầu = mặc định. */
+export const REPORT_PERIOD_TYPES: Record<ReportType, PeriodType[]> = {
+  weekly: ["week", "ksgm_week", "day"],
+  monthly: ["month", "quarter"],
+  seasonal: ["season"],
+  annual: ["year", "quarter"],
+  adhoc: ["adhoc", "day"],
+};
+
+/** Như domain.ResolvePeriodType: rỗng → mặc định; ngoài danh sách → PeriodError("period_type"). */
+export function resolvePeriodType(rt: ReportType, pt: unknown): PeriodType {
+  const allowed = REPORT_PERIOD_TYPES[rt];
+  if (pt === undefined || pt === null || pt === "") return allowed[0]!;
+  if (allowed.includes(pt as PeriodType)) return pt as PeriodType;
+  throw new PeriodError("period_type", `loại báo cáo ${rt} chia kỳ ${allowed.join(" | ")}`);
+}
+
+/** Như domain.ParseKSGMStarts ("1,10,16,23"); sai dạng → null (Service.ksgmStarts bỏ qua → mặc định). */
+export function parseKsgmStarts(v: string): number[] | null {
+  const out = v.split(",").map((x) => Number(x.trim()));
+  return out.every((n) => Number.isInteger(n)) && v.trim() ? out : null;
+}
+
+/** Ranh giới 4 tuần KSGM của một tháng (tham số extension.ksgm_week_starts:YYYY-MM); null → 1, 8, 15, 22. m: 0–11. */
+export type KsgmStarts = (y: number, m: number) => number[] | null;
+
+// Lịch kỳ hệ thống (W11.03) — quy tắc có phiên bản như domain.PeriodRule; tag ghi vào đợt (period_rule).
+export const RULE_VERSION_V1 = "kn.period_rule/v1-tam";
+export const RULE_VERSION_V2 = "kn.period_rule/v2";
+export type WeekNumbering = "season" | "year" | "iso";
+export type MonthAlign = "calendar" | "week_end";
+export interface PeriodRule {
+  version: string;
+  week_start: number; // 0 = Chủ nhật … 6 = thứ Bảy
+  week_numbering: WeekNumbering;
+  month_align: MonthAlign;
+  /** D8: danh tính lịch của phòng (tag ";cal=<phòng>:v<n>", chỉ v2). */
+  calendar_id?: string;
+  calendar_version?: number;
+}
+export const LEGACY_RULE: PeriodRule = { version: RULE_VERSION_V1, week_start: 1, week_numbering: "season", month_align: "calendar" };
+export const DEFAULT_RULE: PeriodRule = { version: RULE_VERSION_V2, week_start: 3, week_numbering: "year", month_align: "week_end" };
+const WEEKDAY_CODE = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+/** Ngày hiệu lực phiên bản tham số extension.report_period_rule nạp sẵn (masterdata seeddata/params.json). */
+export const RULE_V2_EFFECTIVE_FROM = "2026-11-04";
+
+/** Giả lập tra tham số CHUNG tại ngày đầu đợt: trước ngày hiệu lực → v1, từ đó → v2. */
+export const ruleAt = (fromDate: string): PeriodRule => (fromDate >= RULE_V2_EFFECTIVE_FROM ? { ...DEFAULT_RULE } : { ...LEGACY_RULE });
+
+// Lịch tuần theo phòng ban (D8 — CEO 13/10/2026), như reportcycle/domain/calendar.go.
+export const DEPT_CNTS = "chan_nuoi_thuy_san";
+export const CALENDAR_VERSION_LEGACY = 1;
+export const CALENDAR_VERSION_DEFAULT = 2;
+export const CALENDAR_VERSION_CNTS = 3;
+/** CNTS: Thứ Ba – Thứ Hai (BRD CNTS v3.7, tuần 39 = 22/09–28/09/2026), hiệu lực ngay. */
+export const CNTS_RULE: PeriodRule = { version: RULE_VERSION_V2, week_start: 2, week_numbering: "year", month_align: "week_end", calendar_id: DEPT_CNTS, calendar_version: CALENDAR_VERSION_CNTS };
+export const DEPT_KHTC = "ke_hoach_tai_chinh";
+/** KHTC: Thứ Tư – Thứ Ba (BRD KHTC v2.2 đã chốt), lưới v2 mặc định → phiên bản 2, hiệu lực mọi ngày (W11.64). */
+export const KHTC_RULE: PeriodRule = { ...DEFAULT_RULE, calendar_id: DEPT_KHTC, calendar_version: CALENDAR_VERSION_DEFAULT };
+/** Lịch nạp sẵn trong mã (domain.BuiltinCalendars). */
+export const BUILTIN_CALENDARS: Record<string, PeriodRule> = { [DEPT_CNTS]: CNTS_RULE, [DEPT_KHTC]: KHTC_RULE };
+/** Giả lập tham số extension.report_period_rule:<phòng> (mã phòng → tag); trống = chưa có phiên bản. */
+export const DEPT_PERIOD_RULES = new Map<string, string>();
+
+export type CalendarSource = "department_param" | "builtin" | "global_param" | "legacy";
+export interface Calendar {
+  calendar_id: string;
+  calendar_version: number;
+  calendar_source: CalendarSource;
+  rule: PeriodRule;
+}
+
+function stampCalendar(dept: string, r: PeriodRule, source: CalendarSource): Calendar {
+  if (r.version === RULE_VERSION_V1) return { calendar_id: dept, calendar_version: CALENDAR_VERSION_LEGACY, calendar_source: source, rule: r };
+  const rule = r.calendar_id ? r : { ...r, calendar_id: dept, calendar_version: CALENDAR_VERSION_DEFAULT };
+  return { calendar_id: rule.calendar_id!, calendar_version: rule.calendar_version!, calendar_source: source, rule };
+}
+
+/** Như domain.CalendarOf: lịch của quy tắc đã ghi (tag có cal → nguyên; v1 → phiên bản 1; v2 → phiên bản 2). */
+export function calendarOf(dept: string, r: PeriodRule): Calendar {
+  return stampCalendar(dept, { ...r }, r.version === RULE_VERSION_V1 ? "legacy" : "global_param");
+}
+
+/** Như Service.CalendarAt / domain.ResolveCalendar: tham số theo phòng → lịch nạp sẵn → tham số chung → v1. */
+export function calendarAt(dept: string, fromDate: string): Calendar {
+  const own = DEPT_PERIOD_RULES.get(dept);
+  if (own) {
+    try {
+      const r = parseRule(own);
+      if (!r.calendar_id || r.calendar_id === dept) return stampCalendar(dept, r, "department_param");
+    } catch {
+      /* tham số sai dạng → bỏ qua */
+    }
+  }
+  const builtin = BUILTIN_CALENDARS[dept];
+  if (builtin) return stampCalendar(dept, { ...builtin }, "builtin");
+  const g = ruleAt(fromDate);
+  return stampCalendar(dept, g, g.version === RULE_VERSION_V1 ? "legacy" : "global_param");
+}
+
+export function ruleTag(r: PeriodRule): string {
+  if (r.version === RULE_VERSION_V1) return `${r.version};week=${r.week_numbering}`;
+  const cal = r.calendar_id ? `;cal=${r.calendar_id}:v${r.calendar_version}` : "";
+  return `${r.version};week_start=${WEEKDAY_CODE[r.week_start]};week=${r.week_numbering};month=${r.month_align}${cal}`;
+}
+
+/** Như domain.ParseRule ("" → DEFAULT_RULE; không kiểm tra giá trị như Validate — chỉ dùng cho ca vàng/giả lập). */
+export function parseRule(tag: string): PeriodRule {
+  if (!tag.trim()) return { ...DEFAULT_RULE };
+  const parts = tag.trim().split(";");
+  let r: PeriodRule;
+  if (parts[0] === RULE_VERSION_V1) r = { ...LEGACY_RULE };
+  else if (parts[0] === RULE_VERSION_V2) r = { ...DEFAULT_RULE };
+  else throw new PeriodError("period_rule", `phiên bản quy tắc chia kỳ không hỗ trợ: ${parts[0]}`);
+  for (const p of parts.slice(1)) {
+    const [k, v = ""] = p.trim().split("=");
+    if (k === "week") r.week_numbering = v as WeekNumbering;
+    else if (k === "month") r.month_align = v as MonthAlign;
+    else if (k === "week_start" && WEEKDAY_CODE.includes(v)) r.week_start = WEEKDAY_CODE.indexOf(v);
+    else if (k === "cal" && /^[a-z][a-z0-9_]{1,39}:v[1-9][0-9]{0,3}$/.test(v) && r.version === RULE_VERSION_V2) {
+      const [id, n] = v.split(":v");
+      r.calendar_id = id;
+      r.calendar_version = Number(n);
+    }
+    else throw new PeriodError("period_rule", `khóa quy tắc chia kỳ lạ: ${p}`);
+  }
+  return r;
+}
 
 export interface Deadline {
   offset_days: number;
   time: string;
 }
 
-export function defaultDeadline(pt: string): Deadline {
-  if (pt === "week") return { offset_days: 2, time: "17:00" };
-  if (pt === "month") return { offset_days: 10, time: "17:00" };
+/** Như PeriodRule.DefaultDeadline; không truyền quy tắc → v1 (domain.DefaultDeadline). */
+export function defaultDeadline(pt: string, r: PeriodRule = LEGACY_RULE): Deadline {
+  if (r.version === RULE_VERSION_V1) {
+    if (pt === "week") return { offset_days: 2, time: "17:00" };
+    if (pt === "month") return { offset_days: 10, time: "17:00" };
+    return { offset_days: 7, time: "17:00" };
+  }
+  if (pt === "week" || pt === "ksgm_week") return { offset_days: 1, time: "12:00" };
+  if (pt === "day") return { offset_days: 1, time: "09:00" };
+  if (pt === "month" || pt === "quarter" || pt === "year") return r.month_align === "week_end" ? { offset_days: 1, time: "10:00" } : { offset_days: 10, time: "17:00" };
   return { offset_days: 7, time: "17:00" };
 }
 
 export const DEFAULT_CLOSE_AFTER_DAYS = 3;
 export const MAX_PERIODS = 60;
+export const MAX_DAY_PERIODS = 366;
 export const MIN_REASON = 10;
 
 /** Giờ Việt Nam UTC+7 (không có giờ mùa hè). */
@@ -32,9 +166,11 @@ const VN_OFFSET_MS = 7 * 3_600_000;
 
 export interface SplitPeriod {
   slot: number;
+  key: string;
   label: string;
   range_label: string;
   iso_week: number;
+  week_year: number;
   from_date: string;
   to_date: string;
   due_at: string;
@@ -87,18 +223,6 @@ export function rangeLabel(f: number, t: number): string {
   return fy === ty ? `${ddmm(f)}–${ddmm(t)}/${ty}` : `${ddmm(f)}/${fy}–${ddmm(t)}/${ty}`;
 }
 
-/** Tuần ISO 8601 của ngày (ms UTC 00:00). */
-export function isoWeek(t: number): number {
-  const d = new Date(t);
-  const wd = (d.getUTCDay() + 6) % 7; // thứ Hai = 0
-  const thursday = t - wd * DAY + 3 * DAY;
-  const y = new Date(thursday).getUTCFullYear();
-  const jan4 = Date.UTC(y, 0, 4);
-  const jan4wd = (new Date(jan4).getUTCDay() + 6) % 7;
-  const week1Mon = jan4 - jan4wd * DAY;
-  return Math.floor((thursday - week1Mon) / (7 * DAY)) + 1;
-}
-
 /** Hạn nộp UTC (ms) của kỳ kết thúc ngày `to`: to + offset ngày lúc HH:MM giờ Việt Nam. */
 export function dueAt(to: number, d: Deadline): number {
   const c = parseClock(d.time);
@@ -106,8 +230,83 @@ export function dueAt(to: number, d: Deadline): number {
   return to + d.offset_days * DAY + c[0] * 3_600_000 + c[1] * 60_000 - VN_OFFSET_MS;
 }
 
+interface Span {
+  key: string;
+  label: string;
+  from: number;
+  to: number;
+  week_year: number;
+  week_no: number;
+}
+
+const isV2 = (r: PeriodRule) => r.version !== RULE_VERSION_V1;
+const ymdParts = (t: number) => {
+  const d = new Date(t);
+  return [d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()] as const;
+};
+function startOf(r: PeriodRule, t: number): number {
+  const ws = isV2(r) ? r.week_start : 1;
+  return t - ((new Date(t).getUTCDay() - ws + 7) % 7) * DAY;
+}
+const isoNumbering = (r: PeriodRule) => !isV2(r) || r.week_numbering === "iso";
+const week1 = (r: PeriodRule, y: number) => startOf(r, Date.UTC(y, 0, isoNumbering(r) ? 4 : 1));
+
+/** Như PeriodRule.WeekOf (t = ms UTC 00:00). */
+export function weekOf(r: PeriodRule, t: number): { year: number; no: number; from: number; to: number } {
+  const from = startOf(r, t);
+  const to = from + 6 * DAY;
+  const year = new Date(isoNumbering(r) ? from + 3 * DAY : to).getUTCFullYear();
+  return { year, no: Math.round((from - week1(r, year)) / DAY / 7) + 1, from, to };
+}
+
+const ROMAN_Q = ["I", "II", "III", "IV"];
+const PT_V1 = "week | month | season | year | adhoc";
+const PT_V2 = "day | week | ksgm_week | month | quarter | season | year | adhoc";
+
+/** Như PeriodRule.PeriodOf (tuần KSGM: ranh giới ksgm(y, m) — như KSGMWeeks — hoặc mặc định 1, 8, 15, 22). */
+export function periodOf(r: PeriodRule, pt: string, t: number, ksgm?: KsgmStarts): Span {
+  const aligned = isV2(r) && r.month_align === "week_end";
+  const anchor = (x: number) => (aligned ? weekOf(r, x).to : x);
+  const bound = (first: number) => (aligned ? weekOf(r, first).from : first);
+  const span = (key: string, label: string, first: number, next: number): Span => ({ key, label, from: bound(first), to: bound(next) - DAY, week_year: 0, week_no: 0 });
+  if (pt === "week") {
+    const w = weekOf(r, t);
+    return { key: `${w.year}-W${pad2(w.no)}`, label: `Tuần ${w.no}/${w.year}`, from: w.from, to: w.to, week_year: w.year, week_no: w.no };
+  }
+  if (pt === "month") {
+    const [y, m] = ymdParts(anchor(t));
+    return span(`${y}-${pad2(m + 1)}`, `Tháng ${m + 1}/${y}`, Date.UTC(y, m, 1), Date.UTC(y, m + 1, 1));
+  }
+  if (isV2(r)) {
+    if (pt === "day") {
+      const [y, m, d] = ymdParts(t);
+      return { key: dateStr(t), label: `Ngày ${pad2(d)}/${pad2(m + 1)}/${y}`, from: t, to: t, week_year: 0, week_no: 0 };
+    }
+    if (pt === "quarter") {
+      const [y, m] = ymdParts(anchor(t));
+      const q = Math.floor(m / 3);
+      return span(`${y}-Q${q + 1}`, `Quý ${ROMAN_Q[q]}/${y}`, Date.UTC(y, q * 3, 1), Date.UTC(y, q * 3 + 3, 1));
+    }
+    if (pt === "year") {
+      const [y] = ymdParts(anchor(t));
+      return span(String(y), `Năm ${y}`, Date.UTC(y, 0, 1), Date.UTC(y + 1, 0, 1));
+    }
+    if (pt === "ksgm_week") {
+      const [y, m, d] = ymdParts(t);
+      const starts = ksgm?.(y, m) ?? [1, 8, 15, 22];
+      const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+      if (starts.length !== 4 || starts[0] !== 1) throw new PeriodError("ksgm_week_starts", "4 ngày bắt đầu, tuần 1 từ ngày 1");
+      for (let k = 1; k < 4; k++) if (starts[k]! <= starts[k - 1]! || starts[k]! > last) throw new PeriodError("ksgm_week_starts", `ngày bắt đầu tăng dần, không quá ${last}`);
+      const i = starts.filter((s) => s <= d).length - 1;
+      const end = i < 3 ? Date.UTC(y, m, starts[i + 1]!) - DAY : Date.UTC(y, m + 1, 1) - DAY;
+      return { key: `${y}-${pad2(m + 1)}-K${i + 1}`, label: `Tuần KSGM ${i + 1} tháng ${m + 1}/${y}`, from: Date.UTC(y, m, starts[i]!), to: end, week_year: 0, week_no: 0 };
+    }
+  }
+  throw new PeriodError("period_type", isV2(r) ? PT_V2 : PT_V1);
+}
+
 /** Như domain.Split. */
-export function split(pt: string, fromS: string, toS: string, season: string, numbering: WeekNumbering, d: Deadline, closeAfter: number): SplitPeriod[] {
+export function split(pt: string, fromS: string, toS: string, season: string, rule: PeriodRule, d: Deadline, closeAfter: number, ksgm?: KsgmStarts): SplitPeriod[] {
   const from = parseDate(fromS);
   const to = parseDate(toS);
   if (from === null) throw new PeriodError("from_date", "ngày phải dạng YYYY-MM-DD");
@@ -116,51 +315,37 @@ export function split(pt: string, fromS: string, toS: string, season: string, nu
   if (closeAfter < 0 || closeAfter > 60) throw new PeriodError("close_after_days", "0–60 ngày");
   if (d.offset_days < 0 || d.offset_days > 60) throw new PeriodError("deadline.offset_days", "0–60 ngày");
   if (!parseClock(d.time)) throw new PeriodError("deadline.time", "giờ phải dạng HH:MM");
+  const limit = pt === "day" ? MAX_DAY_PERIODS : MAX_PERIODS;
   const out: SplitPeriod[] = [];
-  const add = (f: number, t: number, label: string, iso: number) => {
-    if (out.length >= MAX_PERIODS) throw new PeriodError("to_date", `tối đa ${MAX_PERIODS} kỳ mỗi đợt`);
+  const add = (f: number, t: number, s: Pick<Span, "key" | "label" | "week_year" | "week_no">) => {
+    if (out.length >= limit) throw new PeriodError("to_date", `tối đa ${limit} kỳ mỗi đợt`);
     const due = dueAt(t, d);
     out.push({
       slot: out.length + 1,
-      label,
+      key: s.key,
+      label: s.label,
       range_label: rangeLabel(f, t),
-      iso_week: iso,
+      iso_week: s.week_no,
+      week_year: s.week_year,
       from_date: dateStr(f),
       to_date: dateStr(t),
       due_at: rfc3339(due),
       auto_close_at: rfc3339(due + closeAfter * DAY),
     });
   };
-  switch (pt) {
-    case "week": {
-      const start = from - ((new Date(from).getUTCDay() + 6) % 7) * DAY;
-      for (let ws = start; ws <= to; ws += 7 * DAY) {
-        const f = Math.max(ws, from);
-        const t = Math.min(ws + 6 * DAY, to);
-        const iso = isoWeek(f);
-        add(f, t, `Tuần ${numbering === "iso" ? iso : out.length + 1}`, iso);
-      }
-      break;
-    }
-    case "month": {
-      const fd = new Date(from);
-      for (let ms = Date.UTC(fd.getUTCFullYear(), fd.getUTCMonth(), 1); ms <= to; ) {
-        const md = new Date(ms);
-        const next = Date.UTC(md.getUTCFullYear(), md.getUTCMonth() + 1, 1);
-        add(Math.max(ms, from), Math.min(next - DAY, to), `Tháng ${md.getUTCMonth() + 1}/${md.getUTCFullYear()}`, 0);
-        ms = next;
-      }
-      break;
-    }
-    case "season":
-    case "adhoc":
-      add(from, to, season, 0);
-      break;
-    case "year":
-      add(from, to, season || `Năm ${new Date(from).getUTCFullYear()}`, 0);
-      break;
-    default:
-      throw new PeriodError("period_type", "week | month | season | year | adhoc");
+  if (pt === "season" || pt === "adhoc" || (pt === "year" && !isV2(rule))) {
+    add(from, to, { key: "", label: season || (pt === "year" ? `Năm ${new Date(from).getUTCFullYear()}` : ""), week_year: 0, week_no: 0 });
+    return out;
+  }
+  periodOf(rule, pt, from, ksgm);
+  if ((to - from) / DAY > 3660) throw new PeriodError("to_date", `tối đa ${limit} kỳ mỗi đợt`);
+  for (let t0 = from; t0 <= to; ) {
+    const s = periodOf(rule, pt, t0, ksgm);
+    const t = Math.min(s.to, to);
+    if (pt === "week" && rule.week_numbering === "season") s.label = `Tuần ${out.length + 1}`;
+    else if (pt === "week" && !isV2(rule)) s.label = `Tuần ${s.week_no}`;
+    add(t0, t, s);
+    t0 = t + DAY;
   }
   return out;
 }
@@ -171,7 +356,10 @@ export function split(pt: string, fromS: string, toS: string, season: string, nu
 export type StoredStatus = "not_started" | "draft" | "submitted" | "adjustment_requested" | "confirmed";
 export type DisplayStatus = StoredStatus | "overdue" | "closed";
 
-export const STATUS_LABEL: Record<DisplayStatus, string> = {
+// Vòng đời mở rộng (W11.05, CNTS v3.7 III.3.0) — chỉ phòng ban có ExtendedLifecycle (Go); Trồng trọt không dùng.
+export type ExtendedStatus = "closed_unadjusted" | "missed" | "awaiting_reopen";
+
+export const STATUS_LABEL: Record<DisplayStatus | ExtendedStatus, string> = {
   not_started: "Chưa nhập",
   draft: "Lưu nháp",
   submitted: "Đã nộp",
@@ -179,6 +367,9 @@ export const STATUS_LABEL: Record<DisplayStatus, string> = {
   adjustment_requested: "Yêu cầu điều chỉnh",
   confirmed: "Đã xác nhận",
   closed: "Đã chốt",
+  closed_unadjusted: "Đã chốt – chưa điều chỉnh",
+  missed: "Không nộp",
+  awaiting_reopen: "Chờ mở kỳ",
 };
 
 export const DISPLAY_STATUSES: DisplayStatus[] = ["not_started", "draft", "submitted", "overdue", "adjustment_requested", "confirmed", "closed"];

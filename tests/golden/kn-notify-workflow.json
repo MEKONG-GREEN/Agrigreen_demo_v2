@@ -1,0 +1,1617 @@
+[
+  {
+    "Name": "submitted-amend-False-late-False",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_submitted",
+        "Severity": "normal",
+        "Title": "Lịch công tác chờ duyệt",
+        "Body": "Tuần 20/10–26/10/2027 — mở mục Lịch công tác để duyệt hoặc yêu cầu chỉnh sửa.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "submitted-amend-False-late-True",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_submitted",
+        "Severity": "normal",
+        "Title": "Lịch công tác chờ duyệt",
+        "Body": "Tuần 20/10–26/10/2027 — mở mục Lịch công tác để duyệt hoặc yêu cầu chỉnh sửa. Đăng ký muộn.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "submitted-amend-True-late-False",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_submitted",
+        "Severity": "normal",
+        "Title": "Lịch công tác điều chỉnh — chờ duyệt lại",
+        "Body": "Tuần 20/10–26/10/2027 — mở mục Lịch công tác để duyệt hoặc yêu cầu chỉnh sửa.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "submitted-amend-True-late-True",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_submitted",
+        "Severity": "normal",
+        "Title": "Lịch công tác điều chỉnh — chờ duyệt lại",
+        "Body": "Tuần 20/10–26/10/2027 — mở mục Lịch công tác để duyệt hoặc yêu cầu chỉnh sửa. Đăng ký muộn.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "submitted-topic",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "89"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "work_schedule_submitted",
+        "Severity": "normal",
+        "Title": "Lịch công tác chờ duyệt",
+        "Body": "Tuần 20/10–26/10/2027 — mở mục Lịch công tác để duyệt hoặc yêu cầu chỉnh sửa.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "submitted-topic-owner-only",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "89"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "work_schedule_submitted",
+        "Severity": "normal",
+        "Title": "Lịch công tác chờ duyệt",
+        "Body": "Tuần 20/10–26/10/2027 — mở mục Lịch công tác để duyệt hoặc yêu cầu chỉnh sửa.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "submitted-drop-empty",
+    "Drafts": null,
+    "Error": ""
+  },
+  {
+    "Name": "submitted-nil-id",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_submitted",
+        "Severity": "normal",
+        "Title": "Lịch công tác chờ duyệt",
+        "Body": "Tuần 20/10–26/10/2027 — mở mục Lịch công tác để duyệt hoặc yêu cầu chỉnh sửa.",
+        "DeepLink": "/extension/work-schedules/00000000-0000-0000-0000-000000000000",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "submitted-bad-week",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_submitted",
+        "Severity": "normal",
+        "Title": "Lịch công tác chờ duyệt",
+        "Body": "Tuần bad-week — mở mục Lịch công tác để duyệt hoặc yêu cầu chỉnh sửa.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "submitted-fallback",
+    "Drafts": [
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_submitted",
+        "Severity": "normal",
+        "Title": "Lịch công tác chờ duyệt",
+        "Body": "Tuần 20/10–26/10/2027 — mở mục Lịch công tác để duyệt hoặc yêu cầu chỉnh sửa.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reviewed-approved",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_reviewed",
+        "Severity": "normal",
+        "Title": "Lịch công tác đã được duyệt",
+        "Body": "Lịch tuần 20/10–26/10/2027 đã được Cấp Tỉnh duyệt.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reviewed-change_requested",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_reviewed",
+        "Severity": "normal",
+        "Title": "Lịch công tác cần chỉnh sửa",
+        "Body": "Lịch tuần 20/10–26/10/2027 cần chỉnh sửa: Bổ sung địa điểm 0901234567 — sửa và gửi lại.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reviewed-unknown",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_reviewed",
+        "Severity": "normal",
+        "Title": "Lịch công tác đã được duyệt",
+        "Body": "Lịch tuần 20/10–26/10/2027 đã được Cấp Tỉnh duyệt.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reviewed-auto",
+    "Drafts": null,
+    "Error": ""
+  },
+  {
+    "Name": "reviewed-nil-owner",
+    "Drafts": null,
+    "Error": ""
+  },
+  {
+    "Name": "reviewed-self",
+    "Drafts": null,
+    "Error": ""
+  },
+  {
+    "Name": "reviewed-reason-nil",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_reviewed",
+        "Severity": "normal",
+        "Title": "Lịch công tác cần chỉnh sửa",
+        "Body": "Lịch tuần 20/10–26/10/2027 cần chỉnh sửa — sửa và gửi lại.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reviewed-reason-empty",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_reviewed",
+        "Severity": "normal",
+        "Title": "Lịch công tác cần chỉnh sửa",
+        "Body": "Lịch tuần 20/10–26/10/2027 cần chỉnh sửa — sửa và gửi lại.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reviewed-nil-id",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_reviewed",
+        "Severity": "normal",
+        "Title": "Lịch công tác đã được duyệt",
+        "Body": "Lịch tuần 20/10–26/10/2027 đã được Cấp Tỉnh duyệt.",
+        "DeepLink": "/extension/work-schedules/00000000-0000-0000-0000-000000000000",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reviewed-fallback",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_reviewed",
+        "Severity": "normal",
+        "Title": "Lịch công tác đã được duyệt",
+        "Body": "Lịch tuần 20/10–26/10/2027 đã được Cấp Tỉnh duyệt.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reviewed-invalid-week",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_reviewed",
+        "Severity": "normal",
+        "Title": "Lịch công tác đã được duyệt",
+        "Body": "Lịch tuần bad-week đã được Cấp Tỉnh duyệt.",
+        "DeepLink": "/extension/work-schedules/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "work-reminded-submit_due",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Sắp hết hạn đăng ký lịch công tác",
+        "Body": "Đăng ký và gửi duyệt lịch tuần 20/10–26/10/2027 trước 19/10/2027 10:00.",
+        "DeepLink": "/extension/work-schedules/mine",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Sắp hết hạn đăng ký lịch công tác",
+        "Body": "Đăng ký và gửi duyệt lịch tuần 20/10–26/10/2027 trước 19/10/2027 10:00.",
+        "DeepLink": "/extension/work-schedules/mine",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "work-reminded-review_overdue",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Lịch công tác chờ duyệt quá hạn",
+        "Body": "Còn 12 lịch tuần 20/10–26/10/2027 chờ duyệt, hạn duyệt 19/10/2027 10:00.",
+        "DeepLink": "/extension/work-schedules",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Lịch công tác chờ duyệt quá hạn",
+        "Body": "Còn 12 lịch tuần 20/10–26/10/2027 chờ duyệt, hạn duyệt 19/10/2027 10:00.",
+        "DeepLink": "/extension/work-schedules",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "work-reminded-unknown",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Sắp hết hạn đăng ký lịch công tác",
+        "Body": "Đăng ký và gửi duyệt lịch tuần 20/10–26/10/2027 trước 19/10/2027 10:00.",
+        "DeepLink": "/extension/work-schedules/mine",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Sắp hết hạn đăng ký lịch công tác",
+        "Body": "Đăng ký và gửi duyệt lịch tuần 20/10–26/10/2027 trước 19/10/2027 10:00.",
+        "DeepLink": "/extension/work-schedules/mine",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "work-reminded-empty",
+    "Drafts": null,
+    "Error": ""
+  },
+  {
+    "Name": "work-reminded-nil-only",
+    "Drafts": null,
+    "Error": ""
+  },
+  {
+    "Name": "work-reminded-fallback-due",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Sắp hết hạn đăng ký lịch công tác",
+        "Body": "Đăng ký và gửi duyệt lịch tuần 20/10–26/10/2027 trước 13/10/2027 10:04.",
+        "DeepLink": "/extension/work-schedules/mine",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Sắp hết hạn đăng ký lịch công tác",
+        "Body": "Đăng ký và gửi duyệt lịch tuần 20/10–26/10/2027 trước 13/10/2027 10:04.",
+        "DeepLink": "/extension/work-schedules/mine",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "work-reminded-negative-count",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Lịch công tác chờ duyệt quá hạn",
+        "Body": "Còn -2 lịch tuần 20/10–26/10/2027 chờ duyệt, hạn duyệt 19/10/2027 10:00.",
+        "DeepLink": "/extension/work-schedules",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Lịch công tác chờ duyệt quá hạn",
+        "Body": "Còn -2 lịch tuần 20/10–26/10/2027 chờ duyệt, hạn duyệt 19/10/2027 10:00.",
+        "DeepLink": "/extension/work-schedules",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "work-reminded-bad-week",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Sắp hết hạn đăng ký lịch công tác",
+        "Body": "Đăng ký và gửi duyệt lịch tuần unknown trước 19/10/2027 10:00.",
+        "DeepLink": "/extension/work-schedules/mine",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Sắp hết hạn đăng ký lịch công tác",
+        "Body": "Đăng ký và gửi duyệt lịch tuần unknown trước 19/10/2027 10:00.",
+        "DeepLink": "/extension/work-schedules/mine",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "work-reminded-event-time-ignored",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Sắp hết hạn đăng ký lịch công tác",
+        "Body": "Đăng ký và gửi duyệt lịch tuần 20/10–26/10/2027 trước 19/10/2027 10:00.",
+        "DeepLink": "/extension/work-schedules/mine",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "work_schedule_due",
+        "Severity": "normal",
+        "Title": "Sắp hết hạn đăng ký lịch công tác",
+        "Body": "Đăng ký và gửi duyệt lịch tuần 20/10–26/10/2027 trước 19/10/2027 10:00.",
+        "DeepLink": "/extension/work-schedules/mine",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "issued-sum-order",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_assigned",
+        "Severity": "normal",
+        "Title": "Có công việc nộp báo cáo mới",
+        "Body": "Thu Đông 2027 — 11 công việc (3 kỳ), hạn kỳ đầu 14/10/2027 10:00.",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_assigned",
+        "Severity": "normal",
+        "Title": "Có công việc nộp báo cáo mới",
+        "Body": "Thu Đông 2027 — 7 công việc (3 kỳ), hạn kỳ đầu 14/10/2027 10:00.",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "issued-empty",
+    "Drafts": null,
+    "Error": ""
+  },
+  {
+    "Name": "issued-only-invalid",
+    "Drafts": null,
+    "Error": ""
+  },
+  {
+    "Name": "issued-nil-ref",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_assigned",
+        "Severity": "normal",
+        "Title": "Có công việc nộp báo cáo mới",
+        "Body": "Thu Đông 2027 — 11 công việc (3 kỳ), hạn kỳ đầu 14/10/2027 10:00.",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_assigned",
+        "Severity": "normal",
+        "Title": "Có công việc nộp báo cáo mới",
+        "Body": "Thu Đông 2027 — 7 công việc (3 kỳ), hạn kỳ đầu 14/10/2027 10:00.",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "issued-bad-ref",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_assigned",
+        "Severity": "normal",
+        "Title": "Có công việc nộp báo cáo mới",
+        "Body": "Thu Đông 2027 — 11 công việc (3 kỳ), hạn kỳ đầu 14/10/2027 10:00.",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_assigned",
+        "Severity": "normal",
+        "Title": "Có công việc nộp báo cáo mới",
+        "Body": "Thu Đông 2027 — 7 công việc (3 kỳ), hạn kỳ đầu 14/10/2027 10:00.",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "issued-fallback",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_assigned",
+        "Severity": "normal",
+        "Title": "Có công việc nộp báo cáo mới",
+        "Body": "Thu Đông 2027 — 11 công việc (3 kỳ), hạn kỳ đầu 13/10/2027 10:04.",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_assigned",
+        "Severity": "normal",
+        "Title": "Có công việc nộp báo cáo mới",
+        "Body": "Thu Đông 2027 — 7 công việc (3 kỳ), hạn kỳ đầu 13/10/2027 10:04.",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "issued-zero-negative",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_assigned",
+        "Severity": "normal",
+        "Title": "Có công việc nộp báo cáo mới",
+        "Body": "Thu Đông 2027 — -3 công việc (3 kỳ), hạn kỳ đầu 14/10/2027 10:00.",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_assigned",
+        "Severity": "normal",
+        "Title": "Có công việc nộp báo cáo mới",
+        "Body": "Thu Đông 2027 — -3 công việc (3 kỳ), hạn kỳ đầu 14/10/2027 10:00.",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "report-reminded-manual",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_reminder",
+        "Severity": "normal",
+        "Title": "Cấp Tỉnh nhắc nộp báo cáo",
+        "Body": "Tuần 1: Nhắc nộp",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_reminder",
+        "Severity": "normal",
+        "Title": "Cấp Tỉnh nhắc nộp báo cáo",
+        "Body": "Tuần 1: Nhắc nộp",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "report-reminded-auto_before",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_due",
+        "Severity": "normal",
+        "Title": "Nhắc hạn nộp báo cáo",
+        "Body": "Tuần 1: Nhắc nộp",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_due",
+        "Severity": "normal",
+        "Title": "Nhắc hạn nộp báo cáo",
+        "Body": "Tuần 1: Nhắc nộp",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "report-reminded-auto_overdue",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_due",
+        "Severity": "normal",
+        "Title": "Nhắc hạn nộp báo cáo",
+        "Body": "Tuần 1: Nhắc nộp",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_due",
+        "Severity": "normal",
+        "Title": "Nhắc hạn nộp báo cáo",
+        "Body": "Tuần 1: Nhắc nộp",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "report-reminded-unknown",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_due",
+        "Severity": "normal",
+        "Title": "Nhắc hạn nộp báo cáo",
+        "Body": "Tuần 1: Nhắc nộp",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_task_due",
+        "Severity": "normal",
+        "Title": "Nhắc hạn nộp báo cáo",
+        "Body": "Tuần 1: Nhắc nộp",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "report-reminded-empty",
+    "Drafts": [],
+    "Error": ""
+  },
+  {
+    "Name": "report-reminded-invalid",
+    "Drafts": [],
+    "Error": ""
+  },
+  {
+    "Name": "report-reminded-bad-ref",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_reminder",
+        "Severity": "normal",
+        "Title": "Cấp Tỉnh nhắc nộp báo cáo",
+        "Body": "Tuần 1: Nhắc nộp",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_reminder",
+        "Severity": "normal",
+        "Title": "Cấp Tỉnh nhắc nộp báo cáo",
+        "Body": "Tuần 1: Nhắc nộp",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "report-reminded-fallback",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_reminder",
+        "Severity": "normal",
+        "Title": "Cấp Tỉnh nhắc nộp báo cáo",
+        "Body": "Tuần 1: Nhắc nộp",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_reminder",
+        "Severity": "normal",
+        "Title": "Cấp Tỉnh nhắc nộp báo cáo",
+        "Body": "Tuần 1: Nhắc nộp",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "report-reminded-runes-400",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_reminder",
+        "Severity": "normal",
+        "Title": "Cấp Tỉnh nhắc nộp báo cáo",
+        "Body": "Tuần 1: ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_reminder",
+        "Severity": "normal",
+        "Title": "Cấp Tỉnh nhắc nộp báo cáo",
+        "Body": "Tuần 1: ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "report-reminded-runes-401",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_reminder",
+        "Severity": "normal",
+        "Title": "Cấp Tỉnh nhắc nộp báo cáo",
+        "Body": "Tuần 1: ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ…",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_reminder",
+        "Severity": "normal",
+        "Title": "Cấp Tỉnh nhắc nộp báo cáo",
+        "Body": "Tuần 1: ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ…",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "adjustment-valid",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_adjustment_requested",
+        "Severity": "normal",
+        "Title": "Yêu cầu điều chỉnh báo cáo",
+        "Body": "T01 · Tuần 1 · xã 30001: Yêu cầu bổ sung",
+        "DeepLink": "/kn/nhiem-vu/cong-viec/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "adjustment-empty",
+    "Drafts": [],
+    "Error": ""
+  },
+  {
+    "Name": "adjustment-nil-task",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_adjustment_requested",
+        "Severity": "normal",
+        "Title": "Yêu cầu điều chỉnh báo cáo",
+        "Body": "T01 · Tuần 1 · xã 30001: Yêu cầu bổ sung",
+        "DeepLink": "/kn/nhiem-vu/cong-viec/00000000-0000-0000-0000-000000000000",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "adjustment-invalid-task",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_adjustment_requested",
+        "Severity": "normal",
+        "Title": "Yêu cầu điều chỉnh báo cáo",
+        "Body": "T01 · Tuần 1 · xã 30001: Yêu cầu bổ sung",
+        "DeepLink": "/kn/nhiem-vu/cong-viec/bad/path",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "adjustment-runes-401",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_adjustment_requested",
+        "Severity": "normal",
+        "Title": "Yêu cầu điều chỉnh báo cáo",
+        "Body": "T01 · Tuần 1 · xã 30001: ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ…",
+        "DeepLink": "/kn/nhiem-vu/cong-viec/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "adjustment-fallback",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_adjustment_requested",
+        "Severity": "normal",
+        "Title": "Yêu cầu điều chỉnh báo cáo",
+        "Body": "T01 · Tuần 1 · xã 30001: Yêu cầu bổ sung",
+        "DeepLink": "/kn/nhiem-vu/cong-viec/33333333-3333-4333-8333-333333333333",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reopened-valid",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_period_reopened",
+        "Severity": "normal",
+        "Title": "Kỳ báo cáo được mở lại",
+        "Body": "Tuần 1 mở lại đến 14/10/2027 10:00: Mở lại kỳ",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reopened-empty",
+    "Drafts": [],
+    "Error": ""
+  },
+  {
+    "Name": "reopened-nil-ref",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_period_reopened",
+        "Severity": "normal",
+        "Title": "Kỳ báo cáo được mở lại",
+        "Body": "Tuần 1 mở lại đến 14/10/2027 10:00: Mở lại kỳ",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reopened-bad-ref",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_period_reopened",
+        "Severity": "normal",
+        "Title": "Kỳ báo cáo được mở lại",
+        "Body": "Tuần 1 mở lại đến 14/10/2027 10:00: Mở lại kỳ",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reopened-runes-300",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_period_reopened",
+        "Severity": "normal",
+        "Title": "Kỳ báo cáo được mở lại",
+        "Body": "Tuần 1 mở lại đến 14/10/2027 10:00: ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reopened-runes-301",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_period_reopened",
+        "Severity": "normal",
+        "Title": "Kỳ báo cáo được mở lại",
+        "Body": "Tuần 1 mở lại đến 14/10/2027 10:00: ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ…",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reopened-fallback",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_period_reopened",
+        "Severity": "normal",
+        "Title": "Kỳ báo cáo được mở lại",
+        "Body": "Tuần 1 mở lại đến 13/10/2027 10:04: Mở lại kỳ",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "reopened-dispatch-changed",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "report_period_reopened",
+        "Severity": "normal",
+        "Title": "Kỳ báo cáo được mở lại",
+        "Body": "Tuần 1 mở lại đến 14/10/2027 10:00: Mở lại kỳ",
+        "DeepLink": "/kn/nhiem-vu/cong-viec",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "submitted-bad-json",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.work_schedule.submitted: unexpected end of JSON input"
+  },
+  {
+    "Name": "submitted-wrong-type",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.work_schedule.submitted: json: cannot unmarshal string into Go struct field WorkScheduleSubmittedV1.approver_refs of type []uuid.UUID"
+  },
+  {
+    "Name": "reviewed-bad-json",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.work_schedule.reviewed: unexpected end of JSON input"
+  },
+  {
+    "Name": "reviewed-wrong-type",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.work_schedule.reviewed: json: cannot unmarshal number into Go struct field WorkScheduleReviewedV1.owner_ref of type uuid.UUID"
+  },
+  {
+    "Name": "work-reminded-bad-json",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.work_schedule.reminded: unexpected end of JSON input"
+  },
+  {
+    "Name": "work-reminded-wrong-type",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.work_schedule.reminded: json: cannot unmarshal string into Go struct field WorkScheduleRemindedV1.recipient_refs of type []uuid.UUID"
+  },
+  {
+    "Name": "issued-bad-json",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.report_batch.issued: unexpected end of JSON input"
+  },
+  {
+    "Name": "issued-wrong-type",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.report_batch.issued: json: cannot unmarshal string into Go struct field ReportBatchIssuedV1.assignees of type []port.TaskAssigneesV1"
+  },
+  {
+    "Name": "report-reminded-bad-json",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.report_task.reminded: unexpected end of JSON input"
+  },
+  {
+    "Name": "report-reminded-wrong-type",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.report_task.reminded: json: cannot unmarshal string into Go struct field ReportTaskRemindedV1.recipient_refs of type []string"
+  },
+  {
+    "Name": "adjusted-bad-json",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.submission.adjustment_requested: unexpected end of JSON input"
+  },
+  {
+    "Name": "adjusted-wrong-type",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.submission.adjustment_requested: json: cannot unmarshal string into Go struct field SubmissionAdjustmentRequestedV1.recipient_refs of type []string"
+  },
+  {
+    "Name": "reopened-bad-json",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.period.reopened: unexpected end of JSON input"
+  },
+  {
+    "Name": "reopened-wrong-type",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.period.reopened: json: cannot unmarshal string into Go struct field PeriodReopenedV1.recipient_refs of type []string"
+  },
+  {
+    "Name": "unknown-work",
+    "Drafts": null,
+    "Error": ""
+  },
+  {
+    "Name": "unknown-report",
+    "Drafts": null,
+    "Error": ""
+  }
+]

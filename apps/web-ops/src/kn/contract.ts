@@ -37,6 +37,8 @@ export interface DepartmentRef {
   /** Mô tả ngắn hiện trên thẻ phòng ban (Hình 3b). */
   description: string | null;
   status: DepartmentStatus;
+  /** W11.07: phòng ban ngoài lần gán, chọn được ở chế độ chỉ xem (Lãnh đạo đơn vị, Ban Giám đốc). */
+  read_only?: boolean;
 }
 
 export interface CommuneRef {
@@ -91,6 +93,17 @@ export interface SessionContext {
   support_session_id?: string | null;
   /** Tài khoản được hỗ trợ. */
   on_behalf_of?: string | null;
+  /** W11.07: ngữ cảnh chỉ xem (Cấp TW, Lãnh đạo đơn vị ở phòng ban khác, Ban Giám đốc) — server chặn mọi thao tác ghi. */
+  read_only?: boolean;
+  /** W11.07: lãnh đạo (≥ phó phòng/phụ trách hoặc nhóm Lãnh đạo phòng). */
+  manager?: boolean;
+  mgmt_level_code?: string | null;
+  province_group?: string | null;
+  duties?: string[];
+  /** W11.07: đơn vị nội bộ (Cấp Xã: đơn vị quản lý HS-37). */
+  internal_unit_code?: string | null;
+  /** W11.07: quyền nhận qua ủy quyền có hạn (đầy đủ ở GET /v1/me/context). */
+  powers?: string[];
 }
 
 /** Header mang ngữ cảnh phiên (P1 gap §4.5 phương án A). */
@@ -112,8 +125,11 @@ export interface MenuNode {
   children?: MenuNode[];
   /** Khóa nguồn số đếm (vd "extension.report_tasks.todo"); chỉ đặt cho việc cần xử lý. */
   badge_source?: string;
-  /** "not_open": phòng ban chưa mở — hiện mờ, nhãn "Chưa mở", không bấm được. */
-  status?: "active" | "not_open";
+  /**
+   * "not_open": phòng ban chưa mở — hiện mờ, nhãn "Chưa mở", không bấm được.
+   * "coming_soon": mục của module chưa có (kn.menu/v3) — hiện mờ, nhãn "Sắp có", không bấm được.
+   */
+  status?: "active" | "not_open" | "coming_soon";
 }
 
 export interface MenuGroup {

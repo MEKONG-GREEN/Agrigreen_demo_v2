@@ -8,12 +8,15 @@ package db
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
 // Tên biến ngữ cảnh (khóa của set_config / k_ref.ctx_*).
@@ -58,6 +61,52 @@ func ContextVarsFrom(ctx context.Context) ContextVars {
 		v.OnBehalfOfRef = p.KN.Support.OnBehalfOf
 	}
 	return v
+}
+
+// ErrNodeScopeRequired: Principal người dùng có vai/cấp gắn Nút nhưng ngữ cảnh không có app.node_id (FD, rủi ro R-5
+// của W3.4, docs/design/cooperative.md §18.4). Chính sách p_scope có nhánh "app.node_id rỗng → cả tenant" cho
+// consumer/job/Admin; người dùng HTX/xã rơi vào nhánh đó sẽ thấy cả tenant, nên ForModule từ chối mở giao dịch.
+// Trả ra ngoài dưới dạng problem.NodeScopeRequired (403 node_scope_required); errors.Is(err, ErrNodeScopeRequired).
+var ErrNodeScopeRequired = errors.New("db: người dùng gắn Nút nhưng ngữ cảnh không có app.node_id")
+
+// Ánh xạ vai → "phải có Nút" (FD). Nguồn: app/HTX/app.yaml (roles: coop_manager — quản lý HTX, phạm vi = HTX của
+// org_ref), app/KN/app.yaml (roles: kn_officer — cán bộ KN, phạm vi tính từ org_ref; context_roles: kn_xa — Cấp
+// Xã), authz/kn.go. Vai cấp Tỉnh/Quốc gia/Admin (kn_tinh, kn_tw, admin, kn_province_admin, kn_national_admin,
+// platform_admin) giữ nhánh Nút rỗng như trước. Hằng chuỗi (không import port của module — archlint);
+// TestNodeBoundRolesDeclared_FD kiểm các vai này còn khai trong app.yaml.
+var (
+	// NodeBoundRoles: vai realm (Principal không có ngữ cảnh phiên KN) bắt buộc có org_ref.
+	NodeBoundRoles = []string{"coop_manager", "kn_officer"}
+	// NodeBoundContextRoles: vai ngữ cảnh phiên KN bắt buộc có Nút của lần gán.
+	NodeBoundContextRoles = []string{authz.KNXa}
+	// NodeExemptRoles: vai realm phạm vi tỉnh/toàn quốc/toàn hệ thống — có vai này thì không bắt buộc Nút dù có
+	// thêm vai trong NodeBoundRoles.
+	NodeExemptRoles = []string{authz.RolePlatformAdmin, "kn_national_admin", "kn_province_admin"}
+)
+
+// RequiresNode cho biết Principal người dùng phải có Nút (app.node_id) khi mở giao dịch của module. Có ngữ
+// cảnh phiên KN thì chỉ xét vai của ngữ cảnh (vai realm không dùng cho phạm vi KN v7.7).
+func RequiresNode(p authz.Principal) bool {
+	if p.KN != nil {
+		return slices.Contains(NodeBoundContextRoles, p.KN.Role)
+	}
+	if slices.ContainsFunc(NodeExemptRoles, p.Has) {
+		return false
+	}
+	return slices.ContainsFunc(NodeBoundRoles, p.Has)
+}
+
+// checkNodeScope chặn giao dịch của Principal gắn Nút mà v không có Nút. Không có Principal (consumer, job,
+// worker) → luôn qua. db.WithoutNodeScope (xóa Nút tạm trong giao dịch đã mở) không đi qua đây.
+func checkNodeScope(ctx context.Context, v ContextVars) error {
+	if v.NodeID != uuid.Nil {
+		return nil
+	}
+	p, ok := authz.FromContext(ctx)
+	if !ok || !RequiresNode(p) {
+		return nil
+	}
+	return problem.NodeScopeRequired.WithCause(ErrNodeScopeRequired)
 }
 
 // setConfigSQL đặt vai của module ($1, tương đương SET LOCAL ROLE — kiểm membership như nhau, lỗi 42501)

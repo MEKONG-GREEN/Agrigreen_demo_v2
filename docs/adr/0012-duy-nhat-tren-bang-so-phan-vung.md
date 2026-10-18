@@ -35,6 +35,7 @@ Ghi lệch theo gói W0.3 ([kế hoạch](../kien-truc-v4.1-ke-hoach.md)), mục
 - **Hết hạn** (`expires_at <= now()`): ghi lại cùng khóa được nhận như **bản ghi mới**, kể cả khi job dọn chưa chạy — `shared.fn_chain` thay dòng đăng ký hết hạn (trỏ `row_id` sang bản ghi mới, hạn mới 30 ngày). Hành vi vì thế không phụ thuộc lịch dọn. Sổ khi đó có hai bản ghi cùng `idem_key`; truy vấn tra cứu theo `idem_key` cần chọn bản ghi mới nhất nếu có thể gặp phát lại sau 30 ngày.
 - **Dọn:** `shared.purge_expired_ledger_idem(batch)` (`SECURITY DEFINER`, xóa theo lô). Vai job `ag_outbox_publisher` chỉ có `EXECUTE`, không có quyền bảng. `ledger_idem` là bảng vận hành, không phải bảng sổ (không có `trg_immutable`/`trg_chain`), nên được xóa. Job `idempotency` của `worker` (mỗi giờ) và `migrate purge-idempotency` (CronJob theo vùng, `AG_CLUSTERS`) dọn cả `shared.idempotency_key` và `shared.ledger_idem` của từng cụm; log `ledger_idem_deleted=<số>`.
 - Kiểm thử: `TestLedgerIdemExpiryDefault`, `TestDuplicateIdemKeyExpiresAfter30Days` (`internal/shared/ledger`), `TestPurgeLedgerIdemEveryCluster`, `TestLedgerReplayAcceptedAfterPurge` (`internal/shared/opsjobs`).
+- Truy vấn tra cứu theo `idem_key` trong store đã chọn dòng mới nhất: xem mục [Hiện thực — tra cứu theo `idem_key` chọn dòng mới nhất](#hiện-thực--tra-cứu-theo-idem_key-chọn-dòng-mới-nhất-fb-09102026).
 
 Vai DB của v4.1 (`SET LOCAL ROLE r_<module>`, ADR-0028) không cần quyền trên hai bảng chung: trigger `shared.fn_chain` là `SECURITY DEFINER` (migration `shared 000001`), và hai bảng không cấp quyền cho vai ứng dụng. Kiểm thử ghi sổ dưới vai `r_<module>` thuộc gói W2.3.
 
@@ -72,3 +73,26 @@ Database dựng mới từ đầu không gặp lỗi, vì lúc thêm cột sổ 
   
   Trước `shared 000011`, hai kiểm thử này **hỏng** đúng như mô tả ở trên.
 - `TestLedgerColumns*` (`tools/migratecheck`).
+
+## Hiện thực — tra cứu theo `idem_key` chọn dòng mới nhất (FB, 09/10/2026)
+
+**Lỗi.** Từ W2.1, phát lại cùng `idem_key` sau 30 ngày được ghi như bản ghi mới, nên một sổ có thể giữ hai dòng cùng khóa. Store vẫn tra cứu kiểu `WHERE idem_key = $1` với `QueryRow` (lấy dòng tùy ý), `LIMIT 1` không `ORDER BY`, hoặc tệ hơn `ORDER BY seq`/`ORDER BY recorded_at` tăng dần (`pf_accounts.account_event`, `role_assignment_event`, `pf_simulation.scenario_change`: luôn lấy dòng **cũ nhất**). Lời gọi lặp sau ErrDuplicate vì thế có thể trả bản ghi của lần ghi trước 30 ngày.
+
+**Sửa.** Không migration.
+- `ledger.NewestFirst(alias)` = ` ORDER BY <alias.>recorded_at DESC, <alias.>id DESC`; `ledger.NewestByIdem(alias)` = cùng mệnh đề + ` LIMIT 1`. `recorded_at` là lúc ghi do hệ đặt; `id` (UUIDv7) phá hòa. Không dùng `seq`: `seq` chỉ so được trong một chuỗi, mà lần phát lại có thể rơi vào chuỗi khác. Không lọc theo dòng đăng ký còn hạn: vai ứng dụng không có quyền trên `shared.ledger_idem`, và sau khi job dọn chạy thì dòng đăng ký không còn.
+- Mẫu "một dòng" (98 truy vấn trên 64 tệp store, mkg và pf): thêm `ledger.NewestByIdem` vào truy vấn; helper `one…` tự thêm `LIMIT 1` thì truyền `ledger.NewestFirst`; truy vấn có JOIN dùng bí danh của bảng sổ.
+- Mẫu "nhiều dòng theo tiền tố" (`mkg_logistics.leg_event`, `LegsByIdemPrefix`): các chặng của một lần lập ghi trong một giao dịch nên cùng `recorded_at`; chỉ lấy dòng có `recorded_at` lớn nhất trong các dòng khớp tiền tố.
+- Mẫu "lô khóa" (`pf_extension.material_record`, `ByIdemKeys`, `idem_key = ANY`): `DISTINCT ON (idem_key) … ORDER BY idem_key, recorded_at DESC, id DESC`, mỗi khóa một dòng.
+- Không đổi: truy vấn chỉ hỏi có/không (`EXISTS`, `count(*) > 0`), tập khóa đã có (`mkg_engine.observation`, `pf_sync.inbound.record_idem_key`), con trỏ `max(idem_key)` của `htx_confirmation`, và bảng không phải sổ (có `UNIQUE (tenant_id, idem_key)` thật: `*_job`, `file_object`, `attachment`, `support_request`, `directive`, `pf_masterdata.param_version`, …).
+- **Chỉ mục — còn thiếu, cần migration (ngoài phạm vi gói này):** 8 sổ có tra cứu theo `idem_key` nhưng không có chỉ mục chứa `idem_key`, nên tra cứu quét cả bảng (có từ trước, không do sửa này): `pf_apiclient.client_event`, `api_key_event`, `subscription_event`, `quota_plan`, `webhook_event`, `pf_party.share_grant_event`, `share_grant_review`, `pf_extension.material_record`. Đề xuất `CREATE INDEX … (tenant_id, idem_key)` như các sổ khác. Các sổ còn lại đã có `(tenant_id, idem_key)`; với vài dòng mỗi khóa, sắp theo `recorded_at` sau khi lọc theo chỉ mục là đủ, không cần chỉ mục mới.
+
+**Kiểm thử** (giả lập hết hạn bằng `pgtest.Env.ExpireLedgerIdem`, đặt `expires_at` về quá khứ bằng tài khoản quản trị, chỉ trong kiểm thử):
+- `TestRollCountByIdemReturnsNewestAfterExpiry` (`internal/mkg/fieldops/handler`): mẫu một dòng.
+- `TestParamVersionByIdemReturnsNewestAfterExpiry` (`internal/mkg/hub/handler`): helper tự thêm `LIMIT 1`, có JOIN và bí danh.
+- `TestLegsByIdemPrefixReturnsNewestSetAfterExpiry` (`internal/mkg/logistics/handler`): nhiều dòng theo tiền tố.
+- `TestMaterialByIdemKeysReturnsNewestPerKeyAfterExpiry` (`internal/kn/extension/material/handler`): lô khóa.
+- `TestNewestByIdem` (`internal/shared/ledger`): chuỗi SQL của helper.
+
+## Hiện thực — sổ phụ hiệu lực của danh mục CNTS (W11.41, pf 000146, 12/10/2026)
+
+Giá trị có hiệu lực từ ngày của danh mục `cnts_*` (BRD CNTS FN-06 BR-03) không thêm cột `valid_from` vào `pf_masterdata.catalog_change` (sổ đã có dòng) mà ghi sổ phụ `pf_masterdata.catalog_effective` (`shared.apply_ledger`, cùng `stream_key`, `change_id` trỏ dòng `catalog_change` cùng giao dịch). Tra theo ngày: `valid_from <= ngày` lớn nhất, cùng ngày lấy `seq` lớn nhất; `idem_key` của dòng sổ phụ = khóa của dòng `catalog_change` tương ứng.

@@ -51,10 +51,10 @@ func TestFN_TI_02_06_MessageHelpers(t *testing.T) {
 	if Mask("trongtrot@angiang.gov.vn") != "tr•••@angiang.gov.vn" {
 		t.Fatal(Mask("trongtrot@angiang.gov.vn"))
 	}
-	if s := Subject("Phòng Trồng trọt", "Tuần 36", "T01", true); !strings.HasSuffix(s, "(Tạm tính)") {
+	if s := Subject("Phòng A", "Tuần 36", "T01", true); !strings.HasSuffix(s, "(Tạm tính)") {
 		t.Fatal(s)
 	}
-	b := Body("Tuần 36", "31/08–06/09/2026", []string{"T01"}, true, []string{"Xã A"}, []string{"T01.xlsx: https://x"})
+	b := BodyFor(port.DispatchProfile{Salutation: "Kính gửi bộ phận nhận,", SenderName: "Đơn vị gửi"}, "Tuần 36", "31/08–06/09/2026", []string{"T01"}, true, []string{"Xã A"}, []string{"T01.xlsx: https://x"})
 	if !strings.Contains(b, "TẠM TÍNH") || !strings.Contains(b, "Xã A") || !strings.Contains(b, "https://x") {
 		t.Fatal(b)
 	}

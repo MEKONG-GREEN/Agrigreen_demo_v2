@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-PUB-READERS-A: metadata đọc view có phiên bản do KN khai; đã tích hợp dev14f266a2, helper20803 đủ11migrationPASS.

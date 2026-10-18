@@ -79,7 +79,7 @@ type ProfileUpdater interface {
 }
 
 // Directory là cổng Keycloak Admin REST (realm agrigreen) bằng tài khoản dịch vụ
-// agrigreen-accounts (manage-users, view-users, query-users). Bản HTTP ở
+// agrigreen-accounts (manage-users, view-users, query-users; view-events cho lịch sử đăng nhập — W11.02). Bản HTTP ở
 // accounts.DirectoryFromEnv; bản trong bộ nhớ cho kiểm thử ở accounts.NewMemoryDirectory.
 type Directory interface {
 	CreateUser(ctx context.Context, u NewUser) (uuid.UUID, error)
@@ -104,4 +104,30 @@ type Directory interface {
 	BruteForceLocked(ctx context.Context, id uuid.UUID) (bool, error)
 	// ClearBruteForce xóa trạng thái khóa do đăng nhập sai (Admin mở khóa).
 	ClearBruteForce(ctx context.Context, id uuid.UUID) error
+}
+
+// Session là một phiên đăng nhập đang hoạt động (Keycloak GET /users/{id}/sessions).
+type Session struct {
+	ID         string
+	IPAddress  string
+	Start      time.Time
+	LastAccess time.Time
+	Clients    []string // clientId
+}
+
+// LoginEvent là một sự kiện đăng nhập (Keycloak GET /events?user=…; realm phải bật eventsEnabled).
+type LoginEvent struct {
+	Time      time.Time
+	Type      string // LOGIN | LOGIN_ERROR | LOGOUT | CODE_TO_TOKEN_ERROR …
+	IPAddress string
+	Client    string
+	Error     string // mã lỗi Keycloak (vd invalid_user_credentials), không chứa mật khẩu
+}
+
+// SessionReader là phần tùy chọn của Directory (FN-AD-04.04 tab "Phiên đang hoạt động", "Lịch sử đăng nhập").
+// Tách khỏi Directory để không buộc mọi bản cài phải có; module kiểm bằng type assertion.
+type SessionReader interface {
+	UserSessions(ctx context.Context, id uuid.UUID) ([]Session, error)
+	// LoginEvents trả tối đa max sự kiện mới nhất trước. Realm chưa bật lưu sự kiện → danh sách rỗng.
+	LoginEvents(ctx context.Context, id uuid.UUID, max int) ([]LoginEvent, error)
 }

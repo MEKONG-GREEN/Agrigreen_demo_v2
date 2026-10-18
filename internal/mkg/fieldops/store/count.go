@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 )
 
@@ -105,7 +106,7 @@ func oneRoll(ctx context.Context, tx pgx.Tx, where string, args ...any) (*RollCo
 
 // RollCountByIdem tìm bản ghi đếm cuộn theo idem_key.
 func RollCountByIdem(ctx context.Context, tx pgx.Tx, key string) (*RollCount, error) {
-	return oneRoll(ctx, tx, "idem_key = $1", key)
+	return oneRoll(ctx, tx, "idem_key = $1"+ledger.NewestByIdem(""), key)
 }
 
 // RollCountByID đọc một bản ghi đếm cuộn.

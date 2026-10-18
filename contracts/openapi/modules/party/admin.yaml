@@ -1,0 +1,1030 @@
+paths:
+# @ag-order: 178
+  /v1/share-grants:
+    post:
+      summary: Đề xuất cấp quyền chia sẻ tenant này (bên cấp) → tenant khác (bên nhận) — ADR-0020
+      description: |
+        Chỉ `platform_admin` của tenant bên cấp — quản trị viên của ĐƠN VỊ CHỦ dữ liệu (R-SEC-04). Một `platform_admin` KHÁC
+        duyệt (R-56). `valid_from` vắng → lúc đề xuất; `valid_to` bắt buộc, ở tương lai, tối đa 5 năm.
+
+        Cấp phép v2 (W4.1, ADR-0030 mục 3): `grant_class` vắng = `partner` (hành vi cũ: `kinds` ≥ 1, không `module_table`/
+        `scope_node_ref`). `intra_platform` (đọc tại chỗ qua `k_ref.share_scope`, có hiệu lực từ W4.2): KHÔNG `kinds`;
+        bắt buộc `module_table` (`<module>:<share>` có trong `shares` của module chủ — sai → 422 `party.share_table_not_shared`),
+        `scope_node_ref` (Nút đang hoạt động của tenant bên cấp), `purpose_code`, `basis_ref` (mã thỏa thuận chia sẻ).
+      operationId: proposeShareGrant
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grantee_tenant_id, purpose, valid_to]
+              properties:
+                grantee_tenant_id: {type: string, format: uuid}
+                kinds:
+                  type: array
+                  description: Bắt buộc (≥ 1) với partner; vắng/rỗng với intra_platform
+                  items: {$ref: "#/components/schemas/ShareKind"}
+                purpose: {type: string, minLength: 10, maxLength: 500}
+                valid_from: {type: string, format: date-time}
+                valid_to: {type: string, format: date-time}
+                grant_class: {$ref: "#/components/schemas/ShareGrantClass"}
+                module_table: {type: string, pattern: "^(pf|mkg)/[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$", description: "Chỉ intra_platform, vd pf/cooperative:household"}
+                scope_node_ref: {type: string, format: uuid, description: "Chỉ intra_platform: Nút phạm vi của đơn vị chủ"}
+                purpose_code: {type: string, pattern: "^[a-z][a-z0-9-]{0,39}(\\.[a-z][a-z0-9-]{0,39}){0,3}$", description: "Mục đích có mã, vd khuyen-nong (bắt buộc với intra_platform)"}
+                basis_ref: {type: string, minLength: 3, maxLength: 200, description: "Mã thỏa thuận chia sẻ — căn cứ (bắt buộc với intra_platform)"}
+      responses:
+        "201":
+          description: Đã đề xuất (gọi lặp cùng Idempotency-Key → như lần đầu)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrant"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Cấp quyền chia sẻ của tenant bên cấp — ADR-0020
+      operationId: listShareGrants
+      tags: [party]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [proposed, active, revoked]}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ShareGrant"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 179
+  /v1/share-grants/{id}:
+    get:
+      summary: Một cấp quyền chia sẻ — ADR-0020
+      operationId: getShareGrant
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Cấp quyền
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrant"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 180
+  /v1/share-grants/{id}/approve:
+    post:
+      summary: Duyệt cấp quyền chia sẻ — người duyệt ≠ người đề xuất (R-56), ADR-0020
+      description: Ghi cùng giao dịch bảng chiếu ở tenant bên nhận. Tự duyệt → 403 `self_approval_forbidden`.
+      operationId: approveShareGrant
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: Đã duyệt (gọi lặp của chính người duyệt → 200)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrant"}
+        "200":
+          description: Đã duyệt trước đó bởi chính người gọi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrant"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+# @ag-order: 181
+  /v1/share-grants/{id}/revoke:
+    post:
+      summary: Thu hồi cấp quyền chia sẻ (có hiệu lực ngay) — ADR-0020
+      operationId: revokeShareGrant
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Đã thu hồi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrant"}
+        "200":
+          description: Đã thu hồi trước đó bởi chính người gọi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrant"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 182
+  /v1/share-grants/{id}/reads:
+    get:
+      summary: Sổ đọc của bên nhận với một cấp quyền (mỗi lời gọi /v1/partner/* một dòng) — ADR-0020
+      operationId: listShareGrantReads
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: after, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
+      responses:
+        "200":
+          description: Một trang sổ đọc
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  next_cursor: {type: integer}
+                  items: {type: array, items: {$ref: "#/components/schemas/ShareGrantRead"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 183
+  /v1/share-grant-reviews/due:
+    get:
+      summary: Cấp phép đang hiệu lực đến hạn rà soát định kỳ (R-SEC-04) — W4.1
+      description: |
+        Chỉ `platform_admin` của đơn vị chủ (tenant bên cấp). Đến hạn khi lần rà soát cuối (hoặc lúc duyệt) + chu kỳ
+        (`review_interval_days`, hiện 90 ngày) ≤ hiện tại + `within_days`.
+      operationId: listShareGrantsDueForReview
+      tags: [party]
+      parameters:
+        - {name: within_days, in: query, schema: {type: integer, minimum: 0, maximum: 366, default: 0}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor, review_interval_days]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ShareGrant"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+                  review_interval_days: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 184
+  /v1/share-grants/{id}/reviews:
+    get:
+      summary: Sổ rà soát định kỳ của một cấp phép (chỉ ghi thêm) — W4.1, R-SEC-04
+      operationId: listShareGrantReviews
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Mọi dòng rà soát theo seq
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ShareGrantReview"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Ghi quyết định rà soát định kỳ (giữ | thu hồi) — W4.1, R-SEC-04
+      description: |
+        Chỉ cấp phép đang hiệu lực (khác → 409 `party.share_grant_state`). `retain` đặt lại hạn rà soát; `revoke` thu hồi
+        ngay trong cùng giao dịch (`note` là lý do, bắt buộc) và tăng epoch ngữ cảnh của đơn vị xem như thu hồi thường.
+      operationId: reviewShareGrant
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: {type: string, enum: [retain, revoke]}
+                note: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi (gọi lặp cùng Idempotency-Key → như lần đầu)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrantReviewResult"}
+        "200":
+          description: Gọi lặp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrantReviewResult"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/party cấp quyền chia sẻ ---
+  # --- pf/party KN v7.7 gói P2: phòng ban, khu vực, cây 3 cấp, bảng ảnh hưởng (FN-AD-04.02, 04.03) ---
+# @ag-order: 185
+  /v1/departments:
+    get:
+      summary: "FN-AD-04.03: phòng ban (module) của một đơn vị kèm số tài khoản/bản ghi (null khi chưa nối nguồn đếm)"
+      operationId: knAdminListDepartments
+      tags: [party]
+      parameters:
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}, description: "Đơn vị (Nút cấp 1/2); vắng = đơn vị của Nút người gọi"}
+        - {name: include_retired, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Danh sách theo thứ tự hiển thị
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDepartmentList"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "FN-AD-04.03: khai báo phòng ban cho Nút cấp 1 (TTKNQG) hoặc cấp 2 (TTKN tỉnh); trùng mã trong đơn vị → 409"
+      description: Chỉ Admin (platform_admin, registry_admin). Ghi sổ pf_party.department_event (created, ảnh chụp sau).
+      operationId: knCreateDepartment
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNDepartmentInput"}
+      responses:
+        "201":
+          description: Đã tạo (gọi lặp cùng Idempotency-Key → như lần đầu)
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDepartment"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {description: party.department_code_taken, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | party.department_unit_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 186
+  /v1/departments/{id}:
+    get:
+      summary: Một phòng ban kèm số tài khoản/bản ghi
+      operationId: knGetDepartment
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Phòng ban
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDepartment"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+    put:
+      summary: Sửa tên, mô tả, thứ tự, bộ menu (không đổi gì → không ghi sổ; đổi → một dòng Log cũ → mới)
+      operationId: knUpdateDepartment
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 200}
+                description: {type: string, maxLength: 1000}
+                sort_order: {type: integer, minimum: 0, maximum: 100000}
+                menu_profile: {type: string, enum: [trong_trot, generic]}
+      responses:
+        "200":
+          description: Phòng ban sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDepartment"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: party.department_state (đã xóa), $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 187
+  /v1/departments/{id}/status:
+    post:
+      summary: "Đổi trạng thái Đang áp dụng / Chưa mở / Ngưng hoạt động — hiệu lực ngay ở bước 2 đăng nhập và menu (UR-KT-02)"
+      description: Ngưng (suspended) bắt buộc lý do ≥ 10 ký tự. Ngưng/đóng phòng ban còn tài khoản/dữ liệu → cảnh báo, dữ liệu cũ giữ nguyên.
+      operationId: knDepartmentStatus
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: {type: string, enum: [active, not_open, suspended]}
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Đã đổi
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [department, warnings]
+                properties:
+                  department: {$ref: "#/components/schemas/KNDepartment"}
+                  warnings: {type: array, items: {type: string}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: party.department_state, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 188
+  /v1/departments/{id}/retire:
+    post:
+      summary: "Xóa phòng ban (sự kiện retired, không xóa cứng) — chặn khi có tài khoản/dữ liệu (409) hoặc chưa nối nguồn đếm (503)"
+      operationId: knRetireDepartment
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Đã xóa (mã không tái sử dụng)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDepartment"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: party.department_in_use | party.department_state, $ref: "#/components/responses/Problem"}
+        "503": {description: party.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 189
+  /v1/departments/{id}/log:
+    get:
+      summary: Khung Log của phòng ban — người, thời điểm, cũ → mới, lý do (AC-CHUNG)
+      operationId: knDepartmentLog
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "seq của dòng cuối trang trước"}
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNLogPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 190
+  /v1/modules:
+    get:
+      summary: "Bật module theo đơn vị (W1.4, R-MOD-08): mọi module của danh mục với trạng thái bật của tenant người gọi"
+      description: >-
+        Module `enable: always` (lõi, mkg/*, pf/extdata) luôn bật. Module `per_tenant` bật mặc định (chưa có dòng sổ) —
+        chỉ tắt khi quản trị ghi sự kiện. Tắt module: route của module trả 403 `module_not_enabled`, vai của module không
+        cấp được (`accounts.role_module_not_enabled`), menu không hiện màn của module.
+      operationId: listModuleEnablement
+      tags: [party]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ModuleEnablement"}}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 191
+  /v1/modules/{zone}/{name}/enablement:
+    post:
+      summary: "Bật/tắt một module per_tenant cho tenant người gọi — hiệu lực ngay ở bản sao xử lý, các bản sao khác ≤ 10 giây"
+      description: Tắt bắt buộc lý do 10–500 ký tự. Module là `<zone>/<name>` (vd `pf/geo`).
+      operationId: setModuleEnablement
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: zone, in: path, required: true, schema: {type: string, enum: [pf, mkg, vault]}}
+        - {name: name, in: path, required: true, schema: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$"}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: {type: boolean}
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi (200 khi gọi lặp cùng Idempotency-Key)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ModuleEnablement"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ModuleEnablement"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: party.module_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: party.module_always_on | party.module_enablement_state, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 192
+  /v1/modules/{zone}/{name}/log:
+    get:
+      summary: Khung Log bật/tắt module — người, thời điểm, trạng thái cũ → mới, lý do
+      operationId: moduleEnablementLog
+      tags: [party]
+      parameters:
+        - {name: zone, in: path, required: true, schema: {type: string, enum: [pf, mkg, vault]}}
+        - {name: name, in: path, required: true, schema: {type: string}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "seq của dòng cuối trang trước"}
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNLogPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 193
+  /v1/orgs/{ref}/departments/seed:
+    post:
+      summary: "Nạp 5 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng; W11.06, chờ khách Q-051); xóa mã tạm phong_ban_5/6 chưa dùng; chạy lặp an toàn"
+      operationId: knSeedDepartments
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả nạp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, existing, status, legacy_retired, legacy_kept]
+                properties:
+                  created: {type: array, items: {$ref: "#/components/schemas/KNDepartment"}}
+                  existing: {type: integer}
+                  status: {type: string}
+                  legacy_retired: {type: array, items: {type: string}, description: "Mã tạm (phong_ban_5/6) đã xóa trong lần nạp này — chưa mở, không có tài khoản/dữ liệu"}
+                  legacy_kept: {type: array, items: {type: string}, description: "Mã tạm còn giữ (đang áp dụng, có tài khoản/dữ liệu hoặc chưa nối nguồn đếm) — Admin xử lý; tra cứu mã cũ vẫn trả dòng này"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 194
+  /v1/regions:
+    get:
+      summary: "FN-AD-04.02: khu vực của tỉnh kèm số xã được gán"
+      operationId: knAdminListRegions
+      tags: [party]
+      parameters:
+        - {name: province_code, in: query, required: true, schema: {type: string}}
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Danh sách theo thứ tự hiển thị
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegionList"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Thêm khu vực cho tỉnh (mã duy nhất trong tỉnh)
+      operationId: knCreateRegion
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [province_code, code, name]
+              properties:
+                province_code: {type: string}
+                code: {type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$"}
+                name: {type: string, minLength: 1, maxLength: 200}
+                sort_order: {type: integer, minimum: 0, maximum: 100000}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {description: party.region_code_taken, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 195
+  /v1/regions/seed:
+    post:
+      summary: "Nạp Khu vực (huyện cũ) của tỉnh và gán cho Nút xã chưa có khu vực — TẠM, chờ khách Q-04 (chỉ An Giang, mã 91)"
+      operationId: knSeedRegions
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [province_code]
+              properties:
+                province_code: {type: string}
+      responses:
+        "200":
+          description: Kết quả nạp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [province_code, regions_created, assigned, already_assigned, missing_node, status]
+                properties:
+                  province_code: {type: string}
+                  regions_created: {type: integer}
+                  assigned: {type: integer}
+                  already_assigned: {type: integer}
+                  missing_node: {type: array, items: {type: string}, description: "Mã xã chưa có Nút — chạy communes/ensure trước"}
+                  status: {type: string}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: party.seed_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 196
+  /v1/regions/{id}:
+    get:
+      summary: Một khu vực
+      operationId: knGetRegion
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Khu vực
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+    put:
+      summary: Sửa tên, thứ tự khu vực
+      operationId: knUpdateRegion
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 200}
+                sort_order: {type: integer, minimum: 0, maximum: 100000}
+      responses:
+        "200":
+          description: Khu vực sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 197
+  /v1/regions/{id}/deactivate:
+    post:
+      summary: Ngừng dùng khu vực (lý do bắt buộc; còn xã được gán → 409 party.region_in_use)
+      operationId: knDeactivateRegion
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ngừng dùng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 198
+  /v1/regions/{id}/reactivate:
+    post:
+      summary: Dùng lại khu vực
+      operationId: knReactivateRegion
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: Đã dùng lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+# @ag-order: 199
+  /v1/regions/{id}/log:
+    get:
+      summary: Khung Log của khu vực (cũ → mới)
+      operationId: knRegionLog
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}}
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNLogPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 200
+  /v1/orgs/tree:
+    get:
+      summary: "FN-AD-04.02: cây TTKNQG › TTKN tỉnh › Khu vực › Xã trong phạm vi người gọi (xem xuống, không ngang, không lên)"
+      operationId: knAdminOrgTree
+      tags: [party]
+      parameters:
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Rừng cây (gốc = Nút thấy được cao nhất)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KNOrgTreeNode"}}
+# @ag-order: 201
+  /v1/orgs/{ref}/region:
+    post:
+      summary: "Gán / đổi / bỏ (region_code null) Khu vực của Nút xã — đổi, bỏ cần lý do ≥ 10 ký tự (FN-AD-04.02)"
+      operationId: knAssignRegion
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [region_code]
+              properties:
+                region_code: {type: [string, "null"]}
+                reason: {type: string, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi sổ org_region_event
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [org_ref, commune_code, province_code, region_code, action]
+                properties:
+                  org_ref: {type: string, format: uuid}
+                  commune_code: {type: string}
+                  province_code: {type: string}
+                  region_code: {type: [string, "null"]}
+                  action: {type: string, enum: [assigned, changed, cleared]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: party.region_state, $ref: "#/components/responses/Problem"}
+        "422": {description: party.region_node_invalid | validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 202
+  /v1/orgs/{ref}/region-log:
+    get:
+      summary: Lịch sử gán khu vực của Nút xã (cũ → mới, lý do)
+      operationId: knOrgRegionLog
+      tags: [party]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}}
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNLogPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 203
+  /v1/orgs/{ref}/communes/ensure:
+    post:
+      summary: "Bảo đảm mỗi xã còn hiệu lực của tỉnh có Nút extension_team gắn mã ĐVHC (An Giang: 102), mã = code_prefix-mã xã"
+      operationId: knEnsureCommuneNodes
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}, description: "Nút TTKN tỉnh"}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code_prefix: {type: string, maxLength: 20, default: XA}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [province_code, communes, existing, created]
+                properties:
+                  province_code: {type: string}
+                  communes: {type: integer}
+                  existing: {type: integer}
+                  created: {type: array, items: {$ref: "#/components/schemas/PartyOrg"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 204
+  /v1/orgs/{ref}/impact:
+    get:
+      summary: "Bảng Ảnh hưởng của Nút: tài khoản, HTX, thửa ruộng, kỳ chưa chốt (FN-AD-04.02)"
+      operationId: knOrgImpact
+      tags: [party]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Bảng ảnh hưởng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNImpact"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/party cấp quyền chia sẻ ---
+  # --- pf/metering (G5, ADR-0023 sổ đo lường + bảng kê, ADR-0024 điểm kiểm soát xuất) ---
+components:
+  schemas:
+# @ag-order: 354
+    ShareKind:
+      type: string
+      enum: [cooperative_directory, plot_directory, season_harvest_dates, htx_collection_responses, waterway_routes, valve_hub, valve_collection, valve_mrv_evidence, dp_collection_volume, dp_hub_capacity, dp_mrv_package_status]
+# @ag-order: 355
+    ShareGrant:
+      type: object
+      required: [id, grantor_tenant_id, grantee_tenant_id, kinds, purpose, valid_from, valid_to, status, proposed_by, proposed_at, approved_by, approved_at, revoked_by, revoked_at, revoke_reason, grant_class, legacy_terms, module_table, scope_node_ref, purpose_code, basis_ref, last_reviewed_at, last_reviewed_by, review_due_at]
+      properties:
+        id: {type: string, format: uuid}
+        grantor_tenant_id: {type: string, format: uuid}
+        grantee_tenant_id: {type: string, format: uuid}
+        kinds: {type: array, items: {$ref: "#/components/schemas/ShareKind"}}
+        purpose: {type: string}
+        valid_from: {type: string, format: date-time}
+        valid_to: {type: string, format: date-time}
+        status: {type: string, enum: [proposed, active, revoked]}
+        proposed_by: {type: string, format: uuid}
+        proposed_at: {type: string, format: date-time}
+        approved_by: {type: [string, "null"], format: uuid}
+        approved_at: {type: [string, "null"], format: date-time}
+        revoked_by: {type: [string, "null"], format: uuid}
+        revoked_at: {type: [string, "null"], format: date-time}
+        revoke_reason: {type: [string, "null"]}
+        grant_class: {$ref: "#/components/schemas/ShareGrantClass"}
+        legacy_terms: {type: boolean, description: "true = cấp phép trước v2 (không có điều khoản v2, coi là partner)"}
+        module_table: {type: [string, "null"]}
+        scope_node_ref: {type: [string, "null"], format: uuid}
+        purpose_code: {type: [string, "null"]}
+        basis_ref: {type: [string, "null"]}
+        last_reviewed_at: {type: [string, "null"], format: date-time}
+        last_reviewed_by: {type: [string, "null"], format: uuid}
+        review_due_at: {type: [string, "null"], format: date-time, description: "Hạn rà soát kế tiếp (chỉ cấp phép đang hiệu lực)"}
+# @ag-order: 356
+    ShareGrantClass:
+      type: string
+      enum: [intra_platform, partner]
+      description: "ADR-0030 mục 3: intra_platform = đọc tại chỗ qua share_scope; partner = MKG/bên thứ ba (ADR-0020)"
+# @ag-order: 357
+    ShareGrantReview:
+      type: object
+      required: [id, grant_id, seq, decision, note, actor_ref, event_time, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        grant_id: {type: string, format: uuid}
+        seq: {type: integer}
+        decision: {type: string, enum: [retain, revoke]}
+        note: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+# @ag-order: 358
+    ShareGrantReviewResult:
+      type: object
+      required: [review, grant]
+      properties:
+        review: {$ref: "#/components/schemas/ShareGrantReview"}
+        grant: {$ref: "#/components/schemas/ShareGrant"}
+# @ag-order: 359
+    ShareGrantRead:
+      type: object
+      required: [id, seq, grantee_tenant_id, kind, endpoint, query, item_count, actor_ref, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        grantee_tenant_id: {type: string, format: uuid}
+        kind: {$ref: "#/components/schemas/ShareKind"}
+        endpoint: {type: string}
+        query: {type: [string, "null"]}
+        item_count: {type: integer}
+        actor_ref: {type: string, format: uuid, description: "sub của tài khoản dịch vụ bên nhận"}
+        recorded_at: {type: string, format: date-time}
+    # --- hết pf/party cấp quyền chia sẻ ---
+    # --- pf/party KN v7.7 gói P2 ---
+# @ag-order: 360
+    KNDepartment:
+      type: object
+      required: [id, org_ref, code, name, description, sort_order, status, status_label, menu_profile, retired, selectable, account_count, record_count, updated_by, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid, description: "Đơn vị: Nút cấp 1 (ttkn_national) hoặc cấp 2 (ttkn_province)"}
+        code: {type: string, pattern: "^[a-z][a-z0-9_]{1,39}$", description: "Mã phòng ban — department_code của mọi bản ghi KN mới"}
+        name: {type: string}
+        description: {type: [string, "null"]}
+        sort_order: {type: integer}
+        status: {type: string, enum: [active, not_open, suspended], description: "Đang áp dụng / Chưa mở / Ngưng hoạt động"}
+        status_label: {type: string}
+        menu_profile: {type: string, enum: [trong_trot, generic, chan_nuoi_thuy_san, ke_hoach_tai_chinh, thong_tin_truyen_thong, hanh_chinh_tong_hop], description: "Bộ menu dựng sẵn trong mã (kn.menu/v3); generic + mã có khuôn riêng → khuôn riêng"}
+        retired: {type: boolean, description: "Đã xóa (sự kiện retired) — mã không tái sử dụng"}
+        selectable: {type: boolean, description: "Chọn được ở bước 2 đăng nhập (Đang áp dụng, chưa xóa)"}
+        account_count: {type: [integer, "null"], description: "null = chưa nối nguồn đếm (P1) hoặc Application API"}
+        record_count: {type: [integer, "null"]}
+        updated_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 361
+    KNDepartmentList:
+      type: object
+      required: [org_ref, items]
+      properties:
+        org_ref: {type: string, format: uuid}
+        items: {type: array, items: {$ref: "#/components/schemas/KNDepartment"}}
+# @ag-order: 362
+    KNRegion:
+      type: object
+      required: [id, province_code, code, name, sort_order, active, deactivation_reason, commune_count, updated_by, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        province_code: {type: string}
+        code: {type: string}
+        name: {type: string}
+        sort_order: {type: integer}
+        active: {type: boolean}
+        deactivation_reason: {type: [string, "null"]}
+        commune_count: {type: integer, description: "Số Nút xã đang hoạt động được gán"}
+        updated_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 363
+    KNRegionList:
+      type: object
+      required: [province_code, items, assigned_communes]
+      properties:
+        province_code: {type: string}
+        items: {type: array, items: {$ref: "#/components/schemas/KNRegion"}}
+        assigned_communes: {type: integer, description: "Σ commune_count"}
+# @ag-order: 365
+    KNOrgTreeNode:
+      type: object
+      required: [ref, kind, code, name, admin_unit_code, level, active, region, commune_count, children]
+      properties:
+        ref: {type: [string, "null"], format: uuid, description: "null với nhóm khu vực"}
+        kind: {type: string, enum: [ttkn_national, ttkn_province, extension_team, region, region_unassigned]}
+        code: {type: string}
+        name: {type: string}
+        admin_unit_code: {type: [string, "null"]}
+        level: {type: integer, description: "1 TTKNQG, 2 TTKN tỉnh, 3 Xã; 0 với nhóm khu vực"}
+        active: {type: boolean}
+        region:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/KNRegionRef"
+        commune_count: {type: integer}
+        children: {type: array, items: {$ref: "#/components/schemas/KNOrgTreeNode"}}
+    # --- hết pf/party KN v7.7 gói P2 (chung) ---
+# @ag-order: 366
+    KNDepartmentInput:
+      type: object
+      required: [org_ref, code, name]
+      properties:
+        org_ref: {type: string, format: uuid}
+        code: {type: string, pattern: "^[a-z][a-z0-9_]{1,39}$"}
+        name: {type: string, minLength: 1, maxLength: 200}
+        description: {type: string, maxLength: 1000}
+        sort_order: {type: integer, minimum: 0, maximum: 100000}
+        status: {type: string, enum: [active, not_open, suspended], default: not_open}
+        menu_profile: {type: string, enum: [trong_trot, generic], default: generic}
+# @ag-order: 368
+    KNLogEntry:
+      type: object
+      required: [seq, event, actor_ref, actor_display, at, recorded_at, changes, reason]
+      properties:
+        seq: {type: integer}
+        event: {type: string}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: [string, "null"], description: "Tên tra lúc đọc từ actor_ref (RB-3), null khi chưa nối danh bạ"}
+        at: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        changes: {type: array, items: {$ref: "#/components/schemas/KNFieldChange"}}
+        reason: {type: [string, "null"]}
+# @ag-order: 369
+    ModuleEnablement:
+      type: object
+      description: Trạng thái bật một module cho tenant (W1.4, R-MOD-08)
+      required: [module, kind, enable, enabled, reason, updated_by, updated_at]
+      properties:
+        module: {type: string, description: "Tên repo, vd pf/geo"}
+        kind: {type: string, enum: [kernel, capability, domain]}
+        enable: {type: string, enum: [always, per_tenant]}
+        enabled: {type: boolean}
+        reason: {type: [string, "null"]}
+        updated_by: {type: [string, "null"], format: uuid}
+        updated_at: {type: [string, "null"], format: date-time}
+# @ag-order: 370
+    KNLogPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNLogEntry"}}
+        next_cursor: {type: [integer, "null"]}
+# @ag-order: 371
+    KNImpactRow:
+      type: object
+      required: [kind, label, count, available]
+      properties:
+        kind: {type: string, enum: [accounts, cooperatives, plots, open_periods]}
+        label: {type: string}
+        count: {type: [integer, "null"], description: "null khi chưa nối nguồn đếm"}
+        area_ha: {type: string, description: "Thửa ruộng: tổng diện tích (decimal)"}
+        available: {type: boolean}
+# @ag-order: 372
+    KNImpact:
+      type: object
+      required: [org, communes, rows, warnings, movable]
+      properties:
+        org: {$ref: "#/components/schemas/PartyOrg"}
+        communes: {type: array, items: {type: string}}
+        rows: {type: array, items: {$ref: "#/components/schemas/KNImpactRow"}}
+        warnings: {type: array, items: {type: string}}
+        movable: {type: boolean, description: "false với Nút cấp 1, 2"}
+    # --- hết pf/party cấp quyền chia sẻ ---
+    # --- pf/metering ---

@@ -8,7 +8,9 @@
 #        agrigreen-dev-edge-proposer  vai scale_supervisor  (đề xuất)
 #        agrigreen-dev-edge-approver  vai device_approver   (duyệt — sub khác người đề xuất)
 #      Token mang aud agrigreen-api, tenant_id MKG dev cố định và amr [pwd, otp]: tài khoản
-#      dịch vụ không có yếu tố thứ hai thật, claim này chỉ được phép ở realm Local/CI;
+#      dịch vụ không có yếu tố thứ hai thật, claim này chỉ được phép ở realm Local/CI. Hai client
+#      bỏ scope mặc định agrigreen-claims: mapper amr (oidc-amr-mapper) của scope đó cho [] với
+#      client_credentials và ghi đè amr gắn cứng theo thứ tự không cố định (lúc proposer, lúc approver);
 #   2. đọc device_id, epoch, khóa công khai, cert_sha256 từ `edge-agent info` trong container
 #      edge-sim (khóa riêng không rời volume);
 #   3. đề xuất kỳ (POST /v1/measurement/devices) rồi duyệt (…/epochs/<n>/decision);
@@ -46,6 +48,10 @@ export MSYS_NO_PATHCONV=1   # Git Bash: không đổi /opt/... thành đường 
 kc() { $COMPOSE exec -T keycloak /opt/keycloak/bin/kcadm.sh "$@"; }
 kc config credentials --server http://localhost:8080 --realm master --user admin --password "$KEYCLOAK_ADMIN_PASSWORD" > /dev/null 2>&1
 
+CLAIMS_SCOPE=$(kc get client-scopes -r agrigreen --fields id,name --format csv --noquotes | tr -d '\r' | \
+  awk -F, '$2 == "agrigreen-claims" { print $1 }')
+[ -n "$CLAIMS_SCOPE" ] || { echo "realm agrigreen thiếu client scope agrigreen-claims" >&2; exit 1; }
+
 # token <clientId> <vai> → in access token (tạo client + mapper nếu chưa có; đổi secret mỗi lần).
 token() {
   cid=$(kc get clients -r agrigreen -q clientId="$1" --fields id --format csv --noquotes | tr -d '\r')
@@ -65,6 +71,8 @@ token() {
       -s 'config."claim.value"="[\"pwd\",\"otp\"]"' -s 'config."jsonType.label"=JSON' -s 'config."access.token.claim"=true' > /dev/null
     kc add-roles -r agrigreen --uusername "service-account-$1" --rolename "$2" > /dev/null
   fi
+  # Ngoài khối tạo: client từ lần chạy trước cũng được gỡ. Chưa gắn → kcadm báo lỗi, bỏ qua.
+  kc delete "clients/$cid/default-client-scopes/$CLAIMS_SCOPE" -r agrigreen > /dev/null 2>&1 || true
   secret=$(head -c 24 /dev/urandom | od -An -v -tx1 | tr -d ' \n')
   kc update "clients/$cid" -r agrigreen -s "secret=$secret" > /dev/null
   curl -fsS --retry 10 --retry-delay 2 --retry-all-errors -X POST "$KC/realms/agrigreen/protocol/openid-connect/token" \

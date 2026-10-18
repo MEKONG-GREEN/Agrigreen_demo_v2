@@ -23,6 +23,7 @@ provides:
     - CoopMachineCounts
     - CoopMarkers
     - CoopProfiles
+    - CooperativeRegistrar
     - DepartmentUsage
     - Departments
     - FormAvailability
@@ -53,7 +54,7 @@ provides:
     - pf.party.share_grant.revoked/v1
     - pf.party.share_read.recorded/v1
   internal_events: []
-  publications: []
+  publications: [pf_party_pub.org_tree/v1]
   data_products: []
 consumes:
   events: []
@@ -68,5 +69,5 @@ permissions:
     - mkg_sync
     - registry_admin
 shares: []
-owns_schema: [pf_party]
+owns_schema: [pf_party, pf_party_pub]
 enable: always

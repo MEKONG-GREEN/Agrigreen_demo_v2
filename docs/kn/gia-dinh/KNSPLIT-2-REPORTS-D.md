@@ -1,0 +1,9 @@
+## KNSPLIT-2-REPORTS-D — Gỡ adapter realm và cấu hình cũ
+
+Nền dev08121510 đã đăng ký Policy ở API, hai worker, KN77; fixture handler dùng contribution hiện hành. Bước D bỏ global knRoles/htxRoles/allReaders/schedulers/rolesFor/coopOnly và formReaders, bỏ fallback nil-Policies, bỏ legacyAttachmentLimitParam cùng hai import KN trong production reports. Native roles CGH/HTX/quản trị giữ nguyên; thiếu registry chỉ có native grants. Tham số attachment chỉ tra key đã đăng ký, nếu không có key dùng giới hạn mặc định capability mà không tra tham số ngầm.
+
+TestReportPolicyRequiresRegistration trước sửa đỏ (red2392.exit1): thiếu registry vẫn cấp quyền đọc/lập lịch/form/nguồn, nới scope tài khoản trộn HTX và tra attachment key; empty registry đã đúng. Sau sửa pure-second.exit0/app1.630s,0SKIP: các ca âm, anonymous/session, bất biến registry và ma trận10vai + mixed HTX. Parity với adapter cũ đã được chứng minh ở C; D thay oracle bị xóa bằng ma trận kỳ vọng cố định, không import KN vào core test. Pure-first chỉ thiếu import domain cho FieldError, đã khôi phục; không tính là businessproof.
+
+Chỉ co baseline sau khi xác nhận đúng hai import đã gỡ, không thêm/sửa alias hay ngoại lệ. Cần fullPG13package/consumer + CODEX-G1/helper migration trước tích hợp. Không đổi API/SQL/UI, tenant/D2/MRV/M1–M7. Catalog Sources/BuiltinTemplates, dataset dựng số KN và một số seed vẫn cần registry gói tiếp theo; D không tuyên bố toàn bộ reports đã tách xong.
+
+Kết quả thực: PG65853.exit0 đủ13/13package,0FAIL/SKIP (handler:124.084s, assembly:107.913s, worker:2.382s, kn77:254.394s); production53a19e4d không đổi. Static44159.exit0 đủbuild/vet/modgen/migrate-base/archlint/contract/docs/MFA/boundary388/lint0issues. Gofmt toàn repo chỉ2fixture cũ được phép. Baseline chỉ xóa2entry import đã gỡ. ProofJSON hostTEMP agrigreen-codex-knsplit2reportsd-proof.json. Helper còn kiểm8migrationgate trước tích hợp; source/catalog/seed vẫn có gói tiếp theo.

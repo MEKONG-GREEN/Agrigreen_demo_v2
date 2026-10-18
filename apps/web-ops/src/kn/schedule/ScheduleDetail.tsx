@@ -129,8 +129,8 @@ export function ScheduleDetail({ ws, api, id, backHref, readOnly = false }: { ws
         <div className="alert alert-warn" role="note" style={{ marginBottom: 12 }}>
           <Icon name="alert" />
           <span>
-            {detail.warnings.map((w) => (
-              <div key={w.code}>{w.code === "time_overlap" ? `${w.item_ids.length} mục trùng thời gian (tô vàng).` : w.code === "late_registration" ? "Đăng ký muộn (gửi sau hạn đăng ký)." : w.message}</div>
+            {detail.warnings.map((w, i) => (
+              <div key={`${w.code}-${i}`}>{w.code === "time_overlap" ? `${w.item_ids.length} mục trùng thời gian (tô vàng).` : w.code === "late_registration" ? "Đăng ký muộn (gửi sau hạn đăng ký)." : w.message}</div>
             ))}
           </span>
         </div>
@@ -157,8 +157,49 @@ export function ScheduleDetail({ ws, api, id, backHref, readOnly = false }: { ws
             />
             <section className="lv-block">
               <h2>Mục công tác{diff ? " (bản điều chỉnh)" : ""}</h2>
-              <SessionGrid weekStart={s.week_start} items={detail.items} communeName={communeName} coopName={coopName} caption="Mục công tác của lịch tuần" />
+              <SessionGrid
+                weekStart={s.week_start}
+                items={detail.items.map((it) => ({ ...it, checkin: (detail.checkins ?? []).find((c) => c.item_id === it.id) ?? null }))}
+                communeName={communeName}
+                coopName={coopName}
+                caption="Mục công tác của lịch tuần"
+              />
             </section>
+            {detail.checkin_enabled ? (
+              <section className="lv-block" aria-label="Check-in">
+                <h2>Check-in tại địa điểm</h2>
+                {(detail.checkins ?? []).length === 0 ? (
+                  <p className="mute">Chưa có check-in.</p>
+                ) : (
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Mục</th>
+                        <th>Thời điểm</th>
+                        <th>Cách địa điểm</th>
+                        <th>Sai số GPS</th>
+                        <th>Ghi chú</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(detail.checkins ?? []).map((c) => {
+                        const it = detail.items.find((x) => x.id === c.item_id);
+                        return (
+                          <tr key={c.id}>
+                            <td>{it ? sum(it) : c.item_id.slice(0, 8)}</td>
+                            <td>{formatDateTime(c.captured_at)}</td>
+                            <td>{c.distance_m === null ? "Chưa có tọa độ địa điểm" : `${Math.round(c.distance_m)} m${c.far ? " · xa" : ""}`}</td>
+                            <td>{c.accuracy_m === null ? "—" : `${Math.round(c.accuracy_m)} m${c.weak_accuracy ? " · yếu" : ""}`}</td>
+                            <td>{[c.mock_location ? "vị trí giả lập" : "", c.point_stored && !c.location ? "tọa độ đã hết hạn lưu" : ""].filter(Boolean).join(", ") || "—"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+                {detail.missed_checkin_count ? <p className="mute">{detail.missed_checkin_count} mục công tác ngoài cơ quan đã qua ngày chưa check-in.</p> : null}
+              </section>
+            ) : null}
             <section className="lv-block">
               <RelatedTabs
                 label="Liên quan"

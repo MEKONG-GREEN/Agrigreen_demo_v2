@@ -1,6 +1,6 @@
 // Package notify là module thông báo pf/notify (ADR-0015): hộp thư trong app theo
 // người nhận, token đẩy gắn với thiết bị pf/sync, thông điệp đẩy CHỈ dữ liệu (FCM,
-// RB-7), email tóm tắt chỉ đạo khẩn (SMTP trong lãnh thổ), đồng bộ ngay theo yêu
+// RB-7), email tóm tắt do nguồn đăng ký (SMTP trong lãnh thổ), đồng bộ ngay theo yêu
 // cầu (US-SYNC-02), entity đồng bộ "notification".
 //
 // Người nhận được tìm không cần dữ liệu cá nhân: danh sách actor_ref trong sự kiện
@@ -20,10 +20,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
@@ -52,10 +52,15 @@ var DBModule = db.Module("pf/notify")
 // thiếu Staff → dùng thông báo chủ đề; thiếu Units → không mở rộng tỉnh ra xã;
 // thiếu Pusher → consumer gửi đẩy lỗi (vào DLQ); thiếu Mailer → tắt email tóm tắt.
 type Deps struct {
-	Scope   partyport.ScopeResolver
-	Devices syncport.Devices
-	Staff   port.StaffDirectory
-	Units   partyport.AdminUnits
+	Kinds     []port.KindRegistration
+	Digests   []port.DigestRegistration
+	Builders  []port.EventBuilderRegistration
+	Renderers []port.EventRendererRegistration
+	Consumers []port.ConsumerRegistration
+	Scope     partyport.ScopeResolver
+	Devices   syncport.Devices
+	Staff     port.StaffDirectory
+	Units     partyport.AdminUnits
 	// Farmers (tùy chọn): nông dân có thửa trong địa bàn cảnh báo khẩn (HTX US-NEWS-03).
 	Farmers  port.AreaFarmers
 	Pusher   channel.Pusher
@@ -67,6 +72,12 @@ type Deps struct {
 	NudgeHourly   int
 	// SyncEntities: entity chiều xuống của pf/sync để kiểm entities[] của POST /v1/sync/nudge.
 	SyncEntities []string
+	// Emails (gói NOTIF): tra email người nhận lúc gửi (pf/accounts — Keycloak); nil → không gửi email theo người nhận.
+	Emails port.EmailDirectory
+	// EmailMailer (gói NOTIF): kênh email theo người nhận (Channels.EmailMailer); nil → Mailer.
+	EmailMailer channel.Mailer
+	// LinkBase: gốc URL web-ops cho liên kết trong email (AG_WEB_OPS_URL).
+	LinkBase string
 }
 
 // Channels là kênh gửi ra ngoài đọc từ môi trường (cho cmd/worker).
@@ -74,6 +85,9 @@ type Channels struct {
 	Pusher   channel.Pusher
 	Mailer   channel.Mailer // nil khi chưa đặt AG_SMTP_HOST
 	DigestTo []string
+	// EmailMailer (gói NOTIF): kênh email theo người nhận — SMTP khi đặt AG_SMTP_HOST, không thì LogMailer (chỉ ghi log
+	// số người nhận + tiêu đề, Local/Dev). Bên gọi còn phải nối Deps.Emails thì mới gửi.
+	EmailMailer channel.Mailer
 }
 
 // ChannelsFromEnv: AG_FCM_* → FCM HTTP v1 (không đặt → chỉ ghi log);
@@ -88,23 +102,40 @@ func ChannelsFromEnv(log *slog.Logger) (Channels, error) {
 	if err != nil {
 		return Channels{}, err
 	}
+	out.EmailMailer = channel.LogMailer{Log: log}
 	if m != nil {
-		out.Mailer = m
+		out.Mailer, out.EmailMailer = m, m
 	}
 	return out, nil
 }
 
 // Module là pf/notify đã nối.
-type Module struct{ svc *app.Service }
+type Module struct {
+	svc       *app.Service
+	consumers *consumerRegistry
+}
 
 // New tạo module trên pool b: vai đăng nhập của đơn vị triển khai (app_platform, app_worker) hoặc vai cũ
 // notify_app. Mọi giao dịch module tự mở chạy dưới vai r_notify (db.ForModule).
 func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
-	return &Module{svc: app.NewService(db.ForModule(b, DBModule), clk, app.Deps{
+	m := &Module{svc: app.NewService(db.ForModule(b, DBModule), clk, app.Deps{
 		Scope: d.Scope, Devices: d.Devices, Staff: d.Staff, Units: d.Units, Farmers: d.Farmers, Pusher: d.Pusher, Mailer: d.Mailer,
 		DigestTo: d.DigestTo, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
-		SyncEntities: d.SyncEntities,
+		SyncEntities: d.SyncEntities, Emails: d.Emails, EmailMailer: d.EmailMailer, LinkBase: d.LinkBase,
 	})}
+	m.svc.RegisterKinds(d.Kinds, nativeNotificationKinds())
+	m.consumers = newConsumerRegistry(m.nativeConsumers(), d.Consumers)
+	var subscribed, native []string
+	for _, c := range m.Consumers() {
+		subscribed = append(subscribed, c.Events...)
+	}
+	for _, c := range m.nativeConsumers() {
+		native = append(native, c.consumer.Events...)
+	}
+	m.svc.RegisterEventRenderers(d.Renderers, subscribed, native)
+	m.svc.RegisterEventBuilders(d.Builders, subscribed, native)
+	m.svc.RegisterDigestPolicies(d.Digests, subscribed, native)
+	return m
 }
 
 // RegisterApp gắn route Application API.
@@ -133,25 +164,23 @@ type Consumer struct {
 
 // Consumers trả consumer của module, một consumer mỗi nhóm sự kiện (mục 6). Mọi
 // handler idempotent qua shared.inbox; lỗi → giao lại rồi DLQ (R-62).
-func (m *Module) Consumers() []Consumer {
+func (m *Module) Consumers() []Consumer { return m.consumers.consumers(m.svc.HandleEvent) }
+
+// nativeConsumers declares only capability-owned subscriptions. Stable positions preserve the
+// assembled catalog order when an application registers its source-event groups.
+func (m *Module) nativeConsumers() []orderedConsumer {
 	ev := m.svc.HandleEvent
-	return []Consumer{
-		{Name: port.ConsumerDirective, Events: []string{extport.EventDirectiveIssued}, Handler: ev},
-		{Name: port.ConsumerContent, Events: []string{contentport.EventAlertPublished, contentport.EventDocumentPublished}, Handler: ev},
-		{Name: port.ConsumerTask, Events: []string{extport.EventTaskEscalated, extport.EventTaskCreated}, Handler: ev},
-		{Name: port.ConsumerSync, Events: []string{syncport.EventConflictOpened, syncport.EventDeviceRevoked}, Handler: ev},
-		{Name: port.ConsumerParty, Events: []string{partyport.EventOrgDeactivated, coopport.EventHouseholdRegistered,
-			coopport.EventHouseholdMembershipChanged}, Handler: ev},
-		{Name: port.ConsumerCropCycle, Events: []string{coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened,
-			ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived}, Handler: ev},
-		{Name: port.ConsumerReportCycle, Events: []string{extport.EventReportBatchIssued, extport.EventReportTaskReminded,
-			extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened}, Handler: ev},
-		{Name: port.ConsumerIntegration, Events: []string{syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale}, Handler: ev},
-		{Name: port.ConsumerMRV, Events: []string{mrvport.EventAlertRaised}, Handler: ev},
-		{Name: port.ConsumerWorkSchedule, Events: []string{extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed,
-			extport.EventWorkScheduleReminded}, Handler: ev},
-		{Name: port.ConsumerEgressAnomaly, Events: []string{meteringport.EventEgressAnomaly}, Handler: ev},
-		{Name: port.ConsumerPush, Events: []string{port.EventPushRequested}, Handler: m.svc.HandlePush},
+	return []orderedConsumer{
+		{order: 2, consumer: Consumer{Name: port.ConsumerContent, Events: []string{contentport.EventAlertPublished, contentport.EventDocumentPublished}, Handler: ev}},
+		{order: 4, consumer: Consumer{Name: port.ConsumerSync, Events: []string{syncport.EventConflictOpened, syncport.EventDeviceRevoked}, Handler: ev}},
+		{order: 5, consumer: Consumer{Name: port.ConsumerParty, Events: []string{partyport.EventOrgDeactivated, coopport.EventHouseholdRegistered, coopport.EventHouseholdMembershipChanged}, Handler: ev}},
+		{order: 6, consumer: Consumer{Name: port.ConsumerCropCycle, Events: []string{coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened, ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived}, Handler: ev}},
+		{order: 8, consumer: Consumer{Name: port.ConsumerIntegration, Events: []string{syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale}, Handler: ev}},
+		{order: 9, consumer: Consumer{Name: port.ConsumerMRV, Events: []string{mrvport.EventAlertRaised}, Handler: ev}},
+		{order: 11, consumer: Consumer{Name: port.ConsumerEgressAnomaly, Events: []string{meteringport.EventEgressAnomaly}, Handler: ev}},
+		{order: 14, consumer: Consumer{Name: port.ConsumerAccounts, Events: []string{accport.EventUserDormantWarning}, Handler: ev}},
+		{order: 15, consumer: Consumer{Name: port.ConsumerPush, Events: []string{port.EventPushRequested}, Handler: m.svc.HandlePush}},
+		{order: 16, consumer: Consumer{Name: port.ConsumerEmail, Events: []string{port.EventEmailRequested}, Handler: m.svc.HandleEmail}},
 	}
 }
 
@@ -161,16 +190,24 @@ func (m *Module) EventHandler() inbox.Handler { return m.svc.HandleEvent }
 // PushHandler là handler của pf.notify.push.requested.
 func (m *Module) PushHandler() inbox.Handler { return m.svc.HandlePush }
 
+// EmailHandler là handler của pf.notify.email.requested (gói NOTIF).
+func (m *Module) EmailHandler() inbox.Handler { return m.svc.HandleEmail }
+
 // DigestTenants dựng bộ tìm tenant có email tóm tắt chờ gửi từ pool vai
 // ag_ops_jobs (worker, nối thẳng).
 func DigestTenants(pool *pgxpool.Pool) app.TenantLister {
 	return func(ctx context.Context) ([]uuid.UUID, error) { return store.PendingDigestTenants(ctx, pool) }
 }
 
-// Jobs trả job định kỳ (chỉ chạy ở leader): email tóm tắt chỉ đạo khẩn mỗi giờ.
+// Jobs returns only explicitly registered digest jobs (leader only).
 func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job {
+	definition, configured := m.svc.DigestJobDefinition()
+	if !configured {
+		return nil
+	}
+
 	return []schedule.Job{{
-		Name: port.JobEmailDigest, Spec: schedule.Every{Interval: time.Hour}, RunOnStart: false, Timeout: 10 * time.Minute,
+		Name: definition.Name, Spec: schedule.Every{Interval: definition.Every}, RunOnStart: definition.RunOnStart, Timeout: definition.Timeout,
 		Run: func(ctx context.Context) error {
 			n, err := m.svc.RunEmailDigest(ctx, tenants)
 			if log != nil {
@@ -178,7 +215,7 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 				if err != nil {
 					outcome = "error"
 				}
-				log.Info("email tóm tắt chỉ đạo khẩn", "event", "job."+port.JobEmailDigest, "sent", n, "outcome", outcome)
+				log.Info(definition.LogMessage, "event", "job."+definition.Name, "sent", n, "outcome", outcome)
 			}
 			return err
 		},

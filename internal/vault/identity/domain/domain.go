@@ -29,6 +29,12 @@ const (
 	OpLookup  = "lookup"
 	OpUnwrap  = "unwrap"
 	OpErase   = "erase"
+	// W11.22 (vault 000004): sửa định danh, ghi/đọc ngăn hồ sơ.
+	OpAmend        = "amend"
+	OpSectionWrite = "section_write"
+	OpSectionRead  = "section_read"
+	// W11.23 (vault 20261013165158): đọc thẻ danh bạ theo lô (họ tên, SĐT, năm sinh, email — chỉ trường được hỏi).
+	OpCard = "card"
 )
 
 // Kết quả ghi vào sổ truy cập (vault.access_log.outcome).
@@ -185,15 +191,24 @@ func ValidPurpose(s string) bool { return purposeRe.MatchString(s) }
 // (pf/party, pf/accounts, pf/geo farmerid, pf/mechanization, pf/sync files) — mục
 // đích ngoài danh mục bị từ chối dù đúng dạng, để token bị lộ không thể "khai" mục
 // đích tùy ý mà dò SĐT/CCCD. Thêm mục đích mới = sửa danh mục này + kiểm thử.
+//
+// W11.22: hồ sơ nhân sự HCTH (pf/hrm) dùng PurposeHRMProfile cho định danh và ngăn hrm.profile, PurposeHRMSensitive CHỈ
+// cho ngăn hrm.sensitive (thẻ Thống kê BC Sở) — ngăn gắn cứng với mục đích (SectionPurpose).
 var opPurposes = map[string]map[string]bool{
-	OpCreate: set("registry.admin", "registry.dedup", "extension.contact", "mechanization.owner"),
-	OpLookup: set("registry.admin", "registry.dedup"),
-	// Resolve (định danh đầy đủ): quản trị hồ sơ, liên hệ hộ, khuyến nông hỗ trợ hộ.
-	OpResolve: set("registry.admin", "extension.contact", "extension.field_support"),
+	OpCreate: set("registry.admin", "registry.dedup", "extension.contact", "mechanization.owner", PurposeHRMProfile,
+		PurposeContactDirectory),
+	OpLookup: set("registry.admin", "registry.dedup", PurposeHRMProfile),
+	// Resolve (định danh đầy đủ): quản trị hồ sơ, liên hệ hộ, khuyến nông hỗ trợ hộ, hồ sơ nhân sự.
+	OpResolve: set("registry.admin", "extension.contact", "extension.field_support", PurposeHRMProfile),
 	OpDisplay: set("registry.admin", "extension.contact", "extension.field_support",
-		"mechanization.owner", "mrv.evidence"),
-	// Unwrap (mở DEK ảnh): đúng tập mục đích tệp của pf/sync (FilePurposes).
-	OpUnwrap: set("mrv.evidence", "extension.field_support"),
+		"mechanization.owner", "mrv.evidence", PurposeHRMProfile),
+	OpAmend:        set(PurposeHRMProfile, PurposeContactDirectory),
+	OpSectionWrite: set(PurposeHRMProfile, PurposeHRMSensitive, PurposeContactDirectory),
+	OpSectionRead:  set(PurposeHRMProfile, PurposeHRMSensitive, PurposeContactDirectory),
+	// W11.23: thẻ danh bạ (pf/contact, FN-13) — CHỈ mục đích danh bạ.
+	OpCard: set(PurposeContactDirectory),
+	// Unwrap (mở DEK ảnh): đúng tập mục đích tệp của pf/evidence (domain.Purposes). W11.24: tài liệu nhân sự (hr_records).
+	OpUnwrap: set("mrv.evidence", "extension.field_support", "hr_records"),
 	OpErase:  set("registry.erasure"),
 }
 
@@ -224,7 +239,104 @@ func ValidReason(s string) bool {
 	return n >= 10 && n <= 500
 }
 
+// Mục đích của hồ sơ nhân sự (W11.22).
+const (
+	PurposeHRMProfile   = "hrm.profile"   // hồ sơ nhân sự: định danh + ngăn hrm.profile
+	PurposeHRMSensitive = "hrm.sensitive" // thẻ Thống kê BC Sở (TK-01..06) — chỉ ngăn hrm.sensitive
+	// PurposeContactDirectory (W11.23, Q-071 — đề xuất của dev: mục đích riêng "danh bạ liên hệ", có thông báo chủ thể):
+	// thẻ danh bạ của pf/contact và định danh + ngăn contact.card của liên hệ ngoài tỉnh.
+	PurposeContactDirectory = "contact.directory"
+)
+
+// Ngăn hồ sơ (vault.section, vault 000004).
+const (
+	SectionHRMProfile   = "hrm.profile"
+	SectionHRMSensitive = "hrm.sensitive"
+	SectionContactCard  = "contact.card" // W11.23: email, năm sinh của liên hệ ngoài tỉnh
+)
+
+// sections: ngăn → mục đích DUY NHẤT được đọc/ghi + trường được phép (độ dài tối đa theo rune). Trường lạ bị từ chối
+// để ngăn không thành chỗ chứa tùy ý.
+var sections = map[string]struct {
+	purpose string
+	fields  map[string]int
+}{
+	SectionHRMProfile: {PurposeHRMProfile, map[string]int{
+		"birth_date": 10, "birth_precision": 5, "gender": 6, "email": 254, "note": 1000,
+	}},
+	SectionHRMSensitive: {PurposeHRMSensitive, map[string]int{
+		"ethnicity": 40, "religion": 40, "party_date": 10, "party_precision": 5, "hometown": 300, "birthplace": 300,
+		"revolution_date": 10, "revolution_precision": 5,
+	}},
+	SectionContactCard: {PurposeContactDirectory, map[string]int{"email": 254, "birth_year": 4}},
+}
+
+// ErrSection: ngăn không có hoặc trường không thuộc ngăn / quá dài. Thông báo không chứa giá trị (R-14).
+var ErrSection = errors.New("ngăn hoặc trường không hợp lệ")
+
+// SectionPurpose trả mục đích duy nhất của ngăn; ok = false nếu không có ngăn.
+func SectionPurpose(section string) (string, bool) {
+	s, ok := sections[section]
+	return s.purpose, ok
+}
+
+// ValidSectionFields kiểm tên trường và độ dài theo ngăn; lỗi là FieldError (tên trường, không có giá trị).
+func ValidSectionFields(section string, fields map[string]string) error {
+	s, ok := sections[section]
+	if !ok {
+		return FieldError{Field: "section", Err: ErrSection}
+	}
+	for k, v := range fields {
+		limit, ok := s.fields[k]
+		if !ok || utf8.RuneCountInString(v) > limit {
+			return FieldError{Field: k, Err: ErrSection}
+		}
+	}
+	return nil
+}
+
 // AAD gắn bản mã với đúng (tenant, chủ thể, mục dùng) để không đổi chỗ bản mã giữa các dòng.
 func AAD(use string, tenant, ref uuid.UUID) []byte {
 	return []byte("ag-vault/" + use + "/" + tenant.String() + "/" + ref.String())
+}
+
+// --- W11.23: thẻ danh bạ (OpCard). ---
+
+// Trường của thẻ danh bạ. Kho chỉ trả trường được hỏi; KHÔNG BAO GIỜ trả CCCD, địa chỉ hay trường khác của ngăn hồ sơ
+// (giới tính, ngày sinh đầy đủ, ghi chú, thẻ Thống kê BC Sở).
+const (
+	CardFullName  = "full_name"
+	CardPhone     = "phone"
+	CardBirthYear = "birth_year"
+	CardEmail     = "email"
+)
+
+// MaxCardRefs là số chủ thể tối đa của một lần đọc thẻ.
+const MaxCardRefs = 200
+
+// ValidCardFields kiểm tập trường được hỏi (không rỗng, không lạ, không lặp).
+func ValidCardFields(fields []string) bool {
+	if len(fields) == 0 || len(fields) > 4 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, f := range fields {
+		switch f {
+		case CardFullName, CardPhone, CardBirthYear, CardEmail:
+		default:
+			return false
+		}
+		if seen[f] {
+			return false
+		}
+		seen[f] = true
+	}
+	return true
+}
+
+var yearRe = regexp.MustCompile(`^[0-9]{4}`)
+
+// BirthYear trả năm của ngày sinh dạng YYYY, YYYY-MM hoặc YYYY-MM-DD (FN-13 BR-04: chỉ hiển thị năm); "" nếu không rõ.
+func BirthYear(s string) string {
+	return yearRe.FindString(strings.TrimSpace(s))
 }

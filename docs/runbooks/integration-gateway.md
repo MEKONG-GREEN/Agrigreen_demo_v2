@@ -162,10 +162,43 @@ Job `fieldops_directory_feed` (`AG_MKG_JOBS`, cần `AG_MKG_TENANT_ID`) kéo hai
 1. Bật job feed, giữ `AG_FIELDOPS_DIRECTORY_SOURCE=partner`.
 2. Theo dõi log `fieldops.directory_source_compare` (`outcome=match`) và `fieldops.directory_source_diff` (`kind` = `feed_missing` | `legacy_absent` | `mismatch`, `field`). Khác biệt kéo dài quá một chu kỳ dựng (15 phút) + một chu kỳ làm mới bản sao cũ → điều tra (cấp quyền khác nhau giữa hai đường, dữ liệu bên cấp đổi giữa hai lượt).
 3. Khớp liên tục ≥ 14 ngày → đặt `AG_FIELDOPS_DIRECTORY_SOURCE=feed`, khởi động lại `api-internal`. Lùi: đặt lại `partner`.
-4. Điều kiện W5.10 (ADR-0033 §7.3) thêm metric `partner_legacy_calls_total` = 0 (chưa có — xem ghi lệch W5.5).
+4. Điều kiện W5.10 (ADR-0033 §7.3) thêm metric `ag_partner_legacy_calls_total` = 0 — xem mục kế tiếp.
 
 **Sự cố.**
 - Log job `outcome=revoked`: cổng trả 403 `party.share_grant_missing` — bên cấp thu hồi / cấp quyền hết hạn. Bản sao feed đã xóa; ở nguồn `feed` mọi lệnh gom mới bị từ chối `fieldops.htx_not_found`. Cấp lại → lượt sau đọc lại từ đầu.
 - Log job `outcome=stale` / lệnh gom có cảnh báo `fieldops.directory_stale`: dữ liệu quá `max_age` (PT6H) — cổng ngừng, khóa hết hạn (401), hạn mức (429), hoặc job dựng phía nền tảng ngừng (as_of không tiến). Xem `last_error` trong `mkg_fieldops.directory_feed_state`.
 - 410 `integration.cursor_expired`: bộ điều hợp tự xóa và đọc lại từ đầu trong cùng lượt (feed lớp `partner` không có ảnh chụp; phần còn giữ là trạng thái đầy đủ).
 - Đồng bộ lại tay: xóa dòng trạng thái của feed (`DELETE FROM mkg_fieldops.directory_feed_state WHERE feed = …` dưới vai `r_fieldops`, tenant MKG) và bản ghi tương ứng — lượt sau đọc từ đầu. Bảng đệm, không phải nguồn sự thật.
+
+## Ngừng dùng `/v1/partner/*` và danh sách cutover W5.10 (ADR-0033 §7.2–§7.4)
+
+`api-platform` gắn vào MỌI phản hồi của route `/v1/partner/*` đã khớp (kể cả 401/403):
+
+| Header | Giá trị |
+|---|---|
+| `Deprecation` | `@1791504000` (RFC 9745 — mốc W5.5, 09/10/2026 00:00 UTC; hằng `assembly.PartnerDeprecatedAt`) |
+| `Sunset` | `AG_PARTNER_SUNSET` dạng HTTP-date (RFC 8594); **không đặt → không phát** |
+| `Link` | `<AG_PARTNER_SUCCESSOR_BASE_URL/v1/feeds/<feed>>; rel="successor-version"` — `cooperatives[/:ref]` → `cooperative_directory`, `plots[/:ref]` → `plot_directory`, `season-harvest-dates` → `season_harvest_dates`, `waterway/route` → `waterway_routes`, `htx-collection/responses` → `bilateral` (feed cặp); `grants` không có kế nhiệm (không Link). Không đặt gốc URL → đường dẫn tương đối gốc (là đường dẫn trên cổng, không phải api-platform) |
+
+| Biến (`api-platform`) | Ý nghĩa |
+|---|---|
+| `AG_PARTNER_SUNSET` | Ngày gỡ dự kiến `YYYY-MM-DD` (hoặc RFC 3339). **Không bắt buộc ở production**: điều kiện gỡ §7.3 là metric + một kỳ phát hành, không phải ngày — đặt khi đã chốt lịch W5.10, để đối tác thấy trước. Sai dạng hoặc không sau mốc ngừng dùng → không khởi động |
+| `AG_PARTNER_SUCCESSOR_BASE_URL` | Gốc URL công khai của cổng (vd `https://partner.<domain>`); production bắt buộc `https` nếu đặt |
+
+Metric: `ag.partner.legacy_calls{route, client}` → Prometheus `ag_partner_legacy_calls_total` (tên `partner_legacy_calls_total` của ADR). `route` = mẫu gin (`/v1/partner/plots/:ref`), `client` = tenant của token (bên nhận) hoặc `anonymous` (chưa xác thực). Đếm mọi lời gọi đã khớp route, cả bị từ chối. Truy vấn điều kiện gỡ:
+
+```promql
+sum(increase(ag_partner_legacy_calls_total[14d])) == 0
+sum by (route, client) (increase(ag_partner_legacy_calls_total[1d]))   # ai còn gọi
+```
+
+**Danh sách cutover (đánh dấu từng mục trước khi mở gói W5.10):**
+1. Đã qua **ít nhất một kỳ phát hành** kể từ W5.5 có header `Deprecation` (kiểm `curl -sI` một route `/v1/partner/*` ở production).
+2. Đặt `AG_PARTNER_SUNSET` (≥ 30 ngày sau khi đặt) + `AG_PARTNER_SUCCESSOR_BASE_URL`; báo đối tác qua kênh quản trị.
+3. MKG: `AG_FIELDOPS_DIRECTORY_SOURCE=feed` ổn định ≥ 14 ngày (mục W5.5 ở trên); job `fieldops_bilateral` (W5.6) chạy, van `valve_collection` không còn gửi mới.
+4. `season_harvest_dates`, `htx_collection_responses` đã có đường feed phục vụ ở production (W5.5 ghi lệch: còn qua `/v1/partner/*`) — chưa có thì metric KHÔNG thể về 0, không gỡ.
+5. `sum(increase(ag_partner_legacy_calls_total[14d])) == 0` (mọi `route`, mọi `client`, kể cả `anonymous`).
+6. Đối soát tổng kiểm hai đường khớp (`GET /v1/feeds/{feed}/checksums` ↔ bản sao cũ; log `fieldops.directory_source_compare outcome=match`).
+7. Gỡ (W5.10): route `/v1/partner/*` cùng `assembly.PartnerSuccessors`, client `mkg_sync` ở Keycloak, consumer `pf.cropcycle.htx_collection_valve`, biến `AG_PARTNER_SUNSET`/`AG_PARTNER_SUCCESSOR_BASE_URL`; giữ cảnh báo 410/404 của đối tác cũ trong một kỳ.
+
+Lùi: trước bước 7 không có gì để lùi (header chỉ mang thông tin). Sau bước 7, khôi phục bằng triển khai lại phiên bản trước.

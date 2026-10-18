@@ -15,10 +15,13 @@ export function lockReasonError(reason: string): string | null {
   return n === 0 ? `Nhập lý do (tối thiểu ${LOCK_REASON_MIN} ký tự).` : `Lý do tối thiểu ${LOCK_REASON_MIN} ký tự — còn thiếu ${LOCK_REASON_MIN - n} ký tự.`;
 }
 
-export type AccountState = "active" | "locked" | "locked_org" | "pending";
+export type AccountState = "active" | "locked" | "locked_org" | "locked_dormant" | "pending";
 
 export function accountState(u: Pick<AccountsUser, "enabled" | "lock_cause" | "required_actions">): AccountState {
-  if (!u.enabled) return u.lock_cause === "org_deactivated" ? "locked_org" : "locked";
+  if (!u.enabled) {
+    if (u.lock_cause === "org_deactivated") return "locked_org";
+    return u.lock_cause === "dormant_45d" ? "locked_dormant" : "locked";
+  }
   if (u.required_actions.includes("VERIFY_EMAIL") || u.required_actions.includes("UPDATE_PASSWORD")) return "pending";
   return "active";
 }
@@ -28,7 +31,32 @@ export const ACCOUNT_STATE: Record<AccountState, { text: string; cls: string }> 
   pending: { text: "Chờ kích hoạt", cls: "c-info" },
   locked: { text: "Đã khóa", cls: "c-bad" },
   locked_org: { text: "Khóa theo tổ chức", cls: "c-mute" },
+  // D24: job accounts_dormant khóa sau 45 ngày không hoạt động — Admin mở khóa (có lý do).
+  locked_dormant: { text: "Khóa do không hoạt động", cls: "c-bad" },
 };
+
+/** D24 — trạng thái TOTP của tài khoản (chỉ có ở GET /v1/accounts/users/{id}). */
+export type MfaState = "configured" | "pending" | "missing" | "optional";
+
+export function mfaState(m: AccountsUser["mfa"]): MfaState | null {
+  if (!m) return null;
+  if (m.configured) return "configured";
+  if (m.enrollment_pending) return "pending";
+  return m.required ? "missing" : "optional";
+}
+
+export const MFA_STATE: Record<MfaState, { text: string; cls: string }> = {
+  configured: { text: "Đã đăng ký TOTP", cls: "c-ok" },
+  pending: { text: "Chờ đăng ký TOTP ở lần đăng nhập tới", cls: "c-info" },
+  missing: { text: "Bắt buộc TOTP — chưa đăng ký", cls: "c-bad" },
+  optional: { text: "Không bắt buộc TOTP", cls: "c-mute" },
+};
+
+/** Đặt lại TOTP có ý nghĩa khi đã đăng ký, đang chờ đăng ký, hoặc vai bắt buộc TOTP (máy chủ vẫn kiểm). */
+export function canResetTotp(u: Pick<AccountsUser, "enabled" | "mfa">): boolean {
+  const s = mfaState(u.mfa);
+  return u.enabled && (s === "configured" || s === "pending" || s === "missing");
+}
 
 /** Vai được cấp cho một loại tổ chức theo `role_org_kinds` (vai không ràng buộc → mọi loại). */
 export function rolesForOrgKind(grants: AccountsGrants | undefined, kind: OrgKind | null | undefined): string[] {

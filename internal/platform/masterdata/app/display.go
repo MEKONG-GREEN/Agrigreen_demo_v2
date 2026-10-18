@@ -2,9 +2,7 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -12,49 +10,17 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/seeddata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 )
 
-// ParamDefault là giá trị mặc định của một khóa (seeddata/params.json).
+// ParamDefault là giá trị mặc định của một khóa đã được đăng ký.
 type ParamDefault struct {
 	Key       string
 	Value     *decimal.Decimal
 	Text      *string
 	Unit      string
 	SourceDoc string
-}
-
-var (
-	defaultsOnce sync.Once
-	defaults     map[string]ParamDefault
-	defaultsErr  error
-)
-
-// Defaults trả bảng giá trị mặc định nhúng theo khóa (đọc một lần).
-func Defaults() (map[string]ParamDefault, error) {
-	defaultsOnce.Do(func() {
-		var pf paramFile
-		if err := decodeStrict(seeddata.Params, &pf); err != nil {
-			defaultsErr = fmt.Errorf("masterdata: dữ liệu nhúng params lỗi: %w", err)
-			return
-		}
-		defaults = make(map[string]ParamDefault, len(pf.Params))
-		for _, p := range pf.Params {
-			d := ParamDefault{Key: p.Key, Text: p.Text, Unit: p.Unit, SourceDoc: p.SourceDoc}
-			if p.Value != nil {
-				v, err := decimal.NewFromString(*p.Value)
-				if err != nil {
-					defaultsErr = fmt.Errorf("masterdata: tham số nhúng %s: %w", p.Key, err)
-					return
-				}
-				d.Value = &v
-			}
-			defaults[p.Key] = d
-		}
-	})
-	return defaults, defaultsErr
 }
 
 // RestoreDefaultInput là dữ liệu vào của RestoreDefault.
@@ -76,7 +42,7 @@ func (s *Service) RestoreDefault(ctx context.Context, in RestoreDefaultInput) (d
 	if err := domain.ValidateParamKey(in.Key); err != nil {
 		return domain.ParamVersion{}, false, asProblem(err)
 	}
-	ds, err := Defaults()
+	ds, err := s.parameterDefaults()
 	if err != nil {
 		return domain.ParamVersion{}, false, err
 	}
@@ -131,7 +97,7 @@ func (s *Service) DisplayConfig(ctx context.Context) (DisplayConfig, error) {
 	if err != nil {
 		return DisplayConfig{}, err
 	}
-	ds, err := Defaults()
+	ds, err := s.parameterDefaults()
 	if err != nil {
 		return DisplayConfig{}, err
 	}

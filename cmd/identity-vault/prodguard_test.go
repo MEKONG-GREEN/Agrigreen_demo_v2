@@ -54,3 +54,21 @@ func TestProductionGuard(t *testing.T) {
 		})
 	}
 }
+
+// AG_MFA_DISABLED là cờ demo của Admin API api-platform; kho định danh từ chối khởi động khi thấy nó bật — kể cả
+// trên máy demo hợp lệ. Cờ tắt → chính sách mặc định.
+func TestVaultRefusesMFADisabled(t *testing.T) {
+	env := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
+	for _, m := range []map[string]string{
+		{"AG_MFA_DISABLED": "1", "AG_ENV": "staging", "AG_DEPLOY_ENV": "demo"},
+		{"AG_MFA_DISABLED": "1", "AG_ENV": "production"},
+	} {
+		if _, err := vaultMFAPolicyFromEnv(env(m)); err == nil {
+			t.Fatalf("%v: kho phải từ chối", m)
+		}
+	}
+	p, err := vaultMFAPolicyFromEnv(env(map[string]string{"AG_ENV": "production"}))
+	if err != nil || p.Disabled {
+		t.Fatalf("%+v %v", p, err)
+	}
+}

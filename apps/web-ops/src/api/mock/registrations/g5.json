@@ -1,0 +1,15 @@
+{
+  "id": "g5",
+  "source": "./g5",
+  "app": [],
+  "admin": [
+    {
+      "export": "apiClientAdminRoutes",
+      "order": 22
+    },
+    {
+      "export": "meteringAdminRoutes",
+      "order": 23
+    }
+  ]
+}

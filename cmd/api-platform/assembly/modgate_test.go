@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -15,13 +14,28 @@ import (
 
 // W1.4: tên trong Named() là tên repo (module.yaml) của đúng gói module — cổng route chặn đúng module.
 func TestNamedModulesMatchCatalog(t *testing.T) {
+	manifests, err := modreg.Load("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"extension", "price", "hrm", "contact"} {
+		m, ok := manifests.Get("pf/" + name)
+		if !ok || m.Dir() != "internal/kn/"+name {
+			t.Fatalf("namespace not moved: %s", name)
+		}
+	}
+
 	seen := map[string]bool{}
 	for _, n := range (Modules{}).Named() {
 		if _, ok := modreg.Entry(n.Name); !ok {
 			t.Fatalf("%s không có trong danh mục modreg", n.Name)
 		}
 		pkg := reflect.TypeOf(n.Module).Elem().PkgPath()
-		if want := "/internal/platform/" + strings.TrimPrefix(n.Name, "pf/"); !strings.HasSuffix(pkg, want) {
+		manifest, ok := manifests.Get(n.Name)
+		if !ok {
+			t.Fatalf("%s không có manifest", n.Name)
+		}
+		if want := "github.com/MEKONG-GREEN/Agrigreen_demo_v2/" + manifest.Dir(); pkg != want {
 			t.Fatalf("%s gắn với gói %s", n.Name, pkg)
 		}
 		if seen[n.Name] {

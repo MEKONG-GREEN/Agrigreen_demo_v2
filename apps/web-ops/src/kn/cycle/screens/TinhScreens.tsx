@@ -13,34 +13,80 @@ import { formLayout } from "@/kn/forms/api";
 import type { FormDefinition } from "@/kn/forms/types";
 import { FormGrid, communeRows } from "@/kn/grid";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
-import type { RcBatchInput, RcFormItem, RcPreview, RcStatusItem, RcTask } from "../api";
-import { LoadState, TaskPill, dt, mondayLocal, toLog, useAction, useCommuneNames, useCycleReadOnly, useLoad, ymdLocal } from "../common";
+import { RawFile, type RcBatchInput, type RcFormItem, type RcPreview, type RcProvincialImport, type RcStatusItem, type RcTask } from "../api";
+import {
+  LoadState,
+  REPORT_RULE_V2_FROM,
+  TaskPill,
+  dt,
+  reportWeekStart,
+  toLog,
+  useAction,
+  useCommuneNames,
+  useCycleReadOnly,
+  useLoad,
+  weekRangeName,
+  weekStartLocal,
+  weekStartOfRule,
+  ymdLocal,
+} from "../common";
+import { PiiHint } from "@/kn/pii";
 
 
+// Hạn tính từ ngày cuối kỳ; "" = hạn mặc định của lịch kỳ máy chủ (v2: tuần → 12:00 Thứ Tư sau kỳ; W11.03).
 const DEADLINES = [
-  { value: "2|17:00", label: "Thứ Ba tuần sau, 17:00" },
-  { value: "1|17:00", label: "Thứ Hai tuần sau, 17:00" },
-  { value: "0|17:00", label: "Chủ nhật cuối kỳ, 17:00" },
-  { value: "3|11:00", label: "Thứ Tư tuần sau, 11:00" },
+  { value: "", label: "Mặc định theo lịch kỳ" },
+  { value: "1|12:00", label: "1 ngày sau ngày cuối kỳ, 12:00" },
+  { value: "1|17:00", label: "1 ngày sau ngày cuối kỳ, 17:00" },
+  { value: "0|17:00", label: "Ngày cuối kỳ, 17:00" },
+  { value: "2|11:00", label: "2 ngày sau ngày cuối kỳ, 11:00" },
 ];
+
+type PublishReportType = "weekly" | "monthly" | "seasonal" | "adhoc";
+type PeriodChoice = "" | NonNullable<RcBatchInput["period_type"]>;
+
+/**
+ * Cách chia kỳ theo loại báo cáo (W11.05b, như reportcycle/domain.ReportPeriodTypes): "" = mặc định của loại báo cáo.
+ * Ngày / Tuần KSGM / Quý chỉ chia được với lịch kỳ v2 (đợt bắt đầu từ REPORT_RULE_V2_FROM); tuần KSGM theo ranh giới
+ * tham số extension.ksgm_week_starts của từng tháng.
+ */
+const PERIOD_CHOICES: Record<PublishReportType, { value: PeriodChoice; label: string }[]> = {
+  weekly: [
+    { value: "", label: "Tuần báo cáo" },
+    { value: "ksgm_week", label: "Tuần KSGM (4 tuần/tháng)" },
+    { value: "day", label: "Ngày" },
+  ],
+  monthly: [
+    { value: "", label: "Tháng" },
+    { value: "quarter", label: "Quý" },
+  ],
+  seasonal: [{ value: "", label: "Cả vụ (một kỳ)" }],
+  adhoc: [
+    { value: "", label: "Một kỳ" },
+    { value: "day", label: "Ngày" },
+  ],
+};
 
 /** FN-TI-02.02 Phát hành biểu mẫu báo cáo (Hình 7). */
 export function PublishScreen() {
-  const { cycleApi } = useAuth();
+  const { cycleApi, kn } = useAuth();
   const router = useRouter();
-  const mon = mondayLocal();
-  const [rt, setRt] = useState<"weekly" | "monthly" | "seasonal">("weekly");
+  const ws = weekStartLocal(new Date(), reportWeekStart(new Date(), kn.context?.department_code)); // D8: lịch tuần của phòng
+  const [rt, setRt] = useState<PublishReportType>("weekly");
+  const [pt, setPt] = useState<PeriodChoice>("");
   const [picked, setPicked] = useState<string[]>([]);
   const [mode, setMode] = useState<"province" | "regions" | "communes">("province");
   const [regions, setRegions] = useState<string[]>([]);
   const [communes, setCommunes] = useState<string[]>([]);
-  const [from, setFrom] = useState(ymdLocal(mon));
-  const [to, setTo] = useState(ymdLocal(new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 27)));
+  const [from, setFrom] = useState(ymdLocal(ws));
+  const [to, setTo] = useState(ymdLocal(new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 27)));
   const [season, setSeason] = useState("Thu Đông 2026");
-  const [deadline, setDeadline] = useState("2|17:00");
+  const [deadline, setDeadline] = useState("");
   const [closeAfter, setCloseAfter] = useState(1);
   const [note, setNote] = useState("");
   const [pv, setPv] = useState<Record<string, Record<string, Record<string, string>>>>({});
+  const [pvSource, setPvSource] = useState<"manual" | "excel">("manual");
+  const [pvImport, setPvImport] = useState<RcProvincialImport | null>(null);
   const [preview, setPreview] = useState<RcPreview | null>(null);
   const [showBatches, setShowBatches] = useState(false);
   const act = useAction();
@@ -51,14 +97,16 @@ export function PublishScreen() {
     return {
       report_type: rt,
       template_ids: picked,
+      ...(pt ? { period_type: pt } : {}),
       scope: { mode, ...(mode === "regions" ? { regions } : {}), ...(mode === "communes" ? { communes } : {}) },
       from_date: from,
       to_date: to,
       season_label: season,
-      deadline: { offset_days: Number(offset), time: time! },
+      ...(deadline ? { deadline: { offset_days: Number(offset), time: time! } } : {}),
       close_after_days: closeAfter,
       ...(note ? { note } : {}),
       provincial_values: pv,
+      provincial_source: pvSource,
     };
   };
   const doPreview = async () => {
@@ -70,6 +118,36 @@ export function PublishScreen() {
   const provCols = (forms.data?.items ?? []).filter((f) => picked.includes(f.template_id)).flatMap((f) => f.provincial_columns.map((c) => ({ f, c })));
   const previewCommunes = preview?.communes ?? [];
   const name = useCommuneNames(previewCommunes.map((c) => c.commune_code));
+  /** UR-TI-02: tệp mẫu CSV UTF-8 (BOM) — cột Mã xã, Tên xã và mỗi cột Tỉnh giao "<Mã biểu> <Chữ cột>". */
+  const downloadPvTemplate = () => {
+    const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const head = ["Mã xã", "Tên xã", ...provCols.map(({ f, c }) => `${f.code} ${c.letter} ${c.title}${c.unit ? ` (${c.unit})` : ""}`)];
+    const lines = [head, ...previewCommunes.map((cm) => [cm.commune_code, name(cm.commune_code), ...provCols.map(({ f, c }) => pv[f.template_id]?.[cm.commune_code]?.[c.letter] ?? "")])];
+    const blob = new Blob([String.fromCharCode(0xfeff) + lines.map((l) => l.map(esc).join(",")).join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `tinh-giao-${rt}-${from}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  const importPv = async (file: File) => {
+    const xlsx = /\.xlsx$/i.test(file.name);
+    const type = xlsx ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv; charset=utf-8";
+    const r = await act.run(
+      async () => cycleApi.provincialImport({ report_type: rt, from_date: from, template_ids: picked }, new RawFile(await file.arrayBuffer(), type)),
+      (x) => `Đã đọc ${x.accepted} dòng từ “${file.name}”${x.rejected ? `, ${x.rejected} dòng lỗi` : ""}.`,
+    );
+    if (!r) return;
+    setPvImport(r);
+    setPvSource("excel");
+    setPv((cur) => {
+      const next = { ...cur };
+      for (const [tpl, byCommune] of Object.entries(r.provincial_values)) next[tpl] = { ...(next[tpl] ?? {}), ...byCommune };
+      return next;
+    });
+  };
+  const inPreview = new Set(previewCommunes.map((c) => c.commune_code));
+  const outsideImport = pvImport ? pvImport.rows.filter((x) => x.status === "accepted" && previewCommunes.length > 0 && !inPreview.has(x.commune_code)) : [];
   return (
     <>
       <PageHeader
@@ -230,8 +308,48 @@ export function PublishScreen() {
                   </tbody>
                 </table>
               ) : null}
+              <div className="row" style={{ gap: 8, marginTop: 10 }} aria-label="Nạp Tỉnh giao từ Excel">
+                <button type="button" className="btn btn-o btn-sm" disabled={!previewCommunes.length} onClick={downloadPvTemplate}>
+                  <Icon name="download" size={14} /> Tải tệp mẫu
+                </button>
+                <label className="btn btn-o btn-sm">
+                  <Icon name="upload" size={14} /> Nạp từ Excel/CSV
+                  <input
+                    type="file"
+                    accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    aria-label="Tệp Tỉnh giao"
+                    style={{ display: "none" }}
+                    disabled={act.busy || !picked.length}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void importPv(file);
+                    }}
+                  />
+                </label>
+                {pvSource === "excel" ? <StatusPill tone="info">Nguồn: Excel</StatusPill> : null}
+              </div>
+              {pvImport ? (
+                <div className="small" role="status" aria-label="Kết quả nạp Tỉnh giao" style={{ marginTop: 8 }}>
+                  <div>
+                    Cột nhận: {pvImport.columns.map((c) => `${c.form_code} ${c.letter}`).join(", ")}
+                    {pvImport.ignored_columns.length ? ` · bỏ qua: ${pvImport.ignored_columns.join(", ")}` : ""}
+                  </div>
+                  {pvImport.rows
+                    .filter((x) => x.status === "rejected")
+                    .map((x) => (
+                      <div key={x.row} style={{ color: "var(--danger)" }}>
+                        Dòng {x.row}
+                        {x.commune_code ? ` (${x.commune_code})` : ""}: {x.reason}
+                      </div>
+                    ))}
+                  {outsideImport.length ? (
+                    <div style={{ color: "var(--warn, #b45309)" }}>Xã không nhận đợt này (sẽ bị từ chối khi phát hành): {outsideImport.map((x) => x.commune_code).join(", ")}</div>
+                  ) : null}
+                </div>
+              ) : null}
               <p className="small mute" style={{ marginTop: 8 }}>
-                Nhập Excel / Lấy từ đợt trước: máy chủ nhận <code>provincial_source: excel</code> và <code>copy_provincial_from_previous</code>. Cấp Xã thấy giá trị này ở dạng chỉ đọc.
+                Tệp một dòng một xã: cột “Mã xã” và mỗi cột Tỉnh giao có tiêu đề “&lt;Mã biểu&gt; &lt;Chữ cột&gt;” (vd “T01 E”). Ô công thức bị từ chối — dán giá trị. Cấp Xã thấy giá trị này ở dạng chỉ đọc.
               </p>
             </section>
           ) : null}
@@ -241,12 +359,28 @@ export function PublishScreen() {
             <h2>Bước 3 · Kỳ và hạn nộp</h2>
             <label className="field">
               <span>Loại kỳ*</span>
-              <select className="input" value={rt} onChange={(e) => (setRt(e.target.value as typeof rt), setPicked([]))}>
+              <select className="input" value={rt} onChange={(e) => (setRt(e.target.value as typeof rt), setPt(""), setPicked([]), setPreview(null))}>
                 <option value="weekly">Tuần</option>
                 <option value="monthly">Tháng</option>
                 <option value="seasonal">Vụ</option>
+                <option value="adhoc">Đột xuất</option>
               </select>
             </label>
+            <label className="field">
+              <span>Chia kỳ theo</span>
+              <select className="input" value={pt} onChange={(e) => (setPt(e.target.value as PeriodChoice), setPreview(null))}>
+                {PERIOD_CHOICES[rt].map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {pt && from < REPORT_RULE_V2_FROM ? (
+              <p className="small" role="note" style={{ color: "var(--warn, #b45309)" }}>
+                Kỳ ngày / tuần KSGM / quý theo lịch kỳ hệ thống mới — đợt phải bắt đầu từ {REPORT_RULE_V2_FROM.split("-").reverse().join("/")}.
+              </p>
+            ) : null}
             <label className="field">
               <span>Từ ngày*</span>
               <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -276,6 +410,7 @@ export function PublishScreen() {
             <label className="field">
               <span>Ghi chú giao việc</span>
               <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+              <PiiHint text={note} />
             </label>
           </section>
           <section className="card sec" aria-label="Xem trước">
@@ -289,13 +424,17 @@ export function PublishScreen() {
                   <dd>{preview.commune_count}</dd>
                   <dt>Số kỳ</dt>
                   <dd>{preview.period_count}</dd>
+                  <dt>Lịch tuần</dt>
+                  <dd data-testid="calendar">
+                    {weekRangeName(weekStartOfRule(preview.period_rule))} ({preview.calendar_id} v{preview.calendar_version})
+                  </dd>
                   <dt>Công việc sẽ tạo</dt>
                   <dd data-testid="task-count">{preview.task_count.toLocaleString("vi-VN")}</dd>
                 </dl>
                 <ol className="list-plain small">
                   {preview.periods.map((p) => (
                     <li key={p.slot}>
-                      {p.label} ({p.range_label}) — hạn {dt(p.due_at)}
+                      {p.label} ({p.range_label}){p.period_key ? ` · ${p.period_key}` : ""} — hạn {dt(p.due_at)}
                     </li>
                   ))}
                 </ol>
@@ -445,6 +584,7 @@ export function StatusScreen() {
                 <label className="field" style={{ flex: "1 1 320px" }}>
                   <span>Nội dung nhắc</span>
                   <input className="input" value={message} onChange={(e) => setMessage(e.target.value)} />
+                  <PiiHint text={message} />
                 </label>
                 <button type="button" className="btn btn-p btn-sm" disabled={!sel.length || act.busy} onClick={() => void act.run(() => cycleApi.remind(bp.active!, { period_id: bp.period!.id, template_id: form || null, communes: sel, message }), (r) => `Đã nhắc ${r.reminder.communes.length} xã (${r.reminder.recipient_count} cán bộ).`).then(() => setSel([]))}>
                   Gửi nhắc nhở xã đã chọn
@@ -619,6 +759,7 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
                       <label className="field" style={{ marginTop: 10 }}>
                         <span>Lý do yêu cầu điều chỉnh*</span>
                         <textarea className="textarea" value={reason} onChange={(e) => setReason(e.target.value)} />
+                        <PiiHint text={reason} />
                       </label>
                     )}
                   </>
@@ -672,6 +813,7 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
                   <label className="field">
                     <span>Lý do mở lại*</span>
                     <textarea className="textarea" value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} />
+                    <PiiHint text={reopenReason} />
                   </label>
                   <label className="field">
                     <span>Mở đến ngày* (17:00)</span>

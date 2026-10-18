@@ -34,10 +34,30 @@ type Module struct {
 	svc *app.Service
 }
 
-// New tạo module với pool của vai masterdata_app.
-func New(db tenant.Beginner, clk clock.Clock) *Module {
+// Deps contains optional, application-owned registrations.
+type Deps struct {
+	Params   []port.ParamRegistration
+	Catalogs []port.CatalogRegistration
+}
+
+// New creates a capability instance; authentication and storage stay in the capability.
+func New(db tenant.Beginner, clk clock.Clock, deps ...Deps) *Module {
 	db = forModule(db)
-	return &Module{svc: &app.Service{DB: db, Clock: clk}}
+	var parameters []port.ParamRegistration
+	var catalogs []port.CatalogRegistration
+	for _, d := range deps {
+		parameters = append(parameters, d.Params...)
+		catalogs = append(catalogs, d.Catalogs...)
+	}
+	return &Module{svc: &app.Service{DB: db, Clock: clk, ParamRegistry: app.NewParamRegistry(parameters...), CatalogRegistry: app.NewCatalogRegistry(catalogs...)}}
+}
+
+// CatalogMetadata exposes pure schema metadata, without database counts.
+func (m *Module) CatalogMetadata() []port.CatalogMetadata { return m.svc.CatalogMetadata() }
+
+// NormalizeCatalogItem applies the same pure normalization used by writes and imports.
+func (m *Module) NormalizeCatalogItem(it port.CatalogItem) (port.CatalogItem, error) {
+	return m.svc.NormalizeCatalogItem(it)
 }
 
 // RegisterApp gắn route chỉ đọc của Application API.
@@ -58,6 +78,11 @@ func (m *Module) Params() params.Params { return app.ParamsPort{Svc: m.svc} }
 
 // Catalogs cho module khác: danh mục dùng chung.
 func (m *Module) Catalogs() port.Catalogs { return app.CatalogsPort{Svc: m.svc} }
+
+// EffectiveCatalogs supplies date-aware values without interpreting application attributes.
+func (m *Module) EffectiveCatalogs() port.EffectiveCatalogs {
+	return app.EffectiveCatalogsPort{Svc: m.svc}
+}
 
 // SyncSource cho pf/sync: entity "catalog_item" và "admin_unit" chiều xuống.
 func (m *Module) SyncSource() syncport.Source { return app.Sync{Svc: m.svc} }

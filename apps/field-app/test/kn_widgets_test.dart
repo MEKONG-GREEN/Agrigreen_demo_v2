@@ -126,6 +126,19 @@ Future<void> settle(WidgetTester t, {int rounds = 12}) async {
   }
 }
 
+// SQLite FFI/HTTP chạy ngoài đồng hồ giả của tester. Chờ kết quả quan sát được,
+// thay vì giả định I/O xong sau số vòng cố định khi cả bộ test chạy song song.
+Future<void> waitForWidget(WidgetTester t, Finder finder) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (finder.evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 15)),
+    );
+    await t.pump(const Duration(milliseconds: 50));
+  }
+  expect(finder, findsWidgets);
+}
+
 Future<void> _finish(WidgetTester t, _Env env) async {
   await t.pumpWidget(const SizedBox());
   await t.pump(const Duration(seconds: 5));
@@ -188,6 +201,9 @@ void main() {
       expect(find.text('Cấp Xã · Chăn nuôi'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('kn-choice-a-2|chan_nuoi')));
       await settle(tester, rounds: 20);
+      // Chọn ngữ cảnh + tải menu/việc cần làm là I/O thật: số vòng cố định không đủ trên máy CI chậm.
+      await waitForWidget(tester, find.byType(KnHomeScreen));
+      await waitForWidget(tester, find.text('Chưa có công việc'));
       expect(env.kn.selects.single, {
         'assignment_id': 'a-2',
         'department_code': 'chan_nuoi',
@@ -197,6 +213,11 @@ void main() {
       // Menu Cấp Xã từ GET /v1/menu: khóa lạ bị ẩn, badge việc cần làm.
       await tester.tap(find.byTooltip('Open navigation menu'));
       await settle(tester);
+      await waitForWidget(
+        tester,
+        find.byKey(const ValueKey('kn-menu-xa.thu_thap.htx')),
+      );
+      await waitForWidget(tester, find.text('3'));
       expect(
         find.byKey(const ValueKey('kn-menu-xa.thu_thap.htx')),
         findsOneWidget,
@@ -204,6 +225,13 @@ void main() {
       expect(find.text('Mục lạ'), findsNothing);
       expect(find.text('Lịch công tác'), findsOneWidget);
       expect(find.text('3'), findsOneWidget);
+      // kn.menu/v3: nhóm "Dùng chung", Contact "Sắp có" (không bấm được).
+      expect(find.text('Dùng chung'), findsOneWidget);
+      expect(find.text('Sắp có'), findsOneWidget);
+      final contact = tester.widget<ListTile>(
+        find.byKey(const ValueKey('kn-menu-chung.contact')),
+      );
+      expect(contact.enabled, isFalse);
       await _finish(tester, env);
     },
   );
@@ -369,6 +397,10 @@ void main() {
       ),
     );
     await settle(tester);
+    await waitForWidget(
+      tester,
+      find.byKey(const ValueKey('kn-task-action-$taskA2')),
+    );
     expect(find.text('Công việc cần làm'), findsOneWidget);
     expect(
       find.descendant(
@@ -426,6 +458,7 @@ void main() {
       ),
     );
     await settle(tester);
+    await waitForWidget(tester, find.text('HTX Mỹ Hòa'));
     expect(find.text('HTX Mỹ Hòa'), findsOneWidget);
     expect(find.textContaining('0912•••123'), findsOneWidget);
     expect(find.textContaining('0912345'), findsNothing);

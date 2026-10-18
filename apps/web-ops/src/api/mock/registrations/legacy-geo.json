@@ -1,0 +1,23 @@
+{
+  "id": "legacy-geo",
+  "source": "./legacy-geo",
+  "app": [
+    {
+      "export": "appRoutes38",
+      "order": 38
+    },
+    {
+      "export": "appRoutes39",
+      "order": 39
+    },
+    {
+      "export": "appRoutes40",
+      "order": 40
+    },
+    {
+      "export": "appRoutes42",
+      "order": 42
+    }
+  ],
+  "admin": []
+}

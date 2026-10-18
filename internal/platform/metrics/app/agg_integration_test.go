@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/store"
@@ -77,7 +78,7 @@ func newAggFx(t *testing.T) *aggFx {
 	clk := clock.NewFixed(time.Date(2026, 10, 9, 3, 0, 0, 0, time.UTC))
 	gov := ids.New()
 	pool := env.Pool(t, migrations.PF, dbadmin.AppWorker)
-	a := &Agg{DB: db.ForModule(pool, aggOwner), Clock: clk, Approvals: sqlApprovals{}, Governance: gov}
+	a := &Agg{DB: db.ForModule(pool, aggOwner), AggDB: env.Pool(t, migrations.PF, dbadmin.AppAgg), Clock: clk, Approvals: sqlApprovals{}, Governance: gov}
 	return &aggFx{t: t, ctx: context.Background(), env: env, agg: a, gov: gov, alice: ids.New(), bob: ids.New()}
 }
 
@@ -382,27 +383,52 @@ func TestAggRunRefusedAndRoleScope_W64(t *testing.T) {
 	}
 
 	// Ngoài giao dịch job: kết nối của pool ở vai đăng nhập NOINHERIT — không đọc được view _pub, không BYPASSRLS.
+	// app_worker không còn là thành viên r_agg (gói FC) — đổi vai bị 42501 ngay cả trong giao dịch.
 	pool := f.env.Pool(t, migrations.PF, dbadmin.AppWorker)
-	var who string
-	var bypass bool
-	if err := pool.QueryRow(f.ctx, `SELECT current_user::text, r.rolbypassrls FROM pg_roles r WHERE r.rolname = current_user`).Scan(&who, &bypass); err != nil ||
-		who != dbadmin.AppWorker || bypass {
-		t.Fatalf("sau job: %s bypass=%v %v", who, bypass, err)
+	aggPool := f.env.Pool(t, migrations.PF, dbadmin.AppAgg)
+	for _, c := range []struct {
+		p    *pgxpool.Pool
+		role string
+	}{{pool, dbadmin.AppWorker}, {aggPool, dbadmin.AppAgg}} {
+		var who string
+		var bypass bool
+		if err := c.p.QueryRow(f.ctx, `SELECT current_user::text, r.rolbypassrls FROM pg_roles r WHERE r.rolname = current_user`).Scan(&who, &bypass); err != nil ||
+			who != c.role || bypass {
+			t.Fatalf("sau job: %s bypass=%v %v", who, bypass, err)
+		}
+		var n int
+		if err := c.p.QueryRow(f.ctx, `SELECT count(*) FROM pf_cropcycle_pub.v1_harvest_declaration`).Scan(&n); pgCode(err) != "42501" {
+			t.Fatalf("%s đọc _pub ngoài giao dịch job: %v", c.role, err)
+		}
 	}
-	var n int
-	if err := pool.QueryRow(f.ctx, `SELECT count(*) FROM pf_cropcycle_pub.v1_harvest_declaration`).Scan(&n); pgCode(err) != "42501" {
-		t.Fatalf("app_worker đọc _pub ngoài giao dịch job: %v", err)
+	// app_worker không vào được r_agg (kể cả gọi WithAggTx với pool sai); app_agg không vào được r_metrics.
+	err = db.WithAggTx(f.ctx, f.agg.DB, aggOwner, f.gov, pool, func(pgx.Tx) error { return nil }, func(db.AggTx) error { return nil })
+	if pgCode(err) != "42501" {
+		t.Fatalf("app_worker SET ROLE r_agg phải 42501: %v", err)
+	}
+	err = db.WithModuleTenantTx(f.ctx, aggPool, aggOwner, f.gov, func(pgx.Tx) error { return nil })
+	if pgCode(err) != "42501" {
+		t.Fatalf("app_agg SET ROLE r_metrics phải 42501: %v", err)
+	}
+	// Mặc định của vai app_agg: chỉ đọc kể cả ngoài WithAggTx.
+	var ro string
+	if err := aggPool.QueryRow(f.ctx, `SHOW default_transaction_read_only`).Scan(&ro); err != nil || ro != "on" {
+		t.Fatalf("app_agg default_transaction_read_only: %q %v", ro, err)
 	}
 
 	// authorize lỗi → fn không chạy, không đổi vai.
 	called := false
-	err = db.WithAggTx(f.ctx, f.agg.DB, aggOwner, f.gov, func(pgx.Tx) error { return ErrAggNotApproved },
+	err = db.WithAggTx(f.ctx, f.agg.DB, aggOwner, f.gov, aggPool, func(pgx.Tx) error { return ErrAggNotApproved },
 		func(db.AggTx) error { called = true; return nil })
 	if !IsProblem(err, ErrAggNotApproved) || called {
 		t.Fatalf("authorize lỗi: %v, fn chạy %v", err, called)
 	}
 	// Giao dịch job chỉ đọc; r_agg không ghi được, không đọc bảng nội bộ.
-	err = db.WithAggTx(f.ctx, f.agg.DB, aggOwner, f.gov, func(pgx.Tx) error { return nil }, func(a db.AggTx) error {
+	err = db.WithAggTx(f.ctx, f.agg.DB, aggOwner, f.gov, aggPool, func(pgx.Tx) error { return nil }, func(a db.AggTx) error {
+		var sess string
+		if err := a.Tx().QueryRow(f.ctx, `SELECT session_user::text`).Scan(&sess); err != nil || sess != dbadmin.AppAgg {
+			t.Errorf("session_user trong giao dịch job: %q %v", sess, err)
+		}
 		for q, code := range map[string]string{
 			`SELECT count(*) FROM pf_coop.harvest_declaration`: "42501",
 			`SELECT count(*) FROM pf_metrics.agg_job`:          "42501",

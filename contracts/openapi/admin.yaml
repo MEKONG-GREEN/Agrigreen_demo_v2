@@ -178,6 +178,7 @@ paths:
       tags: [masterdata]
       parameters:
         - {name: include_inactive, in: query, schema: {type: boolean, default: true}}
+        - {name: at, in: query, schema: {type: string}, description: "W11.41 — chỉ danh mục cnts_*: giá trị có hiệu lực tại ngày (YYYY-MM-DD hoặc RFC 3339, giờ Việt Nam); có at thì không phân trang (next_cursor null)"}
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -213,8 +214,8 @@ paths:
               schema: {$ref: "#/components/schemas/CatalogItem"}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {description: masterdata.catalog_not_found, $ref: "#/components/responses/Problem"}
-        "409": {description: masterdata.catalog_item_exists, $ref: "#/components/responses/Problem"}
-        "422": {description: "validation_failed | masterdata.farm_stage_invalid", $ref: "#/components/responses/Problem"}
+        "409": {description: "masterdata.catalog_item_exists | masterdata.catalog_item_name_taken | masterdata.cnts_stamp_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | masterdata.farm_stage_invalid | masterdata.catalog_ref_invalid | masterdata.cnts_commune_invalid", $ref: "#/components/responses/Problem"}
   /v1/masterdata/catalogs/{catalog}/items/{code}:
     parameters:
       - $ref: "#/components/parameters/Catalog"
@@ -236,6 +237,7 @@ paths:
               schema: {$ref: "#/components/schemas/CatalogItem"}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "masterdata.catalog_item_name_taken | masterdata.cnts_stamp_taken", $ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   /v1/masterdata/catalogs/{catalog}/items/{code}/deactivate:
     parameters:
@@ -305,6 +307,26 @@ paths:
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/CatalogChange"}}
                   next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/masterdata/catalogs/{catalog}/items/{code}/versions:
+    parameters:
+      - $ref: "#/components/parameters/Catalog"
+      - $ref: "#/components/parameters/ItemCode"
+    get:
+      summary: "W11.41 (BRD CNTS FN-06 BR-03): các giá trị có hiệu lực từ ngày của một mục danh mục cnts_* (sổ catalog_effective)"
+      operationId: catalogItemVersions
+      tags: [masterdata]
+      responses:
+        "200":
+          description: Theo valid_from tăng dần; valid_to = valid_from của giá trị kế tiếp (null = đang hiệu lực / mới nhất)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CatalogEffectiveVersion"}}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
   /v1/masterdata/params/versions:
@@ -496,7 +518,11 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
     post:
-      summary: Tạo tổ chức trong cây TW → Tỉnh → Xã; kind = cooperative kèm hồ sơ HTX, Mã HTX tự sinh
+      summary: Tạo tổ chức trong cây TW → Tỉnh → Xã (HTX tạo qua Neo)
+      description: |
+        Chỉ platform_admin hoặc registry_admin tạo tổ chức. Vai KN nhận 403 với mọi loại.
+        kind=cooperative nhận 422 party.cooperative_requires_anchor và redirect=/quan-tri/neo-htx;
+        dùng POST /v1/htx-anchors với new_cooperative để tạo Nút, hồ sơ và Neo.
       operationId: partyCreateOrg
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -543,7 +569,9 @@ paths:
       description: |
         Cùng cột với tệp xuất (tiêu đề có/không dấu; bắt buộc Mã tổ chức, Loại, Tên). Mã chưa có → tạo (CreateOrg);
         mã đã có → di chuyển nếu cấp trên/đơn vị khác (MoveOrg, ghi sổ với lý do `reason`), đổi tên nếu tên khác (RenameOrg).
-        Dòng được xử lý cha trước con bất kể thứ tự trong tệp. HTX mới: để trống Mã tổ chức (Mã HTX do hệ thống sinh, CGH BR-01).
+        Dòng được xử lý cha trước con bất kể thứ tự trong tệp. Dòng HTX mới (mã trống hoặc chưa có) bị loại theo dòng:
+        HTX tạo qua Neo HTX theo MST (D2, ADR-0052). Tạo Nút không phải HTX chỉ platform_admin/registry_admin (gói ORGUI);
+        vai KN chỉ di chuyển/đổi tên.
         Tệp không vô hiệu hóa tổ chức vắng mặt; cột Trạng thái chỉ để xem. Ô công thức, tệp .xls cũ, thiếu cột bắt buộc →
         từ chối cả tệp (party.import_invalid). Idem_key từng thao tác = Idempotency-Key + ":org:" + số dòng.
       operationId: partyImportOrgTree
@@ -675,6 +703,184 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/htx-anchors:
+    get:
+      summary: "D2 (ADR-0052): danh sách neo HTX theo mã số thuế (HTX tạm / đã nhận quyền)"
+      operationId: coopListHTXAnchors
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [provisional, claimed]}}
+        - {name: q, in: query, description: "Tiền tố mã số thuế (chuẩn hóa: bỏ khoảng trắng, gạch) hoặc mã tạm TMP-", schema: {type: string}}
+        - {name: after, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HTXAnchor"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "D2: Khuyến nông hoặc MKG lập HTX TẠM — gắn neo cho Nút HTX (MST hoặc mã tạm). MST trùng → 409 cooperative.htx_anchor_mst_taken (kèm existing_anchor_id)"
+      operationId: coopCreateHTXAnchor
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [created_by]
+              oneOf:
+                - required: [org_ref]
+                  not: {required: [new_cooperative]}
+                - required: [new_cooperative]
+                  not: {required: [org_ref]}
+              properties:
+                org_ref: {type: string, format: uuid, description: "Nút HTX (kind=cooperative, đã có hồ sơ)"}
+                new_cooperative:
+                  type: object
+                  additionalProperties: false
+                  required: [name, admin_unit_code]
+                  description: "Tạo Nút + hồ sơ ngay trong luồng Neo; chỉ platform_admin/registry_admin. Gửi lại cùng Idempotency-Key hoàn tất các bước còn thiếu, không tạo Nút thứ hai. MST lấy từ trường mst bên ngoài."
+                  properties:
+                    name: {type: string, minLength: 1, maxLength: 200}
+                    admin_unit_code: {type: string, description: "Mã xã còn hiệu lực"}
+                    parent_ref: {type: string, format: uuid, description: "Nút xã cấp trên (tùy chọn)"}
+                    representative_ref: {type: string, format: uuid}
+                    representative:
+                      type: object
+                      required: [full_name, phone]
+                      description: "Chuyển thẳng vào kho định danh, không lưu trong sổ Neo"
+                      properties:
+                        full_name: {type: string}
+                        phone: {type: string}
+                    profile:
+                      type: object
+                      properties:
+                        area_ha: {type: string, description: "Decimal dạng chuỗi"}
+                        established_on: {type: string, format: date}
+                        address: {type: string, maxLength: 500}
+                        location:
+                          type: object
+                          required: [lat, lon]
+                          properties:
+                            lat: {type: string}
+                            lon: {type: string}
+                created_by: {type: string, enum: [kn, mkg], description: "mkg cần platform_admin"}
+                mst: {type: string, description: "Mã số thuế (10 số hoặc 10 + 3 số chi nhánh; khoảng trắng/gạch được bỏ). Vắng = mã tạm"}
+                agreement_ref: {type: string, minLength: 3, maxLength: 200, description: "Thỏa thuận HTX — basis_ref của share_grant cho Khuyến nông"}
+      responses:
+        "200": {description: Gọi lặp cùng Idempotency-Key, content: {application/json: {schema: {$ref: "#/components/schemas/HTXAnchor"}}}}
+        "201": {description: Đã lập, content: {application/json: {schema: {$ref: "#/components/schemas/HTXAnchor"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/htx-anchors/backfill:
+    post:
+      summary: "D2: neo HTX có trước D2 (HTX tạm do KN lập; khóa = MST hồ sơ hoặc mã tạm), có chạy thử"
+      operationId: coopBackfillHTXAnchors
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: {type: boolean, default: false}
+                limit: {type: integer, minimum: 1, maximum: 1000, default: 500}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [dry_run, created, with_mst, temp_code, items, skipped]
+                properties:
+                  dry_run: {type: boolean}
+                  created: {type: integer}
+                  with_mst: {type: integer}
+                  temp_code: {type: integer}
+                  items: {type: array, items: {type: object, additionalProperties: true}}
+                  skipped: {type: array, items: {type: object, additionalProperties: true}}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/htx-anchors/{anchor_id}:
+    get:
+      summary: "D2: chi tiết neo kèm sổ (vết kiểm toán: lập, gắn MST, nhận quyền)"
+      operationId: coopGetHTXAnchor
+      parameters:
+        - {name: anchor_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Neo
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/HTXAnchor"
+                  - type: object
+                    required: [events]
+                    properties:
+                      events: {type: array, items: {$ref: "#/components/schemas/HTXAnchorEvent"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/htx-anchors/{anchor_id}/mst:
+    post:
+      summary: "D2: gắn mã số thuế cho neo mã tạm (sự kiện mst_attached)"
+      operationId: coopAttachHTXAnchorMST
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: anchor_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mst]
+              properties:
+                mst: {type: string}
+      responses:
+        "200": {description: Neo sau khi gắn, content: {application/json: {schema: {$ref: "#/components/schemas/HTXAnchor"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/htx-anchors/{anchor_id}/claim:
+    post:
+      summary: "D2: HTX thật nhận quyền (MST đã xác minh, tài khoản HTX đã kích hoạt) — một lần mỗi neo, lũy đẳng, nguyên tử; dry_run trả báo cáo không ghi; Nút đích có dữ liệu → 409 cooperative.htx_anchor_claim_conflict kèm conflict_report"
+      operationId: coopClaimHTXAnchor
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: anchor_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account_ref, verified_mst, verification_ref]
+              properties:
+                account_ref: {type: string, format: uuid, description: "Tài khoản HTX đã kích hoạt"}
+                verified_mst: {type: string}
+                verification_ref: {type: string, minLength: 3, maxLength: 200, description: "Chứng cứ xác minh MST"}
+                target_org_ref: {type: string, format: uuid, description: "Nút HTX thật; vắng = Nút tạm của neo"}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {description: Báo cáo nhận quyền (cũng là details của dòng sổ claimed), content: {application/json: {schema: {$ref: "#/components/schemas/HTXClaimReport"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/cooperatives/{ref}/deactivate:
     post:
       summary: Vô hiệu hóa HTX (soft-delete) — lý do ≥ 20 ký tự; phát pf.party.org.deactivated để khóa tài khoản
@@ -2737,6 +2943,23 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/{id}/reset-totp:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: "D24 — Đặt lại TOTP (mất/đổi điện thoại): xóa TOTP trong Keycloak, thêm CONFIGURE_TOTP (đăng ký lại ở lần đăng nhập sau), thu hồi mọi phiên; lý do ≥ 20 ký tự; ghi sổ totp_reset. Không tự đặt lại của chính mình (403 accounts.self_action); tài khoản đang khóa hoặc không có TOTP để đặt lại → 409 accounts.state_conflict"
+      operationId: accountsResetTOTP
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/AccountsReason"
+      responses:
+        "200": {$ref: "#/components/responses/AccountsChanged"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/accounts/users/{id}/resend-actions:
     parameters:
       - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -2811,8 +3034,20 @@ paths:
                 properties:
                   items:
                     type: array
-                    items: {type: object, required: [code, label], properties: {code: {type: string}, label: {type: string}}}
+                    items:
+                      type: object
+                      required: [code, label]
+                      properties:
+                        code: {type: string}
+                        label: {type: string}
+                        manager: {type: boolean, description: "W11.07: có quyền của lãnh đạo"}
+                        reads_all_departments: {type: boolean, description: "W11.07: Lãnh đạo đơn vị — chọn mọi phòng ban ở chế độ chỉ xem"}
                   provisional: {type: boolean}
+                  version: {type: string, description: "W11.07: phiên bản danh mục (accounts.kn-roles/2)"}
+                  province_groups: {type: array, items: {$ref: "#/components/schemas/KNCatalogItem"}}
+                  duties: {type: array, items: {$ref: "#/components/schemas/KNCatalogItem"}}
+                  powers: {type: array, items: {$ref: "#/components/schemas/KNCatalogItem"}}
+                  delegation_max_days: {type: integer}
         "403": {$ref: "#/components/responses/Problem"}
   /v1/accounts/kn-users:
     post:
@@ -2926,6 +3161,222 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/{id}/assignments/{aid}/attributes:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: aid, in: path, required: true, schema: {type: string, format: uuid}}
+    put:
+      summary: "W11.07 Đặt thuộc tính phân quyền trong vai (nhóm Cấp Tỉnh, QTNV báo giá, người phụ trách biểu, đơn vị nội bộ, phạm vi Cấp Xã theo cơ sở/hộ) — sổ phụ, có hiệu lực ở request kế tiếp"
+      operationId: accountsSetAssignmentAttrs
+      tags: [accounts]
+      parameters:
+        - {name: Idempotency-Key, in: header, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                province_group: {type: string}
+                duties: {type: array, items: {type: string}}
+                internal_unit_code: {type: string}
+                facility_refs: {type: array, items: {type: string, format: uuid}}
+                household_refs: {type: array, items: {type: string, format: uuid}}
+                reason: {type: string}
+      responses:
+        "200":
+          description: Thuộc tính hiện hành (không đổi → không ghi sổ)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assignment_id, attributes, seq]
+                properties:
+                  assignment_id: {type: string, format: uuid}
+                  attributes: {$ref: "#/components/schemas/KNAssignmentAttrs"}
+                  seq: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.assignment_state", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed, accounts.internal_unit_invalid, accounts.facility_invalid (W11.41)", $ref: "#/components/responses/Problem"}
+  /v1/accounts/users/{id}/delegations:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: "W11.07 Ủy quyền có hạn tài khoản đã giao hoặc đã nhận"
+      operationId: accountsUserDelegations
+      tags: [accounts]
+      responses:
+        "200":
+          description: Mới nhất trước
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDelegationList"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/delegations/{id}/revoke:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: "W11.07 Admin thu hồi ủy quyền còn hiệu lực (lý do ≥ 10 ký tự)"
+      operationId: accountsRevokeDelegation
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/AccountsReason"
+      responses:
+        "200":
+          description: Đã thu hồi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDelegation"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "accounts.delegation_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.delegation_state", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/internal-units:
+    get:
+      summary: "W11.07 Danh mục đơn vị nội bộ (BGĐ, văn phòng, phòng, trạm, trại, tăng cường — Q-068)"
+      operationId: adminListInternalUnits
+      tags: [accounts]
+      parameters:
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Theo thứ tự hiển thị
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnitList"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "W11.07 Khai báo đơn vị nội bộ (mã không tái sử dụng; chỉ loại phong gắn phòng ban)"
+      operationId: createInternalUnit
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/InternalUnitInput"}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnit"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnit"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.internal_unit_code_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed, accounts.internal_unit_org_invalid, accounts.internal_unit_department_invalid", $ref: "#/components/responses/Problem"}
+  /v1/accounts/internal-units/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    put:
+      summary: "W11.07 Sửa loại, tên, phòng ban, thứ tự (mã không đổi)"
+      operationId: updateInternalUnit
+      tags: [accounts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/InternalUnitInput"}
+      responses:
+        "200":
+          description: Đã sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnit"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/internal-units/{id}/deactivate:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: "W11.07 Ngừng đơn vị nội bộ (lý do ≥ 10 ký tự) — người đã gán giữ nguyên, không chọn được cho lần gán mới"
+      operationId: deactivateInternalUnit
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema: {type: object, properties: {reason: {type: string}}}
+      responses:
+        "200":
+          description: Đã ngừng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnit"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.internal_unit_state", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/internal-units/{id}/reactivate:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: "W11.07 Dùng lại đơn vị nội bộ"
+      operationId: reactivateInternalUnit
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Đang dùng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnit"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/internal-units/{id}/log:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: "W11.07 Khung Log của đơn vị nội bộ"
+      operationId: internalUnitLog
+      tags: [accounts]
+      parameters:
+        - {name: cursor, in: query, schema: {type: integer}}
+        - {name: limit, in: query, schema: {type: integer}}
+      responses:
+        "200":
+          description: Theo seq
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {type: object}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/internal-units/seed:
+    post:
+      summary: "W11.07 Nạp đơn vị nội bộ mặc định (Ban Giám đốc + 5 phòng gắn phòng ban) — chạy lặp an toàn"
+      operationId: seedInternalUnits
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [org_ref], properties: {org_ref: {type: string, format: uuid}}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, existing, status]
+                properties:
+                  created: {type: array, items: {$ref: "#/components/schemas/InternalUnit"}}
+                  existing: {type: integer}
+                  status: {type: string}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/accounts/users/{id}/profile:
     parameters:
       - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -2987,6 +3438,100 @@ paths:
                   next_cursor: {type: [integer, "null"]}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/kn-users/import:
+    post:
+      summary: "Nạp Excel tài khoản KN nhiều vai trò (FN-AD-04.04 \"Nạp Excel\", UR-AD-04, W11.02) — kết quả theo từng dòng"
+      description: |
+        Thân request là tệp CSV UTF-8/.xlsx (shared/tabular; ô công thức → từ chối cả tệp). Mỗi dòng là MỘT lần gán vai trò; các dòng
+        cùng Email gộp thành một tài khoản nhiều vai (vd Cấp Xã 2 xã + Cấp Quốc gia). Cột: Họ tên, Email (bắt buộc), SĐT, Vai trò
+        (kn_tw | kn_tinh | kn_xa hoặc "Cấp Quốc gia" / "Cấp Tỉnh" / "Cấp Xã"; vai Admin không nạp qua tệp), Mã Nút (mã tổ chức hoặc
+        UUID), Phòng ban (mã, phân tách ";"), Cấp quản lý (mã hoặc nhãn), Xã phụ trách (mã, phân tách ";"). Mỗi tài khoản tạo như
+        POST /v1/accounts/kn-users (tiên quyết Nút + phòng ban, liên kết kích hoạt, không mật khẩu tạm). Tài khoản có dòng lỗi bị
+        loại cả nhóm; tài khoản khác vẫn tạo. Khóa idem của tài khoản = Idempotency-Key + ":acc:" + dòng đầu (gửi lại cùng khóa phát
+        lại). Lý do không chứa dữ liệu nhập. Tối đa 300 dòng, 2 MB.
+      operationId: accountsImportKNUsers
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          text/csv: {schema: {type: string, format: binary}}
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Kết quả từng dòng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accounts_created, created, rejected, rows]
+                properties:
+                  accounts_created: {type: integer, description: "Số tài khoản đã tạo"}
+                  created: {type: integer, description: "Số dòng (lần gán) đã ghi"}
+                  rejected: {type: integer}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [row, status, reason, user_id, activation_email_sent]
+                      properties:
+                        row: {type: integer}
+                        status: {type: string, enum: [created, rejected]}
+                        reason: {type: [string, "null"]}
+                        user_id: {type: [string, "null"], format: uuid}
+                        activation_email_sent: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/{id}/sessions:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: "Tab \"Phiên đang hoạt động\" và \"Lịch sử đăng nhập\" của màn Detail tài khoản (FN-AD-04.04, W11.02) — đọc Keycloak Admin REST"
+      description: |
+        Phiên: GET /users/{id}/sessions; lịch sử: GET /events?user=…&type=LOGIN|LOGIN_ERROR|LOGOUT|CODE_TO_TOKEN_ERROR (realm phải bật
+        eventsEnabled; tài khoản dịch vụ cần view-events). Không ghi gì, không lưu IP ở pf. available = false khi bản cài không đọc
+        được phiên. Cùng phạm vi như khung Log.
+      operationId: accountsUserSessions
+      tags: [accounts]
+      parameters:
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Phiên đang hoạt động (mới truy cập trước) và lịch sử đăng nhập (mới nhất trước)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [available, active, history]
+                properties:
+                  available: {type: boolean}
+                  active:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, ip_address, started_at, last_access_at, clients]
+                      properties:
+                        id: {type: string}
+                        ip_address: {type: string}
+                        started_at: {type: [string, "null"], format: date-time}
+                        last_access_at: {type: [string, "null"], format: date-time}
+                        clients: {type: array, items: {type: string}}
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      required: [at, type, ip_address, client, error]
+                      properties:
+                        at: {type: [string, "null"], format: date-time}
+                        type: {type: string}
+                        ip_address: {type: string}
+                        client: {type: string}
+                        error: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/accounts/support-sessions:
     post:
       summary: "FN-AD-04.07 Menu các cấp: Admin (platform_admin, MFA) vào menu Cấp Quốc gia/Tỉnh/Xã để hỗ trợ — trả ngữ cảnh phiên (gửi qua X-AG-Context, dải cảnh báo vàng theo support_session_id)"
@@ -4844,7 +5389,7 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
   /v1/orgs/{ref}/departments/seed:
     post:
-      summary: "Nạp 6 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng) — TẠM, chờ khách Q-02; chạy lặp an toàn"
+      summary: "Nạp 5 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng; W11.06, chờ khách Q-051); xóa mã tạm phong_ban_5/6 chưa dùng; chạy lặp an toàn"
       operationId: knSeedDepartments
       tags: [party]
       parameters:
@@ -4857,11 +5402,13 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [created, existing, status]
+                required: [created, existing, status, legacy_retired, legacy_kept]
                 properties:
                   created: {type: array, items: {$ref: "#/components/schemas/KNDepartment"}}
                   existing: {type: integer}
                   status: {type: string}
+                  legacy_retired: {type: array, items: {type: string}, description: "Mã tạm (phong_ban_5/6) đã xóa trong lần nạp này — chưa mở, không có tài khoản/dữ liệu"}
+                  legacy_kept: {type: array, items: {type: string}, description: "Mã tạm còn giữ (đang áp dụng, có tài khoản/dữ liệu hoặc chưa nối nguồn đếm) — Admin xử lý; tra cứu mã cũ vẫn trả dòng này"}
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   /v1/regions:
@@ -5929,7 +6476,7 @@ components:
       name: catalog
       in: path
       required: true
-      schema: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest, vessel_class, crop, material, production_model, report_type]}
+      schema: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest, vessel_class, crop, material, production_model, report_type, cnts_species, cnts_breed, cnts_vaccine, cnts_vaccination_schedule, cnts_disease, cnts_chemical, cnts_slaughter_facility, cnts_aquaculture_object, cnts_fishing_group, cnts_indicator, cnts_model_type, cnts_document_type]}
     ItemCode:
       name: code
       in: path
@@ -6073,6 +6620,97 @@ components:
               replayed: {type: boolean}
               warnings: {type: array, items: {$ref: "#/components/schemas/KNWarning"}}
   schemas:
+    HTXAnchor:
+      type: object
+      description: "D2 (ADR-0052): neo HTX — định danh ổn định khóa theo MST; đồng sở hữu MKG + HTX"
+      required: [anchor_id, anchor_key, mst, temporary, status, created_by, provisional_org_ref, org_ref, aliases, htx_account_ref, agreement_ref,
+        co_owners, confirmation_status, confirmation_label, claimed_at, created_at]
+      properties:
+        anchor_id: {type: string, format: uuid}
+        anchor_key: {type: string, description: "MST chính tắc (NNNNNNNNNN hoặc NNNNNNNNNN-NNN) hoặc mã tạm TMP-XXXXXXXXXXXX"}
+        mst: {type: [string, "null"]}
+        temporary: {type: boolean, description: "true = chưa có MST (mã tạm)"}
+        status: {type: string, enum: [provisional, claimed]}
+        created_by: {type: string, enum: [kn, mkg]}
+        provisional_org_ref: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid, description: "Nút hiện hành"}
+        aliases: {type: array, items: {type: string, format: uuid}, description: "Mọi Nút của neo (Nút tạm, Nút nhận quyền)"}
+        htx_account_ref: {type: [string, "null"], format: uuid}
+        agreement_ref: {type: [string, "null"]}
+        co_owners: {type: array, items: {type: string, enum: [mkg, htx]}}
+        confirmation_status: {type: string, enum: [confirmed, unconfirmed]}
+        confirmation_label: {type: string, enum: ["Đã xác nhận", "Chưa xác nhận"]}
+        claimed_at: {type: [string, "null"], format: date-time}
+        created_at: {type: string, format: date-time}
+    HTXAnchorEvent:
+      type: object
+      required: [id, seq, action, anchor_key, mst, org_ref, verification_ref, details, actor_ref, event_time, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        action: {type: string, enum: [provisional_created, legacy_backfilled, mst_attached, claimed]}
+        anchor_key: {type: string}
+        mst: {type: [string, "null"]}
+        org_ref: {type: string, format: uuid}
+        verification_ref: {type: [string, "null"]}
+        details: {type: [object, "null"], additionalProperties: true}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+    HTXDataCounts:
+      type: object
+      required: [plots, memberships, seasons, farm_logs, season_areas]
+      properties:
+        plots: {type: integer}
+        memberships: {type: integer}
+        seasons: {type: integer}
+        farm_logs: {type: integer}
+        season_areas: {type: integer}
+    HTXClaimReport:
+      type: object
+      required: [anchor_id, dry_run, would_succeed, replayed, from, to, moved, conflicts, confirmation, data_copied]
+      properties:
+        anchor_id: {type: string, format: uuid}
+        dry_run: {type: boolean}
+        would_succeed: {type: boolean}
+        replayed: {type: boolean}
+        from: {$ref: "#/components/schemas/HTXClaimParty"}
+        to: {$ref: "#/components/schemas/HTXClaimParty"}
+        moved:
+          type: array
+          description: "Số dòng chuyển chủ (không sao chép) theo Nút"
+          items:
+            type: object
+            required: [org_ref, counts]
+            properties:
+              org_ref: {type: string, format: uuid}
+              counts: {$ref: "#/components/schemas/HTXDataCounts"}
+        alias_added: {type: string, format: uuid}
+        conflicts:
+          type: array
+          items:
+            type: object
+            required: [org_ref, reason, counts]
+            properties:
+              org_ref: {type: string, format: uuid}
+              reason: {type: string, enum: [target_has_data, target_has_other_anchor, tax_code_differs]}
+              counts: {$ref: "#/components/schemas/HTXDataCounts"}
+        confirmation:
+          type: object
+          required: [before, after]
+          properties:
+            before: {type: string}
+            after: {type: string}
+        data_copied: {type: boolean}
+        event_id: {type: string, format: uuid}
+    HTXClaimParty:
+      type: object
+      required: [party, org_ref]
+      properties:
+        party: {type: string, enum: [provisional, htx]}
+        created_by: {type: string, enum: [kn, mkg]}
+        account_ref: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid}
     # --- pf/reports ---
     ReportDefinition:
       type: object
@@ -6185,6 +6823,13 @@ components:
           description: |
             Theo danh mục — rice_variety: growth_days, expected_yield_t_per_ha (decimal); farm_stage: pilot (true|false, cờ thí điểm CGH), description;
             machine_type: farm_stage (mã khâu đang dùng); season: start_month, end_month; pest: kind (sau_hai|benh_hai|dong_vat_hai|co_dai).
+            W11.41 CNTS — cnts_species: group, unit, herd_column, order; cnts_breed: species; cnts_disease: species (danh sách), notifiable;
+            cnts_vaccine: species (loài so sánh, bắt buộc), diseases, report_group (heo|bo|cum_gia_cam|dai|khac), order; cnts_chemical: unit, target;
+            cnts_slaughter_facility: commune_code, facility_kind (tap_trung|nho_le), stamp_codes_gs, stamp_codes_gc (nhiều mã, ngăn cách dấu phẩy),
+            species, address — facility_ref do hệ thống cấp và giữ cố định (giá trị gửi lên bị bỏ qua); cnts_aquaculture_object: scale_unit (ha|long|veo|m3);
+            cnts_fishing_group: unit, order; cnts_indicator: unit, value_type (decimal|integer|percent); cnts_model_type: sector (chan_nuoi|thuy_san), species;
+            cnts_vaccination_schedule: model_type và/hoặc breed, doses ("<vaccine>/<lần>@<ngày tuổi>" ngăn cách dấu phẩy).
+        valid_from: {type: string, format: date, description: "W11.41 — chỉ danh mục cnts_*: ngày áp dụng giá trị mới (FN-06 BR-03); trống = hôm nay"}
     CatalogItem:
       type: object
       required: [catalog, code, name, attrs, active, deactivation_reason, revision, updated_at]
@@ -6198,6 +6843,19 @@ components:
         revision: {type: integer}
         updated_at: {type: string, format: date-time}
         forms_in_use: {type: integer, description: "KN v7.7 FN-AD-04.05: số mẫu báo cáo đang dùng mục (vắng khi chưa nối P3)"}
+        valid_from: {type: string, format: date, description: "W11.41 (danh mục cnts_*): ngày bắt đầu hiệu lực của giá trị trả về (đọc theo at hoặc vừa ghi)"}
+    CatalogEffectiveVersion:
+      type: object
+      required: [id, valid_from, valid_to, after, change_id, event_time, actor_ref, seq]
+      properties:
+        id: {type: string, format: uuid}
+        valid_from: {type: string, format: date}
+        valid_to: {type: [string, "null"], format: date}
+        after: {$ref: "#/components/schemas/CatalogSnapshot"}
+        change_id: {type: string, format: uuid, description: "Dòng sổ catalog_change cùng giao dịch"}
+        event_time: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        seq: {type: integer}
     ReasonInput:
       type: object
       properties:
@@ -6881,10 +7539,19 @@ components:
         email_verified: {type: boolean}
         org_ref: {type: [string, "null"], format: uuid}
         roles: {type: [array, "null"], items: {type: string}, description: "Vai do pf/accounts quản lý; null ở danh sách nếu tài khoản tạo ngoài nền tảng"}
-        lock_cause: {type: [string, "null"], enum: [manual, org_deactivated, null]}
+        lock_cause: {type: [string, "null"], enum: [manual, org_deactivated, dormant_45d, null], description: "dormant_45d — job accounts_dormant khóa vì không hoạt động (D24)"}
         required_actions: {type: array, items: {type: string}}
         created_at: {type: [string, "null"], format: date-time}
         tracked: {type: boolean, description: "Có trong pf_accounts (tạo hoặc thao tác qua nền tảng)"}
+        mfa: {$ref: "#/components/schemas/AccountsMFA"}
+    AccountsMFA:
+      type: object
+      description: "D24 — trạng thái TOTP; chỉ có ở GET /v1/accounts/users/{id}"
+      required: [required, configured, enrollment_pending]
+      properties:
+        required: {type: boolean, description: "Vai của tài khoản bắt TOTP khi đăng nhập (cán bộ KN, vai [MFA])"}
+        configured: {type: boolean, description: "Đã có TOTP trong Keycloak"}
+        enrollment_pending: {type: boolean, description: "Đang chờ người dùng đăng ký (required action CONFIGURE_TOTP)"}
     AccountsAccount:
       type: object
       required: [user_ref, org_ref, roles, enabled, lock_cause]
@@ -6893,13 +7560,13 @@ components:
         org_ref: {type: string, format: uuid}
         roles: {type: array, items: {type: string}}
         enabled: {type: boolean}
-        lock_cause: {type: [string, "null"], enum: [manual, org_deactivated, null]}
+        lock_cause: {type: [string, "null"], enum: [manual, org_deactivated, dormant_45d, null]}
     AccountsEvent:
       type: object
       required: [seq, action, event_time, recorded_at, actor_ref, reason, account]
       properties:
         seq: {type: integer}
-        action: {type: string, enum: [created, locked, unlocked, assignment_changed, actions_sent]}
+        action: {type: string, enum: [created, locked, unlocked, assignment_changed, actions_sent, dormant_warned, totp_reset], description: "dormant_warned, locked/dormant_45d do job accounts_dormant (actor_ref = tác nhân hệ thống); totp_reset do quản trị viên (D24)"}
         event_time: {type: string, format: date-time}
         recorded_at: {type: string, format: date-time}
         actor_ref: {type: string, format: uuid}
@@ -6933,6 +7600,7 @@ components:
         name: {type: string}
         description: {type: [string, "null"]}
         status: {type: string, enum: [active, not_open, suspended]}
+        read_only: {type: boolean, description: "W11.07: phòng ban ngoài lần gán, chọn được ở chế độ chỉ xem (Lãnh đạo đơn vị, Ban Giám đốc)"}
     KNAssignment:
       type: object
       required: [assignment_id, user_ref, role, org_ref, org_name, mgmt_level, mgmt_level_code, communes, departments, valid_from, valid_to, active,
@@ -6954,6 +7622,7 @@ components:
         created_at: {type: string, format: date-time}
         updated_by: {type: string, format: uuid}
         updated_at: {type: string, format: date-time}
+        attributes: {$ref: "#/components/schemas/KNAssignmentAttrs"}
     KNWarning:
       type: object
       required: [code, message]
@@ -6977,6 +7646,83 @@ components:
         expires_at: {type: string, format: date-time}
         support_session_id: {type: [string, "null"], format: uuid, description: "Khác null: chế độ hỗ trợ — hiện dải cảnh báo vàng"}
         on_behalf_of: {type: [string, "null"], format: uuid}
+        read_only: {type: boolean, description: "W11.07: ngữ cảnh chỉ xem (Cấp TW, Lãnh đạo đơn vị ở phòng ban khác, Ban Giám đốc) — mọi thao tác ghi 403 accounts.context_read_only"}
+        mgmt_level_code: {type: [string, "null"]}
+        manager: {type: boolean, description: "Lãnh đạo (≥ phó phòng/phụ trách/lãnh đạo đơn vị, hoặc nhóm Lãnh đạo phòng)"}
+        province_group: {type: [string, "null"]}
+        duties: {type: array, items: {type: string}}
+        internal_unit_code: {type: [string, "null"]}
+        powers: {type: array, items: {type: string}, description: "Quyền nhận qua ủy quyền có hạn còn hiệu lực (đầy đủ ở GET /v1/me/context)"}
+    # --- W11.07: phân quyền trong vai + đơn vị nội bộ (cùng định nghĩa ở admin.yaml/application.yaml) ---
+    KNAssignmentAttrs:
+      type: object
+      description: "Thuộc tính phân quyền trong vai (sổ phụ pf_accounts.assignment_attr_event, W11.07)"
+      required: [province_group, province_group_label, duties, internal_unit_code, facility_refs, household_refs]
+      properties:
+        province_group: {type: [string, "null"], enum: [vien_chuc, tong_hop, chu_nhiem, lanh_dao_phong, ban_giam_doc, null], description: "Nhóm Cấp Tỉnh (chỉ kn_tinh; tạm Q-059)"}
+        province_group_label: {type: [string, "null"]}
+        duties: {type: array, items: {type: string, enum: [qtnv_bao_gia, phu_trach_bieu]}, description: "Cờ nhiệm vụ (chỉ kn_tinh)"}
+        internal_unit_code: {type: [string, "null"], description: "Đơn vị nội bộ; Cấp Xã: đơn vị quản lý (HS-37)"}
+        facility_refs: {type: array, items: {type: string, format: uuid}, description: "Cấp Xã: giới hạn cơ sở (rỗng = cả xã)"}
+        household_refs: {type: array, items: {type: string, format: uuid}, description: "Cấp Xã: giới hạn hộ (rỗng = cả xã)"}
+    KNDelegation:
+      type: object
+      required: [delegation_id, grantor_ref, grantee_ref, department_code, power, power_label, valid_from, valid_to, revoked, status, reason, created_at]
+      properties:
+        delegation_id: {type: string, format: uuid}
+        grantor_ref: {type: string, format: uuid}
+        grantee_ref: {type: string, format: uuid}
+        department_code: {type: string}
+        power: {type: string, enum: [mo_lai_ky, duyet_bao_cao]}
+        power_label: {type: string}
+        valid_from: {type: string, format: date-time}
+        valid_to: {type: string, format: date-time}
+        revoked: {type: boolean}
+        status: {type: string, enum: [active, scheduled, expired, revoked]}
+        reason: {type: string}
+        created_at: {type: string, format: date-time}
+    KNDelegationList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNDelegation"}}
+    InternalUnit:
+      type: object
+      required: [id, org_ref, code, kind, kind_label, name, department_code, sort_order, active, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid}
+        code: {type: string}
+        kind: {type: string, enum: [ban_giam_doc, van_phong, phong, tram, trai, tang_cuong]}
+        kind_label: {type: string}
+        name: {type: string}
+        department_code: {type: [string, "null"], description: "kind = phong: mã phòng ban P2"}
+        sort_order: {type: integer}
+        active: {type: boolean}
+        updated_at: {type: string, format: date-time}
+    InternalUnitList:
+      type: object
+      required: [org_ref, items, kinds]
+      properties:
+        org_ref: {type: string, format: uuid}
+        items: {type: array, items: {$ref: "#/components/schemas/InternalUnit"}}
+        kinds: {type: array, items: {type: object, required: [code, label], properties: {code: {type: string}, label: {type: string}}}}
+    InternalUnitInput:
+      type: object
+      required: [code, kind, name]
+      properties:
+        org_ref: {type: string, format: uuid, description: "Tạo: bắt buộc (Nút cấp 1/2)"}
+        code: {type: string, description: "Sửa: bỏ qua (mã không đổi)"}
+        kind: {type: string, enum: [ban_giam_doc, van_phong, phong, tram, trai, tang_cuong]}
+        name: {type: string}
+        department_code: {type: string}
+        sort_order: {type: integer}
+    KNCatalogItem:
+      type: object
+      required: [code, label]
+      properties:
+        code: {type: string}
+        label: {type: string}
     KNAccountLogEntry:
       type: object
       required: [seq, event, entity_ref, actor_ref, actor_display, at, recorded_at, changes, reason]
@@ -6985,7 +7731,8 @@ components:
         event:
           type: string
           enum: [account.created, account.locked, account.unlocked, account.activation_sent, account.assignment_changed, account.profile_updated,
-            assignment.granted, assignment.changed, assignment.revoked]
+            account.dormant_warned, account.totp_reset,
+            assignment.granted, assignment.changed, assignment.revoked, assignment.attributes_changed]
         entity_ref: {type: [string, "null"], format: uuid, description: "assignment_id với sự kiện assignment.*"}
         actor_ref: {type: string, format: uuid}
         actor_display: {type: [string, "null"]}
@@ -7349,7 +8096,7 @@ components:
         sort_order: {type: integer}
         status: {type: string, enum: [active, not_open, suspended], description: "Đang áp dụng / Chưa mở / Ngưng hoạt động"}
         status_label: {type: string}
-        menu_profile: {type: string, enum: [trong_trot, generic], description: "Bộ menu dựng sẵn trong mã (kn.menu/v2)"}
+        menu_profile: {type: string, enum: [trong_trot, generic, chan_nuoi_thuy_san, ke_hoach_tai_chinh, thong_tin_truyen_thong, hanh_chinh_tong_hop], description: "Bộ menu dựng sẵn trong mã (kn.menu/v3); generic + mã có khuôn riêng → khuôn riêng"}
         retired: {type: boolean, description: "Đã xóa (sự kiện retired) — mã không tái sử dụng"}
         selectable: {type: boolean, description: "Chọn được ở bước 2 đăng nhập (Đang áp dụng, chưa xóa)"}
         account_count: {type: [integer, "null"], description: "null = chưa nối nguồn đếm (P1) hoặc Application API"}

@@ -1,0 +1,678 @@
+paths:
+# @ag-order: 320
+  /v1/forms/profiles:
+    get:
+      summary: Cấu hình biểu của các bên dùng (hierarchy, publish_by, close_by, review_by)
+      operationId: formsProfiles
+      tags: [forms]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsProfile"}}
+        "401": {$ref: "#/components/responses/Problem"}
+# @ag-order: 321
+  /v1/forms/templates:
+    get:
+      summary: Phiên bản mới nhất của mỗi biểu của bên dùng
+      operationId: formsTemplates
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsTemplate"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Định nghĩa phiên bản mới của biểu (vai define_by) — phiên bản cũ và kỳ đã phát hành không đổi
+      operationId: formsDefineTemplate
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FormsTemplateInput"}
+      responses:
+        "201":
+          description: Phiên bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsTemplate"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: forms.template_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 322
+  /v1/forms/templates/fixtures:
+    post:
+      summary: Ghi các biểu mẫu thử (fixture) cho bên dùng — cơ chế chạy khi chưa có biểu thật (Q-01)
+      operationId: formsInstallFixtures
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Các phiên bản đã ghi (fixture = true)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsTemplate"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 323
+  /v1/forms/templates/{id}:
+    get:
+      summary: Một phiên bản biểu
+      operationId: formsTemplate
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsTemplate"}
+        "404": {description: forms.template_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 324
+  /v1/forms/periods:
+    get:
+      summary: Kỳ của bên dùng mà người gọi thấy (toàn quốc, Nút phát hành, hoặc có đơn vị nhận trong phạm vi), mới trước
+      operationId: formsPeriods
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsPeriod"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Phát hành kỳ (cấp publish_by; đơn vị nhận thuộc phạm vi người phát hành; biểu fixture chỉ khi profile cho phép)
+      operationId: formsPublishPeriod
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FormsPublishInput"}
+      responses:
+        "201":
+          description: Kỳ đã phát hành
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsPeriodView"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: "forms.profile_not_found | forms.template_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: forms.fixture_template, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | forms.facility_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 325
+  /v1/forms/periods/{id}:
+    get:
+      summary: Kỳ kèm trạng thái chiếu từ sổ, bài nộp cuối của từng đơn vị trong phạm vi, ảnh chụp
+      operationId: formsPeriod
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+      responses:
+        "200":
+          description: Kỳ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsPeriodView"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 326
+  /v1/forms/periods/{id}/submissions:
+    post:
+      summary: Nộp phiên bản mới của bài (cấp lá, đơn vị trong phạm vi) — lập yêu cầu duyệt ở cap/workflow
+      operationId: formsSubmit
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FormsSubmitInput"}
+      responses:
+        "201":
+          description: Phiên bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsSubmission"}
+        "202":
+          description: "Bản offline (captured_at) đến sau khi kỳ đã chốt với đơn vị — giữ ở trạng thái Chờ mở kỳ (status = awaiting_reopen), không vào số liệu kỳ (W11.05)"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsSubmission"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "forms.period_closed | forms.submission_accepted | forms.submission_limit | forms.period_cancelled | forms.submission_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: "forms.values_invalid | forms.unit_not_in_period | forms.late_reason_required", $ref: "#/components/responses/Problem"}
+    get:
+      summary: Lịch sử phiên bản bài nộp của một đơn vị (mới trước) kèm rà soát
+      operationId: formsSubmissions
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: unit, in: query, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsSubmission"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 327
+  /v1/forms/periods/{id}/close:
+    post:
+      summary: Chốt kỳ (cấp close_by của Nút phát hành) — ảnh chụp đóng băng, băm SHA-256 do DB tính; sự kiện pf.forms.period.closed
+      operationId: formsClosePeriod
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Kỳ sau chốt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsPeriodView"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "forms.period_closed | forms.pending_review | forms.period_cancelled", $ref: "#/components/responses/Problem"}
+# @ag-order: 328
+  /v1/forms/periods/{id}/reopen:
+    post:
+      summary: Mở lại kỳ đã chốt (cả kỳ hoặc một số đơn vị; lý do bắt buộc) — bản ghi mới, ảnh chụp đã chốt không đổi
+      operationId: formsReopenPeriod
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FormsReopenInput"}
+      responses:
+        "200":
+          description: Kỳ sau mở lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsPeriodView"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "forms.period_not_closed | forms.period_cancelled", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | forms.unit_not_in_period", $ref: "#/components/responses/Problem"}
+# @ag-order: 329
+  /v1/forms/periods/{id}/cancel:
+    post:
+      summary: Hủy kỳ đang mở (cấp close_by của Nút phát hành; lý do bắt buộc) — trạng thái cuối, không nộp/chốt/mở lại sau hủy (W11.05, KHTC BR-DL-18)
+      operationId: formsCancelPeriod
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FormsCancelInput"}
+      responses:
+        "200":
+          description: Kỳ sau hủy
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsPeriodView"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "forms.period_closed | forms.period_cancelled", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 330
+  /v1/forms/periods/{id}/snapshots:
+    get:
+      summary: Ảnh chụp của kỳ (native hoặc ghi song song — mã kỳ của bên dùng; kỳ ghi song song chỉ cấp trên cấp lá), kèm kiểm băm
+      operationId: formsPeriodSnapshots
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+      responses:
+        "200":
+          description: Danh sách (không kèm nội dung)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsSnapshot"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 331
+  /v1/forms/submissions/{id}/review:
+    post:
+      summary: Rà soát phiên bản bài nộp cuối (cấp review_by) — chấp nhận hoặc trả lại; người rà soát ≠ người nộp (cap/workflow)
+      operationId: formsReview
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FormsReviewInput"}
+      responses:
+        "200":
+          description: Bài nộp sau rà soát
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsSubmission"}
+        "403": {description: "forbidden | self_approval_forbidden", $ref: "#/components/responses/Problem"}
+        "404": {description: forms.submission_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "forms.period_closed | forms.submission_superseded | forms.already_reviewed | forms.submission_limit | forms.period_cancelled", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 332
+  /v1/forms/snapshots/{id}:
+    get:
+      summary: Một ảnh chụp kèm nội dung đóng băng và kết quả kiểm băm (hash_valid)
+      operationId: formsSnapshot
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+      responses:
+        "200":
+          description: Ảnh chụp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsSnapshot"}
+        "404": {description: forms.snapshot_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 333
+  /v1/forms/tasks:
+    get:
+      summary: "W11.42 Công việc (kỳ × đơn vị trong phạm vi người gọi) kèm định nghĩa biểu và bài nộp cuối — màn Công việc cần làm (CNTS FN-08), theo dõi nộp"
+      operationId: formsTasks
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: code, in: query, schema: {type: string}, description: "Mã biểu (vd CNTS-BM04)"}
+        - {name: from, in: query, schema: {type: string, format: date}, description: "Kỳ có ngày cuối ≥ from"}
+        - {name: to, in: query, schema: {type: string, format: date}, description: "Kỳ có ngày đầu ≤ to"}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 60}, description: Số kỳ tối đa}
+      responses:
+        "200":
+          description: Danh sách (kỳ mới trước; kỳ đã hủy bỏ qua)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsTask"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 334
+  /v1/forms/periods/{id}/previous:
+    get:
+      summary: "W11.42 Sao chép kỳ trước (UR-XA-13): bài nộp cuối của đơn vị ở kỳ gần nhất trước đó của cùng biểu (null nếu chưa có)"
+      operationId: formsPrevious
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: unit, in: query, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Bài kỳ trước
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [previous]
+                properties:
+                  previous:
+                    oneOf:
+                      - {type: "null"}
+                      - {$ref: "#/components/schemas/FormsPrevious"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+  # --- hết pf/forms ---
+  # --- pf/extension Kỳ KHTC (W11.62 — BRD KHTC v2.2 FN-TI-02.03, D4 KH2): mở kỳ bằng ô chọn (tên kỳ, khoảng thời gian, hạn tự
+  # điền), một phiếu mỗi phòng = kỳ native cap/forms profile kn_khtc (nộp, yêu cầu bổ sung/xác nhận ở /v1/forms), gắn kỳ nguồn
+  # (calendar_id, calendar_version, native_key), tiến độ phiếu + nguồn, sửa hạn, đóng kỳ, hủy kỳ. Cấp Tỉnh Phòng KHTC ghi. ---
+components:
+  parameters:
+# @ag-order: 489
+    FormsProfile:
+      name: profile
+      in: query
+      required: true
+      description: Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn)
+      schema: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$"}
+  schemas:
+# @ag-order: 851
+    FormsProfile:
+      type: object
+      required: [name, hierarchy, roles, publish_by, close_by, review_by, allow_fixtures, require_reviewed_before_close]
+      properties:
+        name: {type: string}
+        hierarchy: {type: array, items: {type: string}}
+        roles: {type: object, additionalProperties: {type: string}}
+        publish_by: {type: string}
+        close_by: {type: string}
+        review_by: {type: string}
+        allow_fixtures: {type: boolean}
+        require_reviewed_before_close: {type: boolean}
+        unit_kinds: {type: array, items: {type: string, enum: [commune, facility, household, department]}, description: "Loại đơn vị lá (phần tử đầu = mặc định) — W11.05"}
+        departments: {type: array, items: {type: string}, description: "Phòng ban KN được dùng profile (rỗng = mọi phòng ban)"}
+        max_submissions: {type: integer, minimum: 0, maximum: 20, description: "Số lần gửi tối đa mặc định (0 = không giới hạn)"}
+# @ag-order: 853
+    FormsTemplateInput:
+      type: object
+      required: [profile, code, title, fields]
+      properties:
+        profile: {type: string}
+        code: {type: string, pattern: "^[A-Z0-9][A-Z0-9._-]{0,63}$"}
+        title: {type: string, minLength: 1, maxLength: 300}
+        fields: {type: array, minItems: 1, maxItems: 500, items: {$ref: "#/components/schemas/FormsField"}}
+        fixture: {type: boolean, default: false}
+# @ag-order: 854
+    FormsTemplate:
+      type: object
+      required: [id, profile, code, version, title, fields, fixture, created_by, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        profile: {type: string}
+        code: {type: string}
+        version: {type: integer}
+        title: {type: string}
+        fields: {type: array, items: {$ref: "#/components/schemas/FormsField"}}
+        fixture: {type: boolean}
+        created_by: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+# @ag-order: 855
+    FormsPublishInput:
+      type: object
+      required: [profile, template_id, label, due_at, units]
+      properties:
+        profile: {type: string}
+        template_id: {type: string, format: uuid}
+        label: {type: string, minLength: 1, maxLength: 200}
+        due_at: {type: string, format: date-time}
+        units: {type: array, minItems: 1, maxItems: 5000, items: {type: string}}
+        unit_kind: {type: string, enum: [commune, facility, household, department], description: "Rỗng = loại mặc định của profile (W11.05)"}
+        unit_parents: {type: array, items: {type: string}, description: "Mã xã cha song song với units — bắt buộc với facility/household, cấm với loại khác"}
+        max_submissions: {type: integer, minimum: 0, maximum: 20, description: "Vắng = mặc định của profile; 0 = không giới hạn"}
+        period: {$ref: "#/components/schemas/FormsPeriodKey"}
+# @ag-order: 856
+    FormsPeriodKey:
+      type: object
+      description: Khóa kỳ theo lịch kỳ hệ thống (W11.03 — reportcycle/domain Span.Key, thẻ quy tắc chia kỳ) — lưu ở pf_forms.period_spec
+      properties:
+        kind: {type: string, enum: [day, week, ksgm_week, month, quarter, season, year, adhoc]}
+        key: {type: string, pattern: "^[0-9A-Za-z-]{1,20}$", description: "Vd 2026-W41, 2026-10-K2, 2026-Q4"}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        rule: {type: string, maxLength: 200}
+# @ag-order: 857
+    FormsPeriodSpec:
+      type: object
+      required: [unit_kind, unit_parents, max_submissions, review_flow, period_kind, period_key, period_from, period_to, period_rule]
+      properties:
+        unit_kind: {type: string, enum: [commune, facility, household, department]}
+        unit_parents: {type: array, items: {type: string}}
+        max_submissions: {type: integer, description: "0 = không giới hạn"}
+        review_flow: {type: string, enum: [single], description: "Chỉ một bước rà soát bốn mắt; nhiều bước (HCTH) chưa hỗ trợ"}
+        period_kind: {type: [string, "null"]}
+        period_key: {type: [string, "null"]}
+        period_from: {type: [string, "null"], format: date}
+        period_to: {type: [string, "null"], format: date}
+        period_rule: {type: [string, "null"]}
+# @ag-order: 858
+    FormsCancelInput:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 10, maxLength: 500}
+# @ag-order: 859
+    FormsHeld:
+      type: object
+      required: [id, version, values, submitter_ref, captured_at, event_time]
+      description: Bài đến sau khi kỳ đã chốt với đơn vị (Chờ mở kỳ) — không vào số liệu kỳ
+      properties:
+        id: {type: string, format: uuid}
+        version: {type: integer}
+        values: {type: object, additionalProperties: {type: string}}
+        submitter_ref: {type: string, format: uuid}
+        captured_at: {type: string, format: date-time}
+        event_time: {type: string, format: date-time}
+# @ag-order: 860
+    FormsPeriod:
+      type: object
+      required: [id, profile, template_id, template_code, template_version, label, due_at, units, owner_ref, publisher_level, published_by, published_at]
+      properties:
+        id: {type: string, format: uuid}
+        profile: {type: string}
+        template_id: {type: string, format: uuid}
+        template_code: {type: string}
+        template_version: {type: integer}
+        label: {type: string}
+        due_at: {type: string, format: date-time}
+        units: {type: array, items: {type: string}}
+        owner_ref: {type: [string, "null"], format: uuid}
+        publisher_level: {type: string}
+        published_by: {type: string, format: uuid}
+        published_at: {type: string, format: date-time}
+# @ag-order: 861
+    FormsPeriodEvent:
+      type: object
+      required: [id, seq, action, mode, units, reason, actor_ref, event_time]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        action: {type: string, enum: [published, closed, reopened, cancelled]}
+        mode: {type: string, enum: [manual, auto]}
+        units: {type: array, items: {type: string}}
+        reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+# @ag-order: 862
+    FormsReview:
+      type: object
+      required: [id, decision, reviewer_ref, note, event_time]
+      properties:
+        id: {type: string, format: uuid}
+        decision: {type: string, enum: [accepted, returned]}
+        reviewer_ref: {type: string, format: uuid}
+        note: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+# @ag-order: 863
+    FormsSubmitInput:
+      type: object
+      required: [unit, values]
+      properties:
+        unit: {type: string}
+        values: {type: object, additionalProperties: {type: string}, description: "Khóa trường → giá trị chuỗi (thập phân dạng chuỗi, R-10)"}
+        captured_at: {type: string, format: date-time, description: "Bản offline: lúc ghi trên thiết bị — kỳ đã chốt với đơn vị thì bài được giữ (202, Chờ mở kỳ)"}
+        base_version:
+          type: integer
+          minimum: 0
+          description: "W11.42 khóa lạc quan: số phiên bản cuối người nhập đã thấy (0 = chưa có bài). Khác phiên bản hiện tại → 409 forms.submission_conflict (không ghi đè). Vắng = không kiểm"
+        nil_report: {type: boolean, default: false, description: "W11.42 Báo không phát sinh (BM-01 cơ sở không hoạt động, BM-17 không phát sinh): mọi trường số = 0"}
+        note: {type: string, maxLength: 1000, description: "H08 ghi chú chung"}
+        explanation: {type: string, maxLength: 1000, description: "H09 giải trình / lý do trễ — bắt buộc khi gửi sau hạn với profile require_late_reason (kn_cnts)"}
+# @ag-order: 864
+    FormsSubmission:
+      type: object
+      required: [id, period_id, unit, version, values, submitter_ref, event_time, status, review]
+      properties:
+        id: {type: string, format: uuid}
+        period_id: {type: string, format: uuid}
+        unit: {type: string}
+        version: {type: integer}
+        values: {type: object, additionalProperties: {type: string}}
+        submitter_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        status: {type: string, enum: [submitted, accepted, returned, awaiting_reopen]}
+        review:
+          oneOf:
+            - {type: "null"}
+            - {$ref: "#/components/schemas/FormsReview"}
+        nil_report: {type: boolean, description: "W11.42 Báo không phát sinh"}
+        note: {type: [string, "null"]}
+        explanation: {type: [string, "null"]}
+        late: {type: boolean, description: "W11.42 nộp sau hạn (DB tính từ captured_at hoặc event_time)"}
+        captured_at: {type: [string, "null"], format: date-time}
+# @ag-order: 865
+    FormsReviewInput:
+      type: object
+      required: [decision]
+      properties:
+        decision: {type: string, enum: [accepted, returned]}
+        note: {type: string, maxLength: 1000, description: "Bắt buộc khi trả lại"}
+# @ag-order: 866
+    FormsReopenInput:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 10, maxLength: 500}
+        units: {type: array, items: {type: string}, description: "Rỗng = cả kỳ"}
+# @ag-order: 867
+    FormsSnapshot:
+      type: object
+      required: [id, period_ref, profile, snapshot_no, period_event_id, content_hash, hash_valid, rule_version, actor_ref, event_time]
+      properties:
+        id: {type: string, format: uuid}
+        period_ref: {type: string, format: uuid}
+        profile: {type: string}
+        snapshot_no: {type: integer, minimum: 1}
+        period_event_id: {type: string, format: uuid}
+        content_hash: {type: string, description: "SHA-256 (hex) của nội dung, do DB tính"}
+        hash_valid: {type: boolean, description: "Băm tính lại khớp content_hash"}
+        rule_version: {type: string}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        content: {type: object, additionalProperties: true, description: "Nội dung đóng băng (chỉ ở GET /v1/forms/snapshots/{id})"}
+# @ag-order: 868
+    FormsUnit:
+      type: object
+      required: [unit, parent, status, submission, held]
+      properties:
+        unit: {type: string}
+        parent: {type: string, description: "Đơn vị lọc phạm vi: mã xã cha (cơ sở/hộ), chính unit với loại khác"}
+        status:
+          type: string
+          enum: [not_submitted, overdue, submitted, accepted, returned, missed, closed_unadjusted, awaiting_reopen]
+          description: "Khi kỳ đã chốt với đơn vị: missed = Không nộp, closed_unadjusted = Đã chốt – chưa điều chỉnh, awaiting_reopen = Chờ mở kỳ (W11.05). overdue = Trễ hạn: chưa gửi, kỳ còn nhận bài, quá hạn (W11.42)"
+        submission:
+          oneOf:
+            - {type: "null"}
+            - {$ref: "#/components/schemas/FormsSubmission"}
+        held:
+          oneOf:
+            - {type: "null"}
+            - {$ref: "#/components/schemas/FormsHeld"}
+# @ag-order: 869
+    FormsPeriodView:
+      type: object
+      required: [period, spec, status, reopen_units, events, units, snapshots]
+      properties:
+        period: {$ref: "#/components/schemas/FormsPeriod"}
+        spec: {$ref: "#/components/schemas/FormsPeriodSpec"}
+        status: {type: string, enum: [open, closed, reopened, cancelled]}
+        reopen_units: {type: array, items: {type: string}}
+        events: {type: array, items: {$ref: "#/components/schemas/FormsPeriodEvent"}}
+        units: {type: array, items: {$ref: "#/components/schemas/FormsUnit"}}
+        snapshots: {type: array, items: {$ref: "#/components/schemas/FormsSnapshot"}}
+    # --- pf/contact (W11.23) ---
+# @ag-order: 933
+    FormsTask:
+      type: object
+      description: "W11.42 Một công việc (kỳ × đơn vị) — cùng dữ liệu với entity đồng bộ forms_task"
+      required: [id, profile, period_id, unit, unit_kind, parent, template_id, template_code, template_title, template_version, fields, label,
+        period_kind, period_key, period_from, period_to, due_at, period_status, open, status, version, submission_id, values, nil_report, note,
+        explanation, late, submitted_at, return_note, held_at]
+      properties:
+        id: {type: string, format: uuid, description: "UUIDv5 ổn định theo (kỳ, đơn vị)"}
+        profile: {type: string}
+        period_id: {type: string, format: uuid}
+        unit: {type: string}
+        unit_kind: {type: string, enum: [commune, facility, household, department]}
+        parent: {type: string}
+        template_id: {type: string, format: uuid}
+        template_code: {type: string}
+        template_title: {type: string}
+        template_version: {type: integer}
+        fields: {type: array, items: {$ref: "#/components/schemas/FormsField"}}
+        label: {type: string}
+        period_kind: {type: string}
+        period_key: {type: string}
+        period_from: {type: [string, "null"], format: date}
+        period_to: {type: [string, "null"], format: date}
+        due_at: {type: string, format: date-time}
+        period_status: {type: string, enum: [open, closed, reopened, cancelled]}
+        open: {type: boolean, description: Kỳ đang nhận bài của đơn vị}
+        status: {type: string, enum: [not_submitted, overdue, submitted, accepted, returned, missed, closed_unadjusted, awaiting_reopen]}
+        version: {type: integer, minimum: 0, description: "Phiên bản bài nộp cuối (0 = chưa có) — gửi lại làm base_version"}
+        submission_id: {type: [string, "null"], format: uuid}
+        values: {type: object, additionalProperties: {type: string}}
+        nil_report: {type: boolean}
+        note: {type: string}
+        explanation: {type: string}
+        late: {type: boolean}
+        submitted_at: {type: [string, "null"], format: date-time}
+        return_note: {type: [string, "null"], description: Lý do yêu cầu điều chỉnh}
+        held_at: {type: [string, "null"], format: date-time, description: Có bài giữ Chờ mở kỳ}
+# @ag-order: 934
+    FormsPrevious:
+      type: object
+      required: [period_id, label, submission]
+      properties:
+        period_id: {type: string, format: uuid}
+        label: {type: string}
+        submission: {$ref: "#/components/schemas/FormsSubmission"}
+    # --- extension CNTS biểu kỳ Cấp Xã (W11.42) ---

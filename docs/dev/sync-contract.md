@@ -188,7 +188,7 @@ Chiều xuống entity `plot`: `data = {ref, code, name, commune_code, cooperati
 
 ### Payload `field_report` (pf/extension, `app.ReportPayload`)
 
-Nguồn: `internal/platform/extension/app/payload.go` (`ReportPayload.ToReport`), `domain/report.go` (`Report.Validate`), `app/reports.go` (`SubmitReport`). `id` của bản ghi là mã báo cáo; `event_time` lấy từ phong bì. Trường lạ bị bỏ qua (app **không** gửi GPS).
+Nguồn: `internal/kn/extension/app/payload.go` (`ReportPayload.ToReport`), `domain/report.go` (`Report.Validate`), `app/reports.go` (`SubmitReport`). `id` của bản ghi là mã báo cáo; `event_time` lấy từ phong bì. Trường lạ bị bỏ qua (app **không** gửi GPS).
 
 ```json
 {
@@ -287,7 +287,7 @@ Mọi entity chỉ `create` / `correct`; `event_time` là lúc xảy ra tại ru
 
 ## Báo cáo KN v7.7 (P7, field-app Cán bộ xã — FN-XA-03.01/03.02, N-07)
 
-Nguồn: `internal/platform/extension/reportcycle/app/sync.go` (`ReportSync`, `ReportSink`), `store/sync.go`; migration pf 000077 (`report_task.sync_seq` tăng ở mọi UPDATE qua trigger, `report_task.created_seq` cấp một lần). Kiểm thử: `tests/kn77/p7_sync_integration_test.go` (`TestFN_XA_03_02_OfflineReportSync`).
+Nguồn: `internal/kn/extension/reportcycle/app/sync.go` (`ReportSync`, `ReportSink`), `store/sync.go`; migration pf 000077 (`report_task.sync_seq` tăng ở mọi UPDATE qua trigger, `report_task.created_seq` cấp một lần). Kiểm thử: `tests/kn77/p7_sync_integration_test.go` (`TestFN_XA_03_02_OfflineReportSync`).
 
 **Ngữ cảnh phiên.** Request mang `X-AG-Context` (P1) → pf/sync lấy phạm vi pull/push = `Principal.KN.Scope` (Cấp Xã: các xã phụ trách), KHÔNG theo `org_ref` của token; dấu vân tay con trỏ có thêm `kn:<vai>:<phòng ban>:` → đổi vai trò/phòng ban/xã phụ trách = `reset: true`. Đơn vị phụ trách xung đột = Nút của ngữ cảnh. Không có header → đường cũ (`ScopeResolver`), entity báo cáo bị bỏ qua (Source trả 403), các entity khác vẫn đồng bộ. Chỉ vai `kn_xa` nhận/gửi entity báo cáo; dữ liệu lọc theo phòng ban của ngữ cảnh.
 
@@ -309,6 +309,26 @@ Chỉ `op: create`; `id` = UUIDv7 máy sinh = id bài nộp (P4 nhận gửi l�
 | Vi phạm yêu cầu mẫu khi Gửi | `rejected` `extension.submission_invalid`, `errors[{field: "rows.<row_key>.<chữ cái>", reason}]` |
 | Kỳ đã chốt | `rejected` `extension.period_closed` |
 | Công việc ngoài phạm vi / không có | `rejected` `extension.report_task_not_found` |
+
+## Biểu kỳ cap/forms (W11.42, field-app Cấp Xã — CNTS BM-01/04/05/17)
+
+Nguồn: `internal/platform/forms/app/sync.go` (`SyncSource`, `SyncSink`), `store/meta.go`; migration pf 000149 (`pf_forms.sync_feed`: trigger AFTER INSERT trên `period`, `period_event` native, `submission`, `review`, `held_submission` thêm một dòng `feed_seq` tăng dần — `unit_code '*'` = cả kỳ). Kiểm thử: `internal/platform/forms/app/cnts_integration_test.go` (`TestFormsCNTSPeriods_W1142`), field-app `test/cnts_period_test.dart`.
+
+Chỉ người gọi là CẤP LÁ của một profile (`kn_cnts`: vai `kn_xa` phòng CNTS) nhận/gửi; không có → Source trả 403 (pf/sync bỏ qua entity). Phạm vi = ngữ cảnh phiên (xã phụ trách; cơ sở/hộ lọc theo xã cha và giới hạn `facility_refs`/`household_refs` W11.07).
+
+- Chiều xuống `forms_task`: `id` = UUIDv5 cố định theo (kỳ, đơn vị) (`forms/app.TaskID`), `version` = `feed_seq`. `data` = `FormsTask` của OpenAPI (`/v1/forms/tasks`): kỳ, đơn vị, loại đơn vị, xã cha, biểu (mã, tên, phiên bản, `fields[]`), khóa/khoảng kỳ, `due_at`, `period_status`, `open`, `status` (kể cả `overdue`, `missed`, `awaiting_reopen`), phiên bản cuối `version` + `values`, `nil_report`, `note`, `explanation`, `late`, `return_note`, `held_at`. Kỳ hủy → tombstone. Máy tự tính lại "Trễ hạn" theo `due_at`.
+- Chiều lên `forms_submission`: chỉ `op: create`; `id` = UUIDv7 máy sinh = mã phiên bản (gửi lại cùng `id` → `duplicate`). `payload = {profile, period_id, unit, values{}, base_version, nil_report, note, explanation}`; `event_time` = `captured_at` (giờ thiết bị — chỉ lưu để kiểm toán). Đi qua `SubmitWith` của REST. **Trễ hạn tính theo giờ MÁY CHỦ nhận bài** (D8, pf 20261013091503): bản ghi trên máy trước hạn nhưng đồng bộ sau hạn vẫn là trễ (`late = true`) và cần `explanation`; máy chỉ kiểm sớm theo đồng hồ máy để gợi ý.
+
+| Tình huống | Kết quả |
+|---|---|
+| Hợp lệ, kỳ còn nhận bài | `accepted` |
+| Kỳ đã chốt với đơn vị | `accepted` + `code: forms.awaiting_reopen` — bài GIỮ "Chờ mở kỳ" (`held_submission`), lượt pull sau trả `status: awaiting_reopen` |
+| `base_version` khác phiên bản hiện tại | `rejected` `forms.submission_conflict` — KHÔNG ghi đè; máy báo tải bản mới |
+| Ô sai / quy tắc chặn | `rejected` `forms.values_invalid`, `errors[{field: <khóa trường>, reason}]` |
+| Máy chủ nhận sau hạn (kể cả bản ghi trên máy trước hạn) thiếu `explanation` | `rejected` `forms.late_reason_required` — người nhập ghi lý do trễ rồi gửi lại (bản mới, `id` mới) |
+| Kỳ đã hủy | `rejected` `forms.period_cancelled` |
+
+`catalog_item` (pf/masterdata) từ W11.42 gồm cả 12 danh mục CNTS `cnts_*` (giá trị hiện hành; `attrs` như `GET /v1/masterdata/catalogs/{catalog}`).
 
 ## Tệp minh chứng
 

@@ -1,0 +1,541 @@
+[
+  {
+    "Name": "submitted-amend-False-late-False",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.submitted",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"province_code\":\"89\",\"week_start\":\"2027-10-20\",\"version\":2,\"approver_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\"],\"event_time\":\"2027-10-13T11:02:03+07:00\",\"amendment\":false,\"late\":false}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "submitted-amend-False-late-True",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.submitted",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"province_code\":\"89\",\"week_start\":\"2027-10-20\",\"version\":2,\"approver_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\"],\"event_time\":\"2027-10-13T11:02:03+07:00\",\"amendment\":false,\"late\":true}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "submitted-amend-True-late-False",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.submitted",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"province_code\":\"89\",\"week_start\":\"2027-10-20\",\"version\":2,\"approver_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\"],\"event_time\":\"2027-10-13T11:02:03+07:00\",\"amendment\":true,\"late\":false}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "submitted-amend-True-late-True",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.submitted",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"province_code\":\"89\",\"week_start\":\"2027-10-20\",\"version\":2,\"approver_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\"],\"event_time\":\"2027-10-13T11:02:03+07:00\",\"amendment\":true,\"late\":true}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "submitted-topic",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.submitted",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"province_code\":\"89\",\"week_start\":\"2027-10-20\",\"version\":2,\"approver_refs\":[],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "submitted-topic-owner-only",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.submitted",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"province_code\":\"89\",\"week_start\":\"2027-10-20\",\"version\":2,\"approver_refs\":[\"11111111-1111-4111-8111-111111111111\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "submitted-drop-empty",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.submitted",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"province_code\":\"\",\"week_start\":\"2027-10-20\",\"version\":2,\"approver_refs\":[],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "submitted-nil-id",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.submitted",
+    "Payload": "{\"schedule_id\":\"00000000-0000-0000-0000-000000000000\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"province_code\":\"89\",\"week_start\":\"2027-10-20\",\"version\":2,\"approver_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "submitted-bad-week",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.submitted",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"province_code\":\"89\",\"week_start\":\"bad-week\",\"version\":2,\"approver_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "submitted-fallback",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.submitted",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"province_code\":\"89\",\"week_start\":\"2027-10-20\",\"version\":2,\"approver_refs\":[\"22222222-2222-4222-8222-222222222222\",\"22222222-2222-4222-8222-222222222222\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\"],\"event_time\":\"invalid\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-approved",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"reviewer_ref\":\"22222222-2222-4222-8222-222222222222\",\"week_start\":\"2027-10-20\",\"decision\":\"approved\",\"reason\":\"Bổ sung địa điểm 0901234567\",\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-change_requested",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"reviewer_ref\":\"22222222-2222-4222-8222-222222222222\",\"week_start\":\"2027-10-20\",\"decision\":\"change_requested\",\"reason\":\"Bổ sung địa điểm 0901234567\",\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-unknown",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"reviewer_ref\":\"22222222-2222-4222-8222-222222222222\",\"week_start\":\"2027-10-20\",\"decision\":\"unknown\",\"reason\":\"Bổ sung địa điểm 0901234567\",\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-auto",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"reviewer_ref\":\"22222222-2222-4222-8222-222222222222\",\"week_start\":\"2027-10-20\",\"decision\":\"approved\",\"reason\":\"Bổ sung địa điểm 0901234567\",\"event_time\":\"2027-10-13T11:02:03+07:00\",\"auto\":true}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-nil-owner",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"00000000-0000-0000-0000-000000000000\",\"reviewer_ref\":\"22222222-2222-4222-8222-222222222222\",\"week_start\":\"2027-10-20\",\"decision\":\"approved\",\"reason\":\"Bổ sung địa điểm 0901234567\",\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-self",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"reviewer_ref\":\"11111111-1111-4111-8111-111111111111\",\"week_start\":\"2027-10-20\",\"decision\":\"approved\",\"reason\":\"Bổ sung địa điểm 0901234567\",\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-reason-nil",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"reviewer_ref\":\"22222222-2222-4222-8222-222222222222\",\"week_start\":\"2027-10-20\",\"decision\":\"change_requested\",\"reason\":null,\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-reason-empty",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"reviewer_ref\":\"22222222-2222-4222-8222-222222222222\",\"week_start\":\"2027-10-20\",\"decision\":\"change_requested\",\"reason\":\"\",\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-nil-id",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{\"schedule_id\":\"00000000-0000-0000-0000-000000000000\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"reviewer_ref\":\"22222222-2222-4222-8222-222222222222\",\"week_start\":\"2027-10-20\",\"decision\":\"approved\",\"reason\":\"Bổ sung địa điểm 0901234567\",\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-fallback",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"reviewer_ref\":\"22222222-2222-4222-8222-222222222222\",\"week_start\":\"2027-10-20\",\"decision\":\"approved\",\"reason\":\"Bổ sung địa điểm 0901234567\",\"event_time\":\"bad\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-invalid-week",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{\"schedule_id\":\"33333333-3333-4333-8333-333333333333\",\"owner_ref\":\"11111111-1111-4111-8111-111111111111\",\"reviewer_ref\":\"22222222-2222-4222-8222-222222222222\",\"week_start\":\"bad-week\",\"decision\":\"approved\",\"reason\":\"Bổ sung địa điểm 0901234567\",\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "work-reminded-submit_due",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reminded",
+    "Payload": "{\"kind\":\"submit_due\",\"week_start\":\"2027-10-20\",\"due_at\":\"2027-10-19T10:00:00+07:00\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"00000000-0000-0000-0000-000000000000\",\"22222222-2222-4222-8222-222222222222\",\"11111111-1111-4111-8111-111111111111\"],\"pending\":12}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "work-reminded-review_overdue",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reminded",
+    "Payload": "{\"kind\":\"review_overdue\",\"week_start\":\"2027-10-20\",\"due_at\":\"2027-10-19T10:00:00+07:00\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"00000000-0000-0000-0000-000000000000\",\"22222222-2222-4222-8222-222222222222\",\"11111111-1111-4111-8111-111111111111\"],\"pending\":12}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "work-reminded-unknown",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reminded",
+    "Payload": "{\"kind\":\"unknown\",\"week_start\":\"2027-10-20\",\"due_at\":\"2027-10-19T10:00:00+07:00\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"00000000-0000-0000-0000-000000000000\",\"22222222-2222-4222-8222-222222222222\",\"11111111-1111-4111-8111-111111111111\"],\"pending\":12}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "work-reminded-empty",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reminded",
+    "Payload": "{\"kind\":\"submit_due\",\"week_start\":\"2027-10-20\",\"due_at\":\"2027-10-19T10:00:00+07:00\",\"recipient_refs\":[],\"pending\":12}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "work-reminded-nil-only",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reminded",
+    "Payload": "{\"kind\":\"submit_due\",\"week_start\":\"2027-10-20\",\"due_at\":\"2027-10-19T10:00:00+07:00\",\"recipient_refs\":[\"00000000-0000-0000-0000-000000000000\"],\"pending\":12}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "work-reminded-fallback-due",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reminded",
+    "Payload": "{\"kind\":\"submit_due\",\"week_start\":\"2027-10-20\",\"due_at\":\"bad\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"00000000-0000-0000-0000-000000000000\",\"22222222-2222-4222-8222-222222222222\",\"11111111-1111-4111-8111-111111111111\"],\"pending\":12}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "work-reminded-negative-count",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reminded",
+    "Payload": "{\"kind\":\"review_overdue\",\"week_start\":\"2027-10-20\",\"due_at\":\"2027-10-19T10:00:00+07:00\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"00000000-0000-0000-0000-000000000000\",\"22222222-2222-4222-8222-222222222222\",\"11111111-1111-4111-8111-111111111111\"],\"pending\":-2}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "work-reminded-bad-week",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reminded",
+    "Payload": "{\"kind\":\"submit_due\",\"week_start\":\"unknown\",\"due_at\":\"2027-10-19T10:00:00+07:00\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"00000000-0000-0000-0000-000000000000\",\"22222222-2222-4222-8222-222222222222\",\"11111111-1111-4111-8111-111111111111\"],\"pending\":12}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "work-reminded-event-time-ignored",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reminded",
+    "Payload": "{\"kind\":\"submit_due\",\"week_start\":\"2027-10-20\",\"due_at\":\"2027-10-19T10:00:00+07:00\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"00000000-0000-0000-0000-000000000000\",\"22222222-2222-4222-8222-222222222222\",\"11111111-1111-4111-8111-111111111111\"],\"pending\":12,\"event_time\":\"2040-01-01T00:00:00Z\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "issued-sum-order",
+    "Group": "report",
+    "Event": "pf.extension.report_batch.issued",
+    "Payload": "{\"batch_id\":\"33333333-3333-4333-8333-333333333333\",\"season_label\":\"Thu Đông 2027\",\"period_count\":3,\"first_due_at\":\"2027-10-14T10:00:00+07:00\",\"event_time\":\"2027-10-13T11:02:03+07:00\",\"assignees\":[{\"commune_code\":\"30001\",\"officer_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"task_count\":4},{\"commune_code\":\"30002\",\"officer_refs\":[\"22222222-2222-4222-8222-222222222222\",\"11111111-1111-4111-8111-111111111111\"],\"task_count\":7}]}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "issued-empty",
+    "Group": "report",
+    "Event": "pf.extension.report_batch.issued",
+    "Payload": "{\"batch_id\":\"33333333-3333-4333-8333-333333333333\",\"season_label\":\"Thu Đông 2027\",\"period_count\":3,\"first_due_at\":\"2027-10-14T10:00:00+07:00\",\"event_time\":\"2027-10-13T11:02:03+07:00\",\"assignees\":[]}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "issued-only-invalid",
+    "Group": "report",
+    "Event": "pf.extension.report_batch.issued",
+    "Payload": "{\"batch_id\":\"33333333-3333-4333-8333-333333333333\",\"season_label\":\"Thu Đông 2027\",\"period_count\":3,\"first_due_at\":\"2027-10-14T10:00:00+07:00\",\"event_time\":\"2027-10-13T11:02:03+07:00\",\"assignees\":[{\"officer_refs\":[\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"task_count\":2}]}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "issued-nil-ref",
+    "Group": "report",
+    "Event": "pf.extension.report_batch.issued",
+    "Payload": "{\"batch_id\":\"00000000-0000-0000-0000-000000000000\",\"season_label\":\"Thu Đông 2027\",\"period_count\":3,\"first_due_at\":\"2027-10-14T10:00:00+07:00\",\"event_time\":\"2027-10-13T11:02:03+07:00\",\"assignees\":[{\"commune_code\":\"30001\",\"officer_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"task_count\":4},{\"commune_code\":\"30002\",\"officer_refs\":[\"22222222-2222-4222-8222-222222222222\",\"11111111-1111-4111-8111-111111111111\"],\"task_count\":7}]}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "issued-bad-ref",
+    "Group": "report",
+    "Event": "pf.extension.report_batch.issued",
+    "Payload": "{\"batch_id\":\"invalid\",\"season_label\":\"Thu Đông 2027\",\"period_count\":3,\"first_due_at\":\"2027-10-14T10:00:00+07:00\",\"event_time\":\"2027-10-13T11:02:03+07:00\",\"assignees\":[{\"commune_code\":\"30001\",\"officer_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"task_count\":4},{\"commune_code\":\"30002\",\"officer_refs\":[\"22222222-2222-4222-8222-222222222222\",\"11111111-1111-4111-8111-111111111111\"],\"task_count\":7}]}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "issued-fallback",
+    "Group": "report",
+    "Event": "pf.extension.report_batch.issued",
+    "Payload": "{\"batch_id\":\"33333333-3333-4333-8333-333333333333\",\"season_label\":\"Thu Đông 2027\",\"period_count\":3,\"first_due_at\":\"bad\",\"event_time\":\"bad\",\"assignees\":[{\"commune_code\":\"30001\",\"officer_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"task_count\":4},{\"commune_code\":\"30002\",\"officer_refs\":[\"22222222-2222-4222-8222-222222222222\",\"11111111-1111-4111-8111-111111111111\"],\"task_count\":7}]}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "issued-zero-negative",
+    "Group": "report",
+    "Event": "pf.extension.report_batch.issued",
+    "Payload": "{\"batch_id\":\"33333333-3333-4333-8333-333333333333\",\"season_label\":\"Thu Đông 2027\",\"period_count\":3,\"first_due_at\":\"2027-10-14T10:00:00+07:00\",\"event_time\":\"2027-10-13T11:02:03+07:00\",\"assignees\":[{\"officer_refs\":[\"11111111-1111-4111-8111-111111111111\"],\"task_count\":0},{\"officer_refs\":[\"11111111-1111-4111-8111-111111111111\",\"22222222-2222-4222-8222-222222222222\"],\"task_count\":-3}]}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "report-reminded-manual",
+    "Group": "report",
+    "Event": "pf.extension.report_task.reminded",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"period_label\":\"Tuần 1\",\"mode\":\"manual\",\"message\":\"Nhắc nộp\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\",\"22222222-2222-4222-8222-222222222222\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "report-reminded-auto_before",
+    "Group": "report",
+    "Event": "pf.extension.report_task.reminded",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"period_label\":\"Tuần 1\",\"mode\":\"auto_before\",\"message\":\"Nhắc nộp\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\",\"22222222-2222-4222-8222-222222222222\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "report-reminded-auto_overdue",
+    "Group": "report",
+    "Event": "pf.extension.report_task.reminded",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"period_label\":\"Tuần 1\",\"mode\":\"auto_overdue\",\"message\":\"Nhắc nộp\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\",\"22222222-2222-4222-8222-222222222222\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "report-reminded-unknown",
+    "Group": "report",
+    "Event": "pf.extension.report_task.reminded",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"period_label\":\"Tuần 1\",\"mode\":\"unknown\",\"message\":\"Nhắc nộp\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\",\"22222222-2222-4222-8222-222222222222\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "report-reminded-empty",
+    "Group": "report",
+    "Event": "pf.extension.report_task.reminded",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"period_label\":\"Tuần 1\",\"mode\":\"manual\",\"message\":\"Nhắc nộp\",\"recipient_refs\":[],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "report-reminded-invalid",
+    "Group": "report",
+    "Event": "pf.extension.report_task.reminded",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"period_label\":\"Tuần 1\",\"mode\":\"manual\",\"message\":\"Nhắc nộp\",\"recipient_refs\":[\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "report-reminded-bad-ref",
+    "Group": "report",
+    "Event": "pf.extension.report_task.reminded",
+    "Payload": "{\"period_id\":\"bad\",\"period_label\":\"Tuần 1\",\"mode\":\"manual\",\"message\":\"Nhắc nộp\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\",\"22222222-2222-4222-8222-222222222222\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "report-reminded-fallback",
+    "Group": "report",
+    "Event": "pf.extension.report_task.reminded",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"period_label\":\"Tuần 1\",\"mode\":\"manual\",\"message\":\"Nhắc nộp\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\",\"22222222-2222-4222-8222-222222222222\"],\"event_time\":\"invalid\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "report-reminded-runes-400",
+    "Group": "report",
+    "Event": "pf.extension.report_task.reminded",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"period_label\":\"Tuần 1\",\"mode\":\"manual\",\"message\":\"ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\",\"22222222-2222-4222-8222-222222222222\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "report-reminded-runes-401",
+    "Group": "report",
+    "Event": "pf.extension.report_task.reminded",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"period_label\":\"Tuần 1\",\"mode\":\"manual\",\"message\":\"ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\",\"11111111-1111-4111-8111-111111111111\",\"22222222-2222-4222-8222-222222222222\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "adjustment-valid",
+    "Group": "report",
+    "Event": "pf.extension.submission.adjustment_requested",
+    "Payload": "{\"task_id\":\"33333333-3333-4333-8333-333333333333\",\"form_code\":\"T01\",\"period_label\":\"Tuần 1\",\"commune_code\":\"30001\",\"reason\":\"Yêu cầu bổ sung\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "adjustment-empty",
+    "Group": "report",
+    "Event": "pf.extension.submission.adjustment_requested",
+    "Payload": "{\"task_id\":\"33333333-3333-4333-8333-333333333333\",\"form_code\":\"T01\",\"period_label\":\"Tuần 1\",\"commune_code\":\"30001\",\"reason\":\"Yêu cầu bổ sung\",\"recipient_refs\":[],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "adjustment-nil-task",
+    "Group": "report",
+    "Event": "pf.extension.submission.adjustment_requested",
+    "Payload": "{\"task_id\":\"00000000-0000-0000-0000-000000000000\",\"form_code\":\"T01\",\"period_label\":\"Tuần 1\",\"commune_code\":\"30001\",\"reason\":\"Yêu cầu bổ sung\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "adjustment-invalid-task",
+    "Group": "report",
+    "Event": "pf.extension.submission.adjustment_requested",
+    "Payload": "{\"task_id\":\"bad/path\",\"form_code\":\"T01\",\"period_label\":\"Tuần 1\",\"commune_code\":\"30001\",\"reason\":\"Yêu cầu bổ sung\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "adjustment-runes-401",
+    "Group": "report",
+    "Event": "pf.extension.submission.adjustment_requested",
+    "Payload": "{\"task_id\":\"33333333-3333-4333-8333-333333333333\",\"form_code\":\"T01\",\"period_label\":\"Tuần 1\",\"commune_code\":\"30001\",\"reason\":\"ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "adjustment-fallback",
+    "Group": "report",
+    "Event": "pf.extension.submission.adjustment_requested",
+    "Payload": "{\"task_id\":\"33333333-3333-4333-8333-333333333333\",\"form_code\":\"T01\",\"period_label\":\"Tuần 1\",\"commune_code\":\"30001\",\"reason\":\"Yêu cầu bổ sung\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"bad\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reopened-valid",
+    "Group": "report",
+    "Event": "pf.extension.period.reopened",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"label\":\"Tuần 1\",\"reason\":\"Mở lại kỳ\",\"reopen_until\":\"2027-10-14T10:00:00+07:00\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reopened-empty",
+    "Group": "report",
+    "Event": "pf.extension.period.reopened",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"label\":\"Tuần 1\",\"reason\":\"Mở lại kỳ\",\"reopen_until\":\"2027-10-14T10:00:00+07:00\",\"recipient_refs\":[],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reopened-nil-ref",
+    "Group": "report",
+    "Event": "pf.extension.period.reopened",
+    "Payload": "{\"period_id\":\"00000000-0000-0000-0000-000000000000\",\"label\":\"Tuần 1\",\"reason\":\"Mở lại kỳ\",\"reopen_until\":\"2027-10-14T10:00:00+07:00\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reopened-bad-ref",
+    "Group": "report",
+    "Event": "pf.extension.period.reopened",
+    "Payload": "{\"period_id\":\"invalid\",\"label\":\"Tuần 1\",\"reason\":\"Mở lại kỳ\",\"reopen_until\":\"2027-10-14T10:00:00+07:00\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reopened-runes-300",
+    "Group": "report",
+    "Event": "pf.extension.period.reopened",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"label\":\"Tuần 1\",\"reason\":\"ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ\",\"reopen_until\":\"2027-10-14T10:00:00+07:00\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reopened-runes-301",
+    "Group": "report",
+    "Event": "pf.extension.period.reopened",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"label\":\"Tuần 1\",\"reason\":\"ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ\",\"reopen_until\":\"2027-10-14T10:00:00+07:00\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"2027-10-13T11:02:03+07:00\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reopened-fallback",
+    "Group": "report",
+    "Event": "pf.extension.period.reopened",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"label\":\"Tuần 1\",\"reason\":\"Mở lại kỳ\",\"reopen_until\":\"bad\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"bad\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reopened-dispatch-changed",
+    "Group": "report",
+    "Event": "pf.extension.period.reopened",
+    "Payload": "{\"period_id\":\"33333333-3333-4333-8333-333333333333\",\"label\":\"Tuần 1\",\"reason\":\"Mở lại kỳ\",\"reopen_until\":\"2027-10-14T10:00:00+07:00\",\"recipient_refs\":[\"11111111-1111-4111-8111-111111111111\",\"11111111-1111-4111-8111-111111111111\",\"bad\",\"00000000-0000-0000-0000-000000000000\"],\"event_time\":\"2027-10-13T11:02:03+07:00\",\"dispatch_changed\":true}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "submitted-bad-json",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.submitted",
+    "Payload": "{",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "submitted-wrong-type",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.submitted",
+    "Payload": "{\"approver_refs\":\"bad\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-bad-json",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reviewed-wrong-type",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reviewed",
+    "Payload": "{\"owner_ref\":3}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "work-reminded-bad-json",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reminded",
+    "Payload": "{",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "work-reminded-wrong-type",
+    "Group": "work",
+    "Event": "pf.extension.work_schedule.reminded",
+    "Payload": "{\"recipient_refs\":\"bad\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "issued-bad-json",
+    "Group": "report",
+    "Event": "pf.extension.report_batch.issued",
+    "Payload": "{",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "issued-wrong-type",
+    "Group": "report",
+    "Event": "pf.extension.report_batch.issued",
+    "Payload": "{\"assignees\":\"bad\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "report-reminded-bad-json",
+    "Group": "report",
+    "Event": "pf.extension.report_task.reminded",
+    "Payload": "{",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "report-reminded-wrong-type",
+    "Group": "report",
+    "Event": "pf.extension.report_task.reminded",
+    "Payload": "{\"recipient_refs\":\"bad\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "adjusted-bad-json",
+    "Group": "report",
+    "Event": "pf.extension.submission.adjustment_requested",
+    "Payload": "{",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "adjusted-wrong-type",
+    "Group": "report",
+    "Event": "pf.extension.submission.adjustment_requested",
+    "Payload": "{\"recipient_refs\":\"bad\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reopened-bad-json",
+    "Group": "report",
+    "Event": "pf.extension.period.reopened",
+    "Payload": "{",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "reopened-wrong-type",
+    "Group": "report",
+    "Event": "pf.extension.period.reopened",
+    "Payload": "{\"recipient_refs\":\"bad\"}",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "unknown-work",
+    "Group": "work",
+    "Event": "fixture.unknown",
+    "Payload": "{",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  },
+  {
+    "Name": "unknown-report",
+    "Group": "report",
+    "Event": "fixture.unknown",
+    "Payload": "{",
+    "At": "2027-10-13T03:04:05.123456789Z"
+  }
+]

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
@@ -109,7 +110,7 @@ func scanProfileEvent(row pgx.Row) (ProfileEvent, error) {
 
 // ProfileEventByIdem đọc dòng sổ đã ghi với idem_key (gọi lặp PUT cùng Idempotency-Key); nil nếu chưa có.
 func ProfileEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*ProfileEvent, error) {
-	return noRows(scanProfileEvent(tx.QueryRow(ctx, "SELECT "+profileEventCols+" FROM pf_coop.kn_profile_event WHERE idem_key = $1::text", key)))
+	return noRows(scanProfileEvent(tx.QueryRow(ctx, "SELECT "+profileEventCols+" FROM pf_coop.kn_profile_event WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key)))
 }
 
 // ProfileEvents trả sổ sửa hồ sơ của một chủ thể theo seq tăng dần.

@@ -7,16 +7,25 @@ kind: capability
 zones: [pf]
 version: 1.0.0
 depends:
+  pf/sync: ">=1.0 <2"
   pf/workflow: ">=1.0 <2"
 provides:
-  ports: [Freezer]
-  events: [pf.forms.period.closed/v1]
+  ports:
+    - Entry
+    - FacilityDirectory
+    - FiguresReader
+    - Freezer
+    - PeriodControl
+    - Publisher
+    - SubmissionFeed
+    - Validator
+  events: [pf.forms.period.closed/v1, pf.forms.submission.recorded/v1]
   internal_events: []
-  publications: []
+  publications: [pf_forms_pub.closed_figures/v1]
   data_products: []
 consumes:
   events: []
 permissions: []
 shares: []
-owns_schema: [pf_forms]
+owns_schema: [pf_forms, pf_forms_pub]
 enable: per_tenant

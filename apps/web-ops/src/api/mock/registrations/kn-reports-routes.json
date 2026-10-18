@@ -1,0 +1,11 @@
+{
+  "id": "kn-reports-routes",
+  "source": "./kn-reports/routes",
+  "app": [
+    {
+      "export": "reportCycleAppRoutes",
+      "order": 6
+    }
+  ],
+  "admin": []
+}

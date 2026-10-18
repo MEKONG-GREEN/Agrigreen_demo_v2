@@ -40,6 +40,7 @@ func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.POST("/masterdata/catalogs/:catalog/items/:code/deactivate", h.setActive(false))
 	rg.POST("/masterdata/catalogs/:catalog/items/:code/reactivate", h.setActive(true))
 	rg.GET("/masterdata/catalogs/:catalog/items/:code/history", h.history)
+	rg.GET("/masterdata/catalogs/:catalog/items/:code/versions", h.itemVersions)
 	httpx.AllowBody(rg, http.MethodPost, "/masterdata/catalog-imports", app.MaxCatalogImportBytes)
 	rg.POST("/masterdata/catalog-imports", h.importCatalogs)
 	rg.GET("/masterdata/catalog-imports/:id", h.catalogImport)
@@ -159,6 +160,10 @@ func (h Handler) seed(c *gin.Context) {
 
 func (h Handler) listItems(admin bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if c.Query("at") != "" && h.Svc.CatalogEffectiveDated(c.Param("catalog")) {
+			h.listItemsAt(c, admin)
+			return
+		}
 		after, err := decodeCursor(c)
 		if err != nil {
 			httpx.Fail(c, err)
@@ -187,6 +192,20 @@ func (h Handler) listItems(admin bool) gin.HandlerFunc {
 }
 
 func (h Handler) item(c *gin.Context) {
+	if c.Query("at") != "" && h.Svc.CatalogEffectiveDated(c.Param("catalog")) {
+		at, err := h.at(c)
+		if err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		it, err := h.Svc.ItemAt(c.Request.Context(), c.Param("catalog"), c.Param("code"), at)
+		if err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, toItemDTO(it))
+		return
+	}
 	it, err := h.Svc.GetItem(c.Request.Context(), c.Param("catalog"), c.Param("code"))
 	if err != nil {
 		httpx.Fail(c, err)
@@ -199,6 +218,21 @@ type itemReq struct {
 	Code  string            `json:"code"`
 	Name  string            `json:"name"`
 	Attrs map[string]string `json:"attrs"`
+	// ValidFrom (W11.41, chỉ danh mục CNTS): ngày áp dụng YYYY-MM-DD; trống = hôm nay.
+	ValidFrom string `json:"valid_from"`
+}
+
+// toItem dựng mục từ thân request (đọc valid_from).
+func (r itemReq) toItem(catalog, code string) (domain.Item, error) {
+	it := domain.Item{Catalog: catalog, Code: code, Name: r.Name, Attrs: r.Attrs}
+	if strings.TrimSpace(r.ValidFrom) != "" {
+		d, err := domain.ParseDay(strings.TrimSpace(r.ValidFrom))
+		if err != nil {
+			return it, problem.Validation.WithField("valid_from", "YYYY-MM-DD")
+		}
+		it.ValidFrom = d
+	}
+	return it, nil
 }
 
 func (h Handler) createItem(c *gin.Context) {
@@ -206,7 +240,11 @@ func (h Handler) createItem(c *gin.Context) {
 	if !bindJSON(c, &req) {
 		return
 	}
-	in := domain.Item{Catalog: c.Param("catalog"), Code: req.Code, Name: req.Name, Attrs: req.Attrs}
+	in, err := req.toItem(c.Param("catalog"), req.Code)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
 	it, replayed, err := h.Svc.CreateItem(c.Request.Context(), in, idempotency.KeyFromContext(c.Request.Context()))
 	if err != nil {
 		httpx.Fail(c, err)
@@ -229,7 +267,11 @@ func (h Handler) updateItem(c *gin.Context) {
 		httpx.Fail(c, problem.Validation.WithField("code", "không đổi được mã; bỏ trống hoặc trùng mã trên đường dẫn"))
 		return
 	}
-	in := domain.Item{Catalog: c.Param("catalog"), Code: c.Param("code"), Name: req.Name, Attrs: req.Attrs}
+	in, err := req.toItem(c.Param("catalog"), c.Param("code"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
 	it, err := h.Svc.UpdateItem(c.Request.Context(), in)
 	if err != nil {
 		httpx.Fail(c, err)
@@ -494,4 +536,38 @@ func (h Handler) reject(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, toVersionDTO(v))
+}
+
+// listItemsAt: danh mục CNTS theo ngày (?at=) — giá trị có hiệu lực tại ngày đó (FN-06 BR-03), không phân trang.
+func (h Handler) listItemsAt(c *gin.Context, admin bool) {
+	at, err := h.at(c)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	incl := c.Query("include_inactive") == "true" || (admin && c.Query("include_inactive") != "false")
+	items, err := h.Svc.ListItemsAt(c.Request.Context(), c.Param("catalog"), at, incl)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	out := make([]itemDTO, 0, len(items))
+	for _, it := range items {
+		out = append(out, toItemDTO(it))
+	}
+	c.JSON(http.StatusOK, gin.H{"items": out, "next_cursor": nil})
+}
+
+// itemVersions: các giá trị có hiệu lực từ ngày của một mục CNTS (W11.41, FN-06 "danh mục có lịch sử").
+func (h Handler) itemVersions(c *gin.Context) {
+	vs, err := h.Svc.ItemVersions(c.Request.Context(), c.Param("catalog"), c.Param("code"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	items := make([]effectiveDTO, 0, len(vs))
+	for _, v := range vs {
+		items = append(items, toEffectiveDTO(v))
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
 }

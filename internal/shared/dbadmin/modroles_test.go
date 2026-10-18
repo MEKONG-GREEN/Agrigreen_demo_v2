@@ -22,9 +22,10 @@ func pubRoles() []string {
 }
 
 // W6.3 (§14, ADR-0031 §2, R-DB-10): r_<module>_pub NOLOGIN cho đúng các module sở hữu schema _pub, tạo trước
-// vai phân tích; chỉ r_metrics (cap/analytics) là thành viên; không thuộc ag_shared_user, không vượt RLS.
+// vai phân tích; chỉ r_metrics (cap/analytics), r_agg và bên đọc đã rà soát (consumes.publications, ADR-0053) là thành viên;
+// không thuộc ag_shared_user, không vượt RLS. PFPUB: + r_forms_pub (pf_forms_pub, pf 20261013150108).
 func TestPubRoles_W63(t *testing.T) {
-	want := []string{"r_cropcycle_pub", "r_extension_pub", "r_geo_pub", "r_mechanization_pub"}
+	want := []string{"r_cooperative_pub", "r_cropcycle_pub", "r_extension_pub", "r_forms_pub", "r_geo_pub", "r_masterdata_pub", "r_mechanization_pub", "r_party_pub", "r_price_pub"}
 	if got := pubRoles(); !slices.Equal(got, want) {
 		t.Fatalf("vai _pub: %v, muốn %v", got, want)
 	}
@@ -35,7 +36,7 @@ func TestPubRoles_W63(t *testing.T) {
 			t.Errorf("%s: %+v (vị trí %d, r_metrics %d)", name, r, ri, ai)
 		}
 		for _, o := range Roles {
-			if slices.Contains(o.MemberOf, name) && o.Name != modreg.DBRole(AnalyticsModule) && o.Name != AggRole {
+			if slices.Contains(o.MemberOf, name) && o.Name != modreg.DBRole(AnalyticsModule) && o.Name != AggRole && !pubReader(o.Name, name) {
 				t.Errorf("%s không được là thành viên %s", o.Name, name)
 			}
 		}
@@ -43,8 +44,9 @@ func TestPubRoles_W63(t *testing.T) {
 }
 
 // W6.4 (ADR-0031 §3, R-DB-11): r_agg NOLOGIN BYPASSRLS INHERIT, thành viên đúng mọi r_<module>_pub (không
-// ag_shared_user, không vai module nào), tạo sau vai _pub và trước vai đăng nhập; chỉ app_worker (đơn vị chạy job,
-// LoginUnit.Agg) là thành viên — NOINHERIT. Không vai BYPASSRLS mới nào khác.
+// ag_shared_user, không vai module nào), tạo sau vai _pub và trước vai đăng nhập; thành viên DUY NHẤT là vai đăng nhập
+// riêng app_agg (gói FC) — NOINHERIT, chỉ thuộc r_agg, mặc định chỉ đọc + statement_timeout; không app_<đơn vị> nào
+// thuộc r_agg. Không vai BYPASSRLS mới nào khác.
 func TestAggRole_W64(t *testing.T) {
 	r, ri := roleByName(t, AggRole)
 	if r.Login || !r.BypassRLS || r.NoInherit || !slices.Equal(r.MemberOf, pubRoles()) ||
@@ -68,8 +70,13 @@ func TestAggRole_W64(t *testing.T) {
 			bypass = append(bypass, o.Name)
 		}
 	}
-	if !slices.Equal(members, []string{AppWorker}) {
-		t.Errorf("thành viên r_agg: %v, muốn [app_worker]", members)
+	if !slices.Equal(members, []string{AppAgg}) || !slices.Equal(ExclusiveMembers[AggRole], members) {
+		t.Errorf("thành viên r_agg: %v, muốn [app_agg] (ExclusiveMembers %v)", members, ExclusiveMembers[AggRole])
+	}
+	a, _ := roleByName(t, AppAgg)
+	if !slices.Equal(a.MemberOf, []string{AggRole}) || a.BypassRLS || !slices.Equal(a.Clusters, []migrations.Cluster{migrations.PF}) ||
+		a.Settings["default_transaction_read_only"] != "on" || a.Settings["statement_timeout"] == "" || !slices.Contains(LoginRoles(), AppAgg) {
+		t.Errorf("app_agg: %+v", a)
 	}
 	slices.Sort(bypass)
 	// ADR-0031 §6: danh mục vai BYPASSRLS.
@@ -94,10 +101,10 @@ func roleByName(t *testing.T, name string) (Role, int) {
 // thứ tự tạo nhóm trước.
 func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	groups := ModuleGroups()
-	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + pf/evidence + pf/cooperative (W3.3) + 7 mkg có vai cũ
-	// + mkg/engine (W8.2, không vai cũ) + vault/identity; pf/extdata không schema.
-	if len(groups) != 31 || len(legacyGroups()) != 25 {
-		t.Errorf("số vai nhóm: %d (muốn 31, 25 có vai cũ): %v", len(groups), groups)
+	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + pf/evidence + pf/cooperative (W3.3) + pf/price (W11.71) + pf/hrm (W11.21)
+	// + 7 mkg có vai cũ + mkg/engine (W8.2, không vai cũ) + vault/identity; pf/extdata không schema.
+	if len(groups) != 34 || len(legacyGroups()) != 25 {
+		t.Errorf("số vai nhóm: %d (muốn 34 — thêm pf/contact W11.23, 25 có vai cũ): %v", len(groups), groups)
 	}
 	if slices.ContainsFunc(groups, func(g ModuleGroup) bool { return g.Module == "pf/extdata" }) {
 		t.Error("pf/extdata không có schema — không có vai nhóm")
@@ -113,11 +120,12 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 		if g.Module == AnalyticsModule {
 			want = append(want, pubRoles()...) // W6.3: cap/analytics đọc mọi view _pub
 		}
+		want = append(want, pubReaderRoles(g.Module, groups)...) // ADR-0053: bên đọc _pub đã rà soát
 		if r.Login || r.BypassRLS || r.NoInherit || !slices.Equal(r.MemberOf, want) || len(r.Clusters) == 0 {
 			t.Errorf("%s: %+v", g.Role, r)
 		}
 		if g.Legacy == "" {
-			// Module không có vai cũ (W2.5: pf/kref, W6.1: pf/workflow, W6.2: pf/forms, W6.5: pf/evidence, W3.3: pf/cooperative) — không vai đăng nhập nào ngoài app_* là thành viên.
+			// Module không có vai cũ (W2.5: pf/kref, W6.1: pf/workflow, W6.2: pf/forms, W6.5: pf/evidence, W3.3: pf/cooperative, W11.71: pf/price, W11.21: pf/hrm) — không vai đăng nhập nào ngoài app_* là thành viên.
 			for _, o := range Roles {
 				if slices.Contains(o.MemberOf, g.Role) && !slices.Contains(LoginRoles(), o.Name) {
 					t.Errorf("%s không được là thành viên %s", o.Name, g.Role)
@@ -179,6 +187,10 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	if w, _ := roleByName(t, AppWorker); !slices.Contains(w.MemberOf, "r_kref") || slices.Contains(plat.MemberOf, "r_kref") {
 		t.Errorf("r_kref: app_worker %v, app_platform %v", w.MemberOf, plat.MemberOf)
 	}
+	// Gói FC (cooperative.md §17.10): worker chạy consumer pf.simulation.snapshot — app_worker ∋ r_simulation.
+	if w, _ := roleByName(t, AppWorker); !slices.Contains(w.MemberOf, "r_simulation") {
+		t.Errorf("r_simulation: app_worker %v", w.MemberOf)
+	}
 	if k, _ := roleByName(t, "r_kref"); !slices.Equal(k.Clusters, []migrations.Cluster{migrations.PF, migrations.MKG}) {
 		t.Errorf("r_kref: %+v", k)
 	}
@@ -189,6 +201,18 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	// W6.2: api-platform ghép pf/forms — app_platform là thành viên r_forms.
 	if !slices.Contains(plat.MemberOf, "r_forms") {
 		t.Errorf("r_forms: app_platform %v", plat.MemberOf)
+	}
+	// W11.71: api-platform ghép pf/price (ADR-0049) — app_platform là thành viên r_price.
+	if !slices.Contains(plat.MemberOf, "r_price") {
+		t.Errorf("r_price: app_platform %v", plat.MemberOf)
+	}
+	// W11.21: api-platform ghép pf/hrm (ADR-0050) — app_platform là thành viên r_hrm.
+	if !slices.Contains(plat.MemberOf, "r_hrm") {
+		t.Errorf("r_hrm: app_platform %v", plat.MemberOf)
+	}
+	// W11.23: api-platform ghép pf/contact (cap/directory) — app_platform là thành viên r_contact.
+	if !slices.Contains(plat.MemberOf, "r_contact") {
+		t.Errorf("r_contact: app_platform %v", plat.MemberOf)
 	}
 	// W8.2: api-internal ghép mkg/engine (job engine_observation_feed) — app_internal là thành viên r_engine (chỉ cụm mkg).
 	if in, _ := roleByName(t, AppInternal); !slices.Contains(in.MemberOf, "r_engine") {
@@ -256,8 +280,9 @@ func TestEveryUnitHasLogin_ADR0028(t *testing.T) {
 				n++
 			}
 		}
-		if n < 4 || n > 7 {
-			t.Errorf("cụm %s: %d vai đăng nhập (muốn 4–7)", c, n)
+		// pf: + app_agg (ADR-0031 §3, gói FC) → 8.
+		if n < 4 || n > 8 {
+			t.Errorf("cụm %s: %d vai đăng nhập (muốn 4–8)", c, n)
 		}
 	}
 }
@@ -397,7 +422,10 @@ var laterGroups = map[string]string{
 	"pf/workflow":    "pf/000118_pf_workflow.up.sql",
 	"pf/forms":       "pf/000122_pf_forms_grants.up.sql",
 	"pf/evidence":    "pf/000123_pf_evidence.up.sql",
-	"pf/cooperative": "pf/000131_pf_cooperative_schema.up.sql", // W3.3: vai r_cooperative sinh khi module có owns_schema
+	"pf/cooperative": "pf/000131_pf_cooperative_schema.up.sql",        // W3.3: vai r_cooperative sinh khi module có owns_schema
+	"pf/price":       "pf/000138_pf_price.up.sql",                     // W11.71 (ADR-0049): khung cap/price
+	"pf/hrm":         "pf/000147_pf_hrm_catalog.up.sql",               // W11.21 (ADR-0050): dom/hrm, danh mục nhân sự
+	"pf/contact":     "pf/20261013230912_pf_contact_directory.up.sql", // W11.23: cap/directory, Contact (FN-13)
 }
 
 // pf 000092 (W2.5) cấp SELECT k_ref.* cho MỌI r_* của module pf lúc đó (R-DB-05) — danh sách ghi tay khớp
@@ -428,5 +456,73 @@ func TestLaterGroupsGrantKRef(t *testing.T) {
 				t.Errorf("%s: thiếu %q", file, want)
 			}
 		}
+	}
+}
+
+// pubReader: vai nhóm reader là thành viên vai _pub theo khai báo hợp đồng (ADR-0053 §4).
+func pubReader(reader, pub string) bool {
+	for _, entry := range modreg.Catalog() {
+		if modreg.DBRole(entry.Name) != reader {
+			continue
+		}
+		for _, o := range entry.PubReadOwners {
+			if modreg.PubRole(o) == pub {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ADR-0053 §4 (PFPUB): KHTC trong pf/extension đọc họ hợp đồng closed_figures/v1 của hai nguồn — r_extension là thành
+// viên r_extension_pub, r_forms_pub, r_price_pub (tạo trước r_extension), không thành viên vai _pub nào khác; khai báo chỉ trỏ
+// module có schema _pub.
+func TestPubReaders_PFPUB(t *testing.T) {
+	r, ri := roleByName(t, "r_extension")
+	for _, pub := range []string{"r_extension_pub", "r_forms_pub", "r_price_pub"} {
+		p, pi := roleByName(t, pub)
+		if !slices.Contains(r.MemberOf, pub) || pi > ri || p.BypassRLS {
+			t.Errorf("r_extension phải là thành viên %s (tạo trước): %+v", pub, r.MemberOf)
+		}
+	}
+	for _, m := range r.MemberOf {
+		if m != SharedUser && m != "r_extension_pub" && m != "r_forms_pub" && m != "r_price_pub" {
+			t.Errorf("r_extension thành viên thừa %s", m)
+		}
+	}
+	groups := ModuleGroups()
+	for _, entry := range modreg.Catalog() {
+		if got := pubReaderRoles(entry.Name, groups); len(got) != len(entry.PubReadOwners) {
+			t.Errorf("%s: chủ khai báo không có vai _pub (%v / %v)", entry.Name, entry.PubReadOwners, got)
+		}
+	}
+}
+
+// Một module mới chỉ cần khai báo hợp đồng; tên reader không chọn mặc định hay fallback.
+func TestPublicationReaderRolesFollowDeclaration(t *testing.T) {
+	groups := []ModuleGroup{
+		{Module: "pf/alpha", Pub: "r_alpha_pub"},
+		{Module: "pf/beta", Pub: "r_beta_pub"},
+		{Module: "pf/other", Pub: "r_other_pub"},
+		{Module: "pf/extension", Pub: "r_extension_pub"},
+		{Module: "pf/forms", Pub: "r_forms_pub"},
+		{Module: "pf/price", Pub: "r_price_pub"},
+	}
+	reader := modreg.CatalogEntry{Name: "pf/example", PubReadOwners: []string{"pf/beta", "pf/alpha"}}
+	if got, want := declaredPubReaderRoles(reader, groups), []string{"r_beta_pub", "r_alpha_pub"}; !slices.Equal(got, want) {
+		t.Fatalf("vai theo khai báo = %v, muốn %v", got, want)
+	}
+	for _, name := range []string{"pf/extension", "pf/example", "pf/other"} {
+		if got := declaredPubReaderRoles(modreg.CatalogEntry{Name: name}, groups); len(got) != 0 {
+			t.Errorf("%s không khai nhưng được cấp %v", name, got)
+		}
+	}
+	got := declaredPubReaderRoles(reader, groups)
+	got[0] = "changed"
+	if reader.PubReadOwners[0] != "pf/beta" || groups[1].Pub != "r_beta_pub" {
+		t.Fatal("kết quả làm thay đổi metadata đầu vào")
+	}
+	if got := pubReaderRoles("pf/unregistered", groups); len(got) != 0 {
+		t.Fatalf("module không đăng ký được cấp %v", got)
 	}
 }

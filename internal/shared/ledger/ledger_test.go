@@ -48,3 +48,16 @@ func TestClassify(t *testing.T) {
 		t.Fatal("42501 phải là ErrImmutable")
 	}
 }
+
+func TestNewestByIdem(t *testing.T) {
+	cases := map[string]string{
+		NewestFirst(""):   " ORDER BY recorded_at DESC, id DESC",
+		NewestByIdem(""):  " ORDER BY recorded_at DESC, id DESC LIMIT 1",
+		NewestByIdem("v"): " ORDER BY v.recorded_at DESC, v.id DESC LIMIT 1",
+	}
+	for got, want := range cases {
+		if got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	}
+}

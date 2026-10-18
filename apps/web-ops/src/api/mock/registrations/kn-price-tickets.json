@@ -1,0 +1,11 @@
+{
+  "id": "kn-price-tickets",
+  "source": "./kn-price-tickets",
+  "app": [
+    {
+      "export": "priceTicketRoutes",
+      "order": 13
+    }
+  ],
+  "admin": []
+}

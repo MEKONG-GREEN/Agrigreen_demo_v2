@@ -1,0 +1,17 @@
+## KNSPLIT-2-NOTIFY-DIRECTIVE-A — Chỉ đạo và email tóm tắt do KN đăng ký
+
+Nền13b2c4b8. Cơ học tách legacyDirectivePlan358f9cfe: bộ chọn chỉ thay trả lỗi/kết quả, template/formatter/module giữ Gitblob nền. Capture53984actual0 với52 full directive plan/lỗi/Staff+Units calls,11 full email(0/1/2/199/200/201) và một job contract. PGold30873actual0/noSKIP chạy hai luồng cũ trước generic/owner; expected cố định sau đó tại199a23c7.
+
+GenericCore92396d6f thêm EventPlanner XORBuild trong cùng registry, trả NotificationPlan chứa drafts/digest intents không tenant/sourceID/transaction/DB. Core clone input/output, giữ IDs/provenance/Normalize/RLS/inbox và ghi digest→notification cùng transaction, kể cả urgent không audience. DigestRegistration một physical queue, events phải owned/known và không native; metadata/formatter được sao chép, formatter nhận bản sao giữ khóa MarkSent. Digest source không đăng ký trả dependency trước ghi. A giữ legacy case/formatter/job fallback; B mới xóa. Hợp đồng SQL/schema/queue/jobID không đổi.
+
+Corepure12538actual0/5pkg, corePG75674actual0 TestNotificationPlanAtomicQueueRetryAndFormatterIsolation: invalidnotification rollback digest/inbox, retry cùng event/dedup, tenant/provenance, metadata freeze, mail failure/retry và formatter không đổi MarkSent keys PASS. Test-only0c7b7d70 sửa assert lỗi trước PGcompile, không đổi production hay rollback assertions.
+
+KN sở hữu DirectiveNotificationBuilders(StaffDirectory/AdminUnits chỉ đọc) và NotificationDigest(nội dung,job mỗi giờ/10phút/không chạy lúc khởi động/loglabel cũ). Bốn API/worker constructors nạp; worker job mode dùng buildNotify chung. Fixture/customUrgentDigestPG dùng owner, giữ assertions. Owner chỉ đọc52/11/job expected. PG mới kiểm urgent không audience vẫn queue/gửi một lần, normal không queue và lookup failure không ghi/retry. Mailer giả, không gửi ngoài.
+
+Cần ownerpure5/fullstatic/boundary320 không tăng/full9PG thậtnoFAIL-SKIP/helper9migration/remote trướcdev. Chưa coi cổng chưa chạy là đạt. Giữ10oldgoldens+5new; không SQL/migration/API/UI/mobile đổi. Source22/22 qua owner chưa phải Notify/G1xong: còn kindCHECK/nativeKNpolicies/authz/accounts/party/data/routes/tenant/client/KHTCreminder. Tenant4b cần audit globalDigestTo tránh gửi lẫn Trung tâm. Main/worktrees/lịch giữ.
+
+
+Ownerpure59112actualexit0 đủ5testpackage(+KNpricecompile).52directivefullplan/errors/lookup và11full subject/body(0/1/2/199/200/201) cùngjobmetadata khớp frozenOLD từ199a23c7;10oldgoldens nguyên13b2c4b8,5newblobsnguyên199a23c7. Genericcore pure12538/PG75674 đãactual0 trướcowner; capture53984/PGlegacy30873 actual0 trướcgeneric. Ownerproductionf1efdc0f, legacy358f9cfe, generic92396d6f/testfix0c7b7d70. Chưa fullstatic/full9PG/helper/dev; legacyfallbacks giữA.
+
+
+Kết quả thật ownerf1efdc0f/generic92396d6f: ownerpure59112actual0/5pkg, static31812actual0/fullgates/boundary320/lint0/gofmt2old. Full9PG92425actualexit0,không FAIL/SKIP; testsnotify160.620s. Owner urgent không audience vẫn queue/gửi một lần, normal không queue, lookup failure không ghi/retry; GenericAtomicPlan rollback/retry/tenant/provenance/metadata/formatterMarkSent/SMTPfailrecovery và các luồng giá/nhiệm vụ/CNTS/workflow cũ đềuPASS. Private57621/9b690d50893d cleanup,Go0; không Gochange sauPG.52/11/job và15goldens giữ; capture/PGlegacy trướcgeneric/owner, corePG trướcowner đãactual0. Cầnhelper9migration/remote trước dev; legacyfallbacks vẫngiữA.

@@ -68,11 +68,12 @@ type Unwrapper interface {
 
 // Deps là phụ thuộc ngoài module, gốc lắp ráp truyền vào.
 type Deps struct {
-	Store     objstore.Store           // kho đối tượng chỉ chứa bản mã (R-40); nil → 503
-	Vault     Unwrapper                // nil → OpenContent 503
-	Scope     ScopeResolver            // nil → phạm vi rỗng: tệp có chủ thể không mở được (mặc định chặn)
-	Consent   ConsentChecker           // tùy chọn
-	Resolvers map[string]port.Resolver // subject_module → Resolver của module chủ
+	Store     objstore.Store                // kho đối tượng chỉ chứa bản mã (R-40); nil → 503
+	Vault     Unwrapper                     // nil → OpenContent 503
+	Scope     ScopeResolver                 // nil → phạm vi rỗng: tệp có chủ thể không mở được (mặc định chặn)
+	Consent   ConsentChecker                // tùy chọn
+	Purposes  map[string]port.PurposePolicy // mục đích bổ sung, ràng buộc bộ ba chủ thể
+	Resolvers map[string]port.Resolver      // subject_module → Resolver của module chủ
 	Log       *slog.Logger
 }
 
@@ -221,7 +222,7 @@ func (s *Service) authorize(ctx context.Context, ref uuid.UUID, purpose, op stri
 	switch {
 	case purpose == "":
 		return port.File{}, ErrPurposeRequired
-	case !domain.Purposes[purpose]:
+	case !domain.Purposes[purpose] && s.Purposes[purpose].SubjectModule == "":
 		return port.File{}, ErrPurposeNotAllowed
 	}
 	if s.DB == nil {
@@ -256,6 +257,14 @@ type decision struct {
 // decide quyết định cấp hay từ chối; lỗi trả về là lỗi hạ tầng (không ghi sổ). Tệp cũ chưa có bộ ba (trước pf 000123) chỉ kiểm
 // vai, mục đích, đồng ý như trước W6.5.
 func (s *Service) decide(ctx context.Context, p authz.Principal, f port.File, purpose string) (decision, error) {
+	needsConsent := true
+	if policy, ok := s.Purposes[purpose]; ok {
+		if f.Subject == nil || policy.SubjectModule == "" || policy.SubjectType == "" ||
+			f.Subject.Module != policy.SubjectModule || f.Subject.Type != policy.SubjectType {
+			return decision{domain.OutcomeDeniedSubject, ErrPurposeNotAllowed}, nil
+		}
+		needsConsent = policy.RequiresConsent
+	}
 	if f.Subject != nil {
 		res, err := s.resolve(ctx, *f.Subject)
 		var pb *problem.Problem
@@ -269,11 +278,20 @@ func (s *Service) decide(ctx context.Context, p authz.Principal, f port.File, pu
 		if err != nil {
 			return decision{}, err
 		}
+		if checker, ok := s.Resolvers[f.Subject.Module].(port.FileAuthorizer); ok {
+			allowed, err := checker.AuthorizeFile(ctx, f)
+			if err != nil {
+				return decision{}, err
+			}
+			if !allowed {
+				return decision{domain.OutcomeDeniedScope, ErrSubjectForbidden}, nil
+			}
+		}
 		if !domain.Visible(sc, res) {
 			return decision{domain.OutcomeDeniedScope, ErrSubjectForbidden}, nil
 		}
 	}
-	if s.Consent != nil {
+	if s.Consent != nil && needsConsent {
 		ok, err := s.Consent.HasConsent(ctx, f.SubjectRef, purpose)
 		if err != nil {
 			return decision{}, err

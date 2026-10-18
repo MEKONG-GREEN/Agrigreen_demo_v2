@@ -24,7 +24,7 @@ function communeNameOf(ctxCommunes: { code: string; name: string }[], code: stri
 }
 
 /** FN-XA-03.01 Công việc cần làm (Hình 13). */
-export function TasksScreen({ periodType, title = "Công việc cần làm" }: { periodType?: "week" | "month" | "season"; title?: string }) {
+export function TasksScreen({ periodType, title = "Công việc cần làm" }: { periodType?: "week" | "month" | "season" | "adhoc"; title?: string }) {
   const { cycleApi, kn } = useAuth();
   const communes = kn.context?.communes ?? [];
   const defaults = { commune: "", kind: periodType ?? "", status: periodType ? "" : "todo", form: "" };

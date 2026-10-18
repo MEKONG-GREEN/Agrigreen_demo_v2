@@ -29,6 +29,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
@@ -165,6 +166,13 @@ func str(m map[string]any, path ...string) string {
 
 // createOrg tạo tổ chức qua Admin API và trả ref.
 func (c caller) createOrg(body map[string]any) uuid.UUID {
+	if body["kind"] == "cooperative" {
+		out, err := c.provisionCooperative(body, key())
+		if err != nil {
+			c.f.t.Fatalf("setup HTX qua lõi nội bộ: %v", err)
+		}
+		return out.Org.Ref
+	}
 	c.f.t.Helper()
 	r := c.adminDo(http.MethodPost, "/v1/orgs", body)
 	if r.status != http.StatusCreated {
@@ -388,27 +396,25 @@ func verifyChain(t *testing.T, f *fixture, ref uuid.UUID, rows int64) {
 func TestTaxCodeUniquePerTenant(t *testing.T) {
 	f := newFixture(t)
 	root := f.root()
-	coop := func(c caller, tax string) resp {
-		return c.adminDo(http.MethodPost, "/v1/orgs", map[string]any{"kind": "cooperative", "name": "HTX " + tax, "admin_unit_code": "30001",
-			"cooperative": map[string]any{"tax_code": tax}})
+	coop := func(c caller, tax string) error {
+		_, err := c.provisionCooperative(map[string]any{"name": "HTX " + tax, "admin_unit_code": "30001", "cooperative": map[string]any{"tax_code": tax}}, key())
+		return err
 	}
-	if r := coop(root, "0301234567"); r.status != http.StatusCreated {
-		t.Fatalf("tạo HTX: %d %v", r.status, r.body)
+	if err := coop(root, "0301234567"); err != nil {
+		t.Fatal(err)
 	}
-	if r := coop(root, "030-123-4567"); r.status != http.StatusConflict || r.body["code"] != "party.tax_code_taken" {
-		t.Fatalf("trùng MST trong tenant phải 409: %d %v", r.status, r.body)
+	if err := coop(root, "030-123-4567"); problem.From(err).Code != "party.tax_code_taken" {
+		t.Fatalf("trùng MST trong tenant: %v", err)
 	}
-	if r := coop(root, "12345"); r.status != http.StatusUnprocessableEntity {
-		t.Fatalf("MST sai định dạng phải 422: %d", r.status)
+	if err := coop(root, "12345"); err == nil {
+		t.Fatal("MST sai phải bị chặn")
 	}
 	other := f.as(ids.New(), uuid.Nil, port.RoleRegistryAdmin, authz.RolePlatformAdmin)
-	if r := coop(other, "0301234567"); r.status != http.StatusCreated {
-		t.Fatalf("tenant khác được dùng cùng MST: %d %v", r.status, r.body)
+	if err := coop(other, "0301234567"); err != nil {
+		t.Fatalf("tenant khác được dùng MST: %v", err)
 	}
-	// Mã HTX do hệ thống tự sinh (CGH BR-01).
-	r := root.adminDo(http.MethodPost, "/v1/orgs", map[string]any{"kind": "cooperative", "code": "TUNHAP", "name": "HTX tự đặt mã", "admin_unit_code": "30001"})
-	if r.status != http.StatusUnprocessableEntity {
-		t.Fatalf("nhập tay Mã HTX phải 422: %d", r.status)
+	if _, err := root.provisionCooperative(map[string]any{"code": "TUNHAP", "name": "HTX tự đặt mã", "admin_unit_code": "30001"}, key()); err == nil {
+		t.Fatal("mã HTX do hệ thống tự sinh")
 	}
 }
 
@@ -549,59 +555,45 @@ func TestCreateCooperativeTwoStepRetry_W33(t *testing.T) {
 	f := newFixture(t)
 	root := f.root()
 	name := "HTX Hai Bước " + ids.New().String()[:8]
-	b, _ := json.Marshal(map[string]any{"kind": "cooperative", "name": name, "admin_unit_code": "30001",
-		"cooperative": map[string]any{"tax_code": "0311111111", "area_ha": "12.5", "established_on": "2020-02-02", "address": "Ấp 9",
-			"location": map[string]any{"lat": "10.5", "lon": "105.5"}}})
+	body := map[string]any{"name": name, "admin_unit_code": "30001", "cooperative": map[string]any{"tax_code": "0311111111", "area_ha": "12.5", "established_on": "2020-02-02", "address": "Ấp 9", "location": map[string]any{"lat": "10.5", "lon": "105.5"}}}
 	count := func(q string) int {
 		t.Helper()
 		var n int
-		if err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
-			return tx.QueryRow(context.Background(), q, name).Scan(&n)
-		}); err != nil {
+		if err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error { return tx.QueryRow(context.Background(), q, name).Scan(&n) }); err != nil {
 			t.Fatal(err)
 		}
 		return n
 	}
 	f.profiles.failNext(1, nil)
 	k := key()
-	r1 := root.call(f.admin.URL, http.MethodPost, "/v1/orgs", k, "application/json", b)
-	if r1.status != http.StatusServiceUnavailable || r1.body["code"] != "party.dependency_unavailable" {
-		t.Fatalf("bước 2 lỗi phải 503: %d %v", r1.status, r1.body)
+	if _, err := root.provisionCooperative(body, k); problem.From(err).Code != "party.dependency_unavailable" {
+		t.Fatalf("bước 2: %v", err)
 	}
 	if count("SELECT count(*) FROM pf_party.org WHERE name = $1") != 1 || f.profiles.count(f.tenant) != 0 {
-		t.Fatal("sau bước 1: một Nút, chưa có hồ sơ")
+		t.Fatal("một Nút, chưa có hồ sơ")
 	}
-	r2 := root.call(f.admin.URL, http.MethodPost, "/v1/orgs", k, "application/json", b)
-	if r2.status != http.StatusCreated || str(r2.body, "org", "kind") != "cooperative" || !strings.HasPrefix(str(r2.body, "org", "code"), "HTX") {
-		t.Fatalf("gọi lại cùng khóa phải hoàn tất như lần đầu (201): %d %v", r2.status, r2.body)
+	out, err := root.provisionCooperative(body, k)
+	if err != nil || out.Org.Kind != port.OrgCooperative || !strings.HasPrefix(out.Org.Code, "HTX") {
+		t.Fatalf("hoàn tất hồ sơ: %v", err)
 	}
-	ref := uuid.MustParse(str(r2.body, "org", "ref"))
-	r3 := root.call(f.admin.URL, http.MethodPost, "/v1/orgs", k, "application/json", b)
-	if r3.status != http.StatusCreated || str(r3.body, "org", "ref") != ref.String() || r3.hdr.Get("Idempotent-Replayed") != "true" {
-		t.Fatalf("gọi lặp sau khi hoàn tất: %d %v", r3.status, r3.body)
+	again, err := root.provisionCooperative(body, k)
+	if err != nil || again.Org.Ref != out.Org.Ref || !again.Replayed {
+		t.Fatalf("phát lại lõi: %v", err)
 	}
-	if n := count("SELECT count(*) FROM pf_party.org WHERE name = $1"); n != 1 {
-		t.Fatalf("đúng một Nút: %d", n)
+	if count("SELECT count(*) FROM pf_party.org WHERE name = $1") != 1 || count("SELECT count(*) FROM pf_party.org_event WHERE name = $1 AND action = 'created'") != 1 {
+		t.Fatal("chỉ một Nút và một sự kiện tạo")
 	}
-	if n := count("SELECT count(*) FROM pf_party.org_event WHERE name = $1 AND action = 'created'"); n != 1 {
-		t.Fatalf("đúng một dòng sổ org_event.created: %d", n)
+	p, ok := f.profiles.profile(f.tenant, out.Org.Ref)
+	if !ok || f.profiles.count(f.tenant) != 1 || p.TaxCode != "0311111111" || p.AreaHa == nil || p.AreaHa.String() != "12.5" || p.EstablishedOn == nil || p.EstablishedOn.Format(time.DateOnly) != "2020-02-02" || p.Address != "Ấp 9" || p.Lat == nil || p.Lat.String() != "10.5" || p.Lon == nil || p.Lon.String() != "105.5" {
+		t.Fatalf("hồ sơ đầy đủ sau phục hồi: %+v", p)
 	}
-	p, ok := f.profiles.profile(f.tenant, ref)
-	if f.profiles.count(f.tenant) != 1 || !ok || p.TaxCode != "0311111111" || p.AreaHa == nil || p.AreaHa.String() != "12.5" ||
-		p.EstablishedOn == nil || p.EstablishedOn.Format(time.DateOnly) != "2020-02-02" || p.Address != "Ấp 9" ||
-		p.Lat == nil || p.Lat.String() != "10.5" || p.Lon == nil || p.Lon.String() != "105.5" {
-		t.Fatalf("hồ sơ dựng từ dòng sổ: %+v", p)
-	}
-	g := root.appDo(http.MethodGet, "/v1/cooperatives/"+ref.String(), nil)
+	g := root.appDo(http.MethodGet, "/v1/cooperatives/"+out.Org.Ref.String(), nil)
 	if g.status != http.StatusOK || str(g.body, "tax_code") != "0311111111" || g.body["location_provisional"] != false {
-		t.Fatalf("chi tiết HTX: %d %v", g.status, g.body)
+		t.Fatalf("đọc lại HTX: %v", g.body)
 	}
-
-	// Hai yêu cầu song song cùng MST lọt kiểm trước: chỉ mục duy nhất của hồ sơ chặn bên thua ở bước 2 → 409.
 	f.profiles.failNext(1, port.ErrCoopTaxCodeTaken)
-	r4 := root.adminDo(http.MethodPost, "/v1/orgs", map[string]any{"kind": "cooperative", "name": name + " B", "admin_unit_code": "30001",
-		"cooperative": map[string]any{"tax_code": "0322222222"}})
-	if r4.status != http.StatusConflict || r4.body["code"] != "party.tax_code_taken" {
-		t.Fatalf("MST trùng ở bước 2: %d %v", r4.status, r4.body)
+	_, err = root.provisionCooperative(map[string]any{"name": name + " B", "admin_unit_code": "30001", "cooperative": map[string]any{"tax_code": "0322222222"}}, key())
+	if problem.From(err).Code != "party.tax_code_taken" {
+		t.Fatalf("trùng MST ở bước 2: %v", err)
 	}
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
-import { ACCOUNT_STATE, accountState, fullName, importAccounts, lockReasonError, rolesForOrgKind } from "@/admin/accounts";
+import { ACCOUNT_STATE, accountState, canResetTotp, fullName, importAccounts, lockReasonError, MFA_STATE, mfaState, rolesForOrgKind } from "@/admin/accounts";
 import { unwrap } from "@/api/client";
 import { newIdempotencyKey } from "@/api/idempotency";
 import { collectPages, usePagedList } from "@/api/pagination";
@@ -25,6 +25,8 @@ const EVENT: Record<AccountsEvent["action"], string> = {
   unlocked: "Mở khóa",
   assignment_changed: "Đổi đơn vị/vai",
   actions_sent: "Gửi liên kết kích hoạt",
+  dormant_warned: "Báo trước khóa do không hoạt động",
+  totp_reset: "Đặt lại TOTP",
 };
 
 function RolePicker({ roles, value, onChange, idPrefix }: { roles: string[]; value: Set<string>; onChange: (v: Set<string>) => void; idPrefix: string }) {
@@ -212,6 +214,106 @@ function LockForm({ user, onDone }: { user: AccountsUser; onDone: () => void }) 
   );
 }
 
+/** D24 — trạng thái TOTP và đặt lại TOTP có lý do ≥ 20 ký tự — POST /v1/accounts/users/{id}/reset-totp. */
+function MfaPanel({ user, onDone }: { user: AccountsUser; onDone: () => void }) {
+  const { adminApi } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [touched, setTouched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<ApiProblem | null>(null);
+  const [done, setDone] = useState(false);
+  const state = mfaState(user.mfa);
+  const local = lockReasonError(reason);
+  const errs = problem ? fieldErrorMap(problem) : {};
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setTouched(true);
+    if (local) return;
+    setBusy(true);
+    setProblem(null);
+    try {
+      await unwrap(
+        adminApi.POST("/v1/accounts/users/{id}/reset-totp", {
+          params: { path: { id: user.id }, header: { "Idempotency-Key": newIdempotencyKey() } },
+          body: { reason: reason.trim() },
+        }),
+      );
+      setReason("");
+      setTouched(false);
+      setOpen(false);
+      setDone(true);
+      onDone();
+    } catch (err) {
+      setProblem(err instanceof ApiProblem ? err : null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="panel stack" style={{ gap: 8 }} data-testid="mfa-panel">
+      <b>Xác thực hai yếu tố (TOTP)</b>
+      {state ? (
+        <span>
+          <span className={`chip ${MFA_STATE[state].cls}`} data-testid="mfa-state">
+            {MFA_STATE[state].text}
+          </span>
+        </span>
+      ) : (
+        <span className="small mute">Chưa đọc được trạng thái TOTP.</span>
+      )}
+      <span className="small mute">
+        Cán bộ khuyến nông và vai quản trị bắt buộc nhập mã TOTP khi đăng nhập (D24); người chưa đăng ký được yêu cầu đăng ký ngay ở lần đăng nhập tới. Đặt
+        lại khi cán bộ mất hoặc đổi điện thoại: mã cũ bị xóa, mọi phiên bị thu hồi.
+      </span>
+      {done ? (
+        <span className="small" role="status">
+          Đã đặt lại TOTP — cán bộ đăng ký lại ở lần đăng nhập tới.
+        </span>
+      ) : null}
+      {canResetTotp(user) && !open ? (
+        <div>
+          <button type="button" className="btn btn-o btn-sm" onClick={() => setOpen(true)}>
+            <Icon name="lock" size={15} />
+            Đặt lại TOTP
+          </button>
+        </div>
+      ) : null}
+      {open ? (
+        <form className="stack" style={{ gap: 8 }} onSubmit={(e) => void submit(e)} noValidate data-testid="totp-reset-form">
+          <label htmlFor="totp-reason" style={{ fontWeight: 600 }}>
+            Lý do đặt lại TOTP (tối thiểu 20 ký tự, không ghi thông tin cá nhân)
+          </label>
+          <textarea
+            id="totp-reason"
+            className="input textarea"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            onBlur={() => setTouched(true)}
+            aria-invalid={(touched && !!local) || !!errs.reason}
+            aria-describedby="totp-hint"
+          />
+          <span id="totp-hint" className={touched && local ? "err small" : "mute small"} role={touched && local ? "alert" : undefined}>
+            {touched && local ? local : `${reason.trim().length}/20 ký tự`}
+          </span>
+          {errs.reason ? <span className="err small">{errs.reason}</span> : null}
+          {problem && problem.code !== "validation_failed" ? <ProblemAlert problem={problem} /> : null}
+          <div className="row" style={{ gap: 8 }}>
+            <button type="submit" className="btn btn-d btn-sm" disabled={busy}>
+              {busy ? "Đang gửi…" : "Xác nhận đặt lại TOTP"}
+            </button>
+            <button type="button" className="btn btn-o btn-sm" onClick={() => setOpen(false)} disabled={busy}>
+              Hủy
+            </button>
+          </div>
+        </form>
+      ) : null}
+    </div>
+  );
+}
+
 function AssignmentForm({ user, grants, orgs, onDone }: { user: AccountsUser; grants: AccountsGrants | undefined; orgs: PartyOrg[]; onDone: () => void }) {
   const { adminApi } = useAuth();
   const [orgRef, setOrgRef] = useState(user.org_ref ?? "");
@@ -306,6 +408,7 @@ function UserPanel({ id, grants, orgs, onChanged }: { id: string; grants: Accoun
             <dt>Việc chờ người dùng</dt>
             <dd>{u.required_actions.join(", ") || "—"}</dd>
           </dl>
+          <MfaPanel key={`mfa-${u.id}`} user={u} onDone={changed} />
           <LockForm key={`${u.id}-${u.enabled}`} user={u} onDone={changed} />
           <div className="panel stack" style={{ gap: 6 }}>
             <b>Liên kết kích hoạt / đặt lại mật khẩu</b>

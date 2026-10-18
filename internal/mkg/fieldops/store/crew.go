@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // CrewStream là khóa chuỗi băm của sổ tổ gom.
@@ -68,7 +69,7 @@ func scanCrewEvent(row pgx.Row) (CrewEvent, error) {
 
 // CrewEventByIdem tìm sự kiện tổ gom theo idem_key.
 func CrewEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*CrewEvent, error) {
-	e, err := scanCrewEvent(tx.QueryRow(ctx, "SELECT "+crewEventCols+" FROM mkg_fieldops.crew_event WHERE idem_key = $1", key))
+	e, err := scanCrewEvent(tx.QueryRow(ctx, "SELECT "+crewEventCols+" FROM mkg_fieldops.crew_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -320,7 +321,7 @@ func scanAssignment(row pgx.Row) (Assignment, error) {
 
 // AssignmentByIdem tìm phân công theo idem_key.
 func AssignmentByIdem(ctx context.Context, tx pgx.Tx, key string) (*Assignment, error) {
-	a, err := scanAssignment(tx.QueryRow(ctx, "SELECT "+assignCols+" FROM mkg_fieldops.crew_assignment WHERE idem_key = $1", key))
+	a, err := scanAssignment(tx.QueryRow(ctx, "SELECT "+assignCols+" FROM mkg_fieldops.crew_assignment WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

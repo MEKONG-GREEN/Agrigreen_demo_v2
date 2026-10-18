@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-NOTIFY-PRICE-A: Chín builder KN,118 pipeline/32 lookup khớp; pure/static/full9PG đạt, chờhelper9/remote.

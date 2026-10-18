@@ -109,6 +109,7 @@ services:
       AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD:?chạy scripts/gen-dev-secrets}
       AG_DB_PASSWORD_VAULT_APP: ${AG_DB_PASSWORD_VAULT_APP:?chạy scripts/gen-dev-secrets}
       AG_DB_PASSWORD_APP_VAULT: ${AG_DB_PASSWORD_APP_VAULT:?chạy scripts/gen-dev-secrets}
+      AG_DB_PASSWORD_APP_AGG: ${AG_DB_PASSWORD_APP_AGG:-}   # rỗng → AG_DB_APP_PASSWORD
     entrypoint: ["/bin/sh", "/etc/pgbouncer-src/entrypoint.sh"]
     volumes: ["./pgbouncer:/etc/pgbouncer-src:ro"]
     ports: ["127.0.0.1:6432:6432"]
@@ -131,6 +132,7 @@ services:
       AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD}
       AG_DB_PASSWORD_VAULT_APP: ${AG_DB_PASSWORD_VAULT_APP}
       AG_DB_PASSWORD_APP_VAULT: ${AG_DB_PASSWORD_APP_VAULT}
+      AG_DB_PASSWORD_APP_AGG: ${AG_DB_PASSWORD_APP_AGG:-}   # app_agg (ADR-0031 §3); rỗng → AG_DB_APP_PASSWORD
     restart: "no"
 
   migrate-up:
@@ -558,6 +560,9 @@ services:
       AG_DB_VIA_PGBOUNCER: "1"
       AG_DB_DIRECT_URL: postgres://postgres:5432/?sslmode=disable
       AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD}
+      # app_agg (ADR-0031 §3): chỉ `worker -agg-run`; rỗng → AG_DB_APP_PASSWORD. AG_AGG_GOVERNANCE_TENANT: tenant quản trị.
+      AG_DB_PASSWORD_APP_AGG: ${AG_DB_PASSWORD_APP_AGG:-}
+      AG_AGG_GOVERNANCE_TENANT: ${AG_AGG_GOVERNANCE_TENANT:-}
       AG_AMQP_URL: amqp://agrigreen:${AMQP_PASSWORD}@rabbitmq:5672/
       AG_ANCHOR_SIGNING_KEY: ${AG_ANCHOR_SIGNING_KEY:?chạy scripts/gen-dev-secrets}
       AG_ANCHOR_KEY_ID: local-dev-1
@@ -633,6 +638,8 @@ services:
       dockerfile: Dockerfile
       # NEXT_PUBLIC_* nhúng lúc build (địa chỉ trình duyệt gọi, không phải tên container).
       args:
+        # http://localhost chỉ hợp lệ ở bản dev (Dockerfile mặc định production, đòi https — src/deployEnv.ts).
+        NEXT_PUBLIC_DEPLOY_ENV: dev
         NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
         NEXT_PUBLIC_ADMIN_API_BASE: http://localhost:8082
         NEXT_PUBLIC_OIDC_ISSUER: http://localhost:8180/realms/agrigreen
@@ -659,6 +666,8 @@ services:
       dockerfile: Dockerfile
       # NEXT_PUBLIC_* nhúng lúc build: web nội bộ MKG CHỈ gọi api-internal (vùng mkg).
       args:
+        # http://localhost chỉ hợp lệ ở bản dev (Dockerfile mặc định production, đòi https — src/deployEnv.ts).
+        NEXT_PUBLIC_DEPLOY_ENV: dev
         NEXT_PUBLIC_API_BASE_URL: http://localhost:8081
         NEXT_PUBLIC_ADMIN_API_BASE: http://localhost:8083
         NEXT_PUBLIC_OIDC_ISSUER: http://localhost:8180/realms/agrigreen

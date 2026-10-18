@@ -1,0 +1,245 @@
+paths:
+# @ag-order: 2
+  /v1/masterdata/admin-units:
+    get:
+      summary: Đơn vị con trực tiếp có hiệu lực tại thời điểm at (parent bỏ trống → các tỉnh)
+      operationId: listAdminUnits
+      tags: [masterdata]
+      parameters:
+        - {name: parent, in: query, schema: {type: string}}
+        - $ref: "#/components/parameters/At"
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang, theo mã
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/AdminUnit"}}
+                  next_cursor: {type: [string, "null"]}
+        "404": {description: masterdata.admin_unit_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 3
+  /v1/masterdata/admin-units/{code}:
+    get:
+      summary: Đơn vị có hiệu lực tại at (cùng một mã có thể là đơn vị khác nhau ở hai thời điểm)
+      operationId: getAdminUnit
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/UnitCode"
+        - $ref: "#/components/parameters/At"
+      responses:
+        "200":
+          description: Đơn vị
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AdminUnit"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 4
+  /v1/masterdata/admin-units/{code}/tree:
+    get:
+      summary: Cây đơn vị (chính nó và mọi đơn vị con cháu) có hiệu lực tại at
+      operationId: getAdminUnitTree
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/UnitCode"
+        - $ref: "#/components/parameters/At"
+      responses:
+        "200":
+          description: Cây
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AdminUnitNode"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 5
+  /v1/masterdata/admin-units/{code}/current:
+    get:
+      summary: Mã hiện hành (tại at) của một mã có thể đã cũ — đi theo chuỗi sáp nhập/chia tách
+      operationId: currentAdminUnitCodes
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/UnitCode"
+        - $ref: "#/components/parameters/At"
+      responses:
+        "200":
+          description: Mã hiện hành
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, at, current_codes]
+                properties:
+                  code: {type: string}
+                  at: {type: string, format: date-time}
+                  current_codes: {type: array, items: {type: string}}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 6
+  /v1/masterdata/catalogs/{catalog}:
+    get:
+      summary: Danh sách mục của một danh mục (mặc định chỉ mục đang dùng)
+      operationId: listCatalog
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/Catalog"
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+        - {name: at, in: query, schema: {type: string}, description: "W11.41 — chỉ danh mục cnts_*: giá trị có hiệu lực tại ngày (YYYY-MM-DD hoặc RFC 3339, giờ Việt Nam); có at thì không phân trang (next_cursor null)"}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang, theo mã
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CatalogItem"}}
+                  next_cursor: {type: [string, "null"]}
+        "404": {description: masterdata.catalog_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 7
+  /v1/masterdata/catalogs/{catalog}/{code}:
+    get:
+      summary: Một mục danh mục (kể cả đã ngừng dùng)
+      operationId: getCatalogItem
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/Catalog"
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - {name: at, in: query, schema: {type: string}, description: "W11.41 — chỉ danh mục cnts_*: giá trị có hiệu lực tại ngày (YYYY-MM-DD hoặc RFC 3339, giờ Việt Nam); có at thì không phân trang (next_cursor null)"}
+      responses:
+        "200":
+          description: Mục
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CatalogItem"}
+        "404": {description: masterdata.catalog_item_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 8
+  /v1/masterdata/params/value:
+    get:
+      summary: Giá trị tham số ĐÃ PHÊ DUYỆT có hiệu lực tại thời điểm của sự việc (CGH QT-01, AC-02)
+      operationId: getParamValue
+      tags: [masterdata]
+      parameters:
+        - {name: key, in: query, required: true, schema: {type: string}, examples: {norm: {value: "cgh.norm_ha_per_machine:MGD:thu_hoach"}}}
+        - $ref: "#/components/parameters/At"
+      responses:
+        "200":
+          description: Giá trị
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ParamValue"}
+        "404": {description: masterdata.param_not_found, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 9
+  /v1/masterdata/display-config:
+    get:
+      summary: Quy chuẩn hiển thị dùng chung của bản đồ GIS đang hiệu lực (GIS US-CFG-01/02) — bảng màu heatmap giai đoạn, màu mức lấp đầy kho/Hub, ngưỡng %
+      description: |
+        Mọi người dùng đã xác thực đọc được (legend web). Giá trị là phiên bản ĐÃ DUYỆT đang hiệu lực (người đặt ≠
+        người duyệt, R-56 — "áp dụng ngay" của AC nghĩa là áp dụng ngay khi được duyệt); khóa chưa có phiên bản duyệt
+        → giá trị mặc định nhúng (source = default).
+      operationId: getDisplayConfig
+      tags: [masterdata]
+      responses:
+        "200":
+          description: Quy chuẩn hiển thị
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [as_of, stage_colors, capacity_colors, ripening_outline_color, hub_capacity_warn_pct, hub_capacity_full_pct, plot_layer_min_zoom]
+                properties:
+                  as_of: {type: string, format: date-time}
+                  stage_colors:
+                    type: object
+                    description: "Theo mã giai đoạn: chuan_bi, sinh_truong, sap_thu, chin_ro, da_thu, none"
+                    additionalProperties: {$ref: "#/components/schemas/DisplayValue"}
+                  capacity_colors:
+                    type: object
+                    description: "Theo mức: available, near_full, full, unknown"
+                    additionalProperties: {$ref: "#/components/schemas/DisplayValue"}
+                  ripening_outline_color: {$ref: "#/components/schemas/DisplayValue"}
+                  hub_capacity_warn_pct: {$ref: "#/components/schemas/DisplayValue"}
+                  hub_capacity_full_pct: {$ref: "#/components/schemas/DisplayValue"}
+                  plot_layer_min_zoom: {$ref: "#/components/schemas/DisplayValue"}
+        "401": {$ref: "#/components/responses/Problem"}
+components:
+  parameters:
+# @ag-order: 503
+    At:
+      name: at
+      in: query
+      description: Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại.
+      schema: {type: string}
+# @ag-order: 505
+    Catalog:
+      name: catalog
+      in: path
+      required: true
+      schema: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest, vessel_class, crop, material, production_model, report_type, cnts_species, cnts_breed, cnts_vaccine, cnts_vaccination_schedule, cnts_disease, cnts_chemical, cnts_slaughter_facility, cnts_aquaculture_object, cnts_fishing_group, cnts_indicator, cnts_model_type, cnts_document_type]}
+  schemas:
+# @ag-order: 529
+    AdminUnit:
+      type: object
+      required: [code, name, level, parent_code, valid_from, valid_to, successor_codes]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        level: {type: string, enum: [province, commune, district], description: "district chỉ có trong dữ liệu trước 01/07/2025"}
+        parent_code: {type: [string, "null"]}
+        valid_from: {type: string, format: date}
+        valid_to: {type: [string, "null"], format: date, description: "Không bao gồm; null = còn hiệu lực"}
+        successor_codes: {type: array, items: {type: string}}
+# @ag-order: 530
+    AdminUnitNode:
+      allOf:
+        - $ref: "#/components/schemas/AdminUnit"
+        - type: object
+          required: [children]
+          properties:
+            children: {type: array, items: {$ref: "#/components/schemas/AdminUnitNode"}}
+# @ag-order: 531
+    CatalogItem:
+      type: object
+      required: [catalog, code, name, attrs, active, deactivation_reason, revision, updated_at]
+      properties:
+        catalog: {type: string}
+        code: {type: string}
+        name: {type: string}
+        attrs: {type: object, additionalProperties: {type: string}, description: "Số (vd expected_yield_t_per_ha) là chuỗi decimal"}
+        active: {type: boolean}
+        deactivation_reason: {type: [string, "null"]}
+        revision: {type: integer}
+        updated_at: {type: string, format: date-time}
+        forms_in_use: {type: integer, description: "KN v7.7 FN-AD-04.05: số mẫu báo cáo đang dùng mục (vắng khi chưa nối P3)"}
+        valid_from: {type: string, format: date, description: "W11.41 (danh mục cnts_*): ngày bắt đầu hiệu lực của giá trị trả về (đọc theo at hoặc vừa ghi)"}
+# @ag-order: 532
+    DisplayValue:
+      type: object
+      required: [key, value, default, version, source]
+      properties:
+        key: {type: string, examples: ["gis.stage_color:chin_ro"]}
+        value: {type: string, description: "Mã màu HEX #RRGGBB hoặc số thập phân dạng chuỗi"}
+        default: {type: string}
+        version: {type: integer, description: "0 = chưa có phiên bản duyệt"}
+        source: {type: string, enum: [approved, default]}
+# @ag-order: 536
+    ParamValue:
+      type: object
+      required: [key, value, text, unit, version, effective_from, source_doc, approved_at, param_version_id, supersedes_id, seq]
+      properties:
+        key: {type: string}
+        value: {type: [string, "null"], description: "Số thập phân dạng chuỗi (R-10)"}
+        text: {type: [string, "null"]}
+        unit: {type: string}
+        version: {type: integer}
+        effective_from: {type: string, format: date-time}
+        source_doc: {type: string}
+        approved_at: {type: string, format: date-time}
+        param_version_id: {type: string, format: uuid}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        seq: {type: integer}

@@ -1,0 +1,11 @@
+{
+  "id": "kn-price-reports",
+  "source": "./kn-price-reports",
+  "app": [
+    {
+      "export": "priceReportRoutes",
+      "order": 27
+    }
+  ],
+  "admin": []
+}

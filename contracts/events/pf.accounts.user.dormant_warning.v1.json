@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.accounts.user.dormant_warning/v1",
+  "title": "pf.accounts.user.dormant_warning — payload",
+  "description": "D24 (CEO 13/10/2026): tài khoản không hoạt động đã tới ngưỡng báo trước (mặc định 38 ngày) — sẽ bị khóa tự động (cause=dormant_45d) vào disable_at nếu không đăng nhập. Job accounts_dormant phát tối đa một lần cho mỗi mốc hoạt động. pf/notify gửi thông báo cá nhân (trong ứng dụng + email) cho chính tài khoản. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.accounts.user.dormant_warning",
+  "x-schema-version": 1,
+  "x-producer": "pf/accounts",
+  "type": "object",
+  "required": [
+    "user_ref",
+    "org_ref",
+    "last_activity_at",
+    "disable_at",
+    "idle_days",
+    "event_time",
+    "seq"
+  ],
+  "properties": {
+    "user_ref": {
+      "type": "string",
+      "format": "uuid",
+      "description": "id người dùng trong Keycloak (không phải định danh cá nhân)"
+    },
+    "org_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "last_activity_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Mốc hoạt động gần nhất: lần đăng nhập gần nhất, phiên gần nhất, lần mở khóa, hoặc lúc tạo tài khoản"
+    },
+    "disable_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Thời điểm sớm nhất job sẽ khóa tài khoản (last_activity_at + ngưỡng khóa)"
+    },
+    "idle_days": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

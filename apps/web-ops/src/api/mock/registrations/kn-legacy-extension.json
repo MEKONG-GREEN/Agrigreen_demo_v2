@@ -1,0 +1,15 @@
+{
+  "id": "kn-legacy-extension",
+  "source": "./kn-legacy-extension",
+  "app": [
+    {
+      "export": "appRoutes28",
+      "order": 28
+    },
+    {
+      "export": "appRoutes29",
+      "order": 29
+    }
+  ],
+  "admin": []
+}

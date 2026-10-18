@@ -186,16 +186,37 @@ func (k *KN) DepartmentByCode(ctx context.Context, unitRef uuid.UUID, code strin
 	var d *port.Department
 	err := tenant.FromCtxTx(ctx, k.DB, func(tx pgx.Tx) error {
 		var e error
-		d, e = store.DepartmentByCode(ctx, tx, unitRef, code)
+		d, e = departmentByCodeTx(ctx, tx, unitRef, code)
 		return e
 	})
 	if err != nil {
 		return port.Department{}, err
 	}
-	if d == nil || d.Retired {
+	if d == nil {
 		return port.Department{}, port.ErrDepartmentNotFound
 	}
 	return *d, nil
+}
+
+// departmentByCodeTx: phòng ban chưa xóa theo mã; mã tạm cũ (phong_ban_5) đã xóa hoặc chưa từng có →
+// phòng ban của mã kế nhiệm (hanh_chinh_tong_hop) — tham chiếu cũ vẫn chạy (W11.06, Q-051). nil = không có.
+func departmentByCodeTx(ctx context.Context, tx pgx.Tx, unitRef uuid.UUID, code string) (*port.Department, error) {
+	d, err := store.DepartmentByCode(ctx, tx, unitRef, code)
+	if err != nil {
+		return nil, err
+	}
+	if d != nil && !d.Retired {
+		return d, nil
+	}
+	to, ok := port.CanonicalDepartmentCode(code)
+	if !ok || to == "" {
+		return nil, nil
+	}
+	d, err = store.DepartmentByCode(ctx, tx, unitRef, to)
+	if err != nil || d == nil || d.Retired {
+		return nil, err
+	}
+	return d, nil
 }
 
 // ---------------------------------------------------------------------------

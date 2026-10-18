@@ -3,7 +3,7 @@
 // sự kiện pf.forms.period.closed và mã lỗi.
 //
 // Bên dùng cấu hình module (kiến trúc v4.1 §7.2: `cap/forms: {hierarchy, publish_by, close_by}`) bằng Profile; gốc
-// lắp ráp truyền danh sách Profile khi dựng module (KN: KNProfile của cmd/api-platform/assembly).
+// lắp ráp truyền danh sách Profile khi dựng module (KN: KNProfile do ứng dụng đăng ký).
 package port
 
 import (
@@ -15,16 +15,34 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
-// Profile là cấu hình của MỘT bên dùng (ứng dụng) — tương đương mục `cap/forms: {…}` của app.yaml (§7.2).
+// ResolvedActor is an application-owned session projected into the forms capability.
+// Identity and tenant always come from the authenticated principal, never this projection.
+type ResolvedActor struct {
+	Role         string
+	Department   string
+	Scope        authz.Scope
+	Node         uuid.UUID
+	AllowsTarget func(unitKind string, ref uuid.UUID) bool
+}
+
+// ActorResolver returns handled=false only when no application session applies.
+// Errors must never fall back to realm permissions. Registration is server-side only.
+type ActorResolver func(context.Context, authz.Principal, Profile) (ResolvedActor, bool, error)
+
+// Profile là cấu hình của MỘT bên dùng (ứng dụng) — tương đương mục cap/forms của app.yaml.
 type Profile struct {
+	// ResolveActor lets an application own session and target restrictions. Never serialized.
+	ResolveActor ActorResolver `json:"-"`
+
 	// Name: mã bên dùng ([a-z][a-z0-9_]*), vd "kn". Biểu, kỳ, ảnh chụp gắn profile.
 	Name string
 	// Hierarchy: các cấp từ trên xuống, vd [TW, TINH, XA]. Cấp cuối (lá) là cấp nộp bài.
 	Hierarchy []string
-	// Roles: vai → cấp. Vai là vai ngữ cảnh phiên KN (authz.KNContext.Role) hoặc vai realm.
+	// Roles: vai → cấp. Vai do resolver ứng dụng cung cấp hoặc vai realm.
 	Roles map[string]string
 	// PublishBy: cấp được phát hành kỳ (KN: TINH). CloseBy: cấp được chốt/mở lại kỳ (KN: TINH).
 	PublishBy string
@@ -38,6 +56,51 @@ type Profile struct {
 	AllowFixtures bool
 	// RequireReviewedBeforeClose: validator trước chốt — chặn chốt khi còn bài nộp chưa rà soát.
 	RequireReviewedBeforeClose bool
+	// UnitKinds: loại đơn vị lá được phát hành kỳ (W11.05, D4 X4) — UnitCommune, UnitFacility, UnitHousehold,
+	// UnitDepartment; phần tử đầu là mặc định. Rỗng = [UnitCommune] (hành vi trước W11.05). UnitPerson chưa hỗ trợ.
+	UnitKinds []string
+	// Departments: phòng ban của ứng dụng; resolver kiểm chính sách truy cập và quyền quản trị.
+	Departments []string
+	// MaxSubmissions: số lần gửi tối đa mặc định của một đơn vị trong kỳ (0 = không giới hạn); kỳ đặt riêng được khi
+	// phát hành. Lần gửi thứ MaxSubmissions khóa đơn vị (KHTC FN-TI-02.03, Q-081).
+	MaxSubmissions int
+	// RequireLateReason: gửi sau hạn nộp của kỳ phải có giải trình/lý do trễ (CNTS H05, H09 — W11.42).
+	RequireLateReason bool
+}
+
+// Loại đơn vị lá (W11.05). Đơn vị = người và luồng nhiều bước (HCTH, D3 §2.5) CHỪA CHỖ: hằng số có, cấu hình và
+// sổ (pf 000140 CHECK unit_kind, review_flow) chưa nhận — thêm khi HCTH chọn phương án (a) "mở rộng cap/forms".
+const (
+	UnitCommune    = "commune"    // xã (KN Trồng trọt, CNTS phần lớn biểu)
+	UnitFacility   = "facility"   // cơ sở giết mổ (CNTS BM-01) — cha = mã xã
+	UnitHousehold  = "household"  // hộ mô hình / điểm trình diễn — cha = mã xã
+	UnitDepartment = "department" // phòng ban (KHTC: phiếu "Báo cáo cho KHTC") — mã phòng ban
+	UnitPerson     = "person"     // CHỪA CHỖ (HCTH: người được đánh giá) — chưa hỗ trợ
+)
+
+// Luồng rà soát: hiện chỉ một bước bốn mắt. ReviewFlowSteps (tự đánh giá → quản lý → HCTH → tập thể) CHỪA CHỖ.
+const (
+	ReviewFlowSingle = "single"
+	ReviewFlowSteps  = "steps" // CHỪA CHỖ — chưa hỗ trợ
+)
+
+// Kinds trả loại đơn vị lá hiệu lực (mặc định [UnitCommune]).
+func (p Profile) Kinds() []string {
+	if len(p.UnitKinds) == 0 {
+		return []string{UnitCommune}
+	}
+	return p.UnitKinds
+}
+
+// LevelOf trả cấp của vai role ở phòng ban department: khóa "vai@phòng_ban" của Roles được ưu tiên (KHTC: kn_tinh
+// của Phòng KHTC là cấp phát hành, kn_tinh phòng khác là cấp lá), rồi tới khóa "vai".
+func (p Profile) LevelOf(role, department string) string {
+	if department != "" {
+		if l, ok := p.Roles[role+"@"+department]; ok {
+			return l
+		}
+	}
+	return p.Roles[role]
 }
 
 // Reviewer trả cấp rà soát hiệu lực.
@@ -58,8 +121,9 @@ func (p Profile) Leaf() string {
 
 // Hành động của sự kiện kỳ ghi song song.
 const (
-	ActionClosed   = "closed"
-	ActionReopened = "reopened"
+	ActionClosed    = "closed"
+	ActionReopened  = "reopened"
+	ActionCancelled = "cancelled" // hủy kỳ (W11.05): lý do bắt buộc, không ảnh chụp
 )
 
 // Cách chốt.
@@ -73,10 +137,10 @@ type MirrorInput struct {
 	Profile   string
 	PeriodRef uuid.UUID // mã kỳ của bên dùng
 	Label     string    // nhãn kỳ (≤ 200 ký tự)
-	Action    string    // ActionClosed | ActionReopened
+	Action    string    // ActionClosed | ActionReopened | ActionCancelled
 	Mode      string    // ModeManual | ModeAuto
 	Units     []string  // reopened: phạm vi mở lại (rỗng = cả kỳ)
-	Reason    string    // reopened: bắt buộc 10–500 ký tự
+	Reason    string    // reopened, cancelled: bắt buộc 10–500 ký tự
 	// Content: nội dung ảnh chụp đóng băng (bắt buộc với closed) — object JSON; DB tính băm SHA-256.
 	Content json.RawMessage
 	Actor   uuid.UUID
@@ -100,6 +164,12 @@ type MirrorResult struct {
 type Freezer interface {
 	Record(ctx context.Context, in MirrorInput) (MirrorResult, error)
 }
+
+// Entity đồng bộ ngoại tuyến (W11.42, docs/dev/sync-contract.md mục "Biểu kỳ cap/forms").
+const (
+	EntityFormsTask       = "forms_task"       // chiều xuống: công việc (kỳ × đơn vị trong phạm vi) kèm biểu và bài nộp cuối
+	EntityFormsSubmission = "forms_submission" // chiều lên: một lần gửi tạo ngoại tuyến
+)
 
 // EventProducerName là tên module phát sự kiện.
 const EventProducerName = "pf/forms"
@@ -142,4 +212,92 @@ var (
 	ErrPendingReview    = problem.New(http.StatusConflict, "forms.pending_review", "Còn bài nộp chưa rà soát — không chốt được kỳ")
 	ErrInvalidValues    = problem.New(http.StatusUnprocessableEntity, "forms.values_invalid", "Số liệu không khớp định nghĩa biểu")
 	ErrInvalidTemplate  = problem.New(http.StatusUnprocessableEntity, "forms.template_invalid", "Định nghĩa biểu không hợp lệ")
+	ErrPeriodCancelled  = problem.New(http.StatusConflict, "forms.period_cancelled", "Kỳ đã hủy — không nộp, chốt hay mở lại được")
+	ErrSubmissionLimit  = problem.New(http.StatusConflict, "forms.submission_limit", "Đơn vị đã gửi đủ số lần tối đa của kỳ")
+	// W11.42 (pf 000149).
+	ErrVersionConflict = problem.New(http.StatusConflict, "forms.submission_conflict",
+		"Đã có người cập nhật báo cáo — tải bản mới rồi sửa lại (không ghi đè)")
+	ErrLateReason      = problem.New(http.StatusUnprocessableEntity, "forms.late_reason_required", "Gửi sau hạn nộp phải ghi lý do trễ (giải trình)")
+	ErrFacilityInvalid = problem.New(http.StatusUnprocessableEntity, "forms.facility_invalid",
+		"Cơ sở không có trong danh mục cơ sở giết mổ đang dùng hoặc không thuộc xã đã chọn")
 )
+
+// ---------------------------------------------------------------------------
+// W11.42: phụ thuộc tùy chọn do gốc lắp ráp nối, và cổng phát hành cho module nghiệp vụ.
+// ---------------------------------------------------------------------------
+
+// FacilityDirectory tra mã xã của cơ sở (đơn vị lá UnitFacility = facility_ref của danh mục cơ sở giết mổ CNTS,
+// pf/masterdata W11.41) tại ngày on. Cơ sở không có/không dùng tại ngày đó → không có trong kết quả.
+type FacilityDirectory interface {
+	FacilityCommunes(ctx context.Context, refs []uuid.UUID, on time.Time) (map[uuid.UUID]string, error)
+}
+
+// Issue là một lỗi chặn của quy tắc nghiệp vụ do bên dùng cài (Validator).
+type Issue struct {
+	Field  string
+	Reason string
+}
+
+// Validator kiểm thêm số liệu bài nộp theo quy tắc nghiệp vụ của bên dùng (vd CNTS: số liều tiêm ≤ tổng đàn).
+// Chạy sau kiểm kiểu của biểu; trả lỗi chặn (rỗng = qua). Gốc lắp ráp nối theo profile.
+type Validator interface {
+	Validate(ctx context.Context, templateCode string, values map[string]string) []Issue
+}
+
+// TemplateDef là định nghĩa biểu do module nghiệp vụ cài (Fields là JSON mảng trường — khớp domain.Field).
+type TemplateDef struct {
+	Profile, Code, Title string
+	Fields               json.RawMessage
+}
+
+// TemplateRef là phiên bản biểu đã có.
+type TemplateRef struct {
+	ID      uuid.UUID
+	Code    string
+	Version int64
+	Title   string
+	Fields  json.RawMessage
+}
+
+// PeriodDef là một kỳ của lô phát hành (khóa kỳ theo lịch kỳ hệ thống, hạn riêng).
+type PeriodDef struct {
+	Label    string
+	DueAt    time.Time
+	Kind     string
+	Key      string
+	From, To time.Time
+	Rule     string
+}
+
+// BatchInput là một lô kỳ cùng biểu, cùng đơn vị nhận (vd BM-01 một tháng = 30 kỳ ngày × các cơ sở).
+type BatchInput struct {
+	Profile    string
+	TemplateID uuid.UUID
+	UnitKind   string
+	Units      []string
+	// UnitParents: mã xã cha song song với Units (cơ sở/hộ). Cơ sở có thể để trống — tra từ FacilityDirectory.
+	UnitParents []string
+	Periods     []PeriodDef
+	// MaxSubmissions: số lần gửi tối đa của mỗi đơn vị trong từng kỳ của lô (nil = mặc định của profile, 0 = không giới
+	// hạn) — W11.62: Kỳ KHTC đọc tham số số lần gửi tối đa (Q-081, D12) và truyền xuống.
+	MaxSubmissions *int
+}
+
+// PublishedPeriod là một kỳ đã phát hành của lô.
+type PublishedPeriod struct {
+	ID    uuid.UUID
+	Key   string
+	Label string
+	DueAt time.Time
+}
+
+// Publisher là cổng phát hành kỳ native cho module nghiệp vụ (KN CNTS: pf/extension tính lịch kỳ W11.03, hạn
+// riêng từng biểu rồi phát hành qua đây). Người gọi lấy từ ctx (ngữ cảnh phiên KN) — kiểm quyền như REST.
+type Publisher interface {
+	// DefineTemplate ghi phiên bản mới của biểu (vai define_by của profile).
+	DefineTemplate(ctx context.Context, def TemplateDef, idem string) (TemplateRef, error)
+	// LatestTemplate trả phiên bản mới nhất của biểu (ErrTemplateNotFound nếu chưa có).
+	LatestTemplate(ctx context.Context, profile, code string) (TemplateRef, error)
+	// PublishBatch phát hành mọi kỳ của lô trong MỘT giao dịch (cấp publish_by).
+	PublishBatch(ctx context.Context, in BatchInput, idem string) ([]PublishedPeriod, error)
+}

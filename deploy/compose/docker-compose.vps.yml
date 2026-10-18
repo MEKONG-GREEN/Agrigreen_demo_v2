@@ -114,9 +114,12 @@ services:
       <<: [*vps-env, *vps-oidc, *vps-proxy]
       AG_CORS_ORIGINS: https://app.${AG_DOMAIN}
       AG_KC_ACTIONS_REDIRECT_URI: https://app.${AG_DOMAIN}/
-      # DEMO: bỏ bắt buộc OTP ở Admin API để tạo tài khoản cán bộ ngay. Đặt AG_MFA_DISABLED=0 trong .env khi
-      # chuyển sang thật; api-platform từ chối bật cờ này khi AG_ENV=production.
-      AG_MFA_DISABLED: ${AG_MFA_DISABLED:-1}
+      # Cờ DEMO bỏ kiểm amr ở Admin API (authz.DemoMFABypassAllowed). Mặc định TẮT ở file dùng chung này: chỉ máy
+      # demo đặt trong .env của máy cả hai dòng AG_DEPLOY_ENV=demo và AG_MFA_DISABLED=1. Thiếu AG_DEPLOY_ENV=demo
+      # hoặc AG_ENV=production mà cờ bật → api-platform từ chối khởi động. CI (tools/mfaflagcheck) chặn file triển
+      # khai được theo dõi đặt cờ = 1 (docs/dev/sync-main-2026-10-13.md).
+      AG_MFA_DISABLED: ${AG_MFA_DISABLED:-0}
+      AG_DEPLOY_ENV: ${AG_DEPLOY_ENV:-}
 
   # API nội bộ MKG: KHÔNG ra internet (Caddy không định tuyến), chỉ 127.0.0.1 của VPS.
   api-internal:
@@ -157,6 +160,8 @@ services:
   web-ops:
     build:
       args:
+        # Ghi đè dev của docker-compose.yml: bản VPS là production (URL https bắt buộc).
+        NEXT_PUBLIC_DEPLOY_ENV: production
         NEXT_PUBLIC_API_BASE_URL: https://api.${AG_DOMAIN}
         NEXT_PUBLIC_ADMIN_API_BASE: https://admin.${AG_DOMAIN}
         NEXT_PUBLIC_OIDC_ISSUER: https://auth.${AG_DOMAIN}/realms/agrigreen

@@ -88,6 +88,11 @@ func (w *world) user(org string, mfa bool, roles ...string) *harness.User {
 
 func (w *world) createOrg(body map[string]any) string {
 	w.t.Helper()
+	if body["kind"] == "cooperative" {
+		n := map[string]any{"name": body["name"], "admin_unit_code": body["admin_unit_code"], "parent_ref": body["parent_ref"]}
+		r := w.want(w.root.Do(harness.Admin, http.MethodPost, "/v1/htx-anchors", "", map[string]any{"created_by": "mkg", "new_cooperative": n}), 201, "tạo HTX qua Neo")
+		return str(r.Body, "org_ref")
+	}
 	r := w.want(w.root.Do(harness.Admin, http.MethodPost, "/v1/orgs", "", body), 201, "tạo tổ chức "+fmt.Sprint(body["name"]))
 	return str(obj(r.Body, "org"), "ref")
 }

@@ -3,8 +3,10 @@ package main
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"log/slog"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 )
 
@@ -50,4 +52,17 @@ func productionGuard(getenv func(string) string, tlsCfg *tls.Config, localKMS bo
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// vaultMFAPolicyFromEnv: như authz.MFAPolicyFromEnv nhưng kho định danh — nơi giữ dữ liệu cá nhân, vai vault_eraser —
+// không bao giờ nhận AG_MFA_DISABLED, kể cả trên máy demo (cờ đó chỉ dành cho Admin API của api-platform).
+func vaultMFAPolicyFromEnv(getenv func(string) string) (authz.MFAPolicy, error) {
+	p, err := authz.MFAPolicyFromEnv(getenv)
+	if err != nil {
+		return authz.MFAPolicy{}, err
+	}
+	if p.Disabled {
+		return authz.MFAPolicy{}, fmt.Errorf("identity-vault: %s không áp dụng cho kho định danh — bỏ biến này khỏi dịch vụ kho", authz.EnvMFADisabled)
+	}
+	return p, nil
 }

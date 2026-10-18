@@ -180,3 +180,6 @@ func (m *Module) UseMachineCounts(c port.CoopMachineCounts) { m.reg.Machines = c
 
 // UseActorNames nối danh bạ tên người thao tác cho khung Log.
 func (m *Module) UseActorNames(n port.ActorNames) { m.kn.Names = n }
+
+// CooperativeRegistrar tạo Nút HTX qua cổng nội bộ có kiểm vai cho luồng Neo D2.
+func (m *Module) CooperativeRegistrar() port.CooperativeRegistrar { return m.reg }

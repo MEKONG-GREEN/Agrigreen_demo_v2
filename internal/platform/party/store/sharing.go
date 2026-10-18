@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -58,7 +59,7 @@ func InsertGrantEvent(ctx context.Context, tx pgx.Tx, e *GrantEvent) error {
 func GrantEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*GrantEvent, error) {
 	var e GrantEvent
 	err := tx.QueryRow(ctx, `SELECT id, tenant_id, grant_id, action, grantee_tenant_id, kinds, purpose, valid_from, valid_to, proposed_by,
-	    reason, event_time, actor_ref, idem_key, seq, recorded_at FROM pf_party.share_grant_event WHERE idem_key = $1::text`, key).
+	    reason, event_time, actor_ref, idem_key, seq, recorded_at FROM pf_party.share_grant_event WHERE idem_key = $1::text`+ledger.NewestByIdem(""), key).
 		Scan(&e.ID, &e.TenantID, &e.GrantID, &e.Action, &e.Grantee, &e.Kinds, &e.Purpose, &e.ValidFrom, &e.ValidTo, &e.ProposedBy,
 			&e.Reason, &e.EventTime, &e.ActorRef, &e.IdemKey, &e.Seq, &e.RecordedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -222,7 +223,7 @@ func scanReview(row pgx.Row) (Review, error) {
 
 // ReviewByIdem đọc dòng rà soát đã ghi với idem_key (gọi lặp); nil nếu chưa có.
 func ReviewByIdem(ctx context.Context, tx pgx.Tx, key string) (*Review, error) {
-	r, err := scanReview(tx.QueryRow(ctx, "SELECT "+reviewCols+" FROM pf_party.share_grant_review WHERE idem_key = $1::text", key))
+	r, err := scanReview(tx.QueryRow(ctx, "SELECT "+reviewCols+" FROM pf_party.share_grant_review WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

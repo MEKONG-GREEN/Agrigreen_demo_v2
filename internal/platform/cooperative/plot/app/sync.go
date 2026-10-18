@@ -336,6 +336,12 @@ func (snk SyncSink) Accept(ctx context.Context, scope authz.Scope, rec syncport.
 		if err != nil {
 			return rejected(rec.ID, err)
 		}
+		if coop != uuid.Nil && s.Anchors != nil {
+			// D2: Nút HTX tạm đã được HTX thật nhận quyền sang Nút khác → ghi vào Nút hiện hành của neo.
+			if coop, err = s.Anchors.CurrentOrg(ctx, p.TenantID, coop); err != nil {
+				return rejected(rec.ID, err)
+			}
+		}
 		hh, err := optRef("household_ref", pl.HouseholdRef)
 		if err != nil {
 			return rejected(rec.ID, err)

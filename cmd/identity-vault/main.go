@@ -14,6 +14,7 @@
 //	                     mapper; chưa cấu hình Keycloak mà đặt biến này thì mọi lời gọi pf → kho bị 401
 //	AG_MFA_FACTORS, AG_MFA_STRONG_FACTORS, AG_MFA_STRONG_ROLES  chính sách yếu tố thứ hai (authz.MFAPolicy;
 //	                     mặc định sms KHÔNG tính cho platform_admin và vai vault_*)
+//	                     AG_MFA_DISABLED (bỏ kiểm MFA của demo) KHÔNG áp dụng cho kho: đặt = 1 → từ chối khởi động
 //	AG_VAULT_REQUIRE_MFA 1|0 — bắt buộc MFA cho Resolve/Unwrap; mặc định 1 ở production, 0 ở môi trường khác
 //	AG_VAULT_QUOTA_PER_HOUR, AG_VAULT_QUOTA_BURST  hạn mức Lookup/Resolve theo người yêu cầu (mặc định 600/giờ,
 //	                     dồn 200; 0 = tắt). Trong bộ nhớ: đúng cho MỘT bản sao kho
@@ -39,7 +40,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -108,7 +108,7 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	mfaPolicy, err := authz.MFAPolicyFromEnv(os.Getenv)
+	mfaPolicy, err := vaultMFAPolicyFromEnv(os.Getenv)
 	if err != nil {
 		return err
 	}

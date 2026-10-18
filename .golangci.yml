@@ -16,15 +16,17 @@ linters:
       # Lớp dự phòng cho R-03; quy tắc đầy đủ R-02/R-03/R-04 ở tools/archlint.
       rules:
         platform-not-mkg:
-          files: ["**/internal/platform/**"]
+          files: ["**/internal/platform/**", "**/internal/kn/**"]
           deny:
             - pkg: "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg"
-              desc: "R-03: platform/ không được import mkg/"
+              desc: "R-03: platform/ và kn/ không được import mkg/"
         mkg-not-platform:
           files: ["**/internal/mkg/**"]
           deny:
             - pkg: "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform"
               desc: "R-03: mkg/ không được import platform/"
+            - pkg: "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn"
+              desc: "R-03: mkg/ không được import kn/"
         no-lib-pq:
           deny:
             - pkg: "github.com/lib/pq"

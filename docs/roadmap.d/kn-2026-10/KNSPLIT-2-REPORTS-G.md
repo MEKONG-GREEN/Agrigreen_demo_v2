@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-REPORTS-G — Genericbuilderregistry vàKNowner5nguồn, sốhọc/scope/alias/errorfinal/pure và13/13PG noSKIP/static đạt. Helper migration trướcdev; legacy còn đếnH,14seed còn gói sau.

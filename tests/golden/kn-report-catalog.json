@@ -1,0 +1,750 @@
+{
+  "Sources": {
+    "extension.growth_pest": {
+      "Key": "extension.growth_pest",
+      "Module": "extension",
+      "Levels": [
+        "national",
+        "province",
+        "commune"
+      ],
+      "DefaultLevel": "province",
+      "NeedsPeriod": true,
+      "UsesSeason": false,
+      "NeedsCompare": false,
+      "Columns": [
+        {
+          "Key": "province_code",
+          "Title": "Mã tỉnh",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "province",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "province_name",
+          "Title": "Tỉnh/Thành phố",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "province",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "commune_code",
+          "Title": "Mã xã",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "commune",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "commune_name",
+          "Title": "Xã/Phường",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "commune",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "pest_code",
+          "Title": "Sâu bệnh",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "severity",
+          "Title": "Mức độ nhiễm",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "affected_area_ha",
+          "Title": "Diện tích nhiễm (ha)",
+          "Kind": "decimal",
+          "Scale": 2,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "observations",
+          "Title": "Số lượt quan sát",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "urgent",
+          "Title": "Phản ánh khẩn",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        }
+      ]
+    },
+    "extension.period_summary": {
+      "Key": "extension.period_summary",
+      "Module": "extension",
+      "Levels": [
+        "national",
+        "province",
+        "commune"
+      ],
+      "DefaultLevel": "province",
+      "NeedsPeriod": true,
+      "UsesSeason": false,
+      "NeedsCompare": false,
+      "Columns": [
+        {
+          "Key": "province_code",
+          "Title": "Mã tỉnh",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "province",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "province_name",
+          "Title": "Tỉnh/Thành phố",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "province",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "commune_code",
+          "Title": "Mã xã",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "commune",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "commune_name",
+          "Title": "Xã/Phường",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "commune",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "sown_area_ha",
+          "Title": "Diện tích đã sạ (ha)",
+          "Kind": "decimal",
+          "Scale": 2,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "affected_area_ha",
+          "Title": "Diện tích nhiễm sâu bệnh (ha)",
+          "Kind": "decimal",
+          "Scale": 2,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "pest_reports",
+          "Title": "Báo cáo sâu bệnh",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "urgent_reports",
+          "Title": "Phản ánh khẩn",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "registered_ha",
+          "Title": "Đề án: đăng ký (ha)",
+          "Kind": "decimal",
+          "Scale": 2,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "completed_ha",
+          "Title": "Đề án: hoàn thành (ha)",
+          "Kind": "decimal",
+          "Scale": 2,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "tasks_opened",
+          "Title": "Nhiệm vụ mới",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "tasks_resolved",
+          "Title": "Nhiệm vụ đã xử lý",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "tasks_overdue",
+          "Title": "Nhiệm vụ quá hạn",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        }
+      ]
+    },
+    "extension.program_progress": {
+      "Key": "extension.program_progress",
+      "Module": "extension",
+      "Levels": [
+        "national",
+        "province",
+        "commune",
+        "cooperative"
+      ],
+      "DefaultLevel": "province",
+      "NeedsPeriod": false,
+      "UsesSeason": true,
+      "NeedsCompare": false,
+      "Columns": [
+        {
+          "Key": "province_code",
+          "Title": "Mã tỉnh",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "province",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "province_name",
+          "Title": "Tỉnh/Thành phố",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "province",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "commune_code",
+          "Title": "Mã xã",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "commune",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "commune_name",
+          "Title": "Xã/Phường",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "commune",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "cooperative_name",
+          "Title": "HTX",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "cooperative",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "season",
+          "Title": "Vụ",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "target_ha",
+          "Title": "Mục tiêu Đề án (ha)",
+          "Kind": "decimal",
+          "Scale": 2,
+          "MinLevel": "",
+          "MaxLevel": "province"
+        },
+        {
+          "Key": "registered_ha",
+          "Title": "Đăng ký (ha)",
+          "Kind": "decimal",
+          "Scale": 2,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "deploying_ha",
+          "Title": "Đang triển khai (ha)",
+          "Kind": "decimal",
+          "Scale": 2,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "completed_ha",
+          "Title": "Hoàn thành (ha)",
+          "Kind": "decimal",
+          "Scale": 2,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "registered_pct",
+          "Title": "Đăng ký/Mục tiêu (%)",
+          "Kind": "percent",
+          "Scale": 2,
+          "MinLevel": "",
+          "MaxLevel": "province"
+        },
+        {
+          "Key": "cooperatives",
+          "Title": "Số HTX",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "unapproved",
+          "Title": "Chưa duyệt",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        }
+      ]
+    },
+    "extension.sowing": {
+      "Key": "extension.sowing",
+      "Module": "extension",
+      "Levels": [
+        "national",
+        "province",
+        "commune"
+      ],
+      "DefaultLevel": "province",
+      "NeedsPeriod": true,
+      "UsesSeason": false,
+      "NeedsCompare": false,
+      "Columns": [
+        {
+          "Key": "province_code",
+          "Title": "Mã tỉnh",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "province",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "province_name",
+          "Title": "Tỉnh/Thành phố",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "province",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "commune_code",
+          "Title": "Mã xã",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "commune",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "commune_name",
+          "Title": "Xã/Phường",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "commune",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "season_code",
+          "Title": "Vụ",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "variety_code",
+          "Title": "Giống",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "sown_area_ha",
+          "Title": "Diện tích đã sạ (ha)",
+          "Kind": "decimal",
+          "Scale": 2,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "cooperatives",
+          "Title": "Số HTX báo cáo",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "reports",
+          "Title": "Số báo cáo",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        }
+      ]
+    },
+    "extension.tasks_sla": {
+      "Key": "extension.tasks_sla",
+      "Module": "extension",
+      "Levels": [
+        "national",
+        "province",
+        "commune"
+      ],
+      "DefaultLevel": "province",
+      "NeedsPeriod": true,
+      "UsesSeason": false,
+      "NeedsCompare": false,
+      "Columns": [
+        {
+          "Key": "province_code",
+          "Title": "Mã tỉnh",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "province",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "province_name",
+          "Title": "Tỉnh/Thành phố",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "province",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "commune_code",
+          "Title": "Mã xã",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "commune",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "commune_name",
+          "Title": "Xã/Phường",
+          "Kind": "text",
+          "Scale": 0,
+          "MinLevel": "commune",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "opened",
+          "Title": "Nhiệm vụ mới",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "resolved",
+          "Title": "Đã xử lý",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "on_time",
+          "Title": "Đúng hạn SLA",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "escalated",
+          "Title": "Leo thang",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "open",
+          "Title": "Đang mở",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        },
+        {
+          "Key": "overdue",
+          "Title": "Quá hạn",
+          "Kind": "int",
+          "Scale": 0,
+          "MinLevel": "",
+          "MaxLevel": ""
+        }
+      ]
+    }
+  },
+  "Templates": [
+    {
+      "Key": "kn.sowing_progress",
+      "Def": {
+        "Title": "Báo cáo tiến độ gieo sạ",
+        "Source": "extension.sowing",
+        "Grouping": "commune",
+        "Columns": [
+          {
+            "Key": "province_name",
+            "Title": "Tỉnh/Thành phố"
+          },
+          {
+            "Key": "commune_name",
+            "Title": "Xã/Phường"
+          },
+          {
+            "Key": "season_code",
+            "Title": "Vụ"
+          },
+          {
+            "Key": "variety_code",
+            "Title": "Giống"
+          },
+          {
+            "Key": "sown_area_ha",
+            "Title": "Diện tích đã sạ (ha)"
+          },
+          {
+            "Key": "cooperatives",
+            "Title": "Số HTX báo cáo"
+          }
+        ],
+        "Formats": [
+          "xlsx",
+          "pdf"
+        ],
+        "Provisional": true,
+        "FormNote": "Mẫu tạm: BRD chỉ nêu \"theo mẫu Bộ NN\u0026MT/NN\u0026PTNT\" nhưng chưa có mẫu biểu chính thức — bố cục sẽ điều chỉnh khi Bộ ban hành."
+      }
+    },
+    {
+      "Key": "kn.growth_pest",
+      "Def": {
+        "Title": "Báo cáo tình hình sinh trưởng và sâu bệnh",
+        "Source": "extension.growth_pest",
+        "Grouping": "commune",
+        "Columns": [
+          {
+            "Key": "province_name",
+            "Title": "Tỉnh/Thành phố"
+          },
+          {
+            "Key": "commune_name",
+            "Title": "Xã/Phường"
+          },
+          {
+            "Key": "pest_code",
+            "Title": "Sâu bệnh"
+          },
+          {
+            "Key": "severity",
+            "Title": "Mức độ nhiễm"
+          },
+          {
+            "Key": "affected_area_ha",
+            "Title": "Diện tích nhiễm (ha)"
+          },
+          {
+            "Key": "observations",
+            "Title": "Số lượt quan sát"
+          },
+          {
+            "Key": "urgent",
+            "Title": "Phản ánh khẩn"
+          }
+        ],
+        "Formats": [
+          "xlsx",
+          "pdf"
+        ],
+        "Provisional": true,
+        "FormNote": "Mẫu tạm: BRD chỉ nêu \"theo mẫu Bộ NN\u0026MT/NN\u0026PTNT\" nhưng chưa có mẫu biểu chính thức — bố cục sẽ điều chỉnh khi Bộ ban hành."
+      }
+    },
+    {
+      "Key": "kn.program_progress",
+      "Def": {
+        "Title": "Báo cáo tiến độ Đề án 1 triệu ha lúa chất lượng cao, phát thải thấp",
+        "Source": "extension.program_progress",
+        "Grouping": "province",
+        "Columns": [
+          {
+            "Key": "province_name",
+            "Title": "Tỉnh/Thành phố"
+          },
+          {
+            "Key": "season",
+            "Title": "Vụ"
+          },
+          {
+            "Key": "target_ha",
+            "Title": "Mục tiêu Đề án (ha)"
+          },
+          {
+            "Key": "registered_ha",
+            "Title": "Đăng ký (ha)"
+          },
+          {
+            "Key": "deploying_ha",
+            "Title": "Đang triển khai (ha)"
+          },
+          {
+            "Key": "completed_ha",
+            "Title": "Hoàn thành (ha)"
+          },
+          {
+            "Key": "registered_pct",
+            "Title": "Đăng ký/Mục tiêu (%)"
+          },
+          {
+            "Key": "cooperatives",
+            "Title": "Số HTX"
+          },
+          {
+            "Key": "unapproved",
+            "Title": "Chưa duyệt"
+          }
+        ],
+        "Formats": [
+          "xlsx",
+          "pdf"
+        ],
+        "Provisional": true,
+        "FormNote": "Mẫu tạm: BRD chỉ nêu \"theo mẫu Bộ NN\u0026MT/NN\u0026PTNT\" nhưng chưa có mẫu biểu chính thức — bố cục sẽ điều chỉnh khi Bộ ban hành."
+      }
+    },
+    {
+      "Key": "kn.tasks_sla",
+      "Def": {
+        "Title": "Báo cáo xử lý nhiệm vụ hỗ trợ",
+        "Source": "extension.tasks_sla",
+        "Grouping": "province",
+        "Columns": [
+          {
+            "Key": "province_name",
+            "Title": "Tỉnh/Thành phố"
+          },
+          {
+            "Key": "opened",
+            "Title": "Nhiệm vụ mới"
+          },
+          {
+            "Key": "resolved",
+            "Title": "Đã xử lý"
+          },
+          {
+            "Key": "on_time",
+            "Title": "Đúng hạn SLA"
+          },
+          {
+            "Key": "escalated",
+            "Title": "Leo thang"
+          },
+          {
+            "Key": "open",
+            "Title": "Đang mở"
+          },
+          {
+            "Key": "overdue",
+            "Title": "Quá hạn"
+          }
+        ],
+        "Formats": [
+          "xlsx",
+          "pdf"
+        ],
+        "Provisional": true,
+        "FormNote": "Mẫu tạm: BRD chỉ nêu \"theo mẫu Bộ NN\u0026MT/NN\u0026PTNT\" nhưng chưa có mẫu biểu chính thức — bố cục sẽ điều chỉnh khi Bộ ban hành."
+      }
+    },
+    {
+      "Key": "kn.period_summary",
+      "Def": {
+        "Title": "Tổng hợp báo cáo kỳ",
+        "Source": "extension.period_summary",
+        "Grouping": "province",
+        "Columns": [
+          {
+            "Key": "province_name",
+            "Title": "Tỉnh/Thành phố"
+          },
+          {
+            "Key": "sown_area_ha",
+            "Title": "Diện tích đã sạ (ha)"
+          },
+          {
+            "Key": "affected_area_ha",
+            "Title": "Diện tích nhiễm sâu bệnh (ha)"
+          },
+          {
+            "Key": "pest_reports",
+            "Title": "Báo cáo sâu bệnh"
+          },
+          {
+            "Key": "urgent_reports",
+            "Title": "Phản ánh khẩn"
+          },
+          {
+            "Key": "registered_ha",
+            "Title": "Đề án: đăng ký (ha)"
+          },
+          {
+            "Key": "completed_ha",
+            "Title": "Đề án: hoàn thành (ha)"
+          },
+          {
+            "Key": "tasks_opened",
+            "Title": "Nhiệm vụ mới"
+          },
+          {
+            "Key": "tasks_resolved",
+            "Title": "Nhiệm vụ đã xử lý"
+          },
+          {
+            "Key": "tasks_overdue",
+            "Title": "Nhiệm vụ quá hạn"
+          }
+        ],
+        "Formats": [
+          "xlsx",
+          "pdf"
+        ],
+        "Provisional": true,
+        "FormNote": "Mẫu tạm: BRD chỉ nêu \"theo mẫu Bộ NN\u0026MT/NN\u0026PTNT\" nhưng chưa có mẫu biểu chính thức — bố cục sẽ điều chỉnh khi Bộ ban hành."
+      }
+    }
+  ]
+}

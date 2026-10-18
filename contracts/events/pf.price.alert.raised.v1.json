@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.price.alert.raised/v1",
+  "title": "pf.price.alert.raised — payload",
+  "description": "Xã gửi / gửi lại phiếu báo giá làm phát sinh cảnh báo biến động 'Tạm tính' MỚI (gói NOTIF; BRD Báo giá v1.3 FN-TI-02.03 B1, AC-01: cán bộ Tỉnh phụ trách nhận thông báo trong 1 phút). Không phát khi Cấp Tỉnh nhập thay. pf/notify gửi chuông + email cho owner_ref (null = xã chưa phân công → mọi Cấp Tỉnh) và Quản trị nghiệp vụ báo giá. Không dữ liệu cá nhân.",
+  "x-event-type": "pf.price.alert.raised",
+  "x-schema-version": 1,
+  "x-producer": "pf/price",
+  "type": "object",
+  "required": [
+    "profile",
+    "day",
+    "point_code",
+    "point_name",
+    "ticket_id",
+    "item_codes",
+    "owner_ref"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "description": "Bên dùng của cap/price (KN = kn)"
+    },
+    "day": {
+      "type": "string",
+      "format": "date",
+      "description": "Ngày báo giá (giờ VN)"
+    },
+    "point_code": {
+      "type": "string",
+      "description": "Mã xã báo giá (XBG…)"
+    },
+    "point_name": {
+      "type": "string",
+      "description": "Tên xã theo ĐVHC (không phải dữ liệu cá nhân)"
+    },
+    "ticket_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "item_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "Mã mặt hàng"
+    },
+    "owner_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "Cán bộ Cấp Tỉnh được phân công xã tại ngày báo giá; null = chưa phân công"
+    }
+  }
+}

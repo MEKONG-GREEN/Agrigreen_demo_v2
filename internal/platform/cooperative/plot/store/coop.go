@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/plot/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // geomOr dựng hình MultiPolygon từ tham số GeoJSON n; rỗng → lấy hình hiện hành
@@ -87,7 +88,7 @@ func scanCoopBoundary(row pgx.Row, withGeom bool) (CoopBoundary, error) {
 
 // CoopBoundaryByIdemKey tìm phiên bản đã ghi với idem_key (gọi lặp).
 func CoopBoundaryByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*CoopBoundary, error) {
-	b, err := scanCoopBoundary(tx.QueryRow(ctx, "SELECT "+coopBoundaryCols+" FROM pf_coop.cooperative_boundary WHERE idem_key = $1::text", key), false)
+	b, err := scanCoopBoundary(tx.QueryRow(ctx, "SELECT "+coopBoundaryCols+" FROM pf_coop.cooperative_boundary WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key), false)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

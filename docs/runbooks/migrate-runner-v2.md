@@ -44,3 +44,9 @@ Bảng gắn tệp → module → sổ: `go run ./tools/migratecheck -modules mi
 | `ghi trùng` | Cùng tệp ở hai sổ (chỉ xảy ra nếu sửa tay) | Báo nhóm nền tảng; không tự xóa dòng. |
 | `golang-migrate schema_migrations_<x> bẩn` | Lần v1 trước hỏng giữa chừng | Xử lý như sự cố golang-migrate cũ: kiểm tệp ở phiên bản đó đã áp hết chưa, sửa cờ `dirty` bằng quản trị cụm, rồi chạy lại. |
 | Tệp lỗi khi áp (`migrator: <tệp> dòng N: …`) | Lỗi SQL | Giao dịch của tệp lùi (không ghi sổ, không "dirty"); sửa bằng tệp mới hoặc sửa tệp CHƯA áp ở môi trường nào, chạy lại. |
+
+## Gộp dev → main: pf 151 của main
+
+`main` từng có `pf/000151_pf_kref_ctx_grant_agg` (đã áp ở demo); `dev` bỏ tệp đó — nội dung tương đương là `000137_pf_kref_agg_ctx_grant`, chỉ GRANT — và dùng 137–152 cho price/hrm/forms/… Ở DB đứng ở 151 của main, golang-migrate sẽ bỏ qua im lặng 137–151 rồi hỏng ở 152 (`relation "pf_price.board" does not exist`, sổ kẹt `152 dirty`).
+
+`migrate up` (cả v1 và v2) tự xử lý trước khi áp cụm pf (`internal/shared/dbadmin/pf151.go`): khi `schema_migrations_pf` đứng ở `151`, không dirty, và chưa có đối tượng nào của dev 138–151 (`pf_price`, `pf_hrm`, `pf_forms.period_spec`, …), phiên bản được hạ về `136` để áp đủ 137 → mới nhất. Log in một dòng `schema_migrations_pf 151 (tệp của main) → 136 …`. Mọi trạng thái khác giữ nguyên; chạy lại không đổi gì. Không cần thao tác tay — nhưng vẫn sao lưu DB demo trước lần deploy đầu sau khi gộp.

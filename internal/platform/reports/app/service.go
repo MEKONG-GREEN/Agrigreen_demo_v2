@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -15,16 +16,12 @@ import (
 	"github.com/shopspring/decimal"
 
 	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -58,36 +55,11 @@ var (
 // DownloadTTL là thời hạn URL tải tệp (≤ objstore.MaxPresignTTL).
 const DownloadTTL = 10 * time.Minute
 
-// Nhóm vai.
+// Native capability roles. Application roles are registered through Policy.
 var (
-	knRoles  = []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, authz.RolePlatformAdmin}
-	cghRoles = []string{mechport.RoleCGHViewer, mechport.RoleCGHAdmin, authz.RolePlatformAdmin}
-	// HTX US-DASH-02: quản lý HTX (chỉ HTX mình) và cán bộ KN theo phạm vi xã/tỉnh.
-	htxRoles      = append([]string{ccport.RoleCoopManager}, knRoles...)
-	allReaders    = []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, mechport.RoleCGHViewer, mechport.RoleCGHAdmin, ccport.RoleCoopManager, port.RoleReportsAdmin, port.RoleMasterdataAdmin, authz.RolePlatformAdmin}
+	cghRoles      = []string{mechport.RoleCGHViewer, mechport.RoleCGHAdmin, authz.RolePlatformAdmin}
 	templateAdmin = []string{port.RoleReportsAdmin, port.RoleMasterdataAdmin, authz.RolePlatformAdmin}
-	// Lập lịch: cán bộ quản lý (TTKN QG/tỉnh — KN US-DASH-03), Admin CGH và quản lý HTX
-	// (HTX US-DASH-03, chỉ mẫu HTX — rolesFor chặn mẫu khác).
-	schedulers = []string{extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, mechport.RoleCGHAdmin, ccport.RoleCoopManager, authz.RolePlatformAdmin}
 )
-
-// rolesFor trả vai được xuất từ một nguồn dữ liệu.
-func rolesFor(source string) []string {
-	switch domain.Sources[source].Module {
-	case "mechanization":
-		return cghRoles
-	case "cropcycle":
-		return htxRoles
-	}
-	return knRoles
-}
-
-// coopOnly: người gọi xem số liệu HTX CHỈ của HTX mình (Principal.OrgRef) — quản lý
-// HTX không kèm vai KN/quản trị (HTX US-DASH-01 AC-3). Phạm vi xã của tổ chức HTX
-// (pf/party) KHÔNG dùng cho nguồn HTX: một xã có nhiều HTX.
-func coopOnly(p authz.Principal) bool {
-	return p.Has(ccport.RoleCoopManager) && !hasAny(p, knRoles)
-}
 
 func hasAny(p authz.Principal, roles []string) bool {
 	return slices.ContainsFunc(roles, p.Has)
@@ -95,18 +67,21 @@ func hasAny(p authz.Principal, roles []string) bool {
 
 // Service là use case của module.
 type Service struct {
-	DB    tenant.Beginner // pool vai reports_app
-	Clock clock.Clock
-	Log   *slog.Logger
+	FormSeeds      *FormSeedRegistry
+	Builders       *SourceBuilderRegistry
+	Catalog        *CatalogRegistry
+	Policies       *PolicyRegistry
+	ResolveSession port.SessionResolver
+	DB             tenant.Beginner // pool vai reports_app
+	Clock          clock.Clock
+	Log            *slog.Logger
 
-	Scope    partyport.ScopeResolver
-	Orgs     partyport.Orgs
-	Units    partyport.AdminUnits
-	Params   params.Params
-	Catalogs mdport.Catalogs
-	Store    objstore.Store
-
-	Extension     extensionsrc.ReportData
+	Scope         partyport.ScopeResolver
+	Orgs          partyport.Orgs
+	Units         partyport.AdminUnits
+	Params        params.Params
+	Catalogs      mdport.Catalogs
+	Store         objstore.Store
 	Mechanization mechanizationsrc.ReportData
 	CropCycle     cropcyclesrc.ReportData // HTX US-DASH-02: sản lượng HTX
 
@@ -119,7 +94,7 @@ type Service struct {
 	LinkDownloadBase string
 
 	// KN v7.7 P4 — báo cáo Chi cục (dispatch.go): lần tổng hợp của pf/extension, cờ + bộ chuyển Google Sheet (TẮT mặc định).
-	Consolidations extensionsrc.Consolidations
+	Consolidations port.Consolidations
 	GSheet         dispatch.GSheetConfig
 	GSheetPub      dispatch.GSheetPublisher
 	// Egress (G5, ADR-0024 mục 3): điểm kiểm soát xuất DÙNG CHUNG (pf/metering, kênh report_export),

@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-REPORTS-F — GỡcatalogKNimplicit, negative/golden/quyền9source/visibility đạt;13/13PG noSKIP trên224,304chỉxóa2unusedhelpers vàdomain/app/lintđạt. Helperrebuild/migrationtrướcdev; builder/14gridseed còn gói sau.

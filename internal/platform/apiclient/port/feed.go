@@ -109,10 +109,13 @@ func (s StaticContributors) Contributors(context.Context, string, time.Time) ([]
 var (
 	// ErrUnknownFeed: không có hợp đồng feed hợp lệ với tên/phiên bản này (mặc định từ chối).
 	ErrUnknownFeed = problem.New(http.StatusNotFound, "integration.unknown_feed", "Không có feed này")
-	// ErrContractNotServable: hợp đồng chưa approved (proposed/draft/retired) — production không phục vụ; ngoài
-	// production cần AG_GATEWAY_FEED_ALLOW_PROPOSED=1. Cũng dùng cho loại feed chưa phục vụ ở cổng.
+	// ErrContractNotServable: hợp đồng tích hợp (feed, nạp theo lô, song phương) không phục vụ ở môi trường này —
+	// chưa approved (proposed/draft/retired), approved còn pending, hoặc loại chưa phục vụ ở cổng. Production không
+	// phục vụ hợp đồng proposed; ngoài production cần cờ dev/test (AG_GATEWAY_FEED_ALLOW_PROPOSED /
+	// AG_GATEWAY_INGEST_ALLOW_PROPOSED). ĐỊNH NGHĨA DUY NHẤT của mã integration.contract_not_servable:
+	// ingest.ErrContractNotServable và ErrNotServable của pf/cooperative (bilateral) là bí danh của biến này.
 	ErrContractNotServable = problem.New(http.StatusForbidden, "integration.contract_not_servable",
-		"Hợp đồng feed chưa được duyệt hoặc chưa phục vụ ở môi trường này")
+		"Hợp đồng tích hợp chưa được duyệt hoặc không phục vụ ở môi trường này")
 	// ErrCursorExpired: cursor trỏ vào phần feed đã quá hạn giữ 30 ngày — đồng bộ lại từ ảnh chụp (trường
 	// snapshot của phản hồi) rồi đọc tiếp.
 	ErrCursorExpired = problem.New(http.StatusGone, "integration.cursor_expired", "Cursor đã quá hạn giữ của feed")

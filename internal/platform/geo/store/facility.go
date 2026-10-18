@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // pointOr dựng điểm từ tham số GeoJSON n; rỗng → biểu thức cur.
@@ -100,7 +101,7 @@ func scanFacilityEvent(row pgx.Row) (FacilityEvent, error) {
 
 // FacilityEventByIdemKey tìm dòng sổ đã ghi với idem_key.
 func FacilityEventByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*FacilityEvent, error) {
-	e, err := scanFacilityEvent(tx.QueryRow(ctx, "SELECT "+facilityEventCols+" FROM pf_geo.facility_event WHERE idem_key = $1::text", key))
+	e, err := scanFacilityEvent(tx.QueryRow(ctx, "SELECT "+facilityEventCols+" FROM pf_geo.facility_event WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.notify.email.requested/v1",
+  "title": "pf.notify.email.requested — payload",
+  "description": "Một lô email theo từng người nhận đã xếp trong pf_notify.email_delivery (gói NOTIF — thông báo Báo giá nông sản có kênh email). Consumer pf.notify.email tra địa chỉ qua pf/accounts lúc gửi và gửi qua SMTP trong lãnh thổ; lần đã gửi không gửi lại khi giao lặp. Không có địa chỉ email, không dữ liệu cá nhân.",
+  "x-event-type": "pf.notify.email.requested",
+  "x-schema-version": 1,
+  "x-producer": "pf/notify",
+  "type": "object",
+  "required": ["batch_id", "kind", "deliveries"],
+  "properties": {
+    "batch_id":   { "type": "string", "format": "uuid" },
+    "kind":       { "type": "string", "pattern": "^[a-z_]{1,40}$" },
+    "deliveries": { "type": "integer", "minimum": 1 }
+  }
+}

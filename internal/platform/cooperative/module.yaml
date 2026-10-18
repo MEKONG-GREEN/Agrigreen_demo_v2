@@ -22,6 +22,7 @@ provides:
     - Diary
     - FarmerHouseholds
     - FarmerIdentity
+    - HTXConfirmations
     - HouseholdIdentities
     - Households
     - MachineCounts
@@ -45,11 +46,15 @@ provides:
     - pf.party.household.membership_changed/v1
     - pf.party.household.registered/v1
   internal_events: []
-  publications: []
+  publications:
+    - pf_cooperative_pub.confirmations/v1
+    - pf_cooperative_pub.cooperatives/v1
+    - pf_cooperative_pub.plots/v1
+    - pf_cooperative_pub.seasons/v1
   data_products: []
 consumes:
   events: []
 permissions: [coop_manager, farmer, plot_editor, plot_viewer, sop_admin]
 shares: [diary_entry, household, plot, season]
-owns_schema: [pf_coop]
+owns_schema: [pf_coop, pf_cooperative_pub]
 enable: per_tenant

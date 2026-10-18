@@ -35,8 +35,13 @@ abstract final class PushEntity {
   /// mẫu khi ngoại tuyến (FN-XA-03.02). Chỉ `op: create`; `id` = id bài nộp.
   static const reportSubmission = 'report_submission';
 
+  /// W11.42 (pf/forms `cap/forms`): một lần gửi biểu kỳ native (CNTS BM-01/04/
+  /// 05/17) tạo ngoại tuyến. Chỉ `op: create`; `id` = mã phiên bản bài nộp;
+  /// kỳ đã chốt lúc đồng bộ → máy chủ GIỮ "Chờ mở kỳ".
+  static const formsSubmission = 'forms_submission';
+
   static const g1 = {plotBoundary, fieldReport, taskUpdate, consent, evidence};
-  static const kn = {reportSubmission};
+  static const kn = {reportSubmission, formsSubmission};
   static const g3 = {htxCollectionResponse};
   static const g2 = {
     seasonOpen,

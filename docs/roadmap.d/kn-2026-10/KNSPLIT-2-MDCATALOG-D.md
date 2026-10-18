@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-MDCATALOG-D — Bỏlegacylookup,17goldenread-onlygiữ; PG7/fullstatic0,baseline367. Helper9migrationtrướcdev; rules/DTOconstcònE/F.

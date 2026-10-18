@@ -55,10 +55,12 @@ type claims struct {
 //	AG_MFA_STRONG_FACTORS  yếu tố thứ hai cho vai nhạy cảm (mặc định otp,mfa,hwk,swk)
 //	AG_MFA_STRONG_ROLES    vai nhạy cảm (mặc định platform_admin,vault_registrar,
 //	                       vault_evidence_viewer,vault_eraser)
-//	AG_MFA_DISABLED        1 = coi mọi phiên là đã qua yếu tố thứ hai — CHỈ cho demo/dev; bị từ chối
-//	                       khi AG_ENV=production (MFAPolicyFromEnv)
+//	AG_MFA_DISABLED        1 = coi mọi phiên là đã qua yếu tố thứ hai — CHỈ máy demo. Hợp lệ khi và chỉ
+//	                       khi AG_DEPLOY_ENV=demo VÀ AG_ENV đặt, khác production/prod; ngược lại
+//	                       MFAPolicyFromEnv trả lỗi và tiến trình từ chối khởi động (docs/dev/sync-main-2026-10-13.md).
+//	                       Chỉ bỏ kiểm amr ở backend; luồng đăng nhập TOTP của Keycloak (D24, ADR-0041) không đổi.
 type MFAPolicy struct {
-	// Disabled bỏ kiểm yếu tố thứ hai (Principal.MFA luôn true). Chỉ môi trường demo.
+	// Disabled bỏ kiểm yếu tố thứ hai (Principal.MFA luôn true). Chỉ máy demo (DemoMFABypassAllowed).
 	Disabled      bool
 	Factors       []string // vai thường
 	StrongFactors []string // khi người gọi có ít nhất một vai trong StrongRoles
@@ -71,7 +73,45 @@ const (
 	EnvMFAStrongFactors = "AG_MFA_STRONG_FACTORS"
 	EnvMFAStrongRoles   = "AG_MFA_STRONG_ROLES"
 	EnvMFADisabled      = "AG_MFA_DISABLED"
+	// EnvDeployEnv đánh dấu loại máy triển khai. Chỉ giá trị "demo" mới cho phép AG_MFA_DISABLED. Khác AG_ENV
+	// (residency: production|staging|test|development|local) — demo chạy AG_ENV=staging nên AG_ENV không đủ.
+	EnvDeployEnv = "AG_DEPLOY_ENV"
+	// DeployEnvDemo là giá trị AG_DEPLOY_ENV của máy demo.
+	DeployEnvDemo = "demo"
 )
+
+// ErrMFABypassNotDemo: AG_MFA_DISABLED bật ở nơi không phải máy demo — tiến trình phải từ chối khởi động.
+var ErrMFABypassNotDemo = errors.New("authz: AG_MFA_DISABLED chỉ được bật trên máy demo")
+
+// mfaDisabledRequested đọc AG_MFA_DISABLED: rỗng/0/false = tắt cờ; 1/true = bật; giá trị khác là lỗi (gõ sai
+// không được âm thầm hiểu theo hướng nào).
+func mfaDisabledRequested(getenv func(string) string) (bool, error) {
+	switch v := strings.ToLower(strings.TrimSpace(getenv(EnvMFADisabled))); v {
+	case "", "0", "false":
+		return false, nil
+	case "1", "true":
+		return true, nil
+	default:
+		return false, fmt.Errorf("authz: %s=%q — chỉ nhận 0 hoặc 1", EnvMFADisabled, v)
+	}
+}
+
+// DemoMFABypassAllowed kiểm điều kiện bật AG_MFA_DISABLED: AG_DEPLOY_ENV=demo (khớp chính xác, không phân biệt hoa
+// thường) VÀ AG_ENV đặt và không phải production/prod. Thiếu biến nào cũng là từ chối — guard không "mở cửa" vì
+// quên đặt biến.
+func DemoMFABypassAllowed(getenv func(string) string) error {
+	env := strings.ToLower(strings.TrimSpace(getenv("AG_ENV")))
+	switch env {
+	case "production", "prod":
+		return fmt.Errorf("%w: AG_ENV=%s", ErrMFABypassNotDemo, env)
+	case "":
+		return fmt.Errorf("%w: chưa đặt AG_ENV", ErrMFABypassNotDemo)
+	}
+	if d := strings.ToLower(strings.TrimSpace(getenv(EnvDeployEnv))); d != DeployEnvDemo {
+		return fmt.Errorf("%w: %s=%q (phải là %q)", ErrMFABypassNotDemo, EnvDeployEnv, d, DeployEnvDemo)
+	}
+	return nil
+}
 
 // DefaultMFAPolicy: sms chỉ được tính cho vai thường. Tên vai kho định danh lặp lại
 // literal (authz là gói dùng chung, không import vault/identity/client — R-04).
@@ -84,12 +124,17 @@ func DefaultMFAPolicy() MFAPolicy {
 }
 
 // MFAPolicyFromEnv đọc chính sách từ biến môi trường; biến rỗng giữ mặc định. Danh
-// sách đặt ra nhưng rỗng (vd ",") bị từ chối để không vô tình tắt MFA.
+// sách đặt ra nhưng rỗng (vd ",") bị từ chối để không vô tình tắt MFA. AG_MFA_DISABLED bật ngoài máy demo
+// (DemoMFABypassAllowed) → ErrMFABypassNotDemo.
 func MFAPolicyFromEnv(getenv func(string) string) (MFAPolicy, error) {
 	p := DefaultMFAPolicy()
-	if v := strings.TrimSpace(getenv(EnvMFADisabled)); v == "1" || strings.EqualFold(v, "true") {
-		if e := strings.ToLower(strings.TrimSpace(getenv("AG_ENV"))); e == "production" || e == "prod" {
-			return MFAPolicy{}, fmt.Errorf("authz: %s không được bật khi AG_ENV=production", EnvMFADisabled)
+	off, err := mfaDisabledRequested(getenv)
+	if err != nil {
+		return MFAPolicy{}, err
+	}
+	if off {
+		if err := DemoMFABypassAllowed(getenv); err != nil {
+			return MFAPolicy{}, err
 		}
 		p.Disabled = true
 	}

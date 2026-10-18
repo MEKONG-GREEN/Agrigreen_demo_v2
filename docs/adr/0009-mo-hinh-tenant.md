@@ -32,3 +32,7 @@ Nguyên tắc "tenant = tổ chức sở hữu dữ liệu" giữ nguyên. Ứng
 - mọi lần đọc ghi sổ.
 
 Chi tiết ở [ADR-0020](0020-lien-thong-platform-mkg-khac-tenant.md).
+
+## Cập nhật 13/10/2026 — đồng sở hữu MKG + HTX (ADR-0052)
+
+CEO quyết D2: dữ liệu HTX, nông hộ, xã viên, thửa, vụ do HTX nhập là đồng sở hữu của MKG và HTX; Khuyến nông là bên thứ ba đọc qua cấp quyền chia sẻ (`basis_ref` = thỏa thuận HTX). `tenant_id` của các bảng đó giữ nguyên và nay là tenant **lưu ký** (không ghi bù sổ); chủ sở hữu ghi ở neo HTX theo mã số thuế. Chi tiết: [ADR-0052](0052-dong-so-huu-mkg-htx-neo-mst.md).

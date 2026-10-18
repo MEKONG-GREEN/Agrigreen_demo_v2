@@ -1,0 +1,47 @@
+{
+  "Roles": [],
+  "Access": [
+    {
+      "Reader": "r_agg",
+      "View": "pf_cooperative_pub.v1_confirmations"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_cooperative_pub.v1_cooperatives"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_cooperative_pub.v1_plots"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_cooperative_pub.v1_seasons"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_cooperative_pub.v1_confirmations"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_cooperative_pub.v1_cooperatives"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_cooperative_pub.v1_plots"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_cooperative_pub.v1_seasons"
+    }
+  ],
+  "Memberships": [
+    {
+      "Reader": "r_agg",
+      "Granted": "r_cooperative_pub"
+    },
+    {
+      "Reader": "r_metrics",
+      "Granted": "r_cooperative_pub"
+    }
+  ]
+}

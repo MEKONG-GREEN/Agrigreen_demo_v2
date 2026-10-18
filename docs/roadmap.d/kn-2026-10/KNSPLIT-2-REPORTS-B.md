@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-REPORTS-B — Gỡ adapter suy quyền phiên KN trong reports; test âm trước sửa, đủ13/13PG/consumer không SKIP và cổng tĩnh đạt. Helper kiểm migration trước tích hợp dev. Role group/source ports còn gói tiếp theo.

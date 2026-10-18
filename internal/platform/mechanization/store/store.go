@@ -12,6 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // Tên ràng buộc duy nhất để app quy về mã lỗi nghiệp vụ.
@@ -186,7 +187,7 @@ func InsertOwnerEvent(ctx context.Context, tx pgx.Tx, e *domain.OwnerEvent) erro
 
 // OwnerEventByIdem tìm dòng sổ đã ghi với idem_key (gọi lặp).
 func OwnerEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*domain.OwnerEvent, error) {
-	e, err := scanOwnerEvent(tx.QueryRow(ctx, "SELECT "+ownerEventCols+" FROM pf_mechanization.owner_event WHERE idem_key = $1", key))
+	e, err := scanOwnerEvent(tx.QueryRow(ctx, "SELECT "+ownerEventCols+" FROM pf_mechanization.owner_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -366,7 +367,7 @@ func InsertMachineEvent(ctx context.Context, tx pgx.Tx, e *domain.MachineEvent) 
 
 // MachineEventByIdem tìm dòng sổ máy đã ghi với idem_key.
 func MachineEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*domain.MachineEvent, error) {
-	e, err := scanMachineEvent(tx.QueryRow(ctx, "SELECT "+machineEventCols+" FROM pf_mechanization.machine_event WHERE idem_key = $1", key))
+	e, err := scanMachineEvent(tx.QueryRow(ctx, "SELECT "+machineEventCols+" FROM pf_mechanization.machine_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

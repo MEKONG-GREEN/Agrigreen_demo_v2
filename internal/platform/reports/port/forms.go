@@ -85,9 +85,6 @@ const (
 	SeverityWarning = "warning" // chỉ báo
 )
 
-// DefaultDepartment là mã phòng ban Trồng trọt (tạm, chờ P2/Q-02).
-const DefaultDepartment = "trong_trot"
-
 // FormDefinition là định nghĩa lưới của một phiên bản mẫu, đúng bố cục sheet Excel.
 type FormDefinition struct {
 	Schema        string        `json:"schema"`

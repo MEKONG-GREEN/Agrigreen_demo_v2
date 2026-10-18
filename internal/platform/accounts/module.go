@@ -8,14 +8,19 @@ package accounts
 
 import (
 	"context"
+	"log/slog"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/keycloak"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/store"
 
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
@@ -23,6 +28,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
@@ -48,6 +54,8 @@ type Deps struct {
 	Names       partyport.ActorNames
 	// W1.4 (R-MOD-08): trạng thái bật module theo đơn vị — vai của module đã tắt không cấp được.
 	Modules partyport.ModuleEnablement
+	// DormantDryRun (D24): job accounts_dormant chỉ đếm, không báo trước/khóa (AG_ACCOUNTS_DORMANT_DRY_RUN).
+	DormantDryRun bool
 }
 
 // Module là pf/accounts đã nối.
@@ -58,7 +66,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs,
 		Households: d.Households, Vault: d.Vault, Params: d.Params, Departments: d.Departments, Units: d.Units, Names: d.Names,
-		Modules: d.Modules}}
+		Modules: d.Modules, DormantDryRun: d.DormantDryRun}}
 }
 
 // RegisterApp gắn route Application API của App HTX: tài khoản nông dân (quản lý
@@ -90,6 +98,10 @@ func (m *Module) Middleware() gin.HandlerFunc { return handler.Handler{Svc: m.sv
 // UseDepartments nối phòng ban của pf/party sau khi dựng (gốc lắp ráp).
 func (m *Module) UseDepartments(d partyport.Departments) { m.svc.Departments = d }
 
+// UseFacilityCatalog (W11.41) nối danh mục cơ sở giết mổ CNTS (pf/masterdata): facility_refs của phạm vi Cấp Xã
+// phải là cơ sở đang dùng. Không nối → chỉ kiểm dạng UUID.
+func (m *Module) UseFacilityCatalog(f app.FacilityCatalog) { m.svc.Facilities = f }
+
 // SessionContext cho pf/party: menu theo ngữ cảnh phiên (P2 UseSessionContext).
 func (m *Module) SessionContext() partyport.SessionContext { return app.SessionContext{} }
 
@@ -104,6 +116,20 @@ func (m *Module) ActorNames() partyport.ActorNames { return m.svc }
 
 // Assignments cho P4/P5: lần gán vai trò còn hiệu lực.
 func (m *Module) Assignments() port.Assignments { return m.svc }
+
+// RoleHolders (gói NOTIF): tài khoản theo vai / cờ nhiệm vụ trên lần gán (vd Cấp Tỉnh, QTNV báo giá) — người nhận thông
+// báo của consumer worker (tenant tường minh).
+func (m *Module) RoleHolders() port.RoleHolders { return m.svc }
+
+// XaScopes (W11.46) cho lịch trực KSGM BM-03 của pf/extension: cán bộ Cấp Xã của phòng ban kèm xã phụ trách, giới hạn
+// cơ sở/hộ (tenant tường minh).
+func (m *Module) XaScopes() port.XaScopes { return m.svc }
+
+// KNPeople (W11.07) cho pf/hrm, Contact, đánh giá: phạm vi nhân sự của ngữ cảnh phiên (BR-04 HCTH, HS-37).
+func (m *Module) KNPeople() port.KNPeople { return m.svc }
+
+// InternalUnits (W11.07) cho module khác: danh mục đơn vị nội bộ (phòng/trạm/trại/BGĐ — Q-068).
+func (m *Module) InternalUnits() port.InternalUnits { return m.svc }
 
 // OrgStatusHandler xử lý pf.party.org.deactivated/reactivated (consumer
 // port.OrgStatusConsumer, chạy trong inbox.Process trên pool accounts_app).
@@ -150,6 +176,37 @@ func (m *Module) ExtensionKNContext() port.KNContextResolver {
 // ExtensionKNDirectory cho pf/extension (KN v7.7 P5): cán bộ KN của phòng ban × tỉnh từ sổ gán vai trò.
 func (m *Module) ExtensionKNDirectory() port.KNDirectory {
 	return app.ExtensionKN{Assignments: m.svc, Orgs: m.svc.Orgs}
+}
+
+// DormantTenants tìm tenant có tài khoản đang hoạt động bằng pool ag_ops_jobs (worker, nối thẳng) cho job
+// port.JobDormant.
+func DormantTenants(pool *pgxpool.Pool) app.TenantLister {
+	return func(ctx context.Context) ([]uuid.UUID, error) { return store.DormantTenants(ctx, pool) }
+}
+
+// Jobs trả job định kỳ của module (chỉ chạy ở leader): D24 — mỗi ngày 02:00 báo trước (ngày 38) và khóa (ngày 45)
+// tài khoản không hoạt động, ghi sổ account_event (job.accounts_dormant). Cần Directory (Keycloak) có SessionReader.
+func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job {
+	return []schedule.Job{{
+		Name: port.JobDormant, Spec: schedule.Daily{Hour: 2, Minute: 0}, RunOnStart: true, Timeout: time.Hour,
+		Run: func(ctx context.Context) error {
+			r, err := m.svc.RunDormant(ctx, tenants)
+			if log != nil {
+				outcome := "ok"
+				if err != nil {
+					outcome = "error"
+				}
+				log.Info("vô hiệu tài khoản không hoạt động", "event", "job."+port.JobDormant, "checked", r.Checked,
+					"warned", r.Warned, "disabled", r.Disabled, "dry_run", r.DryRun, "outcome", outcome)
+			}
+			return err
+		},
+	}}
+}
+
+// RunDormant chạy một lượt job accounts_dormant (kiểm thử, công cụ vận hành).
+func (m *Module) RunDormant(ctx context.Context, tenants app.TenantLister) (app.DormantResult, error) {
+	return m.svc.RunDormant(ctx, tenants)
 }
 
 // OrgStatusEvents là các sự kiện consumer đăng ký.

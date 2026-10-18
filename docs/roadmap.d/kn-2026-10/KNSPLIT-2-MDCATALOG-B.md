@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-MDCATALOG-B — Bỏ12schema/60seedngầm, giữ25hàmHTTP, 55seednative vàgolden170ca;18/18PG+fullstaticđạt, baseline369. Helper9migration trướcdev; typedlookup/data/tenant/client/KHTCreminder còn.

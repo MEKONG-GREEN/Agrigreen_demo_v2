@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 )
 
@@ -66,7 +67,7 @@ func scanConfirm(row pgx.Row) (Confirmation, error) {
 
 // ConfirmationByIdem tìm xác nhận theo idem_key.
 func ConfirmationByIdem(ctx context.Context, tx pgx.Tx, key string) (*Confirmation, error) {
-	c, err := scanConfirm(tx.QueryRow(ctx, "SELECT "+confirmCols+" FROM mkg_fieldops.htx_confirmation WHERE idem_key = $1", key))
+	c, err := scanConfirm(tx.QueryRow(ctx, "SELECT "+confirmCols+" FROM mkg_fieldops.htx_confirmation WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -219,7 +220,7 @@ func scanCrew(row pgx.Row) (CrewShift, error) {
 
 // CrewShiftByIdem tìm ca theo idem_key.
 func CrewShiftByIdem(ctx context.Context, tx pgx.Tx, key string) (*CrewShift, error) {
-	c, err := scanCrew(tx.QueryRow(ctx, "SELECT "+crewCols+" FROM mkg_fieldops.crew_shift WHERE idem_key = $1", key))
+	c, err := scanCrew(tx.QueryRow(ctx, "SELECT "+crewCols+" FROM mkg_fieldops.crew_shift WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

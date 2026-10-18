@@ -26,9 +26,22 @@ var NoFloat = &analysis.Analyzer{
 // công thức con của Excel và bộ nạp Excel.
 // KN v7.7 P4: vòng đời báo cáo (diện tích, sản lượng, chỉ số dashboard — decimal) và quy tắc báo cáo Chi cục.
 // W8.2: mkg/engine — giá trị và cận bất định của quan sát (diện tích, tỷ lệ) đều decimal.
-var floatFreeZones = []string{"/internal/mkg/hub", "/internal/mkg/logistics", "/internal/mkg/engine",
+// W11.71: pf/price (cap/price, R-CODE-01 nêu đích danh) — giá, ngưỡng %, giá thành đều decimal, cả trong kiểm thử.
+// W11.21: pf/hrm (dom/hrm) — hệ số bậc, hệ số phụ cấp, % TNVK, tỷ lệ chỉ tiêu đều decimal, cả trong kiểm thử.
+// W11.61: extension/khtc — khối lượng kế hoạch, kinh phí kế hoạch đều decimal, cả trong kiểm thử.
+var floatFreeZones = []string{"/internal/platform/extension/reportcycle", "/internal/platform/extension/khtc", "/internal/platform/price", "/internal/platform/hrm", "/internal/mkg/hub", "/internal/mkg/logistics", "/internal/mkg/engine",
 	"/internal/platform/reports/formula", "/internal/platform/reports/form", "/internal/platform/reports/formimport",
-	"/internal/platform/extension/reportcycle", "/internal/platform/reports/dispatch"}
+	"/internal/kn/extension/reportcycle", "/internal/platform/reports/dispatch",
+	"/internal/kn/price", "/internal/kn/hrm", "/internal/kn/extension/khtc"}
+
+// KHTC sibling packages are separate paths; /khtc does not cover /khtcreport.
+func init() {
+	for _, zone := range []string{"platform", "kn"} {
+		for _, name := range []string{"khtcform", "khtcperiod", "khtcreport", "khtcsource"} {
+			floatFreeZones = append(floatFreeZones, "/internal/"+zone+"/extension/"+name)
+		}
+	}
+}
 
 // floatFreeProdZones là module cấm float trong mã không phải kiểm thử: mkg/fieldops (số cuộn, diện tích
 // hiện trường, ngày công) và pf/mechanization (diện tích, giờ máy, số máy). Kiểm thử HTTP của hai module

@@ -2,6 +2,8 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { OrgCreateDialog } from "@/admin/OrgCreateDialog";
+import { canCreateOrg } from "@/admin/orgCreate";
 import { buildOrgTree, type OrgNode } from "@/admin/orgTree";
 import { unwrap } from "@/api/client";
 import { newIdempotencyKey } from "@/api/idempotency";
@@ -271,9 +273,11 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** Cơ cấu tổ chức (Admin API, MFA): cây GET /v1/orgs (G-08), xuất/nhập Excel, nhật ký, đổi tên. */
+/** Cơ cấu tổ chức (Admin API, MFA): cây GET /v1/orgs (G-08), tạo tổ chức (ORGUI), xuất/nhập Excel, nhật ký, đổi tên. */
 function OrgTreeInner() {
-  const { adminApi } = useAuth();
+  const { adminApi, principal } = useAuth();
+  const mayCreate = canCreateOrg(principal?.roles);
+  const [creating, setCreating] = useState(false);
   const params = useSearchParams();
   const focusRef = params.get("org");
   const [version, setVersion] = useState(0);
@@ -285,9 +289,22 @@ function OrgTreeInner() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [picked, setPicked] = useState<Org | null>(null);
   const [showImport, setShowImport] = useState(false);
-  const selected = picked ?? (focusRef ? ((orgs.data ?? []).find((o) => o.ref === focusRef) ?? null) : null);
+  // Nút chọn luôn lấy bản mới nhất trong danh sách (sau tạo/đổi tên); chưa tải xong thì dùng bản vừa chọn.
+  const selectedRef = picked?.ref ?? focusRef;
+  const selected = (selectedRef ? (orgs.data ?? []).find((o) => o.ref === selectedRef) : undefined) ?? picked ?? null;
   const setSelected = setPicked;
   const effective = expanded.size === 0 && tree.length > 0 ? new Set(tree.map((t) => t.org.ref)) : expanded;
+
+  // Sau khi tạo: tải lại cây, chọn nút mới và mở mọi cấp trên của nó.
+  const onCreated = (org: Org) => {
+    setCreating(false);
+    const byRef = new Map((orgs.data ?? []).map((o) => [o.ref, o]));
+    const next = new Set(effective);
+    for (let p = org.parent_ref; p; p = byRef.get(p)?.parent_ref ?? null) next.add(p);
+    setExpanded(next);
+    setPicked(org);
+    setVersion((v) => v + 1);
+  };
 
   const toggle = (ref: string) =>
     setExpanded(() => {
@@ -310,6 +327,11 @@ function OrgTreeInner() {
             <button type="button" className="btn btn-o btn-sm" onClick={() => setExpanded(new Set(["__none__"]))}>
               Thu gọn
             </button>
+            {mayCreate ? (
+              <button type="button" className="btn btn-p btn-sm" onClick={() => setCreating(true)}>
+                Tạo tổ chức
+              </button>
+            ) : null}
             <ExportButton />
             <button type="button" className="btn btn-o btn-sm" onClick={() => setShowImport((v) => !v)} aria-expanded={showImport}>
               <Icon name="upload" size={15} />
@@ -319,6 +341,7 @@ function OrgTreeInner() {
         }
       />
       <MfaNotice />
+      {creating ? <OrgCreateDialog orgs={orgs.data ?? []} onClose={() => setCreating(false)} onCreated={onCreated} /> : null}
       {showImport ? <ImportPanel onDone={() => setVersion((v) => v + 1)} /> : null}
       {orgs.error ? <ProblemAlert problem={orgs.error} onRetry={orgs.reload} /> : null}
       {orgs.loading && !orgs.data ? <Loading /> : null}

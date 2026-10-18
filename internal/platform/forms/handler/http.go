@@ -40,9 +40,13 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/forms/periods/:id/submissions", h.submissions)
 	rg.POST("/forms/periods/:id/close", h.close)
 	rg.POST("/forms/periods/:id/reopen", h.reopen)
+	rg.POST("/forms/periods/:id/cancel", h.cancel)
 	rg.GET("/forms/periods/:id/snapshots", h.snapshots)
 	rg.POST("/forms/submissions/:id/review", h.review)
 	rg.GET("/forms/snapshots/:id", h.snapshot)
+	// W11.42: công việc (kỳ × đơn vị trong phạm vi), sao chép kỳ trước.
+	rg.GET("/forms/tasks", h.tasks)
+	rg.GET("/forms/periods/:id/previous", h.previous)
 }
 
 // ---------------------------------------------------------------------------
@@ -58,6 +62,9 @@ type profileDTO struct {
 	ReviewBy                   string            `json:"review_by"`
 	AllowFixtures              bool              `json:"allow_fixtures"`
 	RequireReviewedBeforeClose bool              `json:"require_reviewed_before_close"`
+	UnitKinds                  []string          `json:"unit_kinds"`
+	Departments                []string          `json:"departments"`
+	MaxSubmissions             int               `json:"max_submissions"`
 }
 
 type templateDTO struct {
@@ -143,17 +150,79 @@ type submissionDTO struct {
 	At        string            `json:"event_time"`
 	Status    string            `json:"status"`
 	Review    *reviewDTO        `json:"review"`
+	// W11.42 (sổ phụ submission_meta; phiên bản trước pf 000149 → mặc định).
+	NilReport   bool    `json:"nil_report"`
+	Note        *string `json:"note"`
+	Explanation *string `json:"explanation"`
+	Late        bool    `json:"late"`
+	CapturedAt  *string `json:"captured_at"`
 }
 
-func submissionOf(s store.Submission, status string, r *domain.Review) submissionDTO {
-	return submissionDTO{ID: s.ID.String(), PeriodID: s.PeriodID.String(), Unit: s.Unit, Version: s.Version, Values: s.Values,
+func submissionOf(s store.Submission, status string, r *domain.Review, m ...*store.Meta) submissionDTO {
+	d := submissionDTO{ID: s.ID.String(), PeriodID: s.PeriodID.String(), Unit: s.Unit, Version: s.Version, Values: s.Values,
 		Submitter: s.Submitter.String(), At: ts(s.EventTime), Status: status, Review: reviewOf(r)}
+	if len(m) > 0 && m[0] != nil {
+		x := m[0]
+		d.NilReport, d.Late = x.NilReport, x.Late
+		if x.Note != "" {
+			d.Note = &x.Note
+		}
+		if x.Explanation != "" {
+			d.Explanation = &x.Explanation
+		}
+		if x.CapturedAt != nil {
+			c := ts(*x.CapturedAt)
+			d.CapturedAt = &c
+		}
+	}
+	return d
 }
 
 type unitDTO struct {
 	Unit       string         `json:"unit"`
+	Parent     string         `json:"parent"`
 	Status     string         `json:"status"`
 	Submission *submissionDTO `json:"submission"`
+	Held       *heldDTO       `json:"held"`
+}
+
+type heldDTO struct {
+	ID         string            `json:"id"`
+	Version    int64             `json:"version"`
+	Values     map[string]string `json:"values"`
+	Submitter  string            `json:"submitter_ref"`
+	CapturedAt string            `json:"captured_at"`
+	At         string            `json:"event_time"`
+}
+
+type specDTO struct {
+	UnitKind       string   `json:"unit_kind"`
+	UnitParents    []string `json:"unit_parents"`
+	MaxSubmissions int      `json:"max_submissions"`
+	ReviewFlow     string   `json:"review_flow"`
+	PeriodKind     *string  `json:"period_kind"`
+	PeriodKey      *string  `json:"period_key"`
+	PeriodFrom     *string  `json:"period_from"`
+	PeriodTo       *string  `json:"period_to"`
+	PeriodRule     *string  `json:"period_rule"`
+}
+
+func specOf(s domain.Spec) specDTO {
+	opt := func(v string) *string {
+		if v == "" {
+			return nil
+		}
+		return &v
+	}
+	day := func(t *time.Time) *string {
+		if t == nil {
+			return nil
+		}
+		v := t.UTC().Format(time.DateOnly)
+		return &v
+	}
+	return specDTO{UnitKind: s.UnitKind, UnitParents: nonNil(s.UnitParents), MaxSubmissions: s.MaxSubmissions, ReviewFlow: s.ReviewFlow,
+		PeriodKind: opt(s.PeriodKind), PeriodKey: opt(s.PeriodKey), PeriodFrom: day(s.From), PeriodTo: day(s.To), PeriodRule: opt(s.PeriodRule)}
 }
 
 type snapshotDTO struct {
@@ -178,6 +247,7 @@ func snapshotOf(s store.Snapshot) snapshotDTO {
 
 type periodViewDTO struct {
 	Period      periodDTO     `json:"period"`
+	Spec        specDTO       `json:"spec"`
 	Status      string        `json:"status"`
 	ReopenUnits []string      `json:"reopen_units"`
 	Events      []eventDTO    `json:"events"`
@@ -186,7 +256,7 @@ type periodViewDTO struct {
 }
 
 func viewOf(v app.PeriodView) periodViewDTO {
-	d := periodViewDTO{Period: periodOf(v.Period), Status: v.State.Status, ReopenUnits: nonNil(v.State.ReopenUnits), Events: []eventDTO{},
+	d := periodViewDTO{Period: periodOf(v.Period), Spec: specOf(v.Spec), Status: v.State.Status, ReopenUnits: nonNil(v.State.ReopenUnits), Events: []eventDTO{},
 		Units: []unitDTO{}, Snapshots: []snapshotDTO{}}
 	for _, e := range v.Events {
 		ed := eventDTO{ID: e.ID.String(), Seq: e.Seq, Action: e.Action, Mode: e.Mode, Units: nonNil(e.Units), Actor: e.Actor.String(), At: ts(e.At)}
@@ -197,10 +267,14 @@ func viewOf(v app.PeriodView) periodViewDTO {
 		d.Events = append(d.Events, ed)
 	}
 	for _, u := range v.Units {
-		ud := unitDTO{Unit: u.Unit, Status: u.Status}
+		ud := unitDTO{Unit: u.Unit, Parent: u.Parent, Status: u.Status}
 		if u.Submission != nil {
-			sd := submissionOf(*u.Submission, u.Status, u.Review)
+			sd := submissionOf(*u.Submission, domain.SubmissionStatus(true, u.Review), u.Review, u.Meta)
 			ud.Submission = &sd
+		}
+		if h := u.Held; h != nil {
+			ud.Held = &heldDTO{ID: h.ID.String(), Version: h.Seq, Values: h.Values, Submitter: h.Submitter.String(), CapturedAt: ts(h.CapturedAt),
+				At: ts(h.EventTime)}
 		}
 		d.Units = append(d.Units, ud)
 	}
@@ -222,7 +296,8 @@ func (h Handler) profiles(c *gin.Context) {
 	out := []profileDTO{}
 	for _, p := range h.Svc.Profiles() {
 		out = append(out, profileDTO{Name: p.Name, Hierarchy: p.Hierarchy, Roles: p.Roles, PublishBy: p.PublishBy, CloseBy: p.CloseBy,
-			ReviewBy: p.Reviewer(), AllowFixtures: p.AllowFixtures, RequireReviewedBeforeClose: p.RequireReviewedBeforeClose})
+			ReviewBy: p.Reviewer(), AllowFixtures: p.AllowFixtures, RequireReviewedBeforeClose: p.RequireReviewedBeforeClose,
+			UnitKinds: p.Kinds(), Departments: nonNil(p.Departments), MaxSubmissions: p.MaxSubmissions})
 	}
 	c.JSON(http.StatusOK, gin.H{"items": out})
 }
@@ -303,11 +378,21 @@ func (h Handler) periods(c *gin.Context) {
 }
 
 type publishReq struct {
-	Profile    string   `json:"profile"`
-	TemplateID string   `json:"template_id"`
-	Label      string   `json:"label"`
-	DueAt      string   `json:"due_at"`
-	Units      []string `json:"units"`
+	Profile        string   `json:"profile"`
+	TemplateID     string   `json:"template_id"`
+	Label          string   `json:"label"`
+	DueAt          string   `json:"due_at"`
+	Units          []string `json:"units"`
+	UnitKind       string   `json:"unit_kind"`
+	UnitParents    []string `json:"unit_parents"`
+	MaxSubmissions *int     `json:"max_submissions"`
+	Period         *struct {
+		Kind string `json:"kind"`
+		Key  string `json:"key"`
+		From string `json:"from"`
+		To   string `json:"to"`
+		Rule string `json:"rule"`
+	} `json:"period"`
 }
 
 func (h Handler) publish(c *gin.Context) {
@@ -325,8 +410,26 @@ func (h Handler) publish(c *gin.Context) {
 		httpx.Fail(c, problem.Validation.WithField("due_at", "RFC 3339"))
 		return
 	}
-	v, err := h.Svc.Publish(c.Request.Context(), app.PublishInput{Profile: req.Profile, TemplateID: tid, Label: req.Label, DueAt: due, Units: req.Units},
-		idemKey(c))
+	in := app.PublishInput{Profile: req.Profile, TemplateID: tid, Label: req.Label, DueAt: due, Units: req.Units, UnitKind: req.UnitKind,
+		UnitParents: req.UnitParents, MaxSubmissions: req.MaxSubmissions}
+	if pk := req.Period; pk != nil {
+		in.Period = &app.PeriodKey{Kind: pk.Kind, Key: pk.Key, Rule: pk.Rule}
+		for _, x := range []struct {
+			field, raw string
+			dst        **time.Time
+		}{{"period.from", pk.From, &in.Period.From}, {"period.to", pk.To, &in.Period.To}} {
+			if x.raw == "" {
+				continue
+			}
+			d, err := time.Parse(time.DateOnly, x.raw)
+			if err != nil {
+				httpx.Fail(c, problem.Validation.WithField(x.field, "YYYY-MM-DD"))
+				return
+			}
+			*x.dst = &d
+		}
+	}
+	v, err := h.Svc.Publish(c.Request.Context(), in, idemKey(c))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -350,6 +453,13 @@ func (h Handler) period(c *gin.Context) {
 type submitReq struct {
 	Unit   string            `json:"unit"`
 	Values map[string]string `json:"values"`
+	// CapturedAt: bản offline (lúc ghi trên thiết bị, RFC 3339) — kỳ đã chốt thì bài được giữ "Chờ mở kỳ" (202).
+	CapturedAt string `json:"captured_at"`
+	// W11.42: khóa lạc quan (phiên bản đã thấy, 0 = chưa có bài), báo không phát sinh, ghi chú (H08), giải trình (H09).
+	BaseVersion *int64 `json:"base_version"`
+	NilReport   bool   `json:"nil_report"`
+	Note        string `json:"note"`
+	Explanation string `json:"explanation"`
 }
 
 func (h Handler) submit(c *gin.Context) {
@@ -361,12 +471,26 @@ func (h Handler) submit(c *gin.Context) {
 	if !bindJSON(c, &req) {
 		return
 	}
-	s, err := h.Svc.Submit(c.Request.Context(), c.Query("profile"), id, req.Unit, req.Values, idemKey(c))
+	in := app.SubmitInput{Unit: req.Unit, Values: req.Values, BaseVersion: req.BaseVersion, NilReport: req.NilReport, Note: req.Note,
+		Explanation: req.Explanation}
+	if req.CapturedAt != "" {
+		at, perr := time.Parse(time.RFC3339, req.CapturedAt)
+		if perr != nil {
+			httpx.Fail(c, problem.Validation.WithField("captured_at", "RFC 3339"))
+			return
+		}
+		in.CapturedAt = &at
+	}
+	s, err := h.Svc.SubmitWith(c.Request.Context(), c.Query("profile"), id, in, idemKey(c))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, submissionOf(s.Submission, s.Status, s.Review))
+	code := http.StatusCreated
+	if s.Status == domain.SubAwaitingReopen {
+		code = http.StatusAccepted
+	}
+	c.JSON(code, submissionOf(s.Submission, s.Status, s.Review, s.Meta))
 }
 
 func (h Handler) submissions(c *gin.Context) {
@@ -443,6 +567,27 @@ func (h Handler) reopen(c *gin.Context) {
 	c.JSON(http.StatusOK, viewOf(v))
 }
 
+type cancelReq struct {
+	Reason string `json:"reason"`
+}
+
+func (h Handler) cancel(c *gin.Context) {
+	id, ok := pathID(c, port.ErrPeriodNotFound)
+	if !ok {
+		return
+	}
+	var req cancelReq
+	if !bindJSON(c, &req) {
+		return
+	}
+	v, err := h.Svc.Cancel(c.Request.Context(), c.Query("profile"), id, req.Reason, idemKey(c))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, viewOf(v))
+}
+
 func (h Handler) snapshots(c *gin.Context) {
 	id, ok := pathID(c, port.ErrPeriodNotFound)
 	if !ok {
@@ -471,6 +616,60 @@ func (h Handler) snapshot(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, snapshotOf(s))
+}
+
+func (h Handler) tasks(c *gin.Context) {
+	f := app.TaskFilter{Code: c.Query("code")}
+	f.Limit, _ = strconv.Atoi(c.Query("limit"))
+	for _, x := range []struct {
+		field string
+		dst   **time.Time
+	}{{"from", &f.From}, {"to", &f.To}} {
+		raw := c.Query(x.field)
+		if raw == "" {
+			continue
+		}
+		d, err := time.Parse(time.DateOnly, raw)
+		if err != nil {
+			httpx.Fail(c, problem.Validation.WithField(x.field, "YYYY-MM-DD"))
+			return
+		}
+		*x.dst = &d
+	}
+	ts, err := h.Svc.Tasks(c.Request.Context(), c.Query("profile"), f)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	out := make([]app.TaskData, 0, len(ts))
+	for _, t := range ts {
+		out = append(out, app.TaskDataOf(t, t.Template))
+	}
+	c.JSON(http.StatusOK, gin.H{"items": out})
+}
+
+type previousDTO struct {
+	PeriodID   string        `json:"period_id"`
+	Label      string        `json:"label"`
+	Submission submissionDTO `json:"submission"`
+}
+
+func (h Handler) previous(c *gin.Context) {
+	id, ok := pathID(c, port.ErrPeriodNotFound)
+	if !ok {
+		return
+	}
+	p, err := h.Svc.Previous(c.Request.Context(), c.Query("profile"), id, c.Query("unit"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if p == nil {
+		c.JSON(http.StatusOK, gin.H{"previous": nil})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"previous": previousDTO{PeriodID: p.PeriodID.String(), Label: p.Label,
+		Submission: submissionOf(p.Submission, domain.SubSubmitted, nil, p.Meta)}})
 }
 
 // ---------------------------------------------------------------------------

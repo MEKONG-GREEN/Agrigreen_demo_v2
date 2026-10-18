@@ -1,0 +1,16 @@
+{
+  "id": "htx-gaps",
+  "source": "./htx-gaps",
+  "app": [
+    {
+      "export": "htxGapAppRoutes",
+      "order": 0
+    }
+  ],
+  "admin": [
+    {
+      "export": "htxGapAdminRoutes",
+      "order": 1
+    }
+  ]
+}

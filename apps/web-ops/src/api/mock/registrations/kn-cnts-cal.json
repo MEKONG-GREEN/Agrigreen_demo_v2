@@ -1,0 +1,11 @@
+{
+  "id": "kn-cnts-cal",
+  "source": "./kn-cnts-cal",
+  "app": [
+    {
+      "export": "cntsCalRoutes",
+      "order": 17
+    }
+  ],
+  "admin": []
+}

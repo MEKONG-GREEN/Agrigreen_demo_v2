@@ -13,8 +13,8 @@
 import { uuidv7 } from "../idempotency";
 import type { DepartmentRef, KnRole, RoleAssignment, SessionContext } from "@/kn/contract";
 import { NATIONAL_REF, provinceOrgRef } from "./data";
-import { hasRole, json, problem, type Ctx, type Route } from "./http";
-import { findKnAccount, KN_ACCOUNTS, KN_DEPARTMENTS, type MockKnAccount } from "./kn-accounts";
+import { hasRole, json, problem, problemOf, type Ctx, type Route } from "./http";
+import { findKnAccount, KN_ACCOUNTS, KN_DEPARTMENTS, KN_MENU_PROFILE, type MockKnAccount } from "./kn-accounts";
 import { dropSupportContexts, knStoredContext, registerKnContext, DEFAULT_ROUTE } from "./kn";
 import { stableUuid } from "./kn-schedules";
 import { AG_COMMUNES, AG_PROVINCE, AG_REGIONS, communeName, regionName } from "./kn-reports/store";
@@ -22,13 +22,89 @@ import { AG_COMMUNES, AG_PROVINCE, AG_REGIONS, communeName, regionName } from ".
 const AG_REF = provinceOrgRef(1);
 const T0 = "2026-08-20T01:30:00Z";
 
+/** Danh mục cấp quản lý (accounts/port.MgmtLevels, accounts.kn-roles/2 — W11.07, Q-059). */
 export const MGMT_LEVELS = [
-  { code: "chuyen_vien", label: "Chuyên viên" },
-  { code: "pho_phong", label: "Phó phòng" },
-  { code: "truong_phong", label: "Trưởng phòng" },
+  { code: "chuyen_vien", label: "Chuyên viên - Cán bộ", manager: false, reads_all_departments: false },
+  { code: "phu_trach", label: "Phụ trách", manager: true, reads_all_departments: false },
+  { code: "pho_truong_phong", label: "Phó trưởng phòng", manager: true, reads_all_departments: false },
+  { code: "truong_phong", label: "Trưởng phòng", manager: true, reads_all_departments: false },
+  { code: "lanh_dao_don_vi", label: "Lãnh đạo đơn vị", manager: true, reads_all_departments: true },
+  { code: "pho_giam_doc", label: "Phó Giám đốc", manager: true, reads_all_departments: false },
+  { code: "giam_doc", label: "Giám đốc", manager: true, reads_all_departments: false },
 ];
-const mgmtLabel = (code: string | null | undefined) => MGMT_LEVELS.find((m) => m.code === code || m.label === code)?.label ?? null;
-const mgmtCode = (label: string | null | undefined) => MGMT_LEVELS.find((m) => m.label === label || m.code === label)?.code ?? null;
+/** W11.07: nhóm Cấp Tỉnh, cờ nhiệm vụ, quyền ủy quyền (cùng danh mục với Go). */
+export const PROVINCE_GROUPS = [
+  { code: "vien_chuc", label: "Viên chức" },
+  { code: "tong_hop", label: "Cán bộ tổng hợp" },
+  { code: "chu_nhiem", label: "Chủ nhiệm chương trình/dự án" },
+  { code: "lanh_dao_phong", label: "Lãnh đạo phòng" },
+  { code: "ban_giam_doc", label: "Ban Giám đốc (chỉ xem)" },
+];
+export const DUTIES = [
+  { code: "qtnv_bao_gia", label: "Quản trị nghiệp vụ báo giá (QTNV)" },
+  { code: "phu_trach_bieu", label: "Người phụ trách biểu" },
+];
+export const POWERS = [
+  { code: "mo_lai_ky", label: "Mở lại kỳ" },
+  { code: "duyet_bao_cao", label: "Duyệt, xác thực báo cáo" },
+];
+// Nhãn cũ "Chuyên viên" (dữ liệu giả lập trước W11.07) ↔ chuyen_vien.
+const LEGACY_LABEL: Record<string, string> = { "Chuyên viên": "chuyen_vien" };
+const mgmtLabel = (code: string | null | undefined) => MGMT_LEVELS.find((m) => m.code === code || m.label === code)?.label ?? (code && LEGACY_LABEL[code] ? code : null);
+const mgmtCode = (label: string | null | undefined) => MGMT_LEVELS.find((m) => m.label === label || m.code === label)?.code ?? (label ? (LEGACY_LABEL[label] ?? null) : null);
+
+// ---------------------------------------------------------------------------
+// W11.07: thuộc tính vai, ủy quyền có hạn, đơn vị nội bộ (giả lập trong bộ nhớ)
+// ---------------------------------------------------------------------------
+interface MockAttrs {
+  province_group: string | null;
+  duties: string[];
+  internal_unit_code: string | null;
+  facility_refs: string[];
+  household_refs: string[];
+}
+const ATTRS = new Map<string, MockAttrs>();
+const emptyAttrs = (): MockAttrs => ({ province_group: null, duties: [], internal_unit_code: null, facility_refs: [], household_refs: [] });
+const attrsWire = (aid: string) => {
+  const a = ATTRS.get(aid) ?? emptyAttrs();
+  return { ...a, province_group_label: PROVINCE_GROUPS.find((g) => g.code === a.province_group)?.label ?? null };
+};
+interface MockUnit {
+  id: string;
+  org_ref: string;
+  code: string;
+  kind: string;
+  kind_label: string;
+  name: string;
+  department_code: string | null;
+  sort_order: number;
+  active: boolean;
+  updated_at: string;
+}
+export const UNIT_KINDS = [
+  { code: "ban_giam_doc", label: "Ban Giám đốc" },
+  { code: "van_phong", label: "Văn phòng" },
+  { code: "phong", label: "Phòng" },
+  { code: "tram", label: "Trạm" },
+  { code: "trai", label: "Trại" },
+  { code: "tang_cuong", label: "Tăng cường" },
+];
+const UNITS: MockUnit[] = [];
+interface MockDelegation {
+  delegation_id: string;
+  grantor_ref: string;
+  grantee_ref: string;
+  department_code: string;
+  power: string;
+  power_label: string;
+  valid_from: string;
+  valid_to: string;
+  revoked: boolean;
+  status: "active" | "scheduled" | "expired" | "revoked";
+  reason: string;
+  created_at: string;
+}
+const DELEGATIONS: MockDelegation[] = [];
 
 interface Profile {
   email: string;
@@ -128,9 +204,13 @@ function log(a: MockKnAccount, e: Omit<AcctLog, "seq" | "at"> & { at?: string })
   LOGS.get(a.id)!.push({ ...e, seq: ++seq, at: e.at ?? now() });
 }
 
+/** D24: tài khoản KN đã được Admin đặt lại TOTP trong phiên mock (chờ đăng ký lại). */
+const KN_TOTP_RESET = new Set<string>();
+
 function userWire(a: MockKnAccount) {
   const p = profileOf(a);
   const parts = a.displayName.split(" ");
+  const totpPending = !p.activated_at || KN_TOTP_RESET.has(userId(a));
   return {
     id: userId(a),
     username: p.phone ?? p.email,
@@ -143,9 +223,11 @@ function userWire(a: MockKnAccount) {
     org_ref: a.assignments[0]?.org_ref ?? null,
     roles: ["kn_user"],
     lock_cause: p.enabled ? null : "manual",
-    required_actions: p.activated_at ? [] : ["UPDATE_PASSWORD", "VERIFY_EMAIL"],
+    required_actions: [...(p.activated_at ? [] : ["UPDATE_PASSWORD", "VERIFY_EMAIL"]), ...(totpPending ? ["CONFIGURE_TOTP"] : [])],
     created_at: p.created_at,
     tracked: true,
+    // D24: mọi cán bộ KN bắt TOTP khi đăng nhập.
+    mfa: { required: true, configured: !totpPending, enrollment_pending: totpPending },
   };
 }
 
@@ -169,6 +251,7 @@ function assignmentWire(a: MockKnAccount, x: RoleAssignment) {
     created_at: T0,
     updated_by: ADMIN_REF,
     updated_at: T0,
+    attributes: attrsWire(x.assignment_id.length === 36 ? x.assignment_id : stableUuid(x.assignment_id)),
   };
 }
 
@@ -334,7 +417,7 @@ function deptWire(d: DepartmentRef, i: number) {
     sort_order: i + 1,
     status: d.status,
     status_label: STATUS_LABEL[d.status],
-    menu_profile: d.code === "trong_trot" ? "trong_trot" : "generic",
+    menu_profile: KN_MENU_PROFILE[d.code] ?? "generic",
     retired: false,
     selectable: d.status === "active",
     account_count: accounts,
@@ -349,9 +432,13 @@ function deptWire(d: DepartmentRef, i: number) {
 // ---------------------------------------------------------------------------
 const communeRef = (code: string) => stableUuid(`org-${code}`);
 
+/** Giả lập FN-AD-04.02 B3: Nút xã đã chuyển sang TTKN tỉnh thứ hai (chỉ để màn cây thể hiện; dữ liệu khác giữ nguyên). */
+const OTHER_PROVINCE_REF = provinceOrgRef(2);
+const MOVED = new Set<string>();
+
 function orgTree() {
   const regionNode = (r: { code: string; name: string } | null) => {
-    const members = AG_COMMUNES.filter((c) => (r ? c.region === r.code : !c.region));
+    const members = AG_COMMUNES.filter((c) => !MOVED.has(c.code) && (r ? c.region === r.code : !c.region));
     return {
       ref: null,
       kind: r ? "region" : "region_unassigned",
@@ -389,7 +476,21 @@ function orgTree() {
         active: true,
         region: null,
         commune_count: AG_COMMUNES.length,
-        children: [{ ref: AG_REF, kind: "ttkn_province", code: "TTKN-AG", name: "TTKN tỉnh An Giang", admin_unit_code: AG_PROVINCE, level: 2, active: true, region: null, commune_count: AG_COMMUNES.length, children: groups }],
+        children: [
+          { ref: AG_REF, kind: "ttkn_province", code: "TTKN-AG", name: "TTKN tỉnh An Giang", admin_unit_code: AG_PROVINCE, level: 2, active: true, region: null, commune_count: AG_COMMUNES.length - MOVED.size, children: groups },
+          {
+            ref: OTHER_PROVINCE_REF,
+            kind: "ttkn_province",
+            code: "TTKN-CT",
+            name: "TTKN tỉnh Cần Thơ",
+            admin_unit_code: "92",
+            level: 2,
+            active: true,
+            region: null,
+            commune_count: MOVED.size,
+            children: AG_COMMUNES.filter((c) => MOVED.has(c.code)).map((c) => ({ ref: communeRef(c.code), kind: "extension_team", code: `AG-${c.code}`, name: c.name, admin_unit_code: c.code, level: 3, active: true, region: null, commune_count: 0, children: [] })),
+          },
+        ],
       },
     ],
   };
@@ -413,7 +514,130 @@ const reasonOk = (b: unknown, min: number) => {
 };
 
 export const knAdminRoutes: Route[] = [
-  { method: "GET", pattern: re("/v1/accounts/mgmt-levels"), handler: (ctx) => (isKnAdmin(ctx) ? json({ items: MGMT_LEVELS, provisional: true }) : deny()) },
+  {
+    method: "GET",
+    pattern: re("/v1/accounts/mgmt-levels"),
+    handler: (ctx) =>
+      isKnAdmin(ctx)
+        ? json({ items: MGMT_LEVELS, provisional: true, version: "accounts.kn-roles/2", province_groups: PROVINCE_GROUPS, duties: DUTIES, powers: POWERS, delegation_max_days: 30 })
+        : deny(),
+  },
+  // W11.07: thuộc tính phân quyền trong vai
+  {
+    method: "PUT",
+    pattern: re("/v1/accounts/users/{id}/assignments/{id}/attributes"),
+    handler: (ctx) =>
+      withAccount(ctx, (a) => {
+        const x = a.assignments.find((y) => wireAid(y) === ctx.params[1]);
+        if (!x) return problem(404, "accounts.assignment_not_found", "Không tìm thấy lần gán vai trò");
+        const b = (ctx.body ?? {}) as Partial<MockAttrs> & { internal_unit_code?: string };
+        const group = b.province_group || null;
+        const duties = [...new Set(b.duties ?? [])].sort();
+        const fac = b.facility_refs ?? [];
+        const hh = b.household_refs ?? [];
+        if (group && !PROVINCE_GROUPS.some((g) => g.code === group)) return errField("province_group", "nhóm Cấp Tỉnh không có trong danh mục");
+        if (duties.some((d) => !DUTIES.some((x2) => x2.code === d))) return errField("duties", "cờ nhiệm vụ không có trong danh mục");
+        if (x.role !== "kn_tinh" && (group || duties.length)) return errField("province_group", "nhóm Cấp Tỉnh và cờ nhiệm vụ chỉ dành cho vai Cấp Tỉnh");
+        if (x.role !== "kn_xa" && (fac.length || hh.length)) return errField("facility_refs", "giới hạn cơ sở/hộ chỉ dành cho vai Cấp Xã");
+        const unit = b.internal_unit_code || null;
+        if (unit && !UNITS.some((u) => u.code === unit && u.active)) return problem(422, "accounts.internal_unit_invalid", "Đơn vị nội bộ không thuộc đơn vị của lần gán hoặc đã ngừng");
+        const aid = wireAid(x);
+        const before = attrsWire(aid);
+        ATTRS.set(aid, { province_group: group, duties, internal_unit_code: unit, facility_refs: fac, household_refs: hh });
+        const after = attrsWire(aid);
+        const changes = (["province_group", "duties", "internal_unit_code"] as const)
+          .map((k) => ({ field: k, old: [before[k]].flat().join(",") || null, new: [after[k]].flat().join(",") || null }))
+          .filter((c) => c.old !== c.new);
+        if (changes.length) log(a, { event: "assignment.attributes_changed", entity_ref: aid, actor_ref: ADMIN_REF, changes, reason: null });
+        return json({ assignment_id: aid, attributes: after, seq: changes.length ? seq : 0 });
+      }),
+  },
+  // W11.07: ủy quyền có hạn (Admin xem, thu hồi)
+  {
+    method: "GET",
+    pattern: re("/v1/accounts/users/{id}/delegations"),
+    handler: (ctx) => withAccount(ctx, (a) => json({ items: DELEGATIONS.filter((d) => d.grantor_ref === userId(a) || d.grantee_ref === userId(a)) })),
+  },
+  {
+    method: "POST",
+    pattern: re("/v1/accounts/delegations/{id}/revoke"),
+    handler: (ctx) => {
+      if (!isKnAdmin(ctx)) return deny();
+      if (!reasonOk(ctx.body, 10)) return errField("reason", "bắt buộc, ít nhất 10 ký tự");
+      const d = DELEGATIONS.find((x) => x.delegation_id === ctx.params[0]);
+      if (!d) return problem(404, "accounts.delegation_not_found", "Không tìm thấy ủy quyền");
+      if (d.revoked || d.status === "expired") return problem(409, "accounts.delegation_state", "Ủy quyền đã thu hồi hoặc đã hết hạn");
+      d.revoked = true;
+      d.status = "revoked";
+      return json(d);
+    },
+  },
+  // W11.07: đơn vị nội bộ (Q-068)
+  {
+    method: "GET",
+    pattern: re("/v1/accounts/internal-units"),
+    handler: (ctx) =>
+      isKnAdmin(ctx)
+        ? json({ org_ref: AG_REF, items: UNITS.filter((u) => ctx.url.searchParams.get("include_inactive") === "true" || u.active), kinds: UNIT_KINDS })
+        : deny(),
+  },
+  {
+    method: "POST",
+    pattern: re("/v1/accounts/internal-units/seed"),
+    handler: (ctx) => {
+      if (!isKnAdmin(ctx)) return deny();
+      const seed: [string, string, string, string | null, number][] = [
+        ["ban_giam_doc", "ban_giam_doc", "Ban Giám đốc", null, 0],
+        ...KN_DEPARTMENTS.map((d, i) => [d.code, "phong", d.name, d.code, (i + 1) * 10] as [string, string, string, string | null, number]),
+      ];
+      const created: MockUnit[] = [];
+      let existing = 0;
+      for (const [code, kind, name, dept, sort] of seed) {
+        if (UNITS.some((u) => u.code === code)) {
+          existing++;
+          continue;
+        }
+        const u: MockUnit = { id: uuidv7(), org_ref: AG_REF, code, kind, kind_label: UNIT_KINDS.find((k) => k.code === kind)!.label, name, department_code: dept, sort_order: sort, active: true, updated_at: now() };
+        UNITS.push(u);
+        created.push(u);
+      }
+      return json({ created, existing, status: "tạm, chờ khách (Q-068)" });
+    },
+  },
+  {
+    method: "POST",
+    pattern: re("/v1/accounts/internal-units"),
+    handler: (ctx) => {
+      if (!isKnAdmin(ctx)) return deny();
+      const b = (ctx.body ?? {}) as { code?: string; kind?: string; name?: string; department_code?: string; sort_order?: number };
+      const code = String(b.code ?? "").trim();
+      if (!/^[a-z][a-z0-9_]{1,39}$/.test(code)) return errField("code", "mã 2–40 ký tự [a-z0-9_]");
+      const kind = UNIT_KINDS.find((k) => k.code === b.kind);
+      if (!kind) return errField("kind", "loại đơn vị nội bộ không có trong danh mục");
+      if (!String(b.name ?? "").trim()) return errField("name", "bắt buộc");
+      if (b.department_code && kind.code !== "phong") return errField("department_code", "chỉ đơn vị loại phòng mới gắn phòng ban");
+      if (UNITS.some((u) => u.code === code)) return problem(409, "accounts.internal_unit_code_taken", "Mã đơn vị nội bộ đã có trong đơn vị");
+      const u: MockUnit = { id: uuidv7(), org_ref: AG_REF, code, kind: kind.code, kind_label: kind.label, name: String(b.name).trim(), department_code: b.department_code || null, sort_order: b.sort_order ?? 0, active: true, updated_at: now() };
+      UNITS.push(u);
+      UNITS.sort((x, y) => x.sort_order - y.sort_order || x.code.localeCompare(y.code));
+      return json(u, 201);
+    },
+  },
+  {
+    method: "POST",
+    pattern: new RegExp(`^/v1/accounts/internal-units/${UUID}/(deactivate|reactivate)$`),
+    handler: (ctx) => {
+      if (!isKnAdmin(ctx)) return deny();
+      const u = UNITS.find((x) => x.id === ctx.params[0]);
+      if (!u) return problem(404, "accounts.internal_unit_not_found", "Không tìm thấy đơn vị nội bộ");
+      const active = ctx.params[1] === "reactivate";
+      if (!active && !reasonOk(ctx.body, 10)) return errField("reason", "lý do ngừng ít nhất 10 ký tự");
+      if (u.active === active) return problem(409, "accounts.internal_unit_state", "Đơn vị nội bộ đã ở trạng thái này");
+      u.active = active;
+      u.updated_at = now();
+      return json(u);
+    },
+  },
   {
     method: "GET",
     pattern: re("/v1/accounts/users"),
@@ -451,6 +675,28 @@ export const knAdminRoutes: Route[] = [
       log(acct, { event: "account.activation_sent", entity_ref: null, actor_ref: ADMIN_REF, changes: [], reason: null });
       return json({ user: userWire(acct), assignments: built.map((x) => assignmentWire(acct, x)), activation_email_sent: true, warnings: built.flatMap(warningsOf) }, 201);
     },
+  },
+  {
+    method: "POST",
+    pattern: re("/v1/accounts/kn-users/import"),
+    handler: (ctx) => importKnUsers(ctx),
+  },
+  {
+    method: "GET",
+    pattern: re("/v1/accounts/users/{id}/sessions"),
+    handler: (ctx) =>
+      withAccount(ctx, (a) => {
+        const p = profileOf(a);
+        const at = p.last_login ?? T0;
+        return json({
+          available: true,
+          active: p.enabled ? [{ id: `s-${a.id}`, ip_address: "10.20.0.15", started_at: at, last_access_at: at, clients: ["agrigreen-web-ops"] }] : [],
+          history: [
+            { at, type: "LOGIN", ip_address: "10.20.0.15", client: "agrigreen-web-ops", error: null },
+            { at: T0, type: "LOGIN_ERROR", ip_address: "10.20.0.15", client: "agrigreen-web-ops", error: "invalid_user_credentials" },
+          ],
+        });
+      }),
   },
   {
     method: "GET",
@@ -569,6 +815,21 @@ export const knAdminRoutes: Route[] = [
   ),
   {
     method: "POST",
+    pattern: re("/v1/accounts/users/{id}/reset-totp"),
+    match: knAdminContext,
+    handler: (ctx) =>
+      withAccount(ctx, (a) => {
+        const r = reasonOk(ctx.body, 20);
+        if (!r) return errField("reason", "bắt buộc, ít nhất 20 ký tự");
+        const p = profileOf(a);
+        if (!p.enabled) return problem(409, "accounts.state_conflict", "Tài khoản đang bị khóa");
+        KN_TOTP_RESET.add(userId(a));
+        log(a, { event: "account.totp_reset", entity_ref: null, actor_ref: ADMIN_REF, changes: [{ field: "TOTP", old: "Đã đăng ký", new: "Chờ đăng ký lại" }], reason: r });
+        return json({ account: { user_ref: userId(a), org_ref: userWire(a).org_ref, roles: ["kn_user"], enabled: true, lock_cause: null }, seq: 1, replayed: false });
+      }),
+  },
+  {
+    method: "POST",
     pattern: re("/v1/accounts/users/{id}/resend-actions"),
     match: knAdminContext,
     handler: (ctx) =>
@@ -663,6 +924,23 @@ export const knAdminRoutes: Route[] = [
     },
   },
   {
+    method: "POST",
+    pattern: re("/v1/orgs/{id}/move"),
+    handler: (ctx) => {
+      if (!isKnAdmin(ctx)) return deny();
+      const c = AG_COMMUNES.find((x) => communeRef(x.code) === ctx.params[0]);
+      if (!c) return problem(422, "party.invalid_hierarchy", "Không di chuyển Nút cấp 1, cấp 2");
+      const b = (ctx.body ?? {}) as { new_parent_ref?: string; reason?: string };
+      if ([...String(b.reason ?? "").trim()].length < 10) return errField("reason", "bắt buộc, ≥ 10 ký tự");
+      if (b.new_parent_ref !== AG_REF && b.new_parent_ref !== OTHER_PROVINCE_REF) return errField("new_parent_ref", "Nút cha phải là TTKN tỉnh");
+      const moved = b.new_parent_ref === OTHER_PROVINCE_REF;
+      if (moved === MOVED.has(c.code)) return problem(409, "party.org_state_conflict", "Nút xã đã thuộc Nút tỉnh này");
+      if (moved) MOVED.add(c.code);
+      else MOVED.delete(c.code);
+      return json({ org: { ref: ctx.params[0], kind: "extension_team", name: c.name, parent_ref: b.new_parent_ref, admin_unit_code: c.code } });
+    },
+  },
+  {
     method: "GET",
     pattern: re("/v1/orgs/{id}/impact"),
     handler: (ctx) => {
@@ -688,11 +966,133 @@ export const knAdminRoutes: Route[] = [
   },
 ];
 
+/** Giả lập POST /v1/accounts/kn-users/import (W11.02): CSV, mỗi dòng một vai trò, cùng Email = một tài khoản (gọi lại route tạo tài khoản). */
+const MOCK_ROLE: Record<string, string> = { kn_tw: "kn_tw", "cấp quốc gia": "kn_tw", kn_tinh: "kn_tinh", "cấp tỉnh": "kn_tinh", kn_xa: "kn_xa", "cấp xã": "kn_xa" };
+function importKnUsers(ctx: Ctx): Response {
+  if (!isKnAdmin(ctx)) return deny();
+  if (typeof ctx.body !== "string") return problem(422, "accounts.import_invalid", "Tệp nhập không đúng mẫu quy định", { detail: "Giả lập chỉ đọc CSV UTF-8" });
+  const lines = ctx.body.replace(/^\ufeff/, "").split(/\r?\n/).filter((l) => l.trim());
+  const head = (lines[0] ?? "").split(",").map((h) => h.trim().toLowerCase());
+  const col = (names: string[]) => head.findIndex((h) => names.includes(h));
+  const ci = { name: col(["họ tên", "ho_ten"]), email: col(["email"]), phone: col(["sđt", "so_dien_thoai"]), role: col(["vai trò", "vai_tro"]), org: col(["mã nút", "ma_nut"]), dept: col(["phòng ban", "phong_ban"]), mgmt: col(["cấp quản lý", "cap_quan_ly"]), communes: col(["xã phụ trách", "xa_phu_trach"]) };
+  if (ci.name < 0 || ci.email < 0 || ci.role < 0 || ci.org < 0) return problem(422, "accounts.import_invalid", "Tệp nhập không đúng mẫu quy định", { detail: "Tệp thiếu cột bắt buộc: Họ tên, Email, Vai trò, Mã Nút" });
+  const create = knAdminRoutes.find((r) => r.method === "POST" && r.pattern.source === re("/v1/accounts/kn-users").source)!;
+  const groups = new Map<string, { lines: number[]; body: { full_name: string; email: string; phone?: string; assignments: Record<string, unknown>[] }; bad?: string }>();
+  lines.slice(1).forEach((l, i) => {
+    const c = l.split(",").map((x) => x.trim());
+    const email = (c[ci.email] ?? "").toLowerCase();
+    const key = email || `#${i}`;
+    const g = groups.get(key) ?? { lines: [], body: { full_name: c[ci.name] ?? "", email, ...(c[ci.phone] ? { phone: c[ci.phone] } : {}), assignments: [] } };
+    groups.set(key, g);
+    g.lines.push(i + 2);
+    const role = MOCK_ROLE[(c[ci.role] ?? "").toLowerCase()];
+    if (!email) g.bad = "Thiếu email";
+    else if (!role) g.bad = "Vai trò không hợp lệ (Cấp Quốc gia, Cấp Tỉnh, Cấp Xã)";
+    const org = c[ci.org] === "TTKNQG" ? NATIONAL_REF : c[ci.org] === "TTKN-AG" ? AG_REF : c[ci.org];
+    const list = (v?: string) => (v ?? "").split(";").map((x) => x.trim()).filter(Boolean);
+    g.body.assignments.push({ role, org_ref: org, department_codes: list(c[ci.dept]), commune_codes: list(c[ci.communes]), mgmt_level: c[ci.mgmt] ? "chuyen_vien" : null });
+  });
+  const rows: { row: number; status: "created" | "rejected"; reason: string | null; user_id: string | null; activation_email_sent: boolean }[] = [];
+  let accounts = 0;
+  for (const g of groups.values()) {
+    let reason = g.bad ?? null;
+    let uid: string | null = null;
+    if (!reason) {
+      const r = create.handler({ ...ctx, body: g.body });
+      if (r.status === 201) {
+        accounts++;
+        const acct = accountByEmail(g.body.email);
+        uid = acct ? userId(acct) : null;
+      } else reason = problemOf(r)?.title ?? "Không tạo được tài khoản";
+    }
+    for (const row of g.lines) rows.push(reason ? { row, status: "rejected", reason, user_id: null, activation_email_sent: false } : { row, status: "created", reason: null, user_id: uid, activation_email_sent: true });
+  }
+  rows.sort((x, y) => x.row - y.row);
+  const created = rows.filter((r) => r.status === "created").length;
+  return json({ accounts_created: accounts, created, rejected: rows.length - created, rows });
+}
+
+function accountByEmail(email: string): MockKnAccount | undefined {
+  return KN_ACCOUNTS.find((a) => a.identifiers.includes(email));
+}
+
 /** Cho kiểm thử: xóa nhật ký và hồ sơ giả lập. */
 export function resetKnAdmin(): void {
+  MOVED.clear();
+  ATTRS.clear();
+  UNITS.length = 0;
+  DELEGATIONS.length = 0;
   PROFILES.clear();
   LOGS.clear();
   SUPPORT_LOG.length = 0;
   DEPT_LOG.clear();
   SUPPORT_OPEN.clear();
 }
+
+// BEGIN GENERATED MOCK ROUTES
+import type { RouteRegistration } from "./registry";
+import { knAppRoutes as route0 } from "./kn";
+import { cntsAggregateRoutes as route2 } from "./kn-cnts-aggregate";
+import { cntsAlertRoutes as route3 } from "./kn-cnts-alert";
+import { cntsCalRoutes as route4 } from "./kn-cnts-cal";
+import { cntsCatalogAppRoutes as route5 } from "./kn-cnts-catalogs";
+import { cntsCatalogAdminRoutes as route6 } from "./kn-cnts-catalogs";
+import { cntsOutbreakRoutes as route7 } from "./kn-cnts-outbreak";
+import { cntsPeriodRoutes as route8 } from "./kn-cnts-periods";
+import { knCollectRoutes as route9 } from "./kn-collect";
+import { contactRoutes as route10 } from "./kn-contact";
+import { hrmRoutes as route11 } from "./kn-hrm";
+import { hrmDocRoutes as route12 } from "./kn-hrm-docs";
+import { hrmReportRoutes as route13 } from "./kn-hrm-reports";
+import { hrmStaffRoutes as route14 } from "./kn-hrm-staff";
+import { khtcRoutes as route15 } from "./kn-khtc";
+import { khtcFormRoutes as route16 } from "./kn-khtc-forms";
+import { khtcPeriodRoutes as route17 } from "./kn-khtc-periods";
+import { khtcReportRoutes as route18 } from "./kn-khtc-reports";
+import { khtcSourceRoutes as route19 } from "./kn-khtc-sources";
+import { appRoutes28 as route20 } from "./kn-legacy-extension";
+import { appRoutes29 as route21 } from "./kn-legacy-extension";
+import { priceConfigRoutes as route22 } from "./kn-price";
+import { priceBoardRoutes as route23 } from "./kn-price-boards";
+import { priceItemRoutes as route24 } from "./kn-price-items";
+import { pricePointRoutes as route25 } from "./kn-price-points";
+import { priceReportRoutes as route26 } from "./kn-price-reports";
+import { priceTicketRoutes as route27 } from "./kn-price-tickets";
+import { reportCycleAppRoutes as route28 } from "./kn-reports/routes";
+import { workScheduleAppRoutes as route29 } from "./kn-schedules";
+
+export function registeredKnRoutes(): RouteRegistration[] {
+  return [
+  { surface: "app", order: 2, routes: route0 },
+  { surface: "admin", order: 0, routes: knAdminRoutes },
+  { surface: "app", order: 15, routes: route2 },
+  { surface: "app", order: 21, routes: route3 },
+  { surface: "app", order: 17, routes: route4 },
+  { surface: "app", order: 10, routes: route5 },
+  { surface: "admin", order: 2, routes: route6 },
+  { surface: "app", order: 18, routes: route7 },
+  { surface: "app", order: 14, routes: route8 },
+  { surface: "app", order: 7, routes: route9 },
+  { surface: "app", order: 23, routes: route10 },
+  { surface: "app", order: 11, routes: route11 },
+  { surface: "app", order: 25, routes: route12 },
+  { surface: "app", order: 24, routes: route13 },
+  { surface: "app", order: 22, routes: route14 },
+  { surface: "app", order: 12, routes: route15 },
+  { surface: "app", order: 20, routes: route16 },
+  { surface: "app", order: 16, routes: route17 },
+  { surface: "app", order: 1000, routes: route18 },
+  { surface: "app", order: 19, routes: route19 },
+  { surface: "app", order: 28, routes: route20 },
+  { surface: "app", order: 29, routes: route21 },
+  { surface: "app", order: 5, routes: route22 },
+  { surface: "app", order: 26, routes: route23 },
+  { surface: "app", order: 8, routes: route24 },
+  { surface: "app", order: 9, routes: route25 },
+  { surface: "app", order: 27, routes: route26 },
+  { surface: "app", order: 13, routes: route27 },
+  { surface: "app", order: 6, routes: route28 },
+  { surface: "app", order: 4, routes: route29 },
+  ];
+}
+// END GENERATED MOCK ROUTES

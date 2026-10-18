@@ -1,0 +1,1230 @@
+[
+  {
+    "Name": "alert-raised-urgent",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "urgent",
+        "Title": "Cảnh báo Khẩn",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "urgent",
+        "Title": "Cảnh báo Khẩn",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-raised-attention",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "normal",
+        "Title": "Cảnh báo Cần chú ý",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "normal",
+        "Title": "Cảnh báo Cần chú ý",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-assigned-urgent",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert_assigned",
+        "Severity": "urgent",
+        "Title": "Được giao xử lý cảnh báo",
+        "Body": "[Khẩn] Ổ dịch · xã 30001 — hạn xử lý 14/10/2027 15:30.",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert_assigned",
+        "Severity": "urgent",
+        "Title": "Được giao xử lý cảnh báo",
+        "Body": "[Khẩn] Ổ dịch · xã 30001 — hạn xử lý 14/10/2027 15:30.",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-assigned-attention",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert_assigned",
+        "Severity": "normal",
+        "Title": "Được giao xử lý cảnh báo",
+        "Body": "[Cần chú ý] Ổ dịch · xã 30001 — hạn xử lý 14/10/2027 15:30.",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert_assigned",
+        "Severity": "normal",
+        "Title": "Được giao xử lý cảnh báo",
+        "Body": "[Cần chú ý] Ổ dịch · xã 30001 — hạn xử lý 14/10/2027 15:30.",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-overdue-urgent",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert_overdue",
+        "Severity": "urgent",
+        "Title": "Cảnh báo quá hạn xử lý",
+        "Body": "[Khẩn] Ổ dịch · xã 30001 — quá hạn 14/10/2027 15:30.",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert_overdue",
+        "Severity": "urgent",
+        "Title": "Cảnh báo quá hạn xử lý",
+        "Body": "[Khẩn] Ổ dịch · xã 30001 — quá hạn 14/10/2027 15:30.",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-overdue-attention",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert_overdue",
+        "Severity": "urgent",
+        "Title": "Cảnh báo quá hạn xử lý",
+        "Body": "[Cần chú ý] Ổ dịch · xã 30001 — quá hạn 14/10/2027 15:30.",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert_overdue",
+        "Severity": "urgent",
+        "Title": "Cảnh báo quá hạn xử lý",
+        "Body": "[Cần chú ý] Ổ dịch · xã 30001 — quá hạn 14/10/2027 15:30.",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-unknown-urgent",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "urgent",
+        "Title": "Cảnh báo Khẩn",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "urgent",
+        "Title": "Cảnh báo Khẩn",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-unknown-attention",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "normal",
+        "Title": "Cảnh báo Cần chú ý",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "normal",
+        "Title": "Cảnh báo Cần chú ý",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-topic",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "89"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "cnts_alert",
+        "Severity": "urgent",
+        "Title": "Cảnh báo Khẩn",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-topic-dedup-nil",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "89"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_province_admin"
+          ]
+        },
+        "Kind": "cnts_alert",
+        "Severity": "urgent",
+        "Title": "Cảnh báo Khẩn",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-missing-province",
+    "Drafts": [],
+    "Error": ""
+  },
+  {
+    "Name": "alert-empty-province",
+    "Drafts": [],
+    "Error": ""
+  },
+  {
+    "Name": "alert-nil-subject",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "urgent",
+        "Title": "Cảnh báo Khẩn",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "urgent",
+        "Title": "Cảnh báo Khẩn",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-fallback-time",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "urgent",
+        "Title": "Cảnh báo Khẩn",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "urgent",
+        "Title": "Cảnh báo Khẩn",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-offset-time",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "urgent",
+        "Title": "Cảnh báo Khẩn",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_alert",
+        "Severity": "urgent",
+        "Title": "Cảnh báo Khẩn",
+        "Body": "Ổ dịch · xã 30001",
+        "DeepLink": "/kn/cnts/canh-bao",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-before-app",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-before-email",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-overdue-app",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Báo cáo kỳ CNTS đã trễ hạn",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Báo cáo kỳ CNTS đã trễ hạn",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-overdue-email",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Báo cáo kỳ CNTS đã trễ hạn",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Báo cáo kỳ CNTS đã trễ hạn",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-repeat-app",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc lại: báo cáo kỳ CNTS chưa gửi",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc lại: báo cáo kỳ CNTS chưa gửi",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-repeat-email",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc lại: báo cáo kỳ CNTS chưa gửi",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc lại: báo cáo kỳ CNTS chưa gửi",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-unknown-app",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-unknown-email",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-topic-email-off",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "30001"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer"
+          ]
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-topic-only-nil",
+    "Drafts": [
+      {
+        "RecipientRef": null,
+        "Audience": {
+          "National": false,
+          "Units": [
+            "30001"
+          ],
+          "OrgRef": null,
+          "Roles": [
+            "kn_officer"
+          ]
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-drop-empty",
+    "Drafts": [],
+    "Error": ""
+  },
+  {
+    "Name": "form-nil-subject",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": null,
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-fallback",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "Nhắc nộp báo cáo kỳ CNTS",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-runes-399",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-runes-400",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "form-runes-401",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ…",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_form_reminder",
+        "Severity": "normal",
+        "Title": "Nhắc nộp báo cáo kỳ CNTS",
+        "Body": "ắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắắ…",
+        "DeepLink": "/kn/cnts/bao-cao-ky",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": true
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "duty-valid",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_duty_changed",
+        "Severity": "normal",
+        "Title": "Lịch trực KSGM đã thay đổi",
+        "Body": "Lịch trực tháng 10/2027 đã cập nhật phiên bản 2. Mở lịch để xem ca của bạn.",
+        "DeepLink": "/kn/cnts/lich-truc",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_duty_changed",
+        "Severity": "normal",
+        "Title": "Lịch trực KSGM đã thay đổi",
+        "Body": "Lịch trực tháng 10/2027 đã cập nhật phiên bản 2. Mở lịch để xem ca của bạn.",
+        "DeepLink": "/kn/cnts/lich-truc",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T04:02:03Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "duty-empty",
+    "Drafts": [],
+    "Error": ""
+  },
+  {
+    "Name": "duty-only-nil",
+    "Drafts": [],
+    "Error": ""
+  },
+  {
+    "Name": "duty-missing-roster",
+    "Drafts": null,
+    "Error": "notify: lịch trực thiếu mã hoặc phiên bản"
+  },
+  {
+    "Name": "duty-zero-version",
+    "Drafts": null,
+    "Error": "notify: lịch trực thiếu mã hoặc phiên bản"
+  },
+  {
+    "Name": "duty-negative-version",
+    "Drafts": null,
+    "Error": "notify: lịch trực thiếu mã hoặc phiên bản"
+  },
+  {
+    "Name": "duty-invalid-month",
+    "Drafts": null,
+    "Error": "notify: tháng lịch trực: parsing time \"2027-13\": month out of range"
+  },
+  {
+    "Name": "duty-fallback",
+    "Drafts": [
+      {
+        "RecipientRef": "11111111-1111-4111-8111-111111111111",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_duty_changed",
+        "Severity": "normal",
+        "Title": "Lịch trực KSGM đã thay đổi",
+        "Body": "Lịch trực tháng 10/2027 đã cập nhật phiên bản 2. Mở lịch để xem ca của bạn.",
+        "DeepLink": "/kn/cnts/lich-truc",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      },
+      {
+        "RecipientRef": "22222222-2222-4222-8222-222222222222",
+        "Audience": {
+          "National": false,
+          "Units": null,
+          "OrgRef": null,
+          "Roles": null
+        },
+        "Kind": "cnts_duty_changed",
+        "Severity": "normal",
+        "Title": "Lịch trực KSGM đã thay đổi",
+        "Body": "Lịch trực tháng 10/2027 đã cập nhật phiên bản 2. Mở lịch để xem ca của bạn.",
+        "DeepLink": "/kn/cnts/lich-truc",
+        "SubjectRef": "33333333-3333-4333-8333-333333333333",
+        "CreatedAt": "2027-10-13T03:04:05.123456789Z",
+        "Email": false
+      }
+    ],
+    "Error": ""
+  },
+  {
+    "Name": "alert-bad-json",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.cnts_alert.changed: unexpected end of JSON input"
+  },
+  {
+    "Name": "alert-wrong-field-type",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.cnts_alert.changed: json: cannot unmarshal string into Go struct field CNTSAlertChangedV1.recipient_refs of type []uuid.UUID"
+  },
+  {
+    "Name": "form-bad-json",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.cnts_form.reminded: unexpected end of JSON input"
+  },
+  {
+    "Name": "form-wrong-field-type",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.cnts_form.reminded: json: cannot unmarshal string into Go struct field CNTSFormRemindedV1.recipient_refs of type []uuid.UUID"
+  },
+  {
+    "Name": "duty-bad-json",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.cnts_duty.changed: unexpected end of JSON input"
+  },
+  {
+    "Name": "duty-wrong-field-type",
+    "Drafts": null,
+    "Error": "notify: payload pf.extension.cnts_duty.changed: json: cannot unmarshal number into Go struct field CNTSDutyChangedV1.roster_id of type uuid.UUID"
+  },
+  {
+    "Name": "unknown-event",
+    "Drafts": null,
+    "Error": ""
+  }
+]

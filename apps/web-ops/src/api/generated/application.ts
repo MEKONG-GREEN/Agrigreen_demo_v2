@@ -291,6 +291,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.07 Ủy quyền có hạn người gọi đã giao hoặc đã nhận */
+        get: operations["knMyDelegations"];
+        put?: never;
+        /** W11.07 Lãnh đạo phòng ủy quyền có hạn (≤ 30 ngày) cho cán bộ Cấp Tỉnh cùng đơn vị, cùng phòng ban của phiên */
+        post: operations["knCreateDelegation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/delegations/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** W11.07 Người giao thu hồi ủy quyền còn hiệu lực (lý do ≥ 10 ký tự) */
+        post: operations["knRevokeDelegation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/internal-units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.07 Đơn vị nội bộ của đơn vị (đọc) */
+        get: operations["knListInternalUnits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/departments": {
         parameters: {
             query?: never;
@@ -317,7 +371,7 @@ export interface paths {
         };
         /**
          * UR-KT-02: cây module (menu) của một phòng ban cho vai KN — bật phòng ban không cần phát hành lại web/app
-         * @description Dựng từ bảng menu tĩnh có phiên bản (kn.menu/v2) và trạng thái phòng ban hiện hành ở MỖI request (Cache-Control: no-store).
+         * @description Dựng từ bảng menu tĩnh có phiên bản (kn.menu/v3: khuôn theo phòng ban + nhóm "Dùng chung" cuối mọi menu; mục module chưa có hiện "Sắp có", enabled = false, status coming_soon) và trạng thái phòng ban hiện hành ở MỖI request (Cache-Control: no-store).
          *     audience vắng: theo ngữ cảnh phiên (P1) hoặc vai duy nhất của người gọi. platform_admin xem được mọi cấp (FN-AD-04.07).
          *     audience = admin: mục con của phòng ban trong nhóm "Phòng ban" (enabled = false khi chưa mở).
          */
@@ -2081,6 +2135,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/work-schedules/{id}/items/{item_id}/checkin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check-in tại địa điểm công tác (CNTS CV-07, W11.46) — một mục một check-in, không sửa được; tọa độ lưu ở bảng có hạn lưu (QĐ-8) */
+        post: operations["extCheckinWorkScheduleItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/mechanization/owners": {
         parameters: {
             query?: never;
@@ -2597,10 +2668,44 @@ export interface paths {
         put?: never;
         /**
          * Xem trước đợt phát hành: kỳ đã chia, số công việc = biểu × xã × kỳ, xã chưa có cán bộ
-         * @description Không ghi gì. Quy tắc chia kỳ Q-17 TẠM (tuần thứ Hai–Chủ nhật, nhãn "Tuần n của đợt" hoặc ISO theo tham số
-         *     extension.report_period_week_numbering); hạn mặc định tuần = Thứ Ba tuần sau 17:00, tháng = ngày 10 tháng sau.
+         * @description Không ghi gì. Lịch kỳ hệ thống v2 (W11.03, QĐ-6 đề xuất, chờ Q-045): quy tắc lấy từ tham số
+         *     extension.report_period_rule có hiệu lực tại from_date (nạp sẵn "kn.period_rule/v2;week_start=wed;week=year;month=week_end"
+         *     từ 04/11/2026; trước đó/chưa có phiên bản → v1):
+         *     tuần báo cáo Thứ Tư–Thứ Ba, nhãn "Tuần 41/2026" (tuần chứa 01/01 là tuần 1), tháng/quý/năm = các tuần có Thứ Ba
+         *     thuộc kỳ. Hạn mặc định v2: tuần = 12:00 ngày sau ngày cuối kỳ, tháng = 10:00 Thứ Tư sau Thứ Ba cuối tháng.
+         *     Đợt đã phát hành giữ period_rule đã ghi (v1 "kn.period_rule/v1-tam;week=season": tuần thứ Hai–Chủ nhật).
+         *     W11.05b: period_type chọn kỳ ngày (day, hạn 09:00 hôm sau), tuần KSGM (ksgm_week — 4 tuần/tháng, ranh giới theo
+         *     tham số extension.ksgm_week_starts:YYYY-MM, mặc định 1, 8, 15, 22) hoặc quý (quarter) — chỉ với quy tắc v2. Kỳ
+         *     mang period_key; phát hành lưu khóa này (không tính lại khi tham số đổi).
+         *     D8 (CEO 13/10/2026): mỗi phòng một lịch tuần — tham số extension.report_period_rule:<mã phòng> trước, rồi lịch
+         *     nạp sẵn (CNTS Thứ Ba–Thứ Hai, hiệu lực ngay), rồi tham số chung; trả calendar_id/calendar_version và period_rule
+         *     mang ";cal=<phòng>:v<n>".
          */
         post: operations["rcPreviewBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-batches/provincial-import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nạp giá trị cột Tỉnh giao từ tệp CSV UTF-8/.xlsx (FN-TI-02.02 Bước 4, UR-TI-02) — chỉ đọc tệp, không ghi
+         * @description Thân request là tệp (không multipart), đọc bằng shared/tabular (ô công thức → cả tệp bị từ chối). Một dòng một xã:
+         *     cột "Mã xã" bắt buộc; mỗi cột Tỉnh giao có tiêu đề "<Mã biểu> <Chữ cột>" (vd "T01 E", "T01_E Diện tích giao");
+         *     chỉ chọn một biểu thì "E"/"Cột E" cũng nhận. Cột không nhận ra → ignored_columns. Dòng lỗi (thiếu/trùng mã xã,
+         *     số âm/không phải số) bị loại kèm lý do không chứa giá trị nhập; dòng khác vẫn nhận. Kết quả đưa vào provincial_values
+         *     của POST /v1/extension/report-batches với provincial_source = excel (máy chủ kiểm lại phạm vi xã). Tối đa 500 dòng, 2 MB.
+         */
+        post: operations["rcImportProvincialValues"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3068,7 +3173,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Số đếm menu việc cần xử lý của ngữ cảnh (badge_source của menu kn.menu/v2) */
+        /** Số đếm menu việc cần xử lý của ngữ cảnh (badge_source của menu kn.menu/v3) */
         get: operations["rcBadges"];
         put?: never;
         post?: never;
@@ -5093,6 +5198,649 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cảnh báo CNTS (W11.43 — FN-13, UR-TINH-13, Mục III.5) trong phạm vi người gọi — Khẩn và chưa đóng trước
+         * @description Cấp Tỉnh: cảnh báo trong phạm vi Nút; Cấp Xã: cảnh báo của các xã phụ trách và cảnh báo được giao cho mình; Admin: mọi
+         *     cảnh báo. status: open (chưa đóng), overdue (chưa đóng, quá hạn xử lý), new, assigned, in_progress, closed.
+         */
+        get: operations["extensionCntsListAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alerts/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cảnh báo CNTS kèm lịch sử vòng đời */
+        get: operations["extensionCntsGetAlert"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alerts/{ref}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh giao xử lý cảnh báo (Mới/Đã giao/Đang xử lý → Đã giao), hạn xử lý mặc định theo loại */
+        post: operations["extensionCntsAssignAlert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alerts/{ref}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Người được giao nhận xử lý (Đã giao → Đang xử lý) */
+        post: operations["extensionCntsStartAlert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alerts/{ref}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đóng cảnh báo với kết quả xử lý (≥ 10 ký tự) — người được giao, Cấp Tỉnh, Admin */
+        post: operations["extensionCntsCloseAlert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alert-assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cán bộ phòng CNTS của tỉnh được giao xử lý cảnh báo (Cấp Xã chỉ khi phụ trách xã đã chọn) */
+        get: operations["extensionCntsAlertAssignees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alert-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cấu hình nhắc nhở theo biểu (UR-TINH-08), xử lý theo loại cảnh báo, ngưỡng đang hiệu lực (tham số cnts.*) */
+        get: operations["extensionCntsAlertConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alert-config/forms/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Cấp Tỉnh lưu phiên bản mới cấu hình nhắc của biểu kỳ CNTS */
+        put: operations["extensionCntsPutFormReminder"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/alert-config/kinds/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Cấp Tỉnh lưu phiên bản mới cấu hình xử lý của loại cảnh báo (hạn xử lý; mức Khẩn của môi trường nước) */
+        put: operations["extensionCntsPutAlertSetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/period-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Biểu kỳ Cấp Xã CNTS và phiên bản đã cài ở cap/forms */
+        get: operations["extensionCntsPeriodForms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/period-forms/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cài (phiên bản mới) biểu chưa có hoặc khác định nghĩa chuẩn — Admin KN / reports_admin */
+        post: operations["extensionCntsInstallPeriodForms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/period-series/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Xem trước lô kỳ của một biểu (kỳ, hạn nộp, số công việc) — chưa ghi
+         * @description D8 (CEO 13/10/2026): BM-01 (ngày), BM-04/BM-17 (tuần) theo lịch tuần CNTS Thứ Ba–Thứ Hai (calendar_id
+         *     chan_nuoi_thuy_san, calendar_version 3; tham số extension.report_period_rule:chan_nuoi_thuy_san đè lên); hạn mặc
+         *     định tuần 12:00 Thứ Ba ngay sau kỳ. BM-05 giữ tuần làm việc Thứ Hai–Thứ Sáu (calendar_id null).
+         */
+        post: operations["extensionCntsPreviewSeries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/period-series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phát hành lô kỳ native cap/forms của một biểu (một giao dịch; Cấp Tỉnh phòng CNTS; cơ sở phải thuộc xã) */
+        post: operations["extensionCntsPublishSeries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/duty-rosters/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch trực KSGM của tháng (BM-03, W11.46) — lưới cơ sở × viên chức × ngày, cảnh báo, lịch sử lưu (Cấp Tỉnh, Admin) */
+        get: operations["extensionCntsGetDutyRoster"];
+        put?: never;
+        /** Lưu lịch trực tháng thành phiên bản mới (cán bộ tổng hợp Cấp Tỉnh, Admin); cảnh báo không chặn; đổi ca phát pf.extension.cnts_duty.changed */
+        post: operations["extensionCntsSaveDutyRoster"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/my-duties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch trực KSGM của tôi (UR-XA-03) — ca của người gọi trong tháng, người trực cùng */
+        get: operations["extensionCntsMyDuties"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/vaccination-batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch tiêm phòng các lứa (BM-07, W11.46) trong phạm vi — bản hiện hành, trạng thái suy diễn (quá hạn = nhãn đỏ) */
+        get: operations["extensionCntsListVaccinationBatches"];
+        put?: never;
+        /** Tạo lịch tiêm theo quy trình của mô hình (FN-15 B4) — chủ nhiệm Cấp Tỉnh, Admin */
+        post: operations["extensionCntsCreateVaccinationBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/vaccination-batches/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết lịch tiêm của lứa kèm các phiên bản */
+        get: operations["extensionCntsGetVaccinationBatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/vaccination-batches/{ref}/doses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cập nhật mũi tiêm — Cấp Xã ghi ngày tiêm thực tế, ghi chú; chủ nhiệm Cấp Tỉnh còn sửa ngày dự kiến từng hộ */
+        post: operations["extensionCntsUpdateVaccinationDoses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/vaccination-batches/{ref}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy lịch tiêm của lứa (bắt buộc lý do) — chủ nhiệm Cấp Tỉnh, Admin */
+        post: operations["extensionCntsCancelVaccinationBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreaks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ổ dịch (bản hiện hành) trong phạm vi + thống kê theo trạng thái, bệnh */
+        get: operations["extensionCntsListOutbreaks"];
+        put?: never;
+        /** Cấp Xã lập báo cáo dịch bệnh BM-10 và gửi Cấp Tỉnh (phiên bản 1; phát pf.extension.outbreak.reported) */
+        post: operations["extensionCntsReportOutbreak"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreak-points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lớp ổ dịch cho bản đồ (GeoJSON FeatureCollection, WGS84) — mặc định bỏ ổ dịch đã kết thúc */
+        get: operations["extensionCntsOutbreakPoints"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreaks/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ổ dịch — bản hiện hành và mọi phiên bản diễn biến (mới nhất trước) */
+        get: operations["extensionCntsGetOutbreak"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreaks/{ref}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Xã cập nhật diễn biến (phiên bản mới đủ trường; khóa lạc quan base_version) */
+        post: operations["extensionCntsUpdateOutbreak"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreaks/{ref}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh xác nhận kết thúc ổ dịch (có lý do) */
+        post: operations["extensionCntsCloseOutbreak"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreaks/{ref}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh mở lại ổ dịch đã kết thúc (có lý do) */
+        post: operations["extensionCntsReopenOutbreak"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/suspects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tin báo nghi dịch (bản hiện hành) trong phạm vi */
+        get: operations["extensionCntsListSuspects"];
+        put?: never;
+        /** Cấp Xã ghi nhận tin báo nghi dịch (vị trí không bắt buộc) */
+        post: operations["extensionCntsReportSuspect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/suspects/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tin báo nghi dịch — mọi phiên bản (mới nhất trước) */
+        get: operations["extensionCntsGetSuspect"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/suspects/{ref}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Xã xác nhận tin báo → tạo ổ dịch (một giao dịch; vị trí trống lấy vị trí của tin báo) */
+        post: operations["extensionCntsConfirmSuspect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/suspects/{ref}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Xã bác bỏ tin báo nghi dịch (có lý do) */
+        post: operations["extensionCntsDismissSuspect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/bm02": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** BM-02 — KSGM theo cơ sở của một tuần KSGM (YYYY-MM-Kn) hoặc tháng (YYYY-MM) = tổng BM-01 + dòng điều chỉnh */
+        get: operations["extensionCntsBM02"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/bm02/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thêm dòng điều chỉnh BM-02 cho một cơ sở × một tuần KSGM (cộng/trừ, lý do 10–500 ký tự; chỉ ghi thêm) */
+        post: operations["extensionCntsBM02Adjust"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/bm18": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** BM-18 Phụ lục 2 phần III — khai thác (tự cộng BM-17 theo xã) + nuôi trồng theo đối tượng; Tuần trước liền kề, Trong kỳ, Lũy kế quý, Lũy kế năm */
+        get: operations["extensionCntsBM18"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/bm18/aquaculture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi số nuôi trồng của tuần theo đối tượng (dòng mới thay dòng trước; tuần BM-18 đã chốt → 409) */
+        post: operations["extensionCntsBM18Aquaculture"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/aggregates/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chốt bảng tổng hợp của một tuần (BM-02 tuần KSGM, BM-18 tuần CNTS) — mọi kỳ nguồn của tuần phải đã chốt (D17); số công bố đóng băng */
+        post: operations["extensionCntsAggregateClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/aggregates/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở lại bảng tổng hợp đã chốt (lý do 10–500 ký tự) — số đã công bố giữ tới lần chốt lại */
+        post: operations["extensionCntsAggregateReopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiên bản tệp chia sẻ Chi cục của một bảng */
+        get: operations["extensionCntsShares"];
+        put?: never;
+        /** Tạo phiên bản tệp chia sẻ Chi cục (số không đổi so với phiên bản cuối → trả phiên bản cuối, 200) */
+        post: operations["extensionCntsShareCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/shares/{id}/xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải tệp Excel của một phiên bản (dựng lại từ nội dung đã lưu; BM-18 gồm sheet TỔNG = Phụ lục 2 và 4 sheet khai thác theo xã × tuần) */
+        get: operations["extensionCntsShareFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/forms/profiles": {
         parameters: {
             query?: never;
@@ -5249,6 +5997,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/forms/periods/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy kỳ đang mở (cấp close_by của Nút phát hành; lý do bắt buộc) — trạng thái cuối, không nộp/chốt/mở lại sau hủy (W11.05, KHTC BR-DL-18) */
+        post: operations["formsCancelPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/forms/periods/{id}/snapshots": {
         parameters: {
             query?: never;
@@ -5294,6 +6059,2825 @@ export interface paths {
         get: operations["formsSnapshot"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.42 Công việc (kỳ × đơn vị trong phạm vi người gọi) kèm định nghĩa biểu và bài nộp cuối — màn Công việc cần làm (CNTS FN-08), theo dõi nộp */
+        get: operations["formsTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/periods/{id}/previous": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.42 Sao chép kỳ trước (UR-XA-13): bài nộp cuối của đơn vị ở kỳ gần nhất trước đó của cùng biểu (null nếu chưa có) */
+        get: operations["formsPrevious"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/weeks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tuần báo cáo KHTC (Thứ Tư – Thứ Ba) của một năm — ô chọn "Tuần" kèm ngày */
+        get: operations["extensionKhtcWeeks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/form-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiếu cơ sở "Báo cáo cho KHTC" đã cài ở cap/forms (profile kn_khtc) */
+        get: operations["extensionKhtcFormTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/form-template/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cài phiếu cơ sở (Admin KN / reports_admin); đã cài thì giữ nguyên */
+        post: operations["extensionKhtcInstallFormTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách kỳ KHTC (mới trước) kèm trạng thái và tiến độ nộp */
+        get: operations["extensionKhtcPeriods"];
+        put?: never;
+        /** Mở kỳ và giao phiếu (một phiếu mỗi phòng, gắn kỳ nguồn) — Cấp Tỉnh Phòng KHTC */
+        post: operations["extensionKhtcOpenPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Kỳ "Nháp" của popup Mở kỳ — tên kỳ, khoảng thời gian, hạn, phiếu giao các phòng, nguồn module (chưa ghi) */
+        post: operations["extensionKhtcPreviewPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết kỳ — 4 thẻ đếm, tiến độ phiếu các phòng và nguồn module, log */
+        get: operations["extensionKhtcPeriod"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/deadline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa hạn nộp / hạn xuất (kỳ chưa đóng, chưa hủy) */
+        post: operations["extensionKhtcPeriodDeadline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đóng kỳ — Đủ dữ liệu, hoặc Trễ hạn quá hạn ≥ N ngày kèm lý do (BR-DL-15) */
+        post: operations["extensionKhtcClosePeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy kỳ mở nhầm — lý do bắt buộc (BR-DL-18); phiếu gỡ khỏi module các phòng */
+        post: operations["extensionKhtcCancelPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/department-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Báo cáo cho KHTC phía phòng (W11.11, FN-PN-03.01) — phiếu KHTC giao cho phòng của phiên theo kỳ KHTC
+         * @description Một mã dùng chung cho mọi phòng chuyên môn (Trồng trọt, CNTS, Thông tin tuyên truyền, HCTH). Cấp Tỉnh chỉ thấy phiếu phòng
+         *     của phiên; Admin KN chọn phòng bằng `department`. view=current ("Phiếu kỳ này"): kỳ chưa đóng, "Cần xử lý" trước rồi hạn
+         *     gần nhất; view=sent ("Phiếu đã gửi"): phiếu đã gửi ≥ 1 lần. Kỳ đã hủy bị gỡ (BR-DL-18). Form nhập/gửi phiếu thuộc màn
+         *     `entry_route` (W11.63); gửi qua /v1/forms (profile kn_khtc).
+         */
+        get: operations["extensionKhtcDepartmentForms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái nguồn của kỳ — mốc dữ liệu từng nguồn, số đã chụp của hạng mục nguồn module, "Nguồn đã thay đổi" */
+        get: operations["extensionKhtcPeriodSources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/sources/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cập nhật số liệu — ảnh chụp mới của số liệu nguồn đã chốt; lịch sử cũ → mới so với ảnh chụp trước */
+        post: operations["extensionKhtcPeriodSourcesRefresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/sources/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử Cập nhật số liệu — người bấm, thời điểm, giá trị cũ → mới (mới trước) */
+        get: operations["extensionKhtcPeriodSourcesHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/form-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mẫu phiếu số liệu KHTC nạp sẵn (4 phòng + mẫu chung) — loại cột Cố định / Từ Kế hoạch năm / Lũy kế kỳ trước / Nhập / Công thức */
+        get: operations["extensionKhtcFormTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/my-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiếu kỳ này / phiếu đã gửi của một phòng (Cấp Tỉnh của phòng; Phòng KHTC, Admin xem phòng bất kỳ) */
+        get: operations["extensionKhtcMyForms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/forms/{dept}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiếu của phòng trong kỳ KHTC — lưới hạng mục theo Kế hoạch năm, lời văn, kết quả kiểm tra, lịch sử gửi */
+        get: operations["extensionKhtcForm"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/forms/{dept}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lưu nháp ở máy chủ (không giới hạn; không kiểm bắt buộc) */
+        post: operations["extensionKhtcFormDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/forms/{dept}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gửi KHTC — kiểm 3 quy tắc, niêm phong bảng số liệu, nộp lần n ở cap/forms (tối đa 3 lần, lần 3 tự khóa) */
+        post: operations["extensionKhtcFormSubmit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/forms/{dept}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rà soát — Yêu cầu bổ sung (returned, bắt buộc nội dung) hoặc Xác nhận (accepted); Cấp Tỉnh Phòng KHTC, bốn mắt */
+        post: operations["extensionKhtcFormReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tình trạng danh mục nhân sự — số mục đang dùng theo loại, bảng hệ số và tham số có hiệu lực hôm nay, số mục còn là dữ liệu mẫu (Q-070) */
+        get: operations["hrmStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cài danh mục, bảng hệ số và tham số mặc định (BRD + dữ liệu mẫu đánh dấu placeholder) — chỉ mã/ngạch/khóa chưa có; Admin */
+        post: operations["hrmInstallDefaults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/catalogs/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+            };
+            cookie?: never;
+        };
+        /** Mục hiện hành (phiên bản mới nhất) của một danh mục nhân sự, sắp theo thứ tự rồi mã */
+        get: operations["hrmCatalogList"];
+        put?: never;
+        /** Thêm mục (mã được chuẩn hóa — bỏ khoảng trắng, xuống dòng; AC-03); mã đã có → chặn; Admin */
+        post: operations["hrmCatalogCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/catalogs/{kind}/{code}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        /** Mọi phiên bản của một mục (cũ trước) */
+        get: operations["hrmCatalogHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/catalogs/{kind}/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi phiên bản mới của mục (sửa tên, thứ tự, thuộc tính; active=false → ngừng sử dụng, true → dùng lại); không đổi mã; Admin */
+        post: operations["hrmCatalogRevise"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/grade-scales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ngạch/CDNN đang dùng kèm bảng hệ số có hiệu lực tại một ngày (valid_from lớn nhất ≤ ngày; cùng ngày lấy bản ghi sau) */
+        get: operations["hrmGradeScales"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/grade-scales/{grade}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mã ngạch/CDNN (vd 01.003, V.05.02.07) */
+                grade: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi phiên bản bảng hệ số của ngạch từ ngày hiệu lực (BR-02, AC-02 — bảng cũ giữ nguyên cho ngày trước đó); ngạch phải đang dùng; Admin */
+        post: operations["hrmGradeScaleAdd"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/grade-scales/{grade}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grade: string;
+            };
+            cookie?: never;
+        };
+        /** Mọi phiên bản bảng hệ số của ngạch theo ngày hiệu lực */
+        get: operations["hrmGradeScaleHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/rules/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Khóa tham số có phiên bản (pf/hrm) — promotion (quy tắc nâng bậc), achievement_conversion (quy đổi thành tích) */
+                key: components["parameters"]["HrmRuleKey"];
+            };
+            cookie?: never;
+        };
+        /** Tham số có hiệu lực tại một ngày và mọi phiên bản (quy tắc nâng bậc, bảng quy đổi thành tích) */
+        get: operations["hrmRule"];
+        put?: never;
+        /** Ghi phiên bản tham số từ ngày hiệu lực (payload kiểm chặt theo khóa; mã kỷ luật/khen thưởng phải đang dùng); Admin */
+        post: operations["hrmRuleAdd"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quyền hồ sơ hiệu lực của người gọi (nhóm vai, đơn vị nội bộ, phạm vi theo nhóm quyền); enabled=false khi hồ sơ chưa bật */
+        get: operations["hrmMyAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đơn vị nội bộ (phòng/trạm/trại/BGĐ) của đơn vị người gọi — bộ lọc, đơn vị công tác (HS-16), đơn vị quản lý (HS-37) */
+        get: operations["hrmUnits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách hồ sơ trong phạm vi xem, chiếu tại ngày chốt (as-of); nhãn họ tên che bớt từ kho (FN-07 B1) */
+        get: operations["hrmStaffList"];
+        put?: never;
+        /** Thêm hồ sơ (FN-07 B2) — mã tự sinh VC/HD/XA-nnnnn; định danh + ngăn hồ sơ vào kho (mục đích hrm.profile), thẻ TK (hrm.sensitive); quá trình ban đầu bắt buộc đơn vị và chức vụ */
+        post: operations["hrmStaffCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất danh sách đang lọc ra CSV (UTF-8 có BOM, mở bằng Excel) trong phạm vi xuất — không có trường TK (BR-03); ghi một dòng nhật ký xuất */
+        get: operations["hrmStaffExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        /** Hồ sơ chi tiết tại ngày chốt (thẻ Thông tin chung, Công tác, Trình độ, Khen thưởng, Ngạch - Bậc, Thông tin làm việc, Lịch sử sửa) — ghi nhật ký xem; không có thẻ TK */
+        get: operations["hrmStaffGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa định danh/ngăn hồ sơ (trường vắng = không đổi) và tài khoản gắn (null = gỡ); sổ ghi TÊN trường đã đổi */
+        post: operations["hrmStaffProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/sensitive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        /** Thẻ Thống kê BC Sở (TK-01..06) — chỉ quyền sensitive.view (mặc định HCTH, Admin); viên chức và HĐLĐ; ghi nhật ký view_sensitive; kho đọc với mục đích hrm.sensitive */
+        get: operations["hrmStaffSensitive"];
+        put?: never;
+        /** Thay thẻ Thống kê BC Sở (cần sensitive.view + profile.edit); dân tộc/tôn giáo là mã danh mục đang dùng */
+        post: operations["hrmStaffSensitiveWrite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thêm một dòng quá trình có hiệu lực (đơn vị, chức vụ, tăng cường, ngạch, bậc, văn bằng, bồi dưỡng, khen thưởng, kỷ luật, vào làm/nghỉ việc — FN-07 B4/B6/B7, FN-08) */
+        post: operations["hrmStaffEventAdd"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/events/{event}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+                event: components["parameters"]["HrmEventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thay một dòng quá trình còn hiệu lực bằng dòng mới cùng loại (reason 10–500 ký tự bắt buộc); dòng cũ giữ trong lịch sử */
+        post: operations["hrmStaffEventReplace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/events/{event}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+                event: components["parameters"]["HrmEventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy một dòng quá trình còn hiệu lực (sự kiện bù có lý do 10–500 ký tự; hồ sơ không xóa — BR-01) */
+        post: operations["hrmStaffEventVoid"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/access-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        /** Nhật ký xem chi tiết, xem thẻ TK, xuất có hồ sơ này (mới trước) — quyền audit.view */
+        get: operations["hrmStaffAccessLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ma trận phân quyền hồ sơ (FN-20) — mọi nhóm vai (mặc định + đã chỉnh) và các dòng theo người dùng; chỉ Admin */
+        get: operations["hrmPermissions"];
+        put?: never;
+        /** Ghi phiên bản mới của một dòng ma trận (nhóm vai hoặc người dùng); quyền Admin cố định (hrm.permission_locked); thẻ TK chỉ cấp cho nhóm HCTH hoặc từng người */
+        post: operations["hrmPermissionSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/permissions/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký đổi quyền hồ sơ — mọi phiên bản của mọi dòng ma trận, cũ trước; chỉ Admin */
+        get: operations["hrmPermissionHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách 6 biểu báo cáo Sở kèm lần xuất gần nhất (FN-12 B1) */
+        get: operations["hrmReportList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/reports/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        /** Xem trước biểu tại ngày chốt + kết quả quy tắc kiểm tra (R1–R3, R6, TK) và người liên quan (FN-12 B3) — ghi sổ preview */
+        get: operations["hrmReportPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/reports/{code}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xuất Excel theo mẫu Sở (FN-12 B4) — chạy quy tắc kiểm tra; lỗi mức chặn → 422 hrm.report_blocked. Trả tóm tắt KHÔNG PII; tệp tải ở /v1/hrm/report-exports/{id}/file */
+        post: operations["hrmReportExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/reports/{code}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        /** Lịch sử xuất và tải lại của biểu (không PII), mới trước */
+        get: operations["hrmReportHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/reports/{code}/cells": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        /** Người được đếm ở một ô số của biểu thống kê NS05/NS06 (FN-12 luồng phụ) — lọc theo phạm vi profile.view; ghi sổ drill */
+        get: operations["hrmReportCell"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/report-exports/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải lại tệp Excel của một lần xuất — dựng lại tại (ngày chốt, thời điểm biết), so SHA-256; X-Export-Drift true khi định danh ở kho đã đổi. Ghi sổ download + nhật ký hồ sơ; qua điểm kiểm soát xuất */
+        get: operations["hrmReportFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard nhân sự tại ngày chốt (FN-06) — HCTH/Admin toàn Trung tâm, lãnh đạo phòng theo phạm vi profile.view; tổng = số dòng NS01 cùng ngày */
+        get: operations["hrmDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/dashboard/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách người của một chỉ số dashboard (FN-06 B3) — metric total | staff | joined | left | retire_soon | over_retire | type:<loại> | unit:<mã> | gender:<nam|nu|unknown> | age:<nhóm> | edu:<trình độ> | grade:<nhóm> */
+        get: operations["hrmDashboardMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cây thư mục người gọi thấy (kèm quyền ở từng thư mục) và cấu hình kho (loại tài liệu, đuôi tệp, dung lượng) */
+        get: operations["hrmDocFolders"];
+        put?: never;
+        /** Tạo thư mục (FN-14 B2) — thư mục gốc chỉ Admin; thư mục con cần docs.manage toàn Trung tâm ở thư mục cha */
+        post: operations["hrmDocFolderCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cài cấu trúc thư mục gốc mặc định còn thiếu (Quyết định nâng bậc, điều động, bổ nhiệm, khen thưởng, kỷ luật, Hồ sơ đánh giá, Tài liệu khác) — Admin */
+        post: operations["hrmDocFolderDefaults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        /** Nhật ký thư mục (tạo, đổi tên, đổi quyền, ẩn/hiện) — docs.manage toàn Trung tâm */
+        get: operations["hrmDocFolderHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders/{id}/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đổi tên thư mục (FN-14 B2) */
+        post: operations["hrmDocFolderRename"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders/{id}/acl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi quyền riêng của thư mục (FN-14 gán quyền theo thư mục) — thay toàn bộ; ghi đè ma trận FN-20 cho docs.view/docs.manage ở thư mục và thư mục con */
+        post: operations["hrmDocFolderACL"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders/{id}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ẩn thư mục — chỉ khi không còn thư mục con hoặc tài liệu đang hiện; lý do bắt buộc */
+        post: operations["hrmDocFolderHide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/folders/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hiện lại thư mục đã ẩn; lý do bắt buộc */
+        post: operations["hrmDocFolderRestore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tra cứu tài liệu người gọi thấy (FN-14 B4) — theo thư mục (đệ quy), tên/số quyết định/tên tệp, loại, năm, phòng ban, nhân viên (AC-01) */
+        get: operations["hrmDocList"];
+        put?: never;
+        /** Tải lên một tệp với phân loại (FN-14 B3) — pdf, jpg, png, docx, xlsx, doc, xls; tối đa 15 MB; mã hóa và lưu qua pf/evidence */
+        post: operations["hrmDocUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        /** Chi tiết tài liệu (FN-14 Hình 28) — phân loại, lịch sử (tải lên, sửa, ẩn), nhật ký xem trước/tải xuống (người quản lý) */
+        get: operations["hrmDocGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/{id}/classify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa phân loại tài liệu (thư mục, tệp không đổi); sổ ghi tên trường đã đổi */
+        post: operations["hrmDocClassify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/{id}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xóa tài liệu = ẩn (FN-14 luồng ngoại lệ) — lý do bắt buộc, lưu vết; tệp giữ nguyên ở pf/evidence */
+        post: operations["hrmDocHide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hiện lại tài liệu đã ẩn; lý do bắt buộc */
+        post: operations["hrmDocRestore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/docs/{id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        /** Xem trước (inline) hoặc tải xuống (download=1) — ghi nhật ký trước khi mở (AC-03); giải mã qua pf/evidence mục đích hr_records */
+        get: operations["hrmDocContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bộ trường, quyền chi tiết/cập nhật của người gọi và trạng thái nguồn cán bộ thuộc tỉnh (enabled | disabled | none) */
+        get: operations["contactAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/persons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thẻ Cán bộ theo vai (FN-13 B1–B3) — tìm theo họ tên (không dấu) hoặc SĐT; bộ full tìm thêm đơn vị, chức danh, email và lọc cấp/đơn vị/chức danh (bộ basic bỏ qua các bộ lọc này) */
+        get: operations["contactPersons"];
+        put?: never;
+        /** Thêm liên hệ ngoài tỉnh (FN-13 B4) — họ tên, SĐT vào kho định danh, email/năm sinh vào ngăn contact.card (mục đích contact.directory); Cấp Tỉnh – HCTH, Admin */
+        post: operations["contactPersonCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/persons/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết liên hệ (chỉ bộ full — Cấp TW, Cấp Xã nhận contact.detail_forbidden); liên hệ ngoài tỉnh kèm lịch sử (tên trường đã đổi) */
+        get: operations["contactPersonGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/persons/{id}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa / ngừng hiển thị (hidden=true) / hiện lại liên hệ ngoài tỉnh — trường vắng giữ nguyên; cán bộ thuộc tỉnh sửa tại hồ sơ FN-07 (contact.staff_read_only) */
+        post: operations["contactPersonRevise"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thẻ Đơn vị (FN-13 B3) — bộ basic tên, cấp, SĐT; bộ full thêm email, địa chỉ */
+        get: operations["contactUnits"];
+        put?: never;
+        /** Thêm thẻ Đơn vị (liên hệ công vụ của tổ chức) — Cấp Tỉnh – HCTH, Admin */
+        post: operations["contactUnitCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/units/{id}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa / ngừng hiển thị thẻ Đơn vị */
+        post: operations["contactUnitRevise"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái khung cap/price của tenant người gọi — cấu hình bên dùng, cấp của người gọi, số mục danh mục đang hiệu lực */
+        get: operations["priceStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh mục nền đang hiệu lực tại một ngày (đơn vị tính, nhóm hàng) — phiên bản mới nhất có valid_from ≤ ngày, bỏ mã đã ngưng */
+        get: operations["priceCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/catalog/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi danh mục mặc định (5 nhóm hàng BRD, đơn vị tính thường gặp, 2 nhóm vùng An Giang / Kiên Giang) hiệu lực từ hôm nay — chỉ mã chưa có; vai quản trị danh mục */
+        post: operations["priceInstallDefaults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch báo giá đang hiệu lực, phiên bản đã lên lịch, lịch khóa nhập các ngày tới (mặc định 30), ngoại lệ, lịch sử thay đổi */
+        get: operations["priceCalendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/calendar/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ghi phiên bản lịch mới (ngày báo giá trong tuần, giờ khóa, hạn phản hồi, giờ nhắc, kênh, nội dung mẫu) có hiệu lực từ valid_from
+         * @description valid_from không trong quá khứ; hôm nay là ngày báo giá → sớm nhất ngày mai (422 price.valid_from). Nhắc 1 < nhắc 2 < giờ khóa
+         *     (422 price.remind_order) < hạn phản hồi (422 price.respond_before_lock). Biến mẫu chỉ {ngày}, {xã}, {giờ khóa} (422 price.template_var).
+         */
+        post: operations["priceSaveSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/calendar/exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thêm ngày nghỉ (holiday — ngày báo giá theo lịch) hoặc ngày báo giá bổ sung (extra — ngày ngoài lịch) kèm lý do; chỉ ngày từ ngày mai */
+        post: operations["priceAddException"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/calendar/exceptions/{day}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xóa ngoại lệ của một ngày (ghi phiên bản retired); chỉ ngày từ ngày mai */
+        post: operations["priceRetireException"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/calendar/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký job price_calendar — mốc khóa thực tế (độ trễ so với giờ khóa) và lịch sử gửi nhắc lần 1/2 */
+        get: operations["priceCalendarRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/calendar/reminder-test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gửi thử nhắc nhập giá (mẫu của lịch hiện hành) tới tài khoản đang đăng nhập — FN-AD-04.05 AC-02 */
+        post: operations["priceReminderTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ngưỡng cảnh báo giá cao / thấp bất thường đang hiệu lực (mặc định + tham số chung, nhóm hàng, mặt hàng) và lịch sử thay đổi */
+        get: operations["priceThresholds"];
+        put?: never;
+        /** Ghi ngưỡng (phiên bản mới) — default kèm lookback_days, flat_pct, survey_pct; group/item chỉ pct. 0 < % ≤ 100 */
+        post: operations["priceSaveThreshold"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/thresholds/{scope}/{code}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xóa ngưỡng nhóm hàng / mặt hàng (phiên bản retired); ngưỡng mặc định không xóa được */
+        post: operations["priceRetireThreshold"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh mục mặt hàng nhìn từ một ngày — mọi trạng thái (Hoạt động / Chờ hiệu lực / Ngưng), sắp theo nhóm, thứ tự, mã */
+        get: operations["priceListItems"];
+        put?: never;
+        /** Thêm mặt hàng — mã tự sinh MH#####; Cơ bản áp dụng mọi xã, Địa phương gán cho points; "thay thế cho" ngưng mặt hàng cũ từ ngày hiệu lực */
+        post: operations["priceCreateItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/items/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một mặt hàng tại ngày — trạng thái, lịch sử phiên bản (lịch sử thay đổi, tên cũ), mặt hàng thay thế nó */
+        get: operations["priceGetItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/items/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa mặt hàng — phiên bản mới từ valid_from; đã có giá thì chỉ sửa tên, nơi bán (BR-04) và chỉ Quản trị nghiệp vụ */
+        post: operations["priceReviseItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/items/{code}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngưng mặt hàng — hiệu lực đến valid_to (vắng → hết ngày trước ngày báo giá kế tiếp), có lý do; không xóa */
+        post: operations["priceRetireItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/items/{code}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đổi thứ tự hiển thị trong nhóm (lên / xuống) từ ngày báo giá kế tiếp */
+        post: operations["priceMoveItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhóm hàng đang hiệu lực tại ngày, kèm số mặt hàng đang hiệu lực */
+        get: operations["priceListGroups"];
+        put?: never;
+        /** Thêm nhóm hàng (hiệu lực từ hôm nay; mã vắng → nhom_<n>) */
+        post: operations["priceCreateGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/groups/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa tên / thứ tự nhóm hàng (hiệu lực từ hôm nay) */
+        post: operations["priceReviseGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/groups/{code}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xóa nhóm hàng (phiên bản ngưng) — chặn khi nhóm còn mặt hàng đang hoặc sắp hiệu lực */
+        post: operations["priceRetireGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gán mặt hàng Địa phương cho xã đang hiệu lực tại ngày (lọc theo xã) */
+        get: operations["priceListAssignments"];
+        put?: never;
+        /** Gán mặt hàng Địa phương cho xã từ valid_from (gán đã có bỏ qua); mặt hàng Cơ bản không gán riêng */
+        post: operations["priceAssignItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/assignments/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bỏ gán mặt hàng khỏi xã từ valid_from; hôm nay xã đã có phiếu → áp dụng từ ngày báo giá kế tiếp */
+        post: operations["priceUnassignItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/point-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mặt hàng xã báo giá phải báo giá tại ngày — Cơ bản ∪ Địa phương đã gán, lọc bộ theo vụ, đúng thứ tự (AC-04) */
+        get: operations["pricePointItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/item-sets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bộ mặt hàng theo vụ nhìn từ một ngày (có hiệu lực hoặc sắp hiệu lực) */
+        get: operations["priceListItemSets"];
+        put?: never;
+        /** Tạo bộ mặt hàng theo vụ — mặt hàng thuộc bộ chỉ xuất hiện ở xã khi có bộ chứa nó đang bật (BR-08) */
+        post: operations["priceCreateItemSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/item-sets/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa bộ (tên, vụ, danh sách, bật/tắt, retire = ngưng bộ) — phiên bản mới từ valid_from */
+        post: operations["priceReviseItemSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đề xuất mặt hàng từ xã (mới nhất trước); Cấp Xã chỉ thấy đề xuất của mình */
+        get: operations["priceListProposals"];
+        put?: never;
+        /** Đề xuất mặt hàng mới (Cấp Xã, Cấp Tỉnh) — chỉ xuất hiện ở màn Nhập báo giá khi được duyệt và gán cho xã */
+        post: operations["priceCreateProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/proposals/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt đề xuất — tạo mặt hàng (nội dung gửi kèm, mặc định Địa phương) và gán cho xã đề xuất từ ngày hiệu lực (AC-05) */
+        post: operations["priceApproveProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/proposals/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Từ chối đề xuất kèm lý do */
+        post: operations["priceRejectProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhóm vùng tại ngày (mọi trạng thái), kèm số xã báo giá đang hoạt động */
+        get: operations["priceListRegions"];
+        put?: never;
+        /** Thêm nhóm vùng (hiệu lực từ hôm nay; mã vắng → vung_<n>) — vai quản trị */
+        post: operations["priceCreateRegion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/regions/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa tên / thứ tự nhóm vùng (hiệu lực từ hôm nay) */
+        post: operations["priceReviseRegion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/regions/{code}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngưng nhóm vùng từ hôm nay — chặn khi còn xã báo giá đang hoặc sắp hoạt động thuộc nhóm */
+        post: operations["priceRetireRegion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh mục xã báo giá tại ngày (B1) — mã, tên, mã ĐVHC, nhóm vùng, cán bộ Xã phụ trách, cán bộ Tỉnh, số mặt hàng, trạng thái */
+        get: operations["priceListPoints"];
+        put?: never;
+        /** Thêm xã báo giá (B2) — ĐVHC cấp xã có hiệu lực (tên theo ĐVHC), nhóm vùng, ngày bắt đầu báo giá; mã XBG#### hệ thống sinh */
+        post: operations["priceCreatePoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/points/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một xã báo giá tại ngày kèm lịch sử thay đổi và lịch sử phân công (AC-02) */
+        get: operations["priceGetPoint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/points/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa xã báo giá từ ngày hiệu lực — đổi nhóm vùng, chuyển sang mã ĐVHC mới khi sắp xếp ĐVHC (giữ mã xã, lịch sử) */
+        post: operations["priceRevisePoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/points/{code}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngưng xã báo giá từ ngày hiệu lực, lý do bắt buộc (B3); hôm nay xã đã gửi phiếu → áp dụng từ ngày báo giá kế tiếp */
+        post: operations["priceRetirePoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/points/{code}/officers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phân công người phụ trách xã từ ngày hiệu lực — role xa (cán bộ Xã phụ trách chính, thay người cũ) | tinh (cán bộ Cấp Tỉnh); officer_ref null = bỏ phân công */
+        post: operations["priceAssignPointOfficer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/admin-units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ĐVHC cấp xã có hiệu lực tại ngày (danh mục ĐVHC dùng chung, ADR-0032) để chọn khi thêm/sửa xã báo giá, kèm xã báo giá đang gắn */
+        get: operations["priceListAdminUnits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/officers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh bạ cán bộ để phân công (cán bộ Cấp Xã / Cấp Tỉnh của phòng ban báo giá) — vai quản trị, Cấp Tỉnh */
+        get: operations["priceListOfficers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiếu của các xã báo giá trong một ngày (Chi tiết báo giá FN-TI-02.02; Cấp Xã chỉ xã mình) — trạng thái nhìn theo giờ khóa */
+        get: operations["priceListDayTickets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiếu báo giá của một xã một ngày (màn Nhập báo giá FN-XA-03.01; Sửa phiếu / Nhập thay FN-TI-02.04, 02.09) — mặt hàng của xã, giá tham chiếu (CT-02), ngưỡng, cảnh báo */
+        get: operations["priceGetSheet"];
+        put?: never;
+        /** Cán bộ Xã lưu nháp (submit = false) hoặc gửi / gửi lại (submit = true) phiếu ngày báo giá hôm nay, trước giờ khóa — gửi sinh / cập nhật / tự hủy cảnh báo Tạm tính */
+        post: operations["priceSaveSheet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/proxy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh nhập thay phiếu của xã Không nộp (FN-TI-02.09) — sau giờ khóa, lý do bắt buộc; submit = true → Nộp muộn */
+        post: operations["priceSaveProxy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử báo giá của một xã (FN-XA-03.03) — mỗi ngày báo giá một dòng (Không nộp khi không có phiếu) và phiếu Đã xóa; khoảng ≤ 12 tháng */
+        get: operations["priceTicketHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel chi tiết báo giá của một ngày theo bộ lọc (FN-TI-02.02 luồng phụ) — Cấp Tỉnh, Admin */
+        get: operations["priceExportTickets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** In một hoặc nhiều phiếu (gộp một tệp) theo bố cục File 2 dạng bảng (FN-XA-03.02) — PDF hoặc Excel; giá in là giá Xã gửi kèm chú thích hiệu chỉnh / loại */
+        get: operations["pricePrintTickets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một phiếu theo mã (kể cả phiếu Đã xóa) — chi tiết phiếu, lịch sử hiệu chỉnh, trao đổi xác minh */
+        get: operations["priceGetTicket"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/{id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký phiếu — mọi phiên bản đầu phiếu, dòng giá, cảnh báo (người, thời điểm, giá trị, lý do) */
+        get: operations["priceTicketLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/{id}/correct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh hiệu chỉnh giá thấp nhất / cao nhất của các dòng (FN-TI-02.04) — lý do bắt buộc; giữ giá Xã gửi; cảnh báo của dòng → Đã hiệu chỉnh */
+        post: operations["priceCorrectTicket"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/{id}/redate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh sửa ngày phiếu nhập nhầm ngày (FN-TI-02.04 B3) — chặn ngày xã đã có phiếu, ngày đã duyệt, ngày không phải ngày báo giá / chưa qua giờ khóa */
+        post: operations["priceRedateTicket"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/{id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh xóa mềm phiếu sai / trùng (FN-TI-02.04) — lý do bắt buộc; phiếu Đã xóa không tính vào bảng giá, thống kê */
+        post: operations["priceDeleteTicket"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cảnh báo biến động (FN-TI-02.03 B2) / Yêu cầu xác minh của Xã (FN-XA-03.05) trong khoảng ngày — trạng thái nhìn (pending, overdue) theo giờ khóa / hạn phản hồi */
+        get: operations["priceListAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/alerts/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh gửi yêu cầu xác minh cho một hoặc nhiều cảnh báo (trước hoặc sau giờ khóa) — nội dung bắt buộc; hạn phản hồi theo lịch */
+        post: operations["priceRequestVerification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/alerts/respond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cán bộ Xã phản hồi yêu cầu xác minh của xã mình (FN-XA-03.05) — giữ giá / đề xuất giá đúng, giải trình bắt buộc; trước hạn phản hồi; không đổi giá trên phiếu */
+        post: operations["priceRespondVerification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/alerts/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh chốt cảnh báo sau giờ khóa (FN-TI-02.03 B6) — keep (Giữ nguyên, ghi chú) | exclude (Loại khỏi bảng giá, lý do) | reopen (khi bảng giá đang mở duyệt); hiệu chỉnh dùng /tickets/{id}/correct */
+        post: operations["priceDecideAlert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái bảng giá các ngày báo giá trong khoảng (tối đa 62 ngày; vắng → 14 ngày tới hôm nay) — mọi vai của bên dùng */
+        get: operations["priceListBoards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bảng giá một ngày ở màn Kiểm duyệt & công bố — trạng thái, tóm tắt kỳ, xem trước (CT-04), phiên bản đã duyệt, nhật ký; Cấp TW / Xã chỉ nhận trạng thái + phiên bản đã duyệt */
+        get: operations["priceGetBoard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards/{day}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt bảng giá — chuyển Đang duyệt, giữ khóa một người (10 phút) tới khi xác nhận / hủy; cần đã qua giờ khóa, hết cảnh báo chưa xử lý, có dòng giá */
+        post: operations["priceLockBoard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards/{day}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy Đang duyệt của mình — về trạng thái trước khóa */
+        post: operations["priceUnlockBoard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards/{day}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xác nhận duyệt — phiên bản mới; ảnh chụp dòng bảng giá (CT-04) + phiếu; khóa tuần lưu lúc duyệt; phát pf.price.board.published */
+        post: operations["priceApproveBoard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards/{day}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở duyệt (FN-TI-02.06) — lý do bắt buộc; ngày trong giới hạn (mặc định 30 ngày); phiên bản đã duyệt vẫn công bố kèm cờ Đang cập nhật */
+        post: operations["priceReopenBoard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/boards/{day}/cancel-reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy mở duyệt khi chưa sửa gì — về Đã duyệt phiên bản cũ */
+        post: operations["priceCancelReopenBoard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TI-02.01 Tiến độ nhập giá — xã đang hoạt động trong ngày báo giá, trạng thái phiếu tại lúc đọc, số mặt hàng ▲/▼, lần hệ thống đã nhắc; thẻ đếm trên bảng đã lọc. Ngày không phải ngày báo giá → ngày báo giá gần nhất trước đó (no_quote). Cấp Tỉnh, Admin */
+        get: operations["priceReportProgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/progress/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel Tiến độ nhập giá theo bộ lọc (luồng phụ FN-TI-02.01) */
+        get: operations["priceReportProgressExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TW-01.01 Bảng giá tổng hợp — phiên bản đã duyệt mới nhất của ngày (vắng → ngày công bố gần nhất), CT-04 theo nhóm vùng, tăng/giảm so bảng giá công bố liền trước; ngày đang mở duyệt → phiên bản cũ (updating). Mọi vai, chỉ xem */
+        get: operations["priceReportSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/summary/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel Bảng giá tổng hợp theo bộ lọc (B3 FN-TW-01.01) */
+        get: operations["priceReportSummaryExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/movement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TW-01.02 Báo cáo tăng giảm, biến động giá — kỳ ngày / tuần / tháng chứa ngày chọn so kỳ liền trước (giá kỳ = trung bình Giá trung bình các ngày công bố), thẻ tăng/giảm/đi ngang/số lần vượt ngưỡng, xu hướng 8 kỳ, chi tiết theo xã. Mọi vai, chỉ xem */
+        get: operations["priceReportMovement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/movement/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Báo cáo biến động đúng bộ lọc — Excel hoặc PDF; chỉ Cấp Tỉnh, Admin (BR-04, AC-03 FN-TW-01.02) */
+        get: operations["priceReportMovementExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TW-01.03 Dashboard tổng hợp giá theo vùng — ngày công bố gần nhất, thẻ chỉ số, giá trung bình mặt hàng Cơ bản theo nhóm vùng (all=true: mọi mặt hàng), biến động theo nhóm hàng, xu hướng 30 ngày công bố, bấm vùng → giá từng xã. Cấp TW, Cấp Tỉnh, Admin */
+        get: operations["priceReportDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/dashboard/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel số liệu Dashboard theo vùng (luồng phụ FN-TW-01.03) */
+        get: operations["priceReportDashboardExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TI-02.08 Thống kê phiếu báo giá theo cán bộ Xã — tháng (month) hoặc khoảng ngày; phải nộp = ngày báo giá đã qua giờ khóa mà xã hoạt động và có cán bộ Xã; nhập thay ở cột Nộp muộn của cán bộ phụ trách; tháng đã khóa (Q-085) đọc ảnh chụp. Cấp Tỉnh, Admin */
+        get: operations["priceReportStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/stats/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel Thống kê phiếu báo giá (B3 FN-TI-02.08) */
+        get: operations["priceReportStatsExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/stats/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách ngày phải nộp của một cán bộ Xã theo ngày và trạng thái (luồng phụ FN-TI-02.08; số liệu hiện tại) */
+        get: operations["priceReportStatsDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/stats/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khóa thống kê phiếu của một tháng đã kết thúc (Q-085) — chụp số liệu theo cán bộ Xã; chỉ Quản trị nghiệp vụ báo giá (D11) */
+        post: operations["priceReportStatsClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/reports/stats/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở lại thống kê tháng đã khóa (lý do bắt buộc) — tính lại từ phiếu tới lần khóa sau; chỉ Quản trị nghiệp vụ báo giá (D11) */
+        post: operations["priceReportStatsReopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/catalogs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-AD-04.01: Danh mục KHTC — mục hiện hành của một loại + số lượng mọi loại (Admin, Cấp Tỉnh) */
+        get: operations["knKhtcListCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/catalogs/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** FN-AD-04.01: thêm mục danh mục (Admin). Trùng mã → 409 */
+        post: operations["knKhtcCreateCatalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/catalogs/{kind}/{code}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** FN-AD-04.01: sửa / ngừng dùng (active=false) / dùng lại — phiên bản mới (Admin) */
+        post: operations["knKhtcReviseCatalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/catalogs/{kind}/{code}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-AD-04.01: mọi phiên bản của một mục, mới nhất trước */
+        get: operations["knKhtcCatalogHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/programs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** D20: danh sách CT/DA chủ của KHTC (bản hiện hành) */
+        get: operations["knKhtcListPrograms"];
+        put?: never;
+        /** FN-TI-02.02 B7: thêm CT/DA (Admin, Cấp Tỉnh phòng KHTC) */
+        post: operations["knKhtcCreateProgram"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/programs/{ref}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa / ngừng (active=false) CT/DA — phiên bản mới */
+        post: operations["knKhtcReviseProgram"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/programs/{ref}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mọi phiên bản của CT/DA, mới nhất trước */
+        get: operations["knKhtcProgramHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TI-02.02: một phiên bản Kế hoạch năm (6 tab) — ?version=n, ?at=ngày (BR-DL-13), mặc định mới nhất */
+        get: operations["knKhtcGetPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử phiên bản kế hoạch năm (cũ trước) */
+        get: operations["knKhtcPlanVersions"];
+        put?: never;
+        /** Lưu kế hoạch năm: phiên bản 1 (lập) hoặc Điều chỉnh theo QĐ (≥ 2, bắt buộc số, ngày QĐ, ngày hiệu lực) — cả cây */
+        post: operations["knKhtcSavePlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}/copy-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sao chép từ năm trước: bản nháp (không ghi) từ phiên bản mới nhất năm N−1, chỉ nội dung còn theo dõi */
+        get: operations["knKhtcCopyDraft"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel một phiên bản kế hoạch năm (cả 6 tab; bố cục nhập lại được) */
+        get: operations["knKhtcExportPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}/import-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nhập Excel/CSV (bố cục của tệp xuất) thành bản nháp — không ghi; lỗi theo dòng */
+        post: operations["knKhtcImportDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bản soạn Mẫu 1–5, ô số chỉ đọc và mốc dữ liệu */
+        get: operations["extensionKhtcReportGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lưu ô hành chính và lời văn; không nhận số liệu hệ thống */
+        post: operations["extensionKhtcReportSave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cán bộ phụ trách cập nhật số liệu, giữ ô hành chính sửa tay */
+        post: operations["extensionKhtcReportRefresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử các phiên bản Excel bất biến */
+        get: operations["extensionKhtcReportExports"];
+        put?: never;
+        /** Xuất Excel từ bản soạn đã lưu; xác nhận cảnh báo Tạm tính */
+        post: operations["extensionKhtcReportExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/exports/{exportID}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải nguyên tệp của phiên bản đã xuất */
+        get: operations["extensionKhtcReportDownload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/exports/{exportID}/final": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đánh dấu Bản cuối khi không Tạm tính và nguồn chưa đổi */
+        post: operations["extensionKhtcReportFinalize"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5548,6 +9132,11 @@ export interface components {
             updated_at: string;
             /** @description KN v7.7 FN-AD-04.05: số mẫu báo cáo đang dùng mục (vắng khi chưa nối P3) */
             forms_in_use?: number;
+            /**
+             * Format: date
+             * @description W11.41 (danh mục cnts_*): ngày bắt đầu hiệu lực của giá trị trả về (đọc theo at hoặc vừa ghi)
+             */
+            valid_from?: string;
         };
         DisplayValue: {
             /** @example gis.stage_color:chin_ro */
@@ -5709,10 +9298,10 @@ export interface components {
             status: "active" | "not_open" | "suspended";
             status_label: string;
             /**
-             * @description Bộ menu dựng sẵn trong mã (kn.menu/v2)
+             * @description Bộ menu dựng sẵn trong mã (kn.menu/v3); generic + mã có khuôn riêng → khuôn riêng
              * @enum {string}
              */
-            menu_profile: "trong_trot" | "generic";
+            menu_profile: "trong_trot" | "generic" | "chan_nuoi_thuy_san" | "ke_hoach_tai_chinh" | "thong_tin_truyen_thong" | "hanh_chinh_tong_hop";
             /** @description Đã xóa (sự kiện retired) — mã không tái sử dụng */
             retired: boolean;
             /** @description Chọn được ở bước 2 đăng nhập (Đang áp dụng, chưa xóa) */
@@ -5784,18 +9373,18 @@ export interface components {
             icon: string;
             /** @description Khóa số đếm việc cần xử lý (ẩn khi 0) — client lấy số từ module sở hữu */
             badge_source: string | null;
-            /** @description false: hiện mờ (phòng ban chưa mở trong menu Admin) */
+            /** @description false: hiện mờ, không bấm được (phòng ban chưa mở trong menu Admin; mục "Sắp có") */
             enabled: boolean;
             /**
-             * @description Chỉ mục phòng ban của menu Admin
+             * @description Mục phòng ban của menu Admin (active/not_open/suspended); coming_soon: mục của module chưa có — nhãn "Sắp có" (kn.menu/v3)
              * @enum {string}
              */
-            status?: "active" | "not_open" | "suspended";
+            status?: "active" | "not_open" | "suspended" | "coming_soon";
             status_label?: string;
             children: components["schemas"]["KNMenuItem"][];
         };
         KNMenuGroup: {
-            /** @description dieu_hanh | bao_cao | du_lieu; Admin: dieu_hanh | phong_ban | quan_tri */
+            /** @description dieu_hanh | nghiep_vu | bao_cao | du_lieu | dung_chung; Admin: dieu_hanh | phong_ban | quan_tri | dung_chung */
             key: string;
             label: string;
             items: components["schemas"]["KNMenuItem"][];
@@ -5816,7 +9405,7 @@ export interface components {
             updated_at: string | null;
         };
         KNMenu: {
-            /** @description Phiên bản bảng menu tĩnh (kn.menu/v2) */
+            /** @description Phiên bản bảng menu tĩnh (kn.menu/v3) */
             menu_version: string;
             /** @enum {string} */
             audience: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
@@ -5841,6 +9430,8 @@ export interface components {
             description: string | null;
             /** @enum {string} */
             status: "active" | "not_open" | "suspended";
+            /** @description W11.07: phòng ban ngoài lần gán, chọn được ở chế độ chỉ xem (Lãnh đạo đơn vị, Ban Giám đốc) */
+            read_only?: boolean;
         };
         KNAssignment: {
             /** Format: uuid */
@@ -5876,6 +9467,7 @@ export interface components {
             updated_by: string;
             /** Format: date-time */
             updated_at: string;
+            attributes?: components["schemas"]["KNAssignmentAttrs"];
         };
         KNSessionContext: {
             /**
@@ -5908,6 +9500,84 @@ export interface components {
             support_session_id: string | null;
             /** Format: uuid */
             on_behalf_of: string | null;
+            /** @description W11.07: ngữ cảnh chỉ xem (Cấp TW, Lãnh đạo đơn vị ở phòng ban khác, Ban Giám đốc) — mọi thao tác ghi 403 accounts.context_read_only */
+            read_only?: boolean;
+            mgmt_level_code?: string | null;
+            /** @description Lãnh đạo (≥ phó phòng/phụ trách/lãnh đạo đơn vị, hoặc nhóm Lãnh đạo phòng) */
+            manager?: boolean;
+            province_group?: string | null;
+            duties?: string[];
+            internal_unit_code?: string | null;
+            /** @description Quyền nhận qua ủy quyền có hạn còn hiệu lực (đầy đủ ở GET /v1/me/context) */
+            powers?: string[];
+        };
+        /** @description Thuộc tính phân quyền trong vai (sổ phụ pf_accounts.assignment_attr_event, W11.07) */
+        KNAssignmentAttrs: {
+            /**
+             * @description Nhóm Cấp Tỉnh (chỉ kn_tinh; tạm Q-059)
+             * @enum {string|null}
+             */
+            province_group: "vien_chuc" | "tong_hop" | "chu_nhiem" | "lanh_dao_phong" | "ban_giam_doc" | null;
+            province_group_label: string | null;
+            /** @description Cờ nhiệm vụ (chỉ kn_tinh) */
+            duties: ("qtnv_bao_gia" | "phu_trach_bieu")[];
+            /** @description Đơn vị nội bộ; Cấp Xã: đơn vị quản lý (HS-37) */
+            internal_unit_code: string | null;
+            /** @description Cấp Xã: giới hạn cơ sở (rỗng = cả xã) */
+            facility_refs: string[];
+            /** @description Cấp Xã: giới hạn hộ (rỗng = cả xã) */
+            household_refs: string[];
+        };
+        KNDelegation: {
+            /** Format: uuid */
+            delegation_id: string;
+            /** Format: uuid */
+            grantor_ref: string;
+            /** Format: uuid */
+            grantee_ref: string;
+            department_code: string;
+            /** @enum {string} */
+            power: "mo_lai_ky" | "duyet_bao_cao";
+            power_label: string;
+            /** Format: date-time */
+            valid_from: string;
+            /** Format: date-time */
+            valid_to: string;
+            revoked: boolean;
+            /** @enum {string} */
+            status: "active" | "scheduled" | "expired" | "revoked";
+            reason: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        KNDelegationList: {
+            items: components["schemas"]["KNDelegation"][];
+        };
+        InternalUnit: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            org_ref: string;
+            code: string;
+            /** @enum {string} */
+            kind: "ban_giam_doc" | "van_phong" | "phong" | "tram" | "trai" | "tang_cuong";
+            kind_label: string;
+            name: string;
+            /** @description kind = phong: mã phòng ban P2 */
+            department_code: string | null;
+            sort_order: number;
+            active: boolean;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        InternalUnitList: {
+            /** Format: uuid */
+            org_ref: string;
+            items: components["schemas"]["InternalUnit"][];
+            kinds: {
+                code: string;
+                label: string;
+            }[];
         };
         Me: {
             /**
@@ -5949,9 +9619,17 @@ export interface components {
             lat: components["schemas"]["Decimal"];
             lon: components["schemas"]["Decimal"];
         };
+        /**
+         * @description D2 (ADR-0052): unconfirmed = HTX tạm do Khuyến nông/MKG lập, nhãn Chưa xác nhận — dữ liệu vẫn vào mọi danh sách, báo cáo và tổng; confirmed sau khi HTX thật nhận quyền theo mã số thuế
+         * @enum {string}
+         */
+        HTXConfirmationStatus: "confirmed" | "unconfirmed";
         Cooperative: components["schemas"]["Org"] & {
             /** @description Lý do vô hiệu hóa hiện tại */
             status_reason: string | null;
+            confirmation_status: components["schemas"]["HTXConfirmationStatus"];
+            /** @enum {string} */
+            confirmation_label: "Đã xác nhận" | "Chưa xác nhận";
             tax_code: string | null;
             /** @description Diện tích đăng ký hành chính (ha) */
             area_ha: components["schemas"]["Decimal"] | null;
@@ -7506,6 +11184,246 @@ export interface components {
          * @enum {string}
          */
         ExtWorkScheduleStatus: "draft" | "pending" | "approved" | "changes_requested";
+        /** @description Địa điểm công tác trên bản đồ (CNTS CV-06, W11.46) — địa điểm của công việc, không phải vị trí người */
+        ExtWorkSchedulePlace: {
+            lat: number;
+            lon: number;
+            /** @enum {string} */
+            source?: "map" | "gps";
+        };
+        ExtWorkScheduleCheckin: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            item_id: string;
+            /** Format: date */
+            day: string;
+            /** Format: date-time */
+            captured_at: string;
+            /** Format: date-time */
+            recorded_at: string;
+            accuracy_m: number | null;
+            /** @description Khoảng cách tới địa điểm đã đăng ký (null = mục chưa có địa điểm) */
+            distance_m: number | null;
+            /** @description Cách địa điểm quá ngưỡng (mặc định 500 m) — cảnh báo */
+            far: boolean;
+            weak_accuracy: boolean;
+            mock_location: boolean;
+            /** @description Có lưu tọa độ (cờ extension.work_schedule_checkin_store_point) */
+            point_stored: boolean;
+            /** @description Tọa độ — chỉ người đăng ký và người duyệt thấy; null khi không lưu, đã quá hạn lưu hoặc là phản hồi gửi lại từ cache. GET lịch trả vị trí hiện còn sau kiểm quyền. */
+            location: null | {
+                lat: number;
+                lon: number;
+            };
+        };
+        ExtWorkScheduleCheckinResult: {
+            checkin: components["schemas"]["ExtWorkScheduleCheckin"];
+            warnings: components["schemas"]["ExtWorkScheduleWarning"][];
+        };
+        CNTSDutyCell: {
+            /** Format: uuid */
+            facility_ref: string;
+            /** Format: uuid */
+            officer_ref: string;
+            day: number;
+            /**
+             * @description N ngày, D (Đ) đêm, ND (NĐ) cả ngày đêm; ca đêm qua nửa đêm thuộc ngày bắt đầu ca
+             * @enum {string}
+             */
+            shift: "N" | "D" | "ND";
+        };
+        CNTSDutyRosterSave: {
+            /** @description Tỉnh suy từ phạm vi phiên; Admin không có tỉnh phải chọn, không ghi legacy */
+            province_code?: string;
+            /** @description Phiên bản đã thấy (0 = chưa có lịch) — khóa lạc quan */
+            base_version: number;
+            cells: components["schemas"]["CNTSDutyCell"][];
+            /** @enum {string} */
+            source?: "grid" | "copy" | "excel";
+            note?: string;
+        };
+        CNTSDutyFacility: {
+            /** Format: uuid */
+            ref: string;
+            code: string;
+            name: string;
+            commune_code: string;
+            kind: string | null;
+        };
+        CNTSDutyOfficer: {
+            /** Format: uuid */
+            ref: string;
+            display: string | null;
+            commune_codes: string[];
+            /** @description Giới hạn cơ sở (rỗng = cả xã phụ trách) */
+            facility_refs: string[];
+        };
+        CNTSDutyWarning: {
+            /** @enum {string} */
+            code: "facility_uncovered" | "double_shift" | "officer_not_granted";
+            message: string;
+            /** Format: uuid */
+            facility_ref: string | null;
+            /** Format: uuid */
+            officer_ref: string | null;
+            days: number[];
+        };
+        CNTSDutyVersion: {
+            version: number;
+            source: string;
+            cell_count: number;
+            note: string | null;
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_display: string | null;
+        };
+        CNTSDutyRoster: {
+            /** @description Tỉnh của luồng lịch; null với lịch chung cũ */
+            province_code: string | null;
+            /** @description Lịch chung cũ chỉ Admin đọc, không sửa */
+            legacy: boolean;
+            month: string;
+            days_in_month: number;
+            /** @description 0 = chưa lập */
+            version: number;
+            source: string | null;
+            note: string | null;
+            cells: components["schemas"]["CNTSDutyCell"][];
+            facilities: components["schemas"]["CNTSDutyFacility"][];
+            officers: components["schemas"]["CNTSDutyOfficer"][];
+            warnings: components["schemas"]["CNTSDutyWarning"][];
+            /** Format: date-time */
+            updated_at: string | null;
+            /** Format: uuid */
+            updated_by: string | null;
+            versions: components["schemas"]["CNTSDutyVersion"][];
+            can_edit: boolean;
+            /** @description Viên chức có ca thay đổi ở lần lưu này */
+            notified_officer_refs: string[];
+        };
+        CNTSMyDuty: {
+            /** Format: date */
+            date: string;
+            /** @enum {string} */
+            shift: "N" | "D" | "ND";
+            facility: {
+                /** Format: uuid */
+                ref: string;
+                code: string | null;
+                name: string | null;
+                commune_code: string | null;
+            };
+            colleagues: {
+                /** Format: uuid */
+                ref: string;
+                display: string | null;
+            }[];
+        };
+        CNTSMyDuties: {
+            month: string;
+            version: number;
+            items: components["schemas"]["CNTSMyDuty"][];
+        };
+        CNTSVaccinationDose: {
+            vaccine_code: string;
+            vaccine_name: string | null;
+            shot: number;
+            age_days: number;
+            /**
+             * Format: date
+             * @description Ngày nhận + ngày tuổi − tuổi lúc nhận (sửa được từng hộ)
+             */
+            expected_date: string;
+            /** Format: date */
+            actual_date: string | null;
+            note: string | null;
+            /** @description Quá ngày dự kiến chưa tiêm (nhãn đỏ) */
+            overdue: boolean;
+        };
+        CNTSVaccinationBatchCore: {
+            /** Format: uuid */
+            ref: string;
+            version: number;
+            /** @enum {string} */
+            event: "created" | "updated" | "dose_recorded" | "cancelled";
+            commune_code: string;
+            model_type_code: string;
+            model_type_name: string | null;
+            breed_code: string | null;
+            breed_name: string | null;
+            schedule_code: string;
+            schedule_name: string | null;
+            /** Format: date */
+            schedule_valid_from: string;
+            /** Format: uuid */
+            household_ref: string | null;
+            locality: string | null;
+            /** Format: date */
+            received_date: string;
+            age_at_receipt: number;
+            head_count: number | null;
+            doses: components["schemas"]["CNTSVaccinationDose"][];
+            note: string | null;
+            status_reason: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            actor_display?: string | null;
+        };
+        CNTSVaccinationBatch: components["schemas"]["CNTSVaccinationBatchCore"] & {
+            /** @enum {string} */
+            status: "open" | "overdue" | "done" | "cancelled";
+            overdue_count: number;
+            can_plan: boolean;
+            can_record: boolean;
+            next_dose: components["schemas"]["CNTSVaccinationDose"] | null;
+        };
+        CNTSVaccinationBatchDetail: components["schemas"]["CNTSVaccinationBatch"] & {
+            /** @description Mới nhất trước */
+            versions: components["schemas"]["CNTSVaccinationBatchCore"][];
+        };
+        CNTSVaccinationBatchCreate: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 máy khách sinh (tùy chọn)
+             */
+            id?: string | null;
+            commune_code: string;
+            model_type_code: string;
+            breed_code?: string | null;
+            /** @description Rỗng → chọn quy trình theo giống/loại mô hình tại ngày nhận giống */
+            schedule_code?: string | null;
+            /**
+             * Format: uuid
+             * @description Hộ mô hình — hoặc ghi địa bàn (không lưu họ tên tự do)
+             */
+            household_ref?: string | null;
+            locality?: string | null;
+            /** Format: date */
+            received_date: string;
+            age_at_receipt: number;
+            head_count?: number | null;
+            note?: string | null;
+        };
+        CNTSVaccinationDosesUpdate: {
+            base_version: number;
+            /** Format: date-time */
+            captured_at?: string | null;
+            doses: {
+                vaccine_code: string;
+                shot: number;
+                /** Format: date */
+                expected_date?: string | null;
+                /** Format: date */
+                actual_date?: string | null;
+                clear_actual?: boolean;
+                note?: string | null;
+            }[];
+        };
         ExtWorkScheduleItemInput: {
             /**
              * Format: uuid
@@ -7538,6 +11456,8 @@ export interface components {
             /** @description Thành phần phối hợp — không ghi SĐT/CCCD (RB-3) */
             participants?: string | null;
             note?: string | null;
+            /** @description Địa điểm trên bản đồ (CNTS CV-06) — check-in so khoảng cách */
+            place?: components["schemas"]["ExtWorkSchedulePlace"] | null;
         };
         ExtWorkScheduleItem: components["schemas"]["ExtWorkScheduleItemInput"] & {
             /**
@@ -7620,10 +11540,16 @@ export interface components {
         ExtWorkScheduleListItem: components["schemas"]["ExtWorkSchedule"] & {
             /** @description Mục của phiên bản hiện hành (lưới tuần) */
             items: components["schemas"]["ExtWorkScheduleItem"][];
+            /** @description Phòng ban dùng check-in GPS (W11.46) */
+            checkin_enabled?: boolean;
+            checkins?: components["schemas"]["ExtWorkScheduleCheckin"][];
+            checkin_count?: number;
+            /** @description Mục công tác ngoài cơ quan đã qua ngày chưa check-in */
+            missed_checkin_count?: number;
         };
         ExtWorkScheduleWarning: {
             /** @enum {string} */
-            code: "time_overlap" | "late_registration" | "outside_week";
+            code: "time_overlap" | "late_registration" | "outside_week" | "checkin_far" | "checkin_no_place" | "checkin_weak_gps" | "checkin_mock_location" | "checkin_missed";
             message: string;
             item_ids: string[];
         };
@@ -7646,6 +11572,12 @@ export interface components {
             approved_items: components["schemas"]["ExtWorkScheduleItem"][];
             warnings: components["schemas"]["ExtWorkScheduleWarning"][];
             versions: components["schemas"]["ExtWorkScheduleVersion"][];
+            /** @description Phòng ban dùng check-in GPS (W11.46) */
+            checkin_enabled?: boolean;
+            checkins?: components["schemas"]["ExtWorkScheduleCheckin"][];
+            checkin_count?: number;
+            /** @description Mục công tác ngoài cơ quan đã qua ngày chưa check-in */
+            missed_checkin_count?: number;
             can: {
                 edit: boolean;
                 submit: boolean;
@@ -7670,6 +11602,8 @@ export interface components {
             previous_week_start: string;
             /** @description Tuần trước có lịch để sao chép */
             previous_available: boolean;
+            /** @description Phòng ban của người gọi dùng check-in GPS (W11.46) — Mobile hiện nút Check-in */
+            checkin_enabled?: boolean;
         };
         ExtWorkScheduleCounts: {
             /** Format: date */
@@ -7712,6 +11646,17 @@ export interface components {
             province_approval: "peer" | "auto";
             /** @description Đang dùng giá trị mặc định tạm, chờ khách */
             provisional: boolean;
+            department_code?: string;
+            /**
+             * @description Q-057 theo phòng: levels = cấp quản lý (Trồng trọt); follower = người theo dõi được phân công hoặc lãnh đạo phòng (CNTS)
+             * @enum {string}
+             */
+            approver_rule?: "levels" | "follower";
+            checkin_enabled?: boolean;
+            checkin_far_m?: number;
+            /** @description Cờ QĐ-8: lưu tọa độ check-in (bảng có hạn lưu) */
+            checkin_store_point?: boolean;
+            checkin_point_retention_days?: number;
         };
         KNFieldChange: {
             field: string;
@@ -7982,7 +11927,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened" | "integration_dead_lettered" | "area_feed_stale";
+            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened" | "integration_dead_lettered" | "area_feed_stale" | "price_reminder" | "price_alert" | "price_verify_request" | "price_verify_reply" | "price_verify_decision" | "price_lock_summary" | "price_board_approved" | "price_board_reopened" | "price_proxy_entry";
             /** @enum {string} */
             severity: "urgent" | "normal";
             title: string;
@@ -9523,8 +13468,11 @@ export interface components {
                 regions?: string[];
                 communes?: string[];
             };
-            /** @enum {string} */
-            period_type?: "week" | "month" | "season" | "year" | "adhoc";
+            /**
+             * @description Loại kỳ chia đợt (W11.05b); bỏ trống = mặc định của report_type. Chọn được theo report_type — weekly: week | ksgm_week | day; monthly: month | quarter; seasonal: season; annual: year | quarter; adhoc: adhoc | day. day/ksgm_week/quarter chỉ với quy tắc chia kỳ v2 (extension.report_period_rule tại from_date); ranh giới tuần KSGM theo tham số extension.ksgm_week_starts:YYYY-MM
+             * @enum {string}
+             */
+            period_type?: "day" | "week" | "ksgm_week" | "month" | "quarter" | "season" | "year" | "adhoc";
             /** Format: date */
             from_date: string;
             /** Format: date */
@@ -9551,7 +13499,17 @@ export interface components {
         RcPreview: {
             report_type: string;
             period_type: string;
+            /** @description Tag quy tắc chia kỳ ghi vào đợt; v2 mang ';cal=<phòng>:v<n>' (D8) */
             period_rule: string;
+            /** @description Lịch tuần của phòng (D8) = mã phòng ban của đợt */
+            calendar_id: string;
+            /** @description Phiên bản lịch (D8): 1 = v1-tam, 2 = v2 Thứ Tư–Thứ Ba, ≥ 3 = lịch riêng của phòng (3 = CNTS Thứ Ba–Thứ Hai) */
+            calendar_version: number;
+            /**
+             * @description Lịch lấy từ: tham số extension.report_period_rule:<phòng> | lịch nạp sẵn | tham số chung | v1 (chưa có tham số)
+             * @enum {string}
+             */
+            calendar_source: "department_param" | "builtin" | "global_param" | "legacy";
             deadline: {
                 [key: string]: unknown;
             };
@@ -9559,6 +13517,7 @@ export interface components {
             forms: {
                 [key: string]: unknown;
             }[];
+            /** @description Kỳ đã chia: slot, label, range_label, from_date, to_date, due_at, auto_close_at, period_key, iso_week, week_year (W11.05b — null khi không có) */
             periods: {
                 [key: string]: unknown;
             }[];
@@ -9628,7 +13587,12 @@ export interface components {
             slot: number;
             label: string;
             range_label: string;
+            /** @description Số tuần của năm theo period_rule của đợt (v1: ISO 8601; v2: tuần chứa 01/01 là tuần 1); null nếu không phải kỳ tuần */
             iso_week: number | null;
+            /** @description Khóa kỳ theo lịch kỳ hệ thống, LƯU lúc phát hành (W11.05b): 2026-11-05 (ngày), 2026-W45 (tuần), 2026-11-K2 (tuần KSGM), 2026-11, 2026-Q4, 2026; null với vụ/đột xuất và kỳ phát hành trước khi có sổ khóa kỳ */
+            period_key: string | null;
+            /** @description Năm của iso_week (kỳ tuần có khóa đã lưu); null nếu không */
+            week_year: number | null;
             /** Format: date */
             from_date: string;
             /** Format: date */
@@ -10228,6 +14192,9 @@ export interface components {
             masked_phone: string | null;
         };
         KNCooperative: {
+            confirmation_status: components["schemas"]["HTXConfirmationStatus"];
+            /** @enum {string} */
+            confirmation_label: "Đã xác nhận" | "Chưa xác nhận";
             /** Format: uuid */
             ref: string;
             code: string;
@@ -10411,6 +14378,7 @@ export interface components {
             area_deviation_pct: string | null;
             /** @enum {string|null} */
             shape?: "polygon" | "circle" | "square" | null;
+            /** @description Thửa có trước v7.7 (không mang phòng ban) đọc là trong_trot — X-12, W11.02 */
             department_code?: string | null;
             /** @enum {string} */
             status: "draft" | "active" | "retired";
@@ -10480,6 +14448,12 @@ export interface components {
             review_by: string;
             allow_fixtures: boolean;
             require_reviewed_before_close: boolean;
+            /** @description Loại đơn vị lá (phần tử đầu = mặc định) — W11.05 */
+            unit_kinds?: ("commune" | "facility" | "household" | "department")[];
+            /** @description Phòng ban KN được dùng profile (rỗng = mọi phòng ban) */
+            departments?: string[];
+            /** @description Số lần gửi tối đa mặc định (0 = không giới hạn) */
+            max_submissions?: number;
         };
         FormsField: {
             key: string;
@@ -10489,6 +14463,10 @@ export interface components {
             required: boolean;
             options?: string[];
             unit?: string;
+            /** @description W11.42: số không âm (integer/decimal) */
+            non_negative?: boolean;
+            /** @description W11.42: nhóm hiển thị trên màn nhập (không kiểm) */
+            group?: string;
         };
         FormsTemplateInput: {
             profile: string;
@@ -10520,6 +14498,65 @@ export interface components {
             /** Format: date-time */
             due_at: string;
             units: string[];
+            /**
+             * @description Rỗng = loại mặc định của profile (W11.05)
+             * @enum {string}
+             */
+            unit_kind?: "commune" | "facility" | "household" | "department";
+            /** @description Mã xã cha song song với units — bắt buộc với facility/household, cấm với loại khác */
+            unit_parents?: string[];
+            /** @description Vắng = mặc định của profile; 0 = không giới hạn */
+            max_submissions?: number;
+            period?: components["schemas"]["FormsPeriodKey"];
+        };
+        /** @description Khóa kỳ theo lịch kỳ hệ thống (W11.03 — reportcycle/domain Span.Key, thẻ quy tắc chia kỳ) — lưu ở pf_forms.period_spec */
+        FormsPeriodKey: {
+            /** @enum {string} */
+            kind?: "day" | "week" | "ksgm_week" | "month" | "quarter" | "season" | "year" | "adhoc";
+            /** @description Vd 2026-W41, 2026-10-K2, 2026-Q4 */
+            key?: string;
+            /** Format: date */
+            from?: string;
+            /** Format: date */
+            to?: string;
+            rule?: string;
+        };
+        FormsPeriodSpec: {
+            /** @enum {string} */
+            unit_kind: "commune" | "facility" | "household" | "department";
+            unit_parents: string[];
+            /** @description 0 = không giới hạn */
+            max_submissions: number;
+            /**
+             * @description Chỉ một bước rà soát bốn mắt; nhiều bước (HCTH) chưa hỗ trợ
+             * @enum {string}
+             */
+            review_flow: "single";
+            period_kind: string | null;
+            period_key: string | null;
+            /** Format: date */
+            period_from: string | null;
+            /** Format: date */
+            period_to: string | null;
+            period_rule: string | null;
+        };
+        FormsCancelInput: {
+            reason: string;
+        };
+        /** @description Bài đến sau khi kỳ đã chốt với đơn vị (Chờ mở kỳ) — không vào số liệu kỳ */
+        FormsHeld: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            values: {
+                [key: string]: string;
+            };
+            /** Format: uuid */
+            submitter_ref: string;
+            /** Format: date-time */
+            captured_at: string;
+            /** Format: date-time */
+            event_time: string;
         };
         FormsPeriod: {
             /** Format: uuid */
@@ -10546,7 +14583,7 @@ export interface components {
             id: string;
             seq: number;
             /** @enum {string} */
-            action: "published" | "closed" | "reopened";
+            action: "published" | "closed" | "reopened" | "cancelled";
             /** @enum {string} */
             mode: "manual" | "auto";
             units: string[];
@@ -10573,6 +14610,22 @@ export interface components {
             values: {
                 [key: string]: string;
             };
+            /**
+             * Format: date-time
+             * @description Bản offline: lúc ghi trên thiết bị — kỳ đã chốt với đơn vị thì bài được giữ (202, Chờ mở kỳ)
+             */
+            captured_at?: string;
+            /** @description W11.42 khóa lạc quan: số phiên bản cuối người nhập đã thấy (0 = chưa có bài). Khác phiên bản hiện tại → 409 forms.submission_conflict (không ghi đè). Vắng = không kiểm */
+            base_version?: number;
+            /**
+             * @description W11.42 Báo không phát sinh (BM-01 cơ sở không hoạt động, BM-17 không phát sinh): mọi trường số = 0
+             * @default false
+             */
+            nil_report: boolean;
+            /** @description H08 ghi chú chung */
+            note?: string;
+            /** @description H09 giải trình / lý do trễ — bắt buộc khi gửi sau hạn với profile require_late_reason (kn_cnts) */
+            explanation?: string;
         };
         FormsSubmission: {
             /** Format: uuid */
@@ -10589,8 +14642,16 @@ export interface components {
             /** Format: date-time */
             event_time: string;
             /** @enum {string} */
-            status: "submitted" | "accepted" | "returned";
+            status: "submitted" | "accepted" | "returned" | "awaiting_reopen";
             review: null | components["schemas"]["FormsReview"];
+            /** @description W11.42 Báo không phát sinh */
+            nil_report?: boolean;
+            note?: string | null;
+            explanation?: string | null;
+            /** @description W11.42 nộp sau hạn (DB tính từ captured_at hoặc event_time) */
+            late?: boolean;
+            /** Format: date-time */
+            captured_at?: string | null;
         };
         FormsReviewInput: {
             /** @enum {string} */
@@ -10628,21 +14689,3818 @@ export interface components {
         };
         FormsUnit: {
             unit: string;
-            /** @enum {string} */
-            status: "not_submitted" | "submitted" | "accepted" | "returned";
+            /** @description Đơn vị lọc phạm vi: mã xã cha (cơ sở/hộ), chính unit với loại khác */
+            parent: string;
+            /**
+             * @description Khi kỳ đã chốt với đơn vị: missed = Không nộp, closed_unadjusted = Đã chốt – chưa điều chỉnh, awaiting_reopen = Chờ mở kỳ (W11.05). overdue = Trễ hạn: chưa gửi, kỳ còn nhận bài, quá hạn (W11.42)
+             * @enum {string}
+             */
+            status: "not_submitted" | "overdue" | "submitted" | "accepted" | "returned" | "missed" | "closed_unadjusted" | "awaiting_reopen";
             submission: null | components["schemas"]["FormsSubmission"];
+            held: null | components["schemas"]["FormsHeld"];
         };
         FormsPeriodView: {
             period: components["schemas"]["FormsPeriod"];
+            spec: components["schemas"]["FormsPeriodSpec"];
             /** @enum {string} */
-            status: "open" | "closed" | "reopened";
+            status: "open" | "closed" | "reopened" | "cancelled";
             reopen_units: string[];
             events: components["schemas"]["FormsPeriodEvent"][];
             units: components["schemas"]["FormsUnit"][];
             snapshots: components["schemas"]["FormsSnapshot"][];
         };
+        /**
+         * @description Cấp — tw (Trung ương), tinh, xa, khac (đơn vị khác)
+         * @enum {string}
+         */
+        ContactLevel: "tw" | "tinh" | "xa" | "khac";
+        ContactAccess: {
+            /** @enum {string} */
+            field_set: "basic" | "full";
+            /** @description cột hiển thị theo thứ tự */
+            fields: string[];
+            /** @description thêm/sửa/ngừng hiển thị liên hệ ngoài tỉnh và thẻ Đơn vị */
+            can_manage: boolean;
+            can_detail: boolean;
+            /**
+             * @description disabled = hồ sơ nhân sự chưa bật cho dữ liệu thật (AG_HRM_RECORDS) — chỉ có liên hệ ngoài tỉnh
+             * @enum {string}
+             */
+            staff_source: "enabled" | "disabled" | "none";
+        };
+        /** @description Dòng của bộ basic (Cấp TW, Cấp Xã) — KHÔNG có trường nào khác (BR-03) */
+        ContactPersonBasic: {
+            /** Format: uuid */
+            id: string;
+            full_name: string;
+            /** @description năm sinh (BR-04) — rỗng nếu chưa có */
+            birth_year: string;
+            phone: string;
+        };
+        ContactPersonFull: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description staff = cán bộ thuộc tỉnh (đồng bộ từ hồ sơ FN-07); external = liên hệ ngoài tỉnh
+             * @enum {string}
+             */
+            source: "staff" | "external";
+            full_name: string;
+            birth_year: string;
+            phone: string;
+            /** @description chức danh */
+            title: string;
+            /** @description đơn vị công tác (cán bộ xã — xã · đơn vị quản lý) hoặc cơ quan của liên hệ ngoài tỉnh */
+            unit: string;
+            unit_code?: string;
+            level: components["schemas"]["ContactLevel"];
+            level_label: string;
+            email: string;
+            hidden: boolean;
+            /** @description chủ thể đã xóa định danh */
+            erased: boolean;
+        };
+        ContactPersonList: {
+            /** @enum {string} */
+            field_set: "basic" | "full";
+            fields: string[];
+            total: number;
+            /** @enum {string} */
+            staff_source: "enabled" | "disabled" | "none";
+            items: (components["schemas"]["ContactPersonFull"] | components["schemas"]["ContactPersonBasic"])[];
+        };
+        ContactHistoryEntry: {
+            /** Format: int64 */
+            version: number;
+            /** @enum {string} */
+            change: "created" | "updated" | "hidden" | "shown";
+            /** @description TÊN trường đã đổi (không giá trị — BR-05) */
+            changed_fields: string[];
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        ContactPersonDetail: components["schemas"]["ContactPersonFull"] & {
+            organization: string;
+            can_edit: boolean;
+            history: components["schemas"]["ContactHistoryEntry"][];
+        };
+        /** @description Thêm — full_name, phone, level bắt buộc (BR-06). Sửa — trường vắng giữ nguyên. */
+        ContactPersonWrite: {
+            full_name?: string;
+            phone?: string;
+            birth_year?: string;
+            email?: string;
+            level?: components["schemas"]["ContactLevel"];
+            organization?: string;
+            title?: string;
+            hidden?: boolean;
+        };
+        ContactUnit: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            level: components["schemas"]["ContactLevel"];
+            level_label: string;
+            phone: string;
+            /** @description chỉ bộ full */
+            email?: string;
+            /** @description chỉ bộ full */
+            address?: string;
+            /** Format: uuid */
+            org_ref?: string | null;
+            hidden?: boolean;
+        };
+        ContactUnitList: {
+            /** @enum {string} */
+            field_set: "basic" | "full";
+            items: components["schemas"]["ContactUnit"][];
+        };
+        ContactUnitWrite: {
+            name: string;
+            level: components["schemas"]["ContactLevel"];
+            /** @description số máy công vụ của cơ quan (8–11 chữ số) — không nhập số di động cá nhân */
+            phone?: string;
+            email?: string;
+            address?: string;
+            /** Format: uuid */
+            org_ref?: string;
+            hidden?: boolean;
+        };
+        /** @enum {string} */
+        HrmStaffType: "vien_chuc" | "hop_dong" | "can_bo_xa";
+        /** @enum {string} */
+        HrmScope: "none" | "self" | "unit" | "all";
+        /** @description Nhóm quyền → phạm vi */
+        HrmPermMatrix: {
+            "profile.view"?: components["schemas"]["HrmScope"];
+            "profile.edit"?: components["schemas"]["HrmScope"];
+            "sensitive.view"?: components["schemas"]["HrmScope"];
+            export?: components["schemas"]["HrmScope"];
+            "audit.view"?: components["schemas"]["HrmScope"];
+            "docs.view"?: components["schemas"]["HrmScope"];
+            "docs.manage"?: components["schemas"]["HrmScope"];
+        };
+        HrmMyAccess: {
+            /** @description false = hồ sơ chưa bật (AG_HRM_RECORDS, Q-005) */
+            enabled: boolean;
+            /** @description admin | hcth | manager | tinh | xa | tw (rỗng khi chưa bật) */
+            group: string;
+            /** @description Đơn vị nội bộ của người gọi */
+            unit: string;
+            perms: components["schemas"]["HrmPermMatrix"];
+        };
+        HrmPermEntry: {
+            /** @enum {string} */
+            grantee_kind: "role" | "user";
+            grantee: string;
+            perms: components["schemas"]["HrmPermMatrix"];
+            default: components["schemas"]["HrmPermMatrix"] | null;
+            /** @description 0 = chưa chỉnh (mặc định) */
+            version: number;
+            note: string;
+            /** Format: date-time */
+            recorded_at: string | null;
+            /** Format: uuid */
+            actor_ref: string | null;
+            /** @description true = nhóm Admin (không chỉnh được) */
+            locked: boolean;
+        };
+        /**
+         * @description Loại tài liệu — quyết định nâng bậc, điều động, bổ nhiệm, khen thưởng, kỷ luật, hồ sơ đánh giá, khác
+         * @enum {string}
+         */
+        HrmDocType: "nang_bac" | "dieu_dong" | "bo_nhiem" | "khen_thuong" | "ky_luat" | "danh_gia" | "khac";
+        HrmDocPerms: {
+            "docs.view"?: components["schemas"]["HrmScope"];
+            "docs.manage"?: components["schemas"]["HrmScope"];
+        };
+        /** @description Khóa role:<nhóm vai> (hcth, manager, tinh, xa, tw) hoặc user:<uuid> → nhóm quyền tài liệu → phạm vi */
+        HrmFolderACL: {
+            [key: string]: components["schemas"]["HrmDocPerms"];
+        };
+        HrmReason: {
+            reason: string;
+        };
+        HrmFolder: {
+            /** Format: uuid */
+            folder_id: string;
+            /** Format: uuid */
+            parent_id: string | null;
+            name: string;
+            path: string[];
+            /** @description Thư mục hệ thống (nghiệp vụ tự lưu tệp): nang_bac, danh_gia, … */
+            system_key: string | null;
+            doc_type: string | null;
+            sort_order: number;
+            /** @enum {string} */
+            status: "active" | "hidden";
+            /** @description Thư mục hoặc thư mục cha đã ẩn */
+            hidden: boolean;
+            /** @description Số tài liệu đang hiện người gọi thấy (trực tiếp trong thư mục) */
+            docs: number;
+            can_view: boolean;
+            /** @description Tải lên, sửa phân loại, ẩn tài liệu (trong phạm vi) */
+            can_manage: boolean;
+            /** @description Tạo thư mục con, đổi tên, quyền thư mục, ẩn thư mục */
+            can_admin: boolean;
+            acl?: components["schemas"]["HrmFolderACL"];
+            version: number;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmDocTree: {
+            /** @description Hồ sơ nhân sự bật (AG_HRM_RECORDS) — false: không gắn/thấy tài liệu theo nhân viên */
+            records_enabled: boolean;
+            /** @description Đã nối kho tệp và kho định danh */
+            ready: boolean;
+            group: string;
+            unit: string;
+            perms: components["schemas"]["HrmDocPerms"];
+            can_create_root: boolean;
+            doc_types: components["schemas"]["HrmDocType"][];
+            extensions: string[];
+            max_bytes: number;
+            items: components["schemas"]["HrmFolder"][];
+        };
+        HrmFolderWrite: {
+            /** Format: uuid */
+            folder_id: string;
+            version: number;
+        };
+        HrmFolderVersion: {
+            version: number;
+            /** @enum {string} */
+            change: "created" | "renamed" | "acl" | "hidden" | "restored";
+            name: string;
+            /** @enum {string} */
+            status: "active" | "hidden";
+            note: string | null;
+            acl: components["schemas"]["HrmFolderACL"];
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmDocInput: {
+            /**
+             * Format: uuid
+             * @description Bắt buộc khi tải lên; bỏ qua khi sửa phân loại
+             */
+            folder_id?: string;
+            title: string;
+            doc_type: components["schemas"]["HrmDocType"];
+            /** @description Vắng → năm của ngày ban hành */
+            year?: number | null;
+            /** @description Phòng ban (đơn vị nội bộ); vắng + có nhân viên → đơn vị công tác của nhân viên đầu tiên */
+            unit_code?: string;
+            staff_ids?: string[];
+            doc_no?: string;
+            /** Format: date */
+            issued_on?: string;
+            note?: string;
+        };
+        HrmDoc: {
+            /** Format: uuid */
+            doc_id: string;
+            /** Format: uuid */
+            folder_id: string;
+            folder_path: string[];
+            title: string;
+            doc_type: components["schemas"]["HrmDocType"];
+            year: number | null;
+            unit_code: string | null;
+            staff_ids: string[];
+            /** @description Mã hồ sơ (HS-01) của nhân viên gắn tài liệu */
+            staff_codes: string[];
+            doc_no: string | null;
+            /** Format: date */
+            issued_on: string | null;
+            note: string | null;
+            file_name: string;
+            content_type: string;
+            size_bytes: number;
+            /** @enum {string} */
+            status: "active" | "hidden";
+            version: number;
+            /**
+             * Format: date-time
+             * @description Lúc tải lên
+             */
+            created_at: string;
+            /** Format: uuid */
+            uploaded_by: string;
+            /** Format: date-time */
+            updated_at: string;
+            can_manage: boolean;
+        };
+        HrmDocWrite: {
+            /** Format: uuid */
+            doc_id: string;
+            version: number;
+        };
+        HrmDocDetail: {
+            doc: components["schemas"]["HrmDoc"];
+            history: {
+                version: number;
+                /** @enum {string} */
+                change: "created" | "updated" | "hidden" | "restored";
+                changed_fields: string[];
+                /** @enum {string} */
+                status: "active" | "hidden";
+                reason: string | null;
+                /** Format: uuid */
+                actor_ref: string;
+                /** Format: date-time */
+                recorded_at: string;
+            }[];
+            /** @description Nhật ký xem trước/tải xuống, mới trước — null khi người gọi không quản lý tài liệu */
+            access: {
+                /** @enum {string} */
+                action: "preview" | "download";
+                /** @enum {string} */
+                scope: "self" | "unit" | "all";
+                /** Format: uuid */
+                actor_ref: string;
+                /** Format: date-time */
+                recorded_at: string;
+            }[] | null;
+        };
+        HrmAccessEntry: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            action: "view" | "view_sensitive" | "export";
+            item_count: number;
+            /** @enum {string} */
+            scope: "self" | "unit" | "all";
+            query: {
+                [key: string]: string;
+            };
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmReportMeta: {
+            /** @enum {string} */
+            code: "NS01" | "NS02" | "NS03" | "NS04" | "NS05" | "NS06";
+            name: string;
+            /** @enum {string} */
+            period: "month" | "quarter" | "ad_hoc";
+            aggregate: boolean;
+            sensitive_fields: string[];
+            source: string;
+        };
+        HrmCheckSummary: {
+            rule: string;
+            /** @enum {string} */
+            level: "block" | "warn";
+            ok: boolean;
+            count: number;
+        };
+        HrmReportLog: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            action: "export" | "download" | "preview" | "drill";
+            report: string;
+            /** Format: date */
+            as_of: string;
+            period: string;
+            item_count: number;
+            sensitive_fields: string[];
+            file_name: string;
+            sha256: string;
+            byte_size: number;
+            check_status: string;
+            checks: components["schemas"]["HrmCheckSummary"][];
+            /** Format: uuid */
+            actor: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            export_id?: string | null;
+            drift?: boolean | null;
+            params?: {
+                [key: string]: string;
+            };
+        };
+        HrmReportSummary: components["schemas"]["HrmReportMeta"] & {
+            exports: number;
+            last_export: components["schemas"]["HrmReportLog"] | null;
+        };
+        HrmPersonBrief: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            type: components["schemas"]["HrmStaffType"];
+            /** @description Họ tên (rỗng khi người gọi không có vai kho) */
+            name: string;
+            unit: string;
+            unit_name: string;
+            position: string;
+        };
+        HrmReportView: {
+            report: components["schemas"]["HrmReportMeta"];
+            title: string;
+            period: string;
+            /** Format: date */
+            as_of: string;
+            /** @enum {string} */
+            status: "ready" | "warning" | "blocked";
+            columns: {
+                key: string;
+                group: string;
+                label: string;
+                sensitive: boolean;
+                numeric: boolean;
+            }[];
+            rows: {
+                /** @enum {string} */
+                kind: "group" | "unit" | "person" | "total";
+                key: string;
+                cells: string[];
+                /** Format: uuid */
+                staff_id?: string;
+            }[];
+            checks: {
+                rule: string;
+                /** @enum {string} */
+                level: "block" | "warn";
+                ok: boolean;
+                message: string;
+                people: components["schemas"]["HrmPersonBrief"][];
+            }[];
+            people: number;
+        };
+        HrmReportExported: {
+            /** Format: uuid */
+            id: string;
+            file_name: string;
+            sha256: string;
+            byte_size: number;
+            /** @enum {string} */
+            status: "ready" | "warning";
+            checks: {
+                rule: string;
+                level: string;
+                ok: boolean;
+                message: string;
+                count: number;
+            }[];
+            download: string;
+        };
+        HrmCount: {
+            key: string;
+            name: string;
+            count: number;
+        };
+        HrmDashboard: {
+            /** Format: date */
+            as_of: string;
+            scope: components["schemas"]["HrmScope"];
+            /** @description Viên chức Đang công tác = số dòng NS01 cùng ngày */
+            total: number;
+            /** @description Viên chức + HĐLĐ Đang công tác (dân số NS06) */
+            staff: number;
+            by_type: {
+                [key: string]: number;
+            };
+            by_unit: components["schemas"]["HrmCount"][];
+            gender: {
+                [key: string]: number;
+            };
+            age: {
+                [key: string]: number;
+            };
+            education: components["schemas"]["HrmCount"][];
+            grade_group: {
+                [key: string]: number;
+            };
+            joined: number;
+            left: number;
+            retire_soon: number;
+            over_retire: number;
+            /** @description false khi người xem không đọc được kho (giới tính, độ tuổi chưa rõ) */
+            pii: boolean;
+            elapsed_ms: number;
+        };
+        HrmSecondment: {
+            /** Format: uuid */
+            id: string;
+            to_org: string;
+            valid_from: string;
+            /** Format: date */
+            valid_to: string | null;
+        };
+        /** @description Phép chiếu của hồ sơ tại ngày chốt — bậc là phép chiếu của các sự kiện ngạch/bậc; hệ số tra bảng hệ số có hiệu lực (NB-05) */
+        HrmSnapshot: {
+            /**
+             * @description Đang công tác | Đã nghỉ việc | chưa vào làm (FN-08)
+             * @enum {string}
+             */
+            status: "active" | "left" | "none";
+            /** Format: date */
+            started_on: string | null;
+            /** Format: date */
+            ended_on: string | null;
+            leave_reason: string;
+            unit: string;
+            commune: string;
+            mgmt_unit: string;
+            position: string;
+            title: string;
+            allowance: string;
+            appointed_on: string;
+            grade: string;
+            step: number;
+            /** @description Số bậc của ngạch tại ngày chốt (hiển thị 6/9) */
+            steps: number;
+            /** @description Hệ số bậc (chuỗi 2 chữ số thập phân); rỗng khi chưa có bảng */
+            coefficient: string;
+            /** @description Ngày xếp bậc hiện tại (Q-069) */
+            step_since: string;
+            /** @description Hệ số bảo lưu (Q-069) */
+            reserved_coeff: string;
+            disciplined: boolean;
+            top_degree: string;
+            secondments: components["schemas"]["HrmSecondment"][];
+        };
+        HrmStaffItem: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            type: components["schemas"]["HrmStaffType"];
+            /** @description Họ tên che bớt (kho định danh); rỗng khi người gọi không có vai kho */
+            label: string;
+            masked_phone: string;
+            current: components["schemas"]["HrmSnapshot"];
+        };
+        HrmProfileInput: {
+            full_name?: string;
+            phone?: string;
+            address?: string;
+            /** @description YYYY-MM-DD | YYYY-MM | YYYY (BR-05) */
+            birth_date?: string;
+            /** @enum {string} */
+            gender?: "nam" | "nu";
+            email?: string;
+            note?: string;
+        };
+        HrmProfileUpdate: {
+            full_name?: string;
+            phone?: string;
+            address?: string;
+            birth_date?: string;
+            /** @enum {string} */
+            gender?: "nam" | "nu";
+            email?: string;
+            note?: string;
+            /**
+             * Format: uuid
+             * @description Tài khoản của chính nhân sự; null = gỡ
+             */
+            account_ref?: string | null;
+        };
+        HrmSensitiveFields: {
+            /** @description Mã danh mục dân tộc (TK-01) */
+            ethnicity?: string;
+            /** @description Mã danh mục tôn giáo (TK-02) */
+            religion?: string;
+            /** @description Ngày vào Đảng (TK-03) */
+            party_date?: string;
+            readonly party_precision?: string;
+            /** @description Quê quán (TK-04) */
+            hometown?: string;
+            /** @description Nơi sinh (TK-05) */
+            birthplace?: string;
+            /** @description Ngày TGCM (TK-06) */
+            revolution_date?: string;
+            readonly revolution_precision?: string;
+        };
+        HrmEventInput: {
+            /** @enum {string} */
+            kind: "work_start" | "work_end" | "unit" | "position" | "secondment" | "grade" | "step" | "degree" | "training" | "award" | "discipline";
+            /** @description YYYY-MM-DD | YYYY-MM | YYYY */
+            valid_from: string;
+            /** @description Chỉ tăng cường, kỷ luật */
+            valid_to?: string;
+            /** @description Trường theo loại (chuỗi). work_end: reason (lý do nghỉ), decision_no. unit: unit | commune + mgmt_unit (cán bộ xã). position: position, title, allowance, appointed_on, decision_no. secondment: to_org. grade: grade, step, step_since, reserved_coeff. step: step, step_since, reserved_coeff. degree: level, major, form, institution. training: type, code, level, cert. award: form, title, level, decision_no. discipline: form, decision_no. */
+            payload?: {
+                [key: string]: string;
+            };
+            /** @description Lý do 10–500 ký tự — bắt buộc ở replace, bỏ qua ở thêm mới */
+            reason?: string;
+        };
+        HrmStaffCreate: {
+            type: components["schemas"]["HrmStaffType"];
+            profile: components["schemas"]["HrmProfileInput"];
+            sensitive?: components["schemas"]["HrmSensitiveFields"];
+            /**
+             * Format: uuid
+             * @description Tài khoản của chính nhân sự (phạm vi bản thân)
+             */
+            account_ref?: string | null;
+            events: components["schemas"]["HrmEventInput"][];
+        };
+        HrmStaffWrite: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            version: number;
+            warnings: string[];
+        };
+        HrmStaffEvent: {
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            valid_from: string;
+            /** @enum {string} */
+            precision: "day" | "month" | "year";
+            /** Format: date */
+            valid_to: string | null;
+            payload: {
+                [key: string]: string;
+            };
+            void: boolean;
+            /** Format: uuid */
+            supersedes: string | null;
+            reason: string;
+            version: number;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** @description false = đã bị thay/hủy, hoặc là dòng hủy */
+            effective: boolean;
+        };
+        HrmStaffProfile: {
+            full_name: string;
+            phone: string;
+            address: string;
+            birth_date: string;
+            birth_precision: string;
+            gender: string;
+            email: string;
+            note: string;
+        };
+        HrmStaffHistory: {
+            version: number;
+            /** @enum {string} */
+            change: "created" | "profile" | "sensitive" | "type" | "account";
+            changed_fields: string[];
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        HrmStaffDetail: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            type: components["schemas"]["HrmStaffType"];
+            /** Format: uuid */
+            account_ref: string | null;
+            /** Format: date */
+            day: string;
+            /** @description Chủ thể đã bị xóa định danh ở kho (RB-3) */
+            erased: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Tuổi tại ngày chốt (HS-33) */
+            age: number | null;
+            profile: components["schemas"]["HrmStaffProfile"];
+            current: components["schemas"]["HrmSnapshot"];
+            events: components["schemas"]["HrmStaffEvent"][];
+            history: components["schemas"]["HrmStaffHistory"][];
+            /** @description Nhóm quyền của người gọi trên hồ sơ này */
+            can: {
+                [key: string]: boolean;
+            };
+        };
+        HrmStatus: {
+            /** @description true = Admin (ghi được) */
+            can_manage: boolean;
+            rule_version: string;
+            /** Format: date */
+            day: string;
+            /** @description Loại danh mục → số mục đang dùng */
+            counts: {
+                [key: string]: number;
+            };
+            /** @description Số mục/bảng hệ số/tham số hiện hành còn là dữ liệu mẫu (chờ Q-070) */
+            placeholders: number;
+            /** @description Số ngạch có bảng hệ số hiệu lực hôm nay */
+            scales: number;
+            rules: number;
+        };
+        /** @description Thuộc tính riêng theo loại; trường không thuộc loại phải vắng. position: leader, allowance (hệ số PCCV, chuỗi 2 chữ số thập phân, chỉ khi leader), mgmt_level. grade: equiv_group, grade_type, salary_class. education_level: rank. major_group: level. major: groups (mã trình độ → mã nhóm chuyên ngành của trình độ đó). ethnicity: minority. religion: no_religion. */
+        HrmCatalogAttrs: {
+            leader?: boolean;
+            allowance?: string;
+            mgmt_level?: string;
+            /** @enum {string} */
+            equiv_group?: "CVCC" | "CVC" | "CV" | "CS" | "CON_LAI";
+            /** @enum {string} */
+            grade_type?: "cong_chuc" | "vien_chuc";
+            salary_class?: string;
+            rank?: number;
+            level?: string;
+            groups?: {
+                [key: string]: string;
+            };
+            minority?: boolean;
+            no_religion?: boolean;
+        };
+        HrmCatalogItem: {
+            kind: string;
+            code: string;
+            name: string;
+            sort_order: number;
+            /** @description false = đã ngừng sử dụng (không xóa — BR-01) */
+            active: boolean;
+            /** @description Dữ liệu mẫu chưa được Phòng HCTH xác nhận (Q-070) */
+            placeholder: boolean;
+            version: number;
+            attrs: components["schemas"]["HrmCatalogAttrs"];
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmCatalogItemInput: {
+            /** @description Bắt buộc khi thêm; vắng khi sửa (mã ở đường dẫn). Khoảng trắng, xuống dòng bị loại bỏ */
+            code?: string;
+            name: string;
+            sort_order?: number;
+            /** @description Vắng → true. Sửa với false = ngừng sử dụng */
+            active?: boolean;
+            attrs?: components["schemas"]["HrmCatalogAttrs"];
+        };
+        HrmWriteResult: {
+            /** @description Mã đã chuẩn hóa (mục, ngạch hoặc khóa tham số) */
+            code: string;
+            version: number;
+        };
+        HrmGradeScale: {
+            grade_code: string;
+            /** Format: date */
+            valid_from: string;
+            steps: number;
+            /** @description Hệ số bậc 1..n, chuỗi thập phân 2 chữ số */
+            coefficients: string[];
+            /** @description Thời gian giữ bậc (tháng) — NLTX */
+            hold_months: number;
+            note: string;
+            placeholder: boolean;
+            version: number;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmGradeScaleInput: {
+            /** Format: date */
+            valid_from: string;
+            /** @description Hệ số bậc 1..n tăng dần, 0 < hệ số ≤ 99,99, tối đa 2 chữ số thập phân */
+            coefficients: string[];
+            hold_months: number;
+            note?: string;
+        };
+        HrmRule: {
+            key: string;
+            /** Format: date */
+            valid_from: string;
+            /** @description promotion: HrmPromotionRules; achievement_conversion: HrmAchievementConversion */
+            payload: Record<string, never>;
+            note: string;
+            placeholder: boolean;
+            version: number;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmRuleView: {
+            key: string;
+            /** Format: date */
+            day: string;
+            current: components["schemas"]["HrmRule"] | null;
+            versions: components["schemas"]["HrmRule"][];
+        };
+        HrmRuleInput: {
+            /** Format: date */
+            valid_from: string;
+            payload: components["schemas"]["HrmPromotionRules"] | components["schemas"]["HrmAchievementConversion"];
+            note?: string;
+        };
+        /** @description Quy tắc nâng bậc (FN-09 BR-02, BR-03) — mặc định là mẫu chờ Q-070. Phần trăm là chuỗi thập phân. */
+        HrmPromotionRules: {
+            /** @enum {string} */
+            min_rating: "HTXSNV" | "HTTNV" | "HTNV" | "KHTNV";
+            rating_years: number;
+            achievement_years: number;
+            discipline_extension_months: {
+                [key: string]: number;
+            };
+            nlth_quota_pct: string;
+            nlth_retirement_months: number;
+            nlth_retirement_within_months: number;
+            tnvk_start_pct: string;
+            tnvk_step_pct: string;
+            tnvk_cycle_months: number;
+            tnvk_first_months: number;
+            remind_months: number[];
+            retirement_age_male_months: number;
+            retirement_age_female_months: number;
+        };
+        HrmAchievementConversion: {
+            rules: {
+                /** @description Mã hình thức khen thưởng (award_form) đang dùng */
+                award_code: string;
+                months: number;
+            }[];
+        };
+        /** @description W11.42 Một công việc (kỳ × đơn vị) — cùng dữ liệu với entity đồng bộ forms_task */
+        FormsTask: {
+            /**
+             * Format: uuid
+             * @description UUIDv5 ổn định theo (kỳ, đơn vị)
+             */
+            id: string;
+            profile: string;
+            /** Format: uuid */
+            period_id: string;
+            unit: string;
+            /** @enum {string} */
+            unit_kind: "commune" | "facility" | "household" | "department";
+            parent: string;
+            /** Format: uuid */
+            template_id: string;
+            template_code: string;
+            template_title: string;
+            template_version: number;
+            fields: components["schemas"]["FormsField"][];
+            label: string;
+            period_kind: string;
+            period_key: string;
+            /** Format: date */
+            period_from: string | null;
+            /** Format: date */
+            period_to: string | null;
+            /** Format: date-time */
+            due_at: string;
+            /** @enum {string} */
+            period_status: "open" | "closed" | "reopened" | "cancelled";
+            /** @description Kỳ đang nhận bài của đơn vị */
+            open: boolean;
+            /** @enum {string} */
+            status: "not_submitted" | "overdue" | "submitted" | "accepted" | "returned" | "missed" | "closed_unadjusted" | "awaiting_reopen";
+            /** @description Phiên bản bài nộp cuối (0 = chưa có) — gửi lại làm base_version */
+            version: number;
+            /** Format: uuid */
+            submission_id: string | null;
+            values: {
+                [key: string]: string;
+            };
+            nil_report: boolean;
+            note: string;
+            explanation: string;
+            late: boolean;
+            /** Format: date-time */
+            submitted_at: string | null;
+            /** @description Lý do yêu cầu điều chỉnh */
+            return_note: string | null;
+            /**
+             * Format: date-time
+             * @description Có bài giữ Chờ mở kỳ
+             */
+            held_at: string | null;
+        };
+        FormsPrevious: {
+            /** Format: uuid */
+            period_id: string;
+            label: string;
+            submission: components["schemas"]["FormsSubmission"];
+        };
+        CNTSAlertActorRef: {
+            /** Format: uuid */
+            ref: string;
+            display: string | null;
+        };
+        /** @description Cảnh báo CNTS (W11.43). detail.findings là các vi phạm theo trường (loài, nhóm), detail.summary tóm tắt. */
+        CNTSAlert: {
+            /** Format: uuid */
+            alert_ref: string;
+            kind: string;
+            kind_label: string;
+            /** @description Số dòng ở bảng Mục III.5 (0 = trễ nộp liên tiếp) */
+            kind_no: number;
+            /** @enum {string} */
+            level: "urgent" | "attention";
+            /** @enum {string} */
+            status: "new" | "assigned" | "in_progress" | "closed";
+            overdue: boolean;
+            commune_code: string | null;
+            province_code: string | null;
+            /** @enum {string} */
+            subject_kind: "commune" | "facility" | "household" | "site" | "outbreak";
+            subject_ref: string;
+            template_code: string | null;
+            period_key: string | null;
+            /** Format: uuid */
+            period_ref: string | null;
+            /** Format: uuid */
+            source_ref: string | null;
+            title: string;
+            detail: {
+                [key: string]: unknown;
+            };
+            recipient_refs: string[];
+            assignee: components["schemas"]["CNTSAlertActorRef"] | null;
+            /** Format: date-time */
+            raised_at: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            overdue_at: string | null;
+            /** Format: date-time */
+            closed_at: string | null;
+            auto_closed: boolean;
+            result: string | null;
+            /** @description Số sự việc cuối (base_seq của khóa lạc quan) */
+            seq: number;
+            /** Format: date-time */
+            updated_at: string;
+            can_assign: boolean;
+            can_start: boolean;
+            can_close: boolean;
+        };
+        CNTSAlertList: {
+            items: components["schemas"]["CNTSAlert"][];
+            counts: {
+                open: number;
+                urgent_open: number;
+                overdue: number;
+            };
+        };
+        CNTSAlertHistory: {
+            seq: number;
+            /** @enum {string} */
+            action: "raised" | "assigned" | "started" | "closed" | "auto_closed" | "overdue";
+            /** @enum {string} */
+            status_after: "new" | "assigned" | "in_progress" | "closed";
+            actor: components["schemas"]["CNTSAlertActorRef"];
+            assignee: components["schemas"]["CNTSAlertActorRef"] | null;
+            /** Format: date-time */
+            due_at: string | null;
+            note: string | null;
+            /** Format: date-time */
+            event_time: string;
+            support_reason: string | null;
+        };
+        CNTSAlertDetail: components["schemas"]["CNTSAlert"] & {
+            history: components["schemas"]["CNTSAlertHistory"][];
+        };
+        CNTSAlertAction: {
+            /** @description Số sự việc cuối đã thấy (0 = không kiểm) */
+            base_seq?: number;
+            /**
+             * Format: uuid
+             * @description assign — bắt buộc
+             */
+            assignee_ref?: string;
+            /**
+             * Format: date-time
+             * @description assign — hạn xử lý (mặc định theo loại)
+             */
+            due_at?: string;
+            note?: string;
+            /** @description close — kết quả xử lý bắt buộc */
+            result?: string;
+        };
+        CNTSAlertAssignees: {
+            items: {
+                actor: components["schemas"]["CNTSAlertActorRef"];
+                /** @enum {string} */
+                level: "commune" | "province";
+                communes: string[];
+                manager: boolean;
+            }[];
+        };
+        CNTSFormReminder: {
+            before_due_hours: number;
+            on_overdue: boolean;
+            repeat_daily: boolean;
+            /** @description HH:MM giờ Việt Nam */
+            repeat_at: string;
+            /** @description Trễ liên tiếp từ n kỳ → cảnh báo (0 = tắt) */
+            late_streak: number;
+            channels: ("in_app" | "push" | "email")[];
+            /** @description Nội dung mẫu — {bieu}, {ky}, {han} */
+            message: string;
+        };
+        CNTSAlertSetting: {
+            sla_hours: number;
+            /** @description Chỉ loại có level_configurable */
+            urgent: boolean;
+        };
+        CNTSAlertConfig: {
+            forms: {
+                code: string;
+                label: string;
+                reminder: components["schemas"]["CNTSFormReminder"];
+                custom: boolean;
+                version: number;
+                /** Format: date-time */
+                updated_at: string | null;
+                updated_by: components["schemas"]["CNTSAlertActorRef"] | null;
+                sent_today: number;
+            }[];
+            kinds: {
+                kind: {
+                    code: string;
+                    no: number;
+                    label: string;
+                    /** @enum {string} */
+                    default_level: "urgent" | "attention";
+                    level_configurable: boolean;
+                    recipients: string[];
+                    /** @enum {string} */
+                    source: "forms" | "outbreak" | "job" | "log" | "schedule";
+                };
+                sla_hours: number;
+                urgent: boolean;
+                /** @enum {string} */
+                level: "urgent" | "attention";
+                custom: boolean;
+                version: number;
+            }[];
+            thresholds: {
+                key: string;
+                label: string;
+                unit: string;
+                /** @description Số thập phân dạng chuỗi; null = chưa có giá trị đã duyệt */
+                value: string | null;
+                version: number;
+                /** Format: date */
+                effective_from: string | null;
+            }[];
+        };
+        CNTSPeriodForm: {
+            /** @enum {string} */
+            code: "CNTS-BM01" | "CNTS-BM04" | "CNTS-BM17" | "CNTS-BM05-I" | "CNTS-BM05-II";
+            bm: string;
+            title: string;
+            /** @enum {string} */
+            unit_kind: "commune" | "facility";
+            /** @enum {string} */
+            period_type: "day" | "week";
+            deadline_offset_days: number;
+            deadline_time: string;
+            /** @description Mô tả hạn mặc định */
+            due: string;
+            /** @description Nhãn Báo không phát sinh (null = biểu không có) */
+            nil_label: string | null;
+            fields: components["schemas"]["FormsField"][];
+            /**
+             * Format: uuid
+             * @description Phiên bản đã cài ở cap/forms (null = chưa cài)
+             */
+            template_id: string | null;
+            template_version: number | null;
+            template_up_to_date: boolean;
+        };
+        CNTSSeriesInput: {
+            code: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /** @description Mã xã (BM-04/05/17) hoặc facility_ref cơ sở giết mổ (BM-01) */
+            units: string[];
+            /** @description Hạn khác mặc định: ngày cuối kỳ + offset_days lúc time (BM-05 Phần II: offset âm tính từ Thứ Hai) */
+            deadline?: {
+                offset_days: number;
+                time: string;
+            };
+        };
+        CNTSSeriesPeriod: {
+            /**
+             * Format: uuid
+             * @description Mã kỳ cap/forms (sau phát hành)
+             */
+            id: string | null;
+            kind: string;
+            key: string;
+            label: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /** Format: date-time */
+            due_at: string;
+            rule: string;
+        };
+        CNTSSeries: {
+            code: string;
+            /** @description Lịch tuần của phòng (D8) — mã phòng, vd chan_nuoi_thuy_san; null với tuần làm việc BM-05 */
+            calendar_id: string | null;
+            /** @description Phiên bản lịch (D8): 1 = v1-tam, 2 = v2 Thứ Tư–Thứ Ba, 3 = CNTS Thứ Ba–Thứ Hai; null với BM-05 */
+            calendar_version: number | null;
+            unit_kind: string;
+            units: string[];
+            /** @description Số công việc sẽ sinh (kỳ × đơn vị) */
+            tasks: number;
+            periods: components["schemas"]["CNTSSeriesPeriod"][];
+        };
+        /** @description Tọa độ WGS84 (độ thập phân, chuỗi) — DB-05; trong lãnh thổ Việt Nam (vĩ độ 8–24, kinh độ 102–118) */
+        CNTSLocation: {
+            /** @example 10.2534100 */
+            lat: string;
+            /** @example 105.9721000 */
+            lon: string;
+            /** @description Sai số GPS (m) */
+            accuracy_m?: string | null;
+            /**
+             * @description GPS thiết bị hoặc chọn trên bản đồ
+             * @enum {string|null}
+             */
+            source?: "gps" | "map" | null;
+        };
+        /** @description Nội dung BM-10 (DB-01…DB-13). Lập mới: mọi trường bắt buộc; cập nhật diễn biến / xác nhận tin báo: gửi lại đủ trường (mỗi lần là một phiên bản). Xác nhận tin báo: commune_code, location, source, received_at trống lấy theo tin báo. */
+        CNTSOutbreakInput: {
+            /** @description Phiên bản người nhập đã thấy (bắt buộc khi cập nhật */
+            base_version?: number;
+            commune_code?: string;
+            /** @description DB-01 mã danh mục cnts_disease */
+            disease_code?: string;
+            /** @description Mã danh mục cnts_species */
+            species_code?: string;
+            /**
+             * Format: date-time
+             * @description DB-02
+             */
+            received_at?: string;
+            /**
+             * @description DB-03
+             * @enum {string}
+             */
+            source?: "ubnd_xa" | "nong_ho" | "can_bo";
+            /**
+             * Format: uuid
+             * @description DB-04 hộ (pf/cooperative)
+             */
+            household_ref?: string | null;
+            /** @description DB-04 địa bàn (ấp */
+            locality?: string;
+            location?: components["schemas"]["CNTSLocation"] | null;
+            /** @description DB-06 */
+            herd_size?: number;
+            herd_age_days?: number | null;
+            /** @description DB-07 lũy kế; ≤ herd_size */
+            dead?: number;
+            /** @description DB-08 */
+            symptoms?: string;
+            /**
+             * Format: date
+             * @description DB-09
+             */
+            sample_date?: string;
+            lab_name?: string;
+            lab_result?: string;
+            /** @description DB-10 lũy kế; ≤ herd_size */
+            culled_head?: number | null;
+            culled_kg?: string | null;
+            chemical_liters?: string | null;
+            /** @description DB-11 (vẽ vùng ở bản đồ — GĐ2) */
+            buffer_note?: string;
+            /** @description DB-12 */
+            prevention_note?: string;
+            /** @description DB-13 mã tệp pf_files */
+            attachment_refs?: string[];
+            /**
+             * Format: date
+             * @description Ngày diễn biến (mặc định ngày tiếp nhận ở bản 1
+             */
+            as_of?: string;
+            /** @description Diễn biến của lần cập nhật */
+            progress_note?: string;
+            /**
+             * Format: date-time
+             * @description Giờ thiết bị của bản ngoại tuyến
+             */
+            captured_at?: string;
+        };
+        CNTSOutbreak: {
+            /** Format: uuid */
+            ref: string;
+            version: number;
+            /** Format: uuid */
+            version_id: string;
+            /** @enum {string} */
+            event: "reported" | "updated" | "closed" | "reopened";
+            /**
+             * @description Đã gửi / Đang theo dõi / Đã kết thúc
+             * @enum {string}
+             */
+            status: "reported" | "monitoring" | "closed";
+            commune_code: string;
+            disease_code: string;
+            disease_name: string;
+            species_code: string;
+            species_name: string;
+            /** Format: date-time */
+            received_at: string;
+            /** @enum {string} */
+            source: "ubnd_xa" | "nong_ho" | "can_bo";
+            /** Format: uuid */
+            suspect_ref: string | null;
+            /** Format: uuid */
+            household_ref: string | null;
+            locality: string | null;
+            location: components["schemas"]["CNTSLocation"] | null;
+            herd_size: number;
+            herd_age_days: number | null;
+            dead: number;
+            symptoms: string;
+            /** Format: date */
+            sample_date: string | null;
+            lab_name: string | null;
+            lab_result: string | null;
+            culled_head: number | null;
+            culled_kg: string | null;
+            chemical_liters: string | null;
+            buffer_note: string | null;
+            prevention_note: string | null;
+            attachment_refs: string[];
+            /** Format: date */
+            as_of: string;
+            progress_note: string | null;
+            status_reason: string | null;
+            /** Format: date-time */
+            captured_at: string | null;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["KhtcActor"];
+        };
+        CNTSCount: {
+            key: string;
+            label: string;
+            count: number;
+        };
+        CNTSOutbreakList: {
+            items: components["schemas"]["CNTSOutbreak"][];
+            by_status: components["schemas"]["CNTSCount"][];
+            by_disease: components["schemas"]["CNTSCount"][];
+        };
+        CNTSOutbreakDetail: {
+            current: components["schemas"]["CNTSOutbreak"];
+            versions: components["schemas"]["CNTSOutbreak"][];
+        };
+        CNTSOutbreakPoints: {
+            /** @enum {string} */
+            type: "FeatureCollection";
+            features: {
+                /** @enum {string} */
+                type: "Feature";
+                /** Format: uuid */
+                id: string;
+                geometry: {
+                    /** @enum {string} */
+                    type: "Point";
+                    /** @description [kinh độ, vĩ độ] */
+                    coordinates: number[];
+                };
+                properties: {
+                    [key: string]: unknown;
+                };
+            }[];
+        };
+        CNTSStatusInput: {
+            base_version: number;
+            reason: string;
+        };
+        CNTSSuspectInput: {
+            commune_code: string;
+            /** @enum {string} */
+            reporter_kind: "nong_ho" | "ubnd_xa" | "can_bo";
+            /** Format: date-time */
+            observed_at: string;
+            species_code?: string;
+            /** @description Bệnh nghi ngờ (tùy chọn) */
+            disease_code?: string;
+            /** Format: uuid */
+            household_ref?: string | null;
+            locality?: string;
+            location?: components["schemas"]["CNTSLocation"] | null;
+            affected?: number | null;
+            dead?: number | null;
+            description: string;
+            attachment_refs?: string[];
+            /** Format: date-time */
+            captured_at?: string;
+        };
+        CNTSSuspect: {
+            /** Format: uuid */
+            ref: string;
+            version: number;
+            /** Format: uuid */
+            version_id: string;
+            /** @enum {string} */
+            status: "reported" | "confirmed" | "dismissed";
+            commune_code: string;
+            /** @enum {string} */
+            reporter_kind: "nong_ho" | "ubnd_xa" | "can_bo";
+            /** Format: date-time */
+            observed_at: string;
+            species_code: string | null;
+            disease_code: string | null;
+            /** Format: uuid */
+            household_ref: string | null;
+            locality: string | null;
+            location: components["schemas"]["CNTSLocation"] | null;
+            affected: number | null;
+            dead: number | null;
+            description: string;
+            attachment_refs: string[];
+            /** Format: uuid */
+            outbreak_ref: string | null;
+            status_reason: string | null;
+            /** Format: date-time */
+            captured_at: string | null;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["KhtcActor"];
+        };
+        CNTSSuspectDetail: {
+            current: components["schemas"]["CNTSSuspect"];
+            versions: components["schemas"]["CNTSSuspect"][];
+        };
+        CntsKeySpan: {
+            key: string;
+            label: string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+        };
+        CntsKeyLabel: {
+            key: string;
+            label: string;
+        };
+        /** @description Khóa → số thập phân (chuỗi) */
+        CntsDecMap: {
+            [key: string]: string;
+        };
+        CntsSources: {
+            count: number;
+            closed: number;
+            /** @description Mọi kỳ nguồn của tuần đã chốt (D17) — điều kiện chốt bảng */
+            all_closed: boolean;
+        };
+        CntsAggregateAction: {
+            /** @enum {string} */
+            form: "CNTS-BM02" | "CNTS-BM18";
+            /** @description BM-02: tuần KSGM YYYY-MM-Kn; BM-18: tuần CNTS YYYY-Www */
+            period_key: string;
+            /** @description Bắt buộc khi mở lại (10–500 ký tự) */
+            reason?: string;
+        };
+        CntsAggregateState: {
+            key: string;
+            /** @enum {string} */
+            state: "none" | "closed" | "reopened";
+            close_count: number;
+            /** Format: date-time */
+            last_at: string | null;
+            figures_hash: string | null;
+            /** @description Số tính lại từ ảnh chụp nguồn khác số đã chốt — Nguồn đã thay đổi */
+            changed: boolean;
+        };
+        CntsShare: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            /** Format: date-time */
+            at: string;
+            /** @enum {string} */
+            basis: "submitted" | "closed";
+            recipient: string;
+            channel: string;
+            /** @description Thay đổi so với bản đã gửi ngày … (phiên bản n) */
+            note: string;
+            content_hash: string;
+            actor_name: string;
+        };
+        CntsShareResult: {
+            share: components["schemas"]["CntsShare"];
+            replayed: boolean;
+        };
+        CntsAdjustment: {
+            /** Format: uuid */
+            id: string;
+            week_key: string;
+            facility_ref: string;
+            facility_name: string;
+            commune_code: string;
+            deltas: components["schemas"]["CntsDecMap"];
+            reason: string;
+            actor_name: string;
+            /** Format: date-time */
+            at: string;
+            /** @description BM-01 của tuần đổi sau khi điều chỉnh — cần xem lại */
+            stale: boolean;
+        };
+        CntsBM02Row: {
+            facility_ref: string;
+            facility_code: string;
+            facility_name: string;
+            facility_kind: string;
+            stamps_gs: string[];
+            stamps_gc: string[];
+            commune_code: string;
+            commune_name: string;
+            auto: components["schemas"]["CntsDecMap"];
+            adjust: components["schemas"]["CntsDecMap"];
+            total: components["schemas"]["CntsDecMap"];
+            days_expected: number;
+            days_reported: number;
+            missing_days: number;
+            stale: boolean;
+        };
+        CntsBM02Commune: {
+            commune_code: string;
+            commune_name: string;
+            total: components["schemas"]["CntsDecMap"];
+            facilities: number;
+        };
+        CntsBM02: {
+            province: string;
+            /** @enum {string} */
+            period_type: "ksgm_week" | "month";
+            period_key: string;
+            label: string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            prev_key: string;
+            next_key: string;
+            /** @enum {string} */
+            basis: "submitted" | "closed";
+            weeks: components["schemas"]["CntsKeySpan"][];
+            species: components["schemas"]["CntsKeyLabel"][];
+            rows: components["schemas"]["CntsBM02Row"][];
+            communes: components["schemas"]["CntsBM02Commune"][];
+            auto: components["schemas"]["CntsDecMap"];
+            adjust: components["schemas"]["CntsDecMap"];
+            total: components["schemas"]["CntsDecMap"];
+            sources: components["schemas"]["CntsSources"];
+            units_total: number;
+            units_reported: number;
+            adjustments: components["schemas"]["CntsAdjustment"][];
+            aggregates: components["schemas"]["CntsAggregateState"][];
+            shares: components["schemas"]["CntsShare"][];
+        };
+        CntsCols: {
+            /** @description Tuần trước liền kề */
+            prev: string;
+            /** @description Trong kỳ báo cáo */
+            cur: string;
+            /** @description Lũy kế từ đầu quý (theo ngày cuối tuần) */
+            qtd: string;
+            /** @description Lũy kế từ đầu năm (theo ngày cuối tuần) */
+            ytd: string;
+        };
+        CntsColsMap: {
+            [key: string]: components["schemas"]["CntsCols"];
+        };
+        CntsBM18Commune: {
+            commune_code: string;
+            commune_name: string;
+            region_code: string;
+            region_name: string;
+            cells: components["schemas"]["CntsColsMap"];
+            expected: boolean;
+            reported: boolean;
+            nil_report: boolean;
+            /** @description Thiếu kỳ (tuần trong năm có kỳ mà xã không nộp — tính 0) */
+            missing_weeks: string[];
+            by_week: {
+                [key: string]: components["schemas"]["CntsDecMap"];
+            };
+        };
+        CntsBM18Region: {
+            region_code: string;
+            region_name: string;
+            sort: number;
+            cells: components["schemas"]["CntsColsMap"];
+        };
+        CntsBM18Aqua: {
+            code: string;
+            label: string;
+            group: string;
+            area_unit: string;
+            output_unit: string;
+            in_total: boolean;
+            area: components["schemas"]["CntsCols"];
+            output: components["schemas"]["CntsCols"];
+            entered_area: string | null;
+            entered_output: string | null;
+            note: string;
+        };
+        CntsBM18: {
+            province: string;
+            week: components["schemas"]["CntsKeySpan"];
+            prev: components["schemas"]["CntsKeySpan"] | null;
+            prev_key: string;
+            next_key: string;
+            /** @description Lịch tuần (D8), vd chan_nuoi_thuy_san:v3 */
+            calendar: string;
+            /** @enum {string} */
+            basis: "submitted" | "closed";
+            groups: components["schemas"]["CntsKeyLabel"][];
+            aqua_groups: components["schemas"]["CntsKeyLabel"][];
+            weeks: components["schemas"]["CntsKeySpan"][];
+            communes: components["schemas"]["CntsBM18Commune"][];
+            regions: components["schemas"]["CntsBM18Region"][];
+            catch: components["schemas"]["CntsColsMap"];
+            aqua: components["schemas"]["CntsBM18Aqua"][];
+            aqua_area: components["schemas"]["CntsCols"];
+            aqua_output: components["schemas"]["CntsCols"];
+            total: components["schemas"]["CntsCols"];
+            sources: components["schemas"]["CntsSources"];
+            units_total: number;
+            units_reported: number;
+            missing_units: string[];
+            aggregate: components["schemas"]["CntsAggregateState"];
+            shares: components["schemas"]["CntsShare"][];
+        };
+        PriceStatus: {
+            profile: string;
+            /** @description Mã phòng ban chủ dữ liệu giá của bên dùng (KN: Phòng TTTT) */
+            department: string;
+            /** @description Cấp của người gọi trong bên dùng (TW | TINH | XA); rỗng nếu chỉ có vai quản trị */
+            level: string;
+            /** @description Vai quản trị (Admin): danh mục nền, xã báo giá, phân công */
+            can_manage: boolean;
+            /** @description W11.72: Quản trị nghiệp vụ báo giá — vai quản trị hoặc Cấp Tỉnh có cờ qtnv_bao_gia (lịch, ngưỡng, mặt hàng) */
+            can_steward: boolean;
+            rule_version: string;
+            /** Format: date */
+            day: string;
+            units: number;
+            groups: number;
+        };
+        PriceCatalogEntry: {
+            code: string;
+            name: string;
+            sort_order: number;
+            version: number;
+            /** Format: date */
+            valid_from: string;
+        };
+        PriceCatalog: {
+            /** Format: date */
+            day: string;
+            units: components["schemas"]["PriceCatalogEntry"][];
+            groups: components["schemas"]["PriceCatalogEntry"][];
+            /** @description W11.72 nhóm vùng */
+            regions: components["schemas"]["PriceCatalogEntry"][];
+        };
+        PriceWriteResult: {
+            /** @description Mã mặt hàng / nhóm / bộ / xã; mã đề xuất (uuid) khi tạo hoặc từ chối đề xuất */
+            code: string;
+            version: number;
+            /** Format: date */
+            valid_from: string;
+            /** @description Số dòng sổ đã ghi */
+            written: number;
+        };
+        PriceItem: {
+            code: string;
+            name: string;
+            /** @description Giống / phẩm cấp */
+            variety: string;
+            group_code: string;
+            unit_code: string;
+            /** @description Quy cách */
+            spec: string | null;
+            /** @description Nơi bán */
+            sale_place: string | null;
+            /** @enum {string} */
+            kind: "basic" | "local";
+            sort_order: number;
+            version: number;
+            /**
+             * Format: date
+             * @description Ngày hiệu lực của phiên bản hiển thị
+             */
+            valid_from: string;
+            /**
+             * Format: date
+             * @description Hiệu lực đến (null = không thời hạn)
+             */
+            valid_to: string | null;
+            /**
+             * Format: date
+             * @description Ngày mặt hàng bắt đầu hiệu lực
+             */
+            since: string | null;
+            /** @enum {string} */
+            state: "active" | "pending" | "retired";
+            /** @description Thay thế cho */
+            replaces_code: string | null;
+            /** @description Lý do ngưng */
+            note: string | null;
+            /** @description Số xã đang gán (Địa phương); null với mặt hàng Cơ bản (mọi xã) */
+            point_count: number | null;
+            has_price: boolean;
+            /** @description Nhãn "Giá mới" — mặt hàng thay thế chưa có giá */
+            new_price: boolean;
+            /** @description Thuộc bộ theo vụ đang tắt tại ngày */
+            gated: boolean;
+            /** Format: uuid */
+            proposal_id: string | null;
+        };
+        PriceItemList: {
+            /** Format: date */
+            day: string;
+            items: components["schemas"]["PriceItem"][];
+            pending_proposals: number;
+            /** @description Thêm mặt hàng */
+            can_edit: boolean;
+            /** @description Quản trị nghiệp vụ — ngưng */
+            can_steward: boolean;
+        };
+        PriceItemVersion: {
+            version: number;
+            /** @enum {string} */
+            status: "active" | "retired";
+            /** Format: date */
+            valid_from: string;
+            name: string;
+            variety: string;
+            group_code: string;
+            unit_code: string;
+            spec: string | null;
+            sale_place: string | null;
+            /** @enum {string} */
+            kind: "basic" | "local";
+            sort_order: number;
+            note: string | null;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: uuid */
+            proposal_id: string | null;
+        };
+        PriceItemDetail: components["schemas"]["PriceItem"] & {
+            history: components["schemas"]["PriceItemVersion"][];
+            replaced_by: string[];
+        };
+        PriceItemInput: {
+            /** @description Tên loại */
+            name: string;
+            /** @description Giống / phẩm cấp (bắt buộc — BR-07) */
+            variety: string;
+            group_code: string;
+            unit_code: string;
+            spec?: string;
+            sale_place?: string;
+            /**
+             * @description Bắt buộc khi thêm; duyệt đề xuất mặc định local
+             * @enum {string}
+             */
+            kind?: "basic" | "local";
+            /**
+             * Format: date
+             * @description Vắng → ngày báo giá kế tiếp
+             */
+            valid_from?: string;
+            /**
+             * Format: date
+             * @description Chỉ khi thêm
+             */
+            valid_to?: string;
+            /** @description Thay thế cho — chỉ khi thêm */
+            replaces_code?: string;
+            /** @description Xã áp dụng mặt hàng Địa phương — chỉ khi thêm/duyệt */
+            points?: string[];
+        };
+        PriceGroup: {
+            code: string;
+            name: string;
+            sort_order: number;
+            version: number;
+            /** Format: date */
+            valid_from: string;
+            items: number;
+        };
+        PriceGroupInput: {
+            /** @description Chỉ khi thêm; vắng → nhom_<n> */
+            code?: string;
+            name: string;
+            /** @description 0 → cuối danh sách (thêm) / giữ nguyên (sửa) */
+            sort_order?: number;
+        };
+        PriceAssignment: {
+            point_code: string;
+            item_code: string;
+            version: number;
+            /** Format: date */
+            valid_from: string;
+        };
+        PriceAssignInput: {
+            point_code: string;
+            item_codes: string[];
+            /** Format: date */
+            valid_from?: string;
+        };
+        PriceItemSet: {
+            code: string;
+            name: string;
+            season: string;
+            item_codes: string[];
+            enabled: boolean;
+            version: number;
+            /** Format: date */
+            valid_from: string;
+            /** @enum {string} */
+            state: "active" | "pending" | "retired";
+        };
+        PriceItemSetInput: {
+            /** @description Bắt buộc khi tạo */
+            code?: string;
+            name: string;
+            season: string;
+            item_codes: string[];
+            enabled: boolean;
+            /** Format: date */
+            valid_from?: string;
+            /** @description Ngưng bộ (chỉ khi sửa) */
+            retire?: boolean;
+        };
+        PriceProposal: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            point_code: string;
+            name: string;
+            variety: string;
+            group_code: string;
+            unit_code: string;
+            spec: string | null;
+            reason: string;
+            /** @enum {string} */
+            status: "pending" | "approved" | "rejected";
+            item_code: string | null;
+            decision_note: string | null;
+            /** Format: uuid */
+            proposer_ref: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            decided_at: string | null;
+        };
+        PriceProposalInput: {
+            /** @description Mã xã báo giá (W11.72). Cấp Xã: xã mình phụ trách chính hôm nay — vắng khi phụ trách đúng một xã; Cấp Tỉnh: bắt buộc */
+            point_code?: string;
+            name: string;
+            variety: string;
+            group_code: string;
+            unit_code: string;
+            spec?: string;
+            reason: string;
+        };
+        PriceRegion: {
+            code: string;
+            name: string;
+            sort_order: number;
+            version: number;
+            /** Format: date */
+            valid_from: string;
+            /** @enum {string} */
+            status: "active" | "retired";
+            /** @description Số xã báo giá đang hoạt động thuộc nhóm tại ngày */
+            points: number;
+        };
+        PriceRegionInput: {
+            /** @description Chỉ khi thêm; vắng → vung_<n> */
+            code?: string;
+            name: string;
+            sort_order?: number;
+        };
+        PricePoint: {
+            code: string;
+            /** @description Tên xã theo ĐVHC tại ngày hiệu lực của phiên bản */
+            name: string;
+            admin_unit_code: string;
+            admin_unit_name: string;
+            /** @description ĐVHC còn hiệu lực tại ngày — false: cần chuyển sang mã ĐVHC kế thừa */
+            admin_unit_valid: boolean;
+            successor_codes: string[];
+            region_code: string;
+            region_name: string;
+            /** @enum {string} */
+            state: "active" | "pending" | "retired";
+            version: number;
+            /** Format: date */
+            valid_from: string;
+            /**
+             * Format: date
+             * @description Ngày bắt đầu báo giá
+             */
+            since: string | null;
+            /** Format: date */
+            valid_to: string | null;
+            note: string | null;
+            /**
+             * Format: uuid
+             * @description Cán bộ Xã phụ trách chính tại ngày (null = Chưa có cán bộ Xã)
+             */
+            officer_ref: string | null;
+            /** @description Chỉ vai quản trị và Cấp Tỉnh */
+            officer_name: string | null;
+            /** Format: date */
+            officer_since: string | null;
+            /**
+             * Format: uuid
+             * @description Cán bộ Cấp Tỉnh được phân công (null = Chưa phân công)
+             */
+            owner_ref: string | null;
+            owner_name: string | null;
+            /** Format: date */
+            owner_since: string | null;
+            item_count: number;
+        };
+        PricePointVersion: {
+            version: number;
+            /** Format: date */
+            valid_from: string;
+            /** @enum {string} */
+            status: "active" | "retired";
+            admin_unit_code: string;
+            name: string;
+            region_code: string;
+            note: string | null;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        PricePointOfficerVersion: {
+            /** @enum {string} */
+            role: "xa" | "tinh";
+            /** Format: uuid */
+            officer_ref: string | null;
+            name: string | null;
+            /** Format: date */
+            valid_from: string;
+            version: number;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        PricePointDetail: {
+            point: components["schemas"]["PricePoint"];
+            versions: components["schemas"]["PricePointVersion"][];
+            officers: components["schemas"]["PricePointOfficerVersion"][];
+        };
+        PricePointInput: {
+            /** @description Thêm: bắt buộc; sửa: vắng = giữ */
+            admin_unit_code?: string;
+            /** @description Thêm: bắt buộc; sửa: vắng = giữ */
+            region_code?: string;
+            /**
+             * Format: date
+             * @description Vắng → ngày báo giá kế tiếp
+             */
+            valid_from?: string;
+            note?: string;
+            /** @description Ngưng: lý do (bắt buộc — hoặc gửi trong note) */
+            reason?: string;
+        };
+        PriceOfficerInput: {
+            /** @enum {string} */
+            role: "xa" | "tinh";
+            /** Format: uuid */
+            officer_ref?: string | null;
+            /** Format: date */
+            valid_from?: string;
+        };
+        PriceAdminUnit: {
+            code: string;
+            name: string;
+            parent_code: string | null;
+            /** Format: date */
+            valid_from: string;
+            /** Format: date */
+            valid_to: string | null;
+            /** @description Mã xã báo giá đang gắn ĐVHC tại ngày */
+            taken_by: string | null;
+        };
+        PriceOfficer: {
+            /** Format: uuid */
+            ref: string;
+            name: string;
+            /** @enum {string} */
+            level: "XA" | "TINH";
+            communes: string[];
+        };
+        PriceSchedule: {
+            weekdays: ("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")[];
+            /** @description Giờ khóa nhập (giờ VN), mặc định 12:00 */
+            lock_at: string;
+            /** @description Hạn phản hồi xác minh, mặc định 13:30 */
+            respond_by: string;
+            remind1_at: string;
+            remind2_at: string;
+            channels: ("in_app" | "email")[];
+            template: string;
+            /**
+             * Format: date
+             * @description null = mặc định của bên dùng (chưa có phiên bản)
+             */
+            valid_from: string | null;
+            version: number;
+        };
+        PriceScheduleInput: {
+            weekdays: ("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")[];
+            lock_at: string;
+            respond_by: string;
+            remind1_at: string;
+            remind2_at: string;
+            channels: ("in_app" | "email")[];
+            /** @description Biến {ngày}, {xã}, {giờ khóa} */
+            template: string;
+            /** Format: date */
+            valid_from: string;
+        };
+        PriceCalendarDay: {
+            /** Format: date */
+            day: string;
+            /** @enum {string} */
+            weekday: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+            /** @enum {string} */
+            kind: "regular" | "extra" | "holiday" | "off";
+            /** @description Là kỳ báo giá */
+            quote: boolean;
+            reason: string;
+            /** Format: date-time */
+            lock_at: string | null;
+            /** Format: date-time */
+            respond_by: string | null;
+            /** Format: date-time */
+            remind1_at: string | null;
+            /** Format: date-time */
+            remind2_at: string | null;
+        };
+        PriceCalendarException: {
+            /** Format: date */
+            day: string;
+            /** @enum {string} */
+            kind: "holiday" | "extra";
+            reason: string;
+            version: number;
+        };
+        PriceScheduleHistory: components["schemas"]["PriceSchedule"] & {
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        PriceCalendar: {
+            profile: string;
+            /** Format: date-time */
+            now: string;
+            can_manage: boolean;
+            today: components["schemas"]["PriceCalendarDay"];
+            /** @description Kỳ hôm nay đã khóa (Xã chỉ xem) */
+            locked: boolean;
+            current: components["schemas"]["PriceSchedule"];
+            upcoming: components["schemas"]["PriceSchedule"][];
+            /** Format: date */
+            earliest_valid_from: string;
+            days: components["schemas"]["PriceCalendarDay"][];
+            exceptions: components["schemas"]["PriceCalendarException"][];
+            history: components["schemas"]["PriceScheduleHistory"][];
+        };
+        PriceCalendarRun: {
+            /** Format: date */
+            day: string;
+            /** @enum {string} */
+            kind: "lock" | "remind1" | "remind2";
+            /** Format: date-time */
+            scheduled_at: string;
+            /** Format: date-time */
+            ran_at: string;
+            lag_seconds: number;
+            recipients: number;
+            /** @description Số xã (0 = thông báo chủ đề toàn tenant) */
+            targets: number;
+            note: string;
+        };
+        PriceThreshold: {
+            /** @enum {string} */
+            scope: "default" | "group" | "item";
+            code: string;
+            pct: components["schemas"]["Decimal"];
+            lookback_days?: number;
+            flat_pct?: components["schemas"]["Decimal"];
+            survey_pct?: components["schemas"]["Decimal"];
+            version: number;
+            /** @enum {string} */
+            status?: "active" | "retired";
+            /** Format: uuid */
+            actor_ref?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+        };
+        PriceThresholdInput: {
+            /** @enum {string} */
+            scope: "default" | "group" | "item";
+            /** @description Rỗng với default; mã nhóm hàng / mặt hàng */
+            code: string;
+            pct: components["schemas"]["Decimal"];
+            lookback_days?: number;
+            flat_pct?: components["schemas"]["Decimal"];
+            survey_pct?: components["schemas"]["Decimal"];
+        };
+        PriceThresholds: {
+            profile: string;
+            can_manage: boolean;
+            default: components["schemas"]["PriceThreshold"];
+            /** @description false = mặc định của bên dùng (chưa ghi phiên bản) */
+            default_stored: boolean;
+            items: components["schemas"]["PriceThreshold"][];
+            history: components["schemas"]["PriceThreshold"][];
+        };
+        /** @description Số thập phân dạng chuỗi hoặc null (không float) */
+        PriceDecimalNull: string | null;
+        /**
+         * @description Trạng thái phiếu nhìn tại lúc đọc (Mục II.3.1): Chưa nhập, Bản nháp, Đã gửi, Đã khóa, Không nộp, Nộp muộn, Đã duyệt, Đã xóa
+         * @enum {string}
+         */
+        PriceTicketView: "not_entered" | "draft" | "submitted" | "locked" | "missed" | "late" | "approved" | "deleted";
+        /**
+         * @description Trạng thái cảnh báo (Mục II.3.2): Tạm tính, Chờ rà soát, Đã yêu cầu xác minh, Xã đã phản hồi, Quá hạn phản hồi, Đã hiệu chỉnh, Giữ nguyên, Đã loại, Tự hủy
+         * @enum {string}
+         */
+        PriceAlertView: "provisional" | "pending" | "requested" | "responded" | "overdue" | "adjusted" | "kept" | "excluded" | "cancelled" | "reopened";
+        PriceTicketPoint: {
+            code: string;
+            name: string;
+            region_code: string;
+            region_name: string;
+            active: boolean;
+            /**
+             * Format: uuid
+             * @description Cán bộ Xã phụ trách chính tại ngày
+             */
+            officer_ref: string | null;
+            /** @description Tên (chỉ Cấp Tỉnh */
+            officer_name: string | null;
+            /**
+             * Format: uuid
+             * @description Cán bộ Cấp Tỉnh được phân công (null = Chưa phân công)
+             */
+            owner_ref: string | null;
+            owner_name: string | null;
+        };
+        PriceTicketHead: {
+            /** Format: uuid */
+            id: string;
+            /** @description Phiên bản đầu phiếu — gửi lại ở lần ghi kế tiếp */
+            version: number;
+            /** Format: date */
+            day: string;
+            point_code: string;
+            /** @enum {string} */
+            status: "draft" | "submitted" | "late" | "deleted";
+            /** @enum {string} */
+            source: "xa" | "proxy";
+            /** @enum {string} */
+            op: "save" | "submit" | "proxy_save" | "proxy_submit" | "correct" | "redate" | "delete";
+            reason: string | null;
+            /** Format: date-time */
+            submitted_at: string | null;
+            /** Format: uuid */
+            officer_ref: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_name: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PriceAlertVersion: {
+            version: number;
+            /** @enum {string} */
+            status: "provisional" | "cancelled" | "requested" | "responded" | "adjusted" | "kept" | "excluded" | "reopened";
+            /** @enum {string} */
+            direction: "high" | "low";
+            ref_price: components["schemas"]["Decimal"];
+            price: components["schemas"]["Decimal"];
+            change_pct: components["schemas"]["Decimal"];
+            threshold_pct: components["schemas"]["Decimal"];
+            /** @description Nội dung yêu cầu xác minh / ghi chú giữ nguyên / lý do loại / lý do hiệu chỉnh */
+            message: string | null;
+            /** Format: date-time */
+            respond_by: string | null;
+            /** @enum {string|null} */
+            response: "keep" | "propose" | null;
+            proposed_min: components["schemas"]["PriceDecimalNull"];
+            proposed_max: components["schemas"]["PriceDecimalNull"];
+            explanation: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        PriceAlert: components["schemas"]["PriceAlertVersion"] & {
+            /** Format: uuid */
+            ticket_id: string;
+            item_code: string;
+            view: components["schemas"]["PriceAlertView"];
+            /** @description Yêu cầu xác minh gần nhất */
+            request: components["schemas"]["PriceAlertVersion"] | null;
+            /** @description Phản hồi gần nhất của Xã */
+            reply: components["schemas"]["PriceAlertVersion"] | null;
+            /** @description Trao đổi xác minh (mọi phiên bản) */
+            history: components["schemas"]["PriceAlertVersion"][];
+        };
+        PriceSheetLine: {
+            item_code: string;
+            name: string;
+            variety: string;
+            group_code: string;
+            group_name: string;
+            unit_code: string;
+            unit_name: string;
+            /** @description basic (Cơ bản) | local (Địa phương) */
+            kind: string;
+            /** @description Giá tham chiếu (CT-02); null = Giá mới */
+            ref: {
+                min: components["schemas"]["Decimal"];
+                max: components["schemas"]["Decimal"];
+                mid: components["schemas"]["Decimal"];
+                /** Format: date */
+                day: string;
+            } | null;
+            threshold_pct: components["schemas"]["Decimal"];
+            min: components["schemas"]["PriceDecimalNull"];
+            max: components["schemas"]["PriceDecimalNull"];
+            no_goods: boolean;
+            note: string | null;
+            entered: boolean;
+            adj_min: components["schemas"]["PriceDecimalNull"];
+            adj_max: components["schemas"]["PriceDecimalNull"];
+            adj_reason: string | null;
+            /** @description So giá đang ghi với giá tham chiếu (▲ / ▼, Δ%) */
+            eval: {
+                /** @enum {string} */
+                direction: "" | "high" | "low";
+                change_pct: components["schemas"]["Decimal"];
+            } | null;
+            alert: components["schemas"]["PriceAlert"] | null;
+        };
+        PriceSheet: {
+            point: components["schemas"]["PriceTicketPoint"];
+            /** Format: date */
+            day: string;
+            /** @description Là ngày báo giá */
+            quote: boolean;
+            /** Format: date-time */
+            lock_at: string | null;
+            /** Format: date-time */
+            respond_by: string | null;
+            locked: boolean;
+            /**
+             * @description Bảng giá ngày (W11.76); open = Chưa duyệt
+             * @enum {string}
+             */
+            board: "open" | "approving" | "approved" | "reopened";
+            /** Format: date-time */
+            now: string;
+            view: components["schemas"]["PriceTicketView"];
+            ticket: components["schemas"]["PriceTicketHead"] | null;
+            can: {
+                enter: boolean;
+                proxy: boolean;
+                correct: boolean;
+                redate: boolean;
+                delete: boolean;
+                review: boolean;
+                respond: boolean;
+            };
+            lines: components["schemas"]["PriceSheetLine"][];
+        };
+        PriceTicketRow: {
+            point: components["schemas"]["PriceTicketPoint"];
+            mine: boolean;
+            view: components["schemas"]["PriceTicketView"];
+            ticket: components["schemas"]["PriceTicketHead"] | null;
+            items: number;
+            priced: number;
+            no_goods: number;
+            adjusted: number;
+            excluded: number;
+            high: number;
+            low: number;
+            open_alerts: number;
+        };
+        PriceTicketDay: {
+            /** Format: date */
+            day: string;
+            quote: boolean;
+            /** Format: date-time */
+            lock_at: string | null;
+            /** Format: date-time */
+            respond_by: string | null;
+            locked: boolean;
+            /** @enum {string} */
+            board: "open" | "approving" | "approved" | "reopened";
+            /** Format: date-time */
+            now: string;
+            rows: components["schemas"]["PriceTicketRow"][];
+        };
+        PriceHistoryRow: {
+            /** Format: date */
+            day: string;
+            view: components["schemas"]["PriceTicketView"];
+            ticket: components["schemas"]["PriceTicketHead"] | null;
+            point: components["schemas"]["PriceTicketPoint"];
+            priced: number;
+            no_goods: number;
+            adjusted: number;
+            excluded: number;
+            high: number;
+            low: number;
+        };
+        PriceTicketLog: {
+            ticket: {
+                version: number;
+                /** Format: date */
+                day: string;
+                status: string;
+                source: string;
+                op: string;
+                reason: string | null;
+                /** Format: date-time */
+                submitted_at: string | null;
+                /** Format: uuid */
+                actor_ref: string;
+                actor_name: string | null;
+                /** Format: date-time */
+                at: string;
+            }[];
+            lines: {
+                item_code: string;
+                version: number;
+                min: components["schemas"]["PriceDecimalNull"];
+                max: components["schemas"]["PriceDecimalNull"];
+                no_goods: boolean;
+                note: string | null;
+                adj_min: components["schemas"]["PriceDecimalNull"];
+                adj_max: components["schemas"]["PriceDecimalNull"];
+                adj_reason: string | null;
+                /** Format: uuid */
+                actor_ref: string;
+                actor_name: string | null;
+                /** Format: date-time */
+                at: string;
+            }[];
+            alerts: {
+                item_code: string;
+                entry: components["schemas"]["PriceAlertVersion"];
+                actor_name: string | null;
+            }[];
+        };
+        PriceAlertRow: components["schemas"]["PriceAlert"] & {
+            /** Format: date */
+            day: string;
+            point: components["schemas"]["PriceTicketPoint"];
+            item_name: string;
+            variety: string;
+            group_code: string;
+            group_name: string;
+            unit_name: string;
+            min: components["schemas"]["PriceDecimalNull"];
+            max: components["schemas"]["PriceDecimalNull"];
+            note: string | null;
+            /** @description Giá hiệu chỉnh "thấp – cao" */
+            adjusted: string | null;
+            ticket_version: number;
+            ticket_status: string;
+            mine: boolean;
+            /** @description Cấp Tỉnh xử lý được (xã phân công / chưa phân công); Cấp Xã phản hồi được */
+            can_act: boolean;
+        };
+        PriceLineInput: {
+            item_code: string;
+            min?: components["schemas"]["PriceDecimalNull"];
+            max?: components["schemas"]["PriceDecimalNull"];
+            no_goods?: boolean;
+            /** @description Ghi chú biến động (bắt buộc với dòng bất thường khi gửi) */
+            note?: string | null;
+        };
+        PriceEntryInput: {
+            point: string;
+            /**
+             * Format: date
+             * @description Ngày báo giá — Xã vắng = hôm nay; nhập thay bắt buộc
+             */
+            day?: string;
+            /** @description Phiên bản đầu phiếu đã đọc (0 = phiếu mới) */
+            version: number;
+            /** @description true = Gửi báo giá (Xã) / Lưu chính thức (nhập thay → Nộp muộn); false = Lưu nháp */
+            submit: boolean;
+            /** @description Lý do nộp muộn (nhập thay — bắt buộc) */
+            reason?: string;
+            /** @description Dòng thay đổi; dòng không gửi giữ nguyên */
+            lines: components["schemas"]["PriceLineInput"][];
+        };
+        PriceCorrectInput: {
+            version: number;
+            reason: string;
+            lines: {
+                item_code: string;
+                min: components["schemas"]["Decimal"];
+                max: components["schemas"]["Decimal"];
+            }[];
+        };
+        PriceRedateInput: {
+            version: number;
+            /** Format: date */
+            day: string;
+            reason: string;
+        };
+        PriceDeleteInput: {
+            version: number;
+            reason: string;
+        };
+        PriceAlertKey: {
+            /** Format: uuid */
+            ticket_id: string;
+            item_code: string;
+        };
+        PriceVerificationRequest: {
+            alerts: components["schemas"]["PriceAlertKey"][];
+            /** @description Mặc định "Giá {mặt hàng} tại {xã} chênh {x%} so với giá tham chiếu, đề nghị xã kiểm tra lại" */
+            message: string;
+        };
+        PriceVerificationResponse: components["schemas"]["PriceAlertKey"] & {
+            /** @enum {string} */
+            choice: "keep" | "propose";
+            min?: components["schemas"]["PriceDecimalNull"];
+            max?: components["schemas"]["PriceDecimalNull"];
+            explanation: string;
+        };
+        PriceAlertDecision: components["schemas"]["PriceAlertKey"] & {
+            /** @enum {string} */
+            decision: "keep" | "exclude" | "reopen";
+            note: string;
+        };
+        PriceWritten: {
+            written: number;
+        };
+        /**
+         * @description Chưa duyệt | Đang duyệt | Đã duyệt | Đang mở duyệt
+         * @enum {string}
+         */
+        PriceBoardState: "open" | "approving" | "approved" | "reopened";
+        PriceBoardOp: {
+            /** @description Phiên bản sổ bảng giá người gọi đã thấy (khóa lạc quan; 0 = chưa có) */
+            seq: number;
+            /** @description Lý do mở duyệt (bắt buộc) / hủy mở duyệt */
+            reason?: string;
+        };
+        PriceBoardLine: {
+            item_code: string;
+            item_name: string;
+            group_code: string;
+            group_name: string;
+            unit_code: string;
+            unit_name: string;
+            min: components["schemas"]["Decimal"];
+            max: components["schemas"]["Decimal"];
+            avg: components["schemas"]["Decimal"];
+            /** @description Số xã có giá */
+            points: number;
+        };
+        PriceBoardDay: {
+            /** Format: date */
+            day: string;
+            quote: boolean;
+            state: components["schemas"]["PriceBoardState"];
+            version: number;
+            /** Format: date-time */
+            approved_at: string | null;
+        };
+        PriceBoardSummary: {
+            points: number;
+            submitted: number;
+            late: number;
+            missed: number;
+            price_lines: number;
+            excluded: number;
+            open_alerts: number;
+        };
+        PriceBoardPublished: {
+            version: number;
+            /** Format: date-time */
+            approved_at: string;
+            /** @description Đang mở duyệt — số có thể đổi (nhãn Đang cập nhật) */
+            reopened: boolean;
+            week_key: string;
+            lines: components["schemas"]["PriceBoardLine"][];
+        };
+        PriceBoardLog: {
+            seq: number;
+            /** @enum {string} */
+            action: "lock" | "unlock" | "approve" | "reopen" | "cancel_reopen";
+            status: components["schemas"]["PriceBoardState"];
+            version: number;
+            reason: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_name: string | null;
+            /** Format: date-time */
+            at: string;
+        };
+        PriceBoard: {
+            /** Format: date */
+            day: string;
+            quote: boolean;
+            /** Format: date-time */
+            lock_at: string | null;
+            /** @description Đã qua giờ khóa nhập */
+            locked: boolean;
+            /** Format: date-time */
+            now: string;
+            state: components["schemas"]["PriceBoardState"];
+            seq: number;
+            /** @description Phiên bản đã duyệt hiện hành (0 = chưa duyệt) */
+            version: number;
+            /** Format: uuid */
+            locked_by: string | null;
+            locked_by_name: string | null;
+            /** Format: date-time */
+            lock_until: string | null;
+            summary: components["schemas"]["PriceBoardSummary"] | null;
+            preview: components["schemas"]["PriceBoardLine"][];
+            published: components["schemas"]["PriceBoardPublished"] | null;
+            log: components["schemas"]["PriceBoardLog"][];
+            can: {
+                approve: boolean;
+                unlock: boolean;
+                reopen: boolean;
+                cancel_reopen: boolean;
+            };
+            /** @description Lý do chưa duyệt được */
+            blockers: string[];
+            reopen_days: number;
+        };
+        PriceRef: {
+            code: string;
+            name: string;
+        };
+        /**
+         * @description Tăng / Giảm / Đi ngang (|Δ%| < ngưỡng đi ngang — CT-04); rỗng = kỳ trước không có giá
+         * @enum {string}
+         */
+        PriceTrend: "up" | "down" | "flat" | "";
+        PriceReportItem: {
+            item_code: string;
+            item_name: string;
+            group_code: string;
+            group_name: string;
+            unit_code: string;
+            unit_name: string;
+            /** @description Mặt hàng Cơ bản */
+            basic: boolean;
+        };
+        PricePointPrice: components["schemas"]["PriceReportItem"] & {
+            point_code: string;
+            point_name: string;
+            region_code: string;
+            region_name: string;
+            min: string;
+            max: string;
+            /** @description P (CT-01) */
+            mid: string;
+            late: boolean;
+        };
+        PriceProgressRow: components["schemas"]["PriceTicketRow"] & {
+            /** Format: date-time */
+            updated_at: string | null;
+            /** @description Lần hệ thống đã nhắc trong ngày */
+            reminders: string[];
+        };
+        PriceProgress: {
+            /** Format: date */
+            requested: string;
+            /** Format: date */
+            day: string;
+            /** @description Ngày chọn không phải ngày báo giá — hiển thị ngày báo giá gần nhất */
+            no_quote: boolean;
+            quote: boolean;
+            /** Format: date-time */
+            lock_at: string | null;
+            locked: boolean;
+            board: string;
+            /** Format: date-time */
+            now: string;
+            cards: {
+                points: number;
+                submitted: number;
+                draft: number;
+                not_entered: number;
+                missed: number;
+                late: number;
+                high: number;
+                low: number;
+                unassigned: number;
+                no_officer: number;
+            };
+            rows: components["schemas"]["PriceProgressRow"][];
+            regions: components["schemas"]["PriceRef"][];
+        };
+        PriceSummaryLine: components["schemas"]["PriceReportItem"] & {
+            min: string;
+            max: string;
+            avg: string;
+            points: number;
+            /** @description Giá trung bình kỳ trước */
+            prev: string | null;
+            change_pct: string | null;
+            trend: components["schemas"]["PriceTrend"];
+        };
+        PriceSummary: {
+            /** Format: date */
+            requested: string;
+            /**
+             * Format: date
+             * @description Ngày của bảng đang hiển thị; null = Chưa có dữ liệu
+             */
+            day: string | null;
+            version: number;
+            /** Format: date-time */
+            approved_at: string | null;
+            /** @description Chưa công bố hôm nay — bảng gần nhất */
+            not_today: boolean;
+            /** @description Đang cập nhật (mở duyệt) — phiên bản cũ */
+            updating: boolean;
+            /** Format: date */
+            prev_day: string | null;
+            flat_pct: string;
+            region: string;
+            read_only: boolean;
+            lines: components["schemas"]["PriceSummaryLine"][];
+            points: components["schemas"]["PricePointPrice"][];
+            regions: components["schemas"]["PriceRef"][];
+            groups: components["schemas"]["PriceRef"][];
+        };
+        PricePeriod: {
+            /** Format: date */
+            from: string | null;
+            /** Format: date */
+            to: string | null;
+            label: string;
+            /** @description Số ngày công bố trong kỳ */
+            days: number;
+        };
+        PriceMovementLine: components["schemas"]["PriceReportItem"] & {
+            cur: string | null;
+            prev: string | null;
+            change_pct: string | null;
+            trend: components["schemas"]["PriceTrend"];
+        };
+        PriceMovement: {
+            /** @enum {string} */
+            period: "day" | "week" | "month";
+            cur: components["schemas"]["PricePeriod"];
+            prev: components["schemas"]["PricePeriod"];
+            /** @description Chưa đủ dữ liệu so sánh */
+            insufficient: boolean;
+            flat_pct: string;
+            cards: {
+                up: number;
+                down: number;
+                flat: number;
+                /** @description Cảnh báo đã chốt trong kỳ */
+                exceeded: number;
+            };
+            lines: components["schemas"]["PriceMovementLine"][];
+            item: string;
+            trend: {
+                period: components["schemas"]["PricePeriod"];
+                avg: string | null;
+            }[];
+            points: {
+                point_code: string;
+                point_name: string;
+                region_name: string;
+                cur: string | null;
+                prev: string | null;
+                change_pct: string | null;
+                trend: components["schemas"]["PriceTrend"];
+            }[];
+            regions: components["schemas"]["PriceRef"][];
+            groups: components["schemas"]["PriceRef"][];
+            can_export: boolean;
+        };
+        PriceRegionAvg: {
+            region: string;
+            avg: string | null;
+            points: number;
+        };
+        PriceDashboardLine: {
+            item: components["schemas"]["PriceReportItem"];
+            avg: string;
+            prev: string | null;
+            change_pct: string | null;
+            trend: components["schemas"]["PriceTrend"];
+            regions: components["schemas"]["PriceRegionAvg"][];
+        };
+        PriceDashboard: {
+            /** Format: date */
+            requested: string;
+            /** Format: date */
+            day: string | null;
+            version: number;
+            /** Format: date-time */
+            approved_at: string | null;
+            not_today: boolean;
+            updating: boolean;
+            /** Format: date */
+            prev_day: string | null;
+            cards: {
+                up: number;
+                down: number;
+                flat: number;
+                /** @description Số xã có báo giá */
+                points: number;
+            };
+            regions: {
+                code: string;
+                name: string;
+                points: number;
+            }[];
+            lines: components["schemas"]["PriceDashboardLine"][];
+            groups: {
+                code: string;
+                name: string;
+                up: number;
+                down: number;
+                flat: number;
+            }[];
+            item: string;
+            trend: {
+                /** Format: date */
+                day: string;
+                avg: string | null;
+                regions: components["schemas"]["PriceRegionAvg"][];
+            }[];
+            region: string;
+            drill: components["schemas"]["PricePointPrice"][];
+        };
+        PriceStatRow: {
+            /** Format: uuid */
+            officer_ref: string;
+            officer_name: string | null;
+            point_code: string;
+            point_name: string;
+            region_code: string;
+            region_name: string;
+            required: number;
+            on_time: number;
+            late: number;
+            missed: number;
+            deleted: number;
+            adjusted_lines: number;
+        };
+        PriceStatMonth: {
+            seq: number;
+            /** @enum {string} */
+            status: "none" | "closed" | "open";
+            version: number;
+            reason: string | null;
+            /** Format: date-time */
+            at?: string;
+        };
+        PriceStats: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            monthly: boolean;
+            month: components["schemas"]["PriceStatMonth"] | null;
+            /** @description Số liệu từ ảnh chụp tháng đã khóa */
+            snapshot: boolean;
+            /** @description Ngày báo giá chưa qua giờ khóa (chưa tính) */
+            pending: number;
+            cards: {
+                quote_days: number;
+                required: number;
+                on_time: number;
+                late: number;
+                missed: number;
+            };
+            rows: components["schemas"]["PriceStatRow"][];
+            can_close: boolean;
+            can_reopen: boolean;
+            regions: components["schemas"]["PriceRef"][];
+        };
+        PriceStatDay: {
+            /** Format: date */
+            day: string;
+            point_code: string;
+            /** @enum {string} */
+            result: "on_time" | "late" | "missed";
+            view: string;
+            /** Format: uuid */
+            ticket_id: string | null;
+            deleted: number;
+            adjusted_lines: number;
+        };
+        PriceStatMonthOp: {
+            month: string;
+            /** @description Phiên bản khóa tháng đã thấy (0 = chưa khóa lần nào) */
+            seq: number;
+            /** @description Bắt buộc khi mở lại */
+            reason?: string;
+        };
+        /**
+         * @description Mặt hàng giá cả ở cap/price (Q-082)
+         * @enum {string}
+         */
+        KhtcCatalogKind: "report_type" | "unit" | "field" | "funding_source" | "signer" | "recipient" | "basis";
+        KhtcActor: {
+            /** Format: uuid */
+            ref: string;
+            display: string | null;
+        };
+        KhtcCatalogInput: {
+            /** @description Chỉ khi thêm; a-z, 0-9, dấu chấm, gạch dưới, gạch ngang (đưa về chữ thường) */
+            code?: string;
+            name: string;
+            sort_order?: number;
+            /** @description false = ngừng dùng */
+            active?: boolean;
+            /** @description mau_1…mau_5 — chỉ người ký, nơi nhận, căn cứ */
+            default_for?: string[];
+            /** @description signer: title, authority; unit: symbol; basis: document_no, date; recipient: address */
+            attrs?: {
+                [key: string]: string;
+            };
+        };
+        KhtcCatalogItem: {
+            kind: components["schemas"]["KhtcCatalogKind"];
+            code: string;
+            name: string;
+            sort_order: number;
+            active: boolean;
+            default_for: string[];
+            attrs: {
+                [key: string]: string;
+            };
+            version: number;
+            /** Format: uuid */
+            version_id: string;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["KhtcActor"];
+        };
+        /** @enum {string} */
+        KhtcProgramKind: "program" | "project" | "central_project" | "cooperation" | "research" | "advisory";
+        KhtcProgramInput: {
+            code: string;
+            name: string;
+            kind: components["schemas"]["KhtcProgramKind"];
+            field_code?: string;
+            owner_department?: string;
+            start_year?: number;
+            end_year?: number;
+            active?: boolean;
+            note?: string;
+        };
+        KhtcProgram: {
+            /**
+             * Format: uuid
+             * @description Định danh bền (module khác tham chiếu — D20)
+             */
+            ref: string;
+            code: string;
+            name: string;
+            kind: components["schemas"]["KhtcProgramKind"];
+            field_code: string | null;
+            owner_department: string | null;
+            start_year: number | null;
+            end_year: number | null;
+            active: boolean;
+            note: string | null;
+            version: number;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["KhtcActor"];
+        };
+        /** @enum {string} */
+        KhtcPlanTab: "programs" | "prev_year" | "central_project" | "cooperation" | "research" | "advisory";
+        KhtcPlanEntryInput: {
+            /** Format: uuid */
+            ref: string;
+            tab: components["schemas"]["KhtcPlanTab"];
+            /** @enum {string} */
+            kind: "program" | "group" | "item";
+            /** Format: uuid */
+            parent_ref?: string | null;
+            /** Format: uuid */
+            program_ref?: string | null;
+            sort_order?: number;
+            code?: string;
+            /** @description Dòng CT/DA để trống → tên trong danh sách chủ */
+            name?: string;
+            unit_code?: string;
+            /** @description Thập phân dạng chuỗi, ≤ 4 chữ số lẻ */
+            planned_qty?: string | null;
+            scale_note?: string;
+            /** @description Kinh phí KH (đồng), ≤ 2 chữ số lẻ */
+            budget?: string | null;
+            funding_code?: string;
+            field_code?: string;
+            /** @description Hạng mục: bắt buộc, đúng một phòng phụ trách */
+            department_code?: string;
+            communes?: string[];
+            points_count?: number | null;
+            /** @enum {string} */
+            data_source?: "" | "form" | "module";
+            source_key?: string;
+            /** @enum {string} */
+            tracking?: "" | "tracking" | "stopped";
+            /** Format: date */
+            stopped_from?: string | null;
+            stop_decision?: string;
+            note?: string;
+        };
+        KhtcPlanEntry: {
+            /** Format: uuid */
+            ref: string;
+            tab: components["schemas"]["KhtcPlanTab"];
+            /** @enum {string} */
+            kind: "program" | "group" | "item";
+            /** Format: uuid */
+            parent_ref: string | null;
+            /** Format: uuid */
+            program_ref: string | null;
+            program_code: string | null;
+            program_name: string | null;
+            /** @description Số La Mã của CT ở tab Các chương trình (BR-DL-21) */
+            roman: string | null;
+            sort_order: number;
+            code: string | null;
+            name: string;
+            unit_code: string | null;
+            planned_qty: string | null;
+            scale_note: string | null;
+            budget: string | null;
+            funding_code: string | null;
+            field_code: string | null;
+            department_code: string | null;
+            communes: string[];
+            points_count: number | null;
+            /** @enum {string|null} */
+            data_source: "form" | "module" | null;
+            source_key: string | null;
+            /** @enum {string} */
+            tracking: "tracking" | "stopped";
+            /** Format: date */
+            stopped_from: string | null;
+            stop_decision: string | null;
+            note: string | null;
+        };
+        KhtcPlanVersion: {
+            /** Format: uuid */
+            id: string;
+            year: number;
+            version: number;
+            /** @enum {string} */
+            basis: "initial" | "adjust";
+            decision_no: string | null;
+            /** Format: date */
+            decision_date: string | null;
+            /** Format: date */
+            effective_from: string;
+            copied_from_year: number | null;
+            note: string | null;
+            entries_count: number;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["KhtcActor"];
+        };
+        KhtcPlan: {
+            year: number;
+            version: components["schemas"]["KhtcPlanVersion"];
+            latest_version: number;
+            entries: components["schemas"]["KhtcPlanEntry"][];
+        };
+        KhtcPlanSave: {
+            /** @description Phiên bản mới nhất đang sửa (0 = chưa có) — khóa lạc quan */
+            base_version: number;
+            decision_no?: string;
+            /** Format: date */
+            decision_date?: string;
+            /**
+             * Format: date
+             * @description Vắng ở phiên bản 1 = 01/01
+             */
+            effective_from?: string;
+            copied_from_year?: number;
+            note?: string;
+            entries: components["schemas"]["KhtcPlanEntryInput"][];
+        };
+        KhtcPlanDraft: {
+            from_year: number | null;
+            from_version: number | null;
+            entries: components["schemas"]["KhtcPlanEntry"][];
+            problems: {
+                row: number | null;
+                field: string;
+                reason: string;
+            }[];
+        };
+        KHTCWeek: {
+            no: number;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+        };
+        KHTCFormTemplate: {
+            code: string;
+            version: number;
+            title: string;
+            installed: boolean;
+        };
+        KHTCReason: {
+            /** @description 10–500 ký tự; bắt buộc khi hủy kỳ và khi đóng kỳ còn thiếu dữ liệu */
+            reason?: string;
+        };
+        /** @description Một lần "Cập nhật số liệu" (W11.64) — bất biến. */
+        KHTCSourceSnapshot: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: int64
+             * @description Số thứ tự ảnh chụp của kỳ
+             */
+            no: number;
+            /** Format: date-time */
+            taken_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_name?: string;
+            /** @description Mọi phòng nguồn đã chốt cho mọi tuần của kỳ (D17) */
+            closed: boolean;
+            /** @description Lịch KHTC (D8), vd ke_hoach_tai_chinh:v2 */
+            target_calendar: string;
+            crosswalk_version: string;
+            /** Format: uuid */
+            plan_version_id: string | null;
+            figures_hash: string;
+            status_hash: string;
+            row_count: number;
+            value_count: number;
+            change_count: number;
+        };
+        /** @description Mốc dữ liệu của một nguồn (phòng × biểu). */
+        KHTCSourceAsOf: {
+            department: string;
+            source_module: string;
+            /** @description null: phòng không có số (Missing) hoặc nguồn chưa công bố */
+            form_code: string | null;
+            /** @description Khóa kỳ nguồn theo lịch của nguồn */
+            native_keys: string[];
+            /** Format: date-time */
+            closed_at: string | null;
+            /** Format: int64 */
+            snapshot_no: number | null;
+            closed: boolean;
+            missing: boolean;
+            unavailable: boolean;
+            /** @description Giá: ngày đã duyệt gần nhất trước kỳ (D22) */
+            fallback: boolean;
+            /** @enum {string} */
+            confirmation: "confirmed" | "unconfirmed";
+        };
+        KHTCSourceEntry: {
+            /** Format: uuid */
+            ref: string;
+            code: string;
+            name: string;
+        };
+        /** @description Số của một khóa nguồn module (hạng mục Kế hoạch năm) trong ảnh chụp — lũy kế của nguồn (D18), giá min/max toàn tỉnh (D22). */
+        KHTCSourceValue: {
+            source_key: string;
+            entries: components["schemas"]["KHTCSourceEntry"][];
+            /** @description cum | season | sum | price (rỗng khi khóa sai dạng) */
+            mode: string;
+            /** @description Khóa nguồn sai dạng — hạng mục không có số */
+            invalid: boolean;
+            cumulative: string | null;
+            base: string | null;
+            /** @description frozen:<tuần> | current:<tuần> | reset | start */
+            base_ref?: string;
+            increment: string | null;
+            year_to_date: string | null;
+            sum: string | null;
+            price_min: string | null;
+            price_max: string | null;
+            /** Format: date */
+            price_day: string | null;
+            price_days: {
+                /** Format: date */
+                day: string;
+                min: string;
+                max: string;
+            }[];
+            /** @description Phần Chưa xác nhận (D2), đã tính trong tổng */
+            unconfirmed: string | null;
+            closed: boolean;
+            /** @description Tạm tính (BR-DL-03) */
+            provisional: boolean;
+            no_source: boolean;
+            frozen: boolean;
+            source_changed: boolean;
+            fallback: boolean;
+            unavailable: boolean;
+            source_keys: string[];
+        };
+        /** @description Kỳ nguồn khác ảnh chụp ("Nguồn đã thay đổi" — chỉ cảnh báo). */
+        KHTCSourceChange: {
+            /** @enum {string} */
+            kind: "added" | "removed" | "figures";
+            target_key: string;
+            department: string;
+            source_module: string;
+            form_code: string;
+            native_key: string;
+            /** Format: date-time */
+            closed_at: string | null;
+            /** Format: date-time */
+            was_closed_at: string | null;
+        };
+        KHTCSourceStatus: {
+            /** Format: uuid */
+            period_id: string;
+            /**
+             * Format: uuid
+             * @description Cán bộ KHTC phụ trách kỳ (người mở kỳ — ⚑3)
+             */
+            owner_ref: string;
+            owner_name?: string;
+            /** @description closed | cancelled; null khi kỳ chưa đóng/hủy */
+            terminal: string | null;
+            can_refresh: boolean;
+            source_changed: boolean;
+            /** @description Mốc dữ liệu đọc từ port (chưa có ảnh chụp) */
+            live: boolean;
+            live_error?: string;
+            snapshot: components["schemas"]["KHTCSourceSnapshot"] | null;
+            as_of: components["schemas"]["KHTCSourceAsOf"][];
+            values: components["schemas"]["KHTCSourceValue"][];
+            changes: components["schemas"]["KHTCSourceChange"][];
+        };
+        KHTCSourceHistoryItem: {
+            snapshot: components["schemas"]["KHTCSourceSnapshot"];
+            changes: {
+                source_key: string;
+                entries: components["schemas"]["KHTCSourceEntry"][];
+                /** @enum {string} */
+                field: "cumulative" | "increment" | "sum" | "price_min" | "price_max";
+                old: string | null;
+                new: string | null;
+            }[];
+        };
+        KHTCOpenInput: {
+            /** @enum {string} */
+            report_type: "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+            /** @description Năm (năm kế hoạch với program) */
+            year?: number;
+            /** @description Tuần 1–52/53, tháng 1–12, quý 1–4 */
+            no?: number;
+            /**
+             * @description Phạm vi báo cáo quý (6 tháng: quý II; 9 tháng: quý III)
+             * @enum {string}
+             */
+            scope?: "quarter" | "half" | "nine_months";
+            /**
+             * Format: date
+             * @description program (Mẫu 5): Đến ngày
+             */
+            as_of_date?: string;
+            /** @description adhoc: tên báo cáo */
+            name?: string;
+            /**
+             * Format: date
+             * @description adhoc: từ ngày
+             */
+            from_date?: string;
+            /**
+             * Format: date
+             * @description adhoc: đến ngày
+             */
+            to_date?: string;
+            /**
+             * Format: date
+             * @description Ngày chốt (bỏ trống = mặc định)
+             */
+            cutoff_date?: string;
+            /**
+             * Format: date-time
+             * @description Hạn nộp phiếu (bỏ trống = mặc định; bắt buộc với program, adhoc)
+             */
+            due_at?: string;
+            /** Format: date-time */
+            export_due_at?: string;
+            /** @description Phòng tham gia (bỏ trống = theo Kế hoạch năm, hoặc mọi phòng đang áp dụng trừ KHTC) */
+            departments?: string[];
+        };
+        KHTCDept: {
+            code: string;
+            name: string;
+        };
+        KHTCSource: {
+            department: string;
+            source: string;
+            calendar_id: string;
+            calendar_version: string;
+            /** @description Khóa kỳ theo lịch của nguồn */
+            native_key: string;
+            label: string;
+            /** @description Đọc được trạng thái chốt */
+            known: boolean;
+            closed: boolean;
+            /** Format: date-time */
+            closed_at: string | null;
+        };
+        KHTCDraft: {
+            report_type: string;
+            year: number;
+            no: number | null;
+            scope: string | null;
+            period_key: string | null;
+            name: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /** Format: date */
+            cutoff_date: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            export_due_at: string;
+            /** @description Số lần gửi tối đa (Q-081: 3, chỉ đọc) */
+            max_submissions: number;
+            departments: components["schemas"]["KHTCDept"][];
+            due_required: boolean;
+            plan_departments: boolean;
+            departments_loaded: boolean;
+            sources: components["schemas"]["KHTCSource"][];
+            /** @description Bộ quy đổi kỳ nguồn đã nối */
+            sources_linked: boolean;
+            duplicate: null | {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** @description 0 = phiếu cơ sở chưa cài */
+            template_version: number;
+        };
+        KHTCForm: {
+            department: string;
+            department_name: string;
+            /** @enum {string} */
+            state: "not_started" | "draft" | "late" | "submitted" | "supplement" | "confirmed" | "locked" | "not_sent" | "withdrawn" | "not_available";
+            state_label: string;
+            attempt: number;
+            limit_reached: boolean;
+            can_request_supplement: boolean;
+            can_confirm: boolean;
+            /** Format: date-time */
+            last_submitted_at: string | null;
+            /** Format: date-time */
+            reviewed_at: string | null;
+            review_note: string;
+            late: boolean;
+        };
+        /** @description Một phiếu KHTC của phòng trong một kỳ (W11.11, FN-PN-03.01) */
+        KHTCDepartmentForm: {
+            /**
+             * Format: uuid
+             * @description Id kỳ KHTC
+             */
+            period_id: string;
+            /**
+             * Format: uuid
+             * @description Id kỳ native cap/forms (gửi phiếu qua /v1/forms)
+             */
+            forms_period_id: string;
+            /** @enum {string} */
+            report_type: "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+            report_type_label: string;
+            year: number;
+            name: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /**
+             * Format: date-time
+             * @description Hạn nộp hiệu lực
+             */
+            due_at: string;
+            /**
+             * @description Kỳ còn nhận phiếu (opened/late) hay đã đóng
+             * @enum {string}
+             */
+            period_state: "opened" | "late" | "closed";
+            period_state_label: string;
+            /** @enum {string} */
+            state: "not_started" | "draft" | "late" | "submitted" | "supplement" | "confirmed" | "locked" | "not_sent";
+            state_label: string;
+            /** @description Lần gửi hiện hành (0 = chưa gửi) */
+            attempt: number;
+            /** @description Số lần gửi tối đa (0 = không giới hạn) */
+            max_submissions: number;
+            limit_reached: boolean;
+            /** @description Lần gửi cuối sau hạn */
+            late: boolean;
+            /** Format: date-time */
+            last_submitted_at: string | null;
+            /** Format: date-time */
+            reviewed_at: string | null;
+            /** @description Nội dung yêu cầu bổ sung mới nhất (chỉ khi state = supplement) */
+            supplement_note: string | null;
+            /** @description Thuộc bộ lọc "Cần xử lý" */
+            needs_action: boolean;
+            /** @enum {string} */
+            action: "enter" | "continue" | "resubmit" | "view";
+            action_label: string;
+            /** @description Màn nhập/xem phiếu của web-ops (W11.63): /kn/khtc/phieu/{period_id}[?department=] */
+            entry_route: string;
+        };
+        KHTCDepartmentForms: {
+            department: string;
+            department_name: string;
+            /** @enum {string} */
+            view: "current" | "sent";
+            /** @description Phiên chỉ xem — mọi nút là Xem */
+            read_only: boolean;
+            counts: {
+                total: number;
+                needs_action: number;
+                supplement: number;
+                late: number;
+                sent: number;
+            };
+            items: components["schemas"]["KHTCDepartmentForm"][];
+        };
+        KHTCEvent: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            action: "deadline_changed" | "closed" | "cancelled";
+            forced: boolean;
+            reason: string | null;
+            /** Format: date-time */
+            due_at: string | null;
+            /** Format: date-time */
+            export_due_at: string | null;
+            state: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCPeriod: {
+            /** Format: uuid */
+            id: string;
+            report_type: string;
+            year: number;
+            no: number | null;
+            scope: string | null;
+            period_key: string | null;
+            name: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /** Format: date */
+            cutoff_date: string;
+            /**
+             * Format: date-time
+             * @description Hạn nộp hiệu lực (sau Sửa hạn nộp)
+             */
+            due_at: string;
+            /** Format: date-time */
+            export_due_at: string;
+            max_submissions: number;
+            departments: components["schemas"]["KHTCDept"][];
+            /**
+             * Format: uuid
+             * @description Kỳ native cap/forms (profile kn_khtc)
+             */
+            forms_period_id: string;
+            forms_status: string;
+            template_code: string;
+            period_rule: string;
+            /** @enum {string} */
+            state: "draft" | "opened" | "collecting" | "late" | "complete" | "closed" | "cancelled";
+            state_label: string;
+            overdue: boolean;
+            counts: {
+                forms: number;
+                forms_sent: number;
+                sources: number;
+                sources_closed: number;
+            };
+            forms: components["schemas"]["KHTCForm"][];
+            sources: components["schemas"]["KHTCSource"][];
+            events: components["schemas"]["KHTCEvent"][];
+            can_close: boolean;
+            /** @description Đóng ngoại lệ (cần lý do) */
+            close_forced: boolean;
+            can_cancel: boolean;
+            close_late_days: number;
+            /** Format: date-time */
+            opened_at: string;
+            /** Format: uuid */
+            opened_by: string;
+        };
+        KHTCFormColumn: {
+            letter: string;
+            title: string;
+            /** @enum {string} */
+            kind: "fixed" | "from_plan" | "prior_cumulative" | "input" | "formula";
+            /** @enum {string} */
+            dtype: "number" | "integer" | "text";
+            unit?: string;
+            source?: string;
+            /** @enum {string} */
+            input?: "done" | "status" | "content" | "people" | "budget";
+            /** @enum {string} */
+            formula?: "adjust" | "cumulative" | "percent";
+            required?: boolean;
+            non_negative?: boolean;
+            note?: string;
+        };
+        KHTCFormSection: {
+            key: string;
+            title: string;
+            required?: boolean;
+        };
+        KHTCFormSheetTemplate: {
+            code: string;
+            version: number;
+            department: string;
+            title: string;
+            requirements: string;
+            columns: components["schemas"]["KHTCFormColumn"][];
+            sections: components["schemas"]["KHTCFormSection"][];
+        };
+        KHTCFormCell: {
+            /** @description Thực hiện trong kỳ (số thập phân */
+            done?: string;
+            status?: string;
+            content?: string;
+            people?: string;
+            budget?: string;
+        };
+        KHTCFormAdjustment: {
+            entry_ref: string;
+            /** @description Kỳ KHTC tuần đã khóa được điều chỉnh */
+            period_id: string;
+            period_year?: number;
+            period_name?: string;
+            /** @description Dương: phần chưa báo cáo; âm: phần ghi thừa */
+            amount: string;
+            reason: string;
+        };
+        KHTCFormContent: {
+            cells: {
+                [key: string]: components["schemas"]["KHTCFormCell"];
+            };
+            adjustments: components["schemas"]["KHTCFormAdjustment"][];
+            texts: {
+                [key: string]: string;
+            };
+        };
+        KHTCFormSaveInput: {
+            sheet: components["schemas"]["KHTCFormContent"];
+            /** @description Số lần đã gửi người nhập thấy khi mở phiếu (khóa lạc quan) */
+            base_attempt: number;
+        };
+        KHTCFormIssue: {
+            /** @enum {string} */
+            rule: "template" | "negative_reason" | "over_plan";
+            /** @enum {string} */
+            severity: "error" | "warning";
+            entry_ref?: string;
+            letter?: string;
+            /** @description Chỉ số dòng điều chỉnh; -1 = không */
+            adjustment: number;
+            section?: string;
+            message: string;
+        };
+        KHTCFormRow: {
+            entry_ref: string;
+            no: number;
+            code: string;
+            name: string;
+            unit: string;
+            planned_qty: string | null;
+            scale_note: string;
+            /** @description Nguồn module (BR-DL-10) — không có ô nhập */
+            module_sourced: boolean;
+            /** @description Đã có số từ Cập nhật số liệu (W11.64) — ô F, H, I của hạng mục nguồn module */
+            module_filled?: boolean;
+            /** @description Số nguồn module Tạm tính — nguồn chưa chốt (BR-DL-03) */
+            module_provisional?: boolean;
+            source_key: string;
+            /** @description Ô hệ thống theo chữ cái cột */
+            cells: {
+                [key: string]: string;
+            };
+            over_plan: boolean;
+        };
+        KHTCFormTab: {
+            key: string;
+            label: string;
+            plan: string;
+            rows: components["schemas"]["KHTCFormRow"][];
+        };
+        KHTCFormSheet: {
+            period: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                report_type: string;
+                year: number;
+                /** Format: date */
+                from_date: string;
+                /** Format: date */
+                to_date: string;
+                /** Format: date */
+                cutoff_date: string;
+                /** Format: date-time */
+                due_at: string;
+                max_submissions: number;
+                /** @description rỗng | closed | cancelled */
+                terminal: string;
+            };
+            department: string;
+            department_name: string;
+            /** @enum {string} */
+            state: "not_started" | "draft" | "late" | "submitted" | "supplement" | "confirmed" | "locked" | "not_sent" | "withdrawn" | "not_available";
+            state_label: string;
+            attempt: number;
+            limit_reached: boolean;
+            can_request_supplement: boolean;
+            can_confirm: boolean;
+            can_review: boolean;
+            editable: boolean;
+            overdue: boolean;
+            request_note: string;
+            template: components["schemas"]["KHTCFormSheetTemplate"];
+            /** @description Phiếu tuần có lưới hạng mục (tháng/quý/năm chỉ lời văn — BR-DL-06) */
+            grid: boolean;
+            plan_missing: boolean;
+            plan: null | {
+                version: number;
+                decision_no: string;
+                /** Format: date */
+                effective_from: string;
+                /** Format: uuid */
+                version_id: string;
+                /** Format: date */
+                decision_date: string | null;
+            };
+            tabs: components["schemas"]["KHTCFormTab"][];
+            content: components["schemas"]["KHTCFormContent"];
+            /** @enum {string} */
+            content_source: "draft" | "submitted" | "empty";
+            /** Format: date-time */
+            draft_at: string | null;
+            valid: boolean;
+            issues: components["schemas"]["KHTCFormIssue"][];
+            adj_periods: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                year: number;
+            }[];
+            submissions: {
+                /** Format: uuid */
+                id: string;
+                attempt: number;
+                /** Format: date-time */
+                submitted_at: string;
+                late: boolean;
+                decision: string;
+                review_note: string;
+                /** Format: date-time */
+                reviewed_at: string | null;
+            }[];
+        };
+        KHTCFormTask: {
+            /** Format: uuid */
+            period_id: string;
+            name: string;
+            report_type: string;
+            year: number;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /** Format: date-time */
+            due_at: string;
+            overdue: boolean;
+            /** @enum {string} */
+            state: "not_started" | "draft" | "late" | "submitted" | "supplement" | "confirmed" | "locked" | "not_sent" | "withdrawn" | "not_available";
+            state_label: string;
+            attempt: number;
+            max_submissions: number;
+            limit_reached: boolean;
+            request_note: string;
+            /** Format: date-time */
+            last_submitted_at: string | null;
+            late: boolean;
+            /** @description Cần xử lý: Chưa nhập, Lưu nháp (nút Tiếp tục), Trễ hạn, Yêu cầu bổ sung */
+            actionable: boolean;
+        };
+        KHTCReportPeriod: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            type: "week" | "month" | "quarter" | "year" | "program";
+            year: number;
+            name: string;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** Format: date-time */
+            cutoff: string;
+            departments: string[];
+            no: number | null;
+            scope: string | null;
+        };
+        KHTCReportPlan: {
+            /** Format: uuid */
+            VersionID: string;
+            Year: number;
+            Version: number;
+            DecisionNo: string;
+            Entries: {
+                [key: string]: unknown;
+            }[] | null;
+        } & {
+            [key: string]: unknown;
+        };
+        KHTCReportSourceRef: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            /** Format: uuid */
+            plan_version_id: string | null;
+            figures_hash: string;
+            status_hash: string;
+            closed: boolean;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCReportSourceMetric: {
+            key: string;
+            department: string;
+            form: string;
+            label: string;
+            unit: string;
+            stock: boolean;
+            value: components["schemas"]["KHTCReportSourceValue"];
+            trace?: {
+                target_key: string;
+                module: string;
+                calendar: string;
+                native_key: string;
+                /** Format: date-time */
+                from: string | null;
+                /** Format: date-time */
+                to: string | null;
+                closed: boolean;
+                figures_hash: string | null;
+            }[];
+        };
+        KHTCReportSourceValue: {
+            Cumulative: string | null;
+            Base: string | null;
+            Increment: string | null;
+            YearToDate: string | null;
+            Sum: string | null;
+            Min: string | null;
+            Max: string | null;
+            Unconfirmed: string | null;
+            Closed: boolean;
+            NoSource: boolean;
+            Frozen: boolean;
+            SourceChanged: boolean;
+            Fallback: boolean;
+            Unavailable: boolean;
+            SourceKey: string;
+            Mode: string;
+            BaseRef: string;
+            PriceDay: string;
+            PriceDays: {
+                Day: string;
+                Min: string;
+                Max: string;
+            }[] | null;
+            SourceKeys: string[] | null;
+            Weeks: {
+                [key: string]: unknown;
+            }[] | null;
+        };
+        KHTCReportSubmission: {
+            /** Format: uuid */
+            period_id: string;
+            department: string;
+            type: string;
+            year: number;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** Format: uuid */
+            submission_id: string;
+            attempt: number;
+            /** Format: uuid */
+            sheet_id: string;
+            hash: string;
+            decision: string;
+        };
+        KHTCReportRow: {
+            /** Format: uuid */
+            ref: string;
+            /** Format: uuid */
+            parent_ref: string | null;
+            /** Format: uuid */
+            program_ref: string | null;
+            kind: string;
+            tab: string;
+            roman: string;
+            name: string;
+            unit: string;
+            department: string;
+            planned: string | null;
+            scale: string;
+            in_period: string;
+            adjustment: string;
+            year_to_date: string;
+            percent: string | null;
+            level: string;
+            status: string;
+            content: string;
+            people: string;
+            budget: string;
+            missing: boolean;
+            source_key: string;
+            communes: string[];
+        };
+        KHTCReportData: {
+            period: components["schemas"]["KHTCReportPeriod"];
+            /** @enum {string} */
+            template: "mau_1" | "mau_2" | "mau_3" | "mau_4" | "mau_5";
+            plan: components["schemas"]["KHTCReportPlan"];
+            sources: components["schemas"]["KHTCReportSourceRef"] | null;
+            metrics: components["schemas"]["KHTCReportSourceMetric"][];
+            submissions: components["schemas"]["KHTCReportSubmission"][];
+            rows: components["schemas"]["KHTCReportRow"][];
+            form_texts: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            provisional: string[];
+            input_hash: string;
+            /** Format: date-time */
+            captured_at: string;
+        };
+        KHTCReportAdminField: {
+            system: string;
+            override: string | null;
+            /** Format: uuid */
+            actor: string | null;
+            /** Format: date-time */
+            at: string | null;
+            system_changed: boolean;
+        };
+        KHTCReportContent: {
+            data: components["schemas"]["KHTCReportData"];
+            admin: {
+                [key: string]: components["schemas"]["KHTCReportAdminField"];
+            };
+            texts: {
+                [key: string]: string;
+            };
+        };
+        KHTCReportSection: {
+            key: string;
+            title: string;
+            editable: boolean;
+        };
+        KHTCReportFinal: {
+            /** Format: uuid */
+            export_id: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCReportDetail: {
+            /** Format: uuid */
+            period_id: string;
+            /** Format: uuid */
+            draft_id: string | null;
+            version: number;
+            content: components["schemas"]["KHTCReportContent"];
+            sections: components["schemas"]["KHTCReportSection"][];
+            final: components["schemas"]["KHTCReportFinal"] | null;
+            editable: boolean;
+            can_refresh: boolean;
+            source_changed: boolean;
+            source_error: string;
+            terminal: string;
+        };
+        KHTCReportSave: {
+            base_version: number;
+            admin?: {
+                [key: string]: string | null;
+            };
+            texts?: {
+                [key: string]: string;
+            };
+        };
+        KHTCReportRefresh: {
+            base_version: number;
+        };
+        KHTCReportFilter: {
+            department?: string;
+            program?: string;
+            commune?: string;
+            /** @enum {string} */
+            level?: "" | "achieved" | "progressing" | "slow" | "qualitative";
+        };
+        KHTCReportExportInput: {
+            base_version: number;
+            acknowledge_provisional?: boolean;
+            filter?: components["schemas"]["KHTCReportFilter"];
+        };
+        KHTCReportExport: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            period_id: string;
+            version: number;
+            /** Format: uuid */
+            draft_id: string;
+            file_name: string;
+            body_hash: string;
+            input_hash: string;
+            provisional: boolean;
+            filter: components["schemas"]["KHTCReportFilter"];
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCReportExportList: {
+            items: components["schemas"]["KHTCReportExport"][];
+        };
     };
     responses: {
+        /** @description Đã ghi dòng quá trình */
+        HrmEventWritten: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    id: string;
+                    version: number;
+                };
+            };
+        };
         /** @description RFC 9457 */
         Problem: {
             headers: {
@@ -10747,15 +18605,35 @@ export interface components {
         PartnerGrantor: string;
         /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
         FormsProfile: string;
+        /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+        HrmKind: "position" | "grade" | "education_level" | "major" | "major_group" | "ethnicity" | "religion" | "political_theory" | "state_mgmt" | "foreign_language" | "language_level" | "it_level" | "award_form" | "discipline_form" | "change_type" | "leave_reason";
+        /** @description Khóa tham số có phiên bản (pf/hrm) — promotion (quy tắc nâng bậc), achievement_conversion (quy đổi thành tích) */
+        HrmRuleKey: "promotion" | "achievement_conversion";
+        /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+        HrmAt: string;
+        /** @description Mã biểu báo cáo Sở */
+        HrmReportCode: "NS01" | "NS02" | "NS03" | "NS04" | "NS05" | "NS06";
+        HrmStaffId: string;
+        HrmEventId: string;
+        HrmFolderId: string;
+        HrmDocId: string;
+        /** @description Ngày báo giá (giờ VN) */
+        PriceBoardDay: string;
+        /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+        PriceProfile: string;
+        /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+        PriceAt: string;
+        /** @description Mã mặt hàng (MH + 5 chữ số) */
+        PriceItemCode: string;
         IdempotencyKey: string;
         /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
         At: string;
         UnitCode: string;
-        Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest" | "vessel_class" | "crop" | "material" | "production_model" | "report_type";
+        Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest" | "vessel_class" | "crop" | "material" | "production_model" | "report_type" | "cnts_species" | "cnts_breed" | "cnts_vaccine" | "cnts_vaccination_schedule" | "cnts_disease" | "cnts_chemical" | "cnts_slaughter_facility" | "cnts_aquaculture_object" | "cnts_fishing_group" | "cnts_indicator" | "cnts_model_type" | "cnts_document_type";
         /** @description Mã thiết bị đã đăng ký bởi chính người gọi (pf/sync) */
         DeviceID: string;
-        /** @description Mục đích xử lý dữ liệu cá nhân (R-42) */
-        Purpose: "mrv.evidence" | "extension.field_support";
+        /** @description Mục đích xử lý (R-42); hr_records chỉ dùng cho tệp có chủ thể pf/hrm / hr_folder do module đăng ký, không áp dụng tệp cũ hoặc tệp hiện trường */
+        Purpose: "mrv.evidence" | "extension.field_support" | "hr_records";
     };
     requestBodies: never;
     headers: never;
@@ -10965,6 +18843,8 @@ export interface operations {
         parameters: {
             query?: {
                 include_inactive?: boolean;
+                /** @description W11.41 — chỉ danh mục cnts_*: giá trị có hiệu lực tại ngày (YYYY-MM-DD hoặc RFC 3339, giờ Việt Nam); có at thì không phân trang (next_cursor null) */
+                at?: string;
                 cursor?: string;
                 limit?: number;
             };
@@ -10994,7 +18874,10 @@ export interface operations {
     };
     getCatalogItem: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description W11.41 — chỉ danh mục cnts_*: giá trị có hiệu lực tại ngày (YYYY-MM-DD hoặc RFC 3339, giờ Việt Nam); có at thì không phân trang (next_cursor null) */
+                at?: string;
+            };
             header?: never;
             path: {
                 catalog: components["parameters"]["Catalog"];
@@ -11269,6 +19152,136 @@ export interface operations {
             401: components["responses"]["Problem"];
         };
     };
+    knMyDelegations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mới nhất trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNDelegationList"];
+                };
+            };
+        };
+    };
+    knCreateDelegation: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    grantee_ref: string;
+                    /** @description Vắng = phòng ban của ngữ cảnh; khác → 403 */
+                    department_code?: string;
+                    /** @enum {string} */
+                    power: "mo_lai_ky" | "duyet_bao_cao";
+                    /** Format: date-time */
+                    valid_from?: string;
+                    /** Format: date-time */
+                    valid_to: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNDelegation"];
+                };
+            };
+            /** @description Đã ủy quyền */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNDelegation"];
+                };
+            };
+            /** @description accounts.delegation_forbidden, accounts.context_read_only */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed, accounts.delegation_grantee_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    knRevokeDelegation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã thu hồi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNDelegation"];
+                };
+            };
+            /** @description accounts.delegation_not_found */
+            404: components["responses"]["Problem"];
+            /** @description accounts.delegation_state */
+            409: components["responses"]["Problem"];
+        };
+    };
+    knListInternalUnits: {
+        parameters: {
+            query?: {
+                org_ref?: string;
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Theo thứ tự hiển thị */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InternalUnitList"];
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
     knListDepartments: {
         parameters: {
             query?: {
@@ -11401,6 +19414,8 @@ export interface operations {
                 /** @description G-03: mã tỉnh hoặc xã hiện hành — chỉ HTX thuộc đơn vị này (và con cháu) giao với phạm vi người gọi; mã không có hiệu lực → 422 validation_failed (trường admin_unit) */
                 admin_unit?: string;
                 include_inactive?: boolean;
+                /** @description D2: lọc theo trạng thái xác nhận; vắng = mọi HTX (gồm HTX tạm Chưa xác nhận) */
+                confirmation?: components["schemas"]["HTXConfirmationStatus"];
                 cursor?: string;
                 limit?: number;
             };
@@ -11957,7 +19972,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Mục đích xử lý dữ liệu cá nhân (R-42) */
+                /** @description Mục đích xử lý (R-42); hr_records chỉ dùng cho tệp có chủ thể pf/hrm / hr_folder do module đăng ký, không áp dụng tệp cũ hoặc tệp hiện trường */
                 "X-Purpose": components["parameters"]["Purpose"];
             };
             path: {
@@ -11994,7 +20009,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Mục đích xử lý dữ liệu cá nhân (R-42) */
+                /** @description Mục đích xử lý (R-42); hr_records chỉ dùng cho tệp có chủ thể pf/hrm / hr_folder do module đăng ký, không áp dụng tệp cũ hoặc tệp hiện trường */
                 "X-Purpose": components["parameters"]["Purpose"];
             };
             path: {
@@ -14816,6 +22831,62 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    extCheckinWorkScheduleItem: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    lat: number;
+                    lon: number;
+                    accuracy_m?: number | null;
+                    /**
+                     * Format: date-time
+                     * @description Giờ thiết bị lúc bấm Check-in (bản ngoại tuyến gửi muộn tối đa 7 ngày)
+                     */
+                    captured_at: string;
+                    /** @description Thiết bị báo vị trí giả lập */
+                    mock_location?: boolean;
+                    device_id?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleCheckinResult"];
+                };
+            };
+            /** @description Đã check-in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleCheckinResult"];
+                };
+            };
+            /** @description extension.schedule_not_found | extension.schedule_item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.checkin_exists | extension.checkin_disabled | extension.checkin_not_registered */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
     mechListOwners: {
         parameters: {
             query?: {
@@ -15787,6 +23858,76 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    rcImportProvincialValues: {
+        parameters: {
+            query: {
+                report_type: "weekly" | "monthly" | "seasonal" | "annual" | "adhoc";
+                /** @description Ngày bắt đầu đợt (chọn phiên bản mẫu áp dụng) */
+                from_date?: string;
+                /** @description template_id các biểu đã chọn, phân tách dấu phẩy */
+                template_ids: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Giá trị đọc được và kết quả từng dòng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        provincial_source: "excel";
+                        /** @description template_id → mã xã → chữ cột → giá trị (như RcBatchInput.provincial_values) */
+                        provincial_values: {
+                            [key: string]: {
+                                [key: string]: {
+                                    [key: string]: string;
+                                };
+                            };
+                        };
+                        columns: {
+                            header: string;
+                            /** Format: uuid */
+                            template_id: string;
+                            form_code: string;
+                            letter: string;
+                        }[];
+                        ignored_columns: string[];
+                        accepted: number;
+                        rejected: number;
+                        rows: {
+                            /** @description Số dòng trong tệp (tiêu đề = 1) */
+                            row: number;
+                            commune_code: string;
+                            /** @enum {string} */
+                            status: "accepted" | "rejected";
+                            /** @description Không chứa giá trị nhập */
+                            reason: string | null;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
     rcListBatches: {
         parameters: {
             query?: {
@@ -16128,7 +24269,7 @@ export interface operations {
         parameters: {
             query?: {
                 commune?: string;
-                period_type?: "week" | "month" | "season" | "year" | "adhoc";
+                period_type?: "day" | "week" | "ksgm_week" | "month" | "quarter" | "season" | "year" | "adhoc";
                 status?: "not_started" | "draft" | "submitted" | "overdue" | "adjustment_requested" | "confirmed" | "closed";
                 form_code?: string;
                 batch_id?: string;
@@ -19976,6 +28117,8 @@ export interface operations {
                 area_min?: string;
                 /** @description Diện tích tối đa (ha, decimal) */
                 area_max?: string;
+                /** @description D2: lọc theo trạng thái xác nhận; vắng = mọi HTX (gồm HTX tạm Chưa xác nhận) */
+                confirmation?: components["schemas"]["HTXConfirmationStatus"];
                 cursor?: string;
                 limit?: number;
             };
@@ -20875,6 +29018,1420 @@ export interface operations {
             404: components["responses"]["Problem"];
         };
     };
+    extensionCntsListAlerts: {
+        parameters: {
+            query?: {
+                status?: "open" | "overdue" | "new" | "assigned" | "in_progress" | "closed";
+                kind?: string;
+                level?: "urgent" | "attention";
+                template_code?: string;
+                /** @description Chỉ cảnh báo giao cho tôi */
+                mine?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertList"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGetAlert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertDetail"];
+                };
+            };
+            /** @description extension.cnts_alert_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsAssignAlert: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSAlertAction"];
+            };
+        };
+        responses: {
+            /** @description Đã giao */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertDetail"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_transition | extension.cnts_alert_version_conflict */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsStartAlert: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSAlertAction"];
+            };
+        };
+        responses: {
+            /** @description Đang xử lý */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertDetail"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_transition | extension.cnts_alert_version_conflict */
+            409: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsCloseAlert: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSAlertAction"];
+            };
+        };
+        responses: {
+            /** @description Đã đóng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertDetail"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_transition | extension.cnts_alert_version_conflict */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsAlertAssignees: {
+        parameters: {
+            query?: {
+                commune_code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertAssignees"];
+                };
+            };
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsAlertConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cấu hình */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertConfig"];
+                };
+            };
+        };
+    };
+    extensionCntsPutFormReminder: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: "CNTS-BM01" | "CNTS-BM04" | "CNTS-BM17" | "CNTS-BM05-I" | "CNTS-BM05-II";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSFormReminder"];
+            };
+        };
+        responses: {
+            /** @description Đã lưu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertConfig"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_config_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsPutAlertSetting: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSAlertSetting"];
+            };
+        };
+        responses: {
+            /** @description Đã lưu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSAlertConfig"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_alert_config_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsPeriodForms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSPeriodForm"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsInstallPeriodForms: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách sau khi cài */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSPeriodForm"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsPreviewSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSSeriesInput"];
+            };
+        };
+        responses: {
+            /** @description Lô kỳ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSeries"];
+                };
+            };
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsPublishSeries: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSSeriesInput"];
+            };
+        };
+        responses: {
+            /** @description Lô kỳ đã phát hành (periods[].id) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSeries"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.template_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | forms.facility_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGetDutyRoster: {
+        parameters: {
+            query?: {
+                /** @description Tỉnh suy từ phạm vi phiên; Admin chọn tỉnh. legacy chỉ Admin đọc lịch chung cũ, không ghi */
+                province_code?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Tháng YYYY-MM */
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch trực (version 0 = chưa lập) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDutyRoster"];
+                };
+            };
+            /** @description forbidden (Cấp Xã dùng /my-duties) */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsSaveDutyRoster: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSDutyRosterSave"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDutyRoster"];
+                };
+            };
+            /** @description Đã lưu phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDutyRoster"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_roster_version_conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_roster_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsMyDuties: {
+        parameters: {
+            query: {
+                /** @description Tỉnh của lịch, mặc định suy từ xã phụ trách */
+                province_code?: string;
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ca trực */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMyDuties"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsListVaccinationBatches: {
+        parameters: {
+            query?: {
+                commune_code?: string;
+                household_ref?: string;
+                status?: "open" | "overdue" | "done" | "cancelled";
+                received_from?: string;
+                received_to?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSVaccinationBatch"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsCreateVaccinationBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSVaccinationBatchCreate"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSVaccinationBatchDetail"];
+                };
+            };
+            /** @description Đã lập */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSVaccinationBatchDetail"];
+                };
+            };
+            /** @description forbidden | extension.out_of_scope | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_vaccination_invalid | extension.cnts_vaccination_no_procedure */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGetVaccinationBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSVaccinationBatchDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_vaccination_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsUpdateVaccinationDoses: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSVaccinationDosesUpdate"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi phiên bản mới */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSVaccinationBatchDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_vaccination_version_conflict | extension.cnts_vaccination_cancelled */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_vaccination_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsCancelVaccinationBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    base_version: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã hủy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSVaccinationBatchDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsListOutbreaks: {
+        parameters: {
+            query?: {
+                status?: "reported" | "monitoring" | "closed";
+                commune?: string;
+                /** @description Mã bệnh (danh mục cnts_disease) */
+                disease?: string;
+                /** @description Ngày tiếp nhận (DB-02) từ */
+                from?: string;
+                /** @description Ngày tiếp nhận (DB-02) đến */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreakList"];
+                };
+            };
+            /** @description forbidden | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsReportOutbreak: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSOutbreakInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description Đã gửi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description forbidden | extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_invalid | extension.support_reason_required */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsOutbreakPoints: {
+        parameters: {
+            query?: {
+                status?: "reported" | "monitoring" | "closed";
+                commune?: string;
+                disease?: string;
+                from?: string;
+                to?: string;
+                include_closed?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description GeoJSON */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/geo+json": components["schemas"]["CNTSOutbreakPoints"];
+                };
+            };
+            /** @description forbidden | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGetOutbreak: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreakDetail"];
+                };
+            };
+            /** @description extension.cnts_outbreak_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsUpdateOutbreak: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSOutbreakInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_version_conflict | extension.cnts_outbreak_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_outbreak_invalid */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsCloseOutbreak: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description Đã kết thúc */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_version_conflict | extension.cnts_outbreak_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_outbreak_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsReopenOutbreak: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description Đã mở lại */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_version_conflict | extension.cnts_outbreak_not_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_outbreak_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsListSuspects: {
+        parameters: {
+            query?: {
+                status?: "reported" | "confirmed" | "dismissed";
+                commune?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSSuspect"][];
+                    };
+                };
+            };
+            /** @description forbidden | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsReportSuspect: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSSuspectInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSuspect"];
+                };
+            };
+            /** @description Đã ghi nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSuspect"];
+                };
+            };
+            /** @description forbidden | extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_suspect_invalid */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGetSuspect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSuspectDetail"];
+                };
+            };
+            /** @description extension.cnts_suspect_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsConfirmSuspect: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSOutbreakInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description Ổ dịch đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreak"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_suspect_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_suspect_version_conflict | extension.cnts_suspect_resolved */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_outbreak_invalid */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDismissSuspect: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng Idempotency-Key — bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSuspect"];
+                };
+            };
+            /** @description Đã bác bỏ */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSuspect"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_suspect_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_suspect_version_conflict | extension.cnts_suspect_resolved */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_suspect_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsBM02: {
+        parameters: {
+            query?: {
+                /** @description Mã tỉnh (chỉ Cấp Quốc gia/Admin) */
+                province?: string;
+                period_type?: "ksgm_week" | "month";
+                /** @description 2026-10-K2 | 2026-10; rỗng = tuần KSGM/tháng hiện tại */
+                key?: string;
+                /** @description Số đã gửi (mặc định) hoặc số đã chốt (ảnh chụp nguồn) */
+                basis?: "submitted" | "closed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng BM-02 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsBM02"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsBM02Adjust: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Tuần KSGM YYYY-MM-Kn */
+                    week_key: string;
+                    /** Format: uuid */
+                    facility_ref: string;
+                    /** @description Loài (trau_bo, heo, gia_cam, de) → số thập phân, có thể âm */
+                    deltas: {
+                        [key: string]: string;
+                    };
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Dòng điều chỉnh đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsAdjustment"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_aggregate_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsBM18: {
+        parameters: {
+            query?: {
+                /** @description Mã tỉnh (chỉ Cấp Quốc gia/Admin) */
+                province?: string;
+                /** @description Tuần CNTS YYYY-Www (Thứ Ba – Thứ Hai, D8); rỗng = tuần hiện tại */
+                week?: string;
+                basis?: "submitted" | "closed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phụ lục 2 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsBM18"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsBM18Aquaculture: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    week: string;
+                    entries: {
+                        /** @description Mã đối tượng (danh sách cnts.bm18_objects/v1) */
+                        object: string;
+                        /** @description Diện tích (ha) hoặc số lồng trong tuần */
+                        area?: string | null;
+                        /** @description Sản lượng (tấn; ngọc trai: 1.000 viên) trong tuần */
+                        output?: string | null;
+                        note?: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Phụ lục 2 sau khi ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsBM18"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_aggregate_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsAggregateClose: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CntsAggregateAction"];
+            };
+        };
+        responses: {
+            /** @description Trạng thái chốt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsAggregateState"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_aggregate_sources_open | extension.cnts_aggregate_state */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsAggregateReopen: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CntsAggregateAction"];
+            };
+        };
+        responses: {
+            /** @description Trạng thái chốt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsAggregateState"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_aggregate_state */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsShares: {
+        parameters: {
+            query: {
+                province?: string;
+                form: "CNTS-BM02" | "CNTS-BM18";
+                period_type: "ksgm_week" | "month" | "week";
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách (cũ trước) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CntsShare"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsShareCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    form: "CNTS-BM02" | "CNTS-BM18";
+                    /** @enum {string} */
+                    period_type: "ksgm_week" | "month" | "week";
+                    period_key: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Số không đổi — phiên bản cuối */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsShareResult"];
+                };
+            };
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CntsShareResult"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsShareFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_share_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
     formsProfiles: {
         parameters: {
             query?: never;
@@ -21075,7 +30632,7 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description forms.fixture_template */
             409: components["responses"]["Problem"];
-            /** @description validation_failed */
+            /** @description validation_failed | forms.facility_invalid */
             422: components["responses"]["Problem"];
         };
     };
@@ -21167,13 +30724,22 @@ export interface operations {
                     "application/json": components["schemas"]["FormsSubmission"];
                 };
             };
+            /** @description Bản offline (captured_at) đến sau khi kỳ đã chốt với đơn vị — giữ ở trạng thái Chờ mở kỳ (status = awaiting_reopen), không vào số liệu kỳ (W11.05) */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsSubmission"];
+                };
+            };
             /** @description forbidden */
             403: components["responses"]["Problem"];
             /** @description forms.period_not_found */
             404: components["responses"]["Problem"];
-            /** @description forms.period_closed | forms.submission_accepted */
+            /** @description forms.period_closed | forms.submission_accepted | forms.submission_limit | forms.period_cancelled | forms.submission_conflict */
             409: components["responses"]["Problem"];
-            /** @description forms.values_invalid | forms.unit_not_in_period */
+            /** @description forms.values_invalid | forms.unit_not_in_period | forms.late_reason_required */
             422: components["responses"]["Problem"];
         };
     };
@@ -21206,7 +30772,7 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description forms.period_not_found */
             404: components["responses"]["Problem"];
-            /** @description forms.period_closed | forms.pending_review */
+            /** @description forms.period_closed | forms.pending_review | forms.period_cancelled */
             409: components["responses"]["Problem"];
         };
     };
@@ -21243,9 +30809,48 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description forms.period_not_found */
             404: components["responses"]["Problem"];
-            /** @description forms.period_not_closed */
+            /** @description forms.period_not_closed | forms.period_cancelled */
             409: components["responses"]["Problem"];
             /** @description validation_failed | forms.unit_not_in_period */
+            422: components["responses"]["Problem"];
+        };
+    };
+    formsCancelPeriod: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormsCancelInput"];
+            };
+        };
+        responses: {
+            /** @description Kỳ sau hủy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsPeriodView"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description forms.period_closed | forms.period_cancelled */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
             422: components["responses"]["Problem"];
         };
     };
@@ -21313,7 +30918,7 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description forms.submission_not_found */
             404: components["responses"]["Problem"];
-            /** @description forms.period_closed | forms.submission_superseded | forms.already_reviewed */
+            /** @description forms.period_closed | forms.submission_superseded | forms.already_reviewed | forms.submission_limit | forms.period_cancelled */
             409: components["responses"]["Problem"];
             /** @description validation_failed */
             422: components["responses"]["Problem"];
@@ -21344,6 +30949,6018 @@ export interface operations {
             };
             /** @description forms.snapshot_not_found */
             404: components["responses"]["Problem"];
+        };
+    };
+    formsTasks: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+                /** @description Mã biểu (vd CNTS-BM04) */
+                code?: string;
+                /** @description Kỳ có ngày cuối ≥ from */
+                from?: string;
+                /** @description Kỳ có ngày đầu ≤ to */
+                to?: string;
+                /** @description Số kỳ tối đa */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách (kỳ mới trước; kỳ đã hủy bỏ qua) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FormsTask"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.profile_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    formsPrevious: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+                unit: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bài kỳ trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        previous: null | components["schemas"]["FormsPrevious"];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.period_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcWeeks: {
+        parameters: {
+            query: {
+                year: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 52 hoặc 53 tuần */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        year: number;
+                        items: components["schemas"]["KHTCWeek"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcFormTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản (0 = chưa cài) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCFormTemplate"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcInstallFormTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiếu cơ sở */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCFormTemplate"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPeriods: {
+        parameters: {
+            query?: {
+                /** @description Năm kế hoạch (bỏ trống = mọi năm) */
+                year?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KHTCPeriod"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcOpenPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCOpenInput"];
+            };
+        };
+        responses: {
+            /** @description Kỳ đã mở */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPeriod"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.template_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_period_duplicate */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPreviewPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCOpenInput"];
+            };
+        };
+        responses: {
+            /** @description Nháp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCDraft"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kỳ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPeriod"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPeriodDeadline: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date-time */
+                    due_at: string;
+                    /** Format: date-time */
+                    export_due_at?: string;
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Kỳ sau khi sửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPeriod"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_period_terminal */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcClosePeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCReason"];
+            };
+        };
+        responses: {
+            /** @description Kỳ đã đóng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPeriod"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_closable | extension.khtc_period_terminal */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcCancelPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCReason"];
+            };
+        };
+        responses: {
+            /** @description Kỳ đã hủy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPeriod"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_cancellable | extension.khtc_period_terminal */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcDepartmentForms: {
+        parameters: {
+            query?: {
+                view?: "current" | "sent";
+                /** @description Chỉ Admin KN — mã phòng cần xem (vai khác bỏ trống hoặc = phòng của phiên) */
+                department?: string;
+                /** @description Năm kế hoạch (bỏ trống = mọi năm) */
+                year?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách phiếu của phòng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCDepartmentForms"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPeriodSources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trạng thái nguồn */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCSourceStatus"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPeriodSourcesRefresh: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trạng thái nguồn sau khi chụp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCSourceStatus"];
+                };
+            };
+            /** @description forbidden | extension.khtc_refresh_not_owner */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_period_terminal */
+            409: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPeriodSourcesHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KHTCSourceHistoryItem"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_period_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcFormTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mẫu phiếu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        column_kinds: string[];
+                        items: components["schemas"]["KHTCFormSheetTemplate"][];
+                    };
+                };
+            };
+        };
+    };
+    extensionKhtcMyForms: {
+        parameters: {
+            query: {
+                department: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiếu (kỳ mới trước; kỳ đã hủy bị gỡ) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KHTCFormTask"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Kỳ KHTC (sổ W11.62) */
+                id: string;
+                dept: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiếu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCFormSheet"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_form_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcFormDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                dept: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCFormSaveInput"];
+            };
+        };
+        responses: {
+            /** @description Phiếu sau khi lưu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCFormSheet"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_form_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_form_locked | forms.submission_conflict */
+            409: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcFormSubmit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                dept: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCFormSaveInput"];
+            };
+        };
+        responses: {
+            /** @description Phiếu đã gửi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCFormSheet"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_form_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_form_locked | forms.submission_conflict | forms.submission_limit | extension.khtc_form_template_outdated */
+            409: components["responses"]["Problem"];
+            /** @description extension.khtc_form_invalid (trường issues: kết quả kiểm tra) */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcFormReview: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                dept: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "returned" | "accepted";
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Phiếu sau rà soát */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCFormSheet"];
+                };
+            };
+            /** @description forbidden | self_approval */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_form_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_form_not_reviewable */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tình trạng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmStatus"];
+                };
+            };
+            /** @description unauthenticated */
+            401: components["responses"]["Problem"];
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmInstallDefaults: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số phiên bản đã ghi (0 khi mọi mục đã có) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: number;
+                        scales: number;
+                        rules: number;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+        };
+    };
+    hrmCatalogList: {
+        parameters: {
+            query?: {
+                /** @description true → cả mục đã ngừng sử dụng */
+                include_retired?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        kind: string;
+                        items: components["schemas"]["HrmCatalogItem"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.kind_unknown */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmCatalogCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmCatalogItemInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi phiên bản 1 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.kind_unknown */
+            404: components["responses"]["Problem"];
+            /** @description hrm.item_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmCatalogHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        versions: components["schemas"]["HrmCatalogItem"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.kind_unknown | hrm.item_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmCatalogRevise: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Loại danh mục nhân sự (pf/hrm, FN-19) */
+                kind: components["parameters"]["HrmKind"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmCatalogItemInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.kind_unknown | hrm.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmGradeScales: {
+        parameters: {
+            query?: {
+                /** @description Ngày YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng hệ số */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        day: string;
+                        grades: {
+                            grade: components["schemas"]["HrmCatalogItem"];
+                            /** @description null nếu ngạch chưa có bảng hệ số hiệu lực tại ngày hỏi */
+                            scale: components["schemas"]["HrmGradeScale"] | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmGradeScaleAdd: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Mã ngạch/CDNN (vd 01.003, V.05.02.07) */
+                grade: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmGradeScaleInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmGradeScaleHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grade: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        versions: components["schemas"]["HrmGradeScale"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.item_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmRule: {
+        parameters: {
+            query?: {
+                /** @description Ngày YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Khóa tham số có phiên bản (pf/hrm) — promotion (quy tắc nâng bậc), achievement_conversion (quy đổi thành tích) */
+                key: components["parameters"]["HrmRuleKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tham số */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmRuleView"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.rule_unknown */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmRuleAdd: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Khóa tham số có phiên bản (pf/hrm) — promotion (quy tắc nâng bậc), achievement_conversion (quy đổi thành tích) */
+                key: components["parameters"]["HrmRuleKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.rule_unknown */
+            404: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmMyAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quyền */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmMyAccess"];
+                };
+            };
+            /** @description unauthenticated */
+            401: components["responses"]["Problem"];
+            /** @description forbidden (không có ngữ cảnh phiên KN) */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmUnits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đơn vị (kể cả đã ngừng) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            code: string;
+                            name: string;
+                            kind: string;
+                            active: boolean;
+                        }[];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffList: {
+        parameters: {
+            query?: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+                type?: components["schemas"]["HrmStaffType"];
+                /** @description Đơn vị công tác hoặc đơn vị quản lý (cán bộ xã) */
+                unit?: string;
+                status?: "active" | "left" | "none";
+                position?: string;
+                grade?: string;
+                /** @description Tiền tố mã hồ sơ, hoặc SĐT (tra qua chỉ mục mù của kho) */
+                q?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        day: string;
+                        total: number;
+                        scope: components["schemas"]["HrmScope"];
+                        items: components["schemas"]["HrmStaffItem"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmStaffCreate"];
+            };
+        };
+        responses: {
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmStaffWrite"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.duplicate_person | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference | hrm.step_out_of_range | hrm.not_applicable */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffExport: {
+        parameters: {
+            query?: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+                type?: components["schemas"]["HrmStaffType"];
+                unit?: string;
+                status?: "active" | "left" | "none";
+                position?: string;
+                grade?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp CSV (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed (quá 5.000 hồ sơ) */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffGet: {
+        parameters: {
+            query?: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hồ sơ (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmStaffDetail"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled | mfa_required (kho) */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found (kể cả hồ sơ ngoài phạm vi) */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffProfile: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi (version không đổi khi không có gì đổi) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmStaffWrite"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.duplicate_person */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffSensitive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Các trường (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        fields: components["schemas"]["HrmSensitiveFields"];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled | mfa_required (kho) */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.not_applicable (cán bộ xã) */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffSensitiveWrite: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    fields: components["schemas"]["HrmSensitiveFields"];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmStaffWrite"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference | hrm.not_applicable */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffEventAdd: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmEventInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["HrmEventWritten"];
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference | hrm.step_out_of_range */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffEventReplace: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+                event: components["parameters"]["HrmEventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmEventInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["HrmEventWritten"];
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found | hrm.event_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.item_reference | hrm.step_out_of_range */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffEventVoid: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+                event: components["parameters"]["HrmEventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["HrmEventWritten"];
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found | hrm.event_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmStaffAccessLog: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmStaffId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhật ký */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmAccessEntry"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmPermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ma trận */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        perms: string[];
+                        scopes: components["schemas"]["HrmScope"][];
+                        groups: string[];
+                        items: components["schemas"]["HrmPermEntry"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmPermissionSet: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    grantee_kind: "role" | "user";
+                    /** @description Nhóm vai (hcth, manager, tinh, xa, tw) hoặc mã người dùng (UUID) */
+                    grantee: string;
+                    perms: components["schemas"]["HrmPermMatrix"];
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: number;
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | hrm.permission_locked */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmPermissionHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmPermEntry"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmReportList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sáu biểu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmReportSummary"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmReportPreview: {
+        parameters: {
+            query?: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+            };
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Biểu (Cache-Control no-store — có họ tên, trường nhạy cảm) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmReportView"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled | mfa_required (kho) */
+            403: components["responses"]["Problem"];
+            /** @description hrm.report_unknown */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmReportExport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: date
+                     * @description Ngày chốt (vắng → hôm nay)
+                     */
+                    as_of?: string;
+                    /**
+                     * Format: uuid
+                     * @description Người lập biểu — mã hồ sơ
+                     */
+                    preparer_id?: string | null;
+                    /**
+                     * Format: uuid
+                     * @description Người ký (Giám đốc) — mã hồ sơ
+                     */
+                    signer_id?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã xuất */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmReportExported"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.report_unknown */
+            404: components["responses"]["Problem"];
+            /** @description hrm.report_blocked | validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmReportHistory: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmReportLog"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.report_unknown */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmReportCell: {
+        parameters: {
+            query: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+                /** @description Khóa dòng (mã đơn vị, _center, _secondment) */
+                row: string;
+                /** @description Khóa cột số */
+                col: string;
+            };
+            header?: never;
+            path: {
+                /** @description Mã biểu báo cáo Sở */
+                code: components["parameters"]["HrmReportCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Người được đếm (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmPersonBrief"][];
+                        /** @description Số người ngoài phạm vi xem */
+                        hidden: number;
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.report_unknown */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed (biểu danh sách */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmReportFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx (Cache-Control no-store) */
+            200: {
+                headers: {
+                    "X-Export-Drift"?: "true" | "false";
+                    "X-Export-Sha256"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.export_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDashboard: {
+        parameters: {
+            query?: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số liệu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDashboard"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmDashboardMembers: {
+        parameters: {
+            query: {
+                /** @description Ngày chốt YYYY-MM-DD (vắng → hôm nay, giờ VN) — truy vấn as-of */
+                at?: components["parameters"]["HrmAt"];
+                metric: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        total: number;
+                        items: components["schemas"]["HrmPersonBrief"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed (chỉ số lạ) */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolders: {
+        parameters: {
+            query?: {
+                /** @description 1 = kèm thư mục đã ẩn (người quản trị thư mục) */
+                include_hidden?: "0" | "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cây thư mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDocTree"];
+                };
+            };
+            /** @description unauthenticated */
+            401: components["responses"]["Problem"];
+            /** @description forbidden (không có ngữ cảnh phiên KN) */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    parent_id?: string | null;
+                    name: string;
+                    doc_type?: components["schemas"]["HrmDocType"];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmFolderWrite"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.folder_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderDefaults: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số thư mục đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: number;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mọi phiên bản, cũ trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmFolderVersion"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderRename: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmFolderWrite"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.folder_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderACL: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    acl: components["schemas"]["HrmFolderACL"];
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmFolderWrite"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed (khóa, nhóm quyền, phạm vi sai; nhóm Admin) */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderHide: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmReason"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmFolderWrite"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.folder_not_empty */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocFolderRestore: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmFolderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmReason"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmFolderWrite"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.folder_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocList: {
+        parameters: {
+            query?: {
+                folder?: string;
+                recursive?: "0" | "1";
+                q?: string;
+                doc_type?: components["schemas"]["HrmDocType"];
+                year?: number;
+                /** @description Phòng ban (đơn vị nội bộ) */
+                unit?: string;
+                /** @description Mã hồ sơ nhân sự (cần hồ sơ bật) */
+                staff?: string;
+                /** @description 1 = kèm tài liệu đã ẩn (người quản lý) */
+                include_hidden?: "0" | "1";
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        total: number;
+                        items: components["schemas"]["HrmDoc"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled (lọc theo nhân viên khi hồ sơ tắt) */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDocUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** @description JSON của HrmDocInput (phần văn bản) */
+                    meta: string;
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã tải lên */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDocWrite"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled (gắn nhân viên khi hồ sơ tắt) */
+            403: components["responses"]["Problem"];
+            /** @description hrm.folder_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.doc_too_large */
+            413: components["responses"]["Problem"];
+            /** @description hrm.doc_format | validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description hrm.docs_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    hrmDocGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tài liệu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDocDetail"];
+                };
+            };
+            /** @description hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.doc_not_found (kể cả ngoài phạm vi) */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDocClassify: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmDocInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi (version không đổi khi không có gì đổi) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDocWrite"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.doc_not_found */
+            404: components["responses"]["Problem"];
+            /** @description conflict (tài liệu đã ẩn) */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocHide: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmReason"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDocWrite"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.doc_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocRestore: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmReason"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDocWrite"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.doc_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDocContent: {
+        parameters: {
+            query?: {
+                download?: "0" | "1";
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["HrmDocId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nội dung tệp (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description forbidden (thiếu vai vault_evidence_viewer) | hrm.records_disabled | mfa_required */
+            403: components["responses"]["Problem"];
+            /** @description hrm.doc_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.docs_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    contactAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quyền */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactAccess"];
+                };
+            };
+            /** @description unauthenticated */
+            401: components["responses"]["Problem"];
+            /** @description forbidden (vai không có quyền danh bạ) */
+            403: components["responses"]["Problem"];
+        };
+    };
+    contactPersons: {
+        parameters: {
+            query?: {
+                q?: string;
+                level?: components["schemas"]["ContactLevel"];
+                /** @description mã đơn vị nội bộ hoặc một phần tên đơn vị/cơ quan */
+                unit?: string;
+                title?: string;
+                /** @description chỉ người cập nhật được — gồm liên hệ đã ngừng hiển thị */
+                include_hidden?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang danh bạ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPersonList"];
+                };
+            };
+            /** @description unauthenticated */
+            401: components["responses"]["Problem"];
+            /** @description forbidden | node_scope_required | kho từ chối (thiếu vai vault_directory) */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    contactPersonCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactPersonWrite"];
+            };
+        };
+        responses: {
+            /** @description Đã thêm */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPersonDetail"];
+                };
+            };
+            /** @description contact.manage_forbidden | forbidden */
+            403: components["responses"]["Problem"];
+            /** @description contact.duplicate_person */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    contactPersonGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPersonDetail"];
+                };
+            };
+            /** @description contact.detail_forbidden | forbidden */
+            403: components["responses"]["Problem"];
+            /** @description contact.not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    contactPersonRevise: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactPersonWrite"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPersonDetail"];
+                };
+            };
+            /** @description contact.manage_forbidden */
+            403: components["responses"]["Problem"];
+            /** @description contact.not_found */
+            404: components["responses"]["Problem"];
+            /** @description contact.duplicate_person */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | contact.staff_read_only */
+            422: components["responses"]["Problem"];
+        };
+    };
+    contactUnits: {
+        parameters: {
+            query?: {
+                q?: string;
+                level?: components["schemas"]["ContactLevel"];
+                include_hidden?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thẻ Đơn vị */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactUnitList"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    contactUnitCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactUnitWrite"];
+            };
+        };
+        responses: {
+            /** @description Đã thêm */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactUnit"];
+                };
+            };
+            /** @description contact.manage_forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    contactUnitRevise: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactUnitWrite"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactUnit"];
+                };
+            };
+            /** @description contact.manage_forbidden */
+            403: components["responses"]["Problem"];
+            /** @description contact.not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceStatus: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trạng thái */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceStatus"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.profile_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceCatalog: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceCatalog"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.profile_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceInstallDefaults: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số phiên bản đã ghi (0 khi mọi mã đã có) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        written: number;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.profile_not_found */
+            404: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+        };
+    };
+    priceCalendar: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceCalendar"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.profile_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceSaveSchedule: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceScheduleInput"];
+            };
+        };
+        responses: {
+            /** @description Phiên bản đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSchedule"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.profile_not_found */
+            404: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.valid_from | price.remind_order | price.respond_before_lock | price.template_var */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceAddException: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    day: string;
+                    /** @enum {string} */
+                    kind: "holiday" | "extra";
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Ngoại lệ đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceCalendarException"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.exception_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.valid_from | price.exception_mismatch */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRetireException: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã xóa */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.exception_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.valid_from */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceCalendarRuns: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Vắng → 30 ngày trước */
+                from?: string;
+                /** @description Vắng → hôm nay (giờ VN); tối đa 92 ngày */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhật ký */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        from: string;
+                        /** Format: date */
+                        to: string;
+                        items: components["schemas"]["PriceCalendarRun"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReminderTest: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã xếp hàng thông báo (pf/notify) */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Nội dung đã thay biến */
+                        body: string;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceThresholds: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ngưỡng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceThresholds"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceSaveThreshold: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceThresholdInput"];
+            };
+        };
+        responses: {
+            /** @description Phiên bản đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceThreshold"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRetireThreshold: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                scope: "default" | "group" | "item";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã xóa */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.threshold_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.default_threshold */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListItems: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+                group?: string;
+                kind?: "basic" | "local";
+                state?: "active" | "pending" | "retired";
+                /** @description Tìm theo mã, tên, giống/phẩm cấp */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceItemList"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.profile_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceCreateItem: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceItemInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description bad_request */
+            400: components["responses"]["Problem"];
+            /** @description forbidden (chỉ Cấp Tỉnh */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found (mặt hàng được thay thế) */
+            404: components["responses"]["Problem"];
+            /** @description price.item_duplicate | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid | price.item_basic_not_assignable */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceGetItem: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+            };
+            header?: never;
+            path: {
+                /** @description Mã mặt hàng (MH + 5 chữ số) */
+                code: components["parameters"]["PriceItemCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mặt hàng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceItemDetail"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceReviseItem: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Mã mặt hàng (MH + 5 chữ số) */
+                code: components["parameters"]["PriceItemCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceItemInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.item_locked | price.item_retired | price.item_duplicate */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRetireItem: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Mã mặt hàng (MH + 5 chữ số) */
+                code: components["parameters"]["PriceItemCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    valid_to?: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.item_retired */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceMoveItem: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Mã mặt hàng (MH + 5 chữ số) */
+                code: components["parameters"]["PriceItemCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    direction: "up" | "down";
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi (written = 0 khi đã ở đầu/cuối nhóm) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.item_retired */
+            409: components["responses"]["Problem"];
+        };
+    };
+    priceListGroups: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhóm hàng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        groups: components["schemas"]["PriceGroup"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceCreateGroup: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceGroupInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description conflict (mã đã có) */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReviseGroup: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceGroupInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.group_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRetireGroup: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.group_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.group_not_empty */
+            409: components["responses"]["Problem"];
+        };
+    };
+    priceListAssignments: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+                point?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gán */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        assignments: components["schemas"]["PriceAssignment"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceAssignItems: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceAssignInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.item_retired */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid | price.item_basic_not_assignable */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceUnassignItems: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceAssignInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid | price.item_basic_not_assignable */
+            422: components["responses"]["Problem"];
+        };
+    };
+    pricePointItems: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+                point: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mặt hàng của xã */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        day: string;
+                        point_code: string;
+                        items: components["schemas"]["PriceItem"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListItemSets: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bộ mặt hàng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sets: components["schemas"]["PriceItemSet"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceCreateItemSet: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceItemSetInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.item_set_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReviseItemSet: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceItemSetInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.item_set_not_found | price.item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListProposals: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                status?: "pending" | "approved" | "rejected";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đề xuất */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        proposals: components["schemas"]["PriceProposal"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceCreateProposal: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceProposalInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi (code = mã đề xuất) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceApproveProposal: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceItemInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi (code = mã mặt hàng mới) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.proposal_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.proposal_decided | price.item_duplicate */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.item_date_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRejectProposal: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    note: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.proposal_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.proposal_decided */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListRegions: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhóm vùng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        regions: components["schemas"]["PriceRegion"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceCreateRegion: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceRegionInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description conflict (mã đã có) */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReviseRegion: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceRegionInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | price.region_not_found */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRetireRegion: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.region_in_use */
+            409: components["responses"]["Problem"];
+            /** @description price.region_not_found */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListPoints: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+                region?: string;
+                state?: "active" | "pending" | "retired";
+                /** @description true: Cấp Xã — xã mình phụ trách chính; Cấp Tỉnh — xã được phân công cho mình */
+                mine?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Xã báo giá (sắp theo nhóm vùng, mã) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        points: components["schemas"]["PricePoint"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceCreatePoint: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PricePointInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.admin_unit_taken */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.admin_unit_invalid | price.region_not_found | price.valid_from */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceGetPoint: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Xã báo giá */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PricePointDetail"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.point_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceRevisePoint: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PricePointInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.point_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.admin_unit_taken */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.admin_unit_invalid | price.region_not_found | price.point_inactive | price.valid_from */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRetirePoint: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PricePointInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.point_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | price.point_inactive | price.valid_from */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceAssignPointOfficer: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceOfficerInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWriteResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.point_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | price.officer_invalid | price.point_inactive | price.valid_from */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListAdminUnits: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: components["parameters"]["PriceAt"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ĐVHC */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        admin_units: components["schemas"]["PriceAdminUnit"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceListOfficers: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                level: "XA" | "TINH";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cán bộ (directory = false khi gốc lắp ráp chưa nối danh bạ) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        officers: components["schemas"]["PriceOfficer"][];
+                        directory: boolean;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListDayTickets: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Ngày báo giá (vắng → hôm nay) */
+                day?: string;
+                region?: string;
+                /** @description Cấp Tỉnh: chỉ xã được phân công */
+                mine?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiếu trong ngày */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceTicketDay"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceGetSheet: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Mã xã báo giá; Cấp Xã phụ trách đúng một xã có thể bỏ trống */
+                point?: string;
+                day?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiếu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSheet"];
+                };
+            };
+            /** @description forbidden | price.point_not_assigned */
+            403: components["responses"]["Problem"];
+            /** @description price.point_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceSaveSheet: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceEntryInput"];
+            };
+        };
+        responses: {
+            /** @description Phiếu sau khi lưu */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSheet"];
+                };
+            };
+            /** @description forbidden | price.point_not_assigned */
+            403: components["responses"]["Problem"];
+            /** @description price.point_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.ticket_locked | price.ticket_stale | price.ticket_exists | price.board_approved | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.price_invalid | price.ticket_incomplete | price.not_quote_day | price.point_inactive */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceSaveProxy: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceEntryInput"];
+            };
+        };
+        responses: {
+            /** @description Phiếu sau khi lưu */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSheet"];
+                };
+            };
+            /** @description forbidden | price.point_not_handled */
+            403: components["responses"]["Problem"];
+            /** @description price.point_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.ticket_not_locked | price.ticket_exists | price.ticket_stale | price.board_approved */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.reason_required | price.price_invalid | price.ticket_incomplete | price.not_quote_day */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceTicketHistory: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                point?: string;
+                /** @description Vắng → 30 ngày trước to */
+                from?: string;
+                /** @description Vắng → hôm nay */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        rows: components["schemas"]["PriceHistoryRow"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceExportTickets: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                region?: string;
+                mine?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    pricePrintTickets: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                ticket: string[];
+                format?: "pdf" | "xlsx";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp PDF hoặc .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden | price.point_not_assigned */
+            403: components["responses"]["Problem"];
+            /** @description price.ticket_not_found */
+            404: components["responses"]["Problem"];
+            /** @description conflict (phiếu Không nộp / Đã xóa không in được) */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description price.pdf_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    priceGetTicket: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiếu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSheet"];
+                };
+            };
+            /** @description forbidden | price.point_not_assigned */
+            403: components["responses"]["Problem"];
+            /** @description price.ticket_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceTicketLog: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhật ký */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceTicketLog"];
+                };
+            };
+            /** @description forbidden | price.point_not_assigned */
+            403: components["responses"]["Problem"];
+            /** @description price.ticket_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceCorrectTicket: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceCorrectInput"];
+            };
+        };
+        responses: {
+            /** @description Phiếu sau khi hiệu chỉnh */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSheet"];
+                };
+            };
+            /** @description forbidden | price.point_not_handled */
+            403: components["responses"]["Problem"];
+            /** @description price.ticket_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.ticket_not_locked | price.ticket_stale | price.board_approved | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.reason_required | price.price_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRedateTicket: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceRedateInput"];
+            };
+        };
+        responses: {
+            /** @description Phiếu sau khi sửa ngày */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSheet"];
+                };
+            };
+            /** @description forbidden | price.point_not_handled */
+            403: components["responses"]["Problem"];
+            /** @description price.ticket_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.ticket_exists | price.ticket_not_locked | price.ticket_stale | price.board_approved */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.reason_required | price.not_quote_day | price.point_inactive */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceDeleteTicket: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceDeleteInput"];
+            };
+        };
+        responses: {
+            /** @description Phiếu sau khi xóa */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSheet"];
+                };
+            };
+            /** @description forbidden | price.point_not_handled */
+            403: components["responses"]["Problem"];
+            /** @description price.ticket_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.ticket_not_locked | price.ticket_stale | price.board_approved | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.reason_required */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListAlerts: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                from?: string;
+                to?: string;
+                point?: string;
+                mine?: boolean;
+                view?: components["schemas"]["PriceAlertView"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cảnh báo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        alerts: components["schemas"]["PriceAlertRow"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRequestVerification: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceVerificationRequest"];
+            };
+        };
+        responses: {
+            /** @description Số cảnh báo đã gửi yêu cầu */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWritten"];
+                };
+            };
+            /** @description forbidden | price.point_not_handled */
+            403: components["responses"]["Problem"];
+            /** @description price.alert_not_found | price.ticket_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.alert_state | price.board_approved */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.reason_required */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceRespondVerification: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceVerificationResponse"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWritten"];
+                };
+            };
+            /** @description forbidden | price.point_not_assigned */
+            403: components["responses"]["Problem"];
+            /** @description price.alert_not_found | price.ticket_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.alert_state | price.respond_overdue | price.board_approved */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.reason_required | price.price_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceDecideAlert: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceAlertDecision"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWritten"];
+                };
+            };
+            /** @description forbidden | price.point_not_handled */
+            403: components["responses"]["Problem"];
+            /** @description price.alert_not_found | price.ticket_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.alert_state | price.ticket_not_locked | price.board_approved */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.reason_required */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceListBoards: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng giá theo ngày */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        boards: components["schemas"]["PriceBoardDay"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceGetBoard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path: {
+                /** @description Ngày báo giá (giờ VN) */
+                day: components["parameters"]["PriceBoardDay"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng giá */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceLockBoard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Ngày báo giá (giờ VN) */
+                day: components["parameters"]["PriceBoardDay"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceBoardOp"];
+            };
+        };
+        responses: {
+            /** @description Bảng giá Đang duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11) */
+            403: components["responses"]["Problem"];
+            /** @description price.board_busy | price.board_state | price.board_stale | price.board_not_locked | price.board_open_alerts */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.not_quote_day | price.board_empty */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceUnlockBoard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Ngày báo giá (giờ VN) */
+                day: components["parameters"]["PriceBoardDay"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceBoardOp"];
+            };
+        };
+        responses: {
+            /** @description Bảng giá */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11) */
+            403: components["responses"]["Problem"];
+            /** @description price.board_busy | price.board_state | price.board_stale */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceApproveBoard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Ngày báo giá (giờ VN) */
+                day: components["parameters"]["PriceBoardDay"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceBoardOp"];
+            };
+        };
+        responses: {
+            /** @description Bảng giá Đã duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11) */
+            403: components["responses"]["Problem"];
+            /** @description price.board_busy | price.board_state | price.board_stale | price.board_not_locked | price.board_open_alerts */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.not_quote_day | price.board_empty */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReopenBoard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Ngày báo giá (giờ VN) */
+                day: components["parameters"]["PriceBoardDay"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceBoardOp"];
+            };
+        };
+        responses: {
+            /** @description Bảng giá Đang mở duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11) */
+            403: components["responses"]["Problem"];
+            /** @description price.board_busy | price.board_state | price.board_stale */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.reason_required | price.reopen_expired */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceCancelReopenBoard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Ngày báo giá (giờ VN) */
+                day: components["parameters"]["PriceBoardDay"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceBoardOp"];
+            };
+        };
+        responses: {
+            /** @description Bảng giá Đã duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description forbidden (Admin khi vận hành chính thức) | price.board_steward_required (Cấp Tỉnh không có cờ QTNV — D11) */
+            403: components["responses"]["Problem"];
+            /** @description price.board_busy | price.board_state | price.board_stale | price.board_changed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportProgress: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                region?: string;
+                /** @description Mã trạng thái phiếu (not_entered, draft, submitted, locked, missed, late, approved) hoặc incomplete | unassigned | no_officer */
+                status?: string;
+                point?: string;
+                mine?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tiến độ nhập giá */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceProgress"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportProgressExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                region?: string;
+                status?: string;
+                point?: string;
+                mine?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceReportSummary: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                region?: string;
+                group?: string;
+                view?: "item" | "point";
+                /** @description Giá từng xã của một mặt hàng */
+                item?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng giá tổng hợp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSummary"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportSummaryExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                region?: string;
+                group?: string;
+                view?: "item" | "point";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | price.report_empty */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportMovement: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                period?: "day" | "week" | "month";
+                day?: string;
+                region?: string;
+                point?: string;
+                group?: string;
+                item?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Biến động giá */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceMovement"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportMovementExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                format?: "xlsx" | "pdf";
+                period?: "day" | "week" | "month";
+                day?: string;
+                region?: string;
+                point?: string;
+                group?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx / .pdf */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/pdf": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | price.report_empty */
+            422: components["responses"]["Problem"];
+            /** @description price.pdf_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    priceReportDashboard: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                group?: string;
+                item?: string;
+                region?: string;
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceDashboard"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportDashboardExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                day?: string;
+                group?: string;
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | price.report_empty */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportStats: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                month?: string;
+                from?: string;
+                to?: string;
+                region?: string;
+                point?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thống kê phiếu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceStats"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportStatsExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                month?: string;
+                from?: string;
+                to?: string;
+                region?: string;
+                point?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportStatsDetail: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                officer: string;
+                month?: string;
+                from?: string;
+                to?: string;
+                point?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ngày phải nộp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        days: components["schemas"]["PriceStatDay"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportStatsClose: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceStatMonthOp"];
+            };
+        };
+        responses: {
+            /** @description Thống kê tháng sau khi khóa */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceStats"];
+                };
+            };
+            /** @description forbidden | price.board_steward_required */
+            403: components["responses"]["Problem"];
+            /** @description price.stat_month_open | price.stat_month_state | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceReportStatsReopen: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceStatMonthOp"];
+            };
+        };
+        responses: {
+            /** @description Thống kê tháng sau khi mở lại */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceStats"];
+                };
+            };
+            /** @description forbidden | price.board_steward_required */
+            403: components["responses"]["Problem"];
+            /** @description price.stat_month_state | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.reason_required */
+            422: components["responses"]["Problem"];
+        };
+    };
+    knKhtcListCatalog: {
+        parameters: {
+            query?: {
+                /** @description Vắng = mọi loại */
+                kind?: components["schemas"]["KhtcCatalogKind"];
+                include_retired?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        counts: {
+                            kind: components["schemas"]["KhtcCatalogKind"];
+                            label: string;
+                            active: number;
+                            total: number;
+                        }[];
+                        items: components["schemas"]["KhtcCatalogItem"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    knKhtcCreateCatalog: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                kind: components["schemas"]["KhtcCatalogKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KhtcCatalogInput"];
+            };
+        };
+        responses: {
+            /** @description Gửi lặp cùng khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcCatalogItem"];
+                };
+            };
+            /** @description Phiên bản 1 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcCatalogItem"];
+                };
+            };
+            /** @description extension.khtc_catalog_exists | extension.khtc_default_conflict */
+            409: components["responses"]["Problem"];
+        };
+    };
+    knKhtcReviseCatalog: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                kind: components["schemas"]["KhtcCatalogKind"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KhtcCatalogInput"];
+            };
+        };
+        responses: {
+            /** @description Gửi lặp cùng khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcCatalogItem"];
+                };
+            };
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcCatalogItem"];
+                };
+            };
+            /** @description extension.khtc_catalog_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_default_conflict */
+            409: components["responses"]["Problem"];
+        };
+    };
+    knKhtcCatalogHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: components["schemas"]["KhtcCatalogKind"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KhtcCatalogItem"][];
+                    };
+                };
+            };
+            /** @description extension.khtc_catalog_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knKhtcListPrograms: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["KhtcProgramKind"];
+                include_retired?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KhtcProgram"][];
+                    };
+                };
+            };
+        };
+    };
+    knKhtcCreateProgram: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KhtcProgramInput"];
+            };
+        };
+        responses: {
+            /** @description Gửi lặp cùng khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcProgram"];
+                };
+            };
+            /** @description Phiên bản 1 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcProgram"];
+                };
+            };
+            /** @description extension.khtc_program_exists */
+            409: components["responses"]["Problem"];
+        };
+    };
+    knKhtcReviseProgram: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KhtcProgramInput"];
+            };
+        };
+        responses: {
+            /** @description Gửi lặp cùng khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcProgram"];
+                };
+            };
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcProgram"];
+                };
+            };
+            /** @description extension.khtc_program_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.khtc_program_exists */
+            409: components["responses"]["Problem"];
+        };
+    };
+    knKhtcProgramHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KhtcProgram"][];
+                    };
+                };
+            };
+            /** @description extension.khtc_program_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knKhtcGetPlan: {
+        parameters: {
+            query?: {
+                version?: number;
+                at?: string;
+            };
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kế hoạch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcPlan"];
+                };
+            };
+            /** @description extension.khtc_plan_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knKhtcPlanVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KhtcPlanVersion"][];
+                    };
+                };
+            };
+        };
+    };
+    knKhtcSavePlan: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KhtcPlanSave"];
+            };
+        };
+        responses: {
+            /** @description Gửi lặp cùng khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcPlan"];
+                };
+            };
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcPlan"];
+                };
+            };
+            /** @description extension.khtc_plan_version_conflict | extension.khtc_entry_in_use */
+            409: components["responses"]["Problem"];
+            /** @description extension.khtc_plan_invalid | extension.khtc_effective_date_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    knKhtcCopyDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bản nháp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcPlanDraft"];
+                };
+            };
+            /** @description extension.khtc_plan_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knKhtcExportPlan: {
+        parameters: {
+            query?: {
+                version?: number;
+            };
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description extension.khtc_plan_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knKhtcImportDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Bản nháp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcPlanDraft"];
+                };
+            };
+            /** @description extension.khtc_import_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportSave: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCReportSave"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportRefresh: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCReportRefresh"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportExports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportExportList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportExport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCReportExportInput"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportExport"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                exportID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportFinalize: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                exportID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
 }

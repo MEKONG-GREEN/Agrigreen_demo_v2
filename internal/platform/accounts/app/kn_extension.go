@@ -9,10 +9,13 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/store"
 
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -73,7 +76,8 @@ func (e ExtensionKN) KNContext(ctx context.Context) (port.KNContext, bool, error
 		return port.KNContext{}, false, nil
 	}
 	k := p.KN
-	c := port.KNContext{Role: k.Role, Department: k.Department, Communes: slices.Clone(k.Communes)}
+	c := port.KNContext{Role: k.Role, Department: k.Department, Communes: slices.Clone(k.Communes), MgmtLevel: k.MgmtLevel,
+		InternalUnit: k.InternalUnit, ReadOnly: k.ReadOnly()}
 	unit := k.UnitRef
 	if unit == uuid.Nil {
 		unit = k.OrgRef
@@ -83,7 +87,8 @@ func (e ExtensionKN) KNContext(ctx context.Context) (port.KNContext, bool, error
 		return port.KNContext{}, false, err
 	}
 	// Cấp quản lý của lần gán (Q-05). Ngữ cảnh hỗ trợ không gắn tài khoản (AssignmentID Nil) → không biết.
-	if k.AssignmentID != uuid.Nil && e.Assignments != nil {
+	// ResolveContext (W11.07) đã đặt MgmtLevel; tra lại chỉ khi thiếu (ngữ cảnh dựng tay trong kiểm thử cũ).
+	if c.MgmtLevel == "" && k.AssignmentID != uuid.Nil && e.Assignments != nil {
 		list, err := e.Assignments.ActiveAssignments(ctx, k.Role, k.Department)
 		if err != nil {
 			return port.KNContext{}, false, err
@@ -154,4 +159,33 @@ func (e ExtensionKN) Officers(ctx context.Context, tenantID uuid.UUID, departmen
 		out = append(out, port.KNOfficer{ActorRef: a.UserRef, Level: level, ProvinceCode: prov, Communes: slices.Clone(a.Communes), MgmtLevel: a.MgmtLevel})
 	}
 	return out, nil
+}
+
+var _ port.RoleHolders = (*Service)(nil)
+
+// RoleHolders thực hiện port.RoleHolders (gói NOTIF — người nhận Cấp Tỉnh của Báo giá). Tenant truyền tường minh.
+func (s *Service) RoleHolders(ctx context.Context, tenantID uuid.UUID, role, dept string) ([]uuid.UUID, error) {
+	list, err := s.ActiveAssignments(tenant.WithID(ctx, tenantID), role, dept)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]uuid.UUID, 0, len(list))
+	for _, a := range list {
+		if !slices.Contains(out, a.UserRef) {
+			out = append(out, a.UserRef)
+		}
+	}
+	slices.SortFunc(out, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
+	return out, nil
+}
+
+// DutyHolders thực hiện port.RoleHolders (gói NOTIF — Quản trị nghiệp vụ báo giá). Tenant truyền tường minh.
+func (s *Service) DutyHolders(ctx context.Context, tenantID uuid.UUID, role, dept, duty string) ([]uuid.UUID, error) {
+	var out []uuid.UUID
+	err := tenant.WithTenantTx(ctx, s.DB, tenantID, func(tx pgx.Tx) error {
+		var e error
+		out, e = store.DutyHoldersAt(ctx, tx, role, dept, duty, s.now())
+		return e
+	})
+	return out, err
 }

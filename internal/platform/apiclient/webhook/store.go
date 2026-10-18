@@ -55,7 +55,7 @@ func insertEvent(ctx context.Context, tx pgx.Tx, e *event) error {
 // webhookIDByIdem trả webhook_id của dòng sổ đã ghi với idem_key (gọi lặp); Nil nếu chưa có.
 func webhookIDByIdem(ctx context.Context, tx pgx.Tx, key string) (uuid.UUID, error) {
 	var id uuid.UUID
-	err := tx.QueryRow(ctx, `SELECT webhook_id FROM pf_apiclient.webhook_event WHERE idem_key = $1::text LIMIT 1`, key).Scan(&id)
+	err := tx.QueryRow(ctx, `SELECT webhook_id FROM pf_apiclient.webhook_event WHERE idem_key = $1::text`+ledger.NewestByIdem(""), key).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, nil
 	}

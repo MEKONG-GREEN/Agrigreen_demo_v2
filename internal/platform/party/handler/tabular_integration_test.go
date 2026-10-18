@@ -110,18 +110,19 @@ func TestOrgTreeExportImportRoundTrip(t *testing.T) {
 	)
 	body := xlsxBytes(t, tb.Header, rows) // người dùng sửa trên chính tệp xuất
 	r = root.call(f.admin.URL, http.MethodPost, "/v1/orgs/import?reason="+"S%C3%A1p+nh%E1%BA%ADp+x%C3%A3+theo+NQ+1234", key(), tabular.ContentTypeXLSX, body)
-	if r.status != http.StatusOK || r.body["created"] != float64(2) || r.body["updated"] != float64(2) || r.body["unchanged"] != float64(5) || r.body["rejected"] != float64(4) {
+	if r.status != http.StatusOK || r.body["created"] != float64(1) || r.body["updated"] != float64(2) || r.body["unchanged"] != float64(5) || r.body["rejected"] != float64(5) {
 		t.Fatalf("nhập tệp đã sửa: %d %v", r.status, r.body)
 	}
 	res := rowsOf(r)
 	if res[0]["status"] != "created" || res[0]["row"] != float64(2) {
 		t.Fatalf("tổ mới đặt trước cha vẫn được tạo: %v", res[0])
 	}
+	// ORGUI / D2: nhập cây không tạo HTX mới — dòng bị loại, lý do chỉ sang màn Neo HTX.
 	newCoop := res[8]
-	if newCoop["status"] != "created" || !strings.HasPrefix(newCoop["code"].(string), "HTX") {
-		t.Fatalf("HTX mới được sinh mã: %v", newCoop)
+	if newCoop["status"] != "rejected" || !strings.Contains(newCoop["reason"].(string), "Neo HTX") || !strings.Contains(newCoop["reason"].(string), "/quan-tri/neo-htx") {
+		t.Fatalf("HTX mới phải bị loại, chỉ sang Neo HTX: %v", newCoop)
 	}
-	for i, want := range map[int]string{9: "không hợp lệ", 10: "KHONG-CO", 11: "để trống", 12: "trùng với dòng 2"} {
+	for i, want := range map[int]string{9: "không hợp lệ", 10: "KHONG-CO", 11: "Neo HTX", 12: "trùng với dòng 2"} {
 		if res[i]["status"] != "rejected" || !strings.Contains(res[i]["reason"].(string), want) {
 			t.Fatalf("dòng lỗi %d: %v", i, res[i])
 		}
@@ -145,10 +146,10 @@ func TestOrgTreeExportImportRoundTrip(t *testing.T) {
 	}
 	verifyChain(t, f, tr.c1, 2)
 
-	// Xuất lại: có tổ và HTX mới, cha trước con.
+	// Xuất lại: có tổ mới (HTX mới không được tạo), cha trước con.
 	_, _, data = root.download("/v1/orgs/export.xlsx")
 	tb2, err := tabular.ReadBytes(data, tabular.Limits{})
-	if err != nil || len(tb2.Rows) != 9 {
+	if err != nil || len(tb2.Rows) != 8 {
 		t.Fatalf("xuất lại: %v %d", err, len(tb2.Rows))
 	}
 	// Sai mẫu: thiếu cột Loại → từ chối cả tệp.

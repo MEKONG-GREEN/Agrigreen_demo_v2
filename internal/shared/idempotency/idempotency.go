@@ -11,10 +11,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"regexp"
+	"slices"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -77,6 +79,34 @@ type stored struct {
 	stale       bool
 }
 
+type authorizationScopeKey struct{}
+
+// WithAuthorizationScope gắn dấu phạm vi do middleware cấp quyền đã giải ở server.
+// Hạ tầng không diễn giải nội dung nghiệp vụ; không lấy dấu này từ header client.
+// Gọi trước Middleware, cập nhật mỗi request để cache không sống vượt quyền hiện tại.
+func WithAuthorizationScope(ctx context.Context, scope []byte) context.Context {
+	return context.WithValue(ctx, authorizationScopeKey{}, bytes.Clone(scope))
+}
+
+// requestHash v2 ràng buộc tài nguyên thật, truy vấn và quyền hiện tại; không chỉ mẫu route.
+func requestHash(ctx context.Context, p authz.Principal, r *http.Request, body []byte) []byte {
+	roles := slices.Clone(p.Roles)
+	slices.Sort(roles)
+	scope, _ := ctx.Value(authorizationScopeKey{}).([]byte)
+	binding, _ := json.Marshal(struct {
+		Org   uuid.UUID
+		Roles []string
+		MFA   bool
+		Scope []byte
+	}{p.OrgRef, roles, p.MFA, scope})
+	h := sha256.New()
+	h.Write([]byte("v2\n" + r.Method + "\n" + r.URL.EscapedPath() + "\n" + r.URL.Query().Encode() + "\n"))
+	h.Write(binding)
+	h.Write([]byte("\n"))
+	h.Write(body)
+	return h.Sum(nil)
+}
+
 // Middleware áp cho các route POST. db là pool của vai có quyền trên shared.idempotency_key.
 func Middleware(db tenant.Beginner) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -106,10 +136,7 @@ func Middleware(db tenant.Beginner) gin.HandlerFunc {
 		}
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
 		route := c.FullPath()
-		h := sha256.New()
-		h.Write([]byte(c.Request.Method + "\n" + route + "\n"))
-		h.Write(body)
-		hash := h.Sum(nil)
+		hash := requestHash(ctx, p, c.Request, body)
 
 		var prev *stored
 		err = tenant.WithTenantTx(ctx, db, p.TenantID, func(tx pgx.Tx) error {

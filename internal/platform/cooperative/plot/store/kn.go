@@ -58,13 +58,17 @@ func PlotEvents(ctx context.Context, tx pgx.Tx, plotRef uuid.UUID) ([]PlotEvent,
 	return out, rows.Err()
 }
 
+// LegacyKNDepartment: phòng ban đọc thay cho thửa có trước v7.7 / không qua KN (department_code NULL) — X-12 (W11.02):
+// "dữ liệu cũ không phòng ban đọc qua module KN mặc định Phòng Trồng trọt", không di trú bằng UPDATE.
+const LegacyKNDepartment = "trong_trot"
+
 // KNFilter là điều kiện danh sách thửa của ngữ cảnh phiên KN.
 type KNFilter struct {
 	All      bool     // phạm vi toàn quốc (Cấp Quốc gia, Admin)
 	Units    []string // xã/tỉnh trong phạm vi
 	Commune  string   // lọc một xã (rỗng = mọi xã trong phạm vi)
 	Coop     uuid.UUID
-	Dept     string // rỗng = mọi phòng ban (Admin); khác rỗng: phòng ban này hoặc thửa không mang phòng ban
+	Dept     string // rỗng = mọi phòng ban (Admin); khác rỗng: phòng ban này (thửa không mang phòng ban tính là LegacyKNDepartment)
 	After    uuid.UUID
 	Limit    int
 	WithGeom bool
@@ -81,9 +85,9 @@ func ListKN(ctx context.Context, tx pgx.Tx, f KNFilter) ([]Plot, error) {
 	  WHERE ($1::boolean OR p.commune_code = ANY($2::text[]))
 	    AND ($3::text = '' OR p.commune_code = $3::text)
 	    AND ($4::uuid IS NULL OR p.cooperative_ref = $4::uuid)
-	    AND ($5::text = '' OR p.department_code IS NULL OR p.department_code = $5::text)
+	    AND ($5::text = '' OR coalesce(p.department_code, $8::text) = $5::text)
 	    AND p.status <> 'retired' AND p.ref > $6::uuid
-	  ORDER BY p.ref LIMIT $7::int`, f.All, units(f.Units), f.Commune, nilIfZero(f.Coop), f.Dept, f.After, f.Limit)
+	  ORDER BY p.ref LIMIT $7::int`, f.All, units(f.Units), f.Commune, nilIfZero(f.Coop), f.Dept, f.After, f.Limit, LegacyKNDepartment)
 	if err != nil {
 		return nil, err
 	}
@@ -159,8 +163,8 @@ func ExportCommune(ctx context.Context, tx pgx.Tx, commune, dept string, limit i
 	rows, err := tx.Query(ctx, "SELECT "+plotCols+`, ST_AsGeoJSON(p.geom, 7), ST_AsKML(p.geom, 7)
 	  FROM pf_coop.plot p
 	  WHERE p.commune_code = $1::text AND p.status <> 'retired'
-	    AND ($2::text = '' OR p.department_code IS NULL OR p.department_code = $2::text)
-	  ORDER BY p.code LIMIT $3::int`, commune, dept, limit)
+	    AND ($2::text = '' OR coalesce(p.department_code, $4::text) = $2::text)
+	  ORDER BY p.code LIMIT $3::int`, commune, dept, limit, LegacyKNDepartment)
 	if err != nil {
 		return nil, err
 	}

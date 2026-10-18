@@ -1,0 +1,158 @@
+[
+  {
+    "code": "masterdata.catalog_ref_invalid",
+    "errors": [
+      {
+        "field": "attrs.species",
+        "reason": "MISSING"
+      }
+    ],
+    "status": 422,
+    "title": "Mục tham chiếu (nhóm cây trồng, cây trồng bị ảnh hưởng) không có hoặc đã ngừng dùng",
+    "type": "https://errors.agrigreen.vn/masterdata.catalog_ref_invalid"
+  },
+  {
+    "code": "masterdata.catalog_ref_invalid",
+    "errors": [
+      {
+        "field": "attrs.species",
+        "reason": "MISSING"
+      }
+    ],
+    "status": 422,
+    "title": "Mục tham chiếu (nhóm cây trồng, cây trồng bị ảnh hưởng) không có hoặc đã ngừng dùng",
+    "type": "https://errors.agrigreen.vn/masterdata.catalog_ref_invalid"
+  },
+  {
+    "code": "masterdata.catalog_ref_invalid",
+    "errors": [
+      {
+        "field": "attrs.diseases",
+        "reason": "MISSING_DISEASE"
+      }
+    ],
+    "status": 422,
+    "title": "Mục tham chiếu (nhóm cây trồng, cây trồng bị ảnh hưởng) không có hoặc đã ngừng dùng",
+    "type": "https://errors.agrigreen.vn/masterdata.catalog_ref_invalid"
+  },
+  {
+    "code": "masterdata.catalog_ref_invalid",
+    "errors": [
+      {
+        "field": "attrs.species",
+        "reason": "MISSING"
+      }
+    ],
+    "status": 422,
+    "title": "Mục tham chiếu (nhóm cây trồng, cây trồng bị ảnh hưởng) không có hoặc đã ngừng dùng",
+    "type": "https://errors.agrigreen.vn/masterdata.catalog_ref_invalid"
+  },
+  {
+    "code": "masterdata.catalog_ref_invalid",
+    "errors": [
+      {
+        "field": "attrs.breed",
+        "reason": "MISSING_BREED"
+      }
+    ],
+    "status": 422,
+    "title": "Mục tham chiếu (nhóm cây trồng, cây trồng bị ảnh hưởng) không có hoặc đã ngừng dùng",
+    "type": "https://errors.agrigreen.vn/masterdata.catalog_ref_invalid"
+  },
+  {
+    "code": "masterdata.catalog_ref_invalid",
+    "errors": [
+      {
+        "field": "attrs.doses",
+        "reason": "MISSING_VACCINE"
+      }
+    ],
+    "status": 422,
+    "title": "Mục tham chiếu (nhóm cây trồng, cây trồng bị ảnh hưởng) không có hoặc đã ngừng dùng",
+    "type": "https://errors.agrigreen.vn/masterdata.catalog_ref_invalid"
+  },
+  {
+    "code": "masterdata.catalog_ref_invalid",
+    "errors": [
+      {
+        "field": "attrs.species",
+        "reason": "MISSING"
+      }
+    ],
+    "status": 422,
+    "title": "Mục tham chiếu (nhóm cây trồng, cây trồng bị ảnh hưởng) không có hoặc đã ngừng dùng",
+    "type": "https://errors.agrigreen.vn/masterdata.catalog_ref_invalid"
+  },
+  {
+    "code": "masterdata.cnts_commune_invalid",
+    "errors": [
+      {
+        "field": "attrs.commune_code",
+        "reason": "89"
+      }
+    ],
+    "status": 422,
+    "title": "Cơ sở giết mổ phải thuộc một xã/phường/đặc khu có hiệu lực tại ngày áp dụng",
+    "type": "https://errors.agrigreen.vn/masterdata.cnts_commune_invalid"
+  },
+  {
+    "code": "masterdata.cnts_commune_invalid",
+    "errors": [
+      {
+        "field": "attrs.commune_code",
+        "reason": "ABSENT"
+      }
+    ],
+    "status": 422,
+    "title": "Cơ sở giết mổ phải thuộc một xã/phường/đặc khu có hiệu lực tại ngày áp dụng",
+    "type": "https://errors.agrigreen.vn/masterdata.cnts_commune_invalid"
+  },
+  {
+    "code": "masterdata.cnts_commune_invalid",
+    "errors": [
+      {
+        "field": "attrs.commune_code",
+        "reason": "30289"
+      }
+    ],
+    "status": 422,
+    "title": "Cơ sở giết mổ phải thuộc một xã/phường/đặc khu có hiệu lực tại ngày áp dụng",
+    "type": "https://errors.agrigreen.vn/masterdata.cnts_commune_invalid"
+  },
+  {
+    "code": "masterdata.cnts_stamp_taken",
+    "errors": [
+      {
+        "field": "attrs.stamp_codes",
+        "reason": "91.03 → OWNER"
+      }
+    ],
+    "status": 409,
+    "title": "Mã số khắc mộc dấu đã thuộc cơ sở giết mổ khác",
+    "type": "https://errors.agrigreen.vn/masterdata.cnts_stamp_taken"
+  },
+  {
+    "code": "masterdata.cnts_stamp_taken",
+    "errors": [
+      {
+        "field": "attrs.stamp_codes",
+        "reason": "91.02 → OWNER"
+      }
+    ],
+    "status": 409,
+    "title": "Mã số khắc mộc dấu đã thuộc cơ sở giết mổ khác",
+    "type": "https://errors.agrigreen.vn/masterdata.cnts_stamp_taken"
+  },
+  {
+    "code": "masterdata.cnts_stamp_taken",
+    "errors": [
+      {
+        "field": "attrs.stamp_codes",
+        "reason": "91.01 → OWNER"
+      }
+    ],
+    "status": 409,
+    "title": "Mã số khắc mộc dấu đã thuộc cơ sở giết mổ khác",
+    "type": "https://errors.agrigreen.vn/masterdata.cnts_stamp_taken"
+  }
+]

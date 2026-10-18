@@ -11,10 +11,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	knprice "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
@@ -60,15 +62,29 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 		return nil, err
 	}
 	clk := clock.System{}
-	md := masterdata.New(mdPool, clk)
+	md := masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 	kn := extension.New(extPool, clk, extension.Deps{Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs()})
 	log.Info("kênh thông báo", "event", "startup", "push", ch.Pusher.Name(), "email", ch.Mailer != nil, "outcome", "ok")
 	// pf/cooperative (W3.3): nông hộ có thửa theo xã (schema pf_coop, r_cooperative).
 	coop := cooperative.New(coopPool, clk, cooperative.Deps{})
-	farmers := assembly.AreaFarmers{Households: coop.Households(),
-		Accounts: accounts.New(accPool, clk, accounts.Deps{}).FarmerAccounts()}
-	return notify.New(nPool, clk, notify.Deps{Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
-		DigestTo: ch.DigestTo, Log: log}), nil
+	// Gói NOTIF: email theo người nhận tra địa chỉ qua pf/accounts (Keycloak, AG_KC_*) lúc gửi; người nhận Cấp Tỉnh của
+	// Báo giá từ lần gán vai + cờ QTNV (pf_accounts, r_accounts).
+	kc, err := accounts.DirectoryFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	acc := accounts.New(accPool, clk, accounts.Deps{Directory: kc})
+	farmers := assembly.AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}
+	ownedDesk := knprice.NewNotificationDirectory(acc.RoleHolders(), assembly.PriceProfiles())
+	d := notify.Deps{Kinds: assembly.NotificationKinds(), Digests: assembly.NotificationDigests(), Builders: assembly.NotificationBuilders(ownedDesk, kn.Staff(), md.AdminUnits()), Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
+		EmailMailer: ch.EmailMailer, DigestTo: ch.DigestTo, Log: log, LinkBase: os.Getenv("AG_WEB_OPS_URL"),
+	}
+	if dir := acc.MailDirectory(); dir != nil {
+		d.Emails = assembly.NotifyEmails{Dir: dir}
+	} else {
+		log.Warn("chưa cấu hình AG_KC_* — thông báo chỉ gửi trong ứng dụng, không email theo người nhận", "event", "startup", "outcome", "skipped")
+	}
+	return notify.New(nPool, clk, d), nil
 }
 
 // notifyConsumers: một consumer mỗi nhóm sự kiện (pf.notify.directive, .content,
@@ -76,7 +92,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 func notifyConsumers(log *slog.Logger) []consumer {
 	lazy := &notifyLazy{log: log}
 	// Danh sách consumer và sự kiện lấy từ module (không cần DB để liệt kê).
-	specs := notify.New(nil, clock.System{}, notify.Deps{}).Consumers()
+	specs := notify.New(nil, clock.System{}, notify.Deps{Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Kinds: assembly.NotificationKinds(), Digests: assembly.NotificationDigests(), Builders: assembly.NotificationBuilders(nil, nil, nil)}).Consumers()
 	out := make([]consumer, 0, len(specs))
 	for i := range specs {
 		sp := specs[i]

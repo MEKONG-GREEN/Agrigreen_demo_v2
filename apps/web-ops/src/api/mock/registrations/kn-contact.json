@@ -1,0 +1,11 @@
+{
+  "id": "kn-contact",
+  "source": "./kn-contact",
+  "app": [
+    {
+      "export": "contactRoutes",
+      "order": 23
+    }
+  ],
+  "admin": []
+}

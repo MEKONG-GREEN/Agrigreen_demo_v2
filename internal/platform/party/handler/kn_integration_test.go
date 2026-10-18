@@ -306,13 +306,13 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	root := f.root()
 	tr := f.seedTree(root)
 
-	// Dữ liệu nền 6 phòng ban An Giang (tạm, Q-02), chạy lặp an toàn.
+	// Dữ liệu nền 5 phòng ban An Giang (W11.06, chờ khách Q-051), chạy lặp an toàn.
 	r := root.adminDo(http.MethodPost, "/v1/orgs/"+tr.p89.String()+"/departments/seed", nil)
-	if created, _ := r.body["created"].([]any); r.status != http.StatusOK || len(created) != 6 {
+	if created, _ := r.body["created"].([]any); r.status != http.StatusOK || len(created) != 5 {
 		t.Fatalf("seed phòng ban: %d %v", r.status, r.body)
 	}
 	r = root.adminDo(http.MethodPost, "/v1/orgs/"+tr.p89.String()+"/departments/seed", nil)
-	if created, _ := r.body["created"].([]any); len(created) != 0 || r.body["existing"] != float64(6) {
+	if created, _ := r.body["created"].([]any); len(created) != 0 || r.body["existing"] != float64(5) || len(r.body["legacy_retired"].([]any)) != 0 {
 		t.Fatalf("seed lặp: %v", r.body)
 	}
 
@@ -322,7 +322,7 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 
 	// Bước 2 đăng nhập: danh sách phòng ban của đơn vị người gọi (Nút xã → TTKN tỉnh).
 	r = xa.appDo(http.MethodGet, "/v1/departments", nil)
-	if list := items(r); r.status != http.StatusOK || len(list) != 6 || str(r.body, "org_ref") != tr.p89.String() ||
+	if list := items(r); r.status != http.StatusOK || len(list) != 5 || str(r.body, "org_ref") != tr.p89.String() ||
 		list[0]["code"] != "trong_trot" || list[0]["selectable"] != true || list[1]["selectable"] != false || list[1]["account_count"] != nil {
 		t.Fatalf("phòng ban (app): %d %v", r.status, r.body)
 	}
@@ -331,8 +331,8 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	r = xa.appDo(http.MethodGet, "/v1/menu", nil)
 	wantStatus(t, r, http.StatusOK, "menu Cấp Xã")
 	if str(r.body, "audience") != port.AudienceXa || str(r.body, "department", "code") != "trong_trot" ||
-		str(r.body, "default_route") != "/kn/nhiem-vu/cong-viec" || str(r.body, "menu_version") != "kn.menu/v2" ||
-		!slices.Equal(groupKeys(r), []string{"dieu_hanh", "bao_cao", "du_lieu"}) || r.hdr.Get("Cache-Control") != "no-store" {
+		str(r.body, "default_route") != "/kn/nhiem-vu/cong-viec" || str(r.body, "menu_version") != "kn.menu/v4" ||
+		!slices.Equal(groupKeys(r), []string{"dieu_hanh", "bao_cao", "du_lieu", "dung_chung"}) || r.hdr.Get("Cache-Control") != "no-store" {
 		t.Fatalf("menu Cấp Xã: %v %v", r.body, r.hdr)
 	}
 	keys := menuKeys(r)
@@ -370,17 +370,19 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 		t.Fatalf("menu Cấp Tỉnh: %v", r.body)
 	}
 	r = tw.appDo(http.MethodGet, "/v1/menu?org_ref="+tr.p89.String(), nil)
-	if keys := menuKeys(r); r.status != http.StatusOK || !slices.Equal(groupKeys(r), []string{"dieu_hanh", "bao_cao"}) || !slices.Contains(keys, "tw.bao_cao.nam") {
+	if keys := menuKeys(r); r.status != http.StatusOK || !slices.Equal(groupKeys(r), []string{"dieu_hanh", "bao_cao", "dung_chung"}) || !slices.Contains(keys, "tw.bao_cao.nam") {
 		t.Fatalf("menu Cấp Quốc gia: %v", r.body)
 	}
 
-	// Admin: Tổng quan hệ thống; Phòng ban (Trồng trọt mở, 5 phòng khác "Chưa mở" mờ); Quản trị hệ thống.
+	// Admin: Tổng quan hệ thống; Phòng ban (Trồng trọt mở, 4 phòng khác "Chưa mở" mờ); Quản trị hệ thống; Dùng chung.
 	r = root.appDo(http.MethodGet, "/v1/menu?org_ref="+tr.p89.String(), nil)
-	if r.status != http.StatusOK || !slices.Equal(groupKeys(r), []string{"dieu_hanh", "phong_ban", "quan_tri"}) || str(r.body, "default_route") != "/kn/tong-quan" {
+	if r.status != http.StatusOK || !slices.Equal(groupKeys(r), []string{"dieu_hanh", "phong_ban", "quan_tri", "dung_chung"}) || str(r.body, "default_route") != "/kn/tong-quan" {
 		t.Fatalf("menu Admin: %v", r.body)
 	}
-	if it := adminDeptItem(t, r, "trong_trot"); it["enabled"] != true || len(it["children"].([]any)) != 7 ||
-		it["children"].([]any)[6].(map[string]any)["route"] != "/kn/phong-ban/trong_trot/mau-bao-cao" {
+	if it := adminDeptItem(t, r, "trong_trot"); it["enabled"] != true ||
+		!hasMenuChildren(it, []string{"admin.pb.theo_doi_nop", "admin.pb.tong_hop", "admin.pb.du_lieu_bao_cao", "admin.pb.thu_thap", "admin.pb.lich_cong_tac", "admin.pb.danh_muc", "admin.pb.mau_bao_cao", "admin.pb.bao_cao_khtc"}) ||
+		!hasMenuChild(it, "admin.pb.mau_bao_cao", "/kn/phong-ban/trong_trot/mau-bao-cao") ||
+		!hasMenuChild(it, "admin.pb.bao_cao_khtc", "/kn/phong-ban/trong_trot/bao-cao-khtc") { // W11.11
 		t.Fatalf("Admin › Phòng Trồng trọt: %v", it)
 	}
 	if it := adminDeptItem(t, r, "chan_nuoi_thuy_san"); it["enabled"] != false || it["status_label"] != "Chưa mở" {
@@ -391,9 +393,18 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	cn := f.deptID(root, tr.p89, "chan_nuoi_thuy_san")
 	wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments/"+cn+"/status", map[string]any{"status": "active"}), http.StatusCreated, "bật phòng ban")
 	r = xa.appDo(http.MethodGet, "/v1/menu?department=chan_nuoi_thuy_san", nil)
-	if r.status != http.StatusOK || str(r.body, "department", "menu_profile") != port.MenuProfileGeneric ||
-		str(r.body, "default_route") != "/kn/nhiem-vu/cong-viec" || slices.Contains(groupKeys(r), "du_lieu") {
-		t.Fatalf("menu phòng ban vừa bật (bộ generic): %d %v", r.status, r.body)
+	if r.status != http.StatusOK || str(r.body, "department", "menu_profile") != port.MenuProfileChanNuoiThuySan ||
+		str(r.body, "default_route") != "/kn/nhiem-vu/cong-viec" || slices.Contains(groupKeys(r), "du_lieu") ||
+		!slices.Equal(groupKeys(r), []string{"dieu_hanh", "nghiep_vu", "bao_cao", "dung_chung"}) {
+		t.Fatalf("menu phòng ban vừa bật (khuôn CNTS kn.menu/v3): %d %v", r.status, r.body)
+	}
+	// Mục của module chưa có: "Sắp có", không bấm được.
+	if raw, _ := json.Marshal(r.body); !strings.Contains(string(raw), `"status":"coming_soon","status_label":"Sắp có"`) {
+		t.Fatalf("mục Sắp có: %s", raw)
+	}
+	// W11.42: "Báo cáo kỳ CNTS" của Cấp Xã đã mở.
+	if keys := menuKeys(r); !slices.Contains(keys, "xa.cnts.bao_cao_ky") {
+		t.Fatalf("Cấp Xã CNTS có Báo cáo kỳ: %v", keys)
 	}
 	wantStatus(t, xa.appDo(http.MethodGet, "/v1/menu", nil), http.StatusUnprocessableEntity, "hai phòng ban đang áp dụng → phải chọn")
 	if it := adminDeptItem(t, root.appDo(http.MethodGet, "/v1/menu?org_ref="+tr.p89.String(), nil), "chan_nuoi_thuy_san"); it["enabled"] != true {
@@ -415,8 +426,12 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 		t.Fatalf("modules Cấp Tỉnh: %v", r.body)
 	}
 	r = root.appDo(http.MethodGet, "/v1/departments/thong_tin_truyen_thong/modules?audience=admin&org_ref="+tr.p89.String(), nil)
-	if gs, _ := r.body["groups"].([]any); r.status != http.StatusOK || len(gs) != 1 || len(menuKeys(r)) != 5 {
-		t.Fatalf("modules Admin (phòng ban chưa mở, bộ generic): %v", r.body)
+	// W11.72: 5 mục chung + "Báo cáo cho KHTC" (W11.11) + "Xã báo giá", "Kỳ báo giá & giờ khóa" (đã mở) + "Mặt hàng" (Sắp có).
+	if gs, _ := r.body["groups"].([]any); r.status != http.StatusOK || len(gs) != 1 ||
+		!slices.Contains(menuKeys(r), "admin.pb.bao_cao_khtc") ||
+		!slices.Contains(menuKeys(r), "admin.pb.bao_gia_xa") || !slices.Contains(menuKeys(r), "admin.pb.bao_gia_lich") ||
+		!slices.Contains(menuKeys(r), "admin.pb.bao_gia_mat_hang") {
+		t.Fatalf("modules Admin (phòng ban chưa mở, khuôn Thông tin Tuyên truyền: 5 mục chung + Báo cáo cho KHTC + Xã báo giá, Kỳ báo giá & giờ khóa + 1 Sắp có): %v", r.body)
 	}
 	// Admin vào menu mọi cấp (FN-AD-04.07).
 	if r := root.appDo(http.MethodGet, "/v1/menu?audience=kn_xa&department=trong_trot&org_ref="+tr.p89.String(), nil); r.status != http.StatusOK {
@@ -430,6 +445,41 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	if r := xa.appDo(http.MethodGet, "/v1/menu", nil); str(r.body, "department", "code") != "trong_trot" {
 		t.Fatalf("sau khi ngưng, mặc định lại Trồng trọt: %v", r.body)
 	}
+}
+
+// W11.06 (Q-051): đơn vị đã nạp seed v7.7 (mã tạm phong_ban_5/6) — nạp lại thêm phòng ban thật; mã tạm
+// có tài khoản/dữ liệu giữ nguyên (legacy_kept), hết dùng thì xóa (legacy_retired); sau đó tra cứu mã cũ
+// phong_ban_5 trả Phòng Hành chính - Tổng hợp, phong_ban_6 không còn.
+func TestW1106_SeedReplacesLegacyTempCodes(t *testing.T) {
+	f := newFixture(t)
+	root := f.root()
+	tr := f.seedTree(root)
+	for _, code := range []string{"phong_ban_5", "phong_ban_6"} {
+		wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments", deptBody(tr.p89, code)), http.StatusCreated, "phòng ban tạm v7.7 "+code)
+	}
+	usage := &fakeUsage{}
+	f.mod.UseDepartmentUsage(usage)
+	usage.set(1, 0)
+	seed := "/v1/orgs/" + tr.p89.String() + "/departments/seed"
+	r := root.adminDo(http.MethodPost, seed, nil)
+	if created, _ := r.body["created"].([]any); r.status != http.StatusOK || len(created) != 5 ||
+		len(r.body["legacy_retired"].([]any)) != 0 || len(r.body["legacy_kept"].([]any)) != 2 {
+		t.Fatalf("seed khi mã tạm còn tài khoản: %d %v", r.status, r.body)
+	}
+	usage.set(0, 0)
+	r = root.adminDo(http.MethodPost, seed, nil)
+	if retired, _ := r.body["legacy_retired"].([]any); r.status != http.StatusOK || len(retired) != 2 || len(r.body["legacy_kept"].([]any)) != 0 {
+		t.Fatalf("seed khi mã tạm hết dùng: %d %v", r.status, r.body)
+	}
+	if list := items(root.adminDo(http.MethodGet, "/v1/departments?org_ref="+tr.p89.String(), nil)); len(list) != 5 {
+		t.Fatalf("còn 5 phòng ban: %v", list)
+	}
+	r = root.appDo(http.MethodGet, "/v1/departments/phong_ban_5/modules?audience=admin&org_ref="+tr.p89.String(), nil)
+	if r.status != http.StatusOK || str(r.body, "department", "code") != "hanh_chinh_tong_hop" {
+		t.Fatalf("mã cũ phong_ban_5 → hanh_chinh_tong_hop: %d %v", r.status, r.body)
+	}
+	wantStatus(t, root.appDo(http.MethodGet, "/v1/departments/phong_ban_6/modules?audience=admin&org_ref="+tr.p89.String(), nil),
+		http.StatusNotFound, "phong_ban_6 bỏ")
 }
 
 // ---------------------------------------------------------------------------
@@ -726,4 +776,34 @@ func TestFN_AD_04_02_ImpactAndTreeScope(t *testing.T) {
 		t.Fatalf("tenant khác thấy cây: %v", roots)
 	}
 	wantCode(t, other.adminDo(http.MethodGet, "/v1/orgs/"+tr.p89.String()+"/impact", nil), http.StatusNotFound, "party.org_not_found", "tenant khác xem ảnh hưởng")
+}
+
+// hasMenuChild checks the route contract by identity, independent of new module registrations.
+func hasMenuChild(parent map[string]any, key, route string) bool {
+	children, _ := parent["children"].([]any)
+	for _, raw := range children {
+		child, ok := raw.(map[string]any)
+		if ok && child["key"] == key && child["route"] == route {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMenuChildren(parent map[string]any, keys []string) bool {
+	children, _ := parent["children"].([]any)
+	for _, key := range keys {
+		found := false
+		for _, raw := range children {
+			child, ok := raw.(map[string]any)
+			if ok && child["key"] == key {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -18,8 +19,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
-func knownCatalog(c string) error {
-	if !domain.KnownCatalog(c) {
+func (s *Service) knownCatalog(c string) error {
+	if !s.catalogKnown(c) {
 		return ErrCatalogNotFound
 	}
 	return nil
@@ -31,7 +32,7 @@ func (s *Service) ListItems(ctx context.Context, catalog string, includeInactive
 	if err != nil {
 		return Page[domain.Item]{}, err
 	}
-	if err := knownCatalog(catalog); err != nil {
+	if err := s.knownCatalog(catalog); err != nil {
 		return Page[domain.Item]{}, err
 	}
 	limit = clampLimit(limit)
@@ -64,7 +65,7 @@ func (s *Service) GetItem(ctx context.Context, catalog, code string) (domain.Ite
 }
 
 func (s *Service) getItem(ctx context.Context, tid uuid.UUID, catalog, code string) (domain.Item, error) {
-	if err := knownCatalog(catalog); err != nil {
+	if err := s.knownCatalog(catalog); err != nil {
 		return domain.Item{}, err
 	}
 	var it *domain.Item
@@ -83,8 +84,12 @@ func (s *Service) getItem(ctx context.Context, tid uuid.UUID, catalog, code stri
 }
 
 // checkRefs kiểm tham chiếu trong danh mục: loại máy phải gắn một khâu đang dùng; cây trồng gắn nhóm
-// (cây trồng cấp 1 đang dùng, khác chính nó); sâu bệnh gắn cây trồng bị ảnh hưởng đang dùng (KN v7.7).
-func checkRefs(ctx context.Context, tx pgx.Tx, it domain.Item) error {
+// (cây trồng cấp 1 đang dùng, khác chính nó); sâu bệnh gắn cây trồng bị ảnh hưởng đang dùng.
+// Danh mục đăng ký dùng constraints của owner, với on là ngày áp dụng.
+func (s *Service) checkRefs(ctx context.Context, tx pgx.Tx, it domain.Item, on time.Time) error {
+	if d, ok := s.CatalogRegistry.definition(it.Catalog); ok && d.Constraints != nil {
+		return s.checkCatalogConstraints(ctx, tx, it, on, *d.Constraints)
+	}
 	switch it.Catalog {
 	case port.CatalogCrop:
 		parent := it.Attrs[port.AttrParentCode]
@@ -127,9 +132,12 @@ func checkRefs(ctx context.Context, tx pgx.Tx, it domain.Item) error {
 	return nil
 }
 
-// writeChange ghi sổ lịch sử rồi bảng hiện trạng trong cùng giao dịch (R-21).
+// writeChange ghi sổ lịch sử (và sổ hiệu lực của danh mục theo ngày) rồi bảng hiện trạng trong cùng giao dịch (R-21).
 func (s *Service) writeChange(ctx context.Context, tx pgx.Tx, tid uuid.UUID, c *domain.Change, it domain.Item) error {
 	if err := store.InsertChange(ctx, tx, tid, c); err != nil {
+		return ledger.Classify(err)
+	}
+	if err := s.writeVersion(ctx, tx, tid, c, it); err != nil {
 		return ledger.Classify(err)
 	}
 	return store.UpsertItem(ctx, tx, tid, it, c.ID)
@@ -156,15 +164,19 @@ func (s *Service) CreateItem(ctx context.Context, in domain.Item, key string) (d
 	if key == "" {
 		return domain.Item{}, false, problem.IdempotencyRequired
 	}
-	if err := knownCatalog(in.Catalog); err != nil {
+	if err := s.knownCatalog(in.Catalog); err != nil {
 		return domain.Item{}, false, err
 	}
-	it, err := in.Normalize()
+	it, err := s.normalizeCatalogItem(s.prepareCatalogIdentity(in))
 	if err != nil {
 		return domain.Item{}, false, asProblem(err)
 	}
+	if err := s.checkValidFrom(it); err != nil {
+		return domain.Item{}, false, err
+	}
 	now := s.Clock.Now()
 	it.Active, it.Revision, it.UpdatedBy, it.UpdatedAt, it.DeactivationReason = true, 1, p.ActorRef, now, ""
+	it.ValidFrom = s.effectiveFrom(it)
 	replayed := false
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.ChangeByIdemKey(ctx, tx, key); err != nil {
@@ -182,7 +194,7 @@ func (s *Service) CreateItem(ctx context.Context, in domain.Item, key string) (d
 		} else if cur != nil {
 			return ErrItemExists
 		}
-		if err := checkRefs(ctx, tx, it); err != nil {
+		if err := s.checkRefs(ctx, tx, it, it.ValidFrom); err != nil {
 			return err
 		}
 		if taken, err := store.ItemNameTaken(ctx, tx, it.Catalog, it.Name, it.Code); err != nil {
@@ -206,13 +218,17 @@ func (s *Service) UpdateItem(ctx context.Context, in domain.Item) (domain.Item, 
 	if err != nil {
 		return domain.Item{}, err
 	}
-	if err := knownCatalog(in.Catalog); err != nil {
+	if err := s.knownCatalog(in.Catalog); err != nil {
 		return domain.Item{}, err
 	}
-	upd, err := in.Normalize()
+	upd, err := s.normalizeCatalogItem(s.prepareCatalogIdentity(in))
 	if err != nil {
 		return domain.Item{}, asProblem(err)
 	}
+	if err := s.checkValidFrom(upd); err != nil {
+		return domain.Item{}, err
+	}
+	upd.ValidFrom = s.effectiveFrom(upd)
 	now := s.Clock.Now()
 	var out domain.Item
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
@@ -223,11 +239,12 @@ func (s *Service) UpdateItem(ctx context.Context, in domain.Item) (domain.Item, 
 		if cur == nil {
 			return ErrItemNotFound
 		}
+		upd = s.keepCatalogIdentity(upd, *cur)
 		if cur.SameContent(upd) {
 			out = *cur
 			return nil
 		}
-		if err := checkRefs(ctx, tx, upd); err != nil {
+		if err := s.checkRefs(ctx, tx, upd, upd.ValidFrom); err != nil {
 			return err
 		}
 		if upd.Name != cur.Name {
@@ -239,6 +256,7 @@ func (s *Service) UpdateItem(ctx context.Context, in domain.Item) (domain.Item, 
 		}
 		next := *cur
 		next.Name, next.Attrs, next.Revision, next.UpdatedBy, next.UpdatedAt = upd.Name, upd.Attrs, cur.Revision+1, p.ActorRef, now
+		next.ValidFrom = upd.ValidFrom
 		before := cur.Snapshot()
 		c := &domain.Change{ID: ids.New(), Catalog: cur.Catalog, Code: cur.Code, Action: domain.ActionUpdated,
 			Before: &before, After: next.Snapshot(), EventTime: now, ActorRef: p.ActorRef, IdemKey: "put:" + ids.New().String()}
@@ -258,7 +276,7 @@ func (s *Service) SetActive(ctx context.Context, catalog, code string, active bo
 	if key == "" {
 		return domain.Item{}, false, problem.IdempotencyRequired
 	}
-	if err := knownCatalog(catalog); err != nil {
+	if err := s.knownCatalog(catalog); err != nil {
 		return domain.Item{}, false, err
 	}
 	reason = strings.TrimSpace(reason)
@@ -292,7 +310,7 @@ func (s *Service) SetActive(ctx context.Context, catalog, code string, active bo
 			return ErrItemState
 		}
 		if active {
-			if err := checkRefs(ctx, tx, *cur); err != nil {
+			if err := s.checkRefs(ctx, tx, *cur, s.today()); err != nil {
 				return err
 			}
 		}
@@ -321,7 +339,7 @@ func (s *Service) History(ctx context.Context, catalog, code string, afterSeq in
 	if err != nil {
 		return Page[domain.Change]{}, err
 	}
-	if err := knownCatalog(catalog); err != nil {
+	if err := s.knownCatalog(catalog); err != nil {
 		return Page[domain.Change]{}, err
 	}
 	limit = clampLimit(limit)
@@ -362,4 +380,15 @@ func (s *Service) FormsInUse(ctx context.Context, catalog string, codes []string
 		m = map[string]int{}
 	}
 	return m
+}
+
+// checkValidFrom: ngày áp dụng chỉ nhận ở danh mục CNTS (có hiệu lực theo ngày) và phải hợp lệ.
+func (s *Service) checkValidFrom(it domain.Item) error {
+	if it.ValidFrom.IsZero() {
+		return nil
+	}
+	if !s.catalogEffective(it.Catalog) {
+		return problem.Validation.WithField("valid_from", "chỉ danh mục Chăn nuôi – Thủy sản có hiệu lực theo ngày")
+	}
+	return asProblem(domain.ValidateValidFrom(it.ValidFrom))
 }

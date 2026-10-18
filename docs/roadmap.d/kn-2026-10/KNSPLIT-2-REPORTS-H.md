@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-REPORTS-H — Gỡ bộ dựng KN legacy/typedExtension, thiếu đăng ký failclosed;13/13PGnoSKIP vàstatic đạt, boundary383; helper kiểm8migrationgate trướcdev.14gridseed còn gói sau.

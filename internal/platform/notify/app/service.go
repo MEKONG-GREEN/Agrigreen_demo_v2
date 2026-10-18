@@ -64,12 +64,23 @@ type Deps struct {
 	// SyncEntities: entity của pf/sync (chiều xuống) — kiểm entities[] của nudge; rỗng → chỉ kiểm dạng tên.
 	SyncEntities []string
 	Log          *slog.Logger
+	// Emails (gói NOTIF): tra email người nhận lúc gửi (pf/accounts); nil → không gửi email theo người nhận.
+	Emails port.EmailDirectory
+	// EmailMailer (gói NOTIF): kênh gửi email theo người nhận (SMTP trong lãnh thổ; Local/Dev: channel.LogMailer). nil →
+	// dùng Mailer; cả hai nil → không gửi email theo người nhận.
+	EmailMailer channel.Mailer
+	// LinkBase: gốc URL web-ops cho đường dẫn trong email (AG_WEB_OPS_URL); rỗng → chỉ đường dẫn tương đối.
+	LinkBase string
 }
 
 // Service là use case của module.
 type Service struct {
-	DB    tenant.Beginner // pool vai notify_app
-	Clock clock.Clock
+	eventRenderers eventRendererRegistry
+	eventBuilders  eventBuilderRegistry
+	digests        *digestRegistry
+	kinds          kindRegistry
+	DB             tenant.Beginner // pool vai notify_app
+	Clock          clock.Clock
 	Deps
 }
 

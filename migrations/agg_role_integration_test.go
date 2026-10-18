@@ -3,6 +3,7 @@ package migrations_test
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -14,7 +15,7 @@ import (
 //
 //  1. r_agg: NOLOGIN, BYPASSRLS; quyền hiệu lực CHỈ trên schema công bố *_pub (USAGE + SELECT view, qua membership
 //     r_<module>_pub) và đúng cột tenant_id của k_ref.org (+ USAGE k_ref) — không gì trên schema nội bộ, không quyền ghi;
-//  2. thành viên r_agg chỉ là vai đăng nhập của đơn vị chạy job (app_worker), NOINHERIT;
+//  2. thành viên r_agg chỉ là vai đăng nhập riêng app_agg (gói FC, ADR-0031 §3), NOINHERIT, không thuộc vai nào khác;
 //  3. danh mục vai BYPASSRLS (ngoài superuser) đúng bảng ADR-0031 §6 — mọi cụm.
 func TestSchemaIsolationAggRole_W64(t *testing.T) {
 	ctx := context.Background()
@@ -78,7 +79,23 @@ func TestSchemaIsolationAggRole_W64(t *testing.T) {
 	if pubViews == 0 || tenantCol != 1 {
 		t.Errorf("r_agg: SELECT %d view _pub, k_ref.org.tenant_id %d", pubViews, tenantCol)
 	}
+	// pf 000137 (gói FC): chính sách RLS dưới view _pub gọi k_ref.ctx_* — quyền EXECUTE kiểm theo current_user (r_agg).
+	for _, fn := range []string{"k_ref.ctx_uuid(text)", "k_ref.ctx_text(text)", "k_ref.ctx_reject(text)"} {
+		var ok bool
+		if err := admin.QueryRow(ctx, `SELECT has_function_privilege($1, $2, 'EXECUTE')`, dbadmin.AggRole, fn).Scan(&ok); err != nil || !ok {
+			t.Errorf("r_agg EXECUTE %s: %v %v", fn, ok, err)
+		}
+	}
 
+	// Gói FC: grant cũ app_worker → r_agg (W6.4) bị bootstrap thu hồi (dbadmin.ExclusiveMembers). Dựng lại trạng thái
+	// W6.4 rồi bootstrap — cũng thu hẹp cửa sổ với tiến trình khác đang chạy bootstrap bản cũ trên cùng máy chủ (vai là
+	// đối tượng toàn cụm PostgreSQL).
+	if _, err := admin.Exec(ctx, `GRANT r_agg TO app_worker WITH INHERIT FALSE, SET TRUE`); err != nil {
+		t.Fatal(err)
+	}
+	if err := dbadmin.Bootstrap(ctx, env.AdminURL, env.Suffix); err != nil {
+		t.Fatal(err)
+	}
 	var members []string
 	mrows, err := admin.Query(ctx, `SELECT m.rolname || ':' || g.inherit_option::text FROM pg_auth_members g
 	    JOIN pg_roles r ON r.oid = g.roleid JOIN pg_roles m ON m.oid = g.member WHERE r.rolname = $1 ORDER BY 1`, dbadmin.AggRole)
@@ -93,8 +110,22 @@ func TestSchemaIsolationAggRole_W64(t *testing.T) {
 		members = append(members, s)
 	}
 	mrows.Close()
-	if !slices.Equal(members, []string{dbadmin.AppWorker + ":false"}) {
-		t.Errorf("thành viên r_agg: %v, muốn [app_worker:false]", members)
+	if !slices.Equal(members, []string{dbadmin.AppAgg + ":false"}) {
+		t.Errorf("thành viên r_agg: %v, muốn [app_agg:false]", members)
+	}
+	// app_agg (gói FC): chỉ thuộc r_agg, NOINHERIT, không BYPASSRLS, mặc định chỉ đọc + statement_timeout.
+	var groups []string
+	var aggInherit, aggBypass bool
+	var cfg []string
+	if err := admin.QueryRow(ctx, `SELECT r.rolinherit, r.rolbypassrls, coalesce(r.rolconfig, '{}'),
+	    coalesce((SELECT array_agg(g.rolname::text ORDER BY g.rolname) FROM pg_auth_members a JOIN pg_roles g ON g.oid = a.roleid
+	               WHERE a.member = r.oid), '{}')
+	    FROM pg_roles r WHERE r.rolname = $1`, dbadmin.AppAgg).Scan(&aggInherit, &aggBypass, &cfg, &groups); err != nil {
+		t.Fatal(err)
+	}
+	if aggInherit || aggBypass || !slices.Equal(groups, []string{dbadmin.AggRole}) ||
+		!slices.Contains(cfg, "default_transaction_read_only=on") || !slices.ContainsFunc(cfg, func(s string) bool { return strings.HasPrefix(s, "statement_timeout=") }) {
+		t.Errorf("app_agg: inherit=%v bypass=%v config=%v thành viên=%v", aggInherit, aggBypass, cfg, groups)
 	}
 
 	allowed := []string{dbadmin.AggRole, dbadmin.MKGMonitorOwner, dbadmin.OpsJobs, dbadmin.OutboxPublisher, dbadmin.TSMonitorOwner}

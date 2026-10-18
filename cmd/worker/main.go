@@ -16,6 +16,7 @@
 //	mechanization_area_feed_check  mỗi giờ: dữ liệu diện tích vụ App HTX quá ngưỡng độ tươi → báo Admin CGH (CGH FN-07)
 //	metrics_snapshot      00:45 hằng ngày (sau anchor): ghi sổ chỉ số của hôm qua + ảnh chụp lớp GIS (pf/metrics, G3)
 //	mrv_review_escalation mỗi 15 phút: hồ sơ MRV chờ duyệt quá hạn → báo người duyệt, rồi quản trị TTKN tỉnh (KN US-MRV-06)
+//	price_calendar        mỗi phút: mốc khóa nhập giá 12:00 (±1 phút) + nhắc nhập giá lần 1/2 (pf/price, Báo giá FN-AD-04.04, FN-XA-03.04)
 //
 // Khi có lịch, worker đăng ký các gauge (gauges.go) — ADR-0006: ag.sync.conflict.overdue
 // (xung đột đồng bộ quá SLA, theo tenant), ag.db.standby_replication_lag (chỉ khi có
@@ -70,6 +71,8 @@
 //	AG_DB_PASSWORD_APP_WORKER          (hoặc AG_DB_APP_PASSWORD) vai đăng nhập app_worker (W2.6, ADR-0028) — MỘT pool cho
 //	                                   mọi consumer và một pool nối thẳng cho job; mỗi module chạy SET LOCAL ROLE r_<module>
 //	AG_DB_MAX_CONNS                    (tùy chọn) cỡ pool vai đơn vị, mặc định 20
+//	AG_DB_PASSWORD_APP_AGG             (chỉ -agg-run) vai đăng nhập riêng app_agg của job tổng hợp (ADR-0031 §3, gói FC) —
+//	                                   pool 2 kết nối, trên AG_DB_REPLICA_URL khi có; AG_AGG_GOVERNANCE_TENANT: tenant quản trị
 //	AG_FCM_PROJECT_ID, AG_FCM_CREDENTIALS_FILE  FCM HTTP v1 (không đặt → kênh đẩy chỉ ghi log); AG_FCM_ENDPOINT, AG_FCM_TOKEN_URL tùy chọn
 //	AG_SMTP_HOST, AG_SMTP_PORT, AG_SMTP_USERNAME, AG_SMTP_PASSWORD, AG_SMTP_FROM, AG_SMTP_DIGEST_TO  email tóm tắt (SMTP trong lãnh thổ)
 //	AG_ANCHOR_SIGNING_KEY              Ed25519 (base64 seed 32 byte) — bắt buộc khi có job anchor
@@ -94,6 +97,8 @@ import (
 	"context"
 	"errors"
 	"flag"
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -109,9 +114,13 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/healthsrv"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
+	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
@@ -121,7 +130,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
-	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
@@ -180,7 +188,16 @@ func main() {
 	bfTenant := flag.String("metrics-tenant", "", "(với -metrics-backfill) chỉ một tenant")
 	bfKeys := flag.String("metrics-keys", "", "(với -metrics-backfill) danh sách chỉ số, phân tách dấu phẩy")
 	krefRebuild := flag.Bool("kref-rebuild", false, "dựng lại k_ref của mọi tenant từ nguồn rồi thoát (W2.5)")
+	aggRun := flag.String("agg-run", "", "chạy một job tổng hợp đã khai và đã duyệt (vai đăng nhập app_agg, ADR-0031 §3) rồi thoát")
+	aggActor := flag.String("agg-actor", "", "(với -agg-run) người chạy (uuid) ghi vào nhật ký pf_metrics.agg_run")
+	aggK := flag.Int("agg-k", 0, "(với -agg-run) ngưỡng k; 0 = max(k job, k sàn publicdata.k_min)")
 	flag.Parse()
+	if *aggRun != "" {
+		if err := runAggJob(log, *aggRun, *aggActor, *aggK); err != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	if *krefRebuild {
 		if err := runKRefRebuild(log); err != nil {
 			log.Error("dựng lại k_ref lỗi", "event", "kref.rebuild", "outcome", "error", "error", err.Error())
@@ -453,7 +470,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			closeFn()
 			return nil, func() {}, err
 		}
-		md := masterdata.New(mdPool, clk)
+		md := masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 		pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits()})
 		kn := extension.New(extPool, clk, extension.Deps{
 			Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
@@ -471,11 +488,12 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			}
 			acc := accounts.New(accPool, clk, accounts.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Departments: pty.Departments(), Units: md.AdminUnits()})
 			kn.UseKNContext(acc.ExtensionKNContext(), acc.ExtensionKNDirectory())
+			kn.UseRoleHolders(acc.RoleHolders()) // W11.46
 			// KN v7.7 P5: khóa tuần đã kết thúc, nhắc hạn đăng ký / hạn duyệt lịch công tác.
 			js = append(js, kn.ScheduleJobs(extension.ScheduleTenants(out.pools[migrations.PF]), log)...)
 		}
 	}
-	if selected(jobs, notifyport.JobEmailDigest) && os.Getenv("AG_SMTP_HOST") != "" {
+	if selected(jobs, extport.JobEmailDigest) && os.Getenv("AG_SMTP_HOST") != "" {
 		// Email tóm tắt chỉ chạy khi đã cấu hình SMTP; tìm tenant bằng ag_ops_jobs (2 cột).
 		var kept []*pgxpool.Pool
 		nt, err := buildNotify(ctx, log, direct, func(p *pgxpool.Pool) { kept = append(kept, p) })
@@ -505,8 +523,8 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			closeFn()
 			return nil, func() {}, err
 		}
-		md := masterdata.New(mdPool, clk)
-		rep := reports.New(repPool, clk, reports.Deps{Params: md.Params(), Log: log})
+		md := masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
+		rep := reports.New(repPool, clk, reports.Deps{FormSeeds: []reportsport.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Clock: clk}), Catalog: []reportsport.CatalogRegistration{extension.ReportCatalog()}, Policies: []reportsport.Policy{extension.ReportPolicy()}, Params: md.Params(), Log: log})
 		// G5 (ADR-0024): lối "lịch" của xuất báo cáo qua điểm kiểm soát chung (kênh report_export) —
 		// Checkpoint của pf/metering (r_metering); workerEgress ghi đè cho kiểm thử.
 		// AG_EGRESS_MODE sai → lỗi khởi động.
@@ -540,7 +558,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			closeFn()
 			return nil, func() {}, err
 		}
-		mech := mechanization.New(mechPool, clk, mechanization.Deps{Params: masterdata.New(mdPool, clk).Params()})
+		mech := mechanization.New(mechPool, clk, mechanization.Deps{Params: masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}}).Params()})
 		js = append(js, mech.Jobs(mechanization.FeedTenants(out.pools[migrations.PF]), log)...)
 	}
 	if selected(jobs, metricsport.JobMetricsSnapshot) {
@@ -573,8 +591,26 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			closeFn()
 			return nil, func() {}, err
 		}
-		mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Params: masterdata.New(mdPool, clk).Params()})
+		mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Params: masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}}).Params()})
 		js = append(js, mrvMod.Jobs(mrv.PendingTenants(out.pools[migrations.PF]), log)...)
+	}
+	if selected(jobs, extension.JobCNTSAlert) {
+		// W11.43 (BRD CNTS FN-13, UR-TINH-08, UR-TINH-13): cảnh báo quá hạn xử lý → Lãnh đạo phòng, nhắc nộp biểu kỳ CNTS, trễ
+		// liên tiếp — cần cap/forms (SubmissionFeed) và gán vai trò (pf/accounts) → dựng module pf qua assembly.Build; tìm
+		// tenant bằng ag_ops_jobs (cột của cnts_alert_current, pf_forms.period).
+		mods, mpools, err := buildPlatform(ctx, direct)
+		prevClose := closeFn
+		closeFn = func() {
+			for _, p := range mpools {
+				p.Close()
+			}
+			prevClose()
+		}
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		js = append(js, mods.Extension.CNTSAlertJobs(extension.CNTSAlertTenants(out.pools[migrations.PF]), log)...)
 	}
 	if selected(jobs, extension.JobReportCycle) {
 		// KN v7.7 P4 — vòng đời báo cáo (tự chốt kỳ + tổng hợp "Hệ thống", chốt lại sau hạn mở, tự nhắc): cần engine mẫu
@@ -626,12 +662,47 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		js = append(js, wjs...)
 	}
+	if selected(jobs, priceport.JobCalendar) {
+		// W11.74 (BRD Báo giá FN-AD-04.04 AC-01, FN-XA-03.04): mỗi phút ghi mốc khóa 12:00 (±1 phút) và nhắc nhập giá;
+		// tìm tenant bằng ag_ops_jobs (cột tenant_id của pf_price, pf 000139), ghi bằng r_price; nhắc → outbox → pf/notify.
+		pricePool, err := openPF(ctx, direct, &closeFn)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		pm, err := price.New(pricePool, clk, assembly.PriceProfiles())
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		js = append(js, pm.CalendarJobs(price.CalendarTenants(out.pools[migrations.PF]), log)...)
+	}
+	if selected(jobs, accport.JobDormant) && os.Getenv("AG_KC_ADMIN_URL") != "" {
+		// D24 (W10.05): báo trước ngày 38, khóa ngày 45 tài khoản không hoạt động. Tìm tenant bằng ag_ops_jobs (cột
+		// tenant_id, enabled của pf_accounts.account), ghi bằng r_accounts; lần đăng nhập đọc ở Keycloak (AG_KC_*,
+		// view-events); ngưỡng là tham số có phiên bản của pf/masterdata (R-05). Chưa cấu hình Keycloak → không có job.
+		dir, err := accounts.DirectoryFromEnv()
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		pfPool, err := openPF(ctx, direct, &closeFn)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		// AG_ACCOUNTS_DORMANT_DRY_RUN=true: chỉ đếm và ghi log (lần chạy đầu ở môi trường thật — runbook keycloak-mfa-d24).
+		dry := os.Getenv("AG_ACCOUNTS_DORMANT_DRY_RUN") == "true"
+		acc := accounts.New(pfPool, clk, accounts.Deps{Directory: dir, Params: masterdata.New(pfPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}}).Params(), DormantDryRun: dry})
+		js = append(js, acc.Jobs(accounts.DormantTenants(out.pools[migrations.PF]), log)...)
+	}
 	if len(js) == 0 {
 		closeFn()
-		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " + extension.JobWorkSchedule + ", " +
-			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot +
-			", " + mrvport.JobReviewEscalator + ", " + extension.JobReportCycle +
-			", " + apiclientport.JobKeyExpiry + ", " + apiclientport.JobFeedBuild + ", " + apiclientport.JobFeedRetention + ", " + apiclientport.JobWebhookDispatch + ")")
+		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + accport.JobDormant + ", " + extension.JobEscalation + ", " + extension.JobWorkSchedule + ", " +
+			extport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot +
+			", " + mrvport.JobReviewEscalator + ", " + extension.JobReportCycle + ", " + extension.JobCNTSAlert +
+			", " + apiclientport.JobKeyExpiry + ", " + apiclientport.JobFeedBuild + ", " + apiclientport.JobFeedRetention + ", " + apiclientport.JobWebhookDispatch +
+			", " + priceport.JobCalendar + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil

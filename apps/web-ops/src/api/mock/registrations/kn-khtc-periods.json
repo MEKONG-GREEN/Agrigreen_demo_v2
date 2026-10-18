@@ -1,0 +1,11 @@
+{
+  "id": "kn-khtc-periods",
+  "source": "./kn-khtc-periods",
+  "app": [
+    {
+      "export": "khtcPeriodRoutes",
+      "order": 16
+    }
+  ],
+  "admin": []
+}

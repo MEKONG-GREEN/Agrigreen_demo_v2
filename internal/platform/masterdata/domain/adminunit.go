@@ -60,27 +60,27 @@ func (u Unit) ValidAt(day time.Time) bool {
 func (u Unit) Validate() error {
 	switch {
 	case !unitCodeRe.MatchString(u.Code):
-		return FieldError{"code", ErrUnitCode}
+		return FieldError{Field: "code", Err: ErrUnitCode}
 	case u.Name == "" || utf8.RuneCountInString(u.Name) > 200:
-		return FieldError{"name", ErrUnitName}
+		return FieldError{Field: "name", Err: ErrUnitName}
 	case u.Level != partyport.LevelProvince && u.Level != partyport.LevelCommune && u.Level != partyport.LevelDistrict:
-		return FieldError{"level", ErrUnitLevel}
+		return FieldError{Field: "level", Err: ErrUnitLevel}
 	case u.Level == partyport.LevelProvince && u.ParentCode != "",
 		u.Level != partyport.LevelProvince && !unitCodeRe.MatchString(u.ParentCode),
 		u.ParentCode == u.Code:
-		return FieldError{"parent_code", ErrUnitParent}
+		return FieldError{Field: "parent_code", Err: ErrUnitParent}
 	case u.ValidFrom.IsZero() || (u.ValidTo != nil && !u.ValidTo.After(u.ValidFrom)):
-		return FieldError{"valid_to", ErrUnitValidity}
+		return FieldError{Field: "valid_to", Err: ErrUnitValidity}
 	case u.Level == partyport.LevelDistrict && (u.ValidTo == nil || u.ValidTo.After(ReorgDate)):
-		return FieldError{"valid_to", ErrUnitDistrict}
+		return FieldError{Field: "valid_to", Err: ErrUnitDistrict}
 	}
 	if len(u.Successors) > 0 && u.ValidTo == nil {
-		return FieldError{"successors", ErrUnitSuccessors}
+		return FieldError{Field: "successors", Err: ErrUnitSuccessors}
 	}
 	seen := map[string]bool{}
 	for _, s := range u.Successors {
 		if !unitCodeRe.MatchString(s) || seen[s] {
-			return FieldError{"successors", ErrUnitSuccessors}
+			return FieldError{Field: "successors", Err: ErrUnitSuccessors}
 		}
 		seen[s] = true
 	}
@@ -225,14 +225,14 @@ func ParseGazetteer(raw []byte) (string, []Unit, error) {
 	dec.DisallowUnknownFields()
 	var f GazetteerFile
 	if err := dec.Decode(&f); err != nil {
-		return "", nil, FieldError{"body", ErrGazetteer}
+		return "", nil, FieldError{Field: "body", Err: ErrGazetteer}
 	}
 	if f.Format != GazetteerFormat || len(f.Units) == 0 || len(f.Units) > MaxImportUnits {
-		return "", nil, FieldError{"format", ErrGazetteer}
+		return "", nil, FieldError{Field: "format", Err: ErrGazetteer}
 	}
 	src := f.Source
 	if src == "" || utf8.RuneCountInString(src) > 300 {
-		return "", nil, FieldError{"source", errors.New("source bắt buộc, tối đa 300 ký tự")}
+		return "", nil, FieldError{Field: "source", Err: errors.New("source bắt buộc, tối đa 300 ký tự")}
 	}
 	units := make([]Unit, 0, len(f.Units))
 	seen := map[string]bool{}
@@ -241,26 +241,26 @@ func ParseGazetteer(raw []byte) (string, []Unit, error) {
 		u := Unit{Code: g.Code, Name: g.Name, Level: partyport.Level(g.Level), ParentCode: g.ParentCode, Successors: g.Successors}
 		from, err := ParseDay(g.ValidFrom)
 		if err != nil {
-			return "", nil, FieldError{prefix + "valid_from", ErrUnitValidity}
+			return "", nil, FieldError{Field: prefix + "valid_from", Err: ErrUnitValidity}
 		}
 		u.ValidFrom = from
 		if g.ValidTo != nil {
 			to, err := ParseDay(*g.ValidTo)
 			if err != nil {
-				return "", nil, FieldError{prefix + "valid_to", ErrUnitValidity}
+				return "", nil, FieldError{Field: prefix + "valid_to", Err: ErrUnitValidity}
 			}
 			u.ValidTo = &to
 		}
 		if err := u.Validate(); err != nil {
 			var fe FieldError
 			if errors.As(err, &fe) {
-				return "", nil, FieldError{prefix + fe.Field, fe.Err}
+				return "", nil, FieldError{Field: prefix + fe.Field, Err: fe.Err}
 			}
 			return "", nil, err
 		}
 		k := u.Code + "@" + g.ValidFrom
 		if seen[k] {
-			return "", nil, FieldError{prefix + "code", ErrUnitDuplicate}
+			return "", nil, FieldError{Field: prefix + "code", Err: ErrUnitDuplicate}
 		}
 		seen[k] = true
 		units = append(units, u)

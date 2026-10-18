@@ -1,0 +1,434 @@
+paths:
+# @ag-order: 205
+  /v1/metering/usage:
+    get:
+      summary: Tổng sử dụng Public API theo ngày × sản phẩm của một khách hàng — ADR-0023
+      description: Tenant đơn vị vận hành (token). Đọc bộ đếm (giờ Việt Nam, bao gồm hai đầu, tối đa 366 ngày).
+      operationId: getMeteringUsage
+      tags: [metering]
+      parameters:
+        - {name: client_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: from, in: query, required: true, schema: {type: string, format: date}}
+        - {name: to, in: query, required: true, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Tổng theo ngày
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MeteringUsageDay"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 206
+  /v1/metering/usage-events:
+    get:
+      summary: Sổ sử dụng (chứng từ) của một khách hàng, mới nhất trước — ADR-0023
+      operationId: listMeteringUsageEvents
+      tags: [metering]
+      parameters:
+        - {name: client_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MeteringUsageEvent"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 207
+  /v1/metering/statements:
+    post:
+      summary: Yêu cầu lập bảng kê kỳ tháng (202 + job) — ADR-0023 mục 4
+      description: |
+        Vai `billing_officer`. Kỳ phải đã kết thúc (giờ Việt Nam) — không thì 409 `metering.period_not_ended`.
+        `client_id` vắng = mọi khách hàng có sử dụng trong kỳ. Bảng kê bù: `supersedes_id` + `correction_reason`
+        (cùng khách hàng, cùng kỳ; bảng kê cũ giữ nguyên, ghi `superseded_by`). Worker dựng ảnh chụp bất biến.
+      operationId: requestMeteringStatement
+      tags: [metering]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period]
+              properties:
+                period: {type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"}
+                client_id: {type: [string, "null"], format: uuid}
+                supersedes_id: {type: [string, "null"], format: uuid}
+                correction_reason: {type: [string, "null"], minLength: 10, maxLength: 500}
+      responses:
+        "202":
+          description: Đã nhận (gọi lặp cùng Idempotency-Key → cùng job)
+          headers:
+            Location: {schema: {type: string}, description: "/v1/metering/statement-jobs/{id}"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MeteringStatementJob"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Bảng kê của tenant đơn vị vận hành — ADR-0023
+      operationId: listMeteringStatements
+      tags: [metering]
+      parameters:
+        - {name: period, in: query, schema: {type: string}}
+        - {name: client_id, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MeteringStatement"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 208
+  /v1/metering/statement-jobs/{id}:
+    get:
+      summary: Trạng thái yêu cầu lập bảng kê — ADR-0023
+      operationId: getMeteringStatementJob
+      tags: [metering]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MeteringStatementJob"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 209
+  /v1/metering/statements/{id}:
+    get:
+      summary: Một bảng kê — ADR-0023
+      operationId: getMeteringStatement
+      tags: [metering]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Bảng kê
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MeteringStatement"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 210
+  /v1/metering/statements/{id}/approve:
+    post:
+      summary: Duyệt bảng kê — `billing_approver` ≠ người yêu cầu (R-56, app/ + CHECK DB)
+      description: |
+        Đóng băng bảng kê. Tự duyệt → 403 `metering.self_approval`. Đã duyệt bởi người khác hoặc đã bị thay →
+        409 `metering.statement_frozen` (sửa = bảng kê bù). Duyệt lặp của chính người duyệt → 200.
+      operationId: approveMeteringStatement
+      tags: [metering]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: Đã duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MeteringStatement"}
+        "200":
+          description: Đã duyệt trước đó bởi chính người gọi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MeteringStatement"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+# @ag-order: 211
+  /v1/metering/statements/{id}/verify:
+    get:
+      summary: Dựng lại ảnh chụp bảng kê từ sổ và so SHA-256 — ADR-0023
+      operationId: verifyMeteringStatement
+      tags: [metering]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả kiểm lại
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [statement_id, stored_sha256, rebuilt_sha256, match]
+                properties:
+                  statement_id: {type: string, format: uuid}
+                  stored_sha256: {type: string}
+                  rebuilt_sha256: {type: string}
+                  match: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 212
+  /v1/metering/statements/{id}/export.csv:
+    get:
+      summary: Tải CSV bảng kê (tất định byte-cho-byte) — qua điểm kiểm soát xuất kênh report_export
+      description: |
+        Vai `billing_officer` hoặc `billing_approver`. Lập hóa đơn NGOÀI hệ thống. Header `AG-Snapshot-SHA256`.
+        `AG_EGRESS_MODE=enforce` + vượt hạn mức kênh → 429 `metering.egress_quota_exceeded`.
+      operationId: exportMeteringStatementCsv
+      tags: [metering]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: CSV UTF-8, LF
+          headers:
+            AG-Snapshot-SHA256: {schema: {type: string}}
+          content:
+            text/csv:
+              schema: {type: string}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "429": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 213
+  /v1/metering/params:
+    get:
+      summary: Tham số hiệu lực của pf/metering (hạn mức/ngưỡng kênh DLP, giá tùy chọn) — tạm, chờ khách
+      description: |
+        Đọc từ pf/masterdata (phiên bản đã duyệt) hoặc mặc định g5-conventions §1.2. Đề xuất/duyệt qua
+        `/v1/masterdata/params` (param_setter ≠ param_approver, R-56).
+      operationId: listMeteringParams
+      tags: [metering]
+      parameters:
+        - {name: at, in: query, schema: {type: string, format: date-time}}
+      responses:
+        "200":
+          description: Tham số
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, value, source]
+                      properties:
+                        key: {type: string}
+                        value: {type: [string, "null"], description: "decimal dạng chuỗi; null = chưa đặt"}
+                        source: {type: string, description: "default | v<N> | unset"}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 214
+  /v1/metering/egress:
+    get:
+      summary: Sổ xuất dữ liệu (DLP) của tenant chủ dữ liệu — ADR-0024
+      description: Vai `metering_viewer` hoặc `platform_admin`; chỉ dòng của tenant mình (RLS). Ngày giờ Việt Nam.
+      operationId: listMeteringEgress
+      tags: [metering]
+      parameters:
+        - {name: channel, in: query, schema: {$ref: "#/components/schemas/EgressChannel"}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/EgressEvent"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 215
+  /v1/metering/egress/anomalies:
+    get:
+      summary: Cảnh báo khối lượng xuất bất thường của tenant chủ dữ liệu — ADR-0024
+      operationId: listMeteringEgressAnomalies
+      tags: [metering]
+      parameters:
+        - {name: channel, in: query, schema: {$ref: "#/components/schemas/EgressChannel"}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/EgressAnomaly"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/party cấp quyền chia sẻ ---
+  # --- pf/apiclient ---
+  # Quản trị khách hàng Public API (ADR-0022): tài khoản tenant đơn vị vận hành, MFA. api_client_admin
+  # đề xuất / phát hành khóa; api_client_approver KHÁC người đề xuất duyệt (R-56, app/ + CHECK DB).
+components:
+  schemas:
+# @ag-order: 373
+    MeteringUsageDay:
+      type: object
+      required: [date, product, calls, units]
+      properties:
+        date: {type: string, format: date}
+        product: {type: string}
+        calls: {type: integer}
+        units: {type: integer}
+# @ag-order: 374
+    MeteringUsageEvent:
+      type: object
+      description: Một dòng sổ sử dụng (chứng từ). Không bí mật khóa, không giá trị truy vấn.
+      required: [id, seq, client_id, key_prefix, auth_method, call_kind, product, contract_version, route_template, status,
+        problem_code, data_tenant_id, units, rows_out, bytes_out, latency_ms, replayed, rule_version, event_time, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        client_id: {type: string, format: uuid}
+        key_prefix: {type: string}
+        auth_method: {type: string}
+        call_kind: {type: string, enum: [read, export_request, job_status, file_download, meta]}
+        product: {type: string}
+        contract_version: {type: integer}
+        route_template: {type: string}
+        status: {type: integer}
+        problem_code: {type: [string, "null"]}
+        data_tenant_id: {type: [string, "null"], format: uuid}
+        units: {type: integer}
+        rows_out: {type: integer}
+        bytes_out: {type: integer}
+        latency_ms: {type: integer}
+        replayed: {type: boolean}
+        rule_version: {type: string}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+# @ag-order: 375
+    MeteringStatementJob:
+      type: object
+      required: [id, period, client_id, supersedes_id, correction_reason, status, statement_ids, error, requested_by, requested_at, completed_at]
+      properties:
+        id: {type: string, format: uuid}
+        period: {type: string}
+        client_id: {type: [string, "null"], format: uuid}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        status: {type: string, enum: [queued, completed, failed]}
+        statement_ids: {type: array, items: {type: string, format: uuid}}
+        error: {type: [string, "null"]}
+        requested_by: {type: string, format: uuid}
+        requested_at: {type: string, format: date-time}
+        completed_at: {type: [string, "null"], format: date-time}
+# @ag-order: 376
+    MeteringStatementLine:
+      type: object
+      required: [product, status_class, calls, units, unit_price_vnd, amount_vnd, price_version]
+      properties:
+        product: {type: string}
+        status_class: {type: string, description: "2xx | 4xx | 5xx"}
+        calls: {type: integer}
+        units: {type: integer}
+        unit_price_vnd: {type: [string, "null"], description: "numeric(18,4) dạng chuỗi; null khi chưa có giá"}
+        amount_vnd: {type: [string, "null"], description: "numeric(18,2) dạng chuỗi"}
+        price_version: {type: [string, "null"]}
+# @ag-order: 377
+    MeteringStatement:
+      type: object
+      description: Bảng kê một khách hàng × kỳ tháng (chứng từ lập hóa đơn ngoài hệ thống). Tiền là chuỗi thập phân.
+      required: [id, client_id, client_tenant_id, period, status, lines, subscription_vnd, total_vnd, price_version, first_seq, last_seq,
+        chain_head_hash, snapshot_sha256, rule_version, job_id, requested_by, requested_at, approved_by, approved_at, supersedes_id,
+        correction_reason, superseded_by]
+      properties:
+        id: {type: string, format: uuid}
+        client_id: {type: string, format: uuid}
+        client_tenant_id: {type: string, format: uuid}
+        period: {type: string}
+        status: {type: string, enum: [draft, approved]}
+        lines: {type: array, items: {$ref: "#/components/schemas/MeteringStatementLine"}}
+        subscription_vnd: {type: [string, "null"]}
+        total_vnd: {type: [string, "null"]}
+        price_version: {type: [string, "null"]}
+        first_seq: {type: integer}
+        last_seq: {type: integer}
+        chain_head_hash: {type: string}
+        snapshot_sha256: {type: string}
+        rule_version: {type: string}
+        job_id: {type: string, format: uuid}
+        requested_by: {type: string, format: uuid}
+        requested_at: {type: string, format: date-time}
+        approved_by: {type: [string, "null"], format: uuid}
+        approved_at: {type: [string, "null"], format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        superseded_by: {type: [string, "null"], format: uuid}
+# @ag-order: 378
+    EgressChannel:
+      type: string
+      enum: [public_api, mrv_package, report_export, valve, partner_share]
+# @ag-order: 379
+    EgressEvent:
+      type: object
+      description: Một lần dữ liệu rời đi qua điểm kiểm soát (tenant = chủ dữ liệu). Chỉ mã tham chiếu và số lượng.
+      required: [id, seq, channel, source_id, counterparty_kind, counterparty_ref, product, contract_version, records, bytes, business_date,
+        decision, reason, mode, daily_records, daily_quota, anomaly, actor_ref, event_time, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        channel: {$ref: "#/components/schemas/EgressChannel"}
+        source_id: {type: string, format: uuid}
+        counterparty_kind: {type: string, enum: [api_client, tenant, actor]}
+        counterparty_ref: {type: string, format: uuid}
+        product: {type: string}
+        contract_version: {type: integer}
+        records: {type: integer}
+        bytes: {type: integer}
+        business_date: {type: string, format: date}
+        decision: {type: string, enum: [allowed, denied]}
+        reason: {type: string, enum: ["", quota_exceeded]}
+        mode: {type: string, enum: [observe, enforce]}
+        daily_records: {type: integer}
+        daily_quota: {type: integer, description: "0 = không giới hạn"}
+        anomaly: {type: boolean}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+# @ag-order: 380
+    EgressAnomaly:
+      type: object
+      required: [id, business_date, channel, counterparty_kind, counterparty_ref, product, egress_event_id, daily_records, threshold, basis, mode, detected_at]
+      properties:
+        id: {type: string, format: uuid}
+        business_date: {type: string, format: date}
+        channel: {$ref: "#/components/schemas/EgressChannel"}
+        counterparty_kind: {type: string, enum: [api_client, tenant, actor]}
+        counterparty_ref: {type: string, format: uuid}
+        product: {type: string}
+        egress_event_id: {type: string, format: uuid}
+        daily_records: {type: integer}
+        threshold: {type: integer}
+        basis: {type: string, enum: [median, absolute]}
+        mode: {type: string, enum: [observe, enforce]}
+        detected_at: {type: string, format: date-time}
+    # --- pf/apiclient ---

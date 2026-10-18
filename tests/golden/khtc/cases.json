@@ -1,0 +1,366 @@
+{
+  "version": "khtc-golden/v1",
+  "status": "Chờ PO và Phòng KHTC ký — docs/uat/khtc-week-mapping.md (KHTCQA, 13/10/2026)",
+  "rules": {
+    "khtc": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+    "trong_trot": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+    "trong_trot_v1": "kn.period_rule/v1-tam;week=season",
+    "cnts": "kn.period_rule/v2;week_start=tue;week=year;month=week_end",
+    "bao_gia": "day"
+  },
+  "cases": [
+    {
+      "id": "G01",
+      "title": "Tuần CNTS vắt qua hai tuần KHTC: tính cả tuần vào tuần KHTC chứa ngày cuối (Thứ Hai)",
+      "kind": "cumulative",
+      "source": "cnts",
+      "indicator": "Sản lượng thủy sản khai thác + nuôi trồng, lũy kế từ đầu năm (Mẫu 1 A.I.3)",
+      "unit": "tấn",
+      "steps": [
+        {
+          "name": "Tuần nguồn 46 đã chốt; KHTC tuần 44 đã đóng",
+          "as_of": "2026-11-18 09:00",
+          "source_periods": [
+            {"key": "2026-W44", "to": "2026-11-02", "cumulative": "4812.0", "closed": true, "series": "2026"},
+            {"key": "2026-W45", "to": "2026-11-09", "cumulative": "4947.5", "closed": true, "series": "2026"},
+            {"key": "2026-W46", "to": "2026-11-16", "cumulative": "5079.0", "closed": true, "series": "2026"}
+          ],
+          "khtc_closed": [
+            {"week": "2026-W44", "cumulative": "4812.0"}
+          ],
+          "expected": [
+            {"week": "2026-W45", "source_keys": ["2026-W45"], "cumulative": "4947.5", "base": "4812.0", "base_ref": "frozen:2026-W44", "increment": "135.5", "year_to_date": "4947.5", "closed": true},
+            {"week": "2026-W46", "source_keys": ["2026-W46"], "cumulative": "5079.0", "base": "4947.5", "base_ref": "current:2026-W45", "increment": "131.5", "year_to_date": "5079.0", "closed": true,
+             "note": "Ngày 10/11 (Thứ Ba) thuộc tuần KHTC 45 nhưng cả tuần CNTS 10/11–16/11 tính vào tuần KHTC 46; không chia theo ngày"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "G02",
+      "title": "Tuần trống: không có kỳ nguồn nào kết thúc trong tuần KHTC 48",
+      "kind": "cumulative",
+      "source": "trong_trot",
+      "indicator": "Diện tích xuống giống lúa Thu Đông, lũy kế vụ (Mẫu 1 A.I.1)",
+      "unit": "ha",
+      "steps": [
+        {
+          "name": "Đợt A (tuần 45–47) và đợt B (từ tuần 49) — tuần 48 không phát hành",
+          "as_of": "2026-12-09 15:00",
+          "source_periods": [
+            {"key": "2026-W46", "to": "2026-11-17", "cumulative": "2810", "closed": true, "series": "ThuDong-2026"},
+            {"key": "2026-W47", "to": "2026-11-24", "cumulative": "3050", "closed": true, "series": "ThuDong-2026"},
+            {"key": "2026-W49", "to": "2026-12-08", "cumulative": "3230", "closed": true, "series": "ThuDong-2026"}
+          ],
+          "khtc_closed": [
+            {"week": "2026-W47", "cumulative": "3050"}
+          ],
+          "expected": [
+            {"week": "2026-W48", "source_keys": [], "no_source": true, "cumulative": "3050", "base": "3050", "base_ref": "frozen:2026-W47", "increment": "0", "closed": true,
+             "note": "Không có kỳ nguồn → coi là đã chốt (mọi kỳ nguồn — tập rỗng — đã chốt); lũy kế giữ của tuần trước, trong kỳ = 0; Mẫu 1 in câu 'không phát sinh'"},
+            {"week": "2026-W49", "source_keys": ["2026-W49"], "cumulative": "3230", "base": "3050", "base_ref": "current:2026-W48", "increment": "180", "closed": true}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "G02B",
+      "title": "Giá Mẫu 1 A.III: min/max toàn tỉnh của bảng giá đã duyệt; ngày chưa duyệt → ngày đã duyệt gần nhất",
+      "kind": "price",
+      "source": "bao_gia",
+      "indicator": "Dưa leo (MH00001) — giá từ – đến, 2 ngày lấy giá gần nhất đến ngày chốt",
+      "unit": "đồng/kg",
+      "steps": [
+        {
+          "name": "Ngày chốt tuần 48 (01/12): bảng 30/11 đang duyệt, 01/12 chưa duyệt",
+          "as_of": "2026-12-01 16:00",
+          "boards": [
+            {"day": "2026-11-25", "status": "approved", "version": 1, "tickets": 3, "lines": [
+              {"point": "XBG0001", "item": "MH00001", "min": "8000", "max": "9500"},
+              {"point": "XBG0002", "item": "MH00001", "min": "8500", "max": "10000"},
+              {"point": "XBG0003", "item": "MH00001", "min": "11000", "max": "13000"}]},
+            {"day": "2026-11-26", "status": "approved", "version": 1, "tickets": 2, "lines": [
+              {"point": "XBG0001", "item": "MH00001", "min": "8000", "max": "9500"},
+              {"point": "XBG0003", "item": "MH00001", "min": "11500", "max": "13500"}]},
+            {"day": "2026-11-27", "status": "approved", "version": 1, "tickets": 3, "lines": [
+              {"point": "XBG0001", "item": "MH00001", "min": "8000", "max": "10000"},
+              {"point": "XBG0002", "item": "MH00001", "min": "9000", "max": "11000"},
+              {"point": "XBG0003", "item": "MH00001", "min": "12000", "max": "14000"}]},
+            {"day": "2026-11-30", "status": "approving", "version": 0, "tickets": 3, "lines": [
+              {"point": "XBG0001", "item": "MH00001", "min": "8000", "max": "10000"},
+              {"point": "XBG0002", "item": "MH00001", "min": "9000", "max": "11000"},
+              {"point": "XBG0003", "item": "MH00001", "min": "12000", "max": "13500"}]},
+            {"day": "2026-12-01", "status": "open", "version": 0, "tickets": 3, "lines": [
+              {"point": "XBG0001", "item": "MH00001", "min": "8500", "max": "10500"},
+              {"point": "XBG0002", "item": "MH00001", "min": "9000", "max": "11000"},
+              {"point": "XBG0003", "item": "MH00001", "min": "11000", "max": "13000"}]}
+          ],
+          "expected": [
+            {"week": "2026-W48", "item": "MH00001", "reference_day": "2026-12-01", "columns": [
+              {"day": "2026-11-26", "min": "8000", "max": "13500"},
+              {"day": "2026-11-27", "min": "8000", "max": "14000"}], "tickets": 8, "closed": false,
+             "note": "30/11, 01/12 chưa duyệt → hai cột là hai ngày đã duyệt gần nhất 26/11, 27/11; số phiếu chỉ đếm bảng đã duyệt; nguồn giá tuần 48 'Tạm tính'"}
+          ]
+        },
+        {
+          "name": "02/12: duyệt 30/11 và 01/12; cán bộ KHTC phụ trách bấm 'Cập nhật số liệu' (kỳ tuần 48 chưa đóng)",
+          "as_of": "2026-12-02 09:00",
+          "boards": [
+            {"day": "2026-11-25", "status": "approved", "version": 1, "tickets": 3, "lines": [
+              {"point": "XBG0001", "item": "MH00001", "min": "8000", "max": "9500"},
+              {"point": "XBG0002", "item": "MH00001", "min": "8500", "max": "10000"},
+              {"point": "XBG0003", "item": "MH00001", "min": "11000", "max": "13000"}]},
+            {"day": "2026-11-26", "status": "approved", "version": 1, "tickets": 2, "lines": [
+              {"point": "XBG0001", "item": "MH00001", "min": "8000", "max": "9500"},
+              {"point": "XBG0003", "item": "MH00001", "min": "11500", "max": "13500"}]},
+            {"day": "2026-11-27", "status": "approved", "version": 1, "tickets": 3, "lines": [
+              {"point": "XBG0001", "item": "MH00001", "min": "8000", "max": "10000"},
+              {"point": "XBG0002", "item": "MH00001", "min": "9000", "max": "11000"},
+              {"point": "XBG0003", "item": "MH00001", "min": "12000", "max": "14000"}]},
+            {"day": "2026-11-30", "status": "approved", "version": 1, "tickets": 3, "lines": [
+              {"point": "XBG0001", "item": "MH00001", "min": "8000", "max": "10000"},
+              {"point": "XBG0002", "item": "MH00001", "min": "9000", "max": "11000"},
+              {"point": "XBG0003", "item": "MH00001", "min": "12000", "max": "13500"}]},
+            {"day": "2026-12-01", "status": "approved", "version": 1, "tickets": 3, "lines": [
+              {"point": "XBG0001", "item": "MH00001", "min": "8500", "max": "10500"},
+              {"point": "XBG0002", "item": "MH00001", "min": "9000", "max": "11000"},
+              {"point": "XBG0003", "item": "MH00001", "min": "11000", "max": "13000"}]}
+          ],
+          "expected": [
+            {"week": "2026-W48", "item": "MH00001", "reference_day": "2026-12-01", "columns": [
+              {"day": "2026-11-30", "min": "8000", "max": "13500"},
+              {"day": "2026-12-01", "min": "8500", "max": "13000"}], "tickets": 14, "closed": true}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "G03",
+      "title": "Sửa lùi lũy kế: nguồn mở lại tuần trước khi KHTC còn mở; lũy kế giảm ở tuần sau",
+      "kind": "cumulative",
+      "source": "trong_trot",
+      "indicator": "Diện tích xuống giống lúa Thu Đông, lũy kế vụ (Mẫu 1 A.I.1)",
+      "unit": "ha",
+      "steps": [
+        {
+          "name": "s1 — trước khi sửa",
+          "as_of": "2026-12-16 15:00",
+          "source_periods": [
+            {"key": "2026-W49", "to": "2026-12-08", "cumulative": "3230", "closed": true, "series": "ThuDong-2026"},
+            {"key": "2026-W50", "to": "2026-12-15", "cumulative": "3400", "closed": true, "series": "ThuDong-2026"}
+          ],
+          "khtc_closed": [{"week": "2026-W48", "cumulative": "3050"}],
+          "expected": [
+            {"week": "2026-W49", "source_keys": ["2026-W49"], "cumulative": "3230", "base": "3050", "base_ref": "frozen:2026-W48", "increment": "180", "closed": true},
+            {"week": "2026-W50", "source_keys": ["2026-W50"], "cumulative": "3400", "base": "3230", "base_ref": "current:2026-W49", "increment": "170", "closed": true}
+          ]
+        },
+        {
+          "name": "s2 — Cấp Tỉnh Trồng trọt mở lại tuần 49 (xã sửa); KHTC vẫn thấy ảnh chụp đã chốt gần nhất",
+          "as_of": "2026-12-17 09:00",
+          "source_periods": [
+            {"key": "2026-W49", "to": "2026-12-08", "cumulative": "3230", "closed": false, "series": "ThuDong-2026"},
+            {"key": "2026-W50", "to": "2026-12-15", "cumulative": "3400", "closed": true, "series": "ThuDong-2026"}
+          ],
+          "khtc_closed": [{"week": "2026-W48", "cumulative": "3050"}],
+          "expected": [
+            {"week": "2026-W49", "source_keys": ["2026-W49"], "cumulative": "3230", "base": "3050", "base_ref": "frozen:2026-W48", "increment": "180", "closed": false,
+             "note": "Tuần 49 KHTC thành 'Tạm tính' (nguồn đang mở lại); số tạm của nguồn không lọt sang KHTC (W11.10)"},
+            {"week": "2026-W50", "source_keys": ["2026-W50"], "cumulative": "3400", "base": "3230", "base_ref": "current:2026-W49", "increment": "170", "closed": true}
+          ]
+        },
+        {
+          "name": "s3 — nguồn chốt lại tuần 49 = 3.190 (tuần 50 giữ ảnh chụp 3.400); cán bộ KHTC phụ trách bấm 'Cập nhật số liệu'",
+          "as_of": "2026-12-17 15:00",
+          "source_periods": [
+            {"key": "2026-W49", "to": "2026-12-08", "cumulative": "3190", "closed": true, "series": "ThuDong-2026"},
+            {"key": "2026-W50", "to": "2026-12-15", "cumulative": "3400", "closed": true, "series": "ThuDong-2026"}
+          ],
+          "khtc_closed": [{"week": "2026-W48", "cumulative": "3050"}],
+          "expected": [
+            {"week": "2026-W49", "source_keys": ["2026-W49"], "cumulative": "3190", "base": "3050", "base_ref": "frozen:2026-W48", "increment": "140", "closed": true},
+            {"week": "2026-W50", "source_keys": ["2026-W50"], "cumulative": "3400", "base": "3190", "base_ref": "current:2026-W49", "increment": "210", "closed": true,
+             "note": "Tổng hai tuần không đổi (350 ha); phần sửa chuyển sang tuần 50 vì lũy kế nguồn tuần 50 không đổi"}
+          ],
+          "diff": [
+            {"week": "2026-W49", "field": "cumulative", "old": "3230", "new": "3190", "by": "can_bo_khtc_phu_trach"},
+            {"week": "2026-W49", "field": "increment", "old": "180", "new": "140", "by": "can_bo_khtc_phu_trach"},
+            {"week": "2026-W50", "field": "increment", "old": "170", "new": "210", "by": "can_bo_khtc_phu_trach"}
+          ]
+        },
+        {
+          "name": "s4 — tuần 51 nguồn ghi lũy kế thấp hơn tuần 50 (xã trừ 50 ha khai trùng)",
+          "as_of": "2026-12-23 15:00",
+          "source_periods": [
+            {"key": "2026-W49", "to": "2026-12-08", "cumulative": "3190", "closed": true, "series": "ThuDong-2026"},
+            {"key": "2026-W50", "to": "2026-12-15", "cumulative": "3400", "closed": true, "series": "ThuDong-2026"},
+            {"key": "2026-W51", "to": "2026-12-22", "cumulative": "3350", "closed": true, "series": "ThuDong-2026"}
+          ],
+          "khtc_closed": [
+            {"week": "2026-W48", "cumulative": "3050"},
+            {"week": "2026-W49", "cumulative": "3190"},
+            {"week": "2026-W50", "cumulative": "3400"}
+          ],
+          "expected": [
+            {"week": "2026-W51", "source_keys": ["2026-W51"], "cumulative": "3350", "base": "3400", "base_ref": "frozen:2026-W50", "increment": "-50", "closed": true,
+             "note": "Trong kỳ âm được giữ nguyên (không làm tròn về 0); Mẫu 1 in 'giảm 50 ha (điều chỉnh)'"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "G04",
+      "title": "Nguồn đổi sau khi kỳ KHTC đã đóng: kỳ đóng giữ nguyên, phần chênh vào tuần KHTC đang mở kế tiếp",
+      "kind": "cumulative",
+      "source": "cnts",
+      "indicator": "Sản lượng thủy sản khai thác + nuôi trồng, lũy kế từ đầu năm (Mẫu 1 A.I.3)",
+      "unit": "tấn",
+      "steps": [
+        {
+          "name": "s1 — KHTC đã đóng tuần 45, 46 và đã xuất Mẫu 1",
+          "as_of": "2026-11-19 09:00",
+          "source_periods": [
+            {"key": "2026-W45", "to": "2026-11-09", "cumulative": "4947.5", "closed": true, "series": "2026"},
+            {"key": "2026-W46", "to": "2026-11-16", "cumulative": "5079.0", "closed": true, "series": "2026"}
+          ],
+          "khtc_closed": [
+            {"week": "2026-W44", "cumulative": "4812.0"},
+            {"week": "2026-W45", "cumulative": "4947.5"},
+            {"week": "2026-W46", "cumulative": "5079.0"}
+          ],
+          "expected": [
+            {"week": "2026-W45", "source_keys": ["2026-W45"], "frozen": true, "cumulative": "4947.5", "base": "4812.0", "base_ref": "frozen:2026-W44", "increment": "135.5", "year_to_date": "4947.5", "closed": true},
+            {"week": "2026-W46", "source_keys": ["2026-W46"], "frozen": true, "cumulative": "5079.0", "base": "4947.5", "base_ref": "frozen:2026-W45", "increment": "131.5", "year_to_date": "5079.0", "closed": true}
+          ]
+        },
+        {
+          "name": "s2 — CNTS mở lại tuần 45 (4.947,5 → 4.940,0), tự tính lại lũy kế tuần 46 (5.071,5); tuần 47 = 5.210,0",
+          "as_of": "2026-11-25 15:00",
+          "source_periods": [
+            {"key": "2026-W45", "to": "2026-11-09", "cumulative": "4940.0", "closed": true, "series": "2026"},
+            {"key": "2026-W46", "to": "2026-11-16", "cumulative": "5071.5", "closed": true, "series": "2026"},
+            {"key": "2026-W47", "to": "2026-11-23", "cumulative": "5210.0", "closed": true, "series": "2026"}
+          ],
+          "khtc_closed": [
+            {"week": "2026-W44", "cumulative": "4812.0"},
+            {"week": "2026-W45", "cumulative": "4947.5"},
+            {"week": "2026-W46", "cumulative": "5079.0"}
+          ],
+          "expected": [
+            {"week": "2026-W45", "source_keys": ["2026-W45"], "frozen": true, "source_changed": true, "reissued": false, "cumulative": "4947.5", "base": "4812.0", "base_ref": "frozen:2026-W44", "increment": "135.5", "year_to_date": "4947.5", "closed": true,
+             "note": "Bản đã xuất chuyển 'Nguồn đã thay đổi' (BR-DL-04) nhưng số không đổi, không phát hành lại"},
+            {"week": "2026-W46", "source_keys": ["2026-W46"], "frozen": true, "source_changed": true, "reissued": false, "cumulative": "5079.0", "base": "4947.5", "base_ref": "frozen:2026-W45", "increment": "131.5", "year_to_date": "5079.0", "closed": true},
+            {"week": "2026-W47", "source_keys": ["2026-W47"], "cumulative": "5210.0", "base": "5079.0", "base_ref": "frozen:2026-W46", "increment": "131.0", "year_to_date": "5210.0", "closed": true,
+             "note": "Trong kỳ tính từ số ĐÃ ĐÓNG của tuần 46 (5.079,0), không từ số mới 5.071,5: phần −7,5 tấn vào tuần 47, lũy kế KHTC = lũy kế nguồn"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "G05",
+      "title": "Cuối năm, CNTS: tuần 29/12/2026–04/01/2027 vào tuần KHTC 1/2027; lũy kế nguồn về 0 từ năm mới",
+      "kind": "cumulative",
+      "source": "cnts",
+      "indicator": "Sản lượng thủy sản khai thác + nuôi trồng, lũy kế từ đầu năm (Mẫu 1 A.I.3)",
+      "unit": "tấn",
+      "steps": [
+        {
+          "name": "Sau tuần nguồn 2/2027",
+          "as_of": "2027-01-13 15:00",
+          "source_periods": [
+            {"key": "2026-W51", "to": "2026-12-21", "cumulative": "5890.0", "closed": true, "series": "2026"},
+            {"key": "2026-W52", "to": "2026-12-28", "cumulative": "6020.0", "closed": true, "series": "2026"},
+            {"key": "2027-W01", "to": "2027-01-04", "cumulative": "118.0", "closed": true, "series": "2027"},
+            {"key": "2027-W02", "to": "2027-01-11", "cumulative": "240.5", "closed": true, "series": "2027"}
+          ],
+          "khtc_closed": [{"week": "2026-W51", "cumulative": "5890.0"}],
+          "expected": [
+            {"week": "2026-W52", "source_keys": ["2026-W52"], "cumulative": "6020.0", "base": "5890.0", "base_ref": "frozen:2026-W51", "increment": "130.0", "year_to_date": "6020.0", "closed": true,
+             "note": "Tuần cuối của năm KHTC 2026 (năm 2026 có 52 tuần, số liệu đến 29/12/2026); Mẫu 4 năm 2026 = 6.020,0 tấn"},
+            {"week": "2027-W01", "source_keys": ["2027-W01"], "cumulative": "118.0", "base": "0", "base_ref": "reset", "increment": "118.0", "year_to_date": "118.0", "closed": true,
+             "note": "30/12 và 31/12/2026 thuộc năm KHTC 2027; chuỗi lũy kế nguồn mới (2027) → gốc 0"},
+            {"week": "2027-W02", "source_keys": ["2027-W02"], "cumulative": "240.5", "base": "118.0", "base_ref": "current:2027-W01", "increment": "122.5", "year_to_date": "240.5", "closed": true}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "G05B",
+      "title": "Cuối năm, Trồng trọt đợt cũ (quy tắc v1, tuần ISO thứ Hai–Chủ nhật): tuần ISO 53/2026 vào tuần KHTC 1/2027",
+      "kind": "cumulative",
+      "source": "trong_trot_v1",
+      "indicator": "Diện tích thu hoạch lúa Thu Đông, lũy kế vụ (Mẫu 1 A.I.1) — đợt phát hành trước 04/11/2026",
+      "unit": "ha",
+      "steps": [
+        {
+          "name": "Sau tuần ISO 1/2027",
+          "as_of": "2027-01-13 15:00",
+          "source_periods": [
+            {"key": "2026-W51", "to": "2026-12-20", "cumulative": "5600", "closed": true, "series": "ThuDong-2026"},
+            {"key": "2026-W52", "to": "2026-12-27", "cumulative": "5800", "closed": true, "series": "ThuDong-2026"},
+            {"key": "2026-W53", "to": "2027-01-03", "cumulative": "6150", "closed": true, "series": "ThuDong-2026"},
+            {"key": "2027-W01", "to": "2027-01-10", "cumulative": "6400", "closed": true, "series": "ThuDong-2026"}
+          ],
+          "khtc_closed": [{"week": "2026-W51", "cumulative": "5600"}],
+          "expected": [
+            {"week": "2026-W52", "source_keys": ["2026-W52"], "cumulative": "5800", "base": "5600", "base_ref": "frozen:2026-W51", "increment": "200", "closed": true},
+            {"week": "2027-W01", "source_keys": ["2026-W53"], "cumulative": "6150", "base": "5800", "base_ref": "current:2026-W52", "increment": "350", "year_to_date": "350", "closed": true,
+             "note": "Không có tuần KHTC 53/2026; chuỗi lũy kế vụ không về 0 ở ranh năm → trong kỳ = hiệu lũy kế; lũy kế hiển thị = lũy kế vụ 6.150"},
+            {"week": "2027-W02", "source_keys": ["2027-W01"], "cumulative": "6400", "base": "6150", "base_ref": "current:2027-W01", "increment": "250", "year_to_date": "600", "closed": true}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "G05C",
+      "title": "Năm có 53 tuần: CNTS 2029 có tuần 53, KHTC 2030 có tuần 53 (chỉ quy đổi)",
+      "kind": "mapping",
+      "source": "cnts",
+      "indicator": "—",
+      "unit": "—"
+    },
+    {
+      "id": "G06",
+      "title": "HTX 'Chưa xác nhận' do Trung tâm KN tạo: tính vào tổng, tách đã/chưa xác nhận; nhận HTX chỉ đổi nhãn",
+      "kind": "htx",
+      "source": "pf_coop",
+      "indicator": "Số HTX và số thành viên HTX toàn tỉnh tại ngày chốt",
+      "unit": "HTX / người",
+      "steps": [
+        {
+          "name": "Ngày chốt tuần 49 (08/12/2026)",
+          "as_of": "2026-12-08 23:59",
+          "cooperatives": [
+            {"code": "HTX01", "confirmed": true, "members": 80, "created_by": "can_bo_xa"},
+            {"code": "HTX02", "confirmed": true, "members": 75, "created_by": "can_bo_xa"},
+            {"code": "HTX03", "confirmed": true, "members": 85, "created_by": "can_bo_xa"},
+            {"code": "HTX04", "confirmed": true, "members": 60, "created_by": "can_bo_xa"},
+            {"code": "HTX05", "confirmed": false, "members": 70, "created_by": "ttkn_tinh"},
+            {"code": "HTX06", "confirmed": false, "members": 50, "created_by": "ttkn_tinh"}
+          ],
+          "expected": [
+            {"week": "2026-W49", "htx_total": 6, "htx_confirmed": 4, "htx_unconfirmed": 2, "members_total": 420, "members_confirmed": 300, "members_unconfirmed": 120, "closed": true}
+          ]
+        },
+        {
+          "name": "10/12/2026 Cán bộ xã nhận HTX05; ngày chốt tuần 50 (15/12/2026)",
+          "as_of": "2026-12-15 23:59",
+          "cooperatives": [
+            {"code": "HTX01", "confirmed": true, "members": 80, "created_by": "can_bo_xa"},
+            {"code": "HTX02", "confirmed": true, "members": 75, "created_by": "can_bo_xa"},
+            {"code": "HTX03", "confirmed": true, "members": 85, "created_by": "can_bo_xa"},
+            {"code": "HTX04", "confirmed": true, "members": 60, "created_by": "can_bo_xa"},
+            {"code": "HTX05", "confirmed": true, "members": 70, "created_by": "ttkn_tinh"},
+            {"code": "HTX06", "confirmed": false, "members": 50, "created_by": "ttkn_tinh"}
+          ],
+          "expected": [
+            {"week": "2026-W49", "frozen": true, "reissued": false, "htx_total": 6, "htx_confirmed": 4, "htx_unconfirmed": 2, "members_total": 420, "members_confirmed": 300, "members_unconfirmed": 120, "closed": true,
+             "note": "Mẫu 1 tuần 49 đã gửi trước khi nhận → không phát hành lại"},
+            {"week": "2026-W50", "htx_total": 6, "htx_confirmed": 5, "htx_unconfirmed": 1, "members_total": 420, "members_confirmed": 370, "members_unconfirmed": 50, "closed": true,
+             "note": "Tổng không đổi (6 HTX, 420 thành viên); chỉ nhãn đổi"}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, consumes, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: pf/price
+aka: [cap/price]
+kind: capability
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/accounts: ">=1.0 <2"
+  pf/notify: ">=1.0 <2"
+provides:
+  ports:
+    - Boards
+    - Calendar
+    - Catalog
+    - Items
+    - Officers
+    - Points
+    - PriceDesk
+    - ReminderTargets
+    - TablePDF
+    - Thresholds
+    - Tickets
+    - Weeks
+  events:
+    - pf.price.alert.raised/v1
+    - pf.price.board.published/v1
+    - pf.price.board.reopened/v1
+    - pf.price.lock.summarized/v1
+    - pf.price.reminder.issued/v1
+    - pf.price.ticket.proxied/v1
+    - pf.price.verification.decided/v1
+    - pf.price.verification.requested/v1
+    - pf.price.verification.responded/v1
+  internal_events: []
+  publications: [pf_price_pub.board_daily/v1, pf_price_pub.ticket_week/v1]
+  data_products: []
+consumes:
+  events: []
+permissions: []
+shares: []
+owns_schema: [pf_price, pf_price_pub]
+enable: per_tenant

@@ -17,12 +17,13 @@ Vai đăng nhập không theo module (`platform_api`, `public_api`, `worker_plat
 | pf | `app_worker` | `worker`, `drill`, `formimport` | `AG_DB_PASSWORD_APP_WORKER` |
 | pf | `app_public` | `api-public` | `AG_DB_PASSWORD_APP_PUBLIC` |
 | pf | `app_sync` | `objsync` / engine đồng bộ | `AG_DB_PASSWORD_APP_SYNC` |
+| pf | `app_agg` | `worker -agg-run` — chỉ `r_agg` (ADR-0031 §3, gói FC; [agg-jobs.md](agg-jobs.md)) | `AG_DB_PASSWORD_APP_AGG` (Helm: Secret `pf-db-agg`, chỉ worker) |
 | mkg | `app_internal` | `api-internal` | `AG_DB_PASSWORD_APP_INTERNAL` |
 | mkg | `app_worker_internal` | `worker-internal`, `rebuilddrill` | `AG_DB_PASSWORD_APP_WORKER_INTERNAL` |
 | mkg + ts | `app_ingest` | `ingest` (một vai, hai cụm, **cùng** mật khẩu) | `AG_DB_PASSWORD_APP_INGEST` |
 | vault | `app_vault` | `identity-vault` | `AG_DB_PASSWORD_APP_VAULT` |
 
-Các vai `ag_migrator`, `ag_outbox_publisher`, `mkg_monitor` và `ts_monitor` giữ nguyên. Số bí mật đăng nhập mỗi cụm: pf 7, mkg 7, ts 5, vault 4 — gồm `ag_ops_jobs` (rà soát 08/10/2026, shared 000009: job vận hành xuyên tenant). Không kể `ag_ops_jobs` thì là 6/6/4/3, khớp mục tiêu 4–6 của §4.
+Các vai `ag_migrator`, `ag_outbox_publisher`, `mkg_monitor` và `ts_monitor` giữ nguyên. Số bí mật đăng nhập mỗi cụm: pf 8 (gồm `app_agg`, gói FC), mkg 7, ts 5, vault 4 — gồm `ag_ops_jobs` (rà soát 08/10/2026, shared 000009: job vận hành xuyên tenant). Không kể `ag_ops_jobs` thì là 6/6/4/3, khớp mục tiêu 4–6 của §4.
 
 ## Thứ tự triển khai
 

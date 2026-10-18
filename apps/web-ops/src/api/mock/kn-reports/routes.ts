@@ -81,6 +81,11 @@ export const reportCycleAppRoutes: Route[] = [
   },
   {
     method: "POST",
+    pattern: re("/v1/extension/report-batches/provincial-import"),
+    handler: kn((ctx, c) => st.writer(c, "kn_tinh") ?? provincialImport(ctx, c)),
+  },
+  {
+    method: "POST",
     pattern: re("/v1/extension/report-batches"),
     handler: kn(
       (ctx, c) =>
@@ -436,6 +441,69 @@ export const reportCycleAppRoutes: Route[] = [
     }),
   },
 ];
+
+/** Giả lập POST /v1/extension/report-batches/provincial-import: chỉ đọc CSV (.xlsx → 422 như tệp sai mẫu trong mock). */
+function normHeader(h: string): string {
+  return h
+    .replace(/^﻿/, "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/gi, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+function provincialImport(ctx: Ctx, c: st.Caller): Response {
+  const invalid = (d: string) => problem(422, "extension.provincial_import_invalid", "Tệp Tỉnh giao không đúng mẫu", { detail: d });
+  const rt = q(ctx, "report_type") ?? "";
+  const ids = (q(ctx, "template_ids") ?? "").split(",").filter(Boolean);
+  if (!ids.length) return st.fieldErr("template_ids", "chọn ít nhất một biểu");
+  const at = q(ctx, "from_date") ?? new Date(st.nowMs()).toISOString().slice(0, 10);
+  const forms = formsFor(c.dept ?? st.AG_DEPARTMENT, rt, at).filter((f) => ids.includes(f.template_id));
+  if (forms.length !== ids.length) return problem(422, "extension.form_not_assigned", "Mẫu chưa được gán cho loại báo cáo của phòng ban");
+  if (typeof ctx.body !== "string") return invalid("Giả lập chỉ đọc CSV UTF-8 — máy chủ thật đọc cả .xlsx");
+  const lines = ctx.body.split(/\r?\n/).map((l) => l.split(",").map((x) => x.trim()));
+  const keys = (lines[0] ?? []).map(normHeader);
+  const ci = keys.findIndex((k) => k === "ma_xa" || k === "commune_code" || k === "ma_xa_phuong");
+  if (ci < 0) return invalid("Tệp thiếu cột bắt buộc: Mã xã");
+  const cands = new Map<string, { tpl: string; code: string; letter: string }>();
+  for (const f of forms)
+    for (const col of f.provincial_columns) {
+      const t = { tpl: f.template_id, code: f.code, letter: col.letter };
+      cands.set(normHeader(`${f.code} ${col.letter}`), t);
+      if (forms.length === 1) cands.set(normHeader(col.letter), t);
+    }
+  const targets = new Map<number, { tpl: string; code: string; letter: string }>();
+  const ignored: string[] = [];
+  keys.forEach((k, i) => {
+    if (i === ci || k.startsWith("ten_xa")) return;
+    const hit = [...cands.entries()].find(([cand]) => k === cand || k.startsWith(`${cand}_`));
+    if (hit) targets.set(i, hit[1]);
+    else ignored.push(lines[0]![i]!);
+  });
+  if (!targets.size) return invalid("Không nhận ra cột Tỉnh giao nào");
+  const values: Record<string, Record<string, Record<string, string>>> = {};
+  const rows: { row: number; commune_code: string; status: "accepted" | "rejected"; reason: string | null }[] = [];
+  const seen = new Set<string>();
+  lines.slice(1).forEach((cells, i) => {
+    if (cells.every((x) => !x)) return;
+    const commune = cells[ci] ?? "";
+    const reject = (reason: string) => rows.push({ row: i + 2, commune_code: commune, status: "rejected", reason });
+    if (!commune) return reject("Thiếu mã xã");
+    if (seen.has(commune)) return reject("Mã xã trùng");
+    seen.add(commune);
+    for (const [idx, t] of targets) {
+      const v = cells[idx] ?? "";
+      if (!v) continue;
+      if (!/^\d+(\.\d+)?$/.test(v)) return reject(`${t.code} cột ${t.letter}: phải là số không âm`);
+      ((values[t.tpl] ??= {})[commune] ??= {})[t.letter] = String(Number(v));
+    }
+    rows.push({ row: i + 2, commune_code: commune, status: "accepted", reason: null });
+  });
+  const columns = [...targets.values()].map((t) => ({ header: `${t.code} ${t.letter}`, template_id: t.tpl, form_code: t.code, letter: t.letter }));
+  const accepted = rows.filter((r) => r.status === "accepted").length;
+  return json({ provincial_source: "excel", provincial_values: values, columns, ignored_columns: ignored, accepted, rejected: rows.length - accepted, rows });
+}
 
 function formsFor(dept: string, rt: string, at: string) {
   return mockAssignedForms(dept, "commune", rt as FormReportType, at).map((f) => ({

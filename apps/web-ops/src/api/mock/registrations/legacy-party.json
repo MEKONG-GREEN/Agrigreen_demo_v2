@@ -1,0 +1,40 @@
+{
+  "id": "legacy-party",
+  "source": "./legacy-party",
+  "app": [
+    {
+      "export": "appRoutes1",
+      "order": 1
+    },
+    {
+      "export": "appRoutes34",
+      "order": 34
+    },
+    {
+      "export": "appRoutes35",
+      "order": 35
+    },
+    {
+      "export": "appRoutes36",
+      "order": 36
+    },
+    {
+      "export": "appRoutes37",
+      "order": 37
+    }
+  ],
+  "admin": [
+    {
+      "export": "adminRoutes10",
+      "order": 10
+    },
+    {
+      "export": "adminRoutes11",
+      "order": 11
+    },
+    {
+      "export": "adminRoutes12",
+      "order": 12
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "view": "pf_cooperative_pub.v1_cooperatives",
+  "directive": "pf_cooperative_pub.cooperatives/v1",
+  "owner": "pf/cooperative",
+  "status": "published",
+  "package": "KNSPLIT-2-HTX-DATA-A",
+  "migration": "pf 20261018030844",
+  "consumers": [
+    "r_metrics, r_agg through existing published-schema policy; no KN reader grant yet"
+  ],
+  "purpose": "Owned HTX profile presence and count of active households with open membership. Combine with published platform org_tree; active orgs without this row still count with zero members. Does not define org activity or names.",
+  "grain": "tenant x org alias",
+  "key": [
+    "tenant_id",
+    "org_ref"
+  ],
+  "closed_rule": "Current native projections. Reporting cutoffs and frozen KN snapshots belong to the consumer; confirmations use immutable claimed_at.",
+  "personal_data": false,
+  "columns": [
+    {
+      "name": "tenant_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "tenant id"
+    },
+    {
+      "name": "org_ref",
+      "type": "uuid",
+      "nullable": false,
+      "description": "org ref"
+    },
+    {
+      "name": "profile_present",
+      "type": "boolean",
+      "nullable": false,
+      "description": "profile present"
+    },
+    {
+      "name": "member_households",
+      "type": "bigint",
+      "nullable": false,
+      "description": "member households"
+    }
+  ]
+}

@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 )
@@ -46,7 +47,8 @@ func run(in, sheet, code, title string, headerStart, dataRow int, out string, li
 		if xlsxOut == "" {
 			return fmt.Errorf("-seed cần -xlsx")
 		}
-		for _, d := range reports.TrongTrotSeedDefinitions() {
+		for _, seedTemplate := range extension.ReportFormSeeds().Templates {
+			d := seedTemplate.Def
 			if d.Code == seed {
 				b, err := reports.ExportFormXLSX(d)
 				if err != nil {

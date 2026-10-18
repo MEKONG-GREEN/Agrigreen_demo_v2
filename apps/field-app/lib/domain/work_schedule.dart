@@ -134,6 +134,8 @@ class WsItem {
     this.note,
     this.changed = false,
     this.conflict = false,
+    this.place,
+    this.checkin,
   });
 
   final String id;
@@ -154,7 +156,25 @@ class WsItem {
   /// Trùng thời gian với mục khác (máy chủ hoặc máy tính).
   final bool conflict;
 
-  WsItem copyWith({bool? conflict, DateTime? day, String? id}) => WsItem(
+  /// W11.46 (CNTS CV-06): địa điểm trên bản đồ (giữ nguyên khi sửa trên app).
+  final WsPlace? place;
+
+  /// W11.46 (CNTS CV-07): check-in của mục (máy chủ trả hoặc đang chờ đồng bộ).
+  final WsCheckin? checkin;
+
+  /// Công tác ngoài cơ quan (có địa điểm/xã/HTX) — cần check-in khi phòng bật.
+  bool get fieldWork =>
+      place != null ||
+      location != null ||
+      communeCode != null ||
+      cooperativeRef != null;
+
+  WsItem copyWith({
+    bool? conflict,
+    DateTime? day,
+    String? id,
+    WsCheckin? checkin,
+  }) => WsItem(
     id: id ?? this.id,
     day: day ?? this.day,
     session: session,
@@ -168,6 +188,8 @@ class WsItem {
     note: note,
     changed: changed,
     conflict: conflict ?? this.conflict,
+    place: place,
+    checkin: checkin ?? this.checkin,
   );
 
   /// "Sáng 07:30–11:00" / "Chiều".
@@ -207,6 +229,7 @@ class WsItem {
       note: _s(j['note']),
       changed: j['changed'] == true,
       conflict: j['conflict'] == true,
+      place: WsPlace.fromJson(j['place']),
     );
   }
 
@@ -231,7 +254,66 @@ class WsItem {
     'location': location,
     'participants': participants,
     'note': note,
+    'place': place?.toJson(),
   };
+}
+
+/// Địa điểm công tác trên bản đồ (W11.46, CV-06).
+class WsPlace {
+  const WsPlace({required this.lat, required this.lon, this.source = 'map'});
+  final double lat;
+  final double lon;
+  final String source;
+
+  static WsPlace? fromJson(Object? v) {
+    if (v is! Map) return null;
+    final lat = v['lat'], lon = v['lon'];
+    if (lat is! num || lon is! num) return null;
+    return WsPlace(
+      lat: lat.toDouble(),
+      lon: lon.toDouble(),
+      source: v['source'] is String ? v['source']! as String : 'map',
+    );
+  }
+
+  Map<String, Object?> toJson() => {'lat': lat, 'lon': lon, 'source': source};
+}
+
+/// Check-in của một mục (W11.46, CV-07). Không sửa được; tọa độ không giữ trên máy sau khi gửi.
+class WsCheckin {
+  const WsCheckin({
+    required this.capturedAt,
+    this.distanceM,
+    this.far = false,
+    this.pending = false,
+  });
+  final DateTime capturedAt;
+  final double? distanceM;
+  final bool far;
+
+  /// Đang chờ đồng bộ (bấm khi mất mạng).
+  final bool pending;
+
+  String get label {
+    if (pending) return 'Đã check-in (chờ đồng bộ)';
+    final d = distanceM == null
+        ? ''
+        : ' · cách địa điểm ${distanceM!.round()} m';
+    return '${far ? 'Check-in xa địa điểm' : 'Đã check-in'}$d';
+  }
+
+  static WsCheckin? fromJson(Map<String, Object?> j) {
+    final at = j['captured_at'] is String
+        ? DateTime.tryParse(j['captured_at']! as String)
+        : null;
+    if (at == null) return null;
+    final d = j['distance_m'];
+    return WsCheckin(
+      capturedAt: at,
+      distanceM: d is num ? d.toDouble() : null,
+      far: j['far'] == true,
+    );
+  }
 }
 
 /// Lỗi kiểm dữ liệu của một mục (giống quy tắc máy chủ, 422).

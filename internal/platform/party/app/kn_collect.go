@@ -109,8 +109,10 @@ type KNCoopQuery struct {
 	Q       string
 	AreaMin *decimal.Decimal
 	AreaMax *decimal.Decimal
-	After   uuid.UUID
-	Limit   int
+	// Confirmation (D2): confirmed | unconfirmed | rỗng = mọi HTX (HTX tạm "Chưa xác nhận" có mặt mặc định).
+	Confirmation string
+	After        uuid.UUID
+	Limit        int
 }
 
 // KNCoopPage là một trang HTX.
@@ -164,7 +166,7 @@ func (k *KN) ListKNCooperatives(ctx context.Context, q KNCoopQuery) (KNCoopPage,
 	if sc.Empty() {
 		return KNCoopPage{Items: []KNCooperative{}}, nil
 	}
-	qRefs, only, err := k.Reg.coopFilterRefs(ctx, c.p.TenantID, q.Q, q.AreaMin, q.AreaMax)
+	qRefs, only, err := k.Reg.coopFilterRefs(ctx, c.p.TenantID, q.Q, q.AreaMin, q.AreaMax, q.Confirmation)
 	if err != nil {
 		return KNCoopPage{}, err
 	}

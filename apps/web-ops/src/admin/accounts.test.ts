@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountState, lockReasonError, rolesForOrgKind } from "./accounts";
+import { accountState, canResetTotp, lockReasonError, mfaState, rolesForOrgKind } from "./accounts";
 
 describe("pf/accounts — kiểm sơ bộ phía client", () => {
   it("lý do khóa/mở khóa tối thiểu 20 ký tự (đếm sau khi bỏ khoảng trắng)", () => {
@@ -13,6 +13,18 @@ describe("pf/accounts — kiểm sơ bộ phía client", () => {
     expect(accountState({ enabled: false, lock_cause: "manual", required_actions: [] })).toBe("locked");
     expect(accountState({ enabled: true, lock_cause: null, required_actions: ["VERIFY_EMAIL"] })).toBe("pending");
     expect(accountState({ enabled: true, lock_cause: null, required_actions: [] })).toBe("active");
+    expect(accountState({ enabled: false, lock_cause: "dormant_45d", required_actions: [] })).toBe("locked_dormant");
+  });
+
+  it("D24 — trạng thái TOTP và điều kiện đặt lại", () => {
+    expect(mfaState(undefined)).toBeNull();
+    expect(mfaState({ required: true, configured: true, enrollment_pending: false })).toBe("configured");
+    expect(mfaState({ required: true, configured: false, enrollment_pending: true })).toBe("pending");
+    expect(mfaState({ required: true, configured: false, enrollment_pending: false })).toBe("missing");
+    expect(mfaState({ required: false, configured: false, enrollment_pending: false })).toBe("optional");
+    expect(canResetTotp({ enabled: true, mfa: { required: true, configured: true, enrollment_pending: false } })).toBe(true);
+    expect(canResetTotp({ enabled: false, mfa: { required: true, configured: true, enrollment_pending: false } })).toBe(false);
+    expect(canResetTotp({ enabled: true, mfa: { required: false, configured: false, enrollment_pending: false } })).toBe(false);
   });
 
   it("vai cho loại tổ chức theo role_org_kinds do backend trả", () => {

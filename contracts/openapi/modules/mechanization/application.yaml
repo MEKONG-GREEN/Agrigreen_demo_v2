@@ -1,0 +1,159 @@
+paths:
+# @ag-order: 271
+  /v1/kn/machine-counts:
+    get:
+      tags: [mechanization]
+      summary: "Khai báo máy của các HTX trong phạm vi + tổng xã theo loại máy (= Σ HTX)"
+      operationId: knMachineCountsOverview
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}, description: "Mã xã; ngoài phạm vi → 403 mechanization.out_of_scope"}
+      responses:
+        "200":
+          description: Tổng quan
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNMachineOverview"}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 272
+  /v1/kn/machine-counts/{ref}:
+    get:
+      tags: [mechanization]
+      summary: "Khai báo máy hiện hành của một HTX"
+      operationId: knCoopMachineCounts
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, description: "cooperative_ref của HTX", schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Khai báo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCoopMachines"}
+        "404": {$ref: "#/components/responses/Problem"}
+    put:
+      tags: [mechanization]
+      summary: "Thay toàn bộ khai báo máy của HTX (mỗi loại đổi = một sự kiện set/removed)"
+      description: >-
+        Loại máy thuộc danh mục masterdata machine_type đang dùng (mechanization.machine_type_unknown); số lượng phải là
+        số JSON nguyên 0–1.000.000 (mechanization.machine_quantity_invalid); trùng loại trong request →
+        mechanization.machine_type_duplicate (gợi ý cập nhật dòng đã có); HTX ngừng hoạt động → mechanization.cooperative_invalid.
+        Gửi lại cùng Idempotency-Key → khai báo hiện tại, không ghi thêm. Admin: tham số department (mặc định trong_trot).
+      operationId: knPutMachineCounts
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, description: "cooperative_ref của HTX", schema: {type: string, format: uuid}}
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin: phòng ban của bản ghi"}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNMachineCountsPut"}
+      responses:
+        "200":
+          description: Khai báo sau khi lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCoopMachines"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 273
+  /v1/kn/machine-counts/{ref}/log:
+    get:
+      tags: [mechanization]
+      summary: "Lịch sử thay đổi số lượng máy của HTX"
+      operationId: knMachineCountLog
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, description: "cooperative_ref của HTX", schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "seq của dòng cuối trang trước"}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNMachineLogPage"}
+        "404": {$ref: "#/components/responses/Problem"}
+  # ---- KN v7.7 P7 (FN-XA-03.05/03.06: thửa, vật tư) ----
+components:
+  schemas:
+# @ag-order: 838
+    KNMachineLine:
+      type: object
+      required: [machine_type, machine_type_name, quantity, note, updated_at, updated_by]
+      properties:
+        machine_type: {type: string}
+        machine_type_name: {type: string}
+        quantity: {type: integer, minimum: 0}
+        note: {type: [string, "null"]}
+        updated_at: {type: string, format: date-time}
+        updated_by: {type: string, format: uuid}
+# @ag-order: 839
+    KNCoopMachines:
+      type: object
+      required: [cooperative_ref, name, commune_code, lines, total]
+      properties:
+        cooperative_ref: {type: string, format: uuid}
+        name: {type: string}
+        commune_code: {type: string}
+        lines: {type: array, items: {$ref: "#/components/schemas/KNMachineLine"}}
+        total: {type: integer}
+# @ag-order: 840
+    KNMachineOverview:
+      type: object
+      required: [cooperatives, commune_totals]
+      properties:
+        cooperatives: {type: array, items: {$ref: "#/components/schemas/KNCoopMachines"}, description: "HTX có ít nhất một dòng khai báo"}
+        commune_totals:
+          type: array
+          items:
+            type: object
+            required: [commune_code, machine_type, machine_type_name, quantity]
+            properties:
+              commune_code: {type: string}
+              machine_type: {type: string}
+              machine_type_name: {type: string}
+              quantity: {type: integer}
+# @ag-order: 841
+    KNMachineCountsPut:
+      type: object
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          maxItems: 100
+          description: "Thay toàn bộ; mảng rỗng = bỏ mọi dòng"
+          items:
+            type: object
+            required: [machine_type, quantity]
+            properties:
+              machine_type: {type: string}
+              quantity: {type: integer, minimum: 0, maximum: 1000000}
+              note: {type: [string, "null"], maxLength: 500}
+        reason: {type: string, maxLength: 500}
+# @ag-order: 842
+    KNMachineLogEntry:
+      type: object
+      required: [seq, event, machine_type, machine_type_name, actor_ref, actor_display, at, recorded_at, changes, reason, department_code]
+      properties:
+        seq: {type: integer}
+        event: {type: string, enum: [set, removed]}
+        machine_type: {type: string}
+        machine_type_name: {type: string}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: [string, "null"]}
+        at: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        changes: {type: array, items: {$ref: "#/components/schemas/KNFieldChange"}, description: "quantity cũ → mới (removed: mới = null), note"}
+        reason: {type: [string, "null"]}
+        department_code: {type: string}
+# @ag-order: 843
+    KNMachineLogPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNMachineLogEntry"}}
+        next_cursor: {type: [integer, "null"]}

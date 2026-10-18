@@ -46,6 +46,10 @@ const (
 	CodeUnavailable     = "vault.unavailable"
 	// CodeQuotaExceeded: người yêu cầu vượt hạn mức tra/đọc định danh (Lookup, Resolve) — M13.
 	CodeQuotaExceeded = "vault.quota_exceeded"
+	// CodeSectionInvalid: ngăn hồ sơ không có, mục đích không phải mục đích của ngăn, hoặc trường lạ/quá dài (W11.22).
+	CodeSectionInvalid = "vault.section_invalid"
+	// CodeProfilesUnsupported: hiện thực kho không có phần mở rộng hồ sơ (Profiles) — lỗi cấu hình.
+	CodeProfilesUnsupported = "vault.profiles_unsupported"
 )
 
 // Problem tương ứng các lỗi của kho. errors.Is(p, ErrX) đúng nhờ WithCause.
@@ -56,4 +60,7 @@ var (
 	ProblemDuplicate       = problem.New(http.StatusConflict, CodeDuplicate, "Đã có chủ thể cùng số điện thoại hoặc CCCD").WithCause(ErrDuplicate)
 	ProblemUnwrapFailed    = problem.New(http.StatusUnprocessableEntity, CodeUnwrapFailed, "Không mở được khóa tệp bằng khóa của chủ thể")
 	ProblemQuotaExceeded   = problem.New(http.StatusTooManyRequests, CodeQuotaExceeded, "Vượt hạn mức tra cứu định danh, vui lòng thử lại sau")
+	ProblemSectionInvalid  = problem.New(http.StatusUnprocessableEntity, CodeSectionInvalid, "Ngăn hồ sơ, mục đích hoặc trường không hợp lệ")
+	// ProblemProfilesUnsupported: 503 — kho được nối không hỗ trợ ngăn hồ sơ.
+	ProblemProfilesUnsupported = problem.New(http.StatusServiceUnavailable, CodeProfilesUnsupported, "Kho định danh chưa hỗ trợ hồ sơ nhân sự")
 )

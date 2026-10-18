@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -119,19 +120,36 @@ type PublishInput struct {
 	Label      string
 	DueAt      time.Time
 	Units      []string // đơn vị nhận (cấp lá), thuộc phạm vi người phát hành
+	// W11.05: loại đơn vị lá (rỗng = loại mặc định của profile), mã xã cha song song với Units (cơ sở/hộ),
+	// giới hạn số lần gửi (nil = mặc định của profile, 0 = không giới hạn), khóa kỳ theo lịch kỳ hệ thống.
+	UnitKind       string
+	UnitParents    []string
+	MaxSubmissions *int
+	Period         *PeriodKey
+}
+
+// PeriodKey là khóa kỳ theo lịch kỳ hệ thống (W11.03 reportcycle/domain.Span: Key, From, To; thẻ quy tắc Tag()).
+type PeriodKey struct {
+	Kind, Key string
+	From, To  *time.Time
+	Rule      string
 }
 
 // UnitView là trạng thái bài nộp của một đơn vị trong kỳ.
 type UnitView struct {
 	Unit       string
-	Status     string
+	Parent     string // đơn vị cha dùng lọc phạm vi (cơ sở/hộ → mã xã); = Unit với xã/phòng ban
+	Status     string // SubmissionStatus, hoặc trạng thái lúc chốt (Không nộp, Đã chốt – chưa điều chỉnh, Chờ mở kỳ)
 	Submission *store.Submission
 	Review     *domain.Review
+	Held       *store.Held // bài giữ cuối ("Chờ mở kỳ"), nếu có
+	Meta       *store.Meta // W11.42: thông tin phiên bản cuối (không phát sinh, ghi chú, giải trình, nộp trễ)
 }
 
 // PeriodView là kỳ kèm trạng thái chiếu từ sổ.
 type PeriodView struct {
 	Period    store.Period
+	Spec      domain.Spec
 	State     domain.PeriodState
 	Events    []domain.Event
 	Units     []UnitView
@@ -157,8 +175,19 @@ func (s *Service) Publish(ctx context.Context, in PublishInput, idem string) (Pe
 	if err := domain.ValidateUnits(in.Units); err != nil {
 		return PeriodView{}, problem.Validation.WithField("units", err.Error())
 	}
+	on := s.Clock.Now().UTC()
+	if in.Period != nil && in.Period.From != nil {
+		on = *in.Period.From
+	}
+	if in.UnitParents, err = s.facilityParents(ctx, unitKindOf(prof, in.UnitKind), in.Units, in.UnitParents, on); err != nil {
+		return PeriodView{}, err
+	}
+	spec, err := specOf(prof, in)
+	if err != nil {
+		return PeriodView{}, err
+	}
 	for _, u := range in.Units {
-		if !a.scope.Allows(u) {
+		if !a.allowsUnit(spec, in.Units, u) {
 			return PeriodView{}, problem.Forbidden.WithDetail("đơn vị " + u + " ngoài phạm vi người phát hành")
 		}
 	}
@@ -185,6 +214,9 @@ func (s *Service) Publish(ctx context.Context, in PublishInput, idem string) (Pe
 			return err
 		}
 		id = p.ID
+		if err := store.InsertSpec(ctx, tx, a.tenant, p.ID, spec, a.ref, now, idemOr(idem, "spec")); err != nil {
+			return err
+		}
 		ev := domain.Event{ID: ids.New(), Action: "published", Mode: port.ModeManual, Actor: a.ref, At: now}
 		return store.InsertEvent(ctx, tx, a.tenant, p.ID, p.Profile, &ev, idemOr(idem, "published"))
 	})
@@ -194,17 +226,39 @@ func (s *Service) Publish(ctx context.Context, in PublishInput, idem string) (Pe
 	return s.Period(ctx, in.Profile, id)
 }
 
+// specOf dựng và kiểm đặc tả kỳ từ yêu cầu phát hành và mặc định của profile.
+func specOf(prof port.Profile, in PublishInput) (domain.Spec, error) {
+	spec := domain.Spec{UnitKind: in.UnitKind, UnitParents: in.UnitParents, MaxSubmissions: prof.MaxSubmissions, ReviewFlow: port.ReviewFlowSingle}
+	if spec.UnitKind == "" {
+		spec.UnitKind = prof.Kinds()[0]
+	}
+	if in.MaxSubmissions != nil {
+		spec.MaxSubmissions = *in.MaxSubmissions
+	}
+	if k := in.Period; k != nil {
+		spec.PeriodKind, spec.PeriodKey, spec.From, spec.To, spec.PeriodRule = k.Kind, strings.TrimSpace(k.Key), k.From, k.To, strings.TrimSpace(k.Rule)
+	}
+	if err := domain.ValidateSpec(prof.Kinds(), in.Units, spec); err != nil {
+		var te domain.ErrTemplate
+		if errorsAs(err, &te) {
+			return spec, problem.Validation.WithField(te.Field, te.Msg)
+		}
+		return spec, problem.Validation.WithDetail(err.Error())
+	}
+	return spec, nil
+}
+
 // owns: người gọi thuộc Nút phát hành của kỳ.
 func (a actor) owns(p store.Period) bool {
 	return a.node != uuid.Nil && p.OwnerRef != nil && *p.OwnerRef == a.node
 }
 
-// canSee: phạm vi toàn quốc, Nút chủ của kỳ, hoặc có ít nhất một đơn vị nhận trong phạm vi.
-func (a actor) canSee(p store.Period) bool {
+// canSee: phạm vi toàn quốc, Nút chủ của kỳ, hoặc có ít nhất một đơn vị nhận trong phạm vi (theo loại đơn vị lá).
+func (a actor) canSee(p store.Period, spec domain.Spec) bool {
 	if a.scope.All || a.owns(p) {
 		return true
 	}
-	return slices.ContainsFunc(p.Units, a.scope.Allows)
+	return slices.ContainsFunc(p.Units, func(u string) bool { return a.allowsUnit(spec, p.Units, u) })
 }
 
 // canClose: cấp close_by và (toàn quốc hoặc Nút chủ của kỳ).
@@ -212,18 +266,25 @@ func (a actor) canClose(prof string, p store.Period) bool {
 	return a.level == prof && (a.scope.All || a.owns(p))
 }
 
-// load đọc kỳ + sự kiện + bài nộp cuối + rà soát + ảnh chụp trong tx.
-func load(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*PeriodView, error) {
+// load đọc kỳ + sự kiện + bài nộp cuối + rà soát + ảnh chụp trong tx; now dùng chiếu "Trễ hạn".
+func load(ctx context.Context, tx pgx.Tx, id uuid.UUID, now time.Time) (*PeriodView, error) {
 	p, err := store.PeriodByID(ctx, tx, id)
 	if err != nil || p == nil {
 		return nil, err
 	}
 	v := &PeriodView{Period: *p}
+	if v.Spec, err = store.SpecOf(ctx, tx, id); err != nil {
+		return nil, err
+	}
 	if v.Events, err = store.Events(ctx, tx, id); err != nil {
 		return nil, err
 	}
 	v.State = domain.StateOf(v.Events)
 	subs, err := store.LatestSubmissions(ctx, tx, id)
+	if err != nil {
+		return nil, err
+	}
+	held, err := store.LatestHeld(ctx, tx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -235,8 +296,12 @@ func load(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*PeriodView, error) {
 	if err != nil {
 		return nil, err
 	}
+	metas, err := store.MetaOf(ctx, tx, sids)
+	if err != nil {
+		return nil, err
+	}
 	for _, u := range p.Units {
-		uv := UnitView{Unit: u}
+		uv := UnitView{Unit: u, Parent: v.Spec.Parent(p.Units, u)}
 		if sb, ok := subs[u]; ok {
 			sb := sb
 			uv.Submission = &sb
@@ -244,8 +309,17 @@ func load(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*PeriodView, error) {
 				r := r
 				uv.Review = &r
 			}
+			if m, ok := metas[sb.ID]; ok {
+				m := m
+				uv.Meta = &m
+			}
 		}
-		uv.Status = domain.SubmissionStatus(uv.Submission != nil, uv.Review)
+		var heldAt *time.Time
+		if h, ok := held[u]; ok {
+			h := h
+			uv.Held, heldAt = &h, &h.EventTime
+		}
+		uv.Status = domain.DisplayStatus(domain.SubmissionStatus(uv.Submission != nil, uv.Review), v.State, u, heldAt, p.DueAt, now)
 		v.Units = append(v.Units, uv)
 	}
 	v.Snapshots, err = store.Snapshots(ctx, tx, id)
@@ -262,17 +336,17 @@ func (s *Service) Period(ctx context.Context, profile string, id uuid.UUID) (Per
 	var v *PeriodView
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
 		var e error
-		v, e = load(ctx, tx, id)
+		v, e = load(ctx, tx, id, s.Clock.Now().UTC())
 		return e
 	})
 	if err != nil {
 		return PeriodView{}, err
 	}
-	if v == nil || v.Period.Profile != profile || !a.canSee(v.Period) {
+	if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
 		return PeriodView{}, port.ErrPeriodNotFound
 	}
 	if !a.scope.All && !a.owns(v.Period) {
-		v.Units = slices.DeleteFunc(v.Units, func(u UnitView) bool { return !a.scope.Allows(u.Unit) })
+		v.Units = slices.DeleteFunc(v.Units, func(u UnitView) bool { return !a.allowsUnit(v.Spec, v.Period.Units, u.Unit) })
 	}
 	return *v, nil
 }
@@ -289,12 +363,21 @@ func (s *Service) Periods(ctx context.Context, profile string, limit int) ([]sto
 	var out []store.Period
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
 		ps, e := store.Periods(ctx, tx, profile, limit)
+		if e != nil {
+			return e
+		}
 		for _, p := range ps {
-			if a.canSee(p) {
+			spec := domain.DefaultSpec()
+			if !a.scope.All && !a.owns(p) {
+				if spec, e = store.SpecOf(ctx, tx, p.ID); e != nil {
+					return e
+				}
+			}
+			if a.canSee(p, spec) {
 				out = append(out, p)
 			}
 		}
-		return e
+		return nil
 	})
 	return out, err
 }
@@ -308,11 +391,49 @@ type SubmissionView struct {
 	Submission store.Submission
 	Status     string
 	Review     *domain.Review
+	Meta       *store.Meta // W11.42
+	Replayed   bool        // nhận lại cùng mã phiên bản (đồng bộ gửi lặp)
+}
+
+// SubmitInput là một lần nộp (W11.42): số liệu, phiên bản người nhập đã thấy (khóa lạc quan), báo không phát sinh,
+// ghi chú (H08), giải trình/lý do trễ (H09), thời điểm ghi offline (bản offline — kỳ đã chốt thì GIỮ "Chờ mở kỳ").
+type SubmitInput struct {
+	ID     *uuid.UUID // mã phiên bản do máy sinh (đồng bộ ngoại tuyến, UUIDv7) — nil = máy chủ sinh
+	Unit   string
+	Values map[string]string
+	// BaseVersion: số phiên bản cuối người nhập đã thấy khi mở bài (0 = chưa có bài). nil = không kiểm (API cũ).
+	BaseVersion *int64
+	NilReport   bool
+	Note        string
+	Explanation string
+	CapturedAt  *time.Time
+	DeviceID    string
 }
 
 // Submit nộp phiên bản mới của bài (cấp lá, đơn vị trong phạm vi): kỳ phải đang nhận bài của đơn vị, số liệu khớp
 // biểu. Lập yêu cầu duyệt ở cap/workflow (rà soát bốn mắt) cùng giao dịch.
 func (s *Service) Submit(ctx context.Context, profile string, periodID uuid.UUID, unit string, values map[string]string, idem string) (SubmissionView, error) {
+	return s.SubmitWith(ctx, profile, periodID, SubmitInput{Unit: unit, Values: values}, idem)
+}
+
+// SubmitOffline nộp bản ghi offline (capturedAt = lúc ghi trên thiết bị): kỳ còn nhận bài của đơn vị → như Submit;
+// kỳ đã chốt với đơn vị → GIỮ bài ở trạng thái "Chờ mở kỳ" (pf_forms.held_submission, CNTS III.3.0 dòng 13), không
+// vào số liệu kỳ, không đổi ảnh chụp; Cấp Tỉnh mở lại kỳ rồi đơn vị nộp lại. Kỳ đã hủy → ErrPeriodCancelled.
+func (s *Service) SubmitOffline(ctx context.Context, profile string, periodID uuid.UUID, unit string, values map[string]string, capturedAt time.Time,
+	idem string) (SubmissionView, error) {
+	if capturedAt.IsZero() {
+		return SubmissionView{}, problem.Validation.WithField("captured_at", "bắt buộc với bản offline")
+	}
+	return s.SubmitWith(ctx, profile, periodID, SubmitInput{Unit: unit, Values: values, CapturedAt: &capturedAt}, idem)
+}
+
+// SubmitWith là Submit đầy đủ (W11.42): khóa lạc quan theo BaseVersion (409 forms.submission_conflict, kèm thời điểm
+// cập nhật của phiên bản mới hơn), báo không phát sinh (trường số = 0), quy tắc nghiệp vụ của bên dùng (Validator),
+// lý do trễ bắt buộc khi profile đòi (RequireLateReason) và máy chủ nhận bài sau hạn (D8 — không theo captured_at của
+// thiết bị). Thông tin phiên bản ghi sổ phụ submission_meta cùng giao dịch (DB kiểm lại base_version = seq − 1, tính
+// late theo giờ máy chủ). in.ID đã ghi (bài nộp hoặc bài
+// giữ) → trả lại bản đã ghi, Replayed (đồng bộ gửi lặp).
+func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.UUID, in SubmitInput, idem string) (SubmissionView, error) {
 	prof, a, err := s.resolve(ctx, profile)
 	if err != nil {
 		return SubmissionView{}, err
@@ -320,12 +441,21 @@ func (s *Service) Submit(ctx context.Context, profile string, periodID uuid.UUID
 	if err := a.need(prof.Leaf(), "nộp bài"); err != nil {
 		return SubmissionView{}, err
 	}
+	unit := in.Unit
 	if !domain.ValidateUnit(unit) {
 		return SubmissionView{}, problem.Validation.WithField("unit", "mã đơn vị không hợp lệ")
 	}
-	if !a.scope.Allows(unit) {
-		return SubmissionView{}, problem.Forbidden.WithDetail("đơn vị " + unit + " ngoài phạm vi")
+	in.Note, in.Explanation = strings.TrimSpace(in.Note), strings.TrimSpace(in.Explanation)
+	if len([]rune(in.Note)) > 1000 {
+		return SubmissionView{}, problem.Validation.WithField("note", "tối đa 1000 ký tự")
 	}
+	if len([]rune(in.Explanation)) > 1000 {
+		return SubmissionView{}, problem.Validation.WithField("explanation", "tối đa 1000 ký tự")
+	}
+	if in.BaseVersion != nil && *in.BaseVersion < 0 {
+		return SubmissionView{}, problem.Validation.WithField("base_version", "≥ 0")
+	}
+	values := in.Values
 	if values == nil {
 		values = map[string]string{}
 	}
@@ -335,15 +465,71 @@ func (s *Service) Submit(ctx context.Context, profile string, periodID uuid.UUID
 		if err := store.Lock(ctx, tx, periodID); err != nil {
 			return err
 		}
-		v, err := load(ctx, tx, periodID)
+		if in.ID != nil {
+			if done, err := s.replayed(ctx, tx, *in.ID, a.ref, &out); err != nil || done {
+				return err
+			}
+		}
+		v, err := load(ctx, tx, periodID, now)
 		if err != nil {
 			return err
 		}
 		if v == nil || v.Period.Profile != profile {
 			return port.ErrPeriodNotFound
 		}
+		if !a.allowsUnit(v.Spec, v.Period.Units, unit) {
+			return problem.Forbidden.WithDetail("đơn vị " + unit + " ngoài phạm vi")
+		}
 		if !slices.Contains(v.Period.Units, unit) {
 			return port.ErrUnitNotInPeriod
+		}
+		if v.State.Status == domain.PeriodCancelled {
+			return port.ErrPeriodCancelled
+		}
+		var t *store.Template
+		check := func() error {
+			var err error
+			if in.NilReport { // điền 0 cho trường số trước khi kiểm bắt buộc
+				tp, err := store.TemplateByID(ctx, tx, v.Period.TemplateID)
+				if err != nil {
+					return err
+				}
+				if tp != nil {
+					if values, err = domain.NilValues(tp.Fields, values); err != nil {
+						var te domain.ErrTemplate
+						errorsAs(err, &te)
+						return port.ErrInvalidValues.WithField(te.Field, te.Msg)
+					}
+				}
+			}
+			if t, err = checkValues(ctx, tx, v.Period.TemplateID, values); err != nil {
+				return err
+			}
+			if vd := s.Validators[profile]; vd != nil {
+				if issues := vd.Validate(ctx, t.Code, values); len(issues) > 0 {
+					p := port.ErrInvalidValues
+					for _, is := range issues {
+						p = p.WithField(is.Field, is.Reason)
+					}
+					return p
+				}
+			}
+			return nil
+		}
+		if in.CapturedAt != nil && v.State.ClosedFor(unit) {
+			if err := check(); err != nil {
+				return err
+			}
+			h := store.Held{ID: ids.New(), PeriodID: periodID, Unit: unit, Values: values, Submitter: a.ref, CapturedAt: *in.CapturedAt, EventTime: now}
+			if in.ID != nil {
+				h.ID = *in.ID
+			}
+			if err := store.InsertHeld(ctx, tx, a.tenant, &h, idemOr(idem, "held")); err != nil {
+				return err
+			}
+			out = SubmissionView{Submission: store.Submission{ID: h.ID, PeriodID: periodID, Unit: unit, Values: values, Submitter: a.ref, EventTime: now},
+				Status: domain.SubAwaitingReopen}
+			return nil
 		}
 		if !v.State.AcceptsUnit(unit) {
 			if v.State.Status == domain.PeriodReopened {
@@ -353,6 +539,14 @@ func (s *Service) Submit(ctx context.Context, profile string, periodID uuid.UUID
 		}
 		i := slices.IndexFunc(v.Units, func(u UnitView) bool { return u.Unit == unit })
 		cur := v.Units[i]
+		var curVersion int64
+		if cur.Submission != nil {
+			curVersion = cur.Submission.Version
+		}
+		if in.BaseVersion != nil && *in.BaseVersion != curVersion {
+			return port.ErrVersionConflict.WithDetail(conflictDetail(cur.Submission)).WithField("base_version",
+				fmt.Sprintf("phiên bản hiện tại %d", curVersion))
+		}
 		var acceptedAt *time.Time
 		if cur.Review != nil && cur.Review.Decision == domain.SubAccepted {
 			acceptedAt = &cur.Review.At
@@ -360,22 +554,28 @@ func (s *Service) Submit(ctx context.Context, profile string, periodID uuid.UUID
 		if !domain.CanResubmit(cur.Status, acceptedAt, v.State) {
 			return port.ErrSubmissionLocked
 		}
-		t, err := store.TemplateByID(ctx, tx, v.Period.TemplateID)
-		if err != nil {
+		if cur.Submission != nil && v.Spec.LimitReached(cur.Submission.Version) {
+			return port.ErrSubmissionLimit.WithDetail(fmt.Sprintf("tối đa %d lần gửi", v.Spec.MaxSubmissions))
+		}
+		if err := check(); err != nil {
 			return err
 		}
-		if t == nil {
-			return port.ErrTemplateNotFound
-		}
-		if err := domain.ValidateValues(t.Fields, values); err != nil {
-			var te domain.ErrTemplate
-			if errorsAs(err, &te) {
-				return port.ErrInvalidValues.WithField(te.Field, te.Msg)
-			}
-			return port.ErrInvalidValues.WithDetail(err.Error())
+		// D8: trễ hạn theo giờ MÁY CHỦ nhận bài (now), kể cả bản offline — captured_at (giờ thiết bị) chỉ lưu để kiểm
+		// toán (submission_meta.captured_at); DB tính late cùng mốc (pf 20261013091503). Bản offline ghi trước hạn nhưng tới sau
+		// hạn cũng phải có lý do trễ: máy nhận 422 forms.late_reason_required, người nhập ghi lý do rồi gửi lại.
+		if prof.RequireLateReason && now.After(v.Period.DueAt) && in.Explanation == "" {
+			return port.ErrLateReason.WithField("explanation", "bắt buộc khi gửi sau hạn "+v.Period.DueAt.In(vnZone).Format("15:04 02/01/2006"))
 		}
 		sb := store.Submission{ID: ids.New(), PeriodID: periodID, Unit: unit, Values: values, Submitter: a.ref, EventTime: now}
+		if in.ID != nil {
+			sb.ID = *in.ID
+		}
 		if err := store.InsertSubmission(ctx, tx, a.tenant, &sb, idemOr(idem, "submission")); err != nil {
+			return err
+		}
+		m := store.Meta{SubmissionID: sb.ID, BaseVersion: curVersion, NilReport: in.NilReport, Note: in.Note, Explanation: in.Explanation,
+			CapturedAt: in.CapturedAt}
+		if err := store.InsertMeta(ctx, tx, a.tenant, &m, a.ref, now, in.DeviceID, idemOr(idem, "meta")); err != nil {
 			return err
 		}
 		if s.Approvals != nil {
@@ -384,10 +584,67 @@ func (s *Service) Submit(ctx context.Context, profile string, periodID uuid.UUID
 				return err
 			}
 		}
-		out = SubmissionView{Submission: sb, Status: domain.SubSubmitted}
-		return nil
+		out = SubmissionView{Submission: sb, Status: domain.SubSubmitted, Meta: &m}
+		// W11.43: quy tắc liên biểu + cảnh báo của bên dùng chạy sau commit (consumer inbox đọc qua port.SubmissionFeed).
+		return enqueueRecorded(ctx, tx, a.tenant, profile, t.Code, sb, m)
 	})
 	return out, classify(err)
+}
+
+// replayed: mã phiên bản id đã ghi (bài nộp hoặc bài giữ) → out = bản đã ghi, done.
+func (s *Service) replayed(ctx context.Context, tx pgx.Tx, id, actorRef uuid.UUID, out *SubmissionView) (bool, error) {
+	sb, err := store.SubmissionByID(ctx, tx, id)
+	if err != nil {
+		return false, err
+	}
+	if sb != nil && sb.Submitter != actorRef {
+		return false, problem.Conflict.WithDetail("mã phiên bản bài nộp đã dùng")
+	}
+	if sb != nil {
+		*out = SubmissionView{Submission: *sb, Status: domain.SubSubmitted, Replayed: true}
+		return true, nil
+	}
+	h, err := store.HeldByID(ctx, tx, id)
+	if err != nil || h == nil {
+		return false, err
+	}
+	if h.Submitter != actorRef {
+		return false, problem.Conflict.WithDetail("mã phiên bản bài nộp đã dùng")
+	}
+	*out = SubmissionView{Submission: store.Submission{ID: h.ID, PeriodID: h.PeriodID, Unit: h.Unit, Values: h.Values, Submitter: h.Submitter,
+		EventTime: h.EventTime}, Status: domain.SubAwaitingReopen, Replayed: true}
+	return true, nil
+}
+
+// vnZone là giờ Việt Nam (hiển thị hạn nộp, thời điểm cập nhật trong thông báo lỗi).
+var vnZone = time.FixedZone("ICT", 7*3600)
+
+// conflictDetail: "Đã có người cập nhật lúc …" (CNTS III.3.0).
+func conflictDetail(cur *store.Submission) string {
+	if cur == nil {
+		return "Bài đã thay đổi — tải bản mới"
+	}
+	return fmt.Sprintf("Đã có người cập nhật lúc %s (phiên bản %d) — tải bản mới rồi sửa lại", cur.EventTime.In(vnZone).Format("15:04 02/01/2006"),
+		cur.Version)
+}
+
+// checkValues đọc phiên bản biểu của kỳ và kiểm số liệu theo nó.
+func checkValues(ctx context.Context, tx pgx.Tx, templateID uuid.UUID, values map[string]string) (*store.Template, error) {
+	t, err := store.TemplateByID(ctx, tx, templateID)
+	if err != nil {
+		return nil, err
+	}
+	if t == nil {
+		return nil, port.ErrTemplateNotFound
+	}
+	if err := domain.ValidateValues(t.Fields, values); err != nil {
+		var te domain.ErrTemplate
+		if errorsAs(err, &te) {
+			return nil, port.ErrInvalidValues.WithField(te.Field, te.Msg)
+		}
+		return nil, port.ErrInvalidValues.WithDetail(err.Error())
+	}
+	return t, nil
 }
 
 // Submissions trả lịch sử phiên bản bài nộp của một đơn vị (mới trước) kèm rà soát.
@@ -395,9 +652,6 @@ func (s *Service) Submissions(ctx context.Context, profile string, periodID uuid
 	_, a, err := s.resolve(ctx, profile)
 	if err != nil {
 		return nil, err
-	}
-	if !a.scope.Allows(unit) {
-		return nil, problem.Forbidden.WithDetail("đơn vị " + unit + " ngoài phạm vi")
 	}
 	var out []SubmissionView
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
@@ -407,6 +661,13 @@ func (s *Service) Submissions(ctx context.Context, profile string, periodID uuid
 		}
 		if p == nil || p.Profile != profile {
 			return port.ErrPeriodNotFound
+		}
+		spec, err := store.SpecOf(ctx, tx, periodID)
+		if err != nil {
+			return err
+		}
+		if !a.allowsUnit(spec, p.Units, unit) {
+			return problem.Forbidden.WithDetail("đơn vị " + unit + " ngoài phạm vi")
 		}
 		subs, err := store.SubmissionHistory(ctx, tx, periodID, unit)
 		if err != nil {
@@ -471,12 +732,15 @@ func (s *Service) Review(ctx context.Context, profile string, submissionID uuid.
 		if err := store.Lock(ctx, tx, sb.PeriodID); err != nil {
 			return err
 		}
-		v, err := load(ctx, tx, sb.PeriodID)
+		v, err := load(ctx, tx, sb.PeriodID, now)
 		if err != nil {
 			return err
 		}
-		if v == nil || v.Period.Profile != profile || !a.scope.Allows(sb.Unit) {
+		if v == nil || v.Period.Profile != profile || !a.allowsUnit(v.Spec, v.Period.Units, sb.Unit) {
 			return port.ErrSubmissionMissing
+		}
+		if v.State.Status == domain.PeriodCancelled {
+			return port.ErrPeriodCancelled
 		}
 		if v.State.Status == domain.PeriodClosed {
 			return port.ErrPeriodClosed
@@ -488,6 +752,10 @@ func (s *Service) Review(ctx context.Context, profile string, submissionID uuid.
 		}
 		if cur.Review != nil {
 			return port.ErrAlreadyReviewed
+		}
+		if decision == domain.SubReturned && v.Spec.LimitReached(sb.Version) {
+			// KHTC FN-TI-02.04: lần gửi cuối cho phép thì phiếu tự khóa — không yêu cầu bổ sung được nữa.
+			return port.ErrSubmissionLimit.WithDetail("đã gửi đủ số lần tối đa — chỉ xác nhận được")
 		}
 		if sb.Submitter == a.ref {
 			return problem.SelfApproval.WithDetail("người rà soát trùng người nộp")
@@ -532,15 +800,18 @@ func (s *Service) Close(ctx context.Context, profile string, periodID uuid.UUID,
 		if err := store.Lock(ctx, tx, periodID); err != nil {
 			return err
 		}
-		v, err := load(ctx, tx, periodID)
+		v, err := load(ctx, tx, periodID, now)
 		if err != nil {
 			return err
 		}
-		if v == nil || v.Period.Profile != profile || !a.canSee(v.Period) {
+		if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
 			return port.ErrPeriodNotFound
 		}
 		if !a.canClose(prof.CloseBy, v.Period) {
 			return problem.Forbidden.WithDetail("chốt kỳ cần cấp " + prof.CloseBy + " của Nút phát hành")
+		}
+		if v.State.Status == domain.PeriodCancelled {
+			return port.ErrPeriodCancelled
 		}
 		if v.State.Status == domain.PeriodClosed {
 			return port.ErrPeriodClosed
@@ -576,7 +847,8 @@ func snapshotOf(v *PeriodView, now time.Time, mode string) domain.Snapshot {
 		TemplateVersion: v.Period.TemplateVersion, SnapshotNo: int64(v.State.Closes + 1), ClosedAt: now.Format(time.RFC3339Nano), Mode: mode,
 		Units: []domain.UnitSnapshot{}}
 	for _, u := range v.Units {
-		us := domain.UnitSnapshot{Unit: u.Unit, Status: u.Status, Values: map[string]string{}}
+		us := domain.UnitSnapshot{Unit: u.Unit, Status: domain.SubmissionStatus(u.Submission != nil, u.Review), ClosedStatus: domain.ClosedStatus(u.Status),
+			Values: map[string]string{}}
 		if u.Submission != nil {
 			id, by := u.Submission.ID.String(), u.Submission.Submitter.String()
 			us.SubmissionID, us.Version, us.Values, us.SubmittedBy = &id, u.Submission.Version, u.Submission.Values, &by
@@ -584,6 +856,9 @@ func snapshotOf(v *PeriodView, now time.Time, mode string) domain.Snapshot {
 		if u.Review != nil {
 			by := u.Review.Reviewer.String()
 			us.ReviewedBy = &by
+		}
+		if u.Meta != nil {
+			us.NilReport, us.Late = u.Meta.NilReport, u.Meta.Late
 		}
 		snap.Units = append(snap.Units, us)
 	}
@@ -611,15 +886,18 @@ func (s *Service) Reopen(ctx context.Context, profile string, periodID uuid.UUID
 		if err := store.Lock(ctx, tx, periodID); err != nil {
 			return err
 		}
-		v, err := load(ctx, tx, periodID)
+		v, err := load(ctx, tx, periodID, now)
 		if err != nil {
 			return err
 		}
-		if v == nil || v.Period.Profile != profile || !a.canSee(v.Period) {
+		if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
 			return port.ErrPeriodNotFound
 		}
 		if !a.canClose(prof.CloseBy, v.Period) {
 			return problem.Forbidden.WithDetail("mở lại kỳ cần cấp " + prof.CloseBy + " của Nút phát hành")
+		}
+		if v.State.Status == domain.PeriodCancelled {
+			return port.ErrPeriodCancelled
 		}
 		if v.State.Status != domain.PeriodClosed {
 			return port.ErrPeriodNotClosed
@@ -631,6 +909,48 @@ func (s *Service) Reopen(ctx context.Context, profile string, periodID uuid.UUID
 		}
 		ev := domain.Event{ID: ids.New(), Action: "reopened", Mode: port.ModeManual, Units: in.Units, Reason: why, Actor: a.ref, At: now}
 		return store.InsertEvent(ctx, tx, a.tenant, periodID, profile, &ev, idemOr(idem, "reopened"))
+	})
+	if err != nil {
+		return PeriodView{}, classify(err)
+	}
+	return s.Period(ctx, profile, periodID)
+}
+
+// Cancel hủy kỳ đang mở (KHTC BR-DL-18, W11.05): cấp close_by của Nút phát hành, lý do bắt buộc. Kỳ đã hủy là trạng
+// thái cuối — không nộp, rà soát, chốt hay mở lại; số liệu đã gửi giữ trong sổ nhưng không vào ảnh chụp (kỳ hủy không
+// có ảnh chụp mới). Kỳ đã chốt không hủy được (mở lại trước — khớp trg_transition).
+func (s *Service) Cancel(ctx context.Context, profile string, periodID uuid.UUID, reason, idem string) (PeriodView, error) {
+	prof, a, err := s.resolve(ctx, profile)
+	if err != nil {
+		return PeriodView{}, err
+	}
+	why, ok := domain.Reason(reason)
+	if !ok {
+		return PeriodView{}, problem.Validation.WithField("reason", "bắt buộc, 10–500 ký tự")
+	}
+	now := s.Clock.Now().UTC()
+	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
+		if err := store.Lock(ctx, tx, periodID); err != nil {
+			return err
+		}
+		v, err := load(ctx, tx, periodID, now)
+		if err != nil {
+			return err
+		}
+		if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
+			return port.ErrPeriodNotFound
+		}
+		if !a.canClose(prof.CloseBy, v.Period) {
+			return problem.Forbidden.WithDetail("hủy kỳ cần cấp " + prof.CloseBy + " của Nút phát hành")
+		}
+		switch v.State.Status {
+		case domain.PeriodCancelled:
+			return port.ErrPeriodCancelled
+		case domain.PeriodClosed:
+			return port.ErrPeriodClosed
+		}
+		ev := domain.Event{ID: ids.New(), Action: port.ActionCancelled, Mode: port.ModeManual, Reason: why, Actor: a.ref, At: now}
+		return store.InsertEvent(ctx, tx, a.tenant, periodID, profile, &ev, idemOr(idem, "cancelled"))
 	})
 	if err != nil {
 		return PeriodView{}, classify(err)
@@ -655,7 +975,17 @@ func (s *Service) Snapshot(ctx context.Context, profile string, id uuid.UUID) (s
 		if err != nil {
 			return err
 		}
-		if (p != nil && a.canSee(*p)) || (p == nil && a.level != "" && a.level != prof.Leaf()) {
+		if p != nil {
+			spec, err := store.SpecOf(ctx, tx, p.ID)
+			if err != nil {
+				return err
+			}
+			if a.canSee(*p, spec) {
+				out = snap
+			}
+			return nil
+		}
+		if a.level != "" && a.level != prof.Leaf() {
 			out = snap
 		}
 		return nil
@@ -682,8 +1012,14 @@ func (s *Service) Snapshots(ctx context.Context, profile string, periodRef uuid.
 		if err != nil {
 			return err
 		}
-		if p != nil && (p.Profile != profile || !a.canSee(*p)) {
-			return port.ErrPeriodNotFound
+		if p != nil {
+			spec, err := store.SpecOf(ctx, tx, p.ID)
+			if err != nil {
+				return err
+			}
+			if p.Profile != profile || !a.canSee(*p, spec) {
+				return port.ErrPeriodNotFound
+			}
 		}
 		if p == nil && (a.level == "" || a.level == prof.Leaf()) {
 			return problem.Forbidden.WithDetail("ảnh chụp kỳ ghi song song cần cấp trên cấp lá")
@@ -697,6 +1033,14 @@ func (s *Service) Snapshots(ctx context.Context, profile string, periodRef uuid.
 		return err
 	})
 	return out, err
+}
+
+// enqueueRecorded ghi sự kiện pf.forms.submission.recorded vào outbox trong giao dịch nộp bài (W11.43).
+func enqueueRecorded(ctx context.Context, tx pgx.Tx, tid uuid.UUID, profile, code string, sb store.Submission, m store.Meta) error {
+	return outbox.Enqueue(ctx, tx, outbox.Event{ID: ids.New(), TenantID: tid, Type: port.EventSubmissionRecorded, SchemaVersion: 1,
+		OccurredAt: sb.EventTime, Producer: port.EventProducerName, Payload: port.SubmissionRecordedV1{SubmissionID: sb.ID.String(),
+			PeriodRef: sb.PeriodID.String(), Profile: profile, TemplateCode: code, Unit: sb.Unit, Version: sb.Version, NilReport: m.NilReport,
+			Late: m.Late, ActorRef: sb.Submitter.String(), EventTime: sb.EventTime.Format(time.RFC3339Nano)}})
 }
 
 // enqueueClosed ghi sự kiện pf.forms.period.closed vào outbox trong giao dịch tx.

@@ -22,7 +22,7 @@ const MaxClockSkew = 5 * time.Minute
 // RuleVersion của sổ truy cập pf_files.access_log.
 const RuleVersion = "evidence.access/v1"
 
-// Purposes là mục đích được phép đọc tệp minh chứng (R-42).
+// Purposes là các mục đích minh chứng có sẵn. Mục đích riêng do module chủ đăng ký.
 var Purposes = map[string]bool{string(client.PurposeMRVEvidence): true, string(client.PurposeFieldSupport): true}
 
 // Thao tác và kết quả quyết định mở tệp ghi vào sổ truy cập (CHECK của pf_files.access_log, pf 000123).
@@ -40,6 +40,10 @@ const (
 var contentTypes = map[string]bool{
 	"image/jpeg": true, "image/png": true, "image/webp": true, "image/heic": true,
 	"application/pdf": true, "video/mp4": true,
+	// W11.24 (pf/hrm FN-14): tài liệu nhân sự Word/Excel.
+	"application/msword": true, "application/vnd.ms-excel": true,
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":       true,
 }
 
 var (

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -99,7 +100,7 @@ func TripDocuments(ctx context.Context, tx pgx.Tx, trip uuid.UUID) ([]TripDocume
 
 // TripDocumentByIdem đọc chứng từ theo idem_key; nil nếu chưa có.
 func TripDocumentByIdem(ctx context.Context, tx pgx.Tx, key string) (*TripDocument, error) {
-	rows, err := tx.Query(ctx, "SELECT "+tripDocCols+" FROM mkg_logistics.trip_document WHERE idem_key = $1", key)
+	rows, err := tx.Query(ctx, "SELECT "+tripDocCols+" FROM mkg_logistics.trip_document WHERE idem_key = $1"+ledger.NewestByIdem(""), key)
 	if err != nil {
 		return nil, err
 	}

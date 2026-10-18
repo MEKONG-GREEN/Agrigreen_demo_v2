@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-NOTIFY-PRICE-B: Xóa legacy/chuyển chín Kind; pure/static/full9PG đạt,8golden giữ nguyên, chờhelper9/remote.

@@ -1,0 +1,481 @@
+paths:
+# @ag-order: 156
+  /v1/waterway/segments:
+    post:
+      summary: Vẽ mới tuyến sông/kênh (kể cả nhánh rẽ) — GIS US-WATER-02, BR-39
+      description: |
+        Vai waterway_editor. Chiều dài do hệ thống tính (geodesic) — `length_m` gửi lên bị bỏ qua (AC-1).
+        Thiếu tên/phân loại hoặc số đo ≤ 0/sai định dạng → 422 với thông báo AC-2. Tuyến `draft` không bao giờ vào đồ thị.
+      operationId: createWaterwaySegment
+      tags: [waterway]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/WaterwaySegmentInput"}
+      responses:
+        "201":
+          description: Bản sửa số 1 đã ghi
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WaterwaySegment"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Bản hiện hành của các đoạn (kể cả nháp) — vai waterway_editor, waterway_publisher hoặc platform_admin
+      operationId: listWaterwaySegments
+      tags: [waterway]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [draft, confirmed, retired]}}
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang (theo segment_ref)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/WaterwaySegment"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 157
+  /v1/waterway/segments/{ref}:
+    get:
+      summary: Một đoạn — bản hiện hành và toàn bộ lịch sử sửa
+      operationId: getWaterwaySegment
+      tags: [waterway]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Đoạn
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [head, history]
+                properties:
+                  head: {$ref: "#/components/schemas/WaterwaySegment"}
+                  history: {type: array, items: {$ref: "#/components/schemas/WaterwaySegment"}}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 158
+  /v1/waterway/segments/{ref}/revisions:
+    post:
+      summary: Sửa tuyến (kéo/thêm/xóa điểm, thuộc tính, xác nhận, ngừng dùng) — GIS US-WATER-03, BR-40
+      description: |
+        Bản ghi bù (RB-1): thay toàn bộ nội dung, trỏ về bản trước, bắt buộc `reason` và `expected_revision` = số sửa hiện hành
+        (khác → 409 waterway.revision_conflict). Thay đổi vào lớp bản đồ dùng chung sau khi dựng và phát hành phiên bản mạng mới.
+      operationId: reviseWaterwaySegment
+      tags: [waterway]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/WaterwaySegmentInput"
+                - $ref: "#/components/schemas/WaterwayRevision"
+      responses:
+        "201":
+          description: Bản sửa mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WaterwaySegment"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 159
+  /v1/waterway/structures:
+    post:
+      summary: Ghi công trình vượt sông (cầu, cống, âu thuyền, đường dây điện) gắn với một đoạn
+      description: Vai waterway_editor. Vị trí phải cách tuyến ≤ waterway.structure_max_offset_m (mặc định 500 m).
+      operationId: createWaterwayStructure
+      tags: [waterway]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/WaterwayStructureInput"}
+      responses:
+        "201":
+          description: Công trình đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WaterwayStructure"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Bản hiện hành của công trình, lọc theo đoạn
+      operationId: listWaterwayStructures
+      tags: [waterway]
+      parameters:
+        - {name: segment_ref, in: query, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/WaterwayStructure"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 160
+  /v1/waterway/structures/{ref}/revisions:
+    post:
+      summary: Sửa công trình (bản ghi bù; ngừng dùng = status retired)
+      operationId: reviseWaterwayStructure
+      tags: [waterway]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/WaterwayStructureInput"
+                - $ref: "#/components/schemas/WaterwayRevision"
+      responses:
+        "201":
+          description: Bản sửa mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WaterwayStructure"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 161
+  /v1/waterway/networks/builds:
+    post:
+      summary: Yêu cầu dựng phiên bản mạng (R-52 — 202 + job, worker dựng)
+      description: |
+        Vai waterway_editor. Tham số dựng (snap 25 m, nối tự động 150 m, báo cáo 1 km, nối chữ T 20 m, biên an toàn,
+        lớp phương tiện) chốt lúc yêu cầu; worker dựng từ các đoạn ĐÃ XÁC NHẬN tại `requested_at` — tất định.
+        Tập đoạn trùng một phiên bản built/published → job hoàn tất với `reused = true`, không tạo phiên bản mới.
+      operationId: requestWaterwayBuild
+      tags: [waterway]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: Job đã nhận
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WaterwayBuild"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 162
+  /v1/waterway/networks/builds/{id}:
+    get:
+      summary: Trạng thái job dựng
+      operationId: getWaterwayBuild
+      tags: [waterway]
+      parameters:
+        - $ref: "#/components/parameters/VersionID"
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WaterwayBuild"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 163
+  /v1/waterway/networks:
+    get:
+      summary: Phiên bản mạng, mới → cũ
+      operationId: listWaterwayNetworks
+      tags: [waterway]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/WaterwayNetworkVersion"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 164
+  /v1/waterway/networks/{version}:
+    get:
+      summary: Một phiên bản mạng
+      operationId: getWaterwayNetwork
+      tags: [waterway]
+      parameters:
+        - {name: version, in: path, required: true, schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WaterwayNetworkVersion"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 165
+  /v1/waterway/networks/{version}/publish:
+    post:
+      summary: Phát hành phiên bản mạng — vai waterway_publisher, KHÁC người dựng (R-56)
+      description: |
+        Phiên bản đang phát hành chuyển sang `superseded` (giữ nguyên, vẫn định tuyến được khi ghim `version`);
+        chỉ một phiên bản có hiệu lực. Phát sự kiện pf.waterway.network.published.
+      operationId: publishWaterwayNetwork
+      tags: [waterway]
+      parameters:
+        - {name: version, in: path, required: true, schema: {type: integer, minimum: 1}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Phiên bản đã phát hành
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WaterwayNetworkVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+# @ag-order: 166
+  /v1/waterway/networks/{version}/findings:
+    get:
+      summary: Phát hiện khi dựng (giao cắt, nối chữ T, khe hở đã nối/chỉ báo cáo, đầu treo, tuyến cô lập)
+      operationId: listWaterwayFindings
+      tags: [waterway]
+      parameters:
+        - {name: version, in: path, required: true, schema: {type: integer, minimum: 1}}
+        - {name: kind, in: query, schema: {type: string, enum: [crossing, t_join, gap_joined, gap_reported, dangling, isolated]}}
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang (theo id)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/WaterwayFinding"}}
+                  next_cursor: {type: [string, "null"]}
+        "404": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/waterway ---
+
+  # --- pf/cropcycle: soạn / phát hành SOP (HTX US-CAT-01, US-CAT-03), dựng lại bảng chiếu ---
+components:
+  schemas:
+# @ag-order: 337
+    WaterwayLineString:
+      type: object
+      required: [type, coordinates]
+      description: GeoJSON LineString WGS84 [kinh độ, vĩ độ], ≥ 2 đỉnh phân biệt
+      properties:
+        type: {type: string, enum: [LineString]}
+        coordinates:
+          type: array
+          minItems: 2
+          items: {type: array, minItems: 2, maxItems: 2, items: {type: number}}
+# @ag-order: 338
+    WaterwayLocation:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: {type: number, minimum: -90, maximum: 90}
+        lng: {type: number, minimum: -180, maximum: 180}
+# @ag-order: 339
+    WaterwayMeasure:
+      description: Số thập phân > 0 (chuỗi hoặc số); null = chưa khai báo
+      oneOf:
+        - {type: string, pattern: "^[0-9]+(\\.[0-9]+)?$"}
+        - {type: number}
+        - {type: "null"}
+# @ag-order: 340
+    WaterwaySegmentInput:
+      type: object
+      required: [name, waterway_class, geometry]
+      properties:
+        name: {type: string, maxLength: 200}
+        waterway_class: {type: string, enum: [kenh_chinh, noi_dong, muong, song], description: "GIS BR-35 + sông"}
+        status: {type: string, enum: [draft, confirmed, retired], default: draft}
+        geometry: {$ref: "#/components/schemas/WaterwayLineString"}
+        width_m: {$ref: "#/components/schemas/WaterwayMeasure"}
+        depth_m: {$ref: "#/components/schemas/WaterwayMeasure"}
+        max_load_tons: {$ref: "#/components/schemas/WaterwayMeasure"}
+        data_source: {type: string, enum: [digitised, official, survey, osm], default: digitised}
+        note: {type: [string, "null"], maxLength: 1000}
+        event_time: {type: string, format: date-time}
+# @ag-order: 341
+    WaterwayRevision:
+      type: object
+      required: [expected_revision, reason]
+      properties:
+        expected_revision: {type: integer, minimum: 1, description: "Số sửa hiện hành mà bản sửa dựa vào"}
+        reason: {type: string, minLength: 5, maxLength: 500}
+# @ag-order: 342
+    WaterwaySegment:
+      type: object
+      required: [segment_ref, id, revision, name, waterway_class, status, geometry, length_m, width_m, depth_m, max_load_tons, data_source, note, event_time, recorded_at, supersedes_id, correction_reason, actor_ref, seq]
+      properties:
+        segment_ref: {type: string, format: uuid}
+        id: {type: string, format: uuid, description: "id của bản sửa"}
+        revision: {type: integer}
+        name: {type: string}
+        waterway_class: {type: string, enum: [kenh_chinh, noi_dong, muong, song]}
+        status: {type: string, enum: [draft, confirmed, retired]}
+        geometry: {$ref: "#/components/schemas/WaterwayLineString"}
+        length_m: {type: string, description: "Geodesic, CSDL tính (US-WATER-02 AC-1)"}
+        width_m: {type: [string, "null"]}
+        depth_m: {type: [string, "null"], description: "Độ sâu khống chế mùa khô"}
+        max_load_tons: {type: [string, "null"], description: "Tải trọng khai báo"}
+        data_source: {type: string}
+        note: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        seq: {type: integer}
+# @ag-order: 343
+    WaterwayStructureInput:
+      type: object
+      required: [kind, name, segment_ref, location]
+      properties:
+        kind: {type: string, enum: [cau, cong, au_thuyen, duong_day_dien]}
+        name: {type: string, maxLength: 200}
+        status: {type: string, enum: [active, retired], default: active}
+        segment_ref: {type: string, format: uuid}
+        location: {$ref: "#/components/schemas/WaterwayLocation"}
+        clearance_height_m: {$ref: "#/components/schemas/WaterwayMeasure"}
+        clearance_width_m: {$ref: "#/components/schemas/WaterwayMeasure"}
+        depth_m: {$ref: "#/components/schemas/WaterwayMeasure"}
+        survey_date: {type: string, format: date}
+        data_source: {type: string, enum: [digitised, official, survey, osm], default: survey}
+        note: {type: [string, "null"], maxLength: 1000}
+        event_time: {type: string, format: date-time}
+# @ag-order: 344
+    WaterwayStructure:
+      type: object
+      required: [structure_ref, id, revision, kind, name, status, segment_ref, location, clearance_height_m, clearance_width_m, depth_m, survey_date, data_source, note, event_time, recorded_at, supersedes_id, correction_reason, actor_ref]
+      properties:
+        structure_ref: {type: string, format: uuid}
+        id: {type: string, format: uuid}
+        revision: {type: integer}
+        kind: {type: string, enum: [cau, cong, au_thuyen, duong_day_dien]}
+        name: {type: string}
+        status: {type: string, enum: [active, retired]}
+        segment_ref: {type: string, format: uuid}
+        location: {$ref: "#/components/schemas/WaterwayLocation"}
+        clearance_height_m: {type: [string, "null"]}
+        clearance_width_m: {type: [string, "null"]}
+        depth_m: {type: [string, "null"]}
+        survey_date: {type: [string, "null"], format: date}
+        data_source: {type: string}
+        note: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+# @ag-order: 345
+    WaterwayBuildParams:
+      type: object
+      description: Ảnh chụp tham số dựng (số thập phân dạng chuỗi)
+      properties:
+        tolerances:
+          type: object
+          properties:
+            snap_m: {type: string}
+            auto_join_max_m: {type: string}
+            report_gap_max_m: {type: string}
+            on_segment_m: {type: string}
+        safety:
+          type: object
+          properties:
+            width_factor: {type: string}
+            under_keel_m: {type: string}
+            air_gap_m: {type: string}
+        vessels:
+          type: array
+          items:
+            type: object
+            properties:
+              code: {type: string}
+              tons: {type: string}
+              beam_m: {type: string}
+              draft_m: {type: string}
+              air_draft_m: {type: string}
+# @ag-order: 346
+    WaterwayBuild:
+      type: object
+      required: [id, status, requested_by, requested_at, network_version_no, reused, error_code, completed_at, params]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [queued, completed, failed]}
+        requested_by: {type: string, format: uuid}
+        requested_at: {type: string, format: date-time, description: "Mốc as_of của sổ đoạn/công trình"}
+        network_version_no: {type: [integer, "null"]}
+        reused: {type: [boolean, "null"]}
+        error_code: {type: [string, "null"]}
+        completed_at: {type: [string, "null"], format: date-time}
+        params: {$ref: "#/components/schemas/WaterwayBuildParams"}
+# @ag-order: 347
+    WaterwayNetworkVersion:
+      type: object
+      required: [id, version_no, status, segment_set_sha256, graph_sha256, rule_version, as_of, segment_count, structure_count, vertex_count, edge_count, component_count, finding_count, build_id, built_by, built_at, published_by, published_at, effective_from, superseded_at, params]
+      properties:
+        id: {type: string, format: uuid}
+        version_no: {type: integer}
+        status: {type: string, enum: [built, published, superseded]}
+        segment_set_sha256: {type: string}
+        graph_sha256: {type: string}
+        rule_version: {type: string}
+        as_of: {type: string, format: date-time}
+        segment_count: {type: integer}
+        structure_count: {type: integer}
+        vertex_count: {type: integer}
+        edge_count: {type: integer}
+        component_count: {type: integer}
+        finding_count: {type: integer}
+        build_id: {type: string, format: uuid}
+        built_by: {type: string, format: uuid}
+        built_at: {type: string, format: date-time}
+        published_by: {type: [string, "null"], format: uuid}
+        published_at: {type: [string, "null"], format: date-time}
+        effective_from: {type: [string, "null"], format: date-time}
+        superseded_at: {type: [string, "null"], format: date-time}
+        params: {$ref: "#/components/schemas/WaterwayBuildParams"}
+# @ag-order: 348
+    WaterwayFinding:
+      type: object
+      required: [id, kind, segment_refs, location, gap_m, auto_fixed, message]
+      properties:
+        id: {type: integer}
+        kind: {type: string, enum: [crossing, t_join, gap_joined, gap_reported, dangling, isolated]}
+        segment_refs: {type: array, items: {type: string, format: uuid}}
+        location: {$ref: "#/components/schemas/WaterwayLocation"}
+        gap_m: {type: [string, "null"]}
+        auto_fixed: {type: boolean}
+        message: {type: string}
+    # --- hết pf/waterway ---
+
+    # --- pf/cropcycle ---

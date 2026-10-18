@@ -14,13 +14,13 @@ import { uuidv7 } from "../idempotency";
 import type { DepartmentRef, KnMenu, KnMenuGroup, KnMenuItem, KnRole, MenuTree, RoleAssignment, SessionContext } from "@/kn/contract";
 import { fromKnMenu } from "@/kn/menuAdapter";
 import { json, problem, type Route } from "./http";
-import { findKnAccount, findKnAccountByIdentifier, KN_DEPARTMENTS, KN_MENU_PROFILE, knPersona, MOCK_KN_PASSWORD, type MockKnAccount } from "./kn-accounts";
+import { findKnAccount, findKnAccountByIdentifier, findKnDepartment, KN_DEPARTMENTS, KN_MENU_PROFILE, knPersona, MOCK_KN_PASSWORD, type KnMenuProfile, type MockKnAccount } from "./kn-accounts";
 import type { MockPersona } from "./personas";
 import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v2";
+export const MENU_VERSION = "kn.menu/v4";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -39,14 +39,7 @@ export const DEFAULT_ROUTE: Record<KnRole, string> = {
 const ADHOC_FORMS: Record<string, boolean> = { trong_trot: false };
 
 // Khóa số đếm (domain.Badge*).
-const B = {
-  tasksTodo: "extension.report_tasks.todo",
-  notSubmitted: "extension.report_status.not_submitted",
-  reviewPending: "extension.submissions.pending_review",
-  schedules: WORK_SCHEDULE_BADGE,
-  adHocTodo: "extension.report_tasks.ad_hoc_todo",
-  adHocStatus: "extension.report_status.ad_hoc_pending",
-} as const;
+
 
 interface Item {
   key: string;
@@ -56,6 +49,8 @@ interface Item {
   badge?: string;
   /** Chỉ hiện khi có mẫu "đột xuất" (MenuRequirement). */
   adHoc?: boolean;
+  /** Module chưa có: hiện mờ "Sắp có" (domain.MenuItem.ComingSoon, kn.menu/v3). */
+  soon?: boolean;
   children?: Item[];
 }
 interface Group {
@@ -64,149 +59,1195 @@ interface Group {
   items: Item[];
 }
 
-const BC_KY = (p: "tw" | "xa"): Item[] => [
-  { key: `${p}.bao_cao.tuan`, label: "Báo cáo tuần", route: "/kn/bao-cao/tuan", icon: "file" },
-  { key: `${p}.bao_cao.thang`, label: "Báo cáo tháng", route: "/kn/bao-cao/thang", icon: "calendar" },
-  { key: `${p}.bao_cao.hang_vu`, label: "Báo cáo hàng vụ", route: "/kn/bao-cao/vu", icon: "sprout" },
-];
-
-/** Bộ menu Phòng Trồng trọt (domain.trongTrotMenus). */
+// BEGIN GENERATED WEB MENU
 const TRONG_TROT: Record<Exclude<KnRole, "admin">, Group[]> = {
-  kn_tw: [
-    { key: "dieu_hanh", label: "Điều hành", items: [{ key: "tw.dashboard", label: "Dashboard", route: "/kn/dashboard", icon: "dashboard" }] },
-    { key: "bao_cao", label: "Báo cáo", items: [...BC_KY("tw"), { key: "tw.bao_cao.nam", label: "Báo cáo năm", route: "/kn/bao-cao/nam", icon: "chart" }] },
-  ],
-  kn_tinh: [
+  "kn_tinh": [
     {
-      key: "dieu_hanh",
-      label: "Điều hành",
-      items: [
-        { key: "tinh.dashboard", label: "Dashboard", route: "/kn/dashboard", icon: "dashboard" },
+      "key": "dieu_hanh",
+      "label": "Điều hành",
+      "items": [
         {
-          key: "tinh.nhiem_vu",
-          label: "Nhiệm vụ",
-          icon: "task",
-          children: [
-            { key: "tinh.nhiem_vu.phat_hanh", label: "Phát hành biểu mẫu", route: "/kn/nhiem-vu/phat-hanh", icon: "send" },
-            { key: "tinh.nhiem_vu.trang_thai_nop", label: "Trạng thái nộp", route: "/kn/nhiem-vu/trang-thai-nop", icon: "bell", badge: B.notSubmitted },
-            { key: "tinh.nhiem_vu.ra_soat", label: "Rà soát & chốt kỳ", route: "/kn/nhiem-vu/ra-soat", icon: "check", badge: B.reviewPending },
-            { key: "tinh.nhiem_vu.lich_cong_tac", label: "Lịch công tác", route: WORK_SCHEDULE_ROUTE, icon: "calendar", badge: B.schedules },
-          ],
+          "key": "tinh.dashboard",
+          "label": "Dashboard",
+          "route": "/kn/dashboard",
+          "icon": "dashboard"
         },
-      ],
-    },
-    {
-      key: "bao_cao",
-      label: "Báo cáo",
-      items: [
-        { key: "tinh.bao_cao.tong_hop", label: "Báo cáo tổng hợp các xã", route: "/kn/bao-cao/tong-hop", icon: "layers" },
-        { key: "tinh.bao_cao.chi_cuc", label: "Báo cáo Chi cục", route: "/kn/bao-cao/chi-cuc", icon: "file" },
-        { key: "tinh.bao_cao.dot_xuat", label: "Báo cáo đột xuất", route: "/kn/bao-cao/dot-xuat", icon: "zap", badge: B.adHocStatus, adHoc: true },
-      ],
-    },
-  ],
-  kn_xa: [
-    {
-      key: "dieu_hanh",
-      label: "Điều hành",
-      items: [
         {
-          key: "xa.nhiem_vu",
-          label: "Nhiệm vụ",
-          icon: "task",
-          children: [
-            { key: "xa.nhiem_vu.cong_viec", label: "Công việc cần làm", route: "/kn/nhiem-vu/cong-viec", icon: "bell", badge: B.tasksTodo },
-            { key: "xa.nhiem_vu.lich_cong_tac", label: "Lịch công tác", route: WORK_SCHEDULE_ROUTE, icon: "calendar" },
-          ],
-        },
-      ],
+          "key": "tinh.nhiem_vu",
+          "label": "Nhiệm vụ",
+          "icon": "task",
+          "children": [
+            {
+              "key": "tinh.nhiem_vu.phat_hanh",
+              "label": "Phát hành biểu mẫu",
+              "route": "/kn/nhiem-vu/phat-hanh",
+              "icon": "send"
+            },
+            {
+              "key": "tinh.nhiem_vu.trang_thai_nop",
+              "label": "Trạng thái nộp",
+              "route": "/kn/nhiem-vu/trang-thai-nop",
+              "icon": "bell",
+              "badge": "extension.report_status.not_submitted"
+            },
+            {
+              "key": "tinh.nhiem_vu.ra_soat",
+              "label": "Rà soát & chốt kỳ",
+              "route": "/kn/nhiem-vu/ra-soat",
+              "icon": "check",
+              "badge": "extension.submissions.pending_review"
+            },
+            {
+              "key": "tinh.nhiem_vu.lich_cong_tac",
+              "label": "Lịch công tác",
+              "route": "/kn/nhiem-vu/lich-cong-tac",
+              "icon": "calendar",
+              "badge": "extension.work_schedules.pending"
+            }
+          ]
+        }
+      ]
     },
     {
-      key: "bao_cao",
-      label: "Báo cáo",
-      items: [
-        ...BC_KY("xa"),
-        { key: "xa.bao_cao.cua_xa", label: "Báo cáo của xã", route: "/kn/bao-cao/cua-xa", icon: "chart" },
-        { key: "xa.bao_cao.dot_xuat", label: "Báo cáo đột xuất", route: "/kn/bao-cao/dot-xuat", icon: "zap", badge: B.adHocTodo, adHoc: true },
-      ],
-    },
-    {
-      key: "du_lieu",
-      label: "Dữ liệu",
-      items: [
+      "key": "bao_cao",
+      "label": "Báo cáo",
+      "items": [
         {
-          key: "xa.thu_thap",
-          label: "Thu thập dữ liệu",
-          icon: "database",
-          children: [
-            { key: "xa.thu_thap.htx", label: "Danh sách HTX", route: "/kn/du-lieu/htx", icon: "coop" },
-            { key: "xa.thu_thap.may_moc", label: "Máy móc HTX", route: "/kn/du-lieu/may-moc", icon: "tractor" },
-            { key: "xa.thu_thap.thua", label: "Vẽ thửa ruộng", route: "/kn/du-lieu/ve-thua", icon: "map" },
-            { key: "xa.thu_thap.vat_tu", label: "Vật tư", route: "/kn/du-lieu/vat-tu", icon: "package" },
-          ],
+          "key": "tinh.bao_cao.tong_hop",
+          "label": "Báo cáo tổng hợp các xã",
+          "route": "/kn/bao-cao/tong-hop",
+          "icon": "layers"
         },
-      ],
-    },
+        {
+          "key": "tinh.bao_cao.chi_cuc",
+          "label": "Báo cáo Chi cục",
+          "route": "/kn/bao-cao/chi-cuc",
+          "icon": "file"
+        },
+        {
+          "key": "tinh.bao_cao.dot_xuat",
+          "label": "Báo cáo đột xuất",
+          "route": "/kn/bao-cao/dot-xuat",
+          "icon": "zap",
+          "badge": "extension.report_status.ad_hoc_pending",
+          "adHoc": true
+        }
+      ]
+    }
   ],
+  "kn_tw": [
+    {
+      "key": "dieu_hanh",
+      "label": "Điều hành",
+      "items": [
+        {
+          "key": "tw.dashboard",
+          "label": "Dashboard",
+          "route": "/kn/dashboard",
+          "icon": "dashboard"
+        }
+      ]
+    },
+    {
+      "key": "bao_cao",
+      "label": "Báo cáo",
+      "items": [
+        {
+          "key": "tw.bao_cao.tuan",
+          "label": "Báo cáo tuần",
+          "route": "/kn/bao-cao/tuan",
+          "icon": "file"
+        },
+        {
+          "key": "tw.bao_cao.thang",
+          "label": "Báo cáo tháng",
+          "route": "/kn/bao-cao/thang",
+          "icon": "calendar"
+        },
+        {
+          "key": "tw.bao_cao.hang_vu",
+          "label": "Báo cáo hàng vụ",
+          "route": "/kn/bao-cao/vu",
+          "icon": "sprout"
+        },
+        {
+          "key": "tw.bao_cao.nam",
+          "label": "Báo cáo năm",
+          "route": "/kn/bao-cao/nam",
+          "icon": "chart"
+        }
+      ]
+    }
+  ],
+  "kn_xa": [
+    {
+      "key": "dieu_hanh",
+      "label": "Điều hành",
+      "items": [
+        {
+          "key": "xa.nhiem_vu",
+          "label": "Nhiệm vụ",
+          "icon": "task",
+          "children": [
+            {
+              "key": "xa.nhiem_vu.cong_viec",
+              "label": "Công việc cần làm",
+              "route": "/kn/nhiem-vu/cong-viec",
+              "icon": "bell",
+              "badge": "extension.report_tasks.todo"
+            },
+            {
+              "key": "xa.nhiem_vu.lich_cong_tac",
+              "label": "Lịch công tác",
+              "route": "/kn/nhiem-vu/lich-cong-tac",
+              "icon": "calendar"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "bao_cao",
+      "label": "Báo cáo",
+      "items": [
+        {
+          "key": "xa.bao_cao.tuan",
+          "label": "Báo cáo tuần",
+          "route": "/kn/bao-cao/tuan",
+          "icon": "file"
+        },
+        {
+          "key": "xa.bao_cao.thang",
+          "label": "Báo cáo tháng",
+          "route": "/kn/bao-cao/thang",
+          "icon": "calendar"
+        },
+        {
+          "key": "xa.bao_cao.hang_vu",
+          "label": "Báo cáo hàng vụ",
+          "route": "/kn/bao-cao/vu",
+          "icon": "sprout"
+        },
+        {
+          "key": "xa.bao_cao.cua_xa",
+          "label": "Báo cáo của xã",
+          "route": "/kn/bao-cao/cua-xa",
+          "icon": "chart"
+        },
+        {
+          "key": "xa.bao_cao.dot_xuat",
+          "label": "Báo cáo đột xuất",
+          "route": "/kn/bao-cao/dot-xuat",
+          "icon": "zap",
+          "badge": "extension.report_tasks.ad_hoc_todo",
+          "adHoc": true
+        }
+      ]
+    },
+    {
+      "key": "du_lieu",
+      "label": "Dữ liệu",
+      "items": [
+        {
+          "key": "xa.thu_thap",
+          "label": "Thu thập dữ liệu",
+          "icon": "database",
+          "children": [
+            {
+              "key": "xa.thu_thap.htx",
+              "label": "Danh sách HTX",
+              "route": "/kn/du-lieu/htx",
+              "icon": "coop"
+            },
+            {
+              "key": "xa.thu_thap.may_moc",
+              "label": "Máy móc HTX",
+              "route": "/kn/du-lieu/may-moc",
+              "icon": "tractor"
+            },
+            {
+              "key": "xa.thu_thap.thua",
+              "label": "Vẽ thửa ruộng",
+              "route": "/kn/du-lieu/ve-thua",
+              "icon": "map"
+            },
+            {
+              "key": "xa.thu_thap.vat_tu",
+              "label": "Vật tư",
+              "route": "/kn/du-lieu/vat-tu",
+              "icon": "package"
+            }
+          ]
+        }
+      ]
+    }
+  ]
 };
 
-/** Mục con của phòng ban trong nhóm "Phòng ban" của Admin (domain.adminDeptItems). */
-function adminDeptItems(code: string, profile: "trong_trot" | "generic"): Item[] {
-  const base = `/kn/phong-ban/${code}`;
-  return [
-    { key: "admin.pb.theo_doi_nop", label: "Theo dõi nộp báo cáo", route: `${base}/theo-doi-nop`, icon: "bell" },
-    { key: "admin.pb.tong_hop", label: "Báo cáo tổng hợp các xã", route: `${base}/tong-hop`, icon: "layers" },
-    { key: "admin.pb.du_lieu_bao_cao", label: "Dữ liệu báo cáo các xã", route: `${base}/du-lieu-bao-cao`, icon: "file" },
-    ...(profile === "trong_trot"
-      ? [
-          { key: "admin.pb.thu_thap", label: "Thu thập dữ liệu", route: `${base}/thu-thap`, icon: "database" },
-          // FN-TI-02.07 (P5): Admin xem lịch công tác (chỉ đọc) — cùng màn của Cấp Tỉnh, chưa tách theo phòng ban.
-          { key: "admin.pb.lich_cong_tac", label: "Lịch công tác", route: WORK_SCHEDULE_ROUTE, icon: "calendar" },
-        ]
-      : []),
-    { key: "admin.pb.danh_muc", label: "Danh mục nông nghiệp", route: `${base}/danh-muc`, icon: "package" },
-    // P3b: trình thiết kế mẫu báo cáo dạng lưới Excel (FN-AD-04.06, Hình 27).
-    { key: "admin.pb.mau_bao_cao", label: "Mẫu báo cáo", route: `${base}/mau-bao-cao`, icon: "table" },
-  ];
-}
+const GENERIC: Record<Exclude<KnRole, "admin">, Group[]> = {
+  "kn_tinh": [
+    {
+      "key": "dieu_hanh",
+      "label": "Điều hành",
+      "items": [
+        {
+          "key": "tinh.dashboard",
+          "label": "Dashboard",
+          "route": "/kn/dashboard",
+          "icon": "dashboard"
+        },
+        {
+          "key": "tinh.nhiem_vu",
+          "label": "Nhiệm vụ",
+          "icon": "task",
+          "children": [
+            {
+              "key": "tinh.nhiem_vu.phat_hanh",
+              "label": "Phát hành biểu mẫu",
+              "route": "/kn/nhiem-vu/phat-hanh",
+              "icon": "send"
+            },
+            {
+              "key": "tinh.nhiem_vu.trang_thai_nop",
+              "label": "Trạng thái nộp",
+              "route": "/kn/nhiem-vu/trang-thai-nop",
+              "icon": "bell",
+              "badge": "extension.report_status.not_submitted"
+            },
+            {
+              "key": "tinh.nhiem_vu.ra_soat",
+              "label": "Rà soát & chốt kỳ",
+              "route": "/kn/nhiem-vu/ra-soat",
+              "icon": "check",
+              "badge": "extension.submissions.pending_review"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "bao_cao",
+      "label": "Báo cáo",
+      "items": [
+        {
+          "key": "tinh.bao_cao.tong_hop",
+          "label": "Báo cáo tổng hợp các xã",
+          "route": "/kn/bao-cao/tong-hop",
+          "icon": "layers"
+        },
+        {
+          "key": "tinh.bao_cao.dot_xuat",
+          "label": "Báo cáo đột xuất",
+          "route": "/kn/bao-cao/dot-xuat",
+          "icon": "zap",
+          "badge": "extension.report_status.ad_hoc_pending",
+          "adHoc": true
+        }
+      ]
+    }
+  ],
+  "kn_tw": [
+    {
+      "key": "dieu_hanh",
+      "label": "Điều hành",
+      "items": [
+        {
+          "key": "tw.dashboard",
+          "label": "Dashboard",
+          "route": "/kn/dashboard",
+          "icon": "dashboard"
+        }
+      ]
+    },
+    {
+      "key": "bao_cao",
+      "label": "Báo cáo",
+      "items": [
+        {
+          "key": "tw.bao_cao.tuan",
+          "label": "Báo cáo tuần",
+          "route": "/kn/bao-cao/tuan",
+          "icon": "file"
+        },
+        {
+          "key": "tw.bao_cao.thang",
+          "label": "Báo cáo tháng",
+          "route": "/kn/bao-cao/thang",
+          "icon": "calendar"
+        },
+        {
+          "key": "tw.bao_cao.hang_vu",
+          "label": "Báo cáo hàng vụ",
+          "route": "/kn/bao-cao/vu",
+          "icon": "sprout"
+        },
+        {
+          "key": "tw.bao_cao.nam",
+          "label": "Báo cáo năm",
+          "route": "/kn/bao-cao/nam",
+          "icon": "chart"
+        }
+      ]
+    }
+  ],
+  "kn_xa": [
+    {
+      "key": "dieu_hanh",
+      "label": "Điều hành",
+      "items": [
+        {
+          "key": "xa.nhiem_vu",
+          "label": "Nhiệm vụ",
+          "icon": "task",
+          "children": [
+            {
+              "key": "xa.nhiem_vu.cong_viec",
+              "label": "Công việc cần làm",
+              "route": "/kn/nhiem-vu/cong-viec",
+              "icon": "bell",
+              "badge": "extension.report_tasks.todo"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "bao_cao",
+      "label": "Báo cáo",
+      "items": [
+        {
+          "key": "xa.bao_cao.tuan",
+          "label": "Báo cáo tuần",
+          "route": "/kn/bao-cao/tuan",
+          "icon": "file"
+        },
+        {
+          "key": "xa.bao_cao.thang",
+          "label": "Báo cáo tháng",
+          "route": "/kn/bao-cao/thang",
+          "icon": "calendar"
+        },
+        {
+          "key": "xa.bao_cao.hang_vu",
+          "label": "Báo cáo hàng vụ",
+          "route": "/kn/bao-cao/vu",
+          "icon": "sprout"
+        },
+        {
+          "key": "xa.bao_cao.cua_xa",
+          "label": "Báo cáo của xã",
+          "route": "/kn/bao-cao/cua-xa",
+          "icon": "chart"
+        },
+        {
+          "key": "xa.bao_cao.dot_xuat",
+          "label": "Báo cáo đột xuất",
+          "route": "/kn/bao-cao/dot-xuat",
+          "icon": "zap",
+          "badge": "extension.report_tasks.ad_hoc_todo",
+          "adHoc": true
+        }
+      ]
+    }
+  ]
+};
+
+const SHARED: Group = {
+  "key": "dung_chung",
+  "label": "Dùng chung",
+  "items": [
+    {
+      "key": "chung.contact",
+      "label": "Contact",
+      "route": "/kn/dung-chung/contact",
+      "icon": "phone"
+    }
+  ]
+};
+
+const SHARED_BY_AUDIENCE: Partial<Record<KnRole, Item[]>> = {
+  "kn_tinh": [
+    {
+      "key": "tinh.chung.nhan_su_phong",
+      "label": "Nhân sự của phòng",
+      "route": "/kn/nhan-su/cua-phong",
+      "icon": "users"
+    },
+    {
+      "key": "tinh.chung.dashboard_nhan_su",
+      "label": "Dashboard nhân sự",
+      "route": "/kn/nhan-su/dashboard",
+      "icon": "chart"
+    },
+    {
+      "key": "tinh.chung.tai_lieu_phong",
+      "label": "Tài liệu của phòng",
+      "route": "/kn/nhan-su/tai-lieu-phong",
+      "icon": "library"
+    }
+  ]
+};
+
+const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "admin">, Item[]>>>> = {
+  "chan_nuoi_thuy_san": {
+    "kn_tinh": [
+      {
+        "key": "tinh.cnts.canh_bao",
+        "label": "Cảnh báo",
+        "route": "/kn/cnts/canh-bao",
+        "icon": "zap"
+      },
+      {
+        "key": "tinh.cnts.duyet_bao_cao",
+        "label": "Duyệt báo cáo",
+        "route": "/kn/cnts/duyet-bao-cao",
+        "icon": "approve",
+        "soon": true
+      },
+      {
+        "key": "tinh.cnts.bieu_mau",
+        "label": "Biểu mẫu & cấp quyền",
+        "route": "/kn/cnts/bieu-mau",
+        "icon": "table"
+      },
+      {
+        "key": "tinh.cnts.dich_benh",
+        "label": "Báo cáo dịch bệnh",
+        "route": "/kn/cnts/dich-benh",
+        "icon": "shield"
+      },
+      {
+        "key": "tinh.cnts.ksgm",
+        "label": "KSGM tuần, tháng",
+        "route": "/kn/cnts/ksgm",
+        "icon": "chart"
+      },
+      {
+        "key": "tinh.cnts.phu_luc_2",
+        "label": "Thủy sản (Phụ lục 2)",
+        "route": "/kn/cnts/phu-luc-2",
+        "icon": "report"
+      },
+      {
+        "key": "tinh.cnts.lich",
+        "label": "Lịch trực KSGM",
+        "route": "/kn/cnts/lich-truc",
+        "icon": "calendar"
+      },
+      {
+        "key": "tinh.cnts.lich_tiem",
+        "label": "Lịch tiêm phòng",
+        "route": "/kn/cnts/lich-tiem",
+        "icon": "check"
+      },
+      {
+        "key": "tinh.cnts.lich_cong_tac",
+        "label": "Lịch công tác",
+        "route": "/kn/nhiem-vu/lich-cong-tac",
+        "icon": "calendar",
+        "badge": "extension.work_schedules.pending"
+      },
+      {
+        "key": "tinh.cnts.chien_dich",
+        "label": "Chiến dịch điều tra",
+        "route": "/kn/cnts/chien-dich",
+        "icon": "megaphone",
+        "soon": true
+      },
+      {
+        "key": "tinh.cnts.ban_do_dich",
+        "label": "Bản đồ vùng dịch",
+        "route": "/kn/cnts/ban-do-dich",
+        "icon": "map",
+        "soon": true
+      },
+      {
+        "key": "tinh.cnts.du_an_knqg",
+        "label": "Dự án KNQG / Điểm trình diễn",
+        "route": "/kn/cnts/du-an-knqg",
+        "icon": "report",
+        "soon": true
+      },
+      {
+        "key": "tinh.cnts.quy_trinh",
+        "label": "Quy trình, văn bản",
+        "route": "/kn/cnts/quy-trinh",
+        "icon": "sop",
+        "soon": true
+      },
+      {
+        "key": "tinh.cnts.danh_muc",
+        "label": "Danh mục CNTS",
+        "route": "/kn/cnts/danh-muc",
+        "icon": "catalog"
+      }
+    ],
+    "kn_tw": [
+      {
+        "key": "tw.cnts.du_an_knqg",
+        "label": "Dự án KNQG",
+        "route": "/kn/cnts/du-an-knqg",
+        "icon": "report",
+        "soon": true
+      }
+    ],
+    "kn_xa": [
+      {
+        "key": "xa.cnts.bao_cao_ky",
+        "label": "Báo cáo kỳ CNTS",
+        "route": "/kn/cnts/bao-cao-ky",
+        "icon": "task"
+      },
+      {
+        "key": "xa.cnts.dich_benh",
+        "label": "Báo cáo dịch bệnh",
+        "route": "/kn/cnts/dich-benh",
+        "icon": "shield"
+      },
+      {
+        "key": "xa.cnts.canh_bao",
+        "label": "Cảnh báo",
+        "route": "/kn/cnts/canh-bao",
+        "icon": "zap"
+      },
+      {
+        "key": "xa.cnts.lich",
+        "label": "Lịch trực của tôi",
+        "route": "/kn/cnts/lich-truc",
+        "icon": "calendar"
+      },
+      {
+        "key": "xa.cnts.lich_tiem",
+        "label": "Lịch tiêm",
+        "route": "/kn/cnts/lich-tiem",
+        "icon": "check"
+      },
+      {
+        "key": "xa.cnts.lich_cong_tac",
+        "label": "Lịch công tác",
+        "route": "/kn/nhiem-vu/lich-cong-tac",
+        "icon": "calendar"
+      },
+      {
+        "key": "xa.cnts.nhat_ky",
+        "label": "Hộ mô hình & nhật ký",
+        "route": "/kn/cnts/nhat-ky",
+        "icon": "journal",
+        "soon": true
+      },
+      {
+        "key": "xa.cnts.ban_do_dich",
+        "label": "Bản đồ vùng dịch",
+        "route": "/kn/cnts/ban-do-dich",
+        "icon": "map",
+        "soon": true
+      },
+      {
+        "key": "xa.cnts.diem_trinh_dien",
+        "label": "Điểm trình diễn",
+        "route": "/kn/cnts/du-an-knqg",
+        "icon": "report",
+        "soon": true
+      },
+      {
+        "key": "xa.cnts.quy_trinh",
+        "label": "Quy trình, văn bản",
+        "route": "/kn/cnts/quy-trinh",
+        "icon": "sop",
+        "soon": true
+      }
+    ]
+  },
+  "ke_hoach_tai_chinh": {
+    "kn_tinh": [
+      {
+        "key": "tinh.khtc.ky_bao_cao",
+        "label": "Kỳ báo cáo & phiếu các phòng",
+        "route": "/kn/khtc/ky-bao-cao",
+        "icon": "task"
+      },
+      {
+        "key": "tinh.khtc.ke_hoach_nam",
+        "label": "Kế hoạch năm",
+        "route": "/kn/khtc/ke-hoach-nam",
+        "icon": "calendar"
+      },
+      {
+        "key": "tinh.khtc.so_lieu_ngoai",
+        "label": "Số liệu nguồn ngoài",
+        "route": "/kn/khtc/so-lieu-ngoai",
+        "icon": "database",
+        "soon": true
+      },
+      {
+        "key": "tinh.khtc.mau_bao_cao",
+        "label": "Mẫu báo cáo KHTC",
+        "route": "/kn/khtc/mau-bao-cao",
+        "icon": "table",
+        "soon": true
+      },
+      {
+        "key": "tinh.khtc.tien_do",
+        "label": "Tiến độ các chương trình",
+        "route": "/kn/khtc/tien-do",
+        "icon": "chart"
+      },
+      {
+        "key": "tinh.khtc.da_xuat",
+        "label": "Báo cáo đã xuất",
+        "route": "/kn/khtc/bao-cao-da-xuat",
+        "icon": "report"
+      },
+      {
+        "key": "tinh.khtc.bao_cao",
+        "label": "Soạn báo cáo (Mẫu 1–5)",
+        "route": "/kn/khtc/bao-cao",
+        "icon": "report"
+      }
+    ],
+    "kn_tw": [
+      {
+        "key": "tw.khtc.bao_cao_tinh",
+        "label": "Báo cáo Tỉnh (KHTC)",
+        "route": "/kn/khtc/bao-cao-da-xuat",
+        "icon": "report",
+        "soon": true
+      }
+    ]
+  },
+  "thong_tin_truyen_thong": {
+    "kn_tinh": [
+      {
+        "key": "tinh.bao_gia.tien_do",
+        "label": "Tiến độ nhập giá",
+        "route": "/kn/bao-gia/tien-do",
+        "icon": "bell"
+      },
+      {
+        "key": "tinh.bao_gia.kiem_duyet",
+        "label": "Kiểm duyệt & công bố",
+        "route": "/kn/bao-gia/kiem-duyet",
+        "icon": "approve"
+      },
+      {
+        "key": "tinh.bao_gia.bang_gia",
+        "label": "Bảng giá tổng hợp",
+        "route": "/kn/bao-gia/bang-gia",
+        "icon": "chart"
+      },
+      {
+        "key": "tinh.bao_gia.bien_dong",
+        "label": "Báo cáo biến động giá",
+        "route": "/kn/bao-gia/bien-dong",
+        "icon": "layers"
+      },
+      {
+        "key": "tinh.bao_gia.dashboard",
+        "label": "Dashboard theo vùng",
+        "route": "/kn/bao-gia/dashboard-vung",
+        "icon": "map"
+      },
+      {
+        "key": "tinh.bao_gia.thong_ke",
+        "label": "Thống kê phiếu báo giá",
+        "route": "/kn/bao-gia/thong-ke",
+        "icon": "table"
+      },
+      {
+        "key": "tinh.bao_gia.dieu_tra",
+        "label": "Điều tra giá thành",
+        "route": "/kn/bao-gia/dieu-tra",
+        "icon": "season",
+        "soon": true
+      },
+      {
+        "key": "tinh.bao_gia.mat_hang",
+        "label": "Mặt hàng",
+        "route": "/kn/bao-gia/mat-hang",
+        "icon": "package",
+        "soon": true
+      },
+      {
+        "key": "tinh.bao_gia.cau_hinh",
+        "label": "Cấu hình báo giá",
+        "route": "/kn/bao-gia/cau-hinh",
+        "icon": "param"
+      }
+    ],
+    "kn_tw": [
+      {
+        "key": "tw.bao_gia.bang_gia",
+        "label": "Bảng giá tổng hợp",
+        "route": "/kn/bao-gia/bang-gia",
+        "icon": "chart"
+      },
+      {
+        "key": "tw.bao_gia.dashboard",
+        "label": "Dashboard theo vùng",
+        "route": "/kn/bao-gia/dashboard-vung",
+        "icon": "map"
+      },
+      {
+        "key": "tw.bao_gia.bien_dong",
+        "label": "Báo cáo biến động giá",
+        "route": "/kn/bao-gia/bien-dong",
+        "icon": "layers"
+      },
+      {
+        "key": "tw.bao_gia.gia_thanh",
+        "label": "Giá thành sản xuất",
+        "route": "/kn/bao-gia/gia-thanh",
+        "icon": "report",
+        "soon": true
+      }
+    ],
+    "kn_xa": [
+      {
+        "key": "xa.bao_gia.nhap",
+        "label": "Nhập báo giá",
+        "route": "/kn/bao-gia/nhap",
+        "icon": "upload"
+      },
+      {
+        "key": "xa.bao_gia.xac_minh",
+        "label": "Yêu cầu xác minh",
+        "route": "/kn/bao-gia/xac-minh",
+        "icon": "check"
+      },
+      {
+        "key": "xa.bao_gia.lich_su",
+        "label": "Lịch sử báo giá",
+        "route": "/kn/bao-gia/lich-su",
+        "icon": "journal"
+      },
+      {
+        "key": "xa.bao_gia.bang_gia",
+        "label": "Bảng giá tổng hợp",
+        "route": "/kn/bao-gia/bang-gia",
+        "icon": "chart"
+      },
+      {
+        "key": "xa.bao_gia.bien_dong",
+        "label": "Báo cáo biến động giá",
+        "route": "/kn/bao-gia/bien-dong",
+        "icon": "layers"
+      }
+    ]
+  },
+  "hanh_chinh_tong_hop": {
+    "kn_tinh": [
+      {
+        "key": "tinh.hcth.dashboard",
+        "label": "Dashboard nhân sự",
+        "route": "/kn/nhan-su/dashboard",
+        "icon": "chart"
+      },
+      {
+        "key": "tinh.hcth.ho_so",
+        "label": "Hồ sơ nhân sự",
+        "route": "/kn/nhan-su/ho-so",
+        "icon": "users"
+      },
+      {
+        "key": "tinh.hcth.bao_cao_so",
+        "label": "Biểu mẫu báo cáo Sở",
+        "route": "/kn/nhan-su/bao-cao-so",
+        "icon": "report"
+      },
+      {
+        "key": "tinh.hcth.kho_tai_lieu",
+        "label": "Hồ sơ dữ liệu",
+        "route": "/kn/nhan-su/kho-tai-lieu",
+        "icon": "library"
+      },
+      {
+        "key": "tinh.hcth.danh_gia",
+        "label": "Đánh giá",
+        "route": "/kn/nhan-su/danh-gia",
+        "icon": "approve",
+        "soon": true
+      },
+      {
+        "key": "tinh.hcth.danh_muc",
+        "label": "Danh mục nhân sự",
+        "route": "/kn/nhan-su/danh-muc",
+        "icon": "catalog"
+      }
+    ],
+    "kn_xa": [
+      {
+        "key": "xa.hcth.danh_gia",
+        "label": "Đánh giá của tôi",
+        "route": "/kn/nhan-su/danh-gia-cua-toi",
+        "icon": "approve",
+        "soon": true
+      }
+    ]
+  }
+};
+
+const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
+  "chan_nuoi_thuy_san": [
+    {
+      "key": "admin.pb.cnts_danh_muc",
+      "label": "Danh mục CNTS",
+      "route": "/kn/phong-ban/{department}/danh-muc-cnts",
+      "icon": "catalog"
+    },
+    {
+      "key": "admin.pb.cnts_bieu_ky",
+      "label": "Biểu kỳ Cấp Xã",
+      "route": "/kn/phong-ban/{department}/bieu-ky-cnts",
+      "icon": "table"
+    },
+    {
+      "key": "admin.pb.cnts_lich_truc",
+      "label": "Lịch trực KSGM",
+      "route": "/kn/phong-ban/{department}/lich-truc",
+      "icon": "calendar"
+    },
+    {
+      "key": "admin.pb.cnts_lich_tiem",
+      "label": "Lịch tiêm phòng",
+      "route": "/kn/phong-ban/{department}/lich-tiem",
+      "icon": "check"
+    }
+  ],
+  "ke_hoach_tai_chinh": [
+    {
+      "key": "admin.pb.khtc_ke_hoach",
+      "label": "Kế hoạch năm",
+      "route": "/kn/phong-ban/{department}/ke-hoach-nam",
+      "icon": "calendar"
+    },
+    {
+      "key": "admin.pb.khtc_danh_muc",
+      "label": "Danh mục KHTC",
+      "route": "/kn/phong-ban/{department}/danh-muc-khtc",
+      "icon": "catalog"
+    },
+    {
+      "key": "admin.pb.khtc_bao_cao",
+      "label": "Báo cáo KHTC",
+      "route": "/kn/phong-ban/{department}/bao-cao-khtc",
+      "icon": "report"
+    }
+  ],
+  "thong_tin_truyen_thong": [
+    {
+      "key": "admin.pb.bao_gia_xa",
+      "label": "Xã báo giá",
+      "route": "/kn/bao-gia/xa-bao-gia",
+      "icon": "map"
+    },
+    {
+      "key": "admin.pb.bao_gia_lich",
+      "label": "Kỳ báo giá & giờ khóa",
+      "route": "/kn/phong-ban/{department}/bao-gia-lich",
+      "icon": "calendar"
+    },
+    {
+      "key": "admin.pb.bao_gia_mat_hang",
+      "label": "Mặt hàng",
+      "route": "/kn/bao-gia/mat-hang",
+      "icon": "package",
+      "soon": true
+    }
+  ],
+  "hanh_chinh_tong_hop": [
+    {
+      "key": "admin.pb.hcth_danh_muc",
+      "label": "Danh mục nhân sự",
+      "route": "/kn/phong-ban/{department}/danh-muc-nhan-su",
+      "icon": "catalog"
+    },
+    {
+      "key": "admin.pb.hcth_phan_quyen",
+      "label": "Phân quyền hồ sơ",
+      "route": "/kn/phong-ban/{department}/phan-quyen-ho-so",
+      "icon": "shield"
+    },
+    {
+      "key": "admin.pb.hcth_thu_muc",
+      "label": "Thư mục tài liệu",
+      "route": "/kn/phong-ban/{department}/thu-muc-tai-lieu",
+      "icon": "library"
+    }
+  ]
+};
+
+const ADMIN_DEPT_BASE: Record<string, Item[]> = {
+  "generic": [
+    {
+      "key": "admin.pb.theo_doi_nop",
+      "label": "Theo dõi nộp báo cáo",
+      "route": "/kn/phong-ban/{department}/theo-doi-nop",
+      "icon": "bell"
+    },
+    {
+      "key": "admin.pb.tong_hop",
+      "label": "Báo cáo tổng hợp các xã",
+      "route": "/kn/phong-ban/{department}/tong-hop",
+      "icon": "layers"
+    },
+    {
+      "key": "admin.pb.du_lieu_bao_cao",
+      "label": "Dữ liệu báo cáo các xã",
+      "route": "/kn/phong-ban/{department}/du-lieu-bao-cao",
+      "icon": "file"
+    },
+    {
+      "key": "admin.pb.danh_muc",
+      "label": "Danh mục nông nghiệp",
+      "route": "/kn/phong-ban/{department}/danh-muc",
+      "icon": "package"
+    },
+    {
+      "key": "admin.pb.mau_bao_cao",
+      "label": "Mẫu báo cáo",
+      "route": "/kn/phong-ban/{department}/mau-bao-cao",
+      "icon": "table"
+    }
+  ],
+  "trong_trot": [
+    {
+      "key": "admin.pb.theo_doi_nop",
+      "label": "Theo dõi nộp báo cáo",
+      "route": "/kn/phong-ban/{department}/theo-doi-nop",
+      "icon": "bell"
+    },
+    {
+      "key": "admin.pb.tong_hop",
+      "label": "Báo cáo tổng hợp các xã",
+      "route": "/kn/phong-ban/{department}/tong-hop",
+      "icon": "layers"
+    },
+    {
+      "key": "admin.pb.du_lieu_bao_cao",
+      "label": "Dữ liệu báo cáo các xã",
+      "route": "/kn/phong-ban/{department}/du-lieu-bao-cao",
+      "icon": "file"
+    },
+    {
+      "key": "admin.pb.thu_thap",
+      "label": "Thu thập dữ liệu",
+      "route": "/kn/phong-ban/{department}/thu-thap",
+      "icon": "database"
+    },
+    {
+      "key": "admin.pb.lich_cong_tac",
+      "label": "Lịch công tác",
+      "route": "/kn/nhiem-vu/lich-cong-tac",
+      "icon": "calendar"
+    },
+    {
+      "key": "admin.pb.danh_muc",
+      "label": "Danh mục nông nghiệp",
+      "route": "/kn/phong-ban/{department}/danh-muc",
+      "icon": "package"
+    },
+    {
+      "key": "admin.pb.mau_bao_cao",
+      "label": "Mẫu báo cáo",
+      "route": "/kn/phong-ban/{department}/mau-bao-cao",
+      "icon": "table"
+    }
+  ]
+};
+
+const KHTC_REPORT: Item = {
+  "key": "tinh.bao_cao_khtc",
+  "label": "Báo cáo cho KHTC",
+  "icon": "send",
+  "children": [
+    {
+      "key": "tinh.bao_cao_khtc.phieu_ky_nay",
+      "label": "Phiếu kỳ này",
+      "route": "/kn/bao-cao-khtc",
+      "icon": "task"
+    },
+    {
+      "key": "tinh.bao_cao_khtc.da_gui",
+      "label": "Phiếu đã gửi",
+      "route": "/kn/bao-cao-khtc/da-gui",
+      "icon": "check"
+    },
+    {
+      "key": "tinh.bao_cao_khtc.tien_do",
+      "label": "Tiến độ các CT của phòng",
+      "route": "/kn/bao-cao-khtc/tien-do",
+      "icon": "chart",
+      "soon": true
+    },
+    {
+      "key": "tinh.bao_cao_khtc.da_xuat",
+      "label": "Báo cáo KHTC đã xuất",
+      "route": "/kn/bao-cao-khtc/da-xuat",
+      "icon": "report",
+      "soon": true
+    }
+  ]
+};
+
+const KHTC_REPORT_ADMIN: Item = {
+  "key": "admin.pb.bao_cao_khtc",
+  "label": "Báo cáo cho KHTC",
+  "route": "/kn/phong-ban/{department}/bao-cao-khtc",
+  "icon": "send"
+};
 
 const ADMIN_OVERVIEW: Group = {
-  key: "dieu_hanh",
-  label: "Điều hành",
-  items: [{ key: "admin.tong_quan", label: "Tổng quan hệ thống", route: "/kn/tong-quan", icon: "dashboard" }],
-};
-const ADMIN_SYSTEM: Group = {
-  key: "quan_tri",
-  label: "Quản trị hệ thống",
-  items: [
-    { key: "admin.qt.dvhc", label: "Đơn vị hành chính", route: "/kn/quan-tri/don-vi-hanh-chinh", icon: "map" },
-    { key: "admin.qt.co_cau", label: "Cơ cấu tổ chức 3 cấp", route: "/kn/quan-tri/co-cau-to-chuc", icon: "org" },
-    { key: "admin.qt.phong_ban", label: "Phòng ban", route: "/kn/quan-tri/phong-ban", icon: "building" },
-    { key: "admin.qt.nguoi_dung", label: "Người dùng", route: "/kn/quan-tri/nguoi-dung", icon: "users" },
-    { key: "admin.qt.menu_cac_cap", label: "Menu các cấp", route: "/kn/quan-tri/menu-cac-cap", icon: "key" },
+  "key": "dieu_hanh",
+  "label": "Điều hành",
+  "items": [
     {
-      // Q-13 (tạm, chờ khách): công cụ quản trị nền tảng đã có đặt trong nhóm Quản trị hệ thống.
-      key: "admin.qt.cong_cu",
-      label: "Công cụ nền tảng (tạm)",
-      icon: "param",
-      children: [
-        { key: "admin.qt.cong_cu.tham_so", label: "Tham số & phê duyệt", route: "/quan-tri/tham-so", icon: "param" },
-        { key: "admin.qt.cong_cu.tai_khoan", label: "Tài khoản cán bộ (G1)", route: "/quan-tri/tai-khoan", icon: "user" },
-        { key: "admin.qt.cong_cu.to_chuc", label: "Cây tổ chức (G1)", route: "/quan-tri/to-chuc", icon: "org" },
-        // Màn G1 (mẫu xuất có phiên bản + lịch gửi email) — giữ nguyên, không xóa tính năng.
-        { key: "admin.qt.cong_cu.mau_xuat", label: "Mẫu xuất & lịch gửi", route: "/quan-tri/mau-bao-cao", icon: "report" },
-        { key: "admin.qt.cong_cu.xung_dot", label: "Xung đột đồng bộ", route: "/quan-tri/xung-dot", icon: "conflict" },
-        { key: "admin.qt.cong_cu.giam_sat", label: "Giám sát đồng bộ", route: "/quan-tri/giam-sat-dong-bo", icon: "sync" },
-        { key: "admin.qt.cong_cu.thiet_bi", label: "Đồng bộ thiết bị", route: "/dong-bo", icon: "sync" },
-        // G5: màn Public API / đo lường / nhật ký xuất (tự kiểm vai).
-        { key: "admin.qt.cong_cu.khach_hang_api", label: "Khách hàng Public API", route: "/quan-tri/khach-hang-api", icon: "key" },
-        { key: "admin.qt.cong_cu.su_dung_api", label: "Sử dụng Public API", route: "/quan-tri/su-dung-api", icon: "chart" },
-        { key: "admin.qt.cong_cu.bang_ke", label: "Bảng kê sử dụng", route: "/quan-tri/bang-ke", icon: "report" },
-        { key: "admin.qt.cong_cu.nhat_ky_xuat", label: "Nhật ký xuất dữ liệu", route: "/quan-tri/nhat-ky-xuat", icon: "shield" },
-      ],
-    },
-  ],
+      "key": "admin.tong_quan",
+      "label": "Tổng quan hệ thống",
+      "route": "/kn/tong-quan",
+      "icon": "dashboard"
+    }
+  ]
 };
+
+const ADMIN_SYSTEM: Group = {
+  "key": "quan_tri",
+  "label": "Quản trị hệ thống",
+  "items": [
+    {
+      "key": "admin.qt.dvhc",
+      "label": "Đơn vị hành chính",
+      "route": "/kn/quan-tri/don-vi-hanh-chinh",
+      "icon": "map"
+    },
+    {
+      "key": "admin.qt.co_cau",
+      "label": "Cơ cấu tổ chức 3 cấp",
+      "route": "/kn/quan-tri/co-cau-to-chuc",
+      "icon": "org"
+    },
+    {
+      "key": "admin.qt.phong_ban",
+      "label": "Phòng ban",
+      "route": "/kn/quan-tri/phong-ban",
+      "icon": "building"
+    },
+    {
+      "key": "admin.qt.nguoi_dung",
+      "label": "Người dùng",
+      "route": "/kn/quan-tri/nguoi-dung",
+      "icon": "users"
+    },
+    {
+      "key": "admin.qt.menu_cac_cap",
+      "label": "Menu các cấp",
+      "route": "/kn/quan-tri/menu-cac-cap",
+      "icon": "key"
+    },
+    {
+      "key": "admin.qt.cong_cu",
+      "label": "Công cụ nền tảng (tạm)",
+      "icon": "param",
+      "children": [
+        {
+          "key": "admin.qt.cong_cu.tham_so",
+          "label": "Tham số & phê duyệt",
+          "route": "/quan-tri/tham-so",
+          "icon": "param"
+        },
+        {
+          "key": "admin.qt.cong_cu.tai_khoan",
+          "label": "Tài khoản cán bộ (G1)",
+          "route": "/quan-tri/tai-khoan",
+          "icon": "user"
+        },
+        {
+          "key": "admin.qt.cong_cu.to_chuc",
+          "label": "Cây tổ chức (G1)",
+          "route": "/quan-tri/to-chuc",
+          "icon": "org"
+        },
+        {
+          "key": "admin.qt.cong_cu.mau_xuat",
+          "label": "Mẫu xuất & lịch gửi",
+          "route": "/quan-tri/mau-bao-cao",
+          "icon": "report"
+        },
+        {
+          "key": "admin.qt.cong_cu.xung_dot",
+          "label": "Xung đột đồng bộ",
+          "route": "/quan-tri/xung-dot",
+          "icon": "conflict"
+        },
+        {
+          "key": "admin.qt.cong_cu.giam_sat",
+          "label": "Giám sát đồng bộ",
+          "route": "/quan-tri/giam-sat-dong-bo",
+          "icon": "sync"
+        },
+        {
+          "key": "admin.qt.cong_cu.thiet_bi",
+          "label": "Đồng bộ thiết bị",
+          "route": "/dong-bo",
+          "icon": "sync"
+        },
+        {
+          "key": "admin.qt.cong_cu.khach_hang_api",
+          "label": "Khách hàng Public API",
+          "route": "/quan-tri/khach-hang-api",
+          "icon": "key"
+        },
+        {
+          "key": "admin.qt.cong_cu.su_dung_api",
+          "label": "Sử dụng Public API",
+          "route": "/quan-tri/su-dung-api",
+          "icon": "chart"
+        },
+        {
+          "key": "admin.qt.cong_cu.bang_ke",
+          "label": "Bảng kê sử dụng",
+          "route": "/quan-tri/bang-ke",
+          "icon": "report"
+        },
+        {
+          "key": "admin.qt.cong_cu.nhat_ky_xuat",
+          "label": "Nhật ký xuất dữ liệu",
+          "route": "/quan-tri/nhat-ky-xuat",
+          "icon": "shield"
+        }
+      ]
+    }
+  ]
+};
+
+const KHTC_REPORT_PROFILES = new Set<KnMenuProfile>(["chan_nuoi_thuy_san","thong_tin_truyen_thong","trong_trot","hanh_chinh_tong_hop"]);
+
+// END GENERATED WEB MENU
+
+function profileGroups(profile: KnMenuProfile, audience: Exclude<KnRole, "admin">): Group[] {
+  const biz = BUSINESS[profile]?.[audience] ?? [];
+  const groups =
+    profile === "trong_trot"
+      ? TRONG_TROT[audience]
+      : GENERIC[audience].flatMap((g) => (g.key === "dieu_hanh" && biz.length ? [g, { key: "nghiep_vu", label: "Nghiệp vụ", items: biz }] : [g]));
+  if (audience !== "kn_tinh" || !KHTC_REPORT_PROFILES.has(profile)) return groups;
+  return groups.map((g) => (g.key === "bao_cao" ? { ...g, items: [...g.items, KHTC_REPORT] } : g));
+}
+
+function bindMenuItems(items: Item[], base: string): Item[] {
+  return items.map((item) => ({ ...item,
+    ...(item.route ? { route: item.route.replace("/kn/phong-ban/{department}", base) } : {}),
+    ...(item.children ? { children: bindMenuItems(item.children, base) } : {}),
+  }));
+}
+
+function adminDeptItems(code: string, profile: KnMenuProfile): Item[] {
+  const base = `/kn/phong-ban/${code}`;
+  return [
+    ...bindMenuItems(ADMIN_DEPT_BASE[profile] ?? ADMIN_DEPT_BASE.generic!, base),
+    ...(KHTC_REPORT_PROFILES.has(profile) ? bindMenuItems([KHTC_REPORT_ADMIN], base) : []),
+    ...bindMenuItems(ADMIN_BUSINESS[profile] ?? [], base),
+  ];
+}
 
 const STATUS_LABEL: Record<DepartmentRef["status"], string> = { active: "Đang áp dụng", not_open: "Chưa mở", suspended: "Ngưng hoạt động" };
 
@@ -216,12 +1257,13 @@ function wire(items: readonly Item[], enabled: boolean, adHoc: boolean): KnMenuI
     if (it.adHoc && !adHoc) continue;
     const children = wire(it.children ?? [], enabled, adHoc);
     if (it.children?.length && !children.length) continue;
-    out.push({ key: it.key, label: it.label, route: it.route ?? null, icon: it.icon, badge_source: it.badge ?? null, enabled, children });
+    const base: KnMenuItem = { key: it.key, label: it.label, route: it.route ?? null, icon: it.icon, badge_source: it.badge ?? null, enabled, children };
+    out.push(it.soon ? { ...base, enabled: false, status: "coming_soon", status_label: "Sắp có" } : base);
   }
   return out;
 }
 
-const profileOf = (code: string) => KN_MENU_PROFILE[code] ?? "generic";
+const profileOf = (code: string): KnMenuProfile => KN_MENU_PROFILE[code] ?? "generic";
 const deptWire = (d: DepartmentRef): NonNullable<KnMenu["department"]> => ({ code: d.code, name: d.name, status: d.status, menu_profile: profileOf(d.code) });
 
 function adminDeptItem(d: DepartmentRef): KnMenuItem {
@@ -241,7 +1283,7 @@ function adminDeptItem(d: DepartmentRef): KnMenuItem {
 
 /**
  * KNMenu trên dây (= Go app.DepartmentMenu / app.AdminMenu). Admin: Điều hành / Phòng ban (mọi phòng ban, chưa mở
- * enabled = false) / Quản trị hệ thống. Chỉ bộ Trồng trọt có ở giả lập (phòng ban khác chưa mở → 409 ở handler).
+ * enabled = false) / Quản trị hệ thống / Dùng chung (kn.menu/v3). Phòng ban chưa mở → 409 ở handler.
  */
 export function knMenu(audience: KnRole, departmentCode: string | null, opts: { adHoc?: boolean; orgRef?: string | null } = {}): KnMenu {
   if (audience === "admin") {
@@ -249,12 +1291,14 @@ export function knMenu(audience: KnRole, departmentCode: string | null, opts: { 
       { key: ADMIN_OVERVIEW.key, label: ADMIN_OVERVIEW.label, items: wire(ADMIN_OVERVIEW.items, true, false) },
       { key: "phong_ban", label: "Phòng ban", items: KN_DEPARTMENTS.map(adminDeptItem) },
       { key: ADMIN_SYSTEM.key, label: ADMIN_SYSTEM.label, items: wire(ADMIN_SYSTEM.items, true, false) },
+      { key: SHARED.key, label: SHARED.label, items: wire(SHARED.items, true, false) },
     ];
     return { menu_version: MENU_VERSION, audience, org_ref: opts.orgRef ?? null, department: null, default_route: DEFAULT_ROUTE.admin, groups };
   }
   const d = KN_DEPARTMENTS.find((x) => x.code === (departmentCode ?? "trong_trot")) ?? KN_DEPARTMENTS[0]!;
   const adHoc = opts.adHoc ?? ADHOC_FORMS[d.code] ?? false;
-  const groups = TRONG_TROT[audience]
+  const shared: Group = { ...SHARED, items: [...SHARED.items, ...(SHARED_BY_AUDIENCE[audience] ?? [])] };
+  const groups = [...profileGroups(profileOf(d.code), audience), shared]
     .map((g) => ({ key: g.key, label: g.label, items: wire(g.items, true, adHoc) }))
     .filter((g) => g.items.length > 0);
   return { menu_version: MENU_VERSION, audience, org_ref: opts.orgRef ?? null, department: deptWire(d), default_route: DEFAULT_ROUTE[audience], groups };
@@ -421,7 +1465,7 @@ export const knAppRoutes: Route[] = [
       const q = menuQuery(request, url);
       if (q instanceof Response) return q;
       if (q.audience === "admin") return json(knMenu("admin", null, { orgRef: q.orgRef }), 200, NO_STORE);
-      const d = q.department ? KN_DEPARTMENTS.find((x) => x.code === q.department) : KN_DEPARTMENTS.find((x) => x.status === "active");
+      const d = q.department ? findKnDepartment(q.department) : KN_DEPARTMENTS.find((x) => x.status === "active");
       if (!d) return problem(404, "party.department_not_found", "Department not found");
       if (d.status !== "active") return problem(409, "party.department_not_open", "Department not open");
       return json(knMenu(q.audience, d.code, { orgRef: q.orgRef }), 200, NO_STORE);
@@ -433,14 +1477,14 @@ export const knAppRoutes: Route[] = [
     handler: ({ params, request, url }) => {
       const q = menuQuery(request, url, params[0] ?? "");
       if (q instanceof Response) return q;
-      const code = params[0] ?? "";
-      const d = KN_DEPARTMENTS.find((x) => x.code === code);
+      const d = findKnDepartment(params[0] ?? "");
       if (!d) return problem(404, "party.department_not_found", "Department not found");
+      const code = d.code;
       if (q.audience === "admin") {
         // Admin: nhóm của MỘT phòng ban (kể cả chưa mở — mục con enabled = false), như app.DepartmentModules.
         const item = knMenu("admin", null).groups.find((g) => g.key === "phong_ban")!.items.find((i) => i.key === `phong_ban.${code}`)!;
         return json(
-          { menu_version: MENU_VERSION, audience: "admin", org_ref: q.orgRef, department: { code: d.code, name: d.name, status: d.status, menu_profile: KN_MENU_PROFILE[d.code] ?? "generic" },
+          { menu_version: MENU_VERSION, audience: "admin", org_ref: q.orgRef, department: { code: d.code, name: d.name, status: d.status, menu_profile: profileOf(d.code) },
             default_route: DEFAULT_ROUTE.admin, groups: [{ key: item.key, label: d.name, items: item.children }] } satisfies KnMenu,
           200,
           NO_STORE,

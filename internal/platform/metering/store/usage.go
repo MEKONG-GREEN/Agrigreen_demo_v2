@@ -8,6 +8,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -59,7 +60,7 @@ func scanUsage(r pgx.Row) (UsageRow, error) {
 
 // UsageByIdem đọc dòng sổ theo idem_key (request_id); nil khi chưa có.
 func UsageByIdem(ctx context.Context, tx pgx.Tx, idem string) (*UsageRow, error) {
-	u, err := scanUsage(tx.QueryRow(ctx, `SELECT `+usageCols+` FROM pf_metering.usage_event WHERE idem_key = $1`, idem))
+	u, err := scanUsage(tx.QueryRow(ctx, `SELECT `+usageCols+` FROM pf_metering.usage_event WHERE idem_key = $1`+ledger.NewestByIdem(""), idem))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

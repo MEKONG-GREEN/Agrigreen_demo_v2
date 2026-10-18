@@ -1,0 +1,241 @@
+{
+  "Specs": [
+    {
+      "Key": "extension.task_sla_hours",
+      "Name": "SLA xử lý nhiệm vụ hỗ trợ",
+      "Unit": "giờ",
+      "Kind": "decimal",
+      "Min": "1",
+      "Max": "720",
+      "Dimensional": false
+    },
+    {
+      "Key": "extension.duty_status_ttl_hours",
+      "Name": "Thời hạn trạng thái trực",
+      "Unit": "giờ",
+      "Kind": "decimal",
+      "Min": "1",
+      "Max": "168",
+      "Dimensional": false
+    },
+    {
+      "Key": "extension.target_sown_area_ha",
+      "Name": "Mục tiêu diện tích gieo sạ",
+      "Unit": "ha",
+      "Kind": "decimal",
+      "Min": "0",
+      "Max": "",
+      "Dimensional": true
+    },
+    {
+      "Key": "extension.report_period_rule",
+      "Name": "Quy tắc chia kỳ báo cáo (lịch tuần; \":\u003cmã phòng\u003e\" = lịch riêng của phòng)",
+      "Unit": "",
+      "Kind": "text",
+      "Min": "",
+      "Max": "",
+      "Dimensional": false
+    },
+    {
+      "Key": "extension.ksgm_week_starts",
+      "Name": "Ranh giới 4 tuần KSGM của tháng (vd 1,8,15,22)",
+      "Unit": "",
+      "Kind": "text",
+      "Min": "",
+      "Max": "",
+      "Dimensional": true
+    },
+    {
+      "Key": "cnts.indicator_min",
+      "Name": "Ngưỡng dưới chỉ tiêu theo dõi CNTS",
+      "Unit": "",
+      "Kind": "decimal",
+      "Min": "",
+      "Max": "",
+      "Dimensional": true
+    },
+    {
+      "Key": "cnts.indicator_max",
+      "Name": "Ngưỡng trên chỉ tiêu theo dõi CNTS",
+      "Unit": "",
+      "Kind": "decimal",
+      "Min": "",
+      "Max": "",
+      "Dimensional": true
+    },
+    {
+      "Key": "cnts.herd_change_pct",
+      "Name": "Biến động tổng đàn BM-04 so kỳ gần nhất",
+      "Unit": "%",
+      "Kind": "decimal",
+      "Min": "0",
+      "Max": "1000",
+      "Dimensional": false
+    },
+    {
+      "Key": "cnts.fishing_change_pct",
+      "Name": "Biến động khai thác thủy sản BM-17 so kỳ gần nhất",
+      "Unit": "%",
+      "Kind": "decimal",
+      "Min": "0",
+      "Max": "1000",
+      "Dimensional": false
+    },
+    {
+      "Key": "cnts.slaughter_spike_factor",
+      "Name": "KSGM bất thường: hệ số so trung bình 4 tuần",
+      "Unit": "lần",
+      "Kind": "decimal",
+      "Min": "1",
+      "Max": "100",
+      "Dimensional": false
+    },
+    {
+      "Key": "cnts.slaughter_spike_min_days",
+      "Name": "KSGM bất thường: số ngày có số liệu tối thiểu",
+      "Unit": "ngày",
+      "Kind": "decimal",
+      "Min": "1",
+      "Max": "28",
+      "Dimensional": false
+    },
+    {
+      "Key": "cnts.lookback_periods",
+      "Name": "Kỳ gần nhất: số kỳ tìm lùi tối đa",
+      "Unit": "kỳ",
+      "Kind": "decimal",
+      "Min": "1",
+      "Max": "12",
+      "Dimensional": false
+    },
+    {
+      "Key": "cnts.location_distance_m",
+      "Name": "Khoảng cách lần ghi tới điểm mô hình",
+      "Unit": "m",
+      "Kind": "decimal",
+      "Min": "0",
+      "Max": "10000",
+      "Dimensional": false
+    },
+    {
+      "Key": "cnts.gps_accuracy_m",
+      "Name": "Sai số GPS tối đa của lần ghi",
+      "Unit": "m",
+      "Kind": "decimal",
+      "Min": "0",
+      "Max": "1000",
+      "Dimensional": false
+    },
+    {
+      "Key": "cnts.log_overdue_grace_days",
+      "Name": "Quá hạn ghi nhật ký: số ngày thêm sau tần suất",
+      "Unit": "ngày",
+      "Kind": "decimal",
+      "Min": "0",
+      "Max": "30",
+      "Dimensional": false
+    },
+    {
+      "Key": "cnts.mortality_max_pct",
+      "Name": "Tỷ lệ chết tối đa theo loại mô hình",
+      "Unit": "%",
+      "Kind": "decimal",
+      "Min": "0",
+      "Max": "100",
+      "Dimensional": true
+    }
+  ],
+  "Seeds": [
+    {
+      "key": "extension.report_period_rule",
+      "text": "kn.period_rule/v2;week_start=wed;week=year;month=week_end",
+      "unit": "",
+      "effective_from": "2026-11-04",
+      "source_doc": "W11.03 lịch kỳ hệ thống — QĐ-6 đề xuất: tuần báo cáo Thứ Tư–Thứ Ba, tháng/quý/năm theo Thứ Ba cuối (KHTC v2.2 GD-05, BR-DL-01) (TẠM, chờ PO chốt Q-045)"
+    },
+    {
+      "key": "extension.report_period_rule:chan_nuoi_thuy_san",
+      "text": "kn.period_rule/v2;week_start=tue;week=year;month=week_end;cal=chan_nuoi_thuy_san:v3",
+      "unit": "",
+      "effective_from": "2026-01-01",
+      "source_doc": "D8 (CEO 13/10/2026) — lịch tuần riêng Phòng CNTS theo BRD CNTS v3.7: Thứ Ba–Thứ Hai (tuần 39 = 22/09–28/09/2026), hiệu lực ngay (CNTS chưa có số liệu thật); trùng lịch nạp sẵn reportcycle/domain.CNTSRule"
+    },
+    {
+      "key": "cnts.herd_change_pct",
+      "value": "15",
+      "unit": "%",
+      "effective_from": "2026-01-01",
+      "source_doc": "BRD CNTS v3.7 Mục III.5 / UR-TINH-13 — ngưỡng mặc định (W11.41), Cấp Tỉnh sửa qua quy trình tham số"
+    },
+    {
+      "key": "cnts.fishing_change_pct",
+      "value": "50",
+      "unit": "%",
+      "effective_from": "2026-01-01",
+      "source_doc": "BRD CNTS v3.7 Mục III.5 / UR-TINH-13 — ngưỡng mặc định (W11.41), Cấp Tỉnh sửa qua quy trình tham số"
+    },
+    {
+      "key": "cnts.slaughter_spike_factor",
+      "value": "3",
+      "unit": "lần",
+      "effective_from": "2026-01-01",
+      "source_doc": "BRD CNTS v3.7 Mục III.5 / UR-TINH-13 — ngưỡng mặc định (W11.41), Cấp Tỉnh sửa qua quy trình tham số"
+    },
+    {
+      "key": "cnts.slaughter_spike_min_days",
+      "value": "7",
+      "unit": "ngày",
+      "effective_from": "2026-01-01",
+      "source_doc": "BRD CNTS v3.7 Mục III.5 / UR-TINH-13 — ngưỡng mặc định (W11.41), Cấp Tỉnh sửa qua quy trình tham số"
+    },
+    {
+      "key": "cnts.lookback_periods",
+      "value": "4",
+      "unit": "kỳ",
+      "effective_from": "2026-01-01",
+      "source_doc": "BRD CNTS v3.7 Mục III.5 / UR-TINH-13 — ngưỡng mặc định (W11.41), Cấp Tỉnh sửa qua quy trình tham số"
+    },
+    {
+      "key": "cnts.location_distance_m",
+      "value": "200",
+      "unit": "m",
+      "effective_from": "2026-01-01",
+      "source_doc": "BRD CNTS v3.7 Mục III.5 / UR-TINH-13 — ngưỡng mặc định (W11.41), Cấp Tỉnh sửa qua quy trình tham số"
+    },
+    {
+      "key": "cnts.gps_accuracy_m",
+      "value": "50",
+      "unit": "m",
+      "effective_from": "2026-01-01",
+      "source_doc": "BRD CNTS v3.7 Mục III.5 / UR-TINH-13 — ngưỡng mặc định (W11.41), Cấp Tỉnh sửa qua quy trình tham số"
+    },
+    {
+      "key": "cnts.log_overdue_grace_days",
+      "value": "1",
+      "unit": "ngày",
+      "effective_from": "2026-01-01",
+      "source_doc": "BRD CNTS v3.7 Mục III.5 / UR-TINH-13 — ngưỡng mặc định (W11.41), Cấp Tỉnh sửa qua quy trình tham số"
+    },
+    {
+      "key": "cnts.indicator_min:PH",
+      "value": "7.5",
+      "unit": "",
+      "effective_from": "2026-01-01",
+      "source_doc": "BRD CNTS v3.7 Mục III.5 / UR-TINH-13 — ngưỡng mặc định (W11.41), Cấp Tỉnh sửa qua quy trình tham số"
+    },
+    {
+      "key": "cnts.indicator_max:PH",
+      "value": "8.5",
+      "unit": "",
+      "effective_from": "2026-01-01",
+      "source_doc": "BRD CNTS v3.7 Mục III.5 / UR-TINH-13 — ngưỡng mặc định (W11.41), Cấp Tỉnh sửa qua quy trình tham số"
+    },
+    {
+      "key": "cnts.indicator_min:DO",
+      "value": "4",
+      "unit": "mg/l",
+      "effective_from": "2026-01-01",
+      "source_doc": "BRD CNTS v3.7 Mục III.5 / UR-TINH-13 — ngưỡng mặc định (W11.41), Cấp Tỉnh sửa qua quy trình tham số"
+    }
+  ]
+}

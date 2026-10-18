@@ -6,6 +6,9 @@
   "resetPasswordAllowed": false,
   "loginWithEmailAllowed": true,
   "loginTheme": "agrigreen",
+  "eventsEnabled": true,
+  "eventsExpiration": 31536000,
+  "enabledEventTypes": ["LOGIN", "LOGIN_ERROR", "LOGOUT", "CODE_TO_TOKEN_ERROR"],
   "duplicateEmailsAllowed": false,
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
@@ -29,6 +32,7 @@
   "otpPolicyAlgorithm": "HmacSHA1",
   "otpPolicyDigits": 6,
   "otpPolicyPeriod": 30,
+  "browserFlow": "agrigreen browser",
   "internationalizationEnabled": true,
   "supportedLocales": ["vi", "en"],
   "defaultLocale": "vi",
@@ -53,31 +57,32 @@
   "attributes": {
     "lockout_note": "Quyết định A3 / Q-21 (chốt 03/10/2026, KN v7.7 FN-CH-00.01 / N-10 thay GIS US-LOG-01 AC-3): mỗi 5 lần sai mật khẩu → khóa TẠM 15 phút (bruteForceStrategy MULTIPLE, failureFactor 5, waitIncrementSeconds = maxFailureWaitSeconds = 900), tự mở sau thời gian chờ; sau 3 lần khóa tạm (maxTemporaryLockouts 3, permanentLockout true) lần khóa kế tiếp là khóa HẲN (Keycloak đặt enabled = false) tới khi Admin mở qua pf/accounts (POST /v1/accounts/users/{id}/unlock). Cửa sổ đếm 24 giờ: maxDeltaTimeSeconds 86400 — Keycloak xóa bộ đếm lần sai VÀ số lần khóa tạm khi lần sai kế tiếp cách lần sai trước > 24 giờ, hoặc khi đăng nhập thành công. Tài khoản bị Admin khóa (enabled = false) vẫn khóa tới khi mở. Đăng nhập bằng email hoặc SĐT: username = SĐT chuẩn hóa 0xxxxxxxxx (pf/accounts tạo), email qua loginWithEmailAllowed.",
     "session_note": "KN v7.7: web-ops hết phiên sau 4 giờ không thao tác (client.session.idle.timeout 14400), app hiện trường phiên 24 giờ (86400) + ngoại tuyến 72 giờ (offline 259200, PIN 6 số giữ trong app); các client khác giữ 1 giờ không thao tác như trước. Lần đầu đăng nhập bắt buộc đặt mật khẩu qua liên kết kích hoạt (required action UPDATE_PASSWORD), không gửi mật khẩu tạm. Theme đăng nhập agrigreen (loginTheme) gắn từ deploy/compose/keycloak-themes/agrigreen vào /opt/keycloak/themes/agrigreen: xem docs/brd/kn-p1-realm-patch.md.",
-    "note": "Vai đánh dấu [MFA] chỉ dùng trên Admin API — backend chặn token không có yếu tố thứ hai (httpx.RequireMFA, mục 11). Người giữ vai này phải cấu hình TOTP (required action CONFIGURE_TOTP) khi tạo tài khoản."
+    "note": "Vai đánh dấu [MFA] chỉ dùng trên Admin API — backend chặn token không có yếu tố thứ hai (httpx.RequireMFA, mục 11). Người giữ vai này phải cấu hình TOTP (required action CONFIGURE_TOTP) khi tạo tài khoản.",
+    "mfa_note": "D24 (CEO 13/10/2026, QĐ-4 phương án c): TOTP bắt buộc khi đăng nhập cho cán bộ KN (kn_user, kn_national_admin, kn_province_admin, kn_officer) và mọi vai [MFA] từ G1. Các vai này là vai tổng hợp chứa vai đánh dấu login_totp_required; luồng browser 'agrigreen browser' có nhánh có điều kiện (Condition - user role = login_totp_required → OTP Form): chưa có TOTP thì Keycloak tự thêm CONFIGURE_TOTP và bắt đăng ký ngay ở lần đăng nhập đầu. Người không có vai đánh dấu nhưng đã tự cấu hình TOTP vẫn bị hỏi OTP (nhánh Condition - user configured). Phiên GIỮ NGUYÊN 4 giờ/24 giờ theo D9 kèm đánh giá rủi ro docs/security/danh-gia-rui-ro-phien-4h-24h.md. Mật khẩu 14 ký tự/không trùng 10 CHỈ ở realm quản trị riêng agrigreen-kn-admin (D24, D25). Realm đã nhập ở môi trường thật không tự cập nhật: làm theo docs/runbooks/keycloak-mfa-d24.md."
   },
   "roles": {
     "realm": [
-      { "name": "platform_admin", "description": "[MFA] Quản trị nền tảng — phạm vi toàn quốc (mục 11)" },
-      { "name": "param_setter", "description": "[MFA] Đặt tham số/danh mục có phê duyệt (R-56)" },
-      { "name": "param_approver", "description": "[MFA] Phê duyệt tham số — không tự phê duyệt thay đổi của mình (R-56)" },
-      { "name": "masterdata_admin", "description": "[MFA] Quản trị danh mục và đơn vị hành chính (Admin API, pf/masterdata)" },
-      { "name": "reports_admin", "description": "[MFA] Quản lý mẫu báo cáo có phiên bản (Admin API, pf/reports — CGH FN-10 BR-03)" },
-      { "name": "registry_admin", "description": "[MFA] Quản trị sổ tổ chức, HTX, nông hộ; nhập hàng loạt (pf/party)" },
+      { "name": "platform_admin", "description": "[MFA] Quản trị nền tảng — phạm vi toàn quốc (mục 11)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
+      { "name": "param_setter", "description": "[MFA] Đặt tham số/danh mục có phê duyệt (R-56)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
+      { "name": "param_approver", "description": "[MFA] Phê duyệt tham số — không tự phê duyệt thay đổi của mình (R-56)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
+      { "name": "masterdata_admin", "description": "[MFA] Quản trị danh mục và đơn vị hành chính (Admin API, pf/masterdata)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
+      { "name": "reports_admin", "description": "[MFA] Quản lý mẫu báo cáo có phiên bản (Admin API, pf/reports — CGH FN-10 BR-03)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
+      { "name": "registry_admin", "description": "[MFA] Quản trị sổ tổ chức, HTX, nông hộ; nhập hàng loạt (pf/party)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
       { "name": "consent_writer", "description": "Ghi đồng ý theo mục đích (pf/party, cả qua đồng bộ ngoại tuyến)" },
       { "name": "consent_reader", "description": "Đọc đồng ý theo mục đích (pf/party)" },
-      { "name": "kn_national_admin", "description": "Cán bộ TTKN Quốc gia — xem toàn quốc, chỉ đạo toàn quốc (KN US-HTX-01)" },
-      { "name": "kn_province_admin", "description": "Cán bộ TTKN tỉnh — đọc/ghi, phân công, chỉ đạo trong tỉnh" },
-      { "name": "kn_officer", "description": "Cán bộ khuyến nông xã / Tổ KNCĐ — đọc/ghi trong xã phụ trách" },
+      { "name": "kn_national_admin", "description": "Cán bộ TTKN Quốc gia — xem toàn quốc, chỉ đạo toàn quốc (KN US-HTX-01)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
+      { "name": "kn_province_admin", "description": "Cán bộ TTKN tỉnh — đọc/ghi, phân công, chỉ đạo trong tỉnh", "composite": true, "composites": { "realm": ["login_totp_required"] } },
+      { "name": "kn_officer", "description": "Cán bộ khuyến nông xã / Tổ KNCĐ — đọc/ghi trong xã phụ trách", "composite": true, "composites": { "realm": ["login_totp_required"] } },
       { "name": "coop_manager", "description": "Quản lý HTX/THT — nông hộ, thửa của chính HTX mình" },
-      { "name": "kn_user", "description": "KN v7.7: cổng vào bề mặt KN Phòng Trồng trọt — vai nghiệp vụ (Cấp Quốc gia/Tỉnh/Xã/Admin), Nút, phòng ban, xã phụ trách nằm ở sổ gán vai trò pf/accounts và chọn theo ngữ cảnh phiên (X-AG-Context), không trong token" },
+      { "name": "kn_user", "description": "KN v7.7: cổng vào bề mặt KN Phòng Trồng trọt — vai nghiệp vụ, Nút, phòng ban, xã phụ trách ở sổ gán vai trò pf/accounts, chọn theo ngữ cảnh phiên (X-AG-Context), không trong token. W11.23: chứa vault_directory để tra Contact (FN-13)", "composite": true, "composites": { "realm": ["login_totp_required", "vault_directory"] } },
       { "name": "farmer", "description": "Nông dân App HTX — tên đăng nhập là SĐT; phạm vi = nông hộ liên kết với tài khoản (pf/accounts farmer_link), không org_ref; kích hoạt bằng QR/liên kết một lần" },
       { "name": "sop_admin", "description": "Soạn quy trình SOP, nhân bản, gắn giống ↔ SOP (pf/cropcycle, Admin API); phát hành cần param_approver khác người soạn" },
       { "name": "cgh_viewer", "description": "Cục KTHT — xem bản đồ cơ giới hóa, chỉ đọc hồ sơ HTX" },
       { "name": "cgh_sync", "description": "Tài khoản dịch vụ nạp dữ liệu diện tích/lịch mùa vụ từ App HTX (FN-07, G2)" },
-      { "name": "cgh_admin", "description": "[MFA] Quản trị dữ liệu bản đồ cơ giới hóa (pf/mechanization, Admin API)" },
+      { "name": "cgh_admin", "description": "[MFA] Quản trị dữ liệu bản đồ cơ giới hóa (pf/mechanization, Admin API)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
       { "name": "plot_editor", "description": "Vẽ/sửa/gán/ngừng dùng thửa trong phạm vi (pf/geo)" },
       { "name": "plot_viewer", "description": "Chỉ xem thửa trong phạm vi (pf/geo)" },
-      { "name": "geo_admin", "description": "[MFA] Nhập tệp ranh giới thửa, ranh giới hành chính (pf/geo, Admin API)" },
+      { "name": "geo_admin", "description": "[MFA] Nhập tệp ranh giới thửa, ranh giới hành chính (pf/geo, Admin API)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
       { "name": "simulation_analyst", "description": "Dựng Hub ứng viên, kịch bản; chạy, so sánh và đánh dấu Chính thức mô phỏng chọn Hub (pf/simulation)" },
       { "name": "content_editor_national", "description": "Soạn quy trình kỹ thuật chuẩn quốc gia (pf/content, KN BR-06)" },
       { "name": "content_editor_province", "description": "Bổ sung hướng dẫn đặc thù địa phương (pf/content, KN FR-13)" },
@@ -86,17 +91,18 @@
       { "name": "mrv_reviewer", "description": "Duyệt minh chứng MRV — không duyệt minh chứng do chính mình thu (KN US-MRV-05)" },
       { "name": "mrv_viewer", "description": "Chỉ xem minh chứng MRV (chuyên gia thẩm định)" },
       { "name": "mrv_exporter", "description": "Yêu cầu xuất và tải gói bằng chứng MRV" },
-      { "name": "device_admin", "description": "[MFA] Thu hồi thiết bị hiện trường (pf/sync, Admin API)" },
-      { "name": "sync_conflict_resolver", "description": "[MFA] Xem và đóng xung đột đồng bộ (pf/sync, Admin API, C-8)" },
+      { "name": "device_admin", "description": "[MFA] Thu hồi thiết bị hiện trường (pf/sync, Admin API)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
+      { "name": "sync_conflict_resolver", "description": "[MFA] Xem và đóng xung đột đồng bộ (pf/sync, Admin API, C-8)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
       { "name": "waterway_editor", "description": "Vẽ/sửa đoạn sông/kênh, công trình vượt sông và yêu cầu dựng mạng đường thủy (pf/waterway, GIS US-WATER-02/03)" },
       { "name": "waterway_publisher", "description": "Phát hành phiên bản mạng đường thủy — không phát hành phiên bản do chính mình dựng (pf/waterway, R-56)" },
       { "name": "vault_registrar", "description": "Kho định danh: tạo, tra, xem đầy đủ hồ sơ hộ/người (có mục đích, R-42)" },
       { "name": "vault_display", "description": "Kho định danh: chỉ nhãn hiển thị tối thiểu đã che" },
+      { "name": "vault_directory", "description": "Kho định danh: đọc thẻ danh bạ Contact (họ tên, SĐT, năm sinh, email — chỉ trường pf/contact hỏi theo vai; mục đích contact.directory) — W11.23. Không đọc định danh đầy đủ, CCCD, địa chỉ, ngăn hồ sơ" },
       { "name": "vault_evidence_viewer", "description": "Kho định danh: mở DEK để xem ảnh minh chứng (có mục đích và đồng ý)" },
-      { "name": "vault_eraser", "description": "[MFA] Kho định danh: xóa định danh theo yêu cầu (RB-3)" },
+      { "name": "vault_eraser", "description": "[MFA] Kho định danh: xóa định danh theo yêu cầu (RB-3)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
       { "name": "vault_pubkey_sync", "description": "Thiết bị hiện trường tải khóa công khai của hộ theo địa bàn" },
-      { "name": "account_admin", "description": "[MFA] Quản trị tài khoản toàn quốc: tạo, khóa/mở khóa, phân quyền theo ma trận cấp vai (pf/accounts, KN US-ADM-01..03)" },
-      { "name": "account_admin_province", "description": "[MFA] Quản trị tài khoản của một tỉnh: chỉ cấp kn_officer/coop_manager cho tổ chức trong tỉnh (pf/accounts)" },
+      { "name": "account_admin", "description": "[MFA] Quản trị tài khoản toàn quốc: tạo, khóa/mở khóa, phân quyền theo ma trận cấp vai (pf/accounts, KN US-ADM-01..03)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
+      { "name": "account_admin_province", "description": "[MFA] Quản trị tài khoản của một tỉnh: chỉ cấp kn_officer/coop_manager cho tổ chức trong tỉnh (pf/accounts)", "composite": true, "composites": { "realm": ["login_totp_required"] } },
       { "name": "hub_operator", "description": "MKG (tài khoản tenant MKG, API nội bộ api-internal): vận hành hub — nhận lô, mẻ sấy/nén, xuất theo rủi ro, bù sai, chụp sức chứa; đề xuất dữ liệu chủ hub/kho qua bề mặt quản trị (MFA)" },
       { "name": "hub_approver", "description": "MKG (bề mặt quản trị api-internal, bắt buộc MFA): phê duyệt/từ chối phiên bản dữ liệu chủ hub/kho — không duyệt đề xuất của chính mình (R-56); phê duyệt xuất qua van công bố" },
       { "name": "scale_supervisor", "description": "MKG (G3, mkg/measurement): giám sát cân — đề xuất đăng ký/thu hồi thiết bị cân, nhập phiếu CUSTOMER_IN tay có bằng chứng, xem số đo thô" },
@@ -122,6 +128,7 @@
       { "name": "billing_approver", "description": "G5 (pf/metering, Admin API — MFA): duyệt bảng kê sử dụng và tham số giá — không duyệt bảng kê do chính mình yêu cầu (R-56)" },
       { "name": "map_consumer", "description": "Ứng dụng tiêu thụ (TMS — mkg/logistics) đọc bản đồ chuẩn hóa GET /v1/geo/standard-map bằng tài khoản dịch vụ (GIS US-INT-02). Chỉ lớp nền không định danh, không có thửa" },
       { "name": "mkg_sync", "description": "Tài khoản dịch vụ tenant MKG (client agrigreen-mkg-sync): đọc bề mặt đối tác /v1/partner/* (danh bạ HTX, thửa, ngày thu hoạch, phản hồi HTX) — chỉ khi tenant chương trình đã duyệt cấp quyền chia sẻ loại đó (ADR-0020)" },
+      { "name": "login_totp_required", "description": "D24 (CEO 13/10/2026): vai ĐÁNH DẤU, không cấp trực tiếp — vai cán bộ KN và vai quản trị bắt MFA là vai tổng hợp chứa vai này; luồng \"agrigreen browser\" bắt TOTP, tự mở đăng ký ở lần đầu (accounts/port.LoginTOTPRoles)" },
       { "name": "offline_access", "description": "Refresh token ngoại tuyến (app hiện trường, tối đa 72 giờ không trực tuyến — mục 15)" },
       { "name": "default-roles-agrigreen", "description": "Vai mặc định của realm — KHÔNG gồm vai nghiệp vụ nào", "composite": true, "composites": { "realm": ["offline_access"] } }
     ]
@@ -131,7 +138,7 @@
       "username": "service-account-agrigreen-accounts",
       "enabled": true,
       "serviceAccountClientId": "agrigreen-accounts",
-      "clientRoles": { "realm-management": ["manage-users", "view-users", "query-users"] }
+      "clientRoles": { "realm-management": ["manage-users", "view-users", "query-users", "view-events"] }
     },
     {
       "username": "service-account-agrigreen-tms",
@@ -169,6 +176,59 @@
       }
     ]
   },
+  "authenticatorConfig": [
+    { "alias": "agrigreen-login-totp-role", "config": { "condUserRole": "login_totp_required", "negate": "false" } },
+    { "alias": "agrigreen-not-login-totp-role", "config": { "condUserRole": "login_totp_required", "negate": "true" } }
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "agrigreen browser",
+      "description": "D24: browser flow — cookie hoặc mật khẩu + TOTP có điều kiện theo vai đánh dấu login_totp_required",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "auth-cookie", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "ALTERNATIVE", "priority": 10, "userSetupAllowed": false },
+        { "authenticator": "identity-provider-redirector", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "ALTERNATIVE", "priority": 25, "userSetupAllowed": false },
+        { "flowAlias": "agrigreen browser forms", "authenticatorFlow": true, "autheticatorFlow": true, "requirement": "ALTERNATIVE", "priority": 30, "userSetupAllowed": false }
+      ]
+    },
+    {
+      "alias": "agrigreen browser forms",
+      "description": "Tên đăng nhập/mật khẩu, rồi TOTP theo vai (bắt buộc, tự mở đăng ký) hoặc theo cấu hình của người dùng",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "auth-username-password-form", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
+        { "flowAlias": "agrigreen browser - TOTP theo vai", "authenticatorFlow": true, "autheticatorFlow": true, "requirement": "CONDITIONAL", "priority": 20, "userSetupAllowed": false },
+        { "flowAlias": "agrigreen browser - TOTP da cau hinh", "authenticatorFlow": true, "autheticatorFlow": true, "requirement": "CONDITIONAL", "priority": 30, "userSetupAllowed": false }
+      ]
+    },
+    {
+      "alias": "agrigreen browser - TOTP theo vai",
+      "description": "D24: người có vai login_totp_required (qua vai tổng hợp) PHẢI nhập TOTP; chưa có thì Keycloak thêm CONFIGURE_TOTP (đăng ký ở lần đăng nhập đầu)",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "conditional-user-role", "authenticatorConfig": "agrigreen-login-totp-role", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
+        { "authenticator": "auth-otp-form", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false }
+      ]
+    },
+    {
+      "alias": "agrigreen browser - TOTP da cau hinh",
+      "description": "Người KHÔNG có vai đánh dấu nhưng đã tự cấu hình TOTP vẫn bị hỏi OTP (giữ hành vi luồng browser mặc định); loại trừ nhau với nhánh theo vai để không hỏi OTP hai lần",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "conditional-user-role", "authenticatorConfig": "agrigreen-not-login-totp-role", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
+        { "authenticator": "conditional-user-configured", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false },
+        { "authenticator": "auth-otp-form", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 30, "userSetupAllowed": false }
+      ]
+    }
+  ],
   "clientScopes": [
     {
       "name": "basic",
@@ -242,7 +302,7 @@
   "clients": [
     {
       "clientId": "agrigreen-accounts",
-      "name": "Tài khoản dịch vụ pf/accounts — Keycloak Admin REST (manage-users, view-users, query-users)",
+      "name": "Tài khoản dịch vụ pf/accounts — Keycloak Admin REST (manage-users, view-users, query-users, view-events)",
       "description": "Bí mật lấy từ biến môi trường AG_KC_CLIENT_SECRET lúc nhập realm (scripts/gen-dev-secrets). Không đăng nhập người dùng.",
       "enabled": true,
       "publicClient": false,
@@ -349,7 +409,7 @@
     {
       "clientId": "agrigreen-mkg-sync",
       "name": "MKG (api-internal, mkg/fieldops) — tài khoản dịch vụ đọc bề mặt đối tác của nền tảng (ADR-0020)",
-      "description": "Client credentials, không đăng nhập người dùng. Thuộc tính tenant_id của service-account-agrigreen-mkg-sync đặt theo tenant MKG (tenant riêng, khác tenant chương trình — ADR-0020). Chỉ vai mkg_sync: bề mặt đối tác /v1/partner/* của Application API, đọc được khi tenant chương trình đã duyệt cấp quyền chia sẻ (POST /v1/share-grants, Admin API).",
+      "description": "Client credentials, không đăng nhập người dùng. tenant_id của service account là tenant MKG (ADR-0020). Chỉ vai mkg_sync: /v1/partner/* của Application API, đọc khi tenant chương trình đã cấp quyền chia sẻ (POST /v1/share-grants).",
       "enabled": true,
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",

@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-MDCATALOG-A — 12schema/60seed/170case frozen;18/18PGcode+upgrade1000rows/checksum/hash đạt, fullstatic/boundary371. Helper9migration trướcdev; B mới gỡlegacy, typedlookup/data/tenant/client/reminder còn.

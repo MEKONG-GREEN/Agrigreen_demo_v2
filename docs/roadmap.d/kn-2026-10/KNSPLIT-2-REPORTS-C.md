@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-REPORTS-C — Registry quyền/source/scope/config KN, parity và13/13PG noSKIP/cổng tĩnh đạt. Helper kiểm migration trước tích hợp; legacy adapter còn đến D, catalog/dataset KN còn gói registry tiếp theo.

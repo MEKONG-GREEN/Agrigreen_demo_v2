@@ -1,0 +1,193 @@
+paths:
+# @ag-order: 246
+  /v1/cropcycle/htx-collection/schedules:
+    get:
+      summary: Lịch gom rơm MKG của HTX (qua van collection_schedule) — G3-2
+      description: |
+        Bản revision lớn nhất theo `schedule_ref`. Quản lý HTX chỉ thấy HTX mình; quản trị toàn tenant (lọc
+        `cooperative_ref`); cán bộ KN theo xã trong phạm vi. Mới nhất trước, cursor = `schedule_ref` cuối.
+      operationId: listHtxCollectionSchedules
+      tags: [cropcycle]
+      parameters:
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [planned, confirmed, in_progress, completed, cancelled]}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang lịch gom
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HtxCollectionSchedule"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 247
+  /v1/cropcycle/htx-collection/statements:
+    get:
+      summary: Bảng kê số cuộn MKG đã gom theo thửa (qua van htx_collection_statement) — RB-6 chiều mua, G3-2
+      description: |
+        `status`: `pending` = HTX chưa phản hồi revision hiện hành; `confirmed` / `disputed` = phản hồi cho revision hiện hành.
+        Quản lý HTX chỉ HTX mình; quản trị toàn tenant.
+      operationId: listHtxCollectionStatements
+      tags: [cropcycle]
+      parameters:
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [pending, confirmed, disputed]}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang bảng kê
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HtxCollectionStatement"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 248
+  /v1/cropcycle/htx-collection/statements/{ref}:
+    get:
+      summary: Một bảng kê kèm lịch sử phản hồi của HTX — G3-2
+      operationId: getHtxCollectionStatement
+      tags: [cropcycle]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Bảng kê
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [statement, responses]
+                properties:
+                  statement: {$ref: "#/components/schemas/HtxCollectionStatement"}
+                  responses: {type: array, items: {$ref: "#/components/schemas/HtxCollectionResponse"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 249
+  /v1/cropcycle/htx-collection/statements/{ref}/responses:
+    post:
+      summary: Quản lý HTX xác nhận hoặc tranh chấp bảng kê — RB-6 chiều mua, G3-2
+      description: |
+        Chỉ `coop_manager` của đúng HTX. `revision` phải là bản hiện hành (409 `cropcycle.collection_statement_stale`).
+        `confirmed`: số HTX = số MKG. `disputed`: bắt buộc `htx_rolls` (≠ số MKG) và `reason` 10–500 ký tự, không chứa SĐT/CCCD.
+        Đã có phản hồi cho cùng revision → bắt buộc `reason`; bản mới thay bản trước (sổ chỉ ghi thêm, `supersedes_id`).
+        MKG kéo phản hồi về qua `GET /v1/partner/htx-collection/responses` (ADR-0020).
+      operationId: respondHtxCollectionStatement
+      tags: [cropcycle]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, outcome]
+              properties:
+                revision: {type: integer, minimum: 1}
+                outcome: {type: string, enum: [confirmed, disputed]}
+                htx_rolls: {type: [integer, "null"], minimum: 0}
+                reason: {type: string, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi phản hồi (gọi lặp cùng Idempotency-Key → phản hồi như lần đầu)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [response, statement]
+                properties:
+                  response: {$ref: "#/components/schemas/HtxCollectionResponse"}
+                  statement: {$ref: "#/components/schemas/HtxCollectionStatement"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 250
+  /v1/cropcycle/htx-collection/responses:
+    get:
+      summary: Bí danh của GET /v1/partner/htx-collection/responses (ADR-0020)
+      description: |
+        Giữ để tương thích G3-2. Cùng kiểm cấp quyền chia sẻ `htx_collection_responses`, cùng sổ đọc, cùng dữ liệu với
+        `GET /v1/partner/htx-collection/responses`. MKG dùng đường của bề mặt đối tác.
+      operationId: listHtxCollectionResponseFeed
+      tags: [cropcycle]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: after, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 200}}
+      responses:
+        "200":
+          description: Một trang luồng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HtxCollectionResponseFeedPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  # --- Bề mặt đối tác (ADR-0020, RB-2 / Q-MKG-12): tài khoản dịch vụ tenant BÊN NHẬN (MKG, vai mkg_sync) đọc dữ liệu
+  # tối thiểu của tenant BÊN CẤP (tenant chương trình) sau khi kiểm cấp quyền chia sẻ đang hiệu lực; mọi lời gọi ghi sổ
+  # pf_party.partner_read_log. Không có cấp quyền / đã thu hồi / hết hạn / loại không được cấp → 403 party.share_grant_missing.
+components:
+  schemas:
+# @ag-order: 517
+    HtxCollectionSchedule:
+      type: object
+      description: Lịch gom rơm MKG của một HTX (van collection_schedule) — chỉ khung thời gian và trạng thái.
+      required: [schedule_ref, cooperative_ref, commune_code, window_from, window_to, status, revision, published_at, updated_at]
+      properties:
+        schedule_ref: {type: string, format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        window_from: {type: string, format: date}
+        window_to: {type: string, format: date}
+        status: {type: string, enum: [planned, confirmed, in_progress, completed, cancelled]}
+        revision: {type: integer}
+        published_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 518
+    HtxCollectionResponse:
+      type: object
+      required: [id, revision, outcome, htx_rolls, reason, responded_at]
+      properties:
+        id: {type: string, format: uuid}
+        revision: {type: integer}
+        outcome: {type: string, enum: [confirmed, disputed]}
+        htx_rolls: {type: integer}
+        reason: {type: [string, "null"]}
+        responded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+# @ag-order: 519
+    HtxCollectionStatement:
+      type: object
+      description: Bảng kê số cuộn MKG đã gom trên một thửa (van htx_collection_statement) kèm phản hồi hiện hành của HTX.
+      required: [statement_ref, cooperative_ref, plot_ref, plot_code, season_ref, collected_on, rolls, revision, pending, response, published_at, updated_at]
+      properties:
+        statement_ref: {type: string, format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        plot_code: {type: [string, "null"]}
+        season_ref: {type: [string, "null"], format: uuid}
+        collected_on: {type: string, format: date}
+        rolls: {type: integer}
+        revision: {type: integer}
+        pending: {type: boolean, description: HTX chưa phản hồi revision hiện hành}
+        response:
+          oneOf:
+            - {$ref: "#/components/schemas/HtxCollectionResponse"}
+            - {type: "null"}
+        published_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    # --- pf/metrics ---

@@ -3,7 +3,9 @@
 app: KN
 description: Khuyến nông TW/Tỉnh/Xã (bề mặt KN v7.7 của web-ops, gồm phòng ban Trồng trọt; app hiện trường)
 modules:
+  # KNSPLIT-1: extension/price/hrm/contact ở internal/kn; giữ ID pf/* và schema/vai DB.
   pf/accounts: ">=1.0 <2"      # ngữ cảnh phiên KN (P1, /v1/me), tài khoản cán bộ
+  pf/contact: ">=1.0 <2"       # cap/directory: Contact dùng chung (FN-13), /v1/contacts/* (W11.23)
   pf/content: ">=1.0 <2"       # thư viện số, tài liệu (/v1/documents, /v1/library)
   pf/cooperative: ">=1.0 <2"   # dom/cooperative: HTX, hộ, thửa, vụ (W3.2 mặt tiền; W3.3 chuyển dữ liệu)
   pf/cropcycle: ">=2.0 <3"     # xem mùa vụ HTX trong phạm vi (dom/cooperative shared-read)
@@ -12,10 +14,12 @@ modules:
   pf/extension: ">=1.0 <2"     # nhiệm vụ, chỉ đạo, phòng ban (dom/extension)
   pf/forms: ">=1.0 <2"         # cap/forms: phát hành/nộp/rà soát/chốt kỳ + ảnh chụp (W6.2; KN v1 ghi song song)
   pf/geo: ">=2.0 <3"           # bản đồ khuyến nông, /v1/kn/* của geo
+  pf/hrm: ">=1.0 <2"           # dom/hrm: nhân sự Phòng HCTH — danh mục nhân sự FN-19, /v1/hrm/* (W11.21, ADR-0050)
   pf/masterdata: ">=1.0 <2"
   pf/mrv: ">=1.0 <2"           # đối chiếu HTX ↔ KN (KN US-MRV-02), thu thập MRV ở app hiện trường
   pf/notify: ">=1.0 <2"
   pf/party: ">=2.0 <3"         # menu KN (/v1/menu), cây tổ chức, phòng ban, HTX/hộ trong phạm vi
+  pf/price: ">=1.0 <2"         # cap/price: khung Báo giá nông sản — danh mục nền, /v1/price/* (W11.71, ADR-0049)
   pf/reports: ">=1.0 <2"       # biểu mẫu, kỳ báo cáo (cap/export; engine mẫu KN P3)
   pf/sync: ">=1.0 <2"          # đồng bộ ngoại tuyến của app hiện trường
   pf/workflow: ">=1.0 <2"      # cap/workflow: duyệt bốn mắt (tham số, cấp quyền chia sẻ — W6.1)

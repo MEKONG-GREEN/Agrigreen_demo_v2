@@ -115,9 +115,10 @@ class _PickerState extends ConsumerState<KnContextPickerScreen> {
                     c.orgName,
                     if (c.communes.isNotEmpty)
                       'Xã: ${c.communes.map((x) => x.name).join(', ')}',
+                    if (c.readOnly) 'Chỉ xem',
                   ].join('\n'),
                 ),
-                isThreeLine: c.communes.isNotEmpty,
+                isThreeLine: c.communes.isNotEmpty || c.readOnly,
                 onTap: () => _pick(c),
               ),
             ),

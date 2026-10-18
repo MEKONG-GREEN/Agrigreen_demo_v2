@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // ---------------------------------------------------------------------------
@@ -402,7 +403,7 @@ func responses(ctx context.Context, tx pgx.Tx, q string, args ...any) ([]Respons
 
 // ResponseByIdem tìm phản hồi theo khóa chống trùng.
 func ResponseByIdem(ctx context.Context, tx pgx.Tx, key string) (*Response, error) {
-	r, err := scanResponse(tx.QueryRow(ctx, "SELECT "+responseCols+" FROM pf_cropcycle.collection_response WHERE idem_key = $1::text", key))
+	r, err := scanResponse(tx.QueryRow(ctx, "SELECT "+responseCols+" FROM pf_cropcycle.collection_response WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

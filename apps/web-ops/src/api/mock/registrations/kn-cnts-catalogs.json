@@ -1,0 +1,16 @@
+{
+  "id": "kn-cnts-catalogs",
+  "source": "./kn-cnts-catalogs",
+  "app": [
+    {
+      "export": "cntsCatalogAppRoutes",
+      "order": 10
+    }
+  ],
+  "admin": [
+    {
+      "export": "cntsCatalogAdminRoutes",
+      "order": 2
+    }
+  ]
+}

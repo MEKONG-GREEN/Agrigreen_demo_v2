@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.price.verification.requested/v1",
+  "title": "pf.price.verification.requested — payload",
+  "description": "Cấp Tỉnh gửi yêu cầu xác minh cho các cảnh báo của một phiếu (gói NOTIF; FN-TI-02.03 B3, FN-XA-03.05). pf/notify gửi chuông + email cho officer_ref (cán bộ Xã phụ trách chính của xã tại ngày báo giá; null = 'Chưa có cán bộ Xã' — không ai nhận). Nội dung yêu cầu đọc trong ứng dụng; không dữ liệu cá nhân.",
+  "x-event-type": "pf.price.verification.requested",
+  "x-schema-version": 1,
+  "x-producer": "pf/price",
+  "type": "object",
+  "required": [
+    "profile",
+    "day",
+    "point_code",
+    "point_name",
+    "ticket_id",
+    "item_codes",
+    "respond_by",
+    "officer_ref",
+    "requester_ref"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "description": "Bên dùng của cap/price (KN = kn)"
+    },
+    "day": {
+      "type": "string",
+      "format": "date",
+      "description": "Ngày báo giá (giờ VN)"
+    },
+    "point_code": {
+      "type": "string",
+      "description": "Mã xã báo giá (XBG…)"
+    },
+    "point_name": {
+      "type": "string",
+      "description": "Tên xã theo ĐVHC (không phải dữ liệu cá nhân)"
+    },
+    "ticket_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "item_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "Mã mặt hàng"
+    },
+    "respond_by": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Hạn phản hồi"
+    },
+    "officer_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "Cán bộ Xã phụ trách chính; null = chưa có"
+    },
+    "requester_ref": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

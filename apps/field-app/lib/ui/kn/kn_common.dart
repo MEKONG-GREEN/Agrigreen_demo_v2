@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/kn_collection_service.dart';
 import '../../domain/kn_context.dart';
 import '../providers.dart';
+import '../../domain/pii_hint.dart';
 
 /// Xã phụ trách của ngữ cảnh hiện hành.
 final knCommunesProvider = Provider<List<KnCommune>>(
@@ -60,6 +61,8 @@ Future<String?> knAskReason(
               onChanged: (_) => set(() {}),
               decoration: InputDecoration(
                 labelText: 'Lý do (ít nhất $min ký tự)',
+                helperText: piiWarning(ctl.text), // X-02
+                helperMaxLines: 3,
               ),
             ),
           ],

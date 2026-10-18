@@ -56,6 +56,22 @@ func (f *fakeParty) Get(ctx context.Context, ref uuid.UUID) (partyport.Org, erro
 	return o, nil
 }
 
+// ByCode thực hiện partyport.OrgCodes (W11.02: cột "Mã Nút" của tệp nạp tài khoản KN).
+func (f *fakeParty) ByCode(ctx context.Context, code string) (partyport.Org, error) {
+	tid, err := tenant.FromContext(ctx)
+	if err != nil {
+		return partyport.Org{}, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, o := range f.orgs[tid] {
+		if o.Code == code {
+			return o, nil
+		}
+	}
+	return partyport.Org{}, partyport.ErrOrgNotFound
+}
+
 func (f *fakeParty) Scope(ctx context.Context) (authz.Scope, error) {
 	p, ok := authz.FromContext(ctx)
 	if !ok {

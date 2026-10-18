@@ -223,6 +223,9 @@ export const COOPERATIVES: MockCooperative[] = COMMUNES.flatMap((c, ci) => {
         representative_ref: null,
         active,
         status_reason: active ? null : "Tạm ngừng hoạt động theo đề nghị của HTX (giả lập)",
+        // D2: một phần HTX là HTX tạm do Khuyến nông lập — "Chưa xác nhận" tới khi HTX thật nhận quyền.
+        confirmation_status: n % 4 === 0 ? "unconfirmed" : "confirmed",
+        confirmation_label: n % 4 === 0 ? "Chưa xác nhận" : "Đã xác nhận",
         tax_code: `${1800000000 + n * 7919}`.slice(0, 10),
         area_ha: `${int(80, 950)}.${String(int(0, 9999)).padStart(4, "0")}`,
         established_on: `20${int(10, 23)}-0${int(1, 9)}-1${int(0, 9)}`,
@@ -546,6 +549,52 @@ export const CATALOGS: Record<CatalogName, CatalogItem[]> = {
     ["tuan", "Báo cáo tuần", { period: "week", level: "commune" }],
     ["dot_xuat", "Báo cáo đột xuất", { period: "ad_hoc", level: "both" }],
   ]),
+  // W11.41 BRD CNTS v3.7 FN-06 — theo seeddata cnts_* của backend (rút gọn).
+  cnts_species: cat("cnts_species", [
+    ["HEO", "Heo", { group: "gia_suc", unit: "con", herd_column: "true", order: "1" }],
+    ["TRAU", "Trâu", { group: "gia_suc", unit: "con", herd_column: "true", order: "3" }],
+    ["BO", "Bò", { group: "gia_suc", unit: "con", herd_column: "true", order: "4" }],
+    ["VIT", "Vịt", { group: "gia_cam", unit: "con", herd_column: "true", order: "5" }],
+    ["GA", "Gà", { group: "gia_cam", unit: "con", herd_column: "true", order: "6" }],
+    ["CHO_MEO", "Chó, mèo", { group: "thu_cung", unit: "con", herd_column: "true", order: "7" }],
+  ]),
+  cnts_breed: cat("cnts_breed", []),
+  cnts_disease: cat("cnts_disease", [
+    ["ASF", "Dịch tả heo Châu Phi", { species: "HEO", notifiable: "true" }],
+    ["VDNC", "Viêm da nổi cục", { species: "BO,TRAU", notifiable: "true" }],
+    ["CUM_GIA_CAM", "Cúm gia cầm", { species: "GA,VIT", notifiable: "true" }],
+    ["NEWCASTLE", "Newcastle", { species: "GA" }],
+  ]),
+  cnts_vaccine: cat("cnts_vaccine", [
+    ["VX_ASF", "Tả heo Châu Phi", { diseases: "ASF", species: "HEO", report_group: "heo", order: "1" }],
+    ["VX_VDNC_BO", "Viêm da nổi cục bò", { diseases: "VDNC", species: "BO,TRAU", report_group: "bo", order: "5" }],
+    ["VX_CUM_GIA_CAM", "Cúm gia cầm (H5N1)", { diseases: "CUM_GIA_CAM", species: "GA,VIT", report_group: "cum_gia_cam", order: "8" }],
+    ["VX_ND_F", "Newcastle chủng F", { diseases: "NEWCASTLE", species: "GA", report_group: "khac", order: "20" }],
+  ]),
+  cnts_vaccination_schedule: cat("cnts_vaccination_schedule", [
+    ["QT_GA_THUONG_PHAM", "Quy trình tiêm gà thương phẩm", { model_type: "GA_THUONG_PHAM", doses: "VX_ND_F/1@3,VX_CUM_GIA_CAM/1@17,VX_CUM_GIA_CAM/2@40" }],
+  ]),
+  cnts_chemical: cat("cnts_chemical", [["HC_GIA_SUC", "Hóa chất khử trùng – gia súc", { unit: "lít", target: "gia_suc" }]]),
+  cnts_slaughter_facility: cat("cnts_slaughter_facility", [
+    [
+      "CS_BINH_DUC",
+      "Cơ sở giết mổ Bình Đức (giả lập)",
+      { facility_ref: "0190f1c4-7d3e-7000-8000-00000000c501", commune_code: "30292", facility_kind: "tap_trung", stamp_codes_gs: "91.589.05,91.589.05.1", species: "HEO,TRAU" },
+    ],
+  ]),
+  cnts_aquaculture_object: cat("cnts_aquaculture_object", [["CA_TRA", "Cá tra", { scale_unit: "ha" }]]),
+  cnts_fishing_group: cat("cnts_fishing_group", [
+    ["CA", "Cá", { unit: "tấn", order: "1" }],
+    ["TOM", "Tôm", { unit: "tấn", order: "2" }],
+    ["MUC", "Mực", { unit: "tấn", order: "3" }],
+    ["KHAC", "Khác", { unit: "tấn", order: "4" }],
+  ]),
+  cnts_indicator: cat("cnts_indicator", [
+    ["PH", "pH", { value_type: "decimal" }],
+    ["DO", "Oxy hòa tan", { unit: "mg/l", value_type: "decimal" }],
+  ]),
+  cnts_model_type: cat("cnts_model_type", [["GA_THUONG_PHAM", "Gà thương phẩm", { sector: "chan_nuoi", species: "GA" }]]),
+  cnts_document_type: cat("cnts_document_type", [["QUY_TRINH", "Quy trình kỹ thuật", {}]]),
 };
 
 /** Tên cán bộ quản trị theo actor_ref (danh bạ pf/extension, G-07). Không có → null (web hiện mã). */
@@ -588,6 +637,18 @@ export const PARAM_VERSIONS: ParamVersion[] = [
   // Ngưỡng lấp đầy kho/Hub đã duyệt (GIS US-HUB-01) — khác mặc định nhúng 80/95 để minh hoạ nguồn "Đã duyệt".
   version({ key: "geo.hub_capacity_warn_pct", value: "60", unit: "%", version: 1, source_doc: "QĐ quy chuẩn hiển thị GIS (giả lập) 07/QĐ" }),
   version({ key: "geo.hub_capacity_full_pct", value: "85", unit: "%", version: 1, source_doc: "QĐ quy chuẩn hiển thị GIS (giả lập) 07/QĐ" }),
+  // W11.41 ngưỡng mặc định CNTS (seed pf/masterdata).
+  version({ key: "cnts.indicator_min:PH", value: "7.5", unit: "", version: 1, source_doc: "BRD CNTS v3.7 Mục III.5 — ngưỡng mặc định (W11.41)" }),
+  version({ key: "cnts.indicator_max:PH", value: "8.5", unit: "", version: 1, source_doc: "BRD CNTS v3.7 Mục III.5 — ngưỡng mặc định (W11.41)" }),
+  version({ key: "cnts.indicator_min:DO", value: "4", unit: "mg/l", version: 1, source_doc: "BRD CNTS v3.7 Mục III.5 — ngưỡng mặc định (W11.41)" }),
+  version({ key: "cnts.herd_change_pct", value: "15", unit: "%", version: 1, source_doc: "BRD CNTS v3.7 Mục III.5 — ngưỡng mặc định (W11.41)" }),
+  version({ key: "cnts.fishing_change_pct", value: "50", unit: "%", version: 1, source_doc: "BRD CNTS v3.7 Mục III.5 — ngưỡng mặc định (W11.41)" }),
+  version({ key: "cnts.slaughter_spike_factor", value: "3", unit: "lần", version: 1, source_doc: "BRD CNTS v3.7 Mục III.5 — ngưỡng mặc định (W11.41)" }),
+  version({ key: "cnts.slaughter_spike_min_days", value: "7", unit: "ngày", version: 1, source_doc: "BRD CNTS v3.7 Mục III.5 — ngưỡng mặc định (W11.41)" }),
+  version({ key: "cnts.lookback_periods", value: "4", unit: "kỳ", version: 1, source_doc: "BRD CNTS v3.7 Mục III.5 — ngưỡng mặc định (W11.41)" }),
+  version({ key: "cnts.location_distance_m", value: "200", unit: "m", version: 1, source_doc: "BRD CNTS v3.7 Mục III.5 — ngưỡng mặc định (W11.41)" }),
+  version({ key: "cnts.gps_accuracy_m", value: "50", unit: "m", version: 1, source_doc: "BRD CNTS v3.7 Mục III.5 — ngưỡng mặc định (W11.41)" }),
+  version({ key: "cnts.log_overdue_grace_days", value: "1", unit: "ngày", version: 1, source_doc: "BRD CNTS v3.7 Mục III.5 — ngưỡng mặc định (W11.41)" }),
   // Chờ duyệt do "người đặt" (persona setter) gửi — người này KHÔNG được tự duyệt (R-56).
   version({
     key: "cgh.norm_ha_per_machine:MGD:thu_hoach",
@@ -640,6 +701,21 @@ export const CATALOG_META: Record<CatalogName, { name: string; attrs_schema: str
   material: { name: "Vật tư", attrs_schema: ["unit", "group", "description"] },
   production_model: { name: "Mô hình sản xuất", attrs_schema: ["description"] },
   report_type: { name: "Loại báo cáo", attrs_schema: ["period", "level", "description"] },
+  cnts_species: { name: "Vật nuôi", attrs_schema: ["description", "group", "herd_column", "order", "unit"] },
+  cnts_breed: { name: "Giống vật nuôi", attrs_schema: ["description", "species"] },
+  cnts_vaccine: { name: "Vaccine", attrs_schema: ["description", "diseases", "order", "report_group", "species"] },
+  cnts_vaccination_schedule: { name: "Quy trình tiêm", attrs_schema: ["breed", "description", "doses", "model_type"] },
+  cnts_disease: { name: "Bệnh", attrs_schema: ["description", "notifiable", "species"] },
+  cnts_chemical: { name: "Hóa chất", attrs_schema: ["description", "target", "unit"] },
+  cnts_slaughter_facility: {
+    name: "Cơ sở giết mổ",
+    attrs_schema: ["address", "commune_code", "description", "facility_kind", "facility_ref", "species", "stamp_codes_gc", "stamp_codes_gs"],
+  },
+  cnts_aquaculture_object: { name: "Đối tượng nuôi thủy sản", attrs_schema: ["description", "scale_unit"] },
+  cnts_fishing_group: { name: "Nhóm khai thác", attrs_schema: ["description", "order", "unit"] },
+  cnts_indicator: { name: "Chỉ tiêu theo dõi", attrs_schema: ["description", "unit", "value_type"] },
+  cnts_model_type: { name: "Loại mô hình", attrs_schema: ["description", "sector", "species"] },
+  cnts_document_type: { name: "Loại văn bản", attrs_schema: ["description"] },
 };
 
 export interface MockParamDef {

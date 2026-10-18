@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-MDCATALOG-C — OwnerlookupCNTS,22/22PG0+17frozenDTOcases,fullstatic/followup0/baseline369. Helper9migrationtrướcdev; Dgỡlegacylookup,rules/DTOconstcònphasekế.

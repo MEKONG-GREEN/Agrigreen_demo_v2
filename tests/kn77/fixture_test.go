@@ -23,8 +23,9 @@ import (
 	"github.com/shopspring/decimal"
 
 	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -152,6 +153,7 @@ type fixture struct {
 	ext     *extension.Module
 	rep     *reports.Module
 	repPool tenant.Beginner
+	extPool tenant.Beginner
 	app     *httptest.Server
 	admin   *httptest.Server
 	mail    *mailer
@@ -159,6 +161,9 @@ type fixture struct {
 	// repParams: tham số của pf/reports trong kiểm thử (A4: reports.dispatch_attachment_limit_mb,
 	// reports.dispatch_link_ttl_hours); rỗng → mặc định.
 	repParams *repParams
+	// extParams: tham số văn bản của pf/extension (W11.05b): lịch kỳ v2 hiệu lực từ 04/11/2026 như dữ liệu nền
+	// masterdata, ranh giới tuần KSGM theo tháng; khóa khác → ErrParamNotFound (mặc định).
+	extParams *extParams
 
 	mu   sync.Mutex
 	ctxs map[uuid.UUID]*authz.KNContext
@@ -206,10 +211,12 @@ func newFixture(t *testing.T, o fixtureOpts) *fixture {
 	}
 	extPool := env.Pool(t, migrations.PF, extension.DBRole)
 	repPool := env.Pool(t, migrations.PF, reports.DBRole)
-	f.repPool = repPool
-	f.ext = extension.New(extPool, f.clk, extension.Deps{Orgs: og, Units: units{names: names}})
+	f.repPool, f.extPool = repPool, extPool
+	f.extParams = &extParams{v: map[string]extParam{extport.ParamPeriodRule: {from: time.Date(2026, 11, 4, 0, 0, 0, 0, clock.Zone()),
+		text: "kn.period_rule/v2;week_start=wed;week=year;month=week_end"}}}
+	f.ext = extension.New(extPool, f.clk, extension.Deps{Orgs: og, Units: units{names: names}, Params: f.extParams})
 	f.repParams = &repParams{v: map[string]decimal.Decimal{}}
-	f.rep = reports.New(repPool, f.clk, reports.Deps{Orgs: og, Units: units{names: names}, Store: st, Mailer: f.mail, Getenv: func(string) string { return "" },
+	f.rep = reports.New(repPool, f.clk, reports.Deps{FormSeeds: []repport.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: f.ext.ReportData(), Orgs: og, Units: units{names: names}, Clock: f.clk}), Catalog: []repport.CatalogRegistration{extension.ReportCatalog()}, Policies: []repport.Policy{extension.ReportPolicy()}, ResolveSession: extension.ReportSessionResolver(og), Orgs: og, Units: units{names: names}, Store: st, Mailer: f.mail, Getenv: func(string) string { return "" },
 		Params: f.repParams})
 	f.ext.UseReportCycle(extension.ReportCycleDeps{Forms: f.rep.Forms(), Regions: rg, Assignments: f.asg})
 	f.ext.UseDispatchHistory(f.rep.DispatchHistory())
@@ -237,6 +244,33 @@ func newFixture(t *testing.T, o fixtureOpts) *fixture {
 	t.Cleanup(f.app.Close)
 	t.Cleanup(f.admin.Close)
 	return f
+}
+
+type extParam struct {
+	from time.Time
+	text string
+}
+
+// extParams là tham số văn bản pf/masterdata giả cho pf/extension: có hiệu lực từ from (tra trước from → không có).
+type extParams struct {
+	mu sync.Mutex
+	v  map[string]extParam
+}
+
+func (p *extParams) set(key, text string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.v[key] = extParam{text: text}
+}
+
+func (p *extParams) At(_ context.Context, key string, at time.Time) (params.ParamValue, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	v, ok := p.v[key]
+	if !ok || at.Before(v.from) {
+		return params.ParamValue{}, params.ErrParamNotFound
+	}
+	return params.ParamValue{Key: key, Text: v.text, Version: 1, EffectiveFrom: v.from}, nil
 }
 
 // repParams là tham số pf/masterdata giả cho pf/reports (khóa chưa đặt → ErrParamNotFound → mặc định).

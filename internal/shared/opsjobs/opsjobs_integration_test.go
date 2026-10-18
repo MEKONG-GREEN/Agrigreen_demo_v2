@@ -604,11 +604,13 @@ func TestOpsJobsRoleSplit_M8(t *testing.T) {
 		"SELECT tenant_id, source FROM pf_mechanization.area_sync_log LIMIT 1",
 		"SELECT tenant_id, status FROM pf_sync.conflict LIMIT 1",
 		"SELECT tenant_id, review_status FROM pf_mrv.evidence_current LIMIT 1",
+		"SELECT tenant_id FROM pf_price.unit UNION SELECT tenant_id FROM pf_price.calendar_rule", // W11.74 job price_calendar
 	} {
 		allowed(t, pfOps, q)
 		denied(t, pfPub, q)
 	}
 	denied(t, pfOps, "SELECT * FROM pf_extension.task_current LIMIT 1")
+	denied(t, pfOps, "SELECT code FROM pf_price.unit LIMIT 1")
 	mkgPub, mkgOps := env.Pool(t, migrations.MKG, dbadmin.OutboxPublisher), env.Pool(t, migrations.MKG, dbadmin.OpsJobs)
 	for _, q := range []string{
 		"SELECT tenant_id, status FROM mkg_hub.facility_current LIMIT 1",

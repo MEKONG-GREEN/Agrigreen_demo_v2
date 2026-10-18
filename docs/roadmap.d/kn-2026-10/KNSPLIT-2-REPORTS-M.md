@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-REPORTS-M —9consumer dùngKNportaliases13DTO/5ID;14/14PGnoSKIP/fullKNhandler/static đạt trên21d2518f,boundary383; helper8migrationgate trướcdev. N mới sở hữu definitions.

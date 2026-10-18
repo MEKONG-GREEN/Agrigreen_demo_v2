@@ -30,7 +30,7 @@ var codeRe = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,40}$`)
 // reach là phạm vi đơn vị của người gọi. Quản lý HTX thuần (coopOnly, không vai CGH)
 // không có phạm vi đơn vị — chỉ HTX của mình — nên không cần pf/party.
 func (s *Service) reach(ctx context.Context, p authz.Principal) (authz.Scope, error) {
-	if coopOnly(p) && !hasAny(p, cghRoles) {
+	if s.coopOnly(p) && !hasAny(p, cghRoles) {
 		return authz.Scope{}, nil
 	}
 	return s.scope(ctx, p)
@@ -40,8 +40,8 @@ func (s *Service) reach(ctx context.Context, p authz.Principal) (authz.Scope, er
 // (coopOnly): phạm vi là HTX của người gọi, ghi vào bộ lọc cooperative_ref (lọc HTX
 // khác → 403), phạm vi đơn vị để trống (domain.Params.CoopScoped). Còn lại: phạm vi
 // đơn vị, rỗng → 403.
-func jobScope(p authz.Principal, sc authz.Scope, def domain.Definition, params *domain.Params) (authz.Scope, error) {
-	if domain.Sources[def.Source].Module == "cropcycle" && coopOnly(p) {
+func (s *Service) jobScope(p authz.Principal, sc authz.Scope, def domain.Definition, params *domain.Params) (authz.Scope, error) {
+	if s.sourceSpec(def.Source).Module == "cropcycle" && s.coopOnly(p) {
 		if p.OrgRef == uuid.Nil {
 			return sc, ErrOutOfScope.WithDetail("tài khoản chưa gắn HTX")
 		}
@@ -68,12 +68,12 @@ type ExportInput struct {
 // normalizeParams kiểm và chuẩn hóa bộ lọc theo nguồn của mẫu (FN-10 BR-01: tệp
 // khớp đúng bộ lọc). now dùng cho kỳ mặc định (tháng hiện tại).
 func (s *Service) normalizeParams(ctx context.Context, def domain.Definition, in domain.Params, sc authz.Scope, now time.Time) (domain.Params, error) {
-	src := domain.Sources[def.Source]
+	src := s.sourceSpec(def.Source)
 	p := domain.Params{Level: strings.TrimSpace(in.Level), UnitCode: strings.TrimSpace(in.UnitCode), MachineType: strings.TrimSpace(in.MachineType)}
 	if p.Level == "" {
 		p.Level = def.Grouping
 	}
-	if !domain.LevelAllowed(def.Source, p.Level) {
+	if !domain.LevelAllowedWithSources(def.Source, p.Level, s.sourceSpecs()) {
 		return p, problem.Validation.WithField("level", "mẫu này hỗ trợ cấp "+strings.Join(src.Levels, ", "))
 	}
 	if p.UnitCode != "" {
@@ -147,7 +147,7 @@ func (s *Service) normalizeParams(ctx context.Context, def domain.Definition, in
 // qua điểm kiểm soát DLP, ghi job + outbox pf.reports.export.requested trong MỘT
 // giao dịch; worker dựng tệp. Trả 202 ở handler.
 func (s *Service) RequestExport(ctx context.Context, in ExportInput) (domain.Job, bool, error) {
-	p, err := authz.Require(ctx, allReaders...)
+	p, err := authz.Require(ctx, s.readerRoles()...)
 	if err != nil {
 		return domain.Job{}, false, err
 	}
@@ -158,7 +158,7 @@ func (s *Service) RequestExport(ctx context.Context, in ExportInput) (domain.Job
 	if err != nil {
 		return domain.Job{}, false, err
 	}
-	if sc.Empty() && !coopOnly(p) {
+	if sc.Empty() && !s.coopOnly(p) {
 		return domain.Job{}, false, ErrOutOfScope.WithDetail("tài khoản chưa gắn đơn vị công tác")
 	}
 	now := s.now()
@@ -171,21 +171,21 @@ func (s *Service) RequestExport(ctx context.Context, in ExportInput) (domain.Job
 			job, replayed = *prev, true
 			return nil
 		}
-		t, err := resolveTemplate(ctx, tx, strings.TrimSpace(in.TemplateKey))
+		t, err := s.resolveTemplate(ctx, tx, strings.TrimSpace(in.TemplateKey))
 		if err != nil {
 			return err
 		}
 		if t.Status != domain.TemplateActive {
 			return ErrTemplateRetired
 		}
-		if !hasAny(p, rolesFor(t.Def.Source)) {
+		if !hasAny(p, s.sourceRoles(t.Def.Source)) {
 			return problem.Forbidden.WithDetail("vai của bạn không được xuất mẫu này")
 		}
 		if !slices.Contains(t.Def.Formats, in.Format) {
 			return ErrFormat.WithField("format", "mẫu hỗ trợ "+strings.Join(t.Def.Formats, ", "))
 		}
 		raw := in.Params
-		jsc, err := jobScope(p, sc, t.Def, &raw)
+		jsc, err := s.jobScope(p, sc, t.Def, &raw)
 		if err != nil {
 			return err
 		}
@@ -234,14 +234,14 @@ func (s *Service) enqueueJob(ctx context.Context, tx pgx.Tx, j *domain.Job) erro
 
 // jobVisible: người yêu cầu luôn thấy việc của mình; người khác cần vai của nguồn
 // và phạm vi bao trọn phạm vi của việc xuất.
-func jobVisible(p authz.Principal, sc authz.Scope, j domain.Job) bool {
+func (s *Service) jobVisible(p authz.Principal, sc authz.Scope, j domain.Job) bool {
 	if j.RequestedBy == p.ActorRef {
 		return true
 	}
-	if !hasAny(p, rolesFor(j.Def.Source)) {
+	if !hasAny(p, s.sourceRoles(j.Def.Source)) {
 		return false
 	}
-	if domain.Sources[j.Def.Source].Module == "cropcycle" && coopOnly(p) {
+	if s.sourceSpec(j.Def.Source).Module == "cropcycle" && s.coopOnly(p) {
 		// HTX US-DASH-02: quản lý HTX chỉ thấy việc xuất trong phạm vi HTX của mình.
 		return p.OrgRef != uuid.Nil && j.Params.CoopScoped(j.ScopeAll, j.ScopeUnits) && j.Params.CooperativeRef == p.OrgRef.String()
 	}
@@ -261,7 +261,7 @@ func jobVisible(p authz.Principal, sc authz.Scope, j domain.Job) bool {
 
 // GetExport đọc trạng thái việc xuất (ngoài phạm vi → 404, không lộ sự tồn tại).
 func (s *Service) GetExport(ctx context.Context, id uuid.UUID) (domain.Job, error) {
-	p, err := authz.Require(ctx, allReaders...)
+	p, err := authz.Require(ctx, s.readerRoles()...)
 	if err != nil {
 		return domain.Job{}, err
 	}
@@ -277,7 +277,7 @@ func (s *Service) GetExport(ctx context.Context, id uuid.UUID) (domain.Job, erro
 	}); err != nil {
 		return domain.Job{}, err
 	}
-	if j == nil || !jobVisible(p, sc, *j) {
+	if j == nil || !s.jobVisible(p, sc, *j) {
 		return domain.Job{}, ErrExportNotFound
 	}
 	return *j, nil
@@ -292,7 +292,7 @@ type ExportPage struct {
 // MyExports liệt kê việc xuất do CHÍNH người gọi yêu cầu (kể cả việc của lịch gửi
 // họ sở hữu), mới nhất trước, phân trang cursor (R-53). limit 1–200, mặc định 50.
 func (s *Service) MyExports(ctx context.Context, before uuid.UUID, limit int) (ExportPage, error) {
-	p, err := authz.Require(ctx, allReaders...)
+	p, err := authz.Require(ctx, s.readerRoles()...)
 	if err != nil {
 		return ExportPage{}, err
 	}
@@ -331,7 +331,7 @@ type DownloadLink struct {
 // Download cấp URL tải ngắn hạn — cũng đi qua điểm kiểm soát DLP (ghi nhật ký).
 // Không ghi URL có chữ ký vào log (R-92).
 func (s *Service) Download(ctx context.Context, id uuid.UUID) (DownloadLink, error) {
-	p, err := authz.Require(ctx, allReaders...)
+	p, err := authz.Require(ctx, s.readerRoles()...)
 	if err != nil {
 		return DownloadLink{}, err
 	}

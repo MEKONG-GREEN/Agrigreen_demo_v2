@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.price.reminder.issued/v1",
+  "title": "pf.price.reminder.issued — payload",
+  "description": "Nhắc nhập giá Báo giá nông sản do job price_calendar phát (W11.74, BRD FN-XA-03.04): round 1 = buổi sáng ngày báo giá, round 2 = trước giờ khóa, chỉ xã chưa gửi; test = 'Gửi thử' tới người đang đăng nhập (FN-AD-04.05 AC-02). recipient_refs rỗng → pf/notify gửi thông báo chủ đề tới cán bộ xã của communes (rỗng = toàn tenant). Tiêu đề/nội dung dựng từ mẫu của Cấp Tỉnh; không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.price.reminder.issued",
+  "x-schema-version": 1,
+  "x-producer": "pf/price",
+  "type": "object",
+  "required": [
+    "profile",
+    "day",
+    "round",
+    "lock_at",
+    "title",
+    "body",
+    "communes",
+    "recipient_refs",
+    "in_app",
+    "email",
+    "test"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "description": "Bên dùng của cap/price (KN = kn)"
+    },
+    "day": {
+      "type": "string",
+      "format": "date"
+    },
+    "round": {
+      "type": "integer",
+      "enum": [
+        1,
+        2
+      ]
+    },
+    "lock_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "title": {
+      "type": "string"
+    },
+    "body": {
+      "type": "string"
+    },
+    "communes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "recipient_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "in_app": {
+      "type": "boolean"
+    },
+    "email": {
+      "type": "boolean"
+    },
+    "test": {
+      "type": "boolean"
+    }
+  }
+}

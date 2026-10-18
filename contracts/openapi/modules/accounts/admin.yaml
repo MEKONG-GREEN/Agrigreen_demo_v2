@@ -1,0 +1,839 @@
+paths:
+# @ag-order: 109
+  /v1/accounts/mgmt-levels:
+    get:
+      summary: "Danh mục cấp quản lý (tạm, chờ khách Q-05)"
+      operationId: accountsMgmtLevels
+      tags: [accounts]
+      responses:
+        "200":
+          description: Danh mục
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, provisional]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [code, label]
+                      properties:
+                        code: {type: string}
+                        label: {type: string}
+                        manager: {type: boolean, description: "W11.07: có quyền của lãnh đạo"}
+                        reads_all_departments: {type: boolean, description: "W11.07: Lãnh đạo đơn vị — chọn mọi phòng ban ở chế độ chỉ xem"}
+                  provisional: {type: boolean}
+                  version: {type: string, description: "W11.07: phiên bản danh mục (accounts.kn-roles/2)"}
+                  province_groups: {type: array, items: {$ref: "#/components/schemas/KNCatalogItem"}}
+                  duties: {type: array, items: {$ref: "#/components/schemas/KNCatalogItem"}}
+                  powers: {type: array, items: {$ref: "#/components/schemas/KNCatalogItem"}}
+                  delegation_max_days: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 110
+  /v1/accounts/kn-users:
+    post:
+      summary: "FN-AD-04.04 Tạo tài khoản KN: tên đăng nhập = SĐT chuẩn hóa (vắng → email), vai realm kn_user, liên kết kích hoạt (lần đầu bắt buộc đặt mật khẩu, không mật khẩu tạm) + các vai trò"
+      description: |
+        Tiên quyết (UR-AD-04): Nút tồn tại, đúng cấp của vai (Cấp Quốc gia → ttkn_national; Cấp Tỉnh, Cấp Xã → ttkn_province), đơn vị đã
+        khai phòng ban → ngược lại 409 accounts.prerequisite_missing. Trùng SĐT/email → 409 accounts.duplicate_identity. Cấp Xã chưa gán xã →
+        lưu được, cảnh báo commune_unassigned. Vai Admin không tạo kèm được (gán sau cho tài khoản platform_admin).
+      operationId: accountsCreateKNUser
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [full_name, email, assignments]
+              properties:
+                full_name: {type: string}
+                email: {type: string, format: email}
+                phone: {type: string, description: "0xxxxxxxxx hoặc +84…; chuẩn hóa thành tên đăng nhập"}
+                assignments: {type: array, minItems: 1, items: {$ref: "#/components/schemas/KNAssignmentInput"}}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user, assignments, activation_email_sent, warnings]
+                properties:
+                  user: {$ref: "#/components/schemas/AccountsUser"}
+                  assignments: {type: array, items: {$ref: "#/components/schemas/KNAssignment"}}
+                  activation_email_sent: {type: boolean}
+                  warnings: {type: array, items: {$ref: "#/components/schemas/KNWarning"}}
+        "403": {description: "accounts.kn_admin_grant, không phải Admin", $ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.prerequisite_missing, accounts.duplicate_identity, accounts.assignment_duplicate", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed, accounts.department_invalid, accounts.commune_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 111
+  /v1/accounts/users/{id}/assignments:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: "Khối Vai trò và phạm vi của màn Detail tài khoản"
+      operationId: accountsListAssignments
+      tags: [accounts]
+      parameters:
+        - {name: include_revoked, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Theo thời điểm gán
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/KNAssignment"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Thêm vai trò (sổ role_assignment_event, phát pf.accounts.assignment.granted); vai Admin chỉ platform_admin gán cho tài khoản platform_admin"
+      operationId: accountsGrantAssignment
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNAssignmentInput"}
+      responses:
+        "201": {$ref: "#/components/responses/KNAssignmentChanged"}
+        "403": {description: "accounts.self_action, accounts.kn_admin_grant", $ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 112
+  /v1/accounts/users/{id}/assignments/{aid}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: aid, in: path, required: true, schema: {type: string, format: uuid}}
+    put:
+      summary: "Sửa vai trò (Nút, phòng ban, cấp quản lý, xã phụ trách, hiệu lực) — có hiệu lực ở request kế tiếp của mọi ngữ cảnh; không đổi vai"
+      operationId: accountsChangeAssignment
+      tags: [accounts]
+      parameters:
+        - {name: Idempotency-Key, in: header, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNAssignmentInput"}
+      responses:
+        "200": {$ref: "#/components/responses/KNAssignmentChanged"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.assignment_state (đã thu hồi / không có thay đổi), accounts.assignment_duplicate", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 113
+  /v1/accounts/users/{id}/assignments/{aid}/revoke:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: aid, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: "Xóa (thu hồi) vai trò — lý do ≥ 10 ký tự; dữ liệu đã nhập bằng vai trò giữ nguyên; ngữ cảnh của vai trò hết hiệu lực ngay"
+      operationId: accountsRevokeAssignment
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/AccountsReason"
+      responses:
+        "200": {$ref: "#/components/responses/KNAssignmentChanged"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 114
+  /v1/accounts/users/{id}/assignments/{aid}/attributes:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: aid, in: path, required: true, schema: {type: string, format: uuid}}
+    put:
+      summary: "W11.07 Đặt thuộc tính phân quyền trong vai (nhóm Cấp Tỉnh, QTNV báo giá, người phụ trách biểu, đơn vị nội bộ, phạm vi Cấp Xã theo cơ sở/hộ) — sổ phụ, có hiệu lực ở request kế tiếp"
+      operationId: accountsSetAssignmentAttrs
+      tags: [accounts]
+      parameters:
+        - {name: Idempotency-Key, in: header, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                province_group: {type: string}
+                duties: {type: array, items: {type: string}}
+                internal_unit_code: {type: string}
+                facility_refs: {type: array, items: {type: string, format: uuid}}
+                household_refs: {type: array, items: {type: string, format: uuid}}
+                reason: {type: string}
+      responses:
+        "200":
+          description: Thuộc tính hiện hành (không đổi → không ghi sổ)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assignment_id, attributes, seq]
+                properties:
+                  assignment_id: {type: string, format: uuid}
+                  attributes: {$ref: "#/components/schemas/KNAssignmentAttrs"}
+                  seq: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.assignment_state", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed, accounts.internal_unit_invalid, accounts.facility_invalid (W11.41)", $ref: "#/components/responses/Problem"}
+# @ag-order: 115
+  /v1/accounts/users/{id}/delegations:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: "W11.07 Ủy quyền có hạn tài khoản đã giao hoặc đã nhận"
+      operationId: accountsUserDelegations
+      tags: [accounts]
+      responses:
+        "200":
+          description: Mới nhất trước
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDelegationList"}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 116
+  /v1/accounts/delegations/{id}/revoke:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: "W11.07 Admin thu hồi ủy quyền còn hiệu lực (lý do ≥ 10 ký tự)"
+      operationId: accountsRevokeDelegation
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/AccountsReason"
+      responses:
+        "200":
+          description: Đã thu hồi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDelegation"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "accounts.delegation_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.delegation_state", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 117
+  /v1/accounts/internal-units:
+    get:
+      summary: "W11.07 Danh mục đơn vị nội bộ (BGĐ, văn phòng, phòng, trạm, trại, tăng cường — Q-068)"
+      operationId: adminListInternalUnits
+      tags: [accounts]
+      parameters:
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Theo thứ tự hiển thị
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnitList"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "W11.07 Khai báo đơn vị nội bộ (mã không tái sử dụng; chỉ loại phong gắn phòng ban)"
+      operationId: createInternalUnit
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/InternalUnitInput"}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnit"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnit"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.internal_unit_code_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed, accounts.internal_unit_org_invalid, accounts.internal_unit_department_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 118
+  /v1/accounts/internal-units/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    put:
+      summary: "W11.07 Sửa loại, tên, phòng ban, thứ tự (mã không đổi)"
+      operationId: updateInternalUnit
+      tags: [accounts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/InternalUnitInput"}
+      responses:
+        "200":
+          description: Đã sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnit"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 119
+  /v1/accounts/internal-units/{id}/deactivate:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: "W11.07 Ngừng đơn vị nội bộ (lý do ≥ 10 ký tự) — người đã gán giữ nguyên, không chọn được cho lần gán mới"
+      operationId: deactivateInternalUnit
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema: {type: object, properties: {reason: {type: string}}}
+      responses:
+        "200":
+          description: Đã ngừng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnit"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.internal_unit_state", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 120
+  /v1/accounts/internal-units/{id}/reactivate:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: "W11.07 Dùng lại đơn vị nội bộ"
+      operationId: reactivateInternalUnit
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Đang dùng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnit"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+# @ag-order: 121
+  /v1/accounts/internal-units/{id}/log:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: "W11.07 Khung Log của đơn vị nội bộ"
+      operationId: internalUnitLog
+      tags: [accounts]
+      parameters:
+        - {name: cursor, in: query, schema: {type: integer}}
+        - {name: limit, in: query, schema: {type: integer}}
+      responses:
+        "200":
+          description: Theo seq
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {type: object}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 122
+  /v1/accounts/internal-units/seed:
+    post:
+      summary: "W11.07 Nạp đơn vị nội bộ mặc định (Ban Giám đốc + 5 phòng gắn phòng ban) — chạy lặp an toàn"
+      operationId: seedInternalUnits
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [org_ref], properties: {org_ref: {type: string, format: uuid}}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, existing, status]
+                properties:
+                  created: {type: array, items: {$ref: "#/components/schemas/InternalUnit"}}
+                  existing: {type: integer}
+                  status: {type: string}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 123
+  /v1/accounts/users/{id}/profile:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    patch:
+      summary: "Sửa Thông tin tài khoản (họ tên, email, SĐT) ở Keycloak; tài khoản đăng nhập bằng SĐT/email đổi tên đăng nhập theo; sổ chỉ ghi tên trường (RB-3)"
+      operationId: accountsUpdateProfile
+      tags: [accounts]
+      parameters:
+        - {name: Idempotency-Key, in: header, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name: {type: string}
+                email: {type: string, format: email}
+                phone: {type: string}
+                reason: {type: string}
+      responses:
+        "200":
+          description: Đã sửa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user, changed_fields, seq, replayed]
+                properties:
+                  user: {$ref: "#/components/schemas/AccountsUser"}
+                  changed_fields: {type: array, items: {type: string, enum: [full_name, email, phone, username]}}
+                  seq: {type: integer}
+                  replayed: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.duplicate_identity, accounts.state_conflict (không có thay đổi)", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {description: accounts.profile_update_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 124
+  /v1/accounts/users/{id}/log:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: "Khung Log của màn Detail (định dạng Log chung P2): tạo, khóa/mở, gửi lại liên kết, thêm/sửa/xóa vai trò (cũ → mới), sửa thông tin"
+      operationId: accountsUserLog
+      tags: [accounts]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}, description: "seq của dòng cuối trang trước"}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Theo thời điểm ghi
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KNAccountLogEntry"}}
+                  next_cursor: {type: [integer, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 125
+  /v1/accounts/kn-users/import:
+    post:
+      summary: "Nạp Excel tài khoản KN nhiều vai trò (FN-AD-04.04 \"Nạp Excel\", UR-AD-04, W11.02) — kết quả theo từng dòng"
+      description: |
+        Thân request là tệp CSV UTF-8/.xlsx (shared/tabular; ô công thức → từ chối cả tệp). Mỗi dòng là MỘT lần gán vai trò; các dòng
+        cùng Email gộp thành một tài khoản nhiều vai (vd Cấp Xã 2 xã + Cấp Quốc gia). Cột: Họ tên, Email (bắt buộc), SĐT, Vai trò
+        (kn_tw | kn_tinh | kn_xa hoặc "Cấp Quốc gia" / "Cấp Tỉnh" / "Cấp Xã"; vai Admin không nạp qua tệp), Mã Nút (mã tổ chức hoặc
+        UUID), Phòng ban (mã, phân tách ";"), Cấp quản lý (mã hoặc nhãn), Xã phụ trách (mã, phân tách ";"). Mỗi tài khoản tạo như
+        POST /v1/accounts/kn-users (tiên quyết Nút + phòng ban, liên kết kích hoạt, không mật khẩu tạm). Tài khoản có dòng lỗi bị
+        loại cả nhóm; tài khoản khác vẫn tạo. Khóa idem của tài khoản = Idempotency-Key + ":acc:" + dòng đầu (gửi lại cùng khóa phát
+        lại). Lý do không chứa dữ liệu nhập. Tối đa 300 dòng, 2 MB.
+      operationId: accountsImportKNUsers
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          text/csv: {schema: {type: string, format: binary}}
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Kết quả từng dòng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accounts_created, created, rejected, rows]
+                properties:
+                  accounts_created: {type: integer, description: "Số tài khoản đã tạo"}
+                  created: {type: integer, description: "Số dòng (lần gán) đã ghi"}
+                  rejected: {type: integer}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [row, status, reason, user_id, activation_email_sent]
+                      properties:
+                        row: {type: integer}
+                        status: {type: string, enum: [created, rejected]}
+                        reason: {type: [string, "null"]}
+                        user_id: {type: [string, "null"], format: uuid}
+                        activation_email_sent: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 126
+  /v1/accounts/users/{id}/sessions:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: "Tab \"Phiên đang hoạt động\" và \"Lịch sử đăng nhập\" của màn Detail tài khoản (FN-AD-04.04, W11.02) — đọc Keycloak Admin REST"
+      description: |
+        Phiên: GET /users/{id}/sessions; lịch sử: GET /events?user=…&type=LOGIN|LOGIN_ERROR|LOGOUT|CODE_TO_TOKEN_ERROR (realm phải bật
+        eventsEnabled; tài khoản dịch vụ cần view-events). Không ghi gì, không lưu IP ở pf. available = false khi bản cài không đọc
+        được phiên. Cùng phạm vi như khung Log.
+      operationId: accountsUserSessions
+      tags: [accounts]
+      parameters:
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Phiên đang hoạt động (mới truy cập trước) và lịch sử đăng nhập (mới nhất trước)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [available, active, history]
+                properties:
+                  available: {type: boolean}
+                  active:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, ip_address, started_at, last_access_at, clients]
+                      properties:
+                        id: {type: string}
+                        ip_address: {type: string}
+                        started_at: {type: [string, "null"], format: date-time}
+                        last_access_at: {type: [string, "null"], format: date-time}
+                        clients: {type: array, items: {type: string}}
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      required: [at, type, ip_address, client, error]
+                      properties:
+                        at: {type: [string, "null"], format: date-time}
+                        type: {type: string}
+                        ip_address: {type: string}
+                        client: {type: string}
+                        error: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 127
+  /v1/accounts/support-sessions:
+    post:
+      summary: "FN-AD-04.07 Menu các cấp: Admin (platform_admin, MFA) vào menu Cấp Quốc gia/Tỉnh/Xã để hỗ trợ — trả ngữ cảnh phiên (gửi qua X-AG-Context, dải cảnh báo vàng theo support_session_id)"
+      description: |
+        target_assignment_id: hỗ trợ một tài khoản (vai, Nút, xã của lần gán; on_behalf_of = tài khoản đó). Vắng: chọn role + org_ref (+ commune_codes
+        với Cấp Xã). Mọi thao tác ghi trong ngữ cảnh này bắt buộc header X-AG-Reason (≥ 10 ký tự, mã hóa phần trăm) → nếu thiếu 422
+        accounts.support_reason_required; mỗi thao tác ghi hai dòng nhật ký (attempted, completed). Hết hạn sau 4 giờ (tạm).
+      operationId: accountsStartSupport
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [department_code, reason]
+              properties:
+                target_assignment_id: {type: string, format: uuid}
+                role: {type: string, enum: [kn_tw, kn_tinh, kn_xa]}
+                org_ref: {type: string, format: uuid}
+                commune_codes: {type: array, items: {type: string}}
+                department_code: {type: string}
+                reason: {type: string, minLength: 10}
+      responses:
+        "201":
+          description: Ngữ cảnh hỗ trợ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNSessionContext"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 128
+  /v1/accounts/support-sessions/{id}/end:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: "Thoát chế độ hỗ trợ — ngữ cảnh hỗ trợ hết hiệu lực ngay"
+      operationId: accountsEndSupport
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Đã kết thúc
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [support_session_id, ended_at]
+                properties:
+                  support_session_id: {type: string, format: uuid}
+                  ended_at: {type: [string, "null"], format: date-time}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: accounts.support_session_ended, $ref: "#/components/responses/Problem"}
+# @ag-order: 129
+  /v1/accounts/support-log:
+    get:
+      summary: "Nhật ký hỗ trợ (không xóa): thời điểm, Admin, thay cho ai, chức năng, nội dung, lý do — mới nhất trước"
+      operationId: accountsSupportLog
+      tags: [accounts]
+      parameters:
+        - {name: support_session_id, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KNSupportLogEntry"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/accounts ---
+
+  # --- pf/reports: mẫu biểu (reports_admin, masterdata_admin hoặc platform_admin — CGH FN-10 BR-03) và lịch gửi định kỳ (US-DASH-03) ---
+components:
+  responses:
+# @ag-order: 253
+    KNAssignmentChanged:
+      description: Lần gán vai trò sau thao tác, seq dòng sổ, cảnh báo (vd commune_unassigned)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [assignment, seq, replayed, warnings]
+            properties:
+              assignment: {$ref: "#/components/schemas/KNAssignment"}
+              seq: {type: integer}
+              replayed: {type: boolean}
+              warnings: {type: array, items: {$ref: "#/components/schemas/KNWarning"}}
+  schemas:
+# @ag-order: 322
+    KNAssignmentInput:
+      type: object
+      required: [role]
+      properties:
+        role: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}
+        org_ref: {type: [string, "null"], format: uuid, description: "Bắt buộc trừ admin. kn_tw → ttkn_national; kn_tinh, kn_xa → ttkn_province"}
+        department_codes: {type: array, items: {type: string}, description: "≥ 1 (trừ admin: rỗng); phòng ban của đơn vị chứa Nút"}
+        mgmt_level: {type: [string, "null"], description: "Mã danh mục cấp quản lý (GET /v1/accounts/mgmt-levels, tạm Q-05)"}
+        commune_codes: {type: array, items: {type: string}, description: "Chỉ kn_xa; ⊂ xã của Nút tỉnh; rỗng → cảnh báo"}
+        valid_from: {type: [string, "null"], format: date-time}
+        valid_to: {type: [string, "null"], format: date-time}
+        reason: {type: string}
+# @ag-order: 323
+    KNCommune:
+      type: object
+      required: [code, name]
+      properties:
+        code: {type: string}
+        name: {type: string}
+# @ag-order: 324
+    KNDepartmentRef:
+      type: object
+      required: [code, name, description, status]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        description: {type: [string, "null"]}
+        status: {type: string, enum: [active, not_open, suspended]}
+        read_only: {type: boolean, description: "W11.07: phòng ban ngoài lần gán, chọn được ở chế độ chỉ xem (Lãnh đạo đơn vị, Ban Giám đốc)"}
+# @ag-order: 325
+    KNAssignment:
+      type: object
+      required: [assignment_id, user_ref, role, org_ref, org_name, mgmt_level, mgmt_level_code, communes, departments, valid_from, valid_to, active,
+        created_by, created_at, updated_by, updated_at]
+      properties:
+        assignment_id: {type: string, format: uuid}
+        user_ref: {type: string, format: uuid}
+        role: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}
+        org_ref: {type: [string, "null"], format: uuid}
+        org_name: {type: string, description: "Admin không Nút: \"Toàn hệ thống\""}
+        mgmt_level: {type: [string, "null"], description: "Nhãn cấp quản lý"}
+        mgmt_level_code: {type: [string, "null"]}
+        communes: {type: array, items: {$ref: "#/components/schemas/KNCommune"}}
+        departments: {type: array, items: {$ref: "#/components/schemas/KNDepartmentRef"}}
+        valid_from: {type: string, format: date-time}
+        valid_to: {type: [string, "null"], format: date-time}
+        active: {type: boolean}
+        created_by: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+        updated_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+        attributes: {$ref: "#/components/schemas/KNAssignmentAttrs"}
+# @ag-order: 326
+    KNWarning:
+      type: object
+      required: [code, message]
+      properties:
+        code: {type: string, enum: [commune_unassigned]}
+        message: {type: string}
+# @ag-order: 327
+    KNSessionContext:
+      type: object
+      required: [context_id, assignment_id, role, department_code, department_name, org_ref, org_name, communes, default_route, expires_at,
+        support_session_id, on_behalf_of]
+      properties:
+        context_id: {type: string, format: uuid, description: "Gửi lại qua header X-AG-Context"}
+        assignment_id: {type: [string, "null"], format: uuid, description: "null: ngữ cảnh hỗ trợ không gắn tài khoản"}
+        role: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}
+        department_code: {type: [string, "null"]}
+        department_name: {type: [string, "null"]}
+        org_ref: {type: [string, "null"], format: uuid}
+        org_name: {type: string}
+        communes: {type: array, items: {$ref: "#/components/schemas/KNCommune"}}
+        default_route: {type: string}
+        expires_at: {type: string, format: date-time}
+        support_session_id: {type: [string, "null"], format: uuid, description: "Khác null: chế độ hỗ trợ — hiện dải cảnh báo vàng"}
+        on_behalf_of: {type: [string, "null"], format: uuid}
+        read_only: {type: boolean, description: "W11.07: ngữ cảnh chỉ xem (Cấp TW, Lãnh đạo đơn vị ở phòng ban khác, Ban Giám đốc) — mọi thao tác ghi 403 accounts.context_read_only"}
+        mgmt_level_code: {type: [string, "null"]}
+        manager: {type: boolean, description: "Lãnh đạo (≥ phó phòng/phụ trách/lãnh đạo đơn vị, hoặc nhóm Lãnh đạo phòng)"}
+        province_group: {type: [string, "null"]}
+        duties: {type: array, items: {type: string}}
+        internal_unit_code: {type: [string, "null"]}
+        powers: {type: array, items: {type: string}, description: "Quyền nhận qua ủy quyền có hạn còn hiệu lực (đầy đủ ở GET /v1/me/context)"}
+    # --- W11.07: phân quyền trong vai + đơn vị nội bộ (cùng định nghĩa ở admin.yaml/application.yaml) ---
+# @ag-order: 328
+    KNAssignmentAttrs:
+      type: object
+      description: "Thuộc tính phân quyền trong vai (sổ phụ pf_accounts.assignment_attr_event, W11.07)"
+      required: [province_group, province_group_label, duties, internal_unit_code, facility_refs, household_refs]
+      properties:
+        province_group: {type: [string, "null"], enum: [vien_chuc, tong_hop, chu_nhiem, lanh_dao_phong, ban_giam_doc, null], description: "Nhóm Cấp Tỉnh (chỉ kn_tinh; tạm Q-059)"}
+        province_group_label: {type: [string, "null"]}
+        duties: {type: array, items: {type: string, enum: [qtnv_bao_gia, phu_trach_bieu]}, description: "Cờ nhiệm vụ (chỉ kn_tinh)"}
+        internal_unit_code: {type: [string, "null"], description: "Đơn vị nội bộ; Cấp Xã: đơn vị quản lý (HS-37)"}
+        facility_refs: {type: array, items: {type: string, format: uuid}, description: "Cấp Xã: giới hạn cơ sở (rỗng = cả xã)"}
+        household_refs: {type: array, items: {type: string, format: uuid}, description: "Cấp Xã: giới hạn hộ (rỗng = cả xã)"}
+# @ag-order: 329
+    KNDelegation:
+      type: object
+      required: [delegation_id, grantor_ref, grantee_ref, department_code, power, power_label, valid_from, valid_to, revoked, status, reason, created_at]
+      properties:
+        delegation_id: {type: string, format: uuid}
+        grantor_ref: {type: string, format: uuid}
+        grantee_ref: {type: string, format: uuid}
+        department_code: {type: string}
+        power: {type: string, enum: [mo_lai_ky, duyet_bao_cao]}
+        power_label: {type: string}
+        valid_from: {type: string, format: date-time}
+        valid_to: {type: string, format: date-time}
+        revoked: {type: boolean}
+        status: {type: string, enum: [active, scheduled, expired, revoked]}
+        reason: {type: string}
+        created_at: {type: string, format: date-time}
+# @ag-order: 330
+    KNDelegationList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNDelegation"}}
+# @ag-order: 331
+    InternalUnit:
+      type: object
+      required: [id, org_ref, code, kind, kind_label, name, department_code, sort_order, active, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid}
+        code: {type: string}
+        kind: {type: string, enum: [ban_giam_doc, van_phong, phong, tram, trai, tang_cuong]}
+        kind_label: {type: string}
+        name: {type: string}
+        department_code: {type: [string, "null"], description: "kind = phong: mã phòng ban P2"}
+        sort_order: {type: integer}
+        active: {type: boolean}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 332
+    InternalUnitList:
+      type: object
+      required: [org_ref, items, kinds]
+      properties:
+        org_ref: {type: string, format: uuid}
+        items: {type: array, items: {$ref: "#/components/schemas/InternalUnit"}}
+        kinds: {type: array, items: {type: object, required: [code, label], properties: {code: {type: string}, label: {type: string}}}}
+# @ag-order: 333
+    InternalUnitInput:
+      type: object
+      required: [code, kind, name]
+      properties:
+        org_ref: {type: string, format: uuid, description: "Tạo: bắt buộc (Nút cấp 1/2)"}
+        code: {type: string, description: "Sửa: bỏ qua (mã không đổi)"}
+        kind: {type: string, enum: [ban_giam_doc, van_phong, phong, tram, trai, tang_cuong]}
+        name: {type: string}
+        department_code: {type: string}
+        sort_order: {type: integer}
+# @ag-order: 334
+    KNCatalogItem:
+      type: object
+      required: [code, label]
+      properties:
+        code: {type: string}
+        label: {type: string}
+# @ag-order: 335
+    KNAccountLogEntry:
+      type: object
+      required: [seq, event, entity_ref, actor_ref, actor_display, at, recorded_at, changes, reason]
+      properties:
+        seq: {type: integer, description: "Thứ tự trong Log hợp nhất của tài khoản"}
+        event:
+          type: string
+          enum: [account.created, account.locked, account.unlocked, account.activation_sent, account.assignment_changed, account.profile_updated,
+            account.dormant_warned, account.totp_reset,
+            assignment.granted, assignment.changed, assignment.revoked, assignment.attributes_changed]
+        entity_ref: {type: [string, "null"], format: uuid, description: "assignment_id với sự kiện assignment.*"}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: [string, "null"]}
+        at: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        changes: {type: array, items: {$ref: "#/components/schemas/KNFieldChange"}, description: "profile_updated: chỉ tên trường, old/new = null (RB-3)"}
+        reason: {type: [string, "null"]}
+# @ag-order: 336
+    KNSupportLogEntry:
+      type: object
+      required: [id, support_session_id, context_id, request_id, phase, actor_ref, actor_display, on_behalf_of, on_behalf_of_display, acted_role,
+        department_code, function, content, status_code, reason, trace_id, at]
+      properties:
+        id: {type: string, format: uuid}
+        support_session_id: {type: string, format: uuid}
+        context_id: {type: string, format: uuid}
+        request_id: {type: string, format: uuid}
+        phase: {type: string, enum: [attempted, completed]}
+        actor_ref: {type: string, format: uuid, description: "Admin thật"}
+        actor_display: {type: [string, "null"]}
+        on_behalf_of: {type: [string, "null"], format: uuid}
+        on_behalf_of_display: {type: [string, "null"]}
+        acted_role: {type: string, enum: [kn_tw, kn_tinh, kn_xa]}
+        department_code: {type: string}
+        function: {type: string, description: "Phương thức + route, vd \"POST /v1/extension/report-tasks/:id/submissions\""}
+        content: {type: object, description: "path_params — không có thân request"}
+        status_code: {type: [integer, "null"]}
+        reason: {type: string}
+        trace_id: {type: [string, "null"]}
+        at: {type: string, format: date-time}
+    # --- hết pf/accounts ---
+
+    # --- pf/waterway ---

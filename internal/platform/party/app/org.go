@@ -202,6 +202,9 @@ func (r *Registry) CreateOrg(ctx context.Context, in CreateOrgInput) (OrgResult,
 	if err != nil {
 		return OrgResult{}, err
 	}
+	if err := requireNodeCreator(p, in.Kind); err != nil {
+		return OrgResult{}, err
+	}
 	return r.createOrg(ctx, p, in, func(unit string) error { return r.requireWriteScope(ctx, p, unit) })
 }
 
@@ -685,6 +688,8 @@ type ListQuery struct {
 	Limit           int
 	// AdminUnit (tùy chọn): chỉ tổ chức thuộc tỉnh/xã này (G-03), giao với phạm vi người gọi.
 	AdminUnit string
+	// Confirmation (D2, chỉ danh sách HTX): confirmed | unconfirmed | rỗng = không lọc.
+	Confirmation string
 }
 
 func (q *ListQuery) normalize() {
@@ -757,7 +762,7 @@ func (r *Registry) ListCooperatives(ctx context.Context, q ListQuery) (CoopPage,
 	if err != nil || sc.Empty() {
 		return CoopPage{Items: []Cooperative{}}, err
 	}
-	qRefs, _, err := r.coopFilterRefs(ctx, p.TenantID, q.Q, nil, nil)
+	qRefs, only, err := r.coopFilterRefs(ctx, p.TenantID, q.Q, nil, nil, q.Confirmation)
 	if err != nil {
 		return CoopPage{}, err
 	}
@@ -765,7 +770,7 @@ func (r *Registry) ListCooperatives(ctx context.Context, q ListQuery) (CoopPage,
 	err = tenant.WithTenantTx(ctx, r.DB, p.TenantID, func(tx pgx.Tx) error {
 		var e error
 		orgs, e = store.ListCooperativeOrgs(ctx, tx, store.CoopOrgFilter{
-			All: sc.All, Units: sc.Units, Q: q.Q, QRefs: qRefs, IncludeInactive: q.IncludeInactive, After: q.After, Limit: q.Limit + 1,
+			All: sc.All, Units: sc.Units, Q: q.Q, QRefs: qRefs, Only: only, IncludeInactive: q.IncludeInactive, After: q.After, Limit: q.Limit + 1,
 		})
 		return e
 	})

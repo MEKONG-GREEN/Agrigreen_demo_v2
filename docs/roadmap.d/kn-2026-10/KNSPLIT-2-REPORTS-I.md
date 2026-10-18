@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-REPORTS-I — Registry và ownerKN14seed, goldenbyte/cách ly/CLI đạt;14/14PGnoSKIP/static xanh,boundary383; helper8migrationgate trướcdev. J mới bỏlegacy.

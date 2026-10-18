@@ -11,8 +11,11 @@ package app
 //     vai). k áp = max(k job, k sàn publicdata.k_min); k xin thấp hơn → refused. Gộp nhóm + ẩn nhóm < k trong tiến
 //     trình; bản ghi chi tiết không rời bộ chạy. Mỗi lần chạy (kể cả bị từ chối, lỗi) ghi MỘT dòng pf_metrics.agg_run;
 //     không ghi được nhật ký → không trả đầu ra.
+//   - Hai pool (gói FC, ADR-0031 §3): DB (app_worker → r_metrics: danh mục, kiểm duyệt, nhật ký) và AggDB (vai
+//     đăng nhập riêng app_agg → r_agg: chỉ đọc _pub + k_ref.org.tenant_id).
 //
-// Chưa nối vào cmd/worker: bật production chờ C-4 (ngưỡng k đã ký, ADR-0031 §7).
+// Nối vào cmd/worker dạng lệnh một lần `worker -agg-run <job>`; chạy theo lịch ở production chờ C-4 (ngưỡng k đã
+// ký, ADR-0031 §7).
 
 import (
 	"context"
@@ -64,7 +67,10 @@ type KFloorSource interface {
 
 // Agg là bộ quản lý danh mục và bộ chạy job tổng hợp.
 type Agg struct {
-	DB         tenant.Beginner // pool vai đăng nhập của đơn vị chạy job (app_worker), đã bọc db.ForModule(pf/metrics)
+	DB tenant.Beginner // pool vai đăng nhập của đơn vị chạy job (app_worker), đã bọc db.ForModule(pf/metrics)
+	// AggDB: pool vai đăng nhập riêng app_agg (ADR-0031 §3, gói FC) — KHÔNG bọc ForModule; chỉ Run cần (nil → Run
+	// trả ErrDependency, Propose/Decide vẫn chạy).
+	AggDB      tenant.Beginner
 	Clock      clock.Clock
 	Approvals  wfport.Approvals // cap/workflow
 	Governance uuid.UUID        // tenant quản trị: danh mục, quyết định, nhật ký chạy
@@ -247,6 +253,9 @@ func (a *Agg) Run(ctx context.Context, j domain.AggJob, actor uuid.UUID, k int) 
 	if err := a.ready(); err != nil {
 		return AggResult{}, err
 	}
+	if a.AggDB == nil {
+		return AggResult{}, ErrDependency
+	}
 	if actor == uuid.Nil {
 		return AggResult{}, problem.Validation.WithField("actor", "bắt buộc")
 	}
@@ -282,7 +291,7 @@ func (a *Agg) Run(ctx context.Context, j domain.AggJob, actor uuid.UUID, k int) 
 			approved = r
 			return nil
 		}
-		runErr = db.WithAggTx(ctx, a.DB, aggOwner, a.Governance, authorize, func(at db.AggTx) error {
+		runErr = db.WithAggTx(ctx, a.DB, aggOwner, a.Governance, a.AggDB, authorize, func(at db.AggTx) error {
 			return a.read(ctx, at, j, acc, &res)
 		})
 	}

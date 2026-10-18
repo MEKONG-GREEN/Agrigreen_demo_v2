@@ -1,0 +1,492 @@
+[
+  {
+    "Mode": "normal",
+    "Profile": "first",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": [
+      {
+        "Name": "first",
+        "Department": "dept1",
+        "StewardDuty": "duty1"
+      },
+      {
+        "Name": "second",
+        "Department": "dept2",
+        "StewardDuty": ""
+      }
+    ],
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": [
+          "44444444-4444-4444-8444-444444444444"
+        ],
+        "Error": "",
+        "Calls": [
+          "role|44444444-4444-4444-8444-444444444444|kn_tinh|dept1"
+        ]
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": [
+          "44444444-4444-4444-8444-444444444444"
+        ],
+        "Error": "",
+        "Calls": [
+          "role|44444444-4444-4444-8444-444444444444|kn_tinh|dept1",
+          "duty|44444444-4444-4444-8444-444444444444|kn_tinh|dept1|duty1"
+        ]
+      }
+    ]
+  },
+  {
+    "Mode": "normal",
+    "Profile": "",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": [
+      {
+        "Name": "first",
+        "Department": "dept1",
+        "StewardDuty": "duty1"
+      },
+      {
+        "Name": "second",
+        "Department": "dept2",
+        "StewardDuty": ""
+      }
+    ],
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": [
+          "44444444-4444-4444-8444-444444444444"
+        ],
+        "Error": "",
+        "Calls": [
+          "role|44444444-4444-4444-8444-444444444444|kn_tinh|dept1"
+        ]
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": [
+          "44444444-4444-4444-8444-444444444444"
+        ],
+        "Error": "",
+        "Calls": [
+          "role|44444444-4444-4444-8444-444444444444|kn_tinh|dept1",
+          "duty|44444444-4444-4444-8444-444444444444|kn_tinh|dept1|duty1"
+        ]
+      }
+    ]
+  },
+  {
+    "Mode": "normal",
+    "Profile": "second",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": [
+      {
+        "Name": "first",
+        "Department": "dept1",
+        "StewardDuty": "duty1"
+      },
+      {
+        "Name": "second",
+        "Department": "dept2",
+        "StewardDuty": ""
+      }
+    ],
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": [
+          "44444444-4444-4444-8444-444444444444"
+        ],
+        "Error": "",
+        "Calls": [
+          "role|44444444-4444-4444-8444-444444444444|kn_tinh|dept2"
+        ]
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "",
+        "Calls": [
+          "role|44444444-4444-4444-8444-444444444444|kn_tinh|dept2"
+        ]
+      }
+    ]
+  },
+  {
+    "Mode": "normal",
+    "Profile": "unknown",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": [
+      {
+        "Name": "first",
+        "Department": "dept1",
+        "StewardDuty": "duty1"
+      },
+      {
+        "Name": "second",
+        "Department": "dept2",
+        "StewardDuty": ""
+      }
+    ],
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      }
+    ]
+  },
+  {
+    "Mode": "error",
+    "Profile": "first",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": [
+      {
+        "Name": "first",
+        "Department": "dept1",
+        "StewardDuty": "duty1"
+      },
+      {
+        "Name": "second",
+        "Department": "dept2",
+        "StewardDuty": ""
+      }
+    ],
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "fixture holders failure",
+        "Calls": [
+          "role|44444444-4444-4444-8444-444444444444|kn_tinh|dept1"
+        ]
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "fixture holders failure",
+        "Calls": [
+          "role|44444444-4444-4444-8444-444444444444|kn_tinh|dept1",
+          "duty|44444444-4444-4444-8444-444444444444|kn_tinh|dept1|duty1"
+        ]
+      }
+    ]
+  },
+  {
+    "Mode": "error",
+    "Profile": "",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": [
+      {
+        "Name": "first",
+        "Department": "dept1",
+        "StewardDuty": "duty1"
+      },
+      {
+        "Name": "second",
+        "Department": "dept2",
+        "StewardDuty": ""
+      }
+    ],
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "fixture holders failure",
+        "Calls": [
+          "role|44444444-4444-4444-8444-444444444444|kn_tinh|dept1"
+        ]
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "fixture holders failure",
+        "Calls": [
+          "role|44444444-4444-4444-8444-444444444444|kn_tinh|dept1",
+          "duty|44444444-4444-4444-8444-444444444444|kn_tinh|dept1|duty1"
+        ]
+      }
+    ]
+  },
+  {
+    "Mode": "error",
+    "Profile": "second",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": [
+      {
+        "Name": "first",
+        "Department": "dept1",
+        "StewardDuty": "duty1"
+      },
+      {
+        "Name": "second",
+        "Department": "dept2",
+        "StewardDuty": ""
+      }
+    ],
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "fixture holders failure",
+        "Calls": [
+          "role|44444444-4444-4444-8444-444444444444|kn_tinh|dept2"
+        ]
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "",
+        "Calls": [
+          "role|44444444-4444-4444-8444-444444444444|kn_tinh|dept2"
+        ]
+      }
+    ]
+  },
+  {
+    "Mode": "error",
+    "Profile": "unknown",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": [
+      {
+        "Name": "first",
+        "Department": "dept1",
+        "StewardDuty": "duty1"
+      },
+      {
+        "Name": "second",
+        "Department": "dept2",
+        "StewardDuty": ""
+      }
+    ],
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      }
+    ]
+  },
+  {
+    "Mode": "nil-holders",
+    "Profile": "first",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": [
+      {
+        "Name": "first",
+        "Department": "dept1",
+        "StewardDuty": "duty1"
+      },
+      {
+        "Name": "second",
+        "Department": "dept2",
+        "StewardDuty": ""
+      }
+    ],
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      }
+    ]
+  },
+  {
+    "Mode": "nil-holders",
+    "Profile": "",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": [
+      {
+        "Name": "first",
+        "Department": "dept1",
+        "StewardDuty": "duty1"
+      },
+      {
+        "Name": "second",
+        "Department": "dept2",
+        "StewardDuty": ""
+      }
+    ],
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      }
+    ]
+  },
+  {
+    "Mode": "nil-holders",
+    "Profile": "second",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": [
+      {
+        "Name": "first",
+        "Department": "dept1",
+        "StewardDuty": "duty1"
+      },
+      {
+        "Name": "second",
+        "Department": "dept2",
+        "StewardDuty": ""
+      }
+    ],
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      }
+    ]
+  },
+  {
+    "Mode": "nil-holders",
+    "Profile": "unknown",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": [
+      {
+        "Name": "first",
+        "Department": "dept1",
+        "StewardDuty": "duty1"
+      },
+      {
+        "Name": "second",
+        "Department": "dept2",
+        "StewardDuty": ""
+      }
+    ],
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      }
+    ]
+  },
+  {
+    "Mode": "empty-profiles",
+    "Profile": "first",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": null,
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      }
+    ]
+  },
+  {
+    "Mode": "empty-profiles",
+    "Profile": "",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": null,
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      }
+    ]
+  },
+  {
+    "Mode": "empty-profiles",
+    "Profile": "second",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": null,
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      }
+    ]
+  },
+  {
+    "Mode": "empty-profiles",
+    "Profile": "unknown",
+    "TenantID": "44444444-4444-4444-8444-444444444444",
+    "Profiles": null,
+    "Steps": [
+      {
+        "Operation": "officers",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      },
+      {
+        "Operation": "stewards",
+        "Recipients": null,
+        "Error": "",
+        "Calls": null
+      }
+    ]
+  }
+]

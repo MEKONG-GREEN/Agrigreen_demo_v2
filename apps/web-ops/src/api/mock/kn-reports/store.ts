@@ -21,8 +21,10 @@ import { Decimal } from "@/kn/grid/decimal";
 import {
   DAY_MS,
   DEFAULT_CLOSE_AFTER_DAYS,
+  LEGACY_RULE,
   PeriodError,
-  REPORT_PERIOD_TYPE,
+  parseKsgmStarts,
+  resolvePeriodType,
   STATUS_LABEL,
   dec,
   defaultDeadline,
@@ -31,6 +33,8 @@ import {
   ratio,
   reason as checkReason,
   rfc3339,
+  calendarAt,
+  calendarOf,
   ruleTag,
   split,
   taskDisplay,
@@ -42,6 +46,7 @@ import {
   type ChangeKind,
   type Deadline,
   type DisplayStatus,
+  type PeriodRule,
   type ReportType,
   type Row,
   type Source,
@@ -225,6 +230,8 @@ export interface Period {
   label: string;
   range_label: string;
   iso_week: number | null;
+  period_key: string | null;
+  week_year: number | null;
   from_date: string;
   to_date: string;
   due_at: string;
@@ -595,6 +602,9 @@ export const runWire = (r: Run) => ({ ...r, actor_display: actorDisplay(r.actor_
 // ---------------------------------------------------------------------------
 export interface BatchPlan {
   report_type: ReportType;
+  rule: PeriodRule;
+  /** D8: lịch tuần của phòng (calendar_id, calendar_version, nguồn). */
+  calendar: { calendar_id: string; calendar_version: number; calendar_source: string };
   period_type: string;
   season_label: string;
   from_date: string;
@@ -614,12 +624,30 @@ export interface BatchPlan {
 
 const REPORT_TYPES: ReportType[] = ["weekly", "monthly", "seasonal", "annual", "adhoc"];
 
-export function planBatch(c: Caller, body: unknown): Result<BatchPlan> {
+/**
+ * Giả lập tham số extension.ksgm_week_starts:YYYY-MM (pf/masterdata, Cấp Tỉnh sửa ranh giới 4 tuần KSGM từng tháng):
+ * khóa "YYYY-MM" → "1,10,16,23". Vắng/sai → 1, 8, 15, 22 (như Service.ksgmStarts).
+ */
+export const KSGM_WEEK_STARTS = new Map<string, string>();
+const ksgmStarts = (y: number, m: number): number[] | null => {
+  const v = KSGM_WEEK_STARTS.get(`${y}-${String(m + 1).padStart(2, "0")}`);
+  return v ? parseKsgmStarts(v) : null;
+};
+
+/** rule: quy tắc chia kỳ; mặc định = lịch tuần của phòng tại from_date (D8, calendarAt: tham số theo phòng → nạp sẵn → chung). */
+export function planBatch(c: Caller, body: unknown, ruleIn?: PeriodRule): Result<BatchPlan> {
   const b = (body ?? {}) as Record<string, unknown>;
+  const cal = calendarAt(c.dept ?? "", String(b.from_date ?? ""));
+  const rule = ruleIn ?? cal.rule;
   const rt = b.report_type as ReportType;
   if (!REPORT_TYPES.includes(rt)) return fieldErr("report_type", "weekly | monthly | seasonal | annual | adhoc");
-  const pt = REPORT_PERIOD_TYPE[rt];
-  if (b.period_type !== undefined && b.period_type !== pt) return fieldErr("period_type", `loại báo cáo ${rt} dùng kỳ ${pt}`);
+  let pt: string;
+  try {
+    pt = resolvePeriodType(rt, b.period_type);
+  } catch (e) {
+    if (e instanceof PeriodError) return fieldErr(e.field, e.msg);
+    throw e;
+  }
   const tplIds = Array.isArray(b.template_ids) ? (b.template_ids as unknown[]).filter((x): x is string => typeof x === "string") : [];
   if (!tplIds.length) return fieldErr("template_ids", "chọn ít nhất một mẫu");
   const scope = (b.scope ?? {}) as { mode?: string; regions?: unknown; communes?: unknown };
@@ -633,12 +661,12 @@ export function planBatch(c: Caller, body: unknown): Result<BatchPlan> {
   const note = typeof b.note === "string" && b.note.trim() ? b.note.trim() : null;
   if (note && [...note].length > 2000) return fieldErr("note", "tối đa 2000 ký tự");
   const dl = (b.deadline ?? {}) as Partial<Deadline>;
-  const def = defaultDeadline(pt);
+  const def = defaultDeadline(pt, rule);
   const deadline: Deadline = { offset_days: typeof dl.offset_days === "number" ? dl.offset_days : def.offset_days, time: typeof dl.time === "string" ? dl.time : def.time };
   const closeAfter = typeof b.close_after_days === "number" ? b.close_after_days : DEFAULT_CLOSE_AFTER_DAYS;
   let periods: SplitPeriod[];
   try {
-    periods = split(pt, String(b.from_date ?? ""), String(b.to_date ?? ""), season, "season", deadline, closeAfter);
+    periods = split(pt, String(b.from_date ?? ""), String(b.to_date ?? ""), season, rule, deadline, closeAfter, ksgmStarts);
   } catch (e) {
     if (e instanceof PeriodError) return fieldErr(e.field, e.msg);
     throw e;
@@ -702,8 +730,11 @@ export function planBatch(c: Caller, body: unknown): Result<BatchPlan> {
       }
     }
   }
+  const used = ruleIn ? calendarOf(c.dept ?? "", ruleIn) : cal;
   return {
     report_type: rt,
+    rule: used.rule,
+    calendar: { calendar_id: used.calendar_id, calendar_version: used.calendar_version, calendar_source: used.calendar_source },
     period_type: pt,
     season_label: season,
     from_date: String(b.from_date),
@@ -726,7 +757,10 @@ export function previewWire(p: BatchPlan) {
   return {
     report_type: p.report_type,
     period_type: p.period_type,
-    period_rule: ruleTag("season"),
+    period_rule: ruleTag(p.rule),
+    calendar_id: p.calendar.calendar_id,
+    calendar_version: p.calendar.calendar_version,
+    calendar_source: p.calendar.calendar_source,
     deadline: p.deadline,
     close_after_days: p.close_after_days,
     forms: p.forms.map((f) => ({
@@ -738,7 +772,7 @@ export function previewWire(p: BatchPlan) {
       period_block: f.definition.period_blocks.length > 0,
       slots: p.slots.get(f.template.id) ?? 0,
     })),
-    periods: p.periods,
+    periods: p.periods.map(({ key, iso_week, week_year, ...x }) => ({ ...x, period_key: key || null, iso_week: iso_week || null, week_year: week_year || null })),
     communes: p.communes.map((x) => ({ commune_code: x, region_code: regionOf(x), region_name: regionName(regionOf(x)), officer_count: officersOf(AG_DEPARTMENT, x).length })),
     communes_without_officer: p.without_officer,
     provincial_columns: p.forms.flatMap((f) =>
@@ -768,7 +802,7 @@ export function issueBatch(c: Caller, plan: BatchPlan, at = nowMs()): Result<{ b
     season_label: plan.season_label,
     from_date: plan.from_date,
     to_date: plan.to_date,
-    period_rule: ruleTag("season"),
+    period_rule: ruleTag(plan.rule),
     deadline_offset_days: plan.deadline.offset_days,
     deadline_time: plan.deadline.time,
     close_after_days: plan.close_after_days,
@@ -787,7 +821,7 @@ export function issueBatch(c: Caller, plan: BatchPlan, at = nowMs()): Result<{ b
   };
   S.batches.push(batch);
   const periods = plan.periods.map(
-    (p): Period => ({ id: uuidv7(at), batch_id: batch.id, slot: p.slot, label: p.label, range_label: p.range_label, iso_week: p.iso_week || null, from_date: p.from_date, to_date: p.to_date, due_at: p.due_at, auto_close_at: p.auto_close_at, status: "open", closed_at: null, closed_by: null, close_mode: null }),
+    (p): Period => ({ id: uuidv7(at), batch_id: batch.id, slot: p.slot, label: p.label, range_label: p.range_label, iso_week: p.iso_week || null, period_key: p.key || null, week_year: (p.key && p.week_year) || null, from_date: p.from_date, to_date: p.to_date, due_at: p.due_at, auto_close_at: p.auto_close_at, status: "open", closed_at: null, closed_by: null, close_mode: null }),
   );
   S.periods.push(...periods);
   S.provincial.set(batch.id, plan.provincial);
@@ -1916,7 +1950,7 @@ export function seed(now = Date.now()): void {
     season_label: "Thu Đông 2026",
     note: "Nộp đủ biểu tuần",
     provincial_values: pv,
-  });
+  }, LEGACY_RULE); // đợt phát hành trước lịch kỳ v2 — giữ quy tắc đã ghi (period_rule v1), không chia/đánh số lại
   if (isErr(plan)) return;
   const issueAt = start - DAY_MS + 7 * 3_600_000;
   const issued = issueBatch(binh, plan, issueAt);

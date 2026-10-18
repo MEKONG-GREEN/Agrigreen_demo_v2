@@ -1,0 +1,28 @@
+{
+  "view": "pf_price_pub.v1_ticket_week",
+  "directive": "pf_price_pub.ticket_week/v1",
+  "owner": "pf/price",
+  "status": "published",
+  "package": "W11.10 (hợp đồng), W11.76 (dựng view)",
+  "migration": "pf 000152 (view; bảng nguồn pf 000151)",
+  "consumers": ["KHTC — bộ đọc nguồn module (W11.64)", "r_metrics, r_agg (thành viên r_price_pub)"],
+  "purpose": "Số phiếu giá đã thu thập theo TUẦN BÁO CÁO (BRD KHTC §3.4 'số phiếu giá đã thu thập theo tuần báo cáo', BG10) theo xã báo giá, kèm cờ tuần đã chốt (mọi ngày báo giá của tuần đã duyệt).",
+  "grain": "tuần báo cáo × xã báo giá",
+  "key": ["profile", "week_key", "point_code"],
+  "closed_rule": "Chỉ đếm phiếu thuộc phiên bản bảng giá đã duyệt của từng ngày (phiếu xóa mềm/thay thế không đếm). week_closed = mọi ngày báo giá theo lịch (W11.74, gồm ngày bổ sung, trừ ngày nghỉ) của tuần đã duyệt và không ngày nào đang mở duyệt.",
+  "personal_data": false,
+  "columns": [
+    { "name": "tenant_id",         "type": "uuid",    "nullable": false, "description": "Tenant (RLS p_tenant áp qua view)" },
+    { "name": "profile",           "type": "text",    "nullable": false, "description": "Bên dùng cap/price (KN = 'kn')" },
+    { "name": "week_key",          "type": "text",    "nullable": false, "description": "Khóa tuần báo cáo (W11.03, tuần Thứ Tư – Thứ Ba), vd 2026-W45" },
+    { "name": "week_year",         "type": "integer", "nullable": false, "description": "Năm của số tuần" },
+    { "name": "week_from",         "type": "date",    "nullable": false, "description": "Ngày đầu tuần" },
+    { "name": "week_to",           "type": "date",    "nullable": false, "description": "Ngày cuối tuần" },
+    { "name": "point_code",        "type": "text",    "nullable": false, "description": "Mã xã báo giá (W11.72; mặc định = mã ĐVHC xã)" },
+    { "name": "commune_code",      "type": "text",    "nullable": false, "description": "Mã ĐVHC xã có hiệu lực của xã báo giá" },
+    { "name": "tickets_collected", "type": "integer", "nullable": false, "description": "Số phiếu báo giá đã thu thập (đã gửi, thuộc bảng giá đã duyệt) trong tuần" },
+    { "name": "days_scheduled",    "type": "integer", "nullable": false, "description": "Số ngày báo giá theo lịch trong tuần" },
+    { "name": "days_approved",     "type": "integer", "nullable": false, "description": "Số ngày của tuần đã có bảng giá duyệt" },
+    { "name": "week_closed",       "type": "boolean", "nullable": false, "description": "Mọi ngày báo giá của tuần đã duyệt, không ngày nào đang mở duyệt" }
+  ]
+}

@@ -40,7 +40,31 @@
 | 0036 | [Engine ba chế độ ở vùng nội bộ MKG, `lib/optcore` dùng chung](0036-engine-ba-che-do-vung-noi-bo-optcore.md) | Đề xuất — chờ MKG ký (A7); bổ sung ADR-0016; W8.1 ngay, W8.3 chờ MKG v1.3 |
 | 0037 | [Tách xác thực và phân quyền, không mạo danh](0037-tach-xac-thuc-va-phan-quyen-khong-mao-danh.md) | Đề xuất — chờ MKG ký (A7); ghi lại KN P1 (đã hiện thực, pf 000060–000061) làm `ResolveContext` ĐTK 1; phần còn lại W7.2 |
 | 0038 | [Bộ chạy migration theo module — sổ theo module, thứ tự topo, vai `own_<module>`](0038-bo-chay-migration-theo-module.md) | Đề xuất — hiện thực bước 1 ở W7.1 (sau cờ `AG_MIGRATE_RUNNER=v2`, mặc định v1 một bản phát hành) |
+| 0041 | [MFA theo nhóm cho cán bộ KN, phiên giữ theo D9, realm quản trị riêng, vô hiệu tài khoản 45 ngày](0041-mfa-theo-nhom-d24.md) | Chấp nhận — quyết định CEO D24, D25 (13/10/2026), ứng với v4.3 ADR-23/P-1…P-5; hiện thực gói MFA (pf 20261013134254, 20261013142347); sửa ADR-0010 |
+| 0049 | [`cap/price` = module năng lực `pf/price`](0049-cap-price-pf-price.md) | Đề xuất — khung hiện thực ở W11.71 (pf 000138); số 0039–0048 dành cho ADR khác của đợt; bị thay thế một phần bởi ADR-0055 (Báo giá là của KN) |
+| 0050 | [`dom/hrm` = module nghiệp vụ `pf/hrm`; danh mục nhân sự ở module của chủ](0050-dom-hrm-pf-hrm.md) | Đề xuất — khung + danh mục nhân sự ở W11.21 (pf 000147); dữ liệu thật chờ Q-070 |
+| 0052 | [Đồng sở hữu dữ liệu MKG + HTX, neo HTX theo mã số thuế, HTX tạm "Chưa xác nhận" và nhận quyền](0052-dong-so-huu-mkg-htx-neo-mst.md) | Chấp nhận — quyết định CEO D2 (13/10/2026), trả lời H-1/QĐ-2; hiện thực gói D2 (pf 20261013091454) |
+| 0053 | [Một hợp đồng `_pub` có phiên bản cho "số liệu đã chốt" — họ `closed_figures/v1`, port KHTC `KHTCSources`, bên đọc qua thành viên vai `_pub`](0053-hop-dong-so-lieu-da-chot-closed-figures.md) | Đề xuất — hiện thực ở PFPUB; D8, D17, D18, D2 đã chốt; Trồng trọt giữ vòng đời báo cáo |
+| 0054 | [`cap/directory` = module năng lực `pf/contact` — danh bạ dùng chung, một bản ghi/người ở kho định danh, lọc trường ở API](0054-cap-directory-pf-contact.md) | Đề xuất — hiện thực W11.23 (pf 20261013230912, vault 20261013165158); Q-071, Q-072 theo đề xuất của dev; bị thay thế một phần bởi ADR-0055 (Contact là của KN) |
+| 0055 | [Tách hệ thống Khuyến nông — hệ độc lập về logic (`internal/kn/*`, dữ liệu hệ khác chỉ qua `_pub`/data product/lớp tích hợp, client kn-web trong G1, frontend riêng sau G1); tách vật lý tùy chọn khi vận hành cần](0055-tach-he-thong-khuyen-nong.md) | Chốt ranh giới G1 theo PO; đề xuất đối chiếu D2 chờ PO |
 
 ADR 0006, 0007, 0009, 0010, 0011 được chủ sản phẩm chấp nhận ngày 30/09/2026 trong phiên làm việc. Bảng đối chiếu cam kết → mã → kiểm thử ở [trien-khai-g1.md](trien-khai-g1.md).
 
 ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0016 phát sinh khi tổng hợp BRD và khi dựng G0. ADR 0017–0019 là nền của cổng G3 ([g3-conventions](../dev/g3-conventions.md)). ADR-0020 đóng câu hỏi RB-2 (MKG là tenant riêng). ADR-0021 ghi các lựa chọn hạ tầng của cổng G4. ADR 0022–0025 là nền của cổng G5 ([g5-conventions](../dev/g5-conventions.md)): Public API, `pf/metering`, điểm kiểm soát xuất dữ liệu, hồ sơ Phase K. ADR 0027–0031 là năm ADR lõi của kiến trúc v4.1 (gói W0.1, [kế hoạch](../kien-truc-v4.1-ke-hoach.md)), ứng với mục 1–2, 7–10 Phụ lục B; ADR-0030 sửa ADR-0005, 0009, 0020. ADR 0032–0036 là năm ADR tích hợp và engine (gói W0.2), ứng với mục 11, 15–19 Phụ lục B; ADR-0033 sửa ADR-0020, 0022, 0025; ADR-0034 sửa ADR-0020; ADR-0035 sửa ADR-0022; ADR-0036 bổ sung ADR-0016. ADR-0037 (gói W0.3) ứng với mục 14 Phụ lục B. Cùng gói W0.3, ADR-0006, 0012 và 0017 có thêm mục "Đối chiếu v4.1 (04/10/2026)" ghi lệch so với v4.1; phần quyết định gốc không đổi.
+
+## Số đã giữ chỗ
+
+Số của ADR **chưa viết** mà tài liệu khác đã nhắc tới. Viết ADR thì thêm dòng vào bảng chỉ mục ở trên và xóa dòng ở đây trong cùng commit. `go run ./tools/docscheck` (CI) kiểm: số trong tên tệp `NNNN-*.md` không trùng; bảng chỉ mục khớp đúng các tệp; số giữ chỗ không trùng nhau và không trùng ADR đã có. Gói cần ADR mới lấy số trống lớn nhất + 1 lúc viết; nếu hai gói song song cùng lấy một số, `docscheck` của gói gộp sau hỏng và gói đó đổi sang số trống kế tiếp (ghi chú ở [docs/dev/parallel-packages.md](../dev/parallel-packages.md)).
+
+| # | Dành cho | Nguồn |
+|---|---|---|
+| 0039 | v4.3 ADR-21 — stack Go cho hệ nội bộ | [đối chiếu BRD KN §3.1](../kn/doi-chieu-brd-kn-2026-10.md#31-quy-ước), W10.00 |
+| 0040 | v4.3 ADR-22 — hai hệ thống thông tin | như trên |
+| 0042 | v4.3 ADR-24 — chữ ký số trên lô | như trên, W10.07 |
+| 0043 | Vai trò kiểm soát/xử lý dữ liệu | như trên |
+| 0044 | Căn cứ an ninh mạng, cấp độ | như trên |
+| 0045 | Phân loại dữ liệu 4 mức | như trên |
+| 0046 | Phụ thuộc OR-Tools | như trên |
+| 0047 | Dữ liệu vị trí người lái/người đếm | như trên, W12.19 |
+| 0048 | Liên kết khách có OTP | như trên |
+| 0051 | Tách `cap/export` → `pf/export` + ghi .docx (W10.17). Trước giữ 0050; 0050 đã dùng cho `dom/hrm` (W11.21) nên lấy số trống kế tiếp | như trên |

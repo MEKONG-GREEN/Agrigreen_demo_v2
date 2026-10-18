@@ -1,0 +1,6 @@
+{
+  "Name": "notify_email_digest",
+  "EveryNS": 3600000000000,
+  "RunOnStart": false,
+  "TimeoutNS": 600000000000
+}

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -31,6 +32,11 @@ func TestFormsHTTP_W62(t *testing.T) {
 	env := pgtest.Get(t)
 	prof := port.Profile{Name: "fx", Hierarchy: []string{"TINH", "XA"}, Roles: map[string]string{"tinh": "TINH", "xa": "XA"}, PublishBy: "TINH",
 		CloseBy: "TINH", DefineBy: []string{"admin"}, AllowFixtures: true}
+	type subjectKey struct{}
+	prof.ResolveActor = func(ctx context.Context, _ authz.Principal, _ port.Profile) (port.ResolvedActor, bool, error) {
+		subject, ok := ctx.Value(subjectKey{}).(port.ResolvedActor)
+		return subject, ok, nil
+	}
 	svc, err := app.NewService(db.ForModule(env.Pool(t, migrations.PF, dbadmin.AppPlatform), app.DBModule), clock.NewFixed(time.Now()), nil,
 		[]port.Profile{prof})
 	if err != nil {
@@ -40,13 +46,20 @@ func TestFormsHTTP_W62(t *testing.T) {
 	r := gin.New()
 	tid, node, xaRef := ids.New(), ids.New(), ids.New()
 	who := map[string]authz.Principal{
-		"admin": {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "admin", Scope: authz.Scope{All: true}}},
-		"tinh":  {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "tinh", OrgRef: node, Scope: authz.Scope{Units: []string{"U1"}}}},
-		"xa":    {ActorRef: xaRef, TenantID: tid, KN: &authz.KNContext{Role: "xa", Scope: authz.Scope{Units: []string{"U1"}}}},
+		"admin": {ActorRef: ids.New(), TenantID: tid},
+		"tinh":  {ActorRef: ids.New(), TenantID: tid},
+		"xa":    {ActorRef: xaRef, TenantID: tid},
+	}
+	subjects := map[string]port.ResolvedActor{
+		"admin": {Role: "admin", Scope: authz.Scope{All: true}},
+		"tinh":  {Role: "tinh", Node: node, Scope: authz.Scope{Units: []string{"U1"}}},
+		"xa":    {Role: "xa", Scope: authz.Scope{Units: []string{"U1"}}},
 	}
 	r.Use(func(c *gin.Context) {
-		if p, ok := who[c.GetHeader("X-Test-As")]; ok {
-			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
+		key := c.GetHeader("X-Test-As")
+		if p, ok := who[key]; ok {
+			ctx := context.WithValue(authz.WithPrincipal(c.Request.Context(), p), subjectKey{}, subjects[key])
+			c.Request = c.Request.WithContext(ctx)
 		}
 	})
 	Handler{Svc: svc}.RegisterApp(r.Group("/v1"))

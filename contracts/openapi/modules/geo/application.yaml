@@ -1,0 +1,229 @@
+paths:
+# @ag-order: 274
+  /v1/kn/plots:
+    get:
+      summary: "FN-XA-03.05: danh sách thửa trong phạm vi ngữ cảnh (không hình học)"
+      operationId: knListPlots
+      tags: [geo]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}, description: "Vắng = mọi xã trong phạm vi; ngoài phạm vi → 403 geo.out_of_scope"}
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
+      responses:
+        "200":
+          description: Trang thửa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KNPlot"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {description: geo.out_of_scope, $ref: "#/components/responses/Problem"}
+        "428": {description: accounts.context_required, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "FN-XA-03.05: vẽ lô mới (Cấp Xã, Admin) — chặn mọi chồng lấn, diện tích tự tính"
+      operationId: knCreatePlot
+      tags: [geo]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin: phòng ban ghi (mặc định trong_trot)"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNPlotCreate"}
+      responses:
+        "201":
+          description: Thửa đã tạo (POST lặp cùng khóa → cùng kết quả)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNPlotWrite"}
+        "403": {description: "geo.read_only | forbidden | geo.out_of_scope", $ref: "#/components/responses/Problem"}
+        "409": {description: "geo.plot_overlap (kèm overlaps) | geo.plot_exists", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | geo.too_few_points | geo.invalid_geometry | geo.area_out_of_range | geo.outside_commune | geo.cooperative_invalid | geo.support_reason_required", $ref: "#/components/responses/Problem"}
+        "503": {description: geo.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 275
+  /v1/kn/plots/export:
+    get:
+      summary: "FN-XA-03.05: tải thửa của một xã (GeoJSON | KML)"
+      operationId: knExportPlots
+      tags: [geo]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: commune, in: query, required: true, schema: {type: string}}
+        - {name: format, in: query, schema: {type: string, enum: [geojson, kml], default: geojson}}
+      responses:
+        "200":
+          description: "Tệp tải về (Content-Disposition: attachment); properties: ref, code, lot_name, commune_code, cooperative_ref, farmer_label, note, area_ha, declared_area_ha, shape, status"
+          content:
+            application/geo+json:
+              schema: {type: object}
+            application/vnd.google-earth.kml+xml:
+              schema: {type: string}
+        "403": {description: geo.out_of_scope, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 276
+  /v1/kn/plots/{ref}:
+    parameters:
+      - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: "FN-XA-03.05: chi tiết thửa kèm hình (ngoài phạm vi/phòng ban → 404)"
+      operationId: knGetPlot
+      tags: [geo]
+      responses:
+        "200":
+          description: Thửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNPlotDetail"}
+        "404": {description: geo.plot_not_found, $ref: "#/components/responses/Problem"}
+    put:
+      summary: "FN-XA-03.05: sửa thuộc tính (sự kiện bù attributes_changed, Log). Trường vắng = giữ nguyên; null = xóa"
+      operationId: knUpdatePlot
+      tags: [geo]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: false, schema: {type: string}, description: "Tùy chọn: PUT lặp cùng khóa → cùng kết quả"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lot_name: {type: string, maxLength: 200}
+                note: {type: [string, "null"], maxLength: 1000}
+                farmer_name: {type: [string, "null"], maxLength: 200, description: "→ kho định danh; null/'' = bỏ"}
+                cooperative_ref: {type: [string, "null"], format: uuid}
+                declared_area_ha: {type: [string, "null"], description: "decimal > 0"}
+                reason: {type: string, maxLength: 500}
+      responses:
+        "200":
+          description: Thửa sau sửa (không đổi gì → hiện trạng, không ghi sổ)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNPlotDetail"}
+        "403": {description: "geo.read_only | forbidden | geo.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: geo.plot_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: geo.plot_state_conflict, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 277
+  /v1/kn/plots/{ref}/boundary:
+    post:
+      summary: "FN-XA-03.05: sửa ranh giới — phiên bản mới thay supersedes_boundary_id (chặn mọi chồng lấn)"
+      operationId: knCorrectPlotBoundary
+      tags: [geo]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [supersedes_boundary_id, geometry, reason]
+              properties:
+                supersedes_boundary_id: {type: string, format: uuid}
+                geometry: {$ref: "#/components/schemas/GeoJSONPolygonal"}
+                shape: {type: string, enum: [polygon, circle, square]}
+                reason: {type: string, minLength: 10}
+      responses:
+        "201":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNPlotWrite"}
+        "404": {description: geo.plot_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "geo.plot_overlap | geo.version_conflict | geo.plot_state_conflict", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 278
+  /v1/kn/plots/{ref}/log:
+    get:
+      summary: "FN-XA-03.05: lịch sử thửa (thuộc tính + phiên bản ranh giới), mới nhất trước"
+      operationId: knPlotLog
+      tags: [geo]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: "Log; event ∈ created|assigned|retired|restored|attributes_changed|boundary_recorded|boundary_corrected"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRecordLogPage"}
+        "404": {description: geo.plot_not_found, $ref: "#/components/responses/Problem"}
+
+components:
+  schemas:
+# @ag-order: 844
+    GeoJSONPolygonal:
+      type: object
+      description: "GeoJSON Polygon/MultiPolygon WGS84; ≥ 3 đỉnh phân biệt không thẳng hàng; vòng chưa khép được tự khép"
+      required: [type, coordinates]
+      properties:
+        type: {type: string, enum: [Polygon, MultiPolygon]}
+        coordinates: {type: array}
+# @ag-order: 845
+    KNPlotCreate:
+      type: object
+      required: [commune_code, lot_name, geometry]
+      properties:
+        plot_ref: {type: string, format: uuid, description: UUIDv7 (tùy chọn)}
+        commune_code: {type: string}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        farmer_name: {type: string, maxLength: 200, description: "→ kho định danh (farmer_ref); API chỉ trả nhãn đã che"}
+        lot_name: {type: string, maxLength: 200}
+        note: {type: string, maxLength: 1000}
+        declared_area_ha: {type: string, description: decimal > 0}
+        shape: {type: string, enum: [polygon, circle, square], default: polygon}
+        geometry: {$ref: "#/components/schemas/GeoJSONPolygonal"}
+# @ag-order: 846
+    KNPlot:
+      type: object
+      required: [ref, code, lot_name, commune_code, cooperative_ref, farmer, note, area_ha, declared_area_ha, area_deviation_pct, status, boundary_id, updated_at]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        lot_name: {type: [string, "null"]}
+        commune_code: {type: string}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        farmer:
+          type: [object, "null"]
+          properties:
+            label: {type: [string, "null"]}
+        note: {type: [string, "null"]}
+        area_ha: {type: string, description: "Diện tích trắc địa tự tính"}
+        declared_area_ha: {type: [string, "null"]}
+        area_deviation_pct: {type: [string, "null"]}
+        shape: {type: [string, "null"], enum: [polygon, circle, square, null]}
+        department_code: {type: [string, "null"], description: "Thửa có trước v7.7 (không mang phòng ban) đọc là trong_trot — X-12, W11.02"}
+        status: {type: string, enum: [draft, active, retired]}
+        needs_review: {type: boolean}
+        version: {type: integer}
+        boundary_id: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 847
+    KNPlotDetail:
+      allOf:
+        - $ref: "#/components/schemas/KNPlot"
+        - type: object
+          required: [geometry]
+          properties:
+            geometry: {type: object, description: GeoJSON MultiPolygon}
+# @ag-order: 848
+    KNPlotWrite:
+      allOf:
+        - $ref: "#/components/schemas/KNPlotDetail"
+        - type: object
+          required: [boundary]
+          properties:
+            boundary: {type: object, description: "Phiên bản ranh giới vừa ghi (như PlotBoundary của /v1/plots)"}

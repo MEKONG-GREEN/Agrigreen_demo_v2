@@ -63,8 +63,9 @@ const (
 // (nội bộ), vault (kho định danh), ts (chuỗi thời gian).
 var Zones = []string{"pf", "mkg", "vault", "ts"}
 
-// zoneDirs ánh xạ thư mục internal/<dir> sang tiền tố tên module.
-var zoneDirs = map[string]string{"platform": "pf", "mkg": "mkg", "vault": "vault"}
+// zoneDirs ánh xạ namespace Go sang định danh DB. Namespace ứng dụng giữ tên pf/*
+// để không đổi schema, vai DB, công bố và tham số đã phát hành (KNSPLIT-1).
+var zoneDirs = map[string]string{"platform": "pf", "kn": "pf", "mkg": "mkg", "vault": "vault"}
 
 // Provides là những gì module cung cấp cho module khác.
 type Provides struct {
@@ -82,6 +83,8 @@ type Provides struct {
 // module phát khai trong provides.events / provides.internal_events.
 type Consumes struct {
 	Events []string `yaml:"events"` // <tên>/v<N>, cùng dạng provides.events
+	// Publications: versioned _pub contracts read as data, outside the call dependency graph.
+	Publications []string `yaml:"publications,omitempty"`
 }
 
 // Manifest là nội dung một module.yaml.
@@ -243,6 +246,12 @@ func (m *Manifest) Validate() error {
 		}
 	}
 	listCheck("provides.data_products", m.Provides.DataProducts, reSnake)
+	listCheck("consumes.publications", m.Consumes.Publications, rePublish)
+	for _, publication := range m.Consumes.Publications {
+		if _, ok := ParsePubView(publication); !ok {
+			bad("consumes.publications %q: expected a versioned _pub view", publication)
+		}
+	}
 	listCheck("consumes.events", m.Consumes.Events, reEvent)
 	for _, e := range m.Consumes.Events {
 		if EventProducer(e) == m.Name {
@@ -391,6 +400,9 @@ func New(ms []*Manifest) (*Registry, error) {
 			}
 		}
 	}
+	if _, err := publicationReaders(ms); err != nil {
+		errs = append(errs, err)
+	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, err
 	}
@@ -400,6 +412,7 @@ func New(ms []*Manifest) (*Registry, error) {
 // Glob là mẫu tìm module.yaml tương đối gốc repo.
 var Glob = []string{
 	"internal/platform/*/" + FileName,
+	"internal/kn/*/" + FileName,
 	"internal/mkg/*/" + FileName,
 	"internal/vault/*/" + FileName,
 }

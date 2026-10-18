@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-MDPARAMS-B — Gỡ16metadata/13seed cũ, KN sở hữu11keys/helper;17/17PGnoSKIP/fullstatic đạt, boundary382→371. Helper8migration trướcdev; G1 còn catalog/data/tenant/client/reminder.

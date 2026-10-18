@@ -9,10 +9,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
@@ -63,7 +64,7 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 		return nil, err
 	}
 	clk := clock.System{}
-	md := masterdata.New(pool, clk)
+	md := masterdata.New(pool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 	pty := party.New(pool, clk, party.Deps{AdminUnits: md.AdminUnits()})
 	kn := extension.New(pool, clk, extension.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
@@ -89,9 +90,10 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 	if mailer == nil {
 		log.Warn("chưa cấu hình AG_SMTP_* — lịch gửi báo cáo sẽ bỏ gửi email", "event", "startup", "outcome", "skipped")
 	}
-	return reports.New(nil, clk, reports.Deps{
-		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
-		Extension: kn.ReportData(), Mechanization: mech.ReportData(), CropCycle: coop.ReportData(), Directory: dir, Mailer: mailer, LinkBase: os.Getenv("AG_WEB_OPS_URL"), Log: log,
+	return reports.New(nil, clk, reports.Deps{FormSeeds: []repport.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: kn.ReportData(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Catalogs: md.Catalogs(), Clock: clk}), Catalog: []repport.CatalogRegistration{extension.ReportCatalog()}, Policies: []repport.Policy{extension.ReportPolicy()},
+		ResolveSession: extension.ReportSessionResolver(pty.Orgs()),
+		Scope:          pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
+		Mechanization: mech.ReportData(), CropCycle: coop.ReportData(), Directory: dir, Mailer: mailer, LinkBase: os.Getenv("AG_WEB_OPS_URL"), Log: log,
 		LinkDownloadBase: os.Getenv("AG_REPORT_LINK_BASE"), // A4: liên kết tải Chi cục do api-platform phục vụ
 	}), nil
 }

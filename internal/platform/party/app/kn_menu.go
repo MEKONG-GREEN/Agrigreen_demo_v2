@@ -36,7 +36,7 @@ type MenuItemView struct {
 	Icon        string
 	BadgeSource string
 	Enabled     bool
-	Status      string // chỉ mục phòng ban của Admin: active | not_open | suspended
+	Status      string // mục phòng ban của Admin: active | not_open | suspended; mục "Sắp có": coming_soon
 	StatusLabel string
 	Children    []MenuItemView
 }
@@ -247,13 +247,13 @@ func (k *KN) DepartmentModules(ctx context.Context, code string, q MenuQuery) (M
 			q.UnitRef = u
 		}
 		var e error
-		d, e = store.DepartmentByCode(ctx, tx, q.UnitRef, code)
+		d, e = departmentByCodeTx(ctx, tx, q.UnitRef, code)
 		return e
 	})
 	if err != nil {
 		return MenuView{}, err
 	}
-	if d == nil || d.Retired {
+	if d == nil {
 		return MenuView{}, ErrDepartmentNotFound
 	}
 	item := adminDeptItem(*d)
@@ -275,15 +275,31 @@ func pickDepartment(depts []port.Department, code string) (port.Department, erro
 		}
 		return port.Department{}, problem.Validation.WithField("department", "bắt buộc khi đơn vị có nhiều hơn một phòng ban Đang áp dụng")
 	}
+	d, ok := findDepartment(depts, code)
+	if !ok {
+		return port.Department{}, ErrDepartmentNotFound
+	}
+	if !d.Selectable() {
+		return port.Department{}, ErrDepartmentNotOpen.WithDetail(d.Name + ": " + domain.StatusLabel(d.Status))
+	}
+	return d, nil
+}
+
+// findDepartment tìm phòng ban theo mã; mã tạm cũ (phong_ban_5) không còn → mã kế nhiệm (W11.06).
+func findDepartment(depts []port.Department, code string) (port.Department, bool) {
 	for _, d := range depts {
 		if d.Code == code {
-			if !d.Selectable() {
-				return port.Department{}, ErrDepartmentNotOpen.WithDetail(d.Name + ": " + domain.StatusLabel(d.Status))
-			}
-			return d, nil
+			return d, true
 		}
 	}
-	return port.Department{}, ErrDepartmentNotFound
+	if to, ok := port.CanonicalDepartmentCode(code); ok && to != "" {
+		for _, d := range depts {
+			if d.Code == to {
+				return d, true
+			}
+		}
+	}
+	return port.Department{}, false
 }
 
 // departmentGroups giải điều kiện mục (FormAvailability) và bỏ mục cha không còn mục con.
@@ -330,13 +346,16 @@ func departmentGroups(ctx context.Context, forms port.FormAvailability, d port.D
 			if len(it.Children) > 0 && len(kids) == 0 {
 				continue
 			}
-			out = append(out, MenuItemView{Key: it.Key, Label: it.Label, Route: it.Route, Icon: it.Icon, BadgeSource: it.BadgeSource,
-				Enabled: true, Children: kids})
+			out = append(out, itemView(it, true, kids))
 		}
 		return out, nil
 	}
 	var out []MenuGroupView
-	for _, g := range domain.DepartmentMenu(d.MenuProfile, audience, d.Code) {
+	groups := domain.DepartmentMenu(d.MenuProfile, audience, d.Code)
+	if t, ok := menuTraits(ctx); ok {
+		groups = domain.FilterNeeds(groups, t)
+	}
+	for _, g := range groups {
 		items, err := conv(g.Items)
 		if err != nil {
 			return nil, err
@@ -348,11 +367,35 @@ func departmentGroups(ctx context.Context, forms port.FormAvailability, d port.D
 	return out, nil
 }
 
+// menuTraits trả thuộc tính phân quyền trong vai (W11.07) của ngữ cảnh phiên để lọc mục có Needs. ok = false
+// (không lọc — menu đầy đủ của đối tượng): không có ngữ cảnh phiên (đường cũ theo vai realm, xem trước của
+// quản trị nền tảng, ca vàng web) hoặc Admin đang hỗ trợ (FN-AD-04.07: Admin thấy mọi mục để hỗ trợ).
+func menuTraits(ctx context.Context) (domain.MenuTraits, bool) {
+	p, ok := authz.FromContext(ctx)
+	if !ok || p.KN == nil || p.KN.Support != nil {
+		return domain.MenuTraits{}, false
+	}
+	k := p.KN
+	if k.ReadOnly() {
+		return domain.MenuTraits{Manager: k.Manager}, true // chỉ xem: không mục nhiệm vụ (ghi)
+	}
+	return domain.MenuTraits{Manager: k.Manager, Duties: k.Duties}, true
+}
+
+// itemView chuyển một mục bảng tĩnh; mục ComingSoon luôn Enabled = false, Status "coming_soon" (kn.menu/v3).
+func itemView(it domain.MenuItem, enabled bool, kids []MenuItemView) MenuItemView {
+	v := MenuItemView{Key: it.Key, Label: it.Label, Route: it.Route, Icon: it.Icon, BadgeSource: it.BadgeSource,
+		Enabled: enabled, Children: kids}
+	if it.ComingSoon {
+		v.Enabled, v.Status, v.StatusLabel = false, domain.ItemComingSoon, domain.ItemComingSoonLabel
+	}
+	return v
+}
+
 func plainItems(items []domain.MenuItem, enabled bool) []MenuItemView {
 	out := []MenuItemView{}
 	for _, it := range items {
-		out = append(out, MenuItemView{Key: it.Key, Label: it.Label, Route: it.Route, Icon: it.Icon, BadgeSource: it.BadgeSource,
-			Enabled: enabled, Children: plainItems(it.Children, enabled)})
+		out = append(out, itemView(it, enabled, plainItems(it.Children, enabled)))
 	}
 	return out
 }
@@ -365,7 +408,7 @@ func adminDeptItem(d port.Department) MenuItemView {
 }
 
 // AdminMenu: Điều hành › Tổng quan hệ thống; Phòng ban › mỗi phòng ban (chưa mở: mờ, không mục con
-// dùng được); Quản trị hệ thống (Hình 3c). Hàm thuần (ca vàng web dùng chung).
+// dùng được); Quản trị hệ thống (Hình 3c); Dùng chung (kn.menu/v3). Hàm thuần (ca vàng web dùng chung).
 func AdminMenu(unit uuid.UUID, depts []port.Department) MenuView {
 	deptItems := make([]MenuItemView, 0, len(depts))
 	for _, d := range depts {
@@ -377,5 +420,7 @@ func AdminMenu(unit uuid.UUID, depts []port.Department) MenuView {
 		{Key: domain.AdminDepartmentGroupKey, Label: domain.AdminDepartmentGroupLabel, Items: deptItems},
 		{Key: domain.AdminSystem.Key, Label: domain.AdminSystem.Label, Items: plainItems(domain.AdminSystem.Items, true)},
 	}
+	shared := domain.SharedMenuGroup()
+	view.Groups = append(view.Groups, MenuGroupView{Key: shared.Key, Label: shared.Label, Items: plainItems(shared.Items, true)})
 	return view
 }

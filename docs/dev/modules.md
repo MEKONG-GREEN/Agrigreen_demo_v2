@@ -163,7 +163,7 @@ ADR-0028, R-DB-02, R-DB-03. Mỗi module pf có vai nhóm `r_<module>` (NOLOGIN,
 
 - Mọi module có schema đã chạy dưới `r_<module>`: 19 pf, 7 mkg, vault/identity (`r_identity`); `r_measurement` có ở cả cụm mkg và ts.
 - Mỗi đơn vị mở **một** pool vai đăng nhập:
-  - pf: `app_platform`, `app_worker` (cả `drill`, `formimport`), `app_public`, `app_sync`;
+  - pf: `app_platform`, `app_worker` (cả `drill`, `formimport`), `app_public`, `app_sync`; `app_agg` (pool nhỏ thứ hai của `worker -agg-run`, chỉ `r_agg` — ADR-0031 §3);
   - mkg: `app_internal`, `app_worker_internal` (cả `rebuilddrill`);
   - mkg + ts: `app_ingest`;
   - vault: `app_vault`.
@@ -232,9 +232,12 @@ Mã tham chiếu chỉ nhận `uuid.UUID`, nên không có đường nào đưa 
 - được planner inline thành `current_setting(…)`;
 - EXECUTE chỉ cấp cho `r_*` (vai cũ `<module>_app` có qua membership).
 
-Mảng xã: `k_ref.ctx_text('app.xa_ids')::text[]`. `app.node_id` và `app.xa_ids` được chính sách `p_scope` của `pf_coop` đọc từ W3.4 (mục "Phạm vi Nút trên `pf_coop`" dưới); `app.purpose` chờ W4.x.
+Mảng xã: `k_ref.ctx_text('app.xa_ids')::text[]`. `app.node_id` và `app.xa_ids` được chính sách `p_scope` của `pf_coop` đọc từ W3.4 (mục "Phạm vi Nút trên `pf_coop`" dưới); `app.purpose` được nhánh chia sẻ `p_share` đọc từ W4.2 (mục "Đọc tại chỗ qua cấp phép").
 
 `db.WithoutNodeScope(ctx, tx, fn)` đặt tạm `app.node_id`, `app.xa_ids` rỗng cho `fn` rồi đặt lại — chỉ cho kiểm toàn vẹn phải nhìn cả tenant (vd chồng lấn thửa giữa HTX), không để trả dữ liệu ngoài phạm vi.
+
+**Người dùng gắn Nút phải có Nút (FD).** `p_scope` coi `app.node_id` rỗng là "cả tenant" (consumer, job, Admin). Vì vậy `db.ForModule` **không mở giao dịch** khi Principal người dùng có vai/cấp gắn Nút mà Nút rỗng — lỗi `db.ErrNodeScopeRequired`, ra ngoài là 403 `node_scope_required` (docs/errors.md). Ánh xạ `db.RequiresNode` (`ctxvars.go`): có ngữ cảnh KN → chỉ `kn_xa` bắt buộc; không ngữ cảnh → `coop_manager`, `kn_officer` bắt buộc `org_ref`, trừ khi kèm `platform_admin`, `kn_province_admin`, `kn_national_admin`. Không Principal → không xét. Thêm vai mới có phạm vi theo Nút cấp HTX/xã: thêm vào `db.NodeBoundRoles`/`NodeBoundContextRoles` (kiểm thử `TestNodeBoundRolesDeclared_FD` đối chiếu `app/*/app.yaml`). Kiểm thử dựng Principal HTX/xã phải đặt `OrgRef` (hoặc `KN.OrgRef`).
+
 ## Bản chiếu `k_ref` (W2.5)
 
 [ADR-0029](../adr/0029-k-ref-ban-chieu-loi-moi-cum.md#hiện-thực), kiến trúc v4.1 §17.1–17.3, R-DB-05. Module lõi `pf/kref` (`internal/platform/kref`, `k/ref`) sở hữu schema `k_ref` ở cụm pf (pf 000092) và mkg (mkg 000022, rỗng). `k_ref` là dữ liệu **dẫn xuất**: nguồn là sổ của `pf/party`, `pf/masterdata`.
@@ -315,9 +318,13 @@ Kiến trúc v4.1 §26, §7.2. Module năng lực `pf/forms` (`internal/platform
 |---|---|---|
 | `template` | một phiên bản biểu (`profile`, `code`; phiên bản = `seq`), `fixture` = biểu mẫu thử | `stream_key = template:<profile>:<code>` |
 | `period` | một kỳ đã phát hành (phiên bản biểu cố định, đơn vị nhận cấp lá, Nút chủ) | `trg_bind_template` chép profile/mã/phiên bản; một dòng mỗi kỳ |
-| `period_event` | `published` / `closed` / `reopened` (`origin` native hoặc mirror) | `trg_transition` (sau `trg_chain`, đầu chuỗi đã khóa): native published → closed ⇄ reopened, sai → AGF01; mirror không trộn với kỳ native |
+| `period_event` | `published` / `closed` / `reopened` / `cancelled` (W11.05, lý do bắt buộc) (`origin` native hoặc mirror) | `trg_transition` (sau `trg_chain`, đầu chuỗi đã khóa): native published → closed ⇄ reopened, sai → AGF01; mirror không trộn với kỳ native |
 | `submission` | một phiên bản bài của một đơn vị | `trg_bind_period`: kỳ tồn tại, đơn vị thuộc kỳ, kỳ đang mở hoặc đơn vị trong phạm vi mở lại — sai → AGF02 |
 | `review` | rà soát duy nhất của một phiên bản (`accepted` / `returned`) | `trg_bind_submission` chép người nộp; CHECK `review_four_eyes` |
+| `period_spec` (W11.05, pf 000140) | đặc tả một kỳ native: `unit_kind` (commune / facility / household / department), `unit_parents` (mã xã cha của cơ sở/hộ), `max_submissions`, `review_flow` (`single`), khóa kỳ W11.03 (`period_kind/key/from/to/rule`); kỳ cũ không có dòng = xã, không giới hạn | `trg_bind_spec`: cùng giao dịch phát hành (`period.recorded_at = now()`), đơn vị cha song song với đơn vị; `trg_submission_limit` trên `submission`: `seq > max_submissions` → AGF03 |
+| `submission_meta` (W11.42, pf 000149) | thông tin một phiên bản bài nộp: `base_version` (khóa lạc quan), `nil_report`, `note`, `explanation`, `captured_at`, `late` | `trg_bind_meta`: cùng giao dịch nộp, `base_version = seq − 1` (sai → AGF04), DB tính `late` = giờ máy chủ ghi phiên bản (`submission.event_time`) > `due_at` của kỳ — D8, pf 20261013091503; `captured_at` (giờ thiết bị) chỉ để kiểm toán |
+| `sync_feed` (W11.42, không phải sổ băm) | một thay đổi của kỳ native cho con trỏ đồng bộ (`feed_seq`) | trigger `trg_feed` AFTER INSERT trên các sổ; chặn UPDATE/DELETE/TRUNCATE, RLS tenant |
+| `held_submission` (W11.05) | một bài offline đến sau khi kỳ đã chốt với đơn vị ("Chờ mở kỳ") | `trg_bind_held`: chỉ khi kỳ đã chốt với đơn vị (chốt, hoặc mở lại một phần không gồm đơn vị) — sai → AGF02 |
 | `close_snapshot` | ảnh chụp đóng băng của một lần chốt | `trg_bind_close`: gắn sự kiện `closed` cùng kỳ, tính `content_hash = sha256(content::text)`; một ảnh mỗi lần chốt |
 
 **Cấu hình theo bên dùng** (`forms/port.Profile`, tương đương `cap/forms: {hierarchy, publish_by, close_by}` của app.yaml §7.2 — app.yaml của repo chưa mang cấu hình module nên gốc lắp ráp truyền): `Hierarchy` (cấp trên → lá; lá nộp bài), `Roles` (vai ngữ cảnh KN hoặc vai realm → cấp), `PublishBy`, `CloseBy`, `ReviewBy` (mặc định `PublishBy`), `DefineBy` (vai định nghĩa biểu), `AllowFixtures`, `RequireReviewedBeforeClose`. Cấu hình sai → lỗi lúc khởi động (`domain.ValidateProfile`). KN: `cmd/api-platform/assembly.KNProfile` — `kn_tw`/`kn_tinh`/`kn_xa` → TW/TINH/XA, Tỉnh phát hành, rà soát, chốt và mở lại; Admin KN và `reports_admin` định nghĩa biểu; không cho biểu mẫu thử.
@@ -329,6 +336,56 @@ Kiến trúc v4.1 §26, §7.2. Module năng lực `pf/forms` (`internal/platform
 **Biểu mẫu thử, Q-01.** 14 biểu thật của KN chưa có (câu hỏi Q-01): `domain.Fixtures()` (`FX-01` tiến độ gieo trồng, `FX-02` sâu bệnh) cài bằng `POST /v1/forms/templates/fixtures`, dòng sổ `fixture = true`. Profile có `AllowFixtures = false` (KN) trả `forms.fixture_template` khi phát hành kỳ trên biểu mẫu thử — bật production chờ Q-01 (định nghĩa biểu thật bằng `POST /v1/forms/templates`).
 
 **Chưa làm:** chuyển kỳ KN sang kỳ native và web-ops sang `/v1/forms`; báo cáo Chi cục đọc ảnh chụp; gộp engine mẫu dạng lưới của `pf/reports` (bố cục, công thức) làm kiểu trường của `cap/forms` (điểm mở rộng `forms.field_types`); `publications` cho `cap/analytics`.
+
+## Module nhân sự `dom/hrm` (W11.21)
+
+[ADR-0050](../adr/0050-dom-hrm-pf-hrm.md). Module nghiệp vụ `pf/hrm` (`internal/kn/hrm`, `dom/hrm`, `kind: domain`, `enable: per_tenant`) sở hữu `pf_hrm` (pf 000147); vai `r_hrm` (không vai cũ, `app_platform` là thành viên). Toàn module cấm float (agnofloat): hệ số, PCCV, % là decimal/`numeric`.
+
+| Thành phần | W11.21 | Gói mở rộng |
+|---|---|---|
+| `port.Access` | phòng ban chủ, vai ghi (`ManageBy`), vai xem trong phòng ban (`ReadBy`); KN ở `cmd/api-platform/assembly/hrm.go` | W11.22 ma trận quyền hồ sơ (FN-20) |
+| `port.Catalog` | `Items(kind)`, `ScaleAt(grade, at)`, `RuleAt(key, at)` (tenant từ ctx) | W11.23 Contact đọc chức vụ |
+| Sổ `pf_hrm.catalog_item` | 16 loại danh mục FN-19, phiên bản theo `(kind, code)`, `attrs` kiểm ở domain, `placeholder` | W11.22 hồ sơ tham chiếu `code` |
+| Sổ `pf_hrm.grade_scale`, `rule_param` | bảng hệ số `numeric(5,2)[]` + giữ bậc, tham số `promotion`/`achievement_conversion`, `valid_from` | W11.25 tra as-of ngày hưởng, chụp hệ số vào quyết định |
+| HTTP | `/v1/hrm/status`, `/defaults`, `/catalogs/{kind}[/{code}/history|revise]`, `/grade-scales[/{grade}[/history]]`, `/rules/{key}` | W11.22–W11.28 thêm route |
+
+Bảng mới của các gói sau: migration riêng tên `<số>_pf_hrm_<việc>.up.sql`, sổ `shared.apply_ledger`, `GRANT SELECT, INSERT … TO r_hrm`. PII (hồ sơ) chỉ qua `vault/identity` (RB-3).
+
+**W11.22 hồ sơ nhân sự (pf 000150, vault 000004).** Sổ `pf_hrm.staff` (phiên bản đầu hồ sơ: mã, loại, `subject_ref`, `account_ref`, tên trường đã đổi), `staff_event` (quá trình có hiệu lực `valid_from` + mức chính xác, thay/hủy bằng `supersedes_id` + lý do), `record_access` (nhật ký xem/xem thẻ TK/xuất, chuỗi theo người xem), `perm_rule` (ma trận FN-20). `domain.Project` chiếu tại một ngày (trạng thái FN-08, đơn vị, chức vụ, ngạch – bậc); hệ số tra `grade_scale` as-of. Ma trận: nhóm vai suy từ `KNContext` (admin / hcth / manager / tinh / xa / tw) × phạm vi none/self/unit/all; "đơn vị" = `KNContext.InternalUnit` khớp đơn vị công tác hoặc đơn vị quản lý cán bộ xã (HS-37); "bản thân" = `account_ref`. PII: định danh (họ tên, SĐT, địa chỉ) + ngăn `hrm.profile` (ngày sinh, giới tính, email, ghi chú) với mục đích `hrm.profile`; ngăn `hrm.sensitive` (TK-01..06) với mục đích `hrm.sensitive` — `vault/identity/client.Profiles` (Amend, PutSection, GetSection; `client.AsProfiles`). Gốc lắp ráp: `hr.UseRecords(ext.Vault, assembly.KNHRMUnits{acc.InternalUnits()}, hrm.RecordsEnabled(os.Getenv, production))` — cờ `AG_HRM_RECORDS` ("1"/"0"; vắng = tắt ở production). Danh sách đọc nhãn che bớt (Display) từng dòng; chi tiết Resolve + GetSection; người gọi cần vai realm `vault_registrar` (Admin cấp) — chưa có vai kho riêng cho HCTH.
+
+**W11.23 Contact.** Port mới `port.Directory` (`StaffDirectory`): mọi hồ sơ chiếu tại hôm nay (mã chủ thể kho, tài khoản, loại, trạng thái, đơn vị, đơn vị quản lý, xã, chức vụ + tên) — KHÔNG áp ma trận FN-20 (Contact có quyền riêng), CÓ áp cổng `AG_HRM_RECORDS` (`hrm.records_disabled`). Gốc lắp ráp nối vào `pf/contact` (`assembly.KNContactStaff`).
+
+## Danh bạ dùng chung `cap/directory` (W11.23)
+
+[ADR-0054](../adr/0054-cap-directory-pf-contact.md). Module năng lực `pf/contact` (`internal/kn/contact`, `kind: capability`, `enable: always`) sở hữu `pf_contact` (pf 20261013230912; sổ `person` — liên hệ ngoài tỉnh, `unit` — thẻ Đơn vị; không PII); vai `r_contact` (`app_platform` là thành viên). Port: `Access` (bộ trường theo vai ngữ cảnh/realm, vai cập nhật — KN ở `cmd/api-platform/assembly/contact.go`), `Staff` (nguồn cán bộ thuộc tỉnh), `Labels` (tên đơn vị nội bộ, tên xã), `Names` (họ tên theo tài khoản — cùng chữ ký `party/port.ActorNames`; `pf/extension` dùng qua `UseContactNames`, Q-072). PII đọc bằng thẻ danh bạ của kho (`client.Directory.Cards`, mục đích `contact.directory`, vai `vault_directory`); ghi liên hệ ngoài tỉnh bằng `Create`/`Amend`/ngăn `contact.card` (vai `vault_registrar`). HTTP `/v1/contacts/access|persons[/{id}[/revise]]|units[/{id}/revise]`; bộ "basic" có DTO riêng — thêm trường vào `basicPersonDTO` là vi phạm BR-03 (kiểm thử `TestContact_FieldFiltering` so khóa và byte).
+
+## Kế hoạch năm KHTC trong `dom/extension` (W11.61)
+
+Gói con `internal/kn/extension/khtc` (schema `pf_extension`, migration pf 20261013070305), phòng ban `ke_hoach_tai_chinh`:
+
+- Sổ `khtc_catalog_item` (Danh mục KHTC, 7 loại), `khtc_program` (danh sách CT/DA chủ — quyết định D20), `khtc_plan_version` (phiên bản theo QĐ, `entries_hash`) + bảng chỉ ghi thêm `khtc_plan_entry` (cả cây mỗi phiên bản).
+- Cổng cho module khác: `extension/port.KHTCPrograms` (Program, Programs — CNTS W11.47 tham chiếu `program_ref`) và `extension/port.KHTCPlans` (PlanAt — phiên bản hiệu lực theo ngày, BR-DL-13; W11.62/63/65). Gốc lắp ráp lấy qua `Module.KHTCPrograms()`, `Module.KHTCPlans()`.
+- Móc chờ nối: `khtc/app.Service.ClosedCutoff` (W11.62 — chặn ngày hiệu lực trước ngày chốt kỳ đã đóng) và `EntryUsage` (W11.63 — dòng đã có số liệu không xóa).
+- `agnofloat` phủ cả gói con (kể cả kiểm thử).
+
+## Khung giá `cap/price` (W11.71)
+
+[ADR-0049](../adr/0049-cap-price-pf-price.md); kiến trúc v4.1 §26. Module năng lực `pf/price` (`internal/kn/price`, `cap/price`, `enable: per_tenant`) sở hữu `pf_price` và `pf_price_pub` (pf 000138); vai `r_price` (không vai cũ, `app_platform` là thành viên), `r_price_pub` (đọc view công bố — chưa có view, `v1_board_daily` ở W11.76). Toàn module cấm float (agnofloat `floatFreeZones`, R-CODE-01): giá, % là decimal/`numeric`.
+
+| Thành phần | Khung W11.71 | Gói mở rộng |
+|---|---|---|
+| `port.Profile` | tên, phòng ban chủ, vai → cấp (TW/TINH/XA), `ManageBy`; KN ở `cmd/api-platform/assembly/price.go` | W11.72 `StewardDuty` (cờ QTNV); W11.74 giờ khóa, hạn phản hồi |
+| `port.Catalog` | `Units`, `Groups` có hiệu lực tại ngày (tenant từ ctx) | W11.73 mặt hàng; KHTC đọc (Q-082) |
+| `port.Calendar`, `port.Thresholds`, `port.ReminderTargets` | W11.74: kế hoạch ngày báo giá (`DayPlan.Locked`), ngưỡng mặt hàng → nhóm → mặc định, bộ chọn người nhận nhắc | W11.72/W11.75 cài `ReminderTargets`; W11.75 đọc `Calendar`, `Thresholds` |
+| Sổ `pf_price.unit`, `pf_price.commodity_group` | mỗi dòng một phiên bản của một mã (`seq`), `valid_from` (date giờ VN), `status` `active`/`retired` | W11.73 tham chiếu `code` |
+| HTTP | `GET /v1/price/status`, `GET /v1/price/catalog?at=`, `POST /v1/price/catalog/defaults` (5 nhóm BRD + 8 ĐVT, chỉ mã chưa có) | W11.72–W11.76 thêm route |
+| Sổ W11.74 (pf 000139) | `calendar_rule`, `calendar_exception`, `alert_threshold`, `calendar_run`; job `price_calendar` (`cmd/worker`, mỗi phút, leader) ghi mốc khóa ±1 phút + nhắc → `pf.price.reminder.issued` → `pf.notify.price` | `/v1/price/calendar*`, `/v1/price/thresholds*` |
+| Xã báo giá (W11.72, pf 000145) | sổ `pf_price.region_group` (nhóm vùng), `collection_point` (mã `XBG####` hệ thống sinh; ↔ ĐVHC cấp xã có hiệu lực đọc từ `k_ref.admin_unit`), `point_officer` (`xa` / `tinh` theo `valid_from`); `port.Points` (`PointsAt`, `PointAt`, `Point.HandledBy`), `port.Officers` (gốc lắp ráp: `assembly.PriceOfficers` ← `pf/accounts`); `Profile.StewardDuty` = cờ QTNV; `app.PointReminders` = `ReminderTargets` mặc định; `app.PointHooks.Submitted` ← W11.75; HTTP `/v1/price/regions*`, `points*`, `admin-units`, `officers` (`handler/point.go`) | W11.75 nối `Submitted`, đọc `Points` để kiểm Cấp Xã/Cấp Tỉnh xử lý xã |
+| Phiếu báo giá (W11.75, pf 000148) | sổ `pf_price.ticket` (một phiếu còn hiệu lực / xã / ngày, khóa lạc quan theo `seq`), `ticket_line` (min/max `numeric`, "Không có hàng", giá hiệu chỉnh `adj_*`), `price_alert` (Tạm tính → xác minh → chốt; trao đổi = lịch sử phiên bản); trạng thái "Không nộp", "Đã khóa", "Chờ rà soát", "Quá hạn phản hồi" chiếu theo `DayPlan.Locked` / hạn phản hồi lúc đọc (không job); `app.TicketService` (`port.Tickets.Day` cho W11.76/W11.77), `ItemHooks.HasPrice/HasSheets` + `PointHooks.Submitted` nối trong `price.New`; `app.TicketHooks.Board` (W11.76); `port.TablePDF` ← `pf/reports`; HTTP `/v1/price/tickets*`, `/v1/price/alerts*` (`handler/ticket.go`) | W11.76 nối `Board`, đọc `Tickets.Day` cho bảng giá ngày |
+| Bảng giá ngày (W11.76, pf 000151/000152) | sổ `pf_price.board` (Chưa duyệt / Đang duyệt — khóa 10 phút một người / Đã duyệt vN / Đang mở duyệt; khóa tuần + `days_scheduled` lưu lúc duyệt), `board_line` (CT-04 toàn tỉnh của một phiên bản), `board_ticket` (phiếu của phiên bản); `port.Boards.Published`, `port.Weeks` (← `pf/extension.ReportWeekOf`, `assembly.PriceWeeks`); sự kiện `pf.price.board.published` v1; `TicketHooks.Board`/`Approved` nối trong `price.New`; view `pf_price_pub.v1_board_daily`, `v1_ticket_week`; HTTP `/v1/price/boards*` (`handler/board.go`) | W11.77 đọc `Boards`; W11.81 nghe sự kiện |
+| Mặt hàng (W11.73, pf 000141) | sổ `pf_price.item` (mã `MH#####` hệ thống sinh, khóa cố vấn theo tenant), `item_assignment` (`point_code` = mã xã báo giá, lỏng), `item_proposal`, `item_set`; `port.Items` (`ItemsAt`, `PointItems`); `app.ItemService` + `app.ItemHooks` (`HasPrice`, `HasSheets` ← W11.75; `NextDay` ← W11.74; `Steward` ← W11.72), nối bằng `price.Module.SetItemHooks` ở gốc lắp ráp; HTTP `/v1/price/items*`, `groups*`, `assignments*`, `point-items`, `item-sets*`, `proposals*` (`handler/item.go`) | W11.72 nối `point_code` ↔ xã báo giá, `Steward`; W11.75 `HasPrice`/`HasSheets` |
+
+Bảng mới của các gói sau: migration riêng tên `<số>_pf_price_<việc>.up.sql`, sổ `shared.apply_ledger`, `GRANT SELECT, INSERT … TO r_price`; view công bố mới khai `//ag:pubview pf_price_pub.<tên> v1` trong `price/port` rồi `GRANT SELECT … TO r_price_pub` (kiểm thử `TestPubViewsDeclaredAndPrivileges_W63` đếm số view).
 
 ## Cấp phép chia sẻ v2 (W4.1)
 
@@ -350,7 +407,7 @@ Còn mở: C-10 (thỏa thuận chia sẻ mẫu, chu kỳ rà soát), H-1 (ai l�
 
 ## Cổng kiến trúc (W9.1)
 
-Bốn cổng giữ ranh giới module sau W2.6. Hai cổng DB dùng tệp ngoại lệ **chỉ được co lại**: mỗi mục có lý do và gói kế hoạch gỡ (`owner: W<n>.<m>`). Cổng hỏng khi có vi phạm mới, hoặc khi một mục ngoại lệ không còn xảy ra (xóa mục đó).
+Bốn cổng giữ ranh giới module sau W2.6. Hai cổng DB dùng tệp ngoại lệ **chỉ được co lại**: mỗi mục có lý do và gói kế hoạch gỡ (`owner: W<n>.<m>`), hoặc `owner: ADR-0028-write-port` cho điểm vào ghi chéo module lâu dài. Cổng hỏng khi có vi phạm mới, hoặc khi một mục ngoại lệ không còn xảy ra (xóa mục đó).
 
 **1. `agnoappname` (archlint).** Module `kind: capability` và `kind: kernel` không rẽ nhánh theo danh tính ứng dụng:
 
@@ -364,7 +421,7 @@ Bốn cổng giữ ranh giới module sau W2.6. Hai cổng DB dùng tệp ngoạ
 - Không `r_<module>` nào có quyền hiệu lực trên đối tượng thuộc schema của module khác (`owns_schema` trong `modreg.Catalog`), trừ `k_ref` và `*_pub`. Xét USAGE/CREATE schema, mọi quyền bảng/khung nhìn/chuỗi số, quyền cột riêng, EXECUTE hàm.
 - Quyền có được qua PUBLIC không tính cho `r_*`. Riêng PUBLIC không được có USAGE/CREATE schema hoặc quyền bảng trên schema module (ngoài `k_ref`, `*_pub`).
 - Schema không thuộc module (`shared`, `public`, schema vận hành) ngoài phạm vi.
-- Ngoại lệ: `migrations/schema_isolation_exceptions.yaml`. Lúc thêm W9.1: `r_masterdata`, `r_party` → `pf_workflow` (USAGE + EXECUTE `submit`/`decide`, hàm `SECURITY DEFINER` của W6.1); gỡ khi điểm vào chuyển sang `pf_workflow_pub` (W6.3).
+- Ngoại lệ: `migrations/schema_isolation_exceptions.yaml`. Lúc thêm W9.1: `r_masterdata`, `r_party` → `pf_workflow` (USAGE + EXECUTE `submit`/`decide`, hàm `SECURITY DEFINER` của W6.1). W6.3 không gỡ mà xếp chúng thành điểm vào ghi lâu dài (`owner: ADR-0028-write-port`, xem "Điểm vào ghi chéo module" ở mục `_pub`); W6.2 thêm `r_forms` → `pf_workflow`, `r_extension` → `pf_forms`, W6.4 thêm `r_metrics` → `pf_workflow`.
 - Module mới cần quyền chéo: công bố view/hàm trong `pf_<module>_pub` (R-DB-10), không cấp thẳng.
 
 **3. `EXPLAIN` chung cho bảng RLS (DB-14)** — `migrations/rls_explain_integration_test.go`:
@@ -390,7 +447,7 @@ Kiến trúc v4.1 §18 (R-DB-07), §26; ADR-0027 mục 2. **Chọn module mới*
 | `Open(purpose)` / `OpenContent(purpose)` | Vai `vault_evidence_viewer`, mục đích bắt buộc + được phép (R-42), người gọi thấy chủ thể (`Resolver` → mã xã; phạm vi người gọi — ngữ cảnh KN hoặc `ScopeResolver` — chứa xã, hoặc `ViaShareGrant`) → không thì `evidence.subject_forbidden` (403); đồng ý của hộ. Tệp chưa có bộ ba: chỉ vai + mục đích + đồng ý như trước |
 | Nhật ký | **Mọi** quyết định sau khi thấy tệp — `granted`, `denied_subject`, `denied_scope`, `denied_consent` — ghi một dòng sổ `pf_files.access_log` (`shared.apply_ledger`, chuỗi `file:<ref>`, chỉ mã tham chiếu). Ghi sổ lỗi → không cấp (fail-closed) |
 
-**Thêm module chủ.** Module chủ có cổng phân giải riêng (vd `cooperativeport.Resolve`); `pf/evidence` khai `evidence/port.Resolver` (interface bên tiêu thụ, mẫu `pf/workflow` ↔ `pf/party`) vì module năng lực không import module domain. Gốc lắp ráp viết bộ chuyển và nối bằng `evidence.Module.UseResolver(<tên module.yaml>, r)` — hiện có `pf/cooperative` (`cmd/api-platform/assembly/evidence.go`: `cooperative`, `household`, `plot`, `diary_entry`; `season`, `harvest` → không hỗ trợ đến W3.3). Phạm vi và đồng ý cũng là interface tự khai (`app.ScopeResolver`, `app.ConsentChecker`) để không thêm cạnh vào chu trình `pf/party ↔ pf/sync`.
+**Thêm module chủ.** Module chủ có cổng phân giải riêng (vd `cooperativeport.Resolve`); `pf/evidence` khai `evidence/port.Resolver` (interface bên tiêu thụ, mẫu `pf/workflow` ↔ `pf/party`) vì module năng lực không import module domain. Gốc lắp ráp viết bộ chuyển và nối bằng `evidence.Module.UseResolver(<tên module.yaml>, r)` — hiện có `pf/cooperative` (`cmd/api-platform/assembly/evidence.go`: `cooperative`, `household`, `plot`, `diary_entry`; `season`, `harvest` qua store vụ từ W3.3). Phạm vi và đồng ý cũng là interface tự khai (`app.ScopeResolver`, `app.ConsentChecker`) để không thêm cạnh vào chu trình `pf/party ↔ pf/sync`.
 
 Vai DB: `r_evidence` là vai nhóm không có vai cũ (suy từ `owns_schema` trong `modreg.Catalog`, W2.6), `app_platform` là thành viên; `SELECT, INSERT` trên `pf_files.file`, `pf_files.access_log`. pf 000123 thu quyền `pf_files` của `r_sync` (và `sync_app` — sau W2.6 không còn quyền trực tiếp, lệnh vô hại).
 
@@ -402,6 +459,8 @@ R-DB-10, ADR-0031 §2, kiến trúc v4.1 §13/§14/§22.1. `cap/analytics` = `pf
 - **Migration:** view tạo trong migration công bố `<cụm>_pub_*` (pf 000124 `pf_pub_v1`) — `agmodgraph` cho phép nó tạo/sửa đối tượng trong schema `_pub` của nhiều module, không đụng schema nội bộ. Module tự thêm view của mình trong migration `<cụm>_<module>_*` cũng được.
 - **Quyền:** vai NOLOGIN `r_<module>_pub` (`dbadmin`, tạo khi module sở hữu schema `_pub`) có USAGE schema + SELECT view; `r_metrics` là thành viên (`dbadmin.AnalyticsModule`); W6.4 thêm `r_agg` (xem [Vai tổng hợp `r_agg`](#vai-tổng-hợp-r_agg-w64)). `r_metrics` không có quyền nào trên schema nội bộ của module nguồn (pf 000124 REVOKE chốt; kiểm `TestPubViewsDeclaredAndPrivileges_W63`). Chủ view là `ag_migrator` (NOBYPASSRLS), mọi bảng gốc FORCE RLS → policy tenant áp qua view.
 - **pf 000124:** `pf_cropcycle_pub.v1_season_event`, `v1_harvest_declaration`; `pf_extension_pub.v1_field_report`, `v1_task_event`, `v1_task`, `v1_directive_target_ack`; `pf_geo_pub.v1_plot_event`, `v1_plot_boundary`, `v1_layer_geometry` (GeoJSON 7 chữ số); `pf_mechanization_pub.v1_balance_run`, `v1_coop_coverage` (mức đáp ứng tổng thể mỗi HTX — quy tắc `domain.Summarize`/QT-02 viết bằng SQL, do mechanization sở hữu).
+- **pf 000144 (W11.10):** `pf_extension_pub.v1_consolidation_closed` — nguồn module cho KHTC: một dòng mỗi kỳ × biểu có khóa kỳ đã lưu (`report_period_key`), số liệu = lần tổng hợp các xã mới nhất ghi không muộn hơn lần chốt gần nhất chạm biểu, cờ `form_closed`/`period_closed`/`key_closed`. Hợp đồng cột ở [`contracts/pubview`](../../contracts/pubview/README.md) (tên, kiểu, thứ tự — kiểm ở `TestPubViewsDeclaredAndPrivileges_W63`); view có hợp đồng `published` không bắt buộc `pf/metrics` đọc. Hai view giá dựng ở W11.76 (pf 000152): `pf_price_pub.v1_board_daily`, `v1_ticket_week` — `published`.
+- **pf 20261013150108, 000154 (PFPUB, [ADR-0053](../adr/0053-hop-dong-so-lieu-da-chot-closed-figures.md)):** họ hợp đồng `closed_figures/v1` — `pf_forms_pub.v1_closed_figures` (kỳ native `cap/forms`, vai `r_forms_pub`) và `pf_extension_pub.v1_closed_figures` (nguồn vòng đời báo cáo cũ), cột giống hệt. **Bên đọc `_pub` ngoài `cap/analytics`:** `consumes.publications` của module đọc (sinh từ `//ag:readpubview`, rà soát như hợp đồng) cho vai nhóm `r_<module>` làm thành viên `r_<chủ>_pub` lúc bootstrap — không cấp thẳng quyền view; hiện có `r_extension` → `r_extension_pub`, `r_forms_pub`, `r_price_pub` (KHTC, port `extension/port.KHTCSources`).
 - **Đọc:** `pf/metrics` mặc định dùng nguồn `_pub` (`app/pubsource.go`, `metrics.Deps.Sources` nil); gốc lắp ráp không còn nối `MetricsSource()`/`LayerGeometry()` của module chủ — các nguồn cũ giữ một kỳ làm **đối chứng**: kiểm thử `metrics_integration_test.go` của cropcycle/extension/geo/mechanization bọc chúng bằng `tests/pubgolden.Compare`, so từng giá trị, watermark, lỗi, phạm vi, hình học. Gỡ nguồn cũ khi bỏ đối chứng. `TestMetricsReadsOnlyDeclaredPubViews_W63`: mã `pf/metrics` chỉ nhắc `pf_metrics.*` và view `_pub` đã khai.
 - **Bản sao chỉ đọc:** `AG_DB_REPLICA_URL` (URL gốc như `AG_PF_DB_URL`/`AG_DB_URL`; vai/mật khẩu ghép như primary) cho `api-platform` và worker (`metrics_snapshot`, `-metrics-backfill`) → `assembly.External.Replica` → `metrics.Deps.Replica`. Mỗi lần đọc kiểm `pg_is_in_recovery()`/`pg_last_xact_replay_timestamp()`: bản sao chưa phát lại tới mốc cutoff (hoặc lỗi) → primary, để giá trị ngày D ghi sổ không thiếu dòng ghi nhận trước Cutoff(D). Ghi (sổ chỉ số, nhật ký lớp) luôn ở primary. Không đặt → primary.
 - **Chưa làm:** `pf/reports` vẫn đọc qua `port/` của module chủ (không đọc thẳng schema khác — DB-09); chuyển sang `_pub` khi tách `cap/forms`/`cap/export`.
@@ -411,8 +470,8 @@ R-DB-10, ADR-0031 §2, kiến trúc v4.1 §13/§14/§22.1. `cap/analytics` = `pf
 
 R-DB-11, R-SEC-03, ADR-0031 §3–§7; [runbook](../runbooks/agg-jobs.md). Module chủ: `pf/metrics` (`cap/analytics`) — danh mục job, nhật ký chạy, bộ chạy; `pf/workflow` chỉ giữ yêu cầu/quyết định bốn mắt (kind `agg.job`).
 
-- **Vai:** `r_agg` NOLOGIN **BYPASSRLS**, thành viên mọi `r_<module>_pub` (bootstrap, `dbadmin.AggRole`), pf 000129 cấp thêm USAGE `k_ref` + SELECT cột `k_ref.org.tenant_id`. `app_worker` (đơn vị chạy job, `LoginUnit.Agg`) là thành viên NOINHERIT. `cmd/migrate bootstrap` phải chạy trước `migrate up` (000129 dừng nếu thiếu `r_agg`).
-- **Đường vào duy nhất:** `db.WithAggTx(ctx, pool, owner, governance, authorize, fn)` (`internal/shared/db/agg.go`): giao dịch chỉ đọc → vai module chủ + tenant quản trị → `authorize` (bộ chạy kiểm job + phiên bản + băm là phiên bản đã duyệt mới nhất ở `pf_metrics.agg_job`) → chỉ khi nil mới `SET LOCAL ROLE r_agg` (xóa `app.*`, `transaction_read_only`, `statement_timeout` 10 phút) → `fn(db.AggTx)`; `AggTx.InTenant` đặt `app.tenant_id` cục bộ để đọc lát một tenant qua view `_pub`. Vai hết khi COMMIT/ROLLBACK.
+- **Vai:** `r_agg` NOLOGIN **BYPASSRLS**, thành viên mọi `r_<module>_pub` (bootstrap, `dbadmin.AggRole`), pf 000129 cấp thêm USAGE `k_ref` + SELECT cột `k_ref.org.tenant_id`; pf 000137 (gói FC) cấp EXECUTE `k_ref.ctx_uuid/ctx_text/ctx_reject` — chính sách RLS dưới view `_pub` gọi chúng và quyền hàm kiểm theo `current_user`. **Chính sách mới gọi hàm khác trên bảng nguồn của `_pub` phải cấp EXECUTE cho `r_agg`.** Thành viên duy nhất: vai đăng nhập riêng `app_agg` (gói FC, `dbadmin.AppAgg`, NOINHERIT, không `r_*` nào khác, mặc định chỉ đọc + `statement_timeout`; bootstrap thu hồi thành viên khác — `dbadmin.ExclusiveMembers`). `cmd/migrate bootstrap` phải chạy trước `migrate up` (000129 dừng nếu thiếu `r_agg`).
+- **Đường vào duy nhất:** `db.WithAggTx(ctx, pool, owner, governance, aggPool, authorize, fn)` (`internal/shared/db/agg.go`): giao dịch chỉ đọc trên `pool` (`app_worker`) → vai module chủ + tenant quản trị → `authorize` (bộ chạy kiểm job + phiên bản + băm là phiên bản đã duyệt mới nhất ở `pf_metrics.agg_job`) → chỉ khi nil mới mở giao dịch chỉ đọc thứ hai trên `aggPool` (`app_agg`, không bọc `ForModule`) và `SET LOCAL ROLE r_agg` (xóa `app.*`, `transaction_read_only`, `statement_timeout` 10 phút) → `fn(db.AggTx)`; `AggTx.InTenant` đặt `app.tenant_id` cục bộ để đọc lát một tenant qua view `_pub`. Vai hết khi COMMIT/ROLLBACK.
 - **Lint `agnosessionset`:** ngoài `internal/shared/db` không có `SET LOCAL ROLE` hay `set_config('role', …)`; tên `r_agg` chỉ trong `shared/db`, `shared/dbadmin`; `db.WithAggTx` chỉ được gọi từ `internal/platform/metrics/app`.
 - **Danh mục job** (`domain.AggJob`, `app/aggjobs.go`): id, phiên bản, view `_pub` đọc, SQL (chỉ tham chiếu view đã khai — kiểm lúc đề xuất), chiều, số đo, mục đích, k. `Agg.Propose` → `Agg.Decide` (người quyết định ≠ người đề xuất: app + CHECK `decision_four_eyes` + CHECK `agg_job_four_eyes`); một phiên bản một đề xuất một quyết định; phiên bản chỉ tăng; dòng quyết định chép định nghĩa từ đề xuất (trigger `trg_bind_proposal`).
 - **Chạy:** `Agg.Run` — k áp = max(k job, k sàn `publicdata.k_min`, mặc định 10); k thấp hơn, job chưa khai/chưa duyệt/cũ/sửa → `refused`. Liệt kê tenant qua `k_ref.org` (vượt RLS), đọc từng lát tenant qua view `_pub` (view W6.3 chạy bằng quyền chủ có FORCE RLS — BYPASSRLS không xuyên view), gộp + ẩn nhóm < k trong tiến trình; mỗi lần chạy một dòng `pf_metrics.agg_run`, không ghi được → không trả đầu ra.
@@ -512,6 +571,7 @@ ADR-0030 (mục "W4.2 — hình chính sách"), kiến trúc v4.1 §17.3, pf 000
 - Kiểm phạm vi ở ứng dụng **giữ nguyên** (`authz.Scope`, `coopOnly`) — RLS là lớp thứ hai.
 - Nút của người dùng HTX là `OrgRef` của token: kiểm thử dựng `k_ref` cho tenant (vd `kref.RebuildTenant`) thì người dùng chỉ thấy cây con của Nút; không dựng thì chính sách lùi về `p_tenant`.
 - Bảng mới có `tenant_id` trong `pf_coop` (hay schema khác muốn phạm vi Nút): thêm `p_scope AS RESTRICTIVE` viết thẳng `EXISTS k_ref.node_closure` (không hàm do repo định nghĩa) — `shared.v_missing_rls` báo nếu `p_scope` PERMISSIVE hay có chính sách thứ ba; cổng EXPLAIN W9.1 báo nếu gọi hàm theo hàng.
+
 ## Module `mkg/engine` — kho quan sát (W8.2)
 
 [Thiết kế](../design/mkg.md#59-mkgengine--kho-quan-sát-của-engine-điều-phối-w82), [ADR-0036](../adr/0036-engine-ba-che-do-vung-noi-bo-optcore.md#hiện-thực). Module mới `internal/mkg/engine` (`kind: domain`, `zones: [mkg]`, `enable: always`, ứng dụng MKG). Sở hữu `mkg_engine` (mkg 000037): sổ `observation` + bảng đệm `observation_feed_state`. Vai nhóm `r_engine` suy từ `modreg.Catalog` (không vai cũ `engine_app`); `cmd/api-internal` ghép module nên `app_internal` là thành viên. Giao dịch chạy `SET LOCAL ROLE r_engine` (`engine.DBModule`).
@@ -521,12 +581,23 @@ ADR-0030 (mục "W4.2 — hình chính sách"), kiến trúc v4.1 §17.3, pf 000
 **Nối ở gốc lắp ráp** (`cmd/api-internal/assembly`): `engine.New(unit, clk, EngineOptionsFromEnv(fo.DirectoryFeed))` — bộ điều hợp feed của `mkg/fieldops` (W5.5, `AG_INTEGRATION_GATEWAY_URL` + `AG_FIELDOPS_FEED_API_KEY`); `AG_ENGINE_FEEDS` (danh sách feed), `AG_ENGINE_FEED_ALLOW_PROPOSED=1` (dev/test, bỏ qua ở production), `AG_ENGINE_FEED_INTERVAL`; job `engine_observation_feed` trong `AG_MKG_JOBS` (cần `AG_MKG_TENANT_ID`). Module không có route HTTP (không trong `Modules.List`).
 
 **Cấm float** (`agnofloat`, `floatFreeZones`): giá trị và cận bất định là `decimal`.
+
 ## Migration theo module (W7.1)
 
-Bộ chạy v2 (`internal/shared/migrator`, [ADR-0038](../adr/0038-bo-chay-migration-theo-module.md)) gắn mỗi tệp `migrations/<cụm>/NNNNNN_*.up.sql` cho module bằng đúng quy tắc của `agmodgraph` ở trên (tên `<cụm>_<module>`, nếu không thì schema đụng; tệp nhiều module → module giả `<cụm>`), ghi lịch sử theo module (cột `module` của `shared.schema_migrations`; dời vào schema module là bước 2) và áp mọi tệp vắng trong sổ theo thứ tự topo `depends` — **số nhỏ hơn số đã áp vẫn được áp**. Trong kỳ chuyển (`AG_MIGRATE_RUNNER=v2` chưa là mặc định) vẫn cấp số theo thứ tự gộp như kế hoạch §1 mục 6.
+Bộ chạy v2 (`internal/shared/migrator`, [ADR-0038](../adr/0038-bo-chay-migration-theo-module.md)) gắn mỗi tệp `migrations/<cụm>/NNNNNN_*.up.sql` cho module bằng đúng quy tắc của `agmodgraph` ở trên (tên `<cụm>_<module>`, nếu không thì schema đụng; tệp nhiều module → module giả `<cụm>`), ghi lịch sử theo module (cột `module` của `shared.schema_migrations`; dời vào schema module là bước 2) và áp mọi tệp vắng trong sổ theo thứ tự topo `depends` — **số nhỏ hơn số đã áp vẫn được áp**. Từ 13/10/2026 (WH-B) tệp mới không cấp số: tên mốc UTC `YYYYMMDDHHMMSS_<cụm>_<module>_….up.sql` (`go run ./tools/migratecheck -new …`), xếp sau mọi số cũ ở cả hai bộ chạy; `migratecheck -base origin/dev` (CI) chặn tệp xếp trước phiên bản lớn nhất của nhánh gốc vì golang-migrate (mặc định) vẫn bỏ qua im lặng — [parallel-packages.md](parallel-packages.md).
 
-- Đặt tên tệp mới `<số>_<cụm>_<module>_….up.sql`, chỉ đụng schema của module đó (agmodgraph đã bắt).
+- Đặt tên tệp mới `<mốc UTC>_<cụm>_<module>_….up.sql` (`go run ./tools/migratecheck -new <cụm>_<module>_<tên>`), chỉ đụng schema của module đó (agmodgraph đã bắt).
 - `go run ./tools/migratecheck -modules migrations`: bảng module → số tệp, khoảng số, schema. `go run ./tools/migratecheck -module pf/party migrations`: thứ tự áp và kiểm riêng các tệp của module.
 - Đổi `depends` trong `module.yaml` → `go run ./tools/modgen` (danh mục sinh mang `depends` cho bộ chạy lúc chạy, `modreg.Depends`).
 - Kiểm thử cả bộ chạy v2 cho một gói: `AG_MIGRATE_RUNNER=v2 go test -count=1 -p 1 ./<gói>/` (`pgtest` dùng `dbadmin.Migrate`).
 - Vai `own_<module>` (NOLOGIN) đã dựng; chạy migration bằng nó và thư mục `migrations/<cụm>/<module>/` là bước 2.
+
+## Hồi quy liên module G1
+
+Xem [sổ hồi quy](../REGRESSION.md) để tái lập đồ thị tiêu thụ và các lệnh chấp nhận
+khi đổi port, sự kiện, namespace hoặc phần lắp ráp liên module.
+
+
+### Khai báo bên đọc view công bố
+
+Module đọc ghi //ag:readpubview <schema>_pub.<tên> v<N> trong mã của mình. modgen sinh consumes.publications và catalog.PubReadOwners; registry từ chối nguồn/phiên bản chưa công bố, schema không thuộc chủ, khác cụm hoặc khai trùng. Đây là phụ thuộc dữ liệu, không thêm cạnh gọi depends. Bootstrap đọc PubReadOwners từ catalog đã kiểm chứng; không còn bảng cấu hình riêng theo tên module trong dbadmin. Module thiếu khai báo không được sinh membership _pub mới. Vai _pub vẫn có quyền SELECT theo schema như hiện trạng; không coi mỗi khai báo là một ACL SQL riêng.

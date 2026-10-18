@@ -78,71 +78,8 @@ func (s SourceSpec) Column(key string) (ColumnSpec, bool) {
 	return ColumnSpec{}, false
 }
 
-func unitCols() []ColumnSpec {
-	return []ColumnSpec{
-		{Key: "province_code", Title: "Mã tỉnh", Kind: KindText, MinLevel: LevelProvince},
-		{Key: "province_name", Title: "Tỉnh/Thành phố", Kind: KindText, MinLevel: LevelProvince},
-		{Key: "commune_code", Title: "Mã xã", Kind: KindText, MinLevel: LevelCommune},
-		{Key: "commune_name", Title: "Xã/Phường", Kind: KindText, MinLevel: LevelCommune},
-	}
-}
-
-func cols(extra ...ColumnSpec) []ColumnSpec { return append(unitCols(), extra...) }
-
-var extLevels = []string{LevelNational, LevelProvince, LevelCommune}
-
 // Sources là các nguồn dữ liệu được hỗ trợ.
-var Sources = map[string]SourceSpec{
-	port.SourceSowing: {Key: port.SourceSowing, Module: "extension", Levels: extLevels, DefaultLevel: LevelProvince, NeedsPeriod: true,
-		Columns: cols(
-			ColumnSpec{Key: "season_code", Title: "Vụ", Kind: KindText},
-			ColumnSpec{Key: "variety_code", Title: "Giống", Kind: KindText},
-			ColumnSpec{Key: "sown_area_ha", Title: "Diện tích đã sạ (ha)", Kind: KindDecimal, Scale: 2},
-			ColumnSpec{Key: "cooperatives", Title: "Số HTX báo cáo", Kind: KindInt},
-			ColumnSpec{Key: "reports", Title: "Số báo cáo", Kind: KindInt},
-		)},
-	port.SourceGrowthPest: {Key: port.SourceGrowthPest, Module: "extension", Levels: extLevels, DefaultLevel: LevelProvince, NeedsPeriod: true,
-		Columns: cols(
-			ColumnSpec{Key: "pest_code", Title: "Sâu bệnh", Kind: KindText},
-			ColumnSpec{Key: "severity", Title: "Mức độ nhiễm", Kind: KindText},
-			ColumnSpec{Key: "affected_area_ha", Title: "Diện tích nhiễm (ha)", Kind: KindDecimal, Scale: 2},
-			ColumnSpec{Key: "observations", Title: "Số lượt quan sát", Kind: KindInt},
-			ColumnSpec{Key: "urgent", Title: "Phản ánh khẩn", Kind: KindInt},
-		)},
-	port.SourceProgramProgress: {Key: port.SourceProgramProgress, Module: "extension",
-		Levels: []string{LevelNational, LevelProvince, LevelCommune, LevelCooperative}, DefaultLevel: LevelProvince, UsesSeason: true,
-		Columns: cols(
-			ColumnSpec{Key: "cooperative_name", Title: "HTX", Kind: KindText, MinLevel: LevelCooperative},
-			ColumnSpec{Key: "season", Title: "Vụ", Kind: KindText},
-			ColumnSpec{Key: "target_ha", Title: "Mục tiêu Đề án (ha)", Kind: KindDecimal, Scale: 2, MaxLevel: LevelProvince},
-			ColumnSpec{Key: "registered_ha", Title: "Đăng ký (ha)", Kind: KindDecimal, Scale: 2},
-			ColumnSpec{Key: "deploying_ha", Title: "Đang triển khai (ha)", Kind: KindDecimal, Scale: 2},
-			ColumnSpec{Key: "completed_ha", Title: "Hoàn thành (ha)", Kind: KindDecimal, Scale: 2},
-			ColumnSpec{Key: "registered_pct", Title: "Đăng ký/Mục tiêu (%)", Kind: KindPercent, Scale: 2, MaxLevel: LevelProvince},
-			ColumnSpec{Key: "cooperatives", Title: "Số HTX", Kind: KindInt},
-			ColumnSpec{Key: "unapproved", Title: "Chưa duyệt", Kind: KindInt},
-		)},
-	port.SourceTasksSLA: {Key: port.SourceTasksSLA, Module: "extension", Levels: extLevels, DefaultLevel: LevelProvince, NeedsPeriod: true,
-		Columns: cols(
-			ColumnSpec{Key: "opened", Title: "Nhiệm vụ mới", Kind: KindInt},
-			ColumnSpec{Key: "resolved", Title: "Đã xử lý", Kind: KindInt},
-			ColumnSpec{Key: "on_time", Title: "Đúng hạn SLA", Kind: KindInt},
-			ColumnSpec{Key: "escalated", Title: "Leo thang", Kind: KindInt},
-			ColumnSpec{Key: "open", Title: "Đang mở", Kind: KindInt},
-			ColumnSpec{Key: "overdue", Title: "Quá hạn", Kind: KindInt},
-		)},
-	port.SourcePeriodSummary: {Key: port.SourcePeriodSummary, Module: "extension", Levels: extLevels, DefaultLevel: LevelProvince, NeedsPeriod: true,
-		Columns: cols(
-			ColumnSpec{Key: "sown_area_ha", Title: "Diện tích đã sạ (ha)", Kind: KindDecimal, Scale: 2},
-			ColumnSpec{Key: "affected_area_ha", Title: "Diện tích nhiễm sâu bệnh (ha)", Kind: KindDecimal, Scale: 2},
-			ColumnSpec{Key: "pest_reports", Title: "Báo cáo sâu bệnh", Kind: KindInt},
-			ColumnSpec{Key: "urgent_reports", Title: "Phản ánh khẩn", Kind: KindInt},
-			ColumnSpec{Key: "registered_ha", Title: "Đề án: đăng ký (ha)", Kind: KindDecimal, Scale: 2},
-			ColumnSpec{Key: "completed_ha", Title: "Đề án: hoàn thành (ha)", Kind: KindDecimal, Scale: 2},
-			ColumnSpec{Key: "tasks_opened", Title: "Nhiệm vụ mới", Kind: KindInt},
-			ColumnSpec{Key: "tasks_resolved", Title: "Nhiệm vụ đã xử lý", Kind: KindInt},
-			ColumnSpec{Key: "tasks_overdue", Title: "Nhiệm vụ quá hạn", Kind: KindInt},
-		)},
+var nativeSourceSpecs = map[string]SourceSpec{
 	// CGH FN-10 — cột đúng "Cấu trúc file xuất Excel/PDF" của BRD v1.3.
 	port.SourceCGHSummary: {Key: port.SourceCGHSummary, Module: "mechanization", Levels: []string{LevelProvince, LevelCommune},
 		DefaultLevel: LevelProvince, UsesSeason: true,
@@ -209,6 +146,9 @@ var Sources = map[string]SourceSpec{
 		}},
 }
 
+// Sources contains only native capability defaults; applications register their catalog.
+var Sources = NativeSources()
+
 // HasColumn cho biết mẫu có cột key.
 func (d Definition) HasColumn(key string) bool {
 	return slices.ContainsFunc(d.Columns, func(c Column) bool { return c.Key == key })
@@ -262,9 +202,12 @@ func (e FieldError) Error() string { return e.Field + ": " + e.Msg }
 func ValidKey(k string) bool { return keyRe.MatchString(k) }
 
 // Validate kiểm định nghĩa mẫu: nguồn có hỗ trợ, cấp tổng hợp hợp lệ, cột thuộc nguồn, định dạng.
-func (d *Definition) Validate() error {
+func (d *Definition) Validate() error { return d.ValidateWithSources(Sources) }
+
+// ValidateWithSources validates against the application's immutable catalog.
+func (d *Definition) ValidateWithSources(sources map[string]SourceSpec) error {
 	d.Title, d.FormNote = strings.TrimSpace(d.Title), strings.TrimSpace(d.FormNote)
-	src, ok := Sources[d.Source]
+	src, ok := sources[d.Source]
 	switch {
 	case len([]rune(d.Title)) < 5 || len([]rune(d.Title)) > 200:
 		return FieldError{"title", "5–200 ký tự"}
@@ -307,8 +250,9 @@ func (d *Definition) Validate() error {
 }
 
 // LevelAllowed cho biết cấp có dùng được với nguồn.
-func LevelAllowed(source, level string) bool {
-	return slices.Contains(Sources[source].Levels, level)
+func LevelAllowed(source, level string) bool { return LevelAllowedWithSources(source, level, Sources) }
+func LevelAllowedWithSources(source, level string, sources map[string]SourceSpec) bool {
+	return slices.Contains(sources[source].Levels, level)
 }
 
 // ColumnVisible: cột có MinLevel chỉ hiện khi cấp tổng hợp đủ chi tiết.
@@ -316,9 +260,6 @@ func ColumnVisible(spec ColumnSpec, level string) bool {
 	return (spec.MinLevel == "" || levelRank[level] >= levelRank[spec.MinLevel]) &&
 		(spec.MaxLevel == "" || levelRank[level] <= levelRank[spec.MaxLevel])
 }
-
-// provisionalNote là ghi chú của bố cục tạm (BRD chưa có mẫu biểu chính thức).
-const provisionalNote = "Mẫu tạm: BRD chỉ nêu \"theo mẫu Bộ NN&MT/NN&PTNT\" nhưng chưa có mẫu biểu chính thức — bố cục sẽ điều chỉnh khi Bộ ban hành."
 
 func defCols(source string, keys ...string) []Column {
 	src := Sources[source]
@@ -341,24 +282,6 @@ func Builtins() []Template {
 		return Template{Key: key, Version: 0, Status: TemplateActive, Def: d}
 	}
 	return []Template{
-		mk("kn.sowing_progress", Definition{Title: "Báo cáo tiến độ gieo sạ", Source: port.SourceSowing, Grouping: LevelCommune,
-			Columns: defCols(port.SourceSowing, "province_name", "commune_name", "season_code", "variety_code", "sown_area_ha", "cooperatives"),
-			Formats: both(), Provisional: true, FormNote: provisionalNote}),
-		mk("kn.growth_pest", Definition{Title: "Báo cáo tình hình sinh trưởng và sâu bệnh", Source: port.SourceGrowthPest, Grouping: LevelCommune,
-			Columns: defCols(port.SourceGrowthPest, "province_name", "commune_name", "pest_code", "severity", "affected_area_ha", "observations", "urgent"),
-			Formats: both(), Provisional: true, FormNote: provisionalNote}),
-		mk("kn.program_progress", Definition{Title: "Báo cáo tiến độ Đề án 1 triệu ha lúa chất lượng cao, phát thải thấp", Source: port.SourceProgramProgress,
-			Grouping: LevelProvince,
-			Columns: defCols(port.SourceProgramProgress, "province_name", "season", "target_ha", "registered_ha", "deploying_ha", "completed_ha",
-				"registered_pct", "cooperatives", "unapproved"),
-			Formats: both(), Provisional: true, FormNote: provisionalNote}),
-		mk("kn.tasks_sla", Definition{Title: "Báo cáo xử lý nhiệm vụ hỗ trợ", Source: port.SourceTasksSLA, Grouping: LevelProvince,
-			Columns: defCols(port.SourceTasksSLA, "province_name", "opened", "resolved", "on_time", "escalated", "open", "overdue"),
-			Formats: both(), Provisional: true, FormNote: provisionalNote}),
-		mk("kn.period_summary", Definition{Title: "Tổng hợp báo cáo kỳ", Source: port.SourcePeriodSummary, Grouping: LevelProvince,
-			Columns: defCols(port.SourcePeriodSummary, "province_name", "sown_area_ha", "affected_area_ha", "pest_reports", "urgent_reports",
-				"registered_ha", "completed_ha", "tasks_opened", "tasks_resolved", "tasks_overdue"),
-			Formats: both(), Provisional: true, FormNote: provisionalNote}),
 		mk("cgh.summary", Definition{Title: "Tổng hợp theo khu vực", Source: port.SourceCGHSummary, Grouping: LevelProvince,
 			Columns: defCols(port.SourceCGHSummary, "province_name", "commune_name", "farm_stage", "machine_type", "required", "capacity",
 				"coverage_pct", "status"),

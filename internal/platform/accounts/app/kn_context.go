@@ -43,6 +43,8 @@ type DepartmentView struct {
 	Name        string
 	Description string
 	Status      string // active | not_open | suspended
+	// ReadOnly: phòng ban ngoài lần gán, chọn được ở chế độ chỉ xem (Lãnh đạo đơn vị, Ban Giám đốc — W11.07).
+	ReadOnly bool
 }
 
 // CommuneView là xã phụ trách.
@@ -58,6 +60,7 @@ type AssignmentView struct {
 	MgmtLevelLabel string
 	CommuneViews   []CommuneView
 	DepartmentRefs []DepartmentView
+	Attrs          port.AssignmentAttrs // W11.07
 }
 
 // ContextView là ngữ cảnh đã chọn (POST /v1/me/context).
@@ -75,6 +78,14 @@ type ContextView struct {
 	OnBehalfOf     uuid.UUID
 	Replayed       bool
 	SupportReplays bool
+	// W11.07: phân quyền trong vai của ngữ cảnh (Powers chỉ có ở GET /v1/me/context — giải mỗi request).
+	ReadOnly      bool
+	MgmtLevel     string
+	Manager       bool
+	ProvinceGroup string
+	Duties        []string
+	InternalUnit  string
+	Powers        []string
 }
 
 // accountEnabled: tài khoản theo dõi ở pf và đang bị khóa → false.
@@ -111,8 +122,9 @@ func (s *Service) communeViews(ctx context.Context, codes []string) []CommuneVie
 	return out
 }
 
-// deptViews trả phòng ban (chưa xóa) của lần gán theo thứ tự của đơn vị.
-func (s *Service) deptViews(ctx context.Context, a port.Assignment) ([]DepartmentView, error) {
+// deptViews trả phòng ban (chưa xóa) của lần gán theo thứ tự của đơn vị. Lãnh đạo đơn vị / Ban Giám đốc
+// (W11.07, Q-059): thêm mọi phòng ban khác của đơn vị, đánh dấu chỉ xem.
+func (s *Service) deptViews(ctx context.Context, a port.Assignment, group string) ([]DepartmentView, error) {
 	out := []DepartmentView{}
 	if a.Role == port.KNAdmin || len(a.Departments) == 0 {
 		return out, nil
@@ -122,27 +134,42 @@ func (s *Service) deptViews(ctx context.Context, a port.Assignment) ([]Departmen
 		return nil, err
 	}
 	for _, d := range depts {
-		if !d.Retired && slices.Contains(a.Departments, d.Code) {
-			out = append(out, DepartmentView{Code: d.Code, Name: d.Name, Description: d.Description, Status: d.Status})
+		if d.Retired {
+			continue
+		}
+		if ro, ok := domain.ViewOnlyDepartment(a, group, d.Code); ok {
+			out = append(out, DepartmentView{Code: d.Code, Name: d.Name, Description: d.Description, Status: d.Status, ReadOnly: ro})
 		}
 	}
 	return out, nil
 }
 
-func (s *Service) viewOf(ctx context.Context, a port.Assignment) (AssignmentView, error) {
-	d, err := s.deptViews(ctx, a)
+func (s *Service) viewOf(ctx context.Context, a port.Assignment, attrs port.AssignmentAttrs) (AssignmentView, error) {
+	d, err := s.deptViews(ctx, a, attrs.ProvinceGroup)
 	if err != nil {
 		return AssignmentView{}, err
 	}
+	if attrs.AssignmentID == uuid.Nil {
+		attrs = port.AssignmentAttrs{AssignmentID: a.ID, Duties: []string{}, Facilities: []uuid.UUID{}, Households: []uuid.UUID{}}
+	}
 	return AssignmentView{Assignment: a, OrgName: s.orgName(ctx, a.OrgRef), MgmtLevelLabel: port.MgmtLevelLabel(a.MgmtLevel),
-		CommuneViews: s.communeViews(ctx, a.Communes), DepartmentRefs: d}, nil
+		CommuneViews: s.communeViews(ctx, a.Communes), DepartmentRefs: d, Attrs: attrs}, nil
 }
 
-// Views tra tên cho danh sách lần gán.
+// Views tra tên (và thuộc tính vai W11.07) cho danh sách lần gán.
 func (s *Service) Views(ctx context.Context, as []port.Assignment) ([]AssignmentView, error) {
 	out := make([]AssignmentView, 0, len(as))
+	attrs := map[uuid.UUID]map[uuid.UUID]port.AssignmentAttrs{}
 	for _, a := range as {
-		v, err := s.viewOf(ctx, a)
+		m, ok := attrs[a.UserRef]
+		if !ok {
+			var err error
+			if m, err = s.attrsByUser(ctx, a.UserRef); err != nil {
+				return nil, err
+			}
+			attrs[a.UserRef] = m
+		}
+		v, err := s.viewOf(ctx, a, m[a.ID])
 		if err != nil {
 			return nil, err
 		}
@@ -249,7 +276,11 @@ func (s *Service) SelectContext(ctx context.Context, assignment uuid.UUID, dept 
 			}
 			dept = ""
 		} else {
-			if dept == "" || !slices.Contains(asg.Departments, dept) {
+			attrs, err := s.attrsByUser(ctx, p.ActorRef)
+			if err != nil {
+				return ContextView{}, err
+			}
+			if _, ok := domain.ViewOnlyDepartment(asg, attrs[asg.ID].ProvinceGroup, dept); dept == "" || !ok {
 				return ContextView{}, ErrDepartmentRequired
 			}
 			d, err := s.Departments.DepartmentByCode(ctx, asg.UnitRef, dept)
@@ -275,7 +306,23 @@ func (s *Service) SelectContext(ctx context.Context, assignment uuid.UUID, dept 
 	}
 	v, err := s.contextView(ctx, row, asg.Communes)
 	v.Replayed = replayed
+	if err == nil && row.SupportID == uuid.Nil && asg.ID != uuid.Nil {
+		attrs, aerr := s.attrsByUser(ctx, p.ActorRef)
+		if aerr != nil {
+			return ContextView{}, aerr
+		}
+		k := &authz.KNContext{Role: asg.Role}
+		ro, _ := domain.ViewOnlyDepartment(asg, attrs[asg.ID].ProvinceGroup, row.Department)
+		applyAttrs(k, asg, attrs[asg.ID], ro, nil)
+		withAttrs(&v, *k)
+	}
 	return v, err
+}
+
+// withAttrs chép phân quyền trong vai của ngữ cảnh vào view.
+func withAttrs(v *ContextView, k authz.KNContext) {
+	v.ReadOnly, v.MgmtLevel, v.Manager, v.ProvinceGroup = k.ReadOnly(), k.MgmtLevel, k.Manager, k.ProvinceGroup
+	v.Duties, v.InternalUnit, v.Powers = slices.Clone(k.Duties), k.InternalUnit, slices.Clone(k.Powers)
 }
 
 func (s *Service) contextView(ctx context.Context, row store.Context, communes []string) (ContextView, error) {
@@ -308,7 +355,9 @@ func (s *Service) CurrentContext(ctx context.Context) (ContextView, error) {
 	if k.Support != nil {
 		row.SupportID, row.OnBehalfOf = k.Support.SessionID, k.Support.OnBehalfOf
 	}
-	return s.contextView(ctx, row, k.Communes)
+	v, err := s.contextView(ctx, row, k.Communes)
+	withAttrs(&v, *k)
+	return v, err
 }
 
 // ResolveContext kiểm và dựng ngữ cảnh phiên cho middleware (mọi request có X-AG-Context):
@@ -328,6 +377,8 @@ func (s *Service) ResolveContext(ctx context.Context, id uuid.UUID) (*authz.KNCo
 	var row *store.Context
 	var asg *port.Assignment
 	var sup *store.Support
+	var attrs port.AssignmentAttrs
+	var powers []string
 	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
 		var err error
 		if row, err = store.ContextByID(ctx, tx, id); err != nil {
@@ -352,7 +403,16 @@ func (s *Service) ResolveContext(ctx context.Context, id uuid.UUID) (*authz.KNCo
 			}
 			return nil
 		}
-		asg, err = store.AssignmentByID(ctx, tx, row.AssignmentID, false)
+		if asg, err = store.AssignmentByID(ctx, tx, row.AssignmentID, false); err != nil || asg == nil {
+			return err
+		}
+		// W11.07: thuộc tính vai + quyền nhận qua ủy quyền có hạn (còn hiệu lực lúc này, đúng phòng ban của phiên).
+		if attrs, err = store.AttrsOf(ctx, tx, asg.ID, false); err != nil {
+			return err
+		}
+		if asg.Role == port.KNTinh {
+			powers, err = store.ActivePowers(ctx, tx, p.ActorRef, asg.UnitRef, row.Department, now)
+		}
 		return err
 	})
 	if err != nil {
@@ -376,10 +436,12 @@ func (s *Service) ResolveContext(ctx context.Context, id uuid.UUID) (*authz.KNCo
 		if row.Role == port.KNAdmin && !p.MFA {
 			return nil, problem.MFARequired
 		}
-		if row.Role != port.KNAdmin && !slices.Contains(asg.Departments, row.Department) {
+		viewOnly, allowed := domain.ViewOnlyDepartment(*asg, attrs.ProvinceGroup, row.Department)
+		if row.Role != port.KNAdmin && !allowed {
 			return nil, ErrContextRevoked
 		}
 		communes, k.OrgRef, k.UnitRef = asg.Communes, asg.OrgRef, asg.UnitRef
+		applyAttrs(k, *asg, attrs, viewOnly, powers)
 	}
 	if row.Role != port.KNAdmin {
 		d, err := s.Departments.DepartmentByCode(ctx, k.UnitRef, row.Department)
@@ -501,4 +563,18 @@ func (s *Service) DisplayNames(ctx context.Context, refs []uuid.UUID) (map[uuid.
 		}
 	}
 	return out, nil
+}
+
+// applyAttrs đưa thuộc tính vai (W11.07) vào ngữ cảnh đã giải. Ngữ cảnh chỉ xem không nhận quyền ủy quyền.
+func applyAttrs(k *authz.KNContext, a port.Assignment, attrs port.AssignmentAttrs, viewOnly bool, powers []string) {
+	k.MgmtLevel, k.ProvinceGroup, k.InternalUnit = a.MgmtLevel, attrs.ProvinceGroup, attrs.InternalUnit
+	k.Manager = a.Role == port.KNTinh && port.IsManager(a.MgmtLevel, attrs.ProvinceGroup)
+	k.Duties = slices.Clone(attrs.Duties)
+	if a.Role == port.KNXa {
+		k.Facilities, k.Households = slices.Clone(attrs.Facilities), slices.Clone(attrs.Households)
+	}
+	k.ViewOnly = viewOnly
+	if !viewOnly {
+		k.Powers = slices.Clone(powers)
+	}
 }

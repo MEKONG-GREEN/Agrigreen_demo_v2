@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/uuid"
-
 	port "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 )
@@ -78,7 +76,7 @@ func TestStageMap_GIS_US_SEASON_01_US_YIELD_01(t *testing.T) {
 		t.Fatalf("KN xã 31117: %v", got)
 	}
 	// Tenant khác không thấy gì (tenant isolation).
-	other := f.as(ids.New(), uuid.Nil, port.RoleCoopManager)
+	other := f.as(ids.New(), ids.New(), port.RoleCoopManager) // HTX của tenant khác (quản lý HTX luôn có org_ref — FD)
 	if got := must(t, other.get("/v1/cropcycle/stage-map")); len(list(got.body, "plots")) != 0 {
 		t.Fatalf("tenant khác thấy dữ liệu: %s", got.raw)
 	}

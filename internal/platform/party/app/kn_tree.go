@@ -387,10 +387,14 @@ type DeptSeedResult struct {
 	Created  []port.Department
 	Existing int
 	Status   string
+	// W11.06: mã tạm cũ (phong_ban_5/6) đã xóa / còn giữ trong lần nạp này.
+	LegacyRetired []string
+	LegacyKept    []string
 }
 
-// SeedDepartments khai báo 6 phòng ban mặc định (TTKN An Giang, Phòng Trồng trọt Đang áp dụng) cho
-// đơn vị; phòng ban đã có mã giữ nguyên. Gọi lặp an toàn.
+// SeedDepartments khai báo 5 phòng ban mặc định (TTKN An Giang, Phòng Trồng trọt Đang áp dụng — W11.06)
+// cho đơn vị; phòng ban đã có mã giữ nguyên. Đơn vị đã nạp seed v7.7: mã tạm phong_ban_5/6 chưa mở, không
+// có tài khoản/dữ liệu bị xóa (sự kiện retired); ngược lại giữ cho Admin xử lý. Gọi lặp an toàn.
 func (k *KN) SeedDepartments(ctx context.Context, unit uuid.UUID, idem string) (DeptSeedResult, error) {
 	p, err := authz.Require(ctx, knAdminRoles...)
 	if err != nil {
@@ -423,6 +427,48 @@ func (k *KN) SeedDepartments(ctx context.Context, unit uuid.UUID, idem string) (
 		default:
 			res.Created = append(res.Created, out)
 		}
+	}
+	return k.retireLegacyDepartments(ctx, p, unit, res)
+}
+
+// retireLegacyDepartments xóa (retired) dòng mã tạm phong_ban_5/6 của đơn vị khi chưa áp dụng và chưa có
+// tài khoản/dữ liệu (nguồn đếm đã nối). Tham chiếu mã cũ sau đó trỏ về mã kế nhiệm (departmentByCodeTx).
+func (k *KN) retireLegacyDepartments(ctx context.Context, p authz.Principal, unit uuid.UUID, res DeptSeedResult) (DeptSeedResult, error) {
+	res.LegacyRetired, res.LegacyKept = []string{}, []string{}
+	reason := "W11.06 (Q-051): mã tạm thay bằng mã phòng ban thật"
+	for _, code := range []string{port.DeptLegacyPhongBan5, port.DeptLegacyPhongBan6} {
+		var cur *port.Department
+		err := tenant.WithTenantTx(ctx, k.DB, p.TenantID, func(tx pgx.Tx) error {
+			var e error
+			cur, e = store.DepartmentByCode(ctx, tx, unit, code)
+			return e
+		})
+		if err != nil {
+			return res, err
+		}
+		if cur == nil || cur.Retired {
+			continue
+		}
+		u, known, err := k.usage(ctx, unit, code)
+		if err != nil {
+			return res, err
+		}
+		if cur.Status == port.DeptActive || !known || u.Accounts > 0 || u.Records > 0 {
+			res.LegacyKept = append(res.LegacyKept, code)
+			continue
+		}
+		if _, _, err := k.writeDept(ctx, cur.ID, "seed:dept-legacy:"+unit.String()+":"+code, domain.DeptRetired, &reason,
+			func(_ pgx.Tx, c port.Department) (*port.Department, error) {
+				if c.Retired {
+					return nil, nil // không đổi (đã xóa bởi request song song)
+				}
+				next := c
+				next.Retired = true
+				return &next, nil
+			}); err != nil {
+			return res, err
+		}
+		res.LegacyRetired = append(res.LegacyRetired, code)
 	}
 	return res, nil
 }

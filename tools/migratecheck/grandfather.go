@@ -12,14 +12,14 @@ package main
 //   - các tệp còn lại: chỉ thiếu lock_timeout (ADD COLUMN, DROP CONSTRAINT, …).
 //
 // pf 000085/000086 đổi CHECK trong khối DO (EXECUTE động) — CheckLocking không thấy được.
-var lockGrandfathered = map[string]map[int]bool{
+var lockGrandfathered = map[string]map[int64]bool{
 	"shared": set(2, 4, 5, 6),
 	"pf":     set(18, 19, 28, 29, 32, 46, 77, 79, 80, 89),
 	"mkg":    set(6, 9, 10, 20),
 }
 
-func set(ns ...int) map[int]bool {
-	m := make(map[int]bool, len(ns))
+func set(ns ...int64) map[int64]bool {
+	m := make(map[int64]bool, len(ns))
 	for _, n := range ns {
 		m[n] = true
 	}

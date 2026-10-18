@@ -18,6 +18,7 @@ import {
   diffItems,
   itemSummary,
   looksLikePersonalNumber,
+  placeError,
   SESSION_LABEL,
   timeError,
   toInput,
@@ -28,6 +29,7 @@ import {
 } from "./model";
 import { ScheduleLog, ScheduleTags, SessionGrid, useCommuneNames, useCoops, usePreloadCoops, WeekPicker, type CardItem } from "./parts";
 import { dayColumnLabel, nextWeekStart, vnDeadlineLabel, weekDays } from "./week";
+import { PiiHint } from "@/kn/pii";
 
 export interface CommuneOption {
   code: string;
@@ -56,6 +58,9 @@ interface FormState {
   location: string;
   participants: string;
   note: string;
+  // W11.46 (CNTS CV-06): địa điểm trên bản đồ — tọa độ độ thập phân; check-in so khoảng cách.
+  lat: string;
+  lon: string;
 }
 
 const s = (v: string | null | undefined) => v ?? "";
@@ -169,6 +174,8 @@ export function RegisterSchedule({
       location: "",
       participants: "",
       note: "",
+      lat: "",
+      lon: "",
     });
   };
   const openEdit = (index: number) => {
@@ -187,6 +194,8 @@ export function RegisterSchedule({
       location: s(it.location),
       participants: s(it.participants),
       note: s(it.note),
+      lat: it.place ? String(it.place.lat) : "",
+      lon: it.place ? String(it.place.lon) : "",
     });
   };
 
@@ -197,6 +206,8 @@ export function RegisterSchedule({
     const te = timeError(draft);
     if (te) return setFormError(te);
     if (looksLikePersonalNumber(form.participants) || looksLikePersonalNumber(form.note)) return setFormError("Không ghi số điện thoại, số CCCD vào thành phần phối hợp hoặc ghi chú.");
+    const pe = placeError(form.lat, form.lon);
+    if (pe) return setFormError(pe);
     const prev = form.index !== null ? cur.items[form.index] : undefined;
     const item: Item = {
       id: prev?.id ?? uuidv7(),
@@ -209,6 +220,7 @@ export function RegisterSchedule({
       location: n(form.location),
       participants: n(form.participants),
       note: n(form.note),
+      place: form.lat.trim() && form.lon.trim() ? { lat: Number(form.lat), lon: Number(form.lon), source: "map" } : null,
     };
     const items = [...cur.items];
     if (form.index !== null) items[form.index] = item;
@@ -523,6 +535,7 @@ function ItemForm({
           Nội dung công việc
         </label>
         <input id="ws-content" className="input" maxLength={500} value={form.content} onChange={(e) => set({ content: e.target.value })} />
+        <PiiHint text={form.content} />
       </div>
       <div className="field">
         <label htmlFor="ws-commune">Địa điểm: xã/phường</label>
@@ -551,6 +564,14 @@ function ItemForm({
         <input id="ws-location" className="input" maxLength={200} placeholder="Ấp, cánh đồng, trụ sở…" value={form.location} onChange={(e) => set({ location: e.target.value })} />
       </div>
       <div className="field">
+        <label htmlFor="ws-lat">Tọa độ địa điểm (vĩ độ, kinh độ)</label>
+        <div className="row">
+          <input id="ws-lat" className="input" inputMode="decimal" placeholder="10.25341" aria-label="Vĩ độ" value={form.lat} onChange={(e) => set({ lat: e.target.value })} />
+          <input id="ws-lon" className="input" inputMode="decimal" placeholder="105.9721" aria-label="Kinh độ" value={form.lon} onChange={(e) => set({ lon: e.target.value })} />
+        </div>
+        <span className="hint">Không bắt buộc — dùng để so khoảng cách khi check-in (phòng có check-in).</span>
+      </div>
+      <div className="field">
         <label htmlFor="ws-participants">Thành phần phối hợp</label>
         <input id="ws-participants" className="input" maxLength={500} aria-describedby="ws-participants-hint" value={form.participants} onChange={(e) => set({ participants: e.target.value })} />
         <span id="ws-participants-hint" className="hint">
@@ -560,6 +581,7 @@ function ItemForm({
       <div className="field">
         <label htmlFor="ws-note">Ghi chú</label>
         <textarea id="ws-note" className="textarea" rows={2} maxLength={1000} value={form.note} onChange={(e) => set({ note: e.target.value })} />
+        <PiiHint text={form.note} />
       </div>
       {error || pii ? (
         <p className="err" role="alert">

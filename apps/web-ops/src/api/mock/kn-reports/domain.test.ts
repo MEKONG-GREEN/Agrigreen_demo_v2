@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest";
 import { Decimal } from "@/kn/grid/decimal";
 import {
   DEFAULT_CLOSE_AFTER_DAYS,
+  DEFAULT_RULE,
   MAX_PERIODS,
   PeriodError,
   STATUS_LABEL,
   defaultDeadline,
+  parseRule,
   diff,
   ratio,
   reason,
@@ -20,13 +22,13 @@ import {
   type Row,
   type Source,
   type StoredStatus,
-  type WeekNumbering,
 } from "./domain";
 import golden from "./fixtures/rc-golden.json";
 
 interface G {
   status_labels: Record<string, string>;
   default_deadlines: Record<string, { offset_days: number; time: string }>;
+  default_deadlines_v2: Record<string, { offset_days: number; time: string }>;
   default_close_after_days: number;
   max_periods: number;
   split: {
@@ -35,7 +37,7 @@ interface G {
     from_date: string;
     to_date: string;
     season_label: string;
-    week_numbering: WeekNumbering;
+    rule: string;
     deadline: { offset_days: number; time: string };
     close_after_days: number;
     periods: unknown[];
@@ -56,14 +58,16 @@ describe("KN v7.7 P4 — bản port giả lập khớp ca vàng Go (reportcycle/
     expect(DEFAULT_CLOSE_AFTER_DAYS).toBe(g.default_close_after_days);
     expect(MAX_PERIODS).toBe(g.max_periods);
     for (const [pt, d] of Object.entries(g.default_deadlines)) expect(defaultDeadline(pt)).toEqual(d);
+    for (const [pt, d] of Object.entries(g.default_deadlines_v2)) expect(defaultDeadline(pt, DEFAULT_RULE)).toEqual(d);
   });
 
   it.each(g.split.map((c) => [c.name, c] as const))("FN-TI-02.02 chia kỳ: %s", (_n, c) => {
-    expect(ruleTag(c.week_numbering)).toBe(c.rule_tag);
+    const rule = parseRule(c.rule);
+    expect(ruleTag(rule)).toBe(c.rule_tag);
     let got: unknown[] = [];
     let err: { Field: string; Msg: string } | null = null;
     try {
-      got = split(c.period_type, c.from_date, c.to_date, c.season_label, c.week_numbering, c.deadline, c.close_after_days);
+      got = split(c.period_type, c.from_date, c.to_date, c.season_label, rule, c.deadline, c.close_after_days);
     } catch (e) {
       if (!(e instanceof PeriodError)) throw e;
       err = { Field: e.field, Msg: e.msg };
@@ -90,5 +94,30 @@ describe("KN v7.7 P4 — bản port giả lập khớp ca vàng Go (reportcycle/
     for (const c of g.ratio) expect(ratio(Decimal.parse(c.a)!, Decimal.parse(c.b)!).toString()).toBe(c.result);
     for (const c of g.yield) expect(yieldOf(Decimal.parse(c.a)!, Decimal.parse(c.b)!).toString()).toBe(c.result);
     for (const c of g.reason) expect(reason(c.input, c.max)).toEqual([c.out, c.ok]);
+  });
+});
+
+// D8 (CEO 13/10/2026) — lịch tuần theo phòng ban, như reportcycle/domain.ResolveCalendar.
+describe("lịch tuần theo phòng ban (D8)", () => {
+  it("CNTS Thứ Ba – Thứ Hai hiệu lực ngay; phòng khác theo lịch chung; tham số theo phòng đè lên", async () => {
+    const d = await import("./domain");
+    const cnts = d.calendarAt(d.DEPT_CNTS, "2026-10-01");
+    expect([cnts.calendar_id, cnts.calendar_version, cnts.calendar_source, d.ruleTag(cnts.rule)]).toEqual([
+      "chan_nuoi_thuy_san", 3, "builtin", "kn.period_rule/v2;week_start=tue;week=year;month=week_end;cal=chan_nuoi_thuy_san:v3",
+    ]);
+    const w = d.split("week", "2026-09-22", "2026-09-28", "", cnts.rule, d.defaultDeadline("week", cnts.rule), 3);
+    expect(w.map((p) => p.label)).toEqual(["Tuần 39/2026"]); // BRD CNTS: tuần 39 = 22/09–28/09/2026
+    expect(d.calendarAt("ke_hoach_tai_chinh", "2026-11-04").calendar_version).toBe(2);
+    // W11.64: KHTC nạp sẵn Thứ Tư – Thứ Ba mọi ngày (không còn v1 trước 04/11).
+    expect(d.calendarAt("ke_hoach_tai_chinh", "2026-10-28").calendar_version).toBe(2);
+    expect(d.calendarAt("ke_hoach_tai_chinh", "2026-10-28").calendar_source).toBe("builtin");
+    expect(d.parseRule(d.ruleTag(cnts.rule))).toEqual(cnts.rule);
+    d.DEPT_PERIOD_RULES.set("trong_trot", "kn.period_rule/v2;week_start=thu;cal=trong_trot:v4");
+    try {
+      const tt = d.calendarAt("trong_trot", "2026-01-01");
+      expect([tt.calendar_version, tt.calendar_source, tt.rule.week_start]).toEqual([4, "department_param", 4]);
+    } finally {
+      d.DEPT_PERIOD_RULES.clear();
+    }
   });
 });

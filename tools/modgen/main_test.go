@@ -161,3 +161,25 @@ func TestPubSchemaOwnerAndPublications(t *testing.T) {
 		t.Fatalf("publications: %v", pubs)
 	}
 }
+
+func TestReadPubViewDirectiveBelongsToReader(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "internal", "platform", "reader", "port")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	source := "package port\n//ag:readpubview pf_source_pub.data v2\n"
+	if err := os.WriteFile(filepath.Join(dir, "publications.go"), []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scan, err := scanModule(root, "internal/platform/reader")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(scan.directives["readpubview"], []string{"pf_source_pub.data/v2"}) {
+		t.Fatalf("reader directive: %v", scan.directives)
+	}
+	if len(publications(scan.directives)) != 0 {
+		t.Fatal("reader declaration accidentally publishes source contract")
+	}
+}

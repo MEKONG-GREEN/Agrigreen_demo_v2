@@ -1,5 +1,5 @@
 {
-  "_source": "internal/platform/extension/app/payload.go ReportPayload + domain/report.go Validate (kind growth_pest, FR-02)",
+  "_source": "internal/kn/extension/app/payload.go ReportPayload + domain/report.go Validate (kind growth_pest, FR-02)",
   "payload": {
     "kind": "growth_pest",
     "commune_code": "31117",

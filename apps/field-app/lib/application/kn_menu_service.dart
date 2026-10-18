@@ -5,7 +5,8 @@ import 'package:agrigreen_mobile/data/db/local_db.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 
 /// Khóa menu Cấp Xã mà app hiện trường có màn hình (hợp đồng P7 §6). Khóa
-/// khác trong `GET /v1/menu` bị ẩn.
+/// khác trong `GET /v1/menu` bị ẩn — trừ mục "Sắp có" (kn.menu/v3,
+/// `status: coming_soon`) và nhóm "Dùng chung", hiện mờ để người dùng thấy.
 abstract final class KnMenuKey {
   static const congViec = 'xa.nhiem_vu.cong_viec';
   static const lichCongTac = 'xa.nhiem_vu.lich_cong_tac';
@@ -19,6 +20,12 @@ abstract final class KnMenuKey {
   static const thua = 'xa.thu_thap.thua';
   static const vatTu = 'xa.thu_thap.vat_tu';
 
+  /// W11.42: biểu kỳ Cấp Xã CNTS (BM-01/04/05/17) — phòng Chăn nuôi – Thủy sản.
+  static const cntsBaoCaoKy = 'xa.cnts.bao_cao_ky';
+
+  /// W11.46: lịch công tác CNTS (đăng ký, gửi duyệt, check-in GPS).
+  static const cntsLichCongTac = 'xa.cnts.lich_cong_tac';
+
   static const known = {
     congViec,
     lichCongTac,
@@ -31,11 +38,16 @@ abstract final class KnMenuKey {
     mayMoc,
     thua,
     vatTu,
+    cntsBaoCaoKy,
+    cntsLichCongTac,
   };
 }
 
 /// Badge "việc cần làm" (badge_source của `xa.nhiem_vu.cong_viec`).
 const knBadgeTasksTodo = 'extension.report_tasks.todo';
+
+/// Trạng thái mục menu của module chưa có (kn.menu/v3, W11.06).
+const knMenuComingSoon = 'coming_soon';
 
 class KnMenuEntry {
   const KnMenuEntry({
@@ -44,14 +56,18 @@ class KnMenuEntry {
     required this.group,
     this.badgeSource,
     this.enabled = true,
+    this.comingSoon = false,
   });
   final String key;
   final String label;
 
-  /// Nhãn nhóm (Điều hành / Báo cáo / Dữ liệu).
+  /// Nhãn nhóm (Điều hành / Nghiệp vụ / Báo cáo / Dữ liệu / Dùng chung).
   final String group;
   final String? badgeSource;
   final bool enabled;
+
+  /// Module chưa có: hiện mờ nhãn "Sắp có", không mở được (kn.menu/v3).
+  final bool comingSoon;
 }
 
 class KnMenu {
@@ -64,26 +80,31 @@ class KnMenu {
 
   bool has(String key) => entries.any((e) => e.key == key);
 
-  /// Mở `KNMenu` (nhóm → mục → mục con) thành danh sách phẳng, chỉ giữ khóa
-  /// app biết ([KnMenuKey.known]).
+  /// Mở `KNMenu` (nhóm → mục → mục con) thành danh sách phẳng, giữ khóa app
+  /// biết ([KnMenuKey.known]) và mục lá "Sắp có" (kn.menu/v3: nhóm Nghiệp vụ
+  /// của phòng ban, nhóm "Dùng chung") — mục "Sắp có" luôn không bấm được.
   factory KnMenu.fromJson(Map<String, Object?> j, {bool fromCache = false}) {
     final out = <KnMenuEntry>[];
     void walk(Object? items, String group) {
       for (final it in (items is List ? items : const [])) {
         if (it is! Map) continue;
         final key = '${it['key']}';
-        if (KnMenuKey.known.contains(key)) {
+        final kids = it['children'];
+        final leaf = kids is! List || kids.isEmpty;
+        final soon = it['status'] == knMenuComingSoon;
+        if (KnMenuKey.known.contains(key) || (soon && leaf)) {
           out.add(
             KnMenuEntry(
               key: key,
               label: '${it['label'] ?? key}',
               group: group,
               badgeSource: it['badge_source'] as String?,
-              enabled: it['enabled'] != false,
+              enabled: it['enabled'] != false && !soon,
+              comingSoon: soon,
             ),
           );
         }
-        walk(it['children'], group);
+        walk(kids, group);
       }
     }
 

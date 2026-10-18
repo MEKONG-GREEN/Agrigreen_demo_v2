@@ -56,7 +56,7 @@ func (s *Service) Propose(ctx context.Context, in ProposeInput) (domain.ParamVer
 		EffectiveFrom: in.EffectiveFrom.UTC(), SourceDoc: strings.TrimSpace(in.SourceDoc), CorrectionReason: in.CorrectionReason,
 		Status: domain.StatusDraft, SetterRef: p.ActorRef, IdemKey: in.IdemKey,
 	}
-	if err := v.ValidateProposal(); err != nil {
+	if err := s.validateParameterProposal(v); err != nil {
 		return v, false, asProblem(err)
 	}
 	replayed := false

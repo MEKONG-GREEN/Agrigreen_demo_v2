@@ -26,8 +26,20 @@ class _SyncHost implements PushHost {
   @override
   Future<void> setPushToken(String token) async {}
   @override
-  Future<void> syncNow({Set<String>? entities}) async {
-    await h.sync.syncOnce(force: true, entities: entities);
+  Future<void> syncNow({Set<String>? entities}) {
+    calls++;
+    return _last = h.sync.syncOnce(force: true, entities: entities);
+  }
+
+  // Lượt đồng bộ thứ n đã chạy XONG. Chờ cố định (50 ms) không đủ trên máy chậm: sync_now kế tiếp đến khi
+  // lượt trước còn chạy thì dùng chung lượt đó (không pull lại), và lượt dở dang chạm CSDL đã đóng.
+  int calls = 0;
+  Future<void> _last = Future<void>.value();
+  Future<void> settled(int n) async {
+    while (calls < n) {
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+    await _last;
   }
 }
 
@@ -132,19 +144,20 @@ void main() {
         notifier: RecordingLocalNotifier(),
       );
       await c.start();
-      await c.attach(_SyncHost(h));
+      final host = _SyncHost(h);
+      await c.attach(host);
       h.fake.pages[null] = PullPage(
         changes: [_up('farm_log', 'l1', 1), _up('plot', 'p1', 1)],
         nextCursor: 'c1',
         hasMore: false,
       );
       fcm.deliver({'kind': 'sync_now', 'entities': 'farm_log,season'});
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await host.settled(1);
       expect(h.fake.pullEntities.single, ['farm_log', 'season']);
       expect(await h.refs.count(RefEntity.farmLog), 1);
       expect(await h.refs.count(RefEntity.plot), 0);
       fcm.deliver({'kind': 'sync_now'});
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await host.settled(2);
       expect(h.fake.pullEntities.last, isNull);
       expect(c.syncNowHandled, 2);
       await c.dispose();

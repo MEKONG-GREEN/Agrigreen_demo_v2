@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.price.verification.responded/v1",
+  "title": "pf.price.verification.responded — payload",
+  "description": "Cán bộ Xã phản hồi yêu cầu xác minh một mặt hàng (gói NOTIF; FN-XA-03.05 B4: Cấp Tỉnh nhận thông báo). choice = keep (giữ giá) | propose (đề xuất giá). pf/notify gửi chuông + email cho owner_ref (null → mọi Cấp Tỉnh) và Quản trị nghiệp vụ. Giải trình đọc trong ứng dụng; không dữ liệu cá nhân.",
+  "x-event-type": "pf.price.verification.responded",
+  "x-schema-version": 1,
+  "x-producer": "pf/price",
+  "type": "object",
+  "required": [
+    "profile",
+    "day",
+    "point_code",
+    "point_name",
+    "ticket_id",
+    "item_code",
+    "choice",
+    "owner_ref",
+    "responder_ref"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "description": "Bên dùng của cap/price (KN = kn)"
+    },
+    "day": {
+      "type": "string",
+      "format": "date",
+      "description": "Ngày báo giá (giờ VN)"
+    },
+    "point_code": {
+      "type": "string",
+      "description": "Mã xã báo giá (XBG…)"
+    },
+    "point_name": {
+      "type": "string",
+      "description": "Tên xã theo ĐVHC (không phải dữ liệu cá nhân)"
+    },
+    "ticket_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "item_code": {
+      "type": "string"
+    },
+    "choice": {
+      "type": "string",
+      "enum": [
+        "keep",
+        "propose"
+      ]
+    },
+    "owner_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "Cán bộ Cấp Tỉnh được phân công; null = chưa phân công"
+    },
+    "responder_ref": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

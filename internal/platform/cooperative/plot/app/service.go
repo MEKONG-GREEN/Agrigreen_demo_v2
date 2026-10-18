@@ -116,6 +116,14 @@ type Service struct {
 	Egress     meter.Checkpoint
 	EgressMode meter.Mode
 	Log        *slog.Logger
+	// Anchors (D2, ADR-0052; tùy chọn): phân giải Nút HTX qua bí danh của neo — bản ghi ngoại tuyến tạo dưới Nút HTX
+	// tạm trước khi HTX thật nhận quyền được ghi vào Nút hiện hành của neo. Nil → giữ nguyên Nút.
+	Anchors OrgAliases
+}
+
+// OrgAliases phân giải Nút HTX qua neo (cooperative/anchor/app.Service).
+type OrgAliases interface {
+	CurrentOrg(ctx context.Context, tid, org uuid.UUID) (uuid.UUID, error)
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

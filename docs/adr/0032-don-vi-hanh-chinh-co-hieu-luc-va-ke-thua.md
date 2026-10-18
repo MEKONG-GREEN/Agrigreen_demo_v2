@@ -128,9 +128,9 @@ Port của `pf/masterdata` có ba hàm, thay mọi truy vấn trực tiếp ở 
 | Gói | Việc | Migration |
 |---|---|---|
 | W2.2 | `btree_gist`, `EXCLUDE`, `admin_unit_succession`, điền từ `successor_codes`, ba hàm port, kiểm truy vấn báo cáo theo kỳ | pf 000089 |
-| W2.5 | `k_ref.admin_unit` gồm kế thừa; sự kiện `pf.masterdata.admin_unit.changed` phiên bản mới | pf 000091–000092 |
+| W2.5 | `k_ref.admin_unit` gồm kế thừa; sự kiện `pf.masterdata.admin_unit.changed` phiên bản mới | pf 000092, mkg 000022 |
 | W3.5 | Nạp danh mục và bảng kế thừa chính thức (chờ C-9) | — |
-| W5.1, W5.3 | Hợp đồng và feed tham chiếu `admin_units` | pf 000100–000101 |
+| W5.1, W5.3 | Hợp đồng và feed tham chiếu `admin_units` | pf 000126–000127 (W5.3; 000100–000101 cũ bỏ) |
 | W7.4 | Chuyển về lõi (hoặc sớm hơn khi có đơn vị thứ hai) | cụm `access` |
 
 ### W2.2 (05/10/2026) — xong phần mã, nạp production chờ C-9

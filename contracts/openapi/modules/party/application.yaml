@@ -1,0 +1,654 @@
+paths:
+# @ag-order: 11
+  /v1/me/modules:
+    get:
+      summary: "Module đã bật cho đơn vị (tenant) của người gọi — W1.4, R-MOD-08: client ẩn màn của module đã tắt"
+      description: >-
+        Mọi người đã xác thực. Route của module đã tắt trả 403 `module_not_enabled` (problem có `module`); menu
+        `GET /v1/menu` đã lọc sẵn ở server. Module `enable: always` luôn `enabled: true`.
+      operationId: myModules
+      tags: [party]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ModuleEnablement"}}
+        "401": {$ref: "#/components/responses/Problem"}
+  # --- pf/accounts KN v7.7 gói P1: ngữ cảnh phiên (FN-CH-00.01, gap §4.5 phương án A) ---
+  # Keycloak chỉ xác thực. Client chọn vai trò × phòng ban → context_id, gửi header X-AG-Context ở MỌI request (cả Admin API);
+  # middleware giải vai, phòng ban, phạm vi ở server. Context lạ / của người khác → 403 accounts.context_invalid; hết hạn → 403
+  # accounts.context_expired; vai trò thu hồi, phòng ban không còn Đang áp dụng, tài khoản bị khóa → 403 accounts.context_revoked.
+  # Đổi vai trò/phòng ban = chọn lại, không đăng nhập lại.
+# @ag-order: 15
+  /v1/orgs/tree:
+    get:
+      summary: "FN-AD-04.02: cây TTKNQG › TTKN tỉnh › Khu vực › Xã trong phạm vi người gọi (xem xuống, không ngang, không lên)"
+      operationId: knOrgTree
+      tags: [party]
+      parameters:
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Rừng cây (gốc = Nút thấy được cao nhất); xã chưa gán khu vực vào nhóm region_unassigned
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KNOrgTreeNode"}}
+        "401": {$ref: "#/components/responses/Problem"}
+# @ag-order: 19
+  /v1/departments:
+    get:
+      summary: "Phòng ban của đơn vị (bước 2 đăng nhập, FN-CH-00.01) — chỉ selectable = true chọn được"
+      operationId: knListDepartments
+      tags: [party]
+      parameters:
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}, description: "Đơn vị; vắng = Nút cấp 1/2 gần nhất của Nút người gọi"}
+      responses:
+        "200":
+          description: Danh sách theo thứ tự hiển thị (account_count/record_count luôn null ở Application API)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDepartmentList"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20
+  /v1/departments/{code}/modules:
+    get:
+      summary: "UR-KT-02: cây module (menu) của một phòng ban cho vai KN — bật phòng ban không cần phát hành lại web/app"
+      description: |
+        Dựng từ bảng menu tĩnh có phiên bản (kn.menu/v3: khuôn theo phòng ban + nhóm "Dùng chung" cuối mọi menu; mục module chưa có hiện "Sắp có", enabled = false, status coming_soon) và trạng thái phòng ban hiện hành ở MỖI request (Cache-Control: no-store).
+        audience vắng: theo ngữ cảnh phiên (P1) hoặc vai duy nhất của người gọi. platform_admin xem được mọi cấp (FN-AD-04.07).
+        audience = admin: mục con của phòng ban trong nhóm "Phòng ban" (enabled = false khi chưa mở).
+      operationId: knDepartmentModules
+      tags: [party]
+      parameters:
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - {name: audience, in: query, schema: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}}
+        - {name: role, in: query, deprecated: true, schema: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}, description: "Tên cũ của audience (hợp đồng tạm P6) — nhận một đợt; audience thắng"}
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Menu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNMenu"}
+        "403": {description: party.menu_audience_forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: party.department_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: party.department_not_open, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21
+  /v1/menu:
+    get:
+      summary: "UR-KT-02, BRD §6: sidebar đầy đủ theo vai + phòng ban của phiên (Admin: Điều hành / Phòng ban / Quản trị hệ thống)"
+      description: |
+        web-ops/app gọi KHÔNG tham số kèm header X-AG-Context: server lấy vai + phòng ban từ ngữ cảnh phiên (P1).
+        Đường dẫn (route) là trang web-ops: "/kn/<màn>" (vai + phòng ban ở ngữ cảnh, không ở URL); màn Admin theo
+        phòng ban "/kn/phong-ban/{mã phòng ban}/<màn>"; màn hiện có ngoài /kn giữ đường dẫn cũ. Bản giả lập web
+        khớp bảng Go qua ca vàng apps/web-ops/src/api/mock/fixtures/kn-menu.json.
+      operationId: knMenu
+      tags: [party]
+      parameters:
+        - {name: audience, in: query, schema: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}, description: "Vắng = theo ngữ cảnh phiên (X-AG-Context) hoặc vai duy nhất"}
+        - {name: role, in: query, deprecated: true, schema: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}, description: "Tên cũ của audience (hợp đồng tạm P6) — nhận một đợt; audience thắng"}
+        - {name: department, in: query, schema: {type: string}, description: "Vắng = phòng ban của ngữ cảnh phiên, hoặc phòng ban Đang áp dụng duy nhất của đơn vị"}
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Menu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNMenu"}
+        "403": {description: party.menu_audience_forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: party.department_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: party.department_not_open, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 22
+  /v1/regions:
+    get:
+      summary: "FN-AD-04.02: khu vực của tỉnh kèm số xã được gán (mọi vai chọn/lọc theo Khu vực)"
+      operationId: knListRegions
+      tags: [party]
+      parameters:
+        - {name: province_code, in: query, required: true, schema: {type: string}}
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegionList"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/party KN v7.7 gói P2 ---
+# @ag-order: 206
+  /v1/households/{ref}/membership:
+    post:
+      summary: Nông hộ vào / chuyển / rời HTX (KN US-HTX-02, US-HTX-05) — phát pf.party.household.membership_changed
+      description: |
+        cooperative_ref null = rời HTX. Quản lý HTX chỉ cho hộ (chưa thuộc HTX nào) vào HTX của mình hoặc rời HTX của mình;
+        cán bộ KN/quản trị trong phạm vi. Lý do 10–500 ký tự (không đi vào sự kiện). effective_date mặc định hôm nay (giờ VN).
+      operationId: changeHouseholdMembership
+      tags: [party]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                cooperative_ref: {type: [string, "null"], format: uuid}
+                effective_date: {type: string, format: date}
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "200":
+          description: Đã đổi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  household: {$ref: "#/components/schemas/Household"}
+                  change: {type: string, enum: [joined, left, transferred]}
+                  prev_cooperative_ref: {type: [string, "null"], format: uuid}
+        "403": {description: "party.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "party.household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "party.membership_unchanged | party.org_state_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: "party.membership_reason_required", $ref: "#/components/responses/Problem"}
+# @ag-order: 263
+  /v1/kn/cooperatives:
+    get:
+      tags: [party]
+      summary: "Danh sách HTX trên các xã phụ trách (FN-XA-03.03)"
+      operationId: knListCooperatives
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}, description: "Mã xã; vắng = mọi xã trong phạm vi; ngoài phạm vi → 403 party.out_of_scope"}
+        - {name: status, in: query, schema: {type: string, enum: [active, inactive, all], default: active}}
+        - {name: q, in: query, schema: {type: string}, description: "Tìm theo tên, Mã HTX, mã số thuế"}
+        - {name: area_min, in: query, schema: {type: string}, description: "Diện tích tối thiểu (ha, decimal)"}
+        - {name: area_max, in: query, schema: {type: string}, description: "Diện tích tối đa (ha, decimal)"}
+        - {name: confirmation, in: query, description: "D2: lọc theo trạng thái xác nhận; vắng = mọi HTX (gồm HTX tạm Chưa xác nhận)", schema: {$ref: "#/components/schemas/HTXConfirmationStatus"}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang HTX
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCooperativeList"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "428": {$ref: "#/components/responses/Problem"}
+    post:
+      tags: [party]
+      summary: "Thêm HTX trong xã phụ trách (Cấp Xã, Admin)"
+      description: "Mã HTX tự sinh. Trùng tên (không phân biệt hoa thường) → 409 party.cooperative_name_taken. Người đại diện chỉ vào kho định danh."
+      operationId: knCreateCooperative
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNCooperativeCreate"}
+      responses:
+        "201":
+          description: HTX đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCooperative"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 264
+  /v1/kn/cooperatives/{ref}:
+    get:
+      tags: [party]
+      summary: "Chi tiết HTX (ngoài phạm vi → 404)"
+      operationId: knGetCooperative
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: HTX
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCooperative"}
+        "404": {$ref: "#/components/responses/Problem"}
+    put:
+      tags: [party]
+      summary: "Sửa hồ sơ HTX — sự kiện bù (Log cũ → mới, không PII)"
+      description: >-
+        Trường vắng = giữ nguyên; area_ha/tax_code/head_office rỗng hoặc null = xóa giá trị. Đổi người đại diện: chủ thể mới
+        trong kho định danh, Log ghi representative_ref cũ → mới. Gửi lại cùng Idempotency-Key → kết quả hiện tại, không ghi thêm.
+        HTX đã vô hiệu hóa → 409 party.org_state_conflict.
+      operationId: knUpdateCooperative
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNCooperativeUpdate"}
+      responses:
+        "200":
+          description: HTX sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCooperative"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 265
+  /v1/kn/cooperatives/{ref}/deactivate:
+    post:
+      tags: [party]
+      summary: "Vô hiệu hóa HTX (thay xóa cứng) kèm cảnh báo dữ liệu liên kết"
+      description: "Lý do ≥ 20 ký tự (ràng buộc sổ org_event, US-HTXSTATUS-01 AC-3). Phát pf.party.org.deactivated."
+      operationId: knDeactivateCooperative
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNReason"}
+      responses:
+        "200":
+          description: HTX đã vô hiệu hóa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCooperativeDeactivated"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 266
+  /v1/kn/cooperatives/{ref}/reactivate:
+    post:
+      tags: [party]
+      summary: "Kích hoạt lại HTX (lý do ≥ 10 ký tự)"
+      operationId: knReactivateCooperative
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNReason"}
+      responses:
+        "200":
+          description: HTX đã kích hoạt lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCooperative"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 267
+  /v1/kn/cooperatives/{ref}/households:
+    get:
+      tags: [party]
+      summary: "Nông hộ thành viên của HTX (tab Nông hộ)"
+      operationId: knListHouseholds
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang nông hộ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNHouseholdList"}
+        "404": {$ref: "#/components/responses/Problem"}
+    post:
+      tags: [party]
+      summary: "Thêm nông hộ vào HTX (chủ hộ vào kho định danh)"
+      description: "SĐT đã có trong kho → 409 party.household_phone_taken; HTX đã vô hiệu hóa → 409 party.org_state_conflict."
+      operationId: knCreateHousehold
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNHouseholdCreate"}
+      responses:
+        "201":
+          description: Nông hộ đã thêm
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNHousehold"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 268
+  /v1/kn/cooperatives/{ref}/log:
+    get:
+      tags: [party]
+      summary: "Log HTX: tạo, vô hiệu hóa/kích hoạt lại, sửa hồ sơ (cũ → mới, không PII)"
+      operationId: knCooperativeLog
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "Vị trí trong Log đã gộp (next_cursor)"}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Log
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNLogPage"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 269
+  /v1/kn/households/{ref}:
+    put:
+      tags: [party]
+      summary: "Sửa diện tích canh tác của nông hộ — sự kiện bù"
+      operationId: knUpdateHousehold
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNHouseholdUpdate"}
+      responses:
+        "200":
+          description: Nông hộ sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNHousehold"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 270
+  /v1/kn/households/{ref}/log:
+    get:
+      tags: [party]
+      summary: "Log nông hộ: tạo và các lần sửa diện tích"
+      operationId: knHouseholdLog
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Log
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNLogPage"}
+        "404": {$ref: "#/components/responses/Problem"}
+
+  # FN-XA-03.04 — Máy móc HTX (khai báo số lượng theo loại máy). Cấp Tỉnh/Quốc gia ghi → 403 mechanization.read_only.
+components:
+  schemas:
+# @ag-order: 539
+    KNDepartment:
+      type: object
+      required: [id, org_ref, code, name, description, sort_order, status, status_label, menu_profile, retired, selectable, account_count, record_count, updated_by, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid, description: "Đơn vị: Nút cấp 1 (ttkn_national) hoặc cấp 2 (ttkn_province)"}
+        code: {type: string, pattern: "^[a-z][a-z0-9_]{1,39}$", description: "Mã phòng ban — department_code của mọi bản ghi KN mới"}
+        name: {type: string}
+        description: {type: [string, "null"]}
+        sort_order: {type: integer}
+        status: {type: string, enum: [active, not_open, suspended], description: "Đang áp dụng / Chưa mở / Ngưng hoạt động"}
+        status_label: {type: string}
+        menu_profile: {type: string, enum: [trong_trot, generic, chan_nuoi_thuy_san, ke_hoach_tai_chinh, thong_tin_truyen_thong, hanh_chinh_tong_hop], description: "Bộ menu dựng sẵn trong mã (kn.menu/v3); generic + mã có khuôn riêng → khuôn riêng"}
+        retired: {type: boolean, description: "Đã xóa (sự kiện retired) — mã không tái sử dụng"}
+        selectable: {type: boolean, description: "Chọn được ở bước 2 đăng nhập (Đang áp dụng, chưa xóa)"}
+        account_count: {type: [integer, "null"], description: "null = chưa nối nguồn đếm (P1) hoặc Application API"}
+        record_count: {type: [integer, "null"]}
+        updated_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 540
+    KNDepartmentList:
+      type: object
+      required: [org_ref, items]
+      properties:
+        org_ref: {type: string, format: uuid}
+        items: {type: array, items: {$ref: "#/components/schemas/KNDepartment"}}
+# @ag-order: 541
+    KNRegion:
+      type: object
+      required: [id, province_code, code, name, sort_order, active, deactivation_reason, commune_count, updated_by, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        province_code: {type: string}
+        code: {type: string}
+        name: {type: string}
+        sort_order: {type: integer}
+        active: {type: boolean}
+        deactivation_reason: {type: [string, "null"]}
+        commune_count: {type: integer, description: "Số Nút xã đang hoạt động được gán"}
+        updated_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 542
+    KNRegionList:
+      type: object
+      required: [province_code, items, assigned_communes]
+      properties:
+        province_code: {type: string}
+        items: {type: array, items: {$ref: "#/components/schemas/KNRegion"}}
+        assigned_communes: {type: integer, description: "Σ commune_count"}
+# @ag-order: 544
+    KNOrgTreeNode:
+      type: object
+      required: [ref, kind, code, name, admin_unit_code, level, active, region, commune_count, children]
+      properties:
+        ref: {type: [string, "null"], format: uuid, description: "null với nhóm khu vực"}
+        kind: {type: string, enum: [ttkn_national, ttkn_province, extension_team, region, region_unassigned]}
+        code: {type: string}
+        name: {type: string}
+        admin_unit_code: {type: [string, "null"]}
+        level: {type: integer, description: "1 TTKNQG, 2 TTKN tỉnh, 3 Xã; 0 với nhóm khu vực"}
+        active: {type: boolean}
+        region:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/KNRegionRef"
+        commune_count: {type: integer}
+        children: {type: array, items: {$ref: "#/components/schemas/KNOrgTreeNode"}}
+    # --- hết pf/party KN v7.7 gói P2 (chung) ---
+# @ag-order: 545
+    KNMenuItem:
+      type: object
+      required: [key, label, route, icon, badge_source, enabled, children]
+      properties:
+        key: {type: string, description: "Khóa ổn định của mục (vd xa.nhiem_vu.cong_viec)"}
+        label: {type: string}
+        route: {type: [string, "null"], description: "Trang web-ops (/kn/<màn>; Admin theo phòng ban /kn/phong-ban/{mã}/<màn>); null với mục cha chỉ mở/đóng"}
+        icon: {type: string, description: "Tên icon NavIcon của web-ops (app tự ánh xạ)"}
+        badge_source: {type: [string, "null"], description: "Khóa số đếm việc cần xử lý (ẩn khi 0) — client lấy số từ module sở hữu"}
+        enabled: {type: boolean, description: "false: hiện mờ, không bấm được (phòng ban chưa mở trong menu Admin; mục \"Sắp có\")"}
+        status: {type: string, enum: [active, not_open, suspended, coming_soon], description: "Mục phòng ban của menu Admin (active/not_open/suspended); coming_soon: mục của module chưa có — nhãn \"Sắp có\" (kn.menu/v3)"}
+        status_label: {type: string}
+        children: {type: array, items: {$ref: "#/components/schemas/KNMenuItem"}}
+# @ag-order: 546
+    KNMenuGroup:
+      type: object
+      required: [key, label, items]
+      properties:
+        key: {type: string, description: "dieu_hanh | nghiep_vu | bao_cao | du_lieu | dung_chung; Admin: dieu_hanh | phong_ban | quan_tri | dung_chung"}
+        label: {type: string}
+        items: {type: array, items: {$ref: "#/components/schemas/KNMenuItem"}}
+# @ag-order: 547
+    ModuleEnablement:
+      type: object
+      description: Trạng thái bật một module cho tenant (W1.4, R-MOD-08)
+      required: [module, kind, enable, enabled, reason, updated_by, updated_at]
+      properties:
+        module: {type: string, description: "Tên repo, vd pf/geo"}
+        kind: {type: string, enum: [kernel, capability, domain]}
+        enable: {type: string, enum: [always, per_tenant]}
+        enabled: {type: boolean}
+        reason: {type: [string, "null"]}
+        updated_by: {type: [string, "null"], format: uuid}
+        updated_at: {type: [string, "null"], format: date-time}
+# @ag-order: 548
+    KNMenu:
+      type: object
+      required: [menu_version, audience, org_ref, department, default_route, groups]
+      properties:
+        menu_version: {type: string, description: "Phiên bản bảng menu tĩnh (kn.menu/v3)"}
+        audience: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}
+        org_ref: {type: [string, "null"], format: uuid}
+        department:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [code, name, status, menu_profile]
+              properties:
+                code: {type: string}
+                name: {type: string}
+                status: {type: string}
+                menu_profile: {type: string}
+        default_route: {type: string}
+        groups: {type: array, items: {$ref: "#/components/schemas/KNMenuGroup"}}
+    # --- pf/accounts KN v7.7 gói P1 (cùng định nghĩa ở admin.yaml) ---
+# @ag-order: 826
+    KNMaskedPerson:
+      type: object
+      description: "Nhãn đã che từ kho định danh (RB-3) — không bao giờ có SĐT đầy đủ"
+      required: [label, masked_phone]
+      properties:
+        label: {type: string, description: "vd 'Nguyễn V. A.'; 'Không hiển thị được' khi kho không trả nhãn"}
+        masked_phone: {type: [string, "null"], description: "vd '0912•••123'"}
+# @ag-order: 827
+    KNCooperative:
+      type: object
+      required: [ref, code, name, commune_code, area_ha, representative, household_count, active, status_reason, tax_code, head_office, updated_at,
+        confirmation_status, confirmation_label]
+      properties:
+        confirmation_status: {$ref: "#/components/schemas/HTXConfirmationStatus"}
+        confirmation_label: {type: string, enum: ["Đã xác nhận", "Chưa xác nhận"]}
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        commune_code: {type: string}
+        area_ha: {type: [string, "null"], description: "decimal (ha)"}
+        representative: {oneOf: [{$ref: "#/components/schemas/KNMaskedPerson"}, {type: "null"}]}
+        household_count: {type: integer}
+        active: {type: boolean}
+        status_reason: {type: [string, "null"]}
+        tax_code: {type: [string, "null"]}
+        head_office: {type: [string, "null"]}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 828
+    KNCooperativeList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNCooperative"}}
+        next_cursor: {type: [string, "null"]}
+# @ag-order: 829
+    KNRepresentativeInput:
+      type: object
+      required: [full_name, phone]
+      properties:
+        full_name: {type: string}
+        phone: {type: string}
+# @ag-order: 830
+    KNCooperativeCreate:
+      type: object
+      required: [name, commune_code]
+      properties:
+        name: {type: string, maxLength: 200}
+        commune_code: {type: string}
+        area_ha: {type: [string, number, "null"], description: "decimal ≥ 0, tối đa 4 chữ số lẻ"}
+        tax_code: {type: string}
+        head_office: {type: string, maxLength: 500}
+        representative: {$ref: "#/components/schemas/KNRepresentativeInput"}
+# @ag-order: 831
+    KNCooperativeUpdate:
+      type: object
+      properties:
+        name: {type: string, maxLength: 200}
+        area_ha: {type: [string, number, "null"]}
+        tax_code: {type: [string, "null"]}
+        head_office: {type: [string, "null"]}
+        representative: {$ref: "#/components/schemas/KNRepresentativeInput"}
+        reason: {type: string, maxLength: 500}
+# @ag-order: 832
+    KNReason:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string}
+# @ag-order: 833
+    KNCooperativeDeactivated:
+      type: object
+      required: [cooperative, warnings]
+      properties:
+        cooperative: {$ref: "#/components/schemas/KNCooperative"}
+        warnings:
+          type: object
+          required: [households, plots, machines]
+          properties:
+            households: {type: integer, description: "Nông hộ đang là thành viên"}
+            plots: {type: [integer, "null"], description: "Thửa đã số hóa (null khi chưa nối pf/geo)"}
+            machines: {type: [integer, "null"], description: "Tổng số máy khai báo (null khi chưa nối pf/mechanization)"}
+# @ag-order: 834
+    KNHousehold:
+      type: object
+      required: [ref, holder, cultivated_area_ha, active, since_date]
+      properties:
+        ref: {type: string, format: uuid}
+        holder: {$ref: "#/components/schemas/KNMaskedPerson"}
+        cultivated_area_ha: {type: [string, "null"]}
+        active: {type: boolean}
+        since_date: {type: [string, "null"], format: date}
+# @ag-order: 835
+    KNHouseholdList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNHousehold"}}
+        next_cursor: {type: [string, "null"]}
+# @ag-order: 836
+    KNHouseholdCreate:
+      type: object
+      required: [full_name, phone]
+      properties:
+        full_name: {type: string}
+        phone: {type: string}
+        cultivated_area_ha: {type: [string, number, "null"]}
+# @ag-order: 837
+    KNHouseholdUpdate:
+      type: object
+      required: [cultivated_area_ha]
+      properties:
+        cultivated_area_ha: {type: [string, number, "null"], description: "null = xóa giá trị"}
+        reason: {type: string, maxLength: 500}

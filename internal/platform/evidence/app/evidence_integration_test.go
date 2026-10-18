@@ -434,3 +434,68 @@ func TestStorageInvariants_W65(t *testing.T) {
 		t.Fatalf("sync_app đọc pf_files: %v", err)
 	}
 }
+
+// Kiểm thực thi bộ kiểm quyền từng tệp do module chủ cung cấp.
+type fileCheckedResolver struct {
+	*fakeResolver
+	allow bool
+}
+
+func (r *fileCheckedResolver) AuthorizeFile(context.Context, port.File) (bool, error) {
+	return r.allow, nil
+}
+
+// W11.24: mục đích hr_records (tài liệu nhân sự pf/hrm) được phép mở, KHÔNG kiểm đồng ý của chủ thể (chủ thể là khóa kho
+// tài liệu, cơ sở là nghĩa vụ quản lý hồ sơ); mrv.evidence vẫn kiểm đồng ý.
+func TestOpenHRRecordsWithoutConsent_W1124(t *testing.T) {
+	f := newFx(t)
+	up := f.as(f.tid, f.orgA)
+	f.svc.Resolvers["pf/hrm"] = f.res
+	f.svc.Purposes = map[string]port.PurposePolicy{string(client.PurposeHRRecords): {SubjectModule: "pf/hrm", SubjectType: "hr_folder"}}
+	folder := ids.New()
+	f.res.set(folder, &port.Resolved{ViaShareGrant: true})
+	file, err := f.attach(up, &port.Subject{Module: "pf/hrm", Type: "hr_folder", ID: folder})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.consent.denied[file.SubjectRef] = true
+	viewer := f.as(f.tid, f.orgB, client.RoleEvidenceViewer)
+	if _, _, err := f.svc.OpenContent(viewer, file.Ref, string(client.PurposeHRRecords)); err != nil {
+		t.Fatalf("hr_records không phụ thuộc đồng ý: %v", err)
+	}
+	if _, err := f.svc.Open(viewer, file.Ref, string(client.PurposeMRVEvidence)); code(err) != ErrConsentMissing.Code {
+		t.Fatalf("mrv.evidence vẫn kiểm đồng ý: %v", err)
+	}
+	checker := &fileCheckedResolver{fakeResolver: f.res}
+	f.svc.Resolvers["pf/hrm"] = checker
+	if _, _, err := f.svc.OpenContent(viewer, file.Ref, string(client.PurposeHRRecords)); code(err) != ErrSubjectForbidden.Code {
+		t.Fatalf("module chủ từ chối tệp phải chặn: %v", err)
+	}
+	checker.allow = true
+	if _, _, err := f.svc.OpenContent(viewer, file.Ref, string(client.PurposeHRRecords)); err != nil {
+		t.Fatal(err)
+	}
+	// HRM-DOC-PURPOSE-001: đổi mục đích không được vượt kiểm đồng ý của tệp
+	// hiện trường, tệp cũ chưa có bộ ba, hoặc loại thực thể khác của HRM.
+	for _, sub := range []*port.Subject{
+		{Module: mod, Type: "plot", ID: folder},
+		nil,
+		{Module: "pf/hrm", Type: "staff", ID: folder},
+	} {
+		other, err := f.attach(up, sub)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.consent.denied[other.SubjectRef] = true
+		if _, _, err := f.svc.OpenContent(viewer, other.Ref, string(client.PurposeHRRecords)); code(err) != ErrPurposeNotAllowed.Code {
+			t.Fatalf("hr_records không được mở tệp %v: %v", sub, err)
+		}
+		if _, err := f.svc.Open(viewer, other.Ref, string(client.PurposeHRRecords)); code(err) != ErrPurposeNotAllowed.Code {
+			t.Fatalf("hr_records không được cấp URL tệp %v: %v", sub, err)
+		}
+		logs := f.log(f.tid, other.Ref)
+		if len(logs) != 2 || logs[0].Outcome != domain.OutcomeDeniedSubject || logs[1].Outcome != domain.OutcomeDeniedSubject {
+			t.Fatal("từ chối sai mục đích phải ghi sổ cả metadata và nội dung")
+		}
+	}
+}

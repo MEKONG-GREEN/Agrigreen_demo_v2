@@ -1,0 +1,11 @@
+{
+  "id": "kn-price-boards",
+  "source": "./kn-price-boards",
+  "app": [
+    {
+      "export": "priceBoardRoutes",
+      "order": 26
+    }
+  ],
+  "admin": []
+}

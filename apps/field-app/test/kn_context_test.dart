@@ -170,7 +170,14 @@ void main() {
         KnMenuKey.congViec,
         KnMenuKey.lichCongTac,
         KnMenuKey.htx,
+        'chung.contact',
       ]);
+      // kn.menu/v3: mục "Sắp có" (nhóm Dùng chung) giữ lại, không bấm được.
+      final contact = online.entries.last;
+      expect(contact.group, 'Dùng chung');
+      expect(contact.comingSoon, isTrue);
+      expect(contact.enabled, isFalse);
+      expect(online.version, 'kn.menu/v3');
       expect((await menu.badges())[knBadgeTasksTodo], 3);
       kn.offline = true;
       final cached = await menu.load();
@@ -197,6 +204,44 @@ void main() {
     });
     expect(list.map((c) => c.key), ['a-1|trong_trot', 'a-3|']);
   });
+
+  test(
+    'W11.07 expand: phòng ban chỉ xem của Lãnh đạo đơn vị giữ cờ readOnly',
+    () {
+      final list = KnContextChoice.expand({
+        'assignments': [
+          {
+            ...assignment('a-1', role: 'kn_tinh'),
+            'departments': [
+              {'code': 'trong_trot', 'name': 'Trồng trọt', 'status': 'active'},
+              {
+                'code': 'chan_nuoi_thuy_san',
+                'name': 'Chăn nuôi - Thủy sản',
+                'status': 'active',
+                'read_only': true,
+              },
+            ],
+          },
+        ],
+      });
+      expect(list.map((c) => c.readOnly), [false, true]);
+      final back = KnContextChoice.fromJson(list[1].toJson());
+      expect(back.readOnly, isTrue);
+      final ctx = KnSessionContext.fromJson({
+        'context_id': 'c-1',
+        'role': 'kn_tinh',
+        'org_name': 'TTKN',
+        'default_route': '/kn/dashboard',
+        'read_only': true,
+        'internal_unit_code': 'trong_trot',
+      });
+      expect(ctx.readOnly, isTrue);
+      expect(
+        KnSessionContext.fromJson(ctx.toJson()).internalUnitCode,
+        'trong_trot',
+      );
+    },
+  );
 
   test('KN P1 FakeServer: ghi lại sendJson (PUT) theo khóa', () async {
     final r = await h.fake.sendJson(

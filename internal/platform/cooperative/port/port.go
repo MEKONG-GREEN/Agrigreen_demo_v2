@@ -192,7 +192,7 @@ const SubjectModule = "pf/cooperative"
 type Subject struct {
 	Type          SubjectType
 	ID            uuid.UUID
-	TenantID      uuid.UUID // đơn vị chủ (H-1)
+	TenantID      uuid.UUID // tenant lưu ký (ADR-0052: chủ sở hữu MKG + HTX ghi ở neo HTX)
 	NodeRef       uuid.UUID // Nút phạm vi = cooperative_ref; uuid.Nil khi thửa nháp chưa gán HTX
 	CommuneCode   string
 	HouseholdRef  uuid.UUID // uuid.Nil nếu không gắn hộ

@@ -119,7 +119,7 @@ describe("quản trị KN giả lập", () => {
     const adminCtx = await contextOf("kn-admin", "asg-admin", null);
     const adm = createKnAdminApi(opts("kn-admin", () => adminCtx, true));
     const depts = (await adm.departments()).items;
-    expect(depts).toHaveLength(6);
+    expect(depts).toHaveLength(5); // W11.06: 5 phòng ban seed
     const cn = depts.find((d) => d.code === "chan_nuoi_thuy_san")!;
     expect(await code(adm.departmentStatus(cn.id, "suspended"))).toBe("422 validation_failed");
     const r = await adm.departmentStatus(cn.id, "active");
@@ -129,5 +129,37 @@ describe("quản trị KN giả lập", () => {
     expect(await contextOf("kn-loc", "asg-loc-xa", "chan_nuoi_thuy_san")).toMatch(/^[0-9a-f-]{36}$/);
     const tree = await adm.orgTree();
     expect(tree.items[0]!.children[0]!.children.map((g) => g.name)).toEqual(["Khu vực Long Xuyên", "Khu vực Châu Đốc"]);
+  });
+
+  it("W11.07: danh mục phân quyền trong vai, đơn vị nội bộ, thuộc tính vai (ca âm theo vai)", async () => {
+    const adminCtx = await contextOf("kn-admin", "asg-admin", null);
+    const adm = createKnAdminApi(opts("kn-admin", () => adminCtx, true));
+    const cat = await adm.mgmtLevels();
+    expect(cat.items.map((m) => m.code)).toEqual(expect.arrayContaining(["lanh_dao_don_vi", "phu_trach", "pho_truong_phong"]));
+    expect(cat.province_groups?.map((g) => g.code)).toEqual(["vien_chuc", "tong_hop", "chu_nhiem", "lanh_dao_phong", "ban_giam_doc"]);
+    const seed = await adm.seedInternalUnits(AG_REF);
+    expect(seed.created.find((u) => u.code === "trong_trot")?.department_code).toBe("trong_trot");
+    expect((await adm.seedInternalUnits(AG_REF)).created).toHaveLength(0);
+    await adm.createInternalUnit({ org_ref: AG_REF, code: "tram_1", kind: "tram", name: "Trạm 1" });
+    expect(await code(adm.createInternalUnit({ org_ref: AG_REF, code: "tram_1", kind: "tram", name: "x" }))).toBe("409 accounts.internal_unit_code_taken");
+    expect(await code(adm.createInternalUnit({ org_ref: AG_REF, code: "tram_2", kind: "tram", name: "x", department_code: "trong_trot" }))).toBe("422 validation_failed");
+    const created = await adm.createKnUser({
+      full_name: "Lê Thị Tổng Hợp",
+      email: "tonghop@angiang.gov.vn",
+      assignments: [
+        { role: "kn_tinh", org_ref: AG_REF, department_codes: ["trong_trot"], mgmt_level: "truong_phong" },
+        { role: "kn_xa", org_ref: AG_REF, department_codes: ["trong_trot"], commune_codes: ["91307"] },
+      ],
+    });
+    const tinh = created.assignments.find((a) => a.role === "kn_tinh")!;
+    const xa = created.assignments.find((a) => a.role === "kn_xa")!;
+    const r = await adm.setAttrs(created.user.id, tinh.assignment_id, { province_group: "lanh_dao_phong", duties: ["qtnv_bao_gia"], internal_unit_code: "trong_trot" });
+    expect(r.attributes.province_group_label).toBe("Lãnh đạo phòng");
+    expect(await code(adm.setAttrs(created.user.id, xa.assignment_id, { province_group: "tong_hop" }))).toBe("422 validation_failed");
+    expect(await code(adm.setAttrs(created.user.id, tinh.assignment_id, { facility_refs: ["01a1251b-b5a9-79b2-87c4-ccf7c5248859"] }))).toBe("422 validation_failed");
+    expect(await code(adm.setAttrs(created.user.id, xa.assignment_id, { internal_unit_code: "khong_co" }))).toBe("422 accounts.internal_unit_invalid");
+    const list = await adm.assignments(created.user.id);
+    expect(list.items.find((a) => a.role === "kn_tinh")?.attributes?.duties).toEqual(["qtnv_bao_gia"]);
+    expect((await adm.delegations(created.user.id)).items).toEqual([]);
   });
 });

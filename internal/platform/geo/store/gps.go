@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // GpsFix là một dòng log toạ độ (HTX US-GPS-03).
@@ -80,7 +81,7 @@ func scanGps(row pgx.Row) (GpsFix, error) {
 
 // GpsFixByIdemKey tìm log đã ghi với idem_key.
 func GpsFixByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*GpsFix, error) {
-	f, err := scanGps(tx.QueryRow(ctx, "SELECT "+gpsCols+" FROM pf_geo.gps_fix g WHERE g.idem_key = $1::text", key))
+	f, err := scanGps(tx.QueryRow(ctx, "SELECT "+gpsCols+" FROM pf_geo.gps_fix g WHERE g.idem_key = $1::text"+ledger.NewestByIdem("g"), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

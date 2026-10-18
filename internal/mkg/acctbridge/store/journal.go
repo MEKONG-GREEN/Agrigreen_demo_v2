@@ -13,6 +13,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/acctbridge/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/acctbridge/port"
 	costingport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/costing/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/money"
 )
 
@@ -248,7 +249,7 @@ func scanJournalEvent(row pgx.Row) (JournalEvent, error) {
 
 // JournalEventByIdem tìm sự kiện bút toán theo idem_key.
 func JournalEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*JournalEvent, error) {
-	e, err := scanJournalEvent(tx.QueryRow(ctx, "SELECT "+journalEventCols+" FROM mkg_acctbridge.journal_event WHERE idem_key = $1", key))
+	e, err := scanJournalEvent(tx.QueryRow(ctx, "SELECT "+journalEventCols+" FROM mkg_acctbridge.journal_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

@@ -31,14 +31,9 @@ const (
 
 // Nguồn dữ liệu của mẫu biểu.
 const (
-	SourceSowing          = "extension.sowing"
-	SourceGrowthPest      = "extension.growth_pest"
-	SourceProgramProgress = "extension.program_progress"
-	SourceTasksSLA        = "extension.tasks_sla"
-	SourcePeriodSummary   = "extension.period_summary"
-	SourceCGHSummary      = "mechanization.summary"
-	SourceCGHShortage     = "mechanization.shortage_by_coop"
-	SourceCGHCompare      = "mechanization.season_compare"
+	SourceCGHSummary  = "mechanization.summary"
+	SourceCGHShortage = "mechanization.shortage_by_coop"
+	SourceCGHCompare  = "mechanization.season_compare"
 	// SourceHTXProduction: sản lượng dự kiến – thực tế, diện tích, số hộ, tiến độ SOP theo
 	// HTX × vụ × giống từ pf/cropcycle (HTX US-DASH-02, US-DASH-03).
 	SourceHTXProduction = "cropcycle.production"

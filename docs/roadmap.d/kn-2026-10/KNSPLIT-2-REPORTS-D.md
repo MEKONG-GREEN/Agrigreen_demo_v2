@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-REPORTS-D — Bỏ realm/config KN ngầm, test âm và ma trận10vai/mixed HTX đạt; đủ13/13PG noSKIP/static, baseline390→388 chỉgỡ2import. Helper migration trước dev; source/catalog/seed còn gói tiếp theo.

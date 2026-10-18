@@ -1,0 +1,14 @@
+## KNSPLIT-2-NOTIFY-PRICE-A — Bộ dựng báo giá do KN đăng ký
+
+Nền dev 60a04022, production f4e5322c. Thêm EventBuilderRegistration dùng chung: context, tenant, tên sự kiện, bản sao JSON và thời điểm vào; draft hoặc lỗi ra. Callback không nhận transaction, DB hay quyền cấp ID/source. Registry theo instance, khởi tạo một lần, chặn native/unknown/duplicate và trùng với pure renderer ở cả hai thứ tự. Core vẫn giữ Normalize/Redact, transaction, inbox, provenance và RLS.
+
+KNprice sở hữu chín builder báo giá và NotificationDirectory chỉ đọc RoleHolders/DutyHolders. Cấu hình directory được sao chép ba trường dùng thực tế. Worker nạp directory KN; API/dummy giữ nil directory như trước. A giữ nguyên chín đường legacy, Kind/PriceDesk và adapter assembly để đối chiếu; B mới xóa. Không alias ngược, không thêm cap gọi KN. Native MRV vẫn thuộc HTX/MKG.
+
+118 input cố định và expected lấy từ pipeline cũ PriceMessages → priceTinh → Notifications sau capture36412 actualexit0, gồm mọi trường draft, lỗi, thứ tự lookup, nil/empty, owner/self/exclusion, fallback topic, chế độ nhắc/email, JSON/type/time lỗi và giới hạn danh sách. Owner chỉ đọc expected. Pure81844 actualexit0 đủ năm package có test, thêm KNprice compile. 16 ca chọn profile/directory so trực tiếp adapter cũ với owner (32 thao tác), gồm normal/error/nil holders/empty profiles; kiểm bản sao cấu hình bằng sửa input sau constructor. Directory capture actualexit0 rồi cố định expected riêng. Năm golden Gitblob cũ nguyên nền 60a04022, không sinh expected từ owner.
+
+Impact: generic notification dispatch/constructor, API/worker assembly, KNprice và fixture notify. Full hồi quy trên PostgreSQL riêng: notify/... + KN extension/price roots + API assembly + worker + tests/notifyconsumers + tests/notify (chín package có test). Ca PG mới kiểm lỗi lookup giữ nguyên, rollback, retry cùng event, dedup, tenant và redaction; các ca giá/email/topic/CNTS/workflow hiện hữu chạy qua owner thật. Chưa nhận static/PG/helper cho đến actualexit0, không FAIL/SKIP.
+
+Không SQL/schema/migration/OpenAPI/UI/mobile thay đổi. Static đầy đủ, baseline không tăng (nền324), helper chín migration và xác minh remote trước dev. Mới chuyển nội dung 19/22 sự kiện nguồn KN; directive/task/digest, authz/accounts/party, data products/routes/tenant/client và KHTC reminder vẫn còn. G1 chưa hoàn tất; giữ main, worktrees và quyết định PO.
+
+
+Kết quả thật production f4e5322c/test-name-fix d9b6c177: pure81844 actual0/5 testpackage; directory capture actual0/16 ca/32 thao tác; staticverified50048 actual0 toàn cổng/boundary324/lint0/gofmt chỉ hai fixture cũ (static41310 exit1 ST1012 giữ log). Full9PG81245 actualexit0, không FAIL/SKIP; API assembly132.843s. Ca lookup retry/tenant/redaction mới và toàn bộ giá/email/topic/CNTS/workflow cùng generic delivery guards PASS. Cụm riêng59962/4e5265f0ea5b đã dọn, Go0; không sửa Go sauPG. Helper9 migration và remote còn cần trước dev.

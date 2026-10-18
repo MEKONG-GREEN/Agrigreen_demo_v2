@@ -1,14 +1,14 @@
 package assembly
 
 import (
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
@@ -56,6 +56,9 @@ var Consumers = []Consumer{
 		Handler: func(m Modules) inbox.Handler { return m.Cooperative.GpsLogHandler() }},
 	{Name: extport.GpsLogConsumer, Module: extension.DBModule, Events: []string{extport.EventSupportRequestSubmitted},
 		Handler: func(m Modules) inbox.Handler { return m.Extension.GpsLogHandler() }},
+	// W11.43: quy tắc liên biểu + cảnh báo CNTS sau commit (bài nộp kn_cnts, ổ dịch mới).
+	{Name: extport.CNTSAlertConsumer, Module: extension.DBModule, Events: extension.CNTSAlertEvents,
+		Handler: func(m Modules) inbox.Handler { return m.Extension.CNTSAlertHandler() }},
 	{Name: simport.SnapshotConsumer, Module: simulation.DBModule, Events: []string{simport.EventRunSubmitted},
 		Handler: func(m Modules) inbox.Handler { return m.Simulation.SnapshotHandler() }},
 	{Name: mrvport.FarmLogLinkConsumer, Module: mrv.DBModule, Events: mrvport.FarmLogLinkEvents,

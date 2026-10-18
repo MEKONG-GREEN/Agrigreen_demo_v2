@@ -439,12 +439,13 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (Result, error) {
 		return Result{}, dirErr(err)
 	}
 	totp := false
-	if port.NeedsMFA(newRoles) && !port.NeedsMFA(t.roles) {
+	// D24: cấp thêm vai bắt TOTP lúc đăng nhập (vai [MFA] hoặc cán bộ KN) mà chưa có TOTP → đăng ký ở lần sau.
+	if port.NeedsLoginTOTP(newRoles) && !port.NeedsLoginTOTP(t.roles) {
 		has, err := s.Dir.HasOTP(ctx, t.user.ID)
 		if err != nil {
 			return Result{}, dirErr(err)
 		}
-		if !has {
+		if !has && !slices.Contains(t.user.RequiredActions, port.ActionConfigureTOTP) {
 			if err := s.Dir.AddRequiredActions(ctx, t.user.ID, []string{port.ActionConfigureTOTP}); err != nil {
 				return Result{}, dirErr(err)
 			}
@@ -474,6 +475,8 @@ type UserView struct {
 	Roles     []string
 	LockCause port.LockCause
 	Tracked   bool // có trong pf_accounts (tạo hoặc thao tác qua nền tảng)
+	// MFA: trạng thái TOTP (chỉ ở Get — đọc thêm Keycloak; D24).
+	MFA *MFAStatus
 }
 
 // Get đọc một tài khoản trong phạm vi.
@@ -492,6 +495,15 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (UserView, error) {
 	} else if !t.user.Enabled {
 		v.LockCause = port.LockManual
 	}
+	realm, err := s.Dir.RealmRoles(ctx, id)
+	if err != nil {
+		return UserView{}, dirErr(err)
+	}
+	m, err := s.mfaStatus(ctx, t.user, realm)
+	if err != nil {
+		return UserView{}, err
+	}
+	v.MFA = &m
 	return v, nil
 }
 

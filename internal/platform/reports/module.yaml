@@ -13,12 +13,11 @@ depends:
   pf/party: ">=2.0 <3"
 provides:
   ports:
+    - Consolidations
+    - DispatchHistory
     - FormEngine
     - Mailer
     - cropcyclesrc.ReportData
-    - extensionsrc.Consolidations
-    - extensionsrc.DispatchHistory
-    - extensionsrc.ReportData
     - mechanizationsrc.ReportData
   events:
     - pf.reports.dispatch.requested/v1

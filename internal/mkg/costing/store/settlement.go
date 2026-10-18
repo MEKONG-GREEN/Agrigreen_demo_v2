@@ -160,7 +160,7 @@ func SettlementByID(ctx context.Context, tx pgx.Tx, id uuid.UUID, forUpdate bool
 // SettlementIDByIdem trả settlement_id của bản ghi sổ theo idem_key.
 func SettlementIDByIdem(ctx context.Context, tx pgx.Tx, idem string) (*uuid.UUID, error) {
 	var id uuid.UUID
-	return one(id, tx.QueryRow(ctx, "SELECT settlement_id FROM mkg_costing.settlement_event WHERE idem_key = $1", idem).Scan(&id))
+	return one(id, tx.QueryRow(ctx, "SELECT settlement_id FROM mkg_costing.settlement_event WHERE idem_key = $1"+ledger.NewestByIdem(""), idem).Scan(&id))
 }
 
 // OpenSettlementsForOrder trả quyết toán gốc CHƯA duyệt của lệnh gom (làm mới sau mỗi lần cân — PM-01).
@@ -259,7 +259,7 @@ func scanCarbon(r pgx.Row) (Carbon, error) {
 
 // CarbonByIdem đọc khoản carbon theo idem_key.
 func CarbonByIdem(ctx context.Context, tx pgx.Tx, idem string) (*Carbon, error) {
-	return one(scanCarbon(tx.QueryRow(ctx, "SELECT "+carbonCols+" FROM mkg_costing.carbon_revenue_event WHERE idem_key = $1", idem)))
+	return one(scanCarbon(tx.QueryRow(ctx, "SELECT "+carbonCols+" FROM mkg_costing.carbon_revenue_event WHERE idem_key = $1"+ledger.NewestByIdem(""), idem)))
 }
 
 // CarbonForPeriod trả khoản carbon của kỳ.

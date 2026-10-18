@@ -41,7 +41,7 @@ var (
 )
 
 // DefaultKNDepartment: phòng ban mặc định khi Admin ghi không chọn phòng ban (tạm, chờ khách).
-const DefaultKNDepartment = "trong_trot"
+const DefaultKNDepartment = store.LegacyKNDepartment
 
 // MaxKNExport là số thửa tối đa của một tệp xuất (tạm: một xã; > 2 s cần job — chờ số liệu thực tế).
 const MaxKNExport = 5000
@@ -146,9 +146,14 @@ func (c knCaller) readDept() string {
 	return c.k.Department
 }
 
-// sees: xã trong phạm vi và (thửa không mang phòng ban hoặc phòng ban thuộc ngữ cảnh).
+// sees: xã trong phạm vi và phòng ban thuộc ngữ cảnh. X-12 (W11.02): thửa không mang phòng ban (có trước v7.7) đọc
+// là Phòng Trồng trọt (store.LegacyKNDepartment), không còn hiện ở mọi phòng ban.
 func (c knCaller) sees(p store.Plot) bool {
-	return c.a.sees(p.CommuneCode, p.CooperativeRef) && (p.Department == "" || c.k.AllowsDepartment(p.Department))
+	dept := p.Department
+	if dept == "" {
+		dept = store.LegacyKNDepartment
+	}
+	return c.a.sees(p.CommuneCode, p.CooperativeRef) && c.k.AllowsDepartment(dept)
 }
 
 // writeDept là phòng ban ghi vào thửa mới: ngữ cảnh; Admin: tham số hoặc mặc định.

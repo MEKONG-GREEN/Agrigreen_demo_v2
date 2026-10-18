@@ -50,9 +50,13 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "masterdata.param_correction_required":
     "Đã có phiên bản được duyệt cùng ngày hiệu lực. Nhập “Lý do sửa” (ít nhất 10 ký tự) để ghi bản ghi bù.",
   // pf/party
+  "party.cooperative_requires_anchor": "Vui lòng tạo HTX tại màn Neo HTX theo mã số thuế.",
+  "cooperative.registrar_unavailable": "Luồng tạo HTX tạm chưa sẵn sàng. Vui lòng thử lại sau.",
   "party.org_not_found": "Không tìm thấy tổ chức/HTX, hoặc nằm ngoài phạm vi được phân quyền.",
   "party.org_state_conflict": "Trạng thái tổ chức không cho phép thao tác này (hoặc không có gì thay đổi).",
   "party.out_of_scope": "Thao tác nằm ngoài phạm vi TW → Tỉnh → Xã được phân quyền.",
+  "party.org_code_taken": "Mã tổ chức đã được dùng (mã không tái sử dụng). Chọn mã khác.",
+  "party.invalid_hierarchy": "Vị trí trong cây phân cấp không hợp lệ (sai loại cấp trên hoặc khác địa bàn).",
   "party.import_invalid":
     "Tệp nhập sai mẫu (thiếu cột bắt buộc, không phải CSV UTF-8/.xlsx, tệp .xls cũ, có ô công thức hoặc quá số dòng). Cả tệp bị từ chối.",
   "party.dependency_unavailable": "Dịch vụ danh bạ tổ chức/kho định danh tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
@@ -76,6 +80,12 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "geo.dependency_unavailable": "Dịch vụ bản đồ tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
   // pf/extension, pf/content, pf/mechanization
   "extension.out_of_scope": "Dữ liệu nằm ngoài phạm vi TW → Tỉnh → Xã được phân quyền.",
+  "extension.khtc_report_not_found": "Không tìm thấy báo cáo hoặc bản xuất trong phạm vi được giao.",
+  "extension.khtc_report_final": "Báo cáo đã có Bản cuối. Bạn có thể xem và tải lại tệp đã lưu.",
+  "extension.khtc_report_version_conflict": "Bản soạn đã thay đổi. Tải lại trước khi lưu hoặc xuất.",
+  "extension.khtc_report_provisional": "Báo cáo còn Tạm tính. Kiểm tra nguồn và phiếu; xác nhận nếu cần xuất bản tạm.",
+  "extension.khtc_report_source_changed": "Nguồn đã thay đổi. Cập nhật số liệu trước khi đánh dấu Bản cuối.",
+  "extension.khtc_report_invalid": "Nội dung chưa hợp lệ. Các ô số liệu do hệ thống tính và chỉ được xem.",
   "extension.dependency_unavailable": "Dịch vụ khuyến nông tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
   "content.document_not_found": "Tài liệu không tồn tại, đã gỡ hoặc nằm ngoài phạm vi.",
   "content.dependency_unavailable": "Thư viện số tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
@@ -102,11 +112,68 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "mechanization.run_not_found": "Chưa có kết quả cân đối đã lưu cho vụ này.",
   "mechanization.dependency_unavailable": "Dịch vụ Bản đồ CGH tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
   "mechanization.forecast_not_found": "Chưa có lần dự báo đã lưu này. Quản trị CGH chạy dự báo trên Admin API.",
+  // W11.61 — Danh mục KHTC, CT/DA, Kế hoạch năm
+  "extension.khtc_catalog_exists": "Mã đã có trong danh mục (kể cả mục đã ngừng dùng).",
+  "extension.khtc_catalog_not_found": "Không có mục danh mục KHTC này.",
+  "extension.khtc_default_conflict": "Mẫu đã có người ký mặc định đang dùng — bỏ mặc định của người ký kia trước.",
+  "extension.khtc_program_exists": "Mã CT/DA đã có trong danh sách.",
+  "extension.khtc_program_not_found": "Không có CT/DA này trong danh sách KHTC.",
+  "extension.khtc_plan_not_found": "Chưa có kế hoạch năm (hoặc phiên bản) này.",
+  "extension.khtc_plan_version_conflict": "Kế hoạch đã có phiên bản mới hơn — tải lại rồi điều chỉnh.",
+  "extension.khtc_plan_invalid": "Kế hoạch năm chưa hợp lệ — xem lỗi từng dòng.",
+  "extension.khtc_effective_date_invalid": "Số quyết định, ngày quyết định hoặc ngày hiệu lực chưa hợp lệ.",
+  "extension.khtc_entry_in_use": "Dòng đã có số liệu — chỉ được ngừng theo dõi, không xóa.",
+  "extension.khtc_refresh_not_owner": "Chỉ cán bộ KHTC phụ trách kỳ được “Cập nhật số liệu”.",
+  "extension.khtc_import_invalid": "Tệp Excel kế hoạch năm không đọc được.",
+  // W11.63: phiếu Báo cáo cho KHTC.
+  "extension.khtc_form_not_found": "Không tìm thấy phiếu của phòng trong kỳ này, hoặc kỳ đã bị hủy.",
+  "extension.khtc_form_locked": "Phiếu đang bị khóa hoặc đã gửi. Chỉ sửa khi KHTC yêu cầu bổ sung và kỳ còn mở.",
+  "extension.khtc_form_invalid": "Phiếu còn lỗi chặn gửi. Kiểm tra các ô, mục lời văn và dòng điều chỉnh được đánh dấu.",
+  "extension.khtc_form_not_reviewable": "Trạng thái phiếu không cho phép rà soát, kỳ đã đóng hoặc đã hết số lần gửi bổ sung.",
+  "extension.khtc_form_template_outdated": "Kỳ này dùng mẫu phiếu cũ. Liên hệ cán bộ KHTC để hủy và mở lại kỳ với mẫu mới.",
+  // W11.49 Báo cáo dịch bệnh BM-10, báo nghi dịch
+  "extension.cnts_roster_invalid": "Lịch trực chưa hợp lệ — xem lỗi từng trường.",
+  "extension.cnts_roster_version_conflict": "Lịch trực đã có người cập nhật — tải lại bản mới rồi sửa.",
+  "extension.cnts_vaccination_not_found": "Không có lịch tiêm này hoặc ngoài phạm vi phụ trách.",
+  "extension.cnts_vaccination_invalid": "Lịch tiêm chưa hợp lệ — xem lỗi từng trường.",
+  "extension.cnts_vaccination_version_conflict": "Lịch tiêm đã có người cập nhật — tải lại bản mới rồi sửa.",
+  "extension.cnts_vaccination_cancelled": "Lứa đã hủy, không thể cập nhật lịch tiêm.",
+  "extension.cnts_vaccination_no_procedure": "Chưa có quy trình tiêm phù hợp tại ngày nhận giống.",
+  "extension.checkin_disabled": "Phòng ban này không dùng check-in lịch công tác.",
+  "extension.checkin_exists": "Mục công tác đã check-in. Không thể sửa check-in đã gửi.",
+  "extension.checkin_not_registered": "Gửi lịch công tác duyệt trước khi check-in.",
+  "extension.schedule_item_not_found": "Không có mục này trong lịch công tác hiện hành.",
+  "extension.cnts_alert_not_found": "Không có cảnh báo này (hoặc ngoài xã được phân công).",
+  "extension.cnts_alert_transition": "Cảnh báo đã đóng hoặc chưa được giao — tải lại để xem trạng thái mới.",
+  "extension.cnts_alert_version_conflict": "Cảnh báo đã có người cập nhật — tải bản mới rồi thao tác lại.",
+  "extension.cnts_alert_invalid": "Thao tác cảnh báo chưa hợp lệ — xem lỗi từng trường.",
+  "extension.cnts_alert_config_invalid": "Cấu hình nhắc nhở / cảnh báo chưa hợp lệ — xem lỗi từng trường.",
+  "extension.cnts_outbreak_not_found": "Không có ổ dịch này (hoặc ngoài xã được phân công).",
+  "extension.cnts_outbreak_invalid": "Báo cáo dịch bệnh chưa hợp lệ — xem lỗi từng trường.",
+  "extension.cnts_outbreak_version_conflict": "Ổ dịch đã có người cập nhật — tải bản mới rồi nhập lại.",
+  "extension.cnts_outbreak_closed": "Ổ dịch đã kết thúc — Cấp Tỉnh mở lại trước khi cập nhật.",
+  "extension.cnts_outbreak_not_closed": "Ổ dịch chưa kết thúc.",
+  "extension.cnts_suspect_not_found": "Không có tin báo nghi dịch này.",
+  "extension.cnts_suspect_invalid": "Tin báo nghi dịch chưa hợp lệ — xem lỗi từng trường.",
+  "extension.cnts_suspect_version_conflict": "Tin báo đã có người cập nhật — tải bản mới.",
+  "extension.cnts_suspect_resolved": "Tin báo đã được xác nhận hoặc bác bỏ.",
   "extension.directive_not_found": "Không tìm thấy chỉ đạo, hoặc bạn không thuộc danh sách nhận/giám sát.",
   "extension.not_directive_target": "Bạn không thuộc danh sách nhận chỉ đạo này nên không xác nhận được.",
   "extension.no_directive_targets": "Vùng đã chọn chưa có cán bộ nào trong danh bạ — không ban hành chỉ đạo rỗng.",
   "extension.task_not_found": "Không tìm thấy nhiệm vụ, hoặc nhiệm vụ nằm ngoài phạm vi.",
   "content.library_item_not_found": "Tài liệu chưa có trong danh mục cá nhân.",
+  // W11.28: báo cáo Sở và dashboard nhân sự.
+  "hrm.folder_not_found": "Không tìm thấy thư mục hoặc bạn không có quyền xem.",
+  "hrm.folder_exists": "Đã có thư mục cùng tên ở cấp này. Vui lòng chọn tên khác.",
+  "hrm.folder_not_empty": "Thư mục còn tài liệu hoặc thư mục con. Chỉ có thể ẩn thư mục rỗng.",
+  "hrm.doc_not_found": "Không tìm thấy tài liệu hoặc bạn không có quyền xem.",
+  "hrm.doc_format": "Định dạng tệp không được hỗ trợ hoặc nội dung không khớp với đuôi tệp.",
+  "hrm.doc_too_large": "Tệp vượt dung lượng cho phép. Vui lòng chọn tệp nhỏ hơn 15 MB.",
+  "hrm.docs_unavailable": "Kho tài liệu hiện chưa sẵn sàng. Vui lòng thử lại sau.",
+  "hrm.report_unknown": "Không có biểu báo cáo Sở này. Chọn một biểu từ NS01 đến NS06.",
+  "hrm.report_blocked": "Số liệu chưa đạt quy tắc kiểm tra bắt buộc. Sửa các lỗi trước khi xuất báo cáo.",
+  "hrm.export_not_found": "Không tìm thấy lần xuất báo cáo này.",
+  "vault.batch_unsupported": "Chưa thể đọc hồ sơ nhân sự. Vui lòng liên hệ bộ phận hỗ trợ.",
   // pf/notify
   "notify.notification_not_found": "Thông báo không còn (đã quá 90 ngày hoặc ngoài phạm vi).",
   "notify.out_of_scope": "Đơn vị đã chọn nằm ngoài phạm vi phụ trách.",
@@ -325,7 +392,7 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "masterdata.catalog_import_not_found": "Không tìm thấy lần nhập danh mục này.",
   // pf/sync — tệp minh chứng
   "sync.purpose_required": "Thiếu mục đích xử lý dữ liệu khi mở tệp minh chứng.",
-  "sync.purpose_not_allowed": "Vai của bạn không được mở tệp minh chứng với mục đích này.",
+  "sync.purpose_not_allowed": "Mục đích này không được phép mở tệp đã chọn.",
   "sync.consent_missing": "Nông hộ chưa đồng ý chia sẻ dữ liệu cho mục đích này — không mở được ảnh.",
   "sync.file_not_found": "Không tìm thấy tệp minh chứng.",
   // pf/apiclient (G5, ADR-0022) — Public API và Admin API quản trị khách hàng
@@ -348,6 +415,11 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "apiclient.job_not_found": "Không tìm thấy việc xuất dữ liệu.",
   "apiclient.job_not_ready": "Việc xuất dữ liệu chưa hoàn tất — chưa tải được tệp.",
   "apiclient.export_not_supported": "Sản phẩm dữ liệu này chưa hỗ trợ xuất tệp.",
+  "apiclient.sandbox_key_refused": "Khóa thử chỉ dùng cho môi trường thử và khóa thật chỉ dùng cho môi trường thật — khóa này bị từ chối.",
+  "apiclient.too_many_webhooks": "Khách hàng đã có tối đa 5 webhook đang hoạt động. Tắt một webhook trước khi thêm mới.",
+  "apiclient.webhook_feed_not_subscribed": "Feed chưa có hợp đồng tích hợp hoặc khách hàng chưa được duyệt quyền đọc feed này.",
+  "apiclient.webhook_not_found": "Không tìm thấy webhook này của khách hàng.",
+  "apiclient.webhook_url_rejected": "Địa chỉ webhook không hợp lệ: phải là https tới tên miền công khai đầy đủ, cổng 443/8443, không trỏ vào mạng nội bộ.",
   "apiclient.export_conflict": "Đã có tệp xuất khác nội dung dưới cùng khóa — việc xuất bị dừng.",
   // pf/metering (G5, ADR-0023 / ADR-0024)
   "metering.unavailable": "Không ghi được sổ sử dụng — hệ thống không trả dữ liệu. Vui lòng thử lại sau.",
@@ -415,7 +487,7 @@ export function parseRetryAfter(value: string | null | undefined, now: number = 
 }
 
 /** Thông báo cho người dùng: ưu tiên bảng mã; mã lạ thì dùng detail/title của server. */
-const PREFER_DETAIL: ReadonlySet<string> = new Set(["party.out_of_scope", "party.import_invalid"]);
+const PREFER_DETAIL: ReadonlySet<string> = new Set(["party.out_of_scope", "party.import_invalid", "hrm.report_blocked"]);
 
 export function problemMessage(p: Pick<ProblemDetails, "code" | "status" | "detail" | "title">): string {
   // Thông báo nghiệp vụ của 422 (vd "Vui lòng nhập đầy đủ Tên tuyến và Phân loại." — docs/errors.md) nằm ở `detail`.

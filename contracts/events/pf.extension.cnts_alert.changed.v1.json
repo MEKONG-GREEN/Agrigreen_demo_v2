@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.cnts_alert.changed/v1",
+  "title": "pf.extension.cnts_alert.changed — payload",
+  "description": "Cảnh báo phòng Chăn nuôi – Thủy sản (W11.43 — BRD CNTS v3.7 FN-13, UR-TINH-13, Mục III.5): raised = hệ thống tạo cảnh báo (quy tắc liên biểu, ổ dịch mới, trễ nộp liên tiếp) → người nhận theo bảng Mục III.5; assigned = Cấp Tỉnh giao xử lý → người được giao; overdue = quá hạn xử lý → Lãnh đạo phòng và người được giao. pf/notify dựng thông báo cho recipient_refs (rỗng → thông báo chủ đề Cấp Tỉnh của tỉnh). Không chứa dữ liệu cá nhân, không số liệu chi tiết.",
+  "x-event-type": "pf.extension.cnts_alert.changed",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": ["alert_ref", "action", "kind", "level", "title", "commune_code", "province_code", "template_code", "period_key", "due_at", "recipient_refs", "department", "event_time"],
+  "properties": {
+    "alert_ref":      { "type": "string", "format": "uuid" },
+    "action":         { "type": "string", "enum": ["raised", "assigned", "overdue"] },
+    "kind":           { "type": "string", "description": "herd_change, slaughter_spike, slaughter_zero, ksgm_mismatch, fishing_change, water_quality, low_growth, mortality, log_location, log_overdue, vaccine_overdue, outbreak, late_streak" },
+    "level":          { "type": "string", "enum": ["urgent", "attention"] },
+    "title":          { "type": "string", "maxLength": 300 },
+    "commune_code":   { "type": ["string", "null"] },
+    "province_code":  { "type": ["string", "null"] },
+    "template_code":  { "type": ["string", "null"], "description": "Mã biểu cap/forms (CNTS-BM01…)" },
+    "period_key":     { "type": ["string", "null"] },
+    "due_at":         { "type": "string", "format": "date-time", "description": "Hạn xử lý hiện hành" },
+    "recipient_refs": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+    "department":     { "type": "string", "enum": ["chan_nuoi_thuy_san"] },
+    "event_time":     { "type": "string", "format": "date-time" }
+  }
+}

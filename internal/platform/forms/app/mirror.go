@@ -22,7 +22,7 @@ func errorsAs(err error, target any) bool { return errors.As(err, target) }
 
 func hexOf(b []byte) string { return hex.EncodeToString(b) }
 
-// Record thực hiện port.Freezer: ghi chốt/mở lại kỳ của bên dùng (origin = mirror) — và ảnh chụp đóng băng khi chốt —
+// Record thực hiện port.Freezer: ghi chốt/mở lại/hủy kỳ của bên dùng (origin = mirror) — và ảnh chụp đóng băng khi chốt —
 // trong giao dịch của bên dùng (ctx mang giao dịch — db.JoinTx), qua hàm pf_forms.mirror. Gọi lặp cùng IdemKey trả
 // lại kết quả cũ (Replayed). Chốt mới → sự kiện pf.forms.period.closed trong cùng giao dịch.
 func (s *Service) Record(ctx context.Context, in port.MirrorInput) (port.MirrorResult, error) {
@@ -61,14 +61,14 @@ func (s *Service) Record(ctx context.Context, in port.MirrorInput) (port.MirrorR
 			return port.MirrorResult{}, problem.Validation.WithField("content", "chốt kỳ cần nội dung ảnh chụp là object JSON")
 		}
 		content = in.Content
-	case port.ActionReopened:
+	case port.ActionReopened, port.ActionCancelled:
 		why, ok := domain.Reason(in.Reason)
 		if !ok {
 			return port.MirrorResult{}, problem.Validation.WithField("reason", "bắt buộc, 10–500 ký tự")
 		}
 		reason = &why
 	default:
-		return port.MirrorResult{}, problem.Validation.WithField("action", "closed | reopened")
+		return port.MirrorResult{}, problem.Validation.WithField("action", "closed | reopened | cancelled")
 	}
 	for _, u := range in.Units {
 		if !domain.ValidateUnit(u) {

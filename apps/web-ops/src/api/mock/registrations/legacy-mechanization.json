@@ -1,0 +1,23 @@
+{
+  "id": "legacy-mechanization",
+  "source": "./legacy-mechanization",
+  "app": [
+    {
+      "export": "appRoutes43",
+      "order": 43
+    },
+    {
+      "export": "appRoutes44",
+      "order": 44
+    },
+    {
+      "export": "appRoutes45",
+      "order": 45
+    },
+    {
+      "export": "appRoutes46",
+      "order": 46
+    }
+  ],
+  "admin": []
+}

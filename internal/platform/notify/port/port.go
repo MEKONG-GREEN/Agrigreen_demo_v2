@@ -18,18 +18,14 @@ const EntityNotification = "notification"
 
 // Loại thông báo (cột kind, trường "kind" của thông điệp đẩy).
 const (
-	KindDirective      = "directive"       // chỉ đạo từ TTKN (KN US-TASK-03)
 	KindAlert          = "alert"           // cảnh báo khẩn (HTX US-NEWS-03)
 	KindDocument       = "document"        // tài liệu/tin mới hoặc cập nhật (US-LIB-06)
-	KindTaskEscalated  = "task_escalated"  // nhiệm vụ leo thang lên tỉnh (KN US-TASK-02)
 	KindSyncConflict   = "sync_conflict"   // xung đột đồng bộ chờ xử lý (C-8)
 	KindOrgDeactivated = "org_deactivated" // tổ chức bị vô hiệu hóa
 	// KindHouseholdRegistered / KindHouseholdMembershipChanged: nông hộ mới từ App HTX,
 	// nông hộ vào/rời/chuyển HTX → cán bộ khuyến nông của xã (KN US-HTX-05, migration 000028).
 	KindHouseholdRegistered        = "household_registered"
 	KindHouseholdMembershipChanged = "household_membership_changed"
-	// KindTaskAssigned: nhiệm vụ tự sinh từ yêu cầu hỗ trợ App HTX → cán bộ được giao (KN US-TASK-01).
-	KindTaskAssigned = "task_assigned"
 	// KindFarmLogPending: nông dân ghi nhật ký canh tác → quản lý HTX "nhật ký chờ duyệt"
 	// (HTX US-LOG-05; migration 000029).
 	KindFarmLogPending = "farm_log_pending"
@@ -53,19 +49,12 @@ const (
 	KindMRVAnomaly = "mrv_anomaly"
 	// KindMRVOverdue: hồ sơ MRV chờ duyệt quá hạn — mức 1 người duyệt, mức 2 quản trị TTKN tỉnh (KN US-MRV-06).
 	KindMRVOverdue = "mrv_overdue"
-	// KindWorkScheduleSubmitted: lịch công tác tuần gửi duyệt / điều chỉnh chờ duyệt lại → người duyệt Cấp Tỉnh
-	// (KN v7.7 FN-TI-02.07: "lịch Cán bộ xã gửi hiện ngay ở Chờ duyệt"). Ràng buộc kind trong DB do migration
-	// pf_notify của P4 (000073) mở rộng — chưa có thì consumer không ghi được (người tích hợp thêm kind này).
-	KindWorkScheduleSubmitted = "work_schedule_submitted"
-	// KindWorkScheduleReviewed: kết quả duyệt (Đã duyệt / Yêu cầu chỉnh sửa kèm lý do) → người đăng ký
-	// (KN v7.7 FN-XA-03.08 AC; kế hoạch 000073).
-	KindWorkScheduleReviewed = "work_schedule_reviewed"
-	// KindWorkScheduleDue: nhắc hạn đăng ký lịch tuần (cán bộ chưa gửi) hoặc lịch chờ duyệt quá hạn (người duyệt)
-	// (KN v7.7 FN-TI-02.07 luồng phụ; kế hoạch 000073).
-	KindWorkScheduleDue = "work_schedule_due"
 	// KindEgressAnomaly: khối lượng xuất dữ liệu bất thường lần đầu trong ngày (pf/metering, DLP — ADR-0024,
 	// G5) → người nhận DLP của tenant CHỦ DỮ LIỆU (EgressAnomalyRoles; migration pf 000083).
 	KindEgressAnomaly = "egress_anomaly"
+	// KindAccountDormant: tài khoản sắp bị khóa vì không hoạt động (pf.accounts.user.dormant_warning, D24) → chính
+	// tài khoản đó, trong ứng dụng + email (migration pf 20261013142347 mở rộng CHECK kind).
+	KindAccountDormant = "account_dormant"
 	// KindSyncNow là thông điệp dữ liệu "đồng bộ ngay" (US-SYNC-02) — không tạo thông báo.
 	KindSyncNow = "sync_now"
 )
@@ -93,12 +82,10 @@ const (
 
 // Tên consumer trong cmd/worker (-modules), một consumer mỗi nhóm sự kiện.
 const (
-	ConsumerDirective = "pf.notify.directive"
-	ConsumerContent   = "pf.notify.content"
-	ConsumerTask      = "pf.notify.task"
-	ConsumerSync      = "pf.notify.sync"
-	ConsumerParty     = "pf.notify.party"
-	ConsumerPush      = "pf.notify.push"
+	ConsumerContent = "pf.notify.content"
+	ConsumerSync    = "pf.notify.sync"
+	ConsumerParty   = "pf.notify.party"
+	ConsumerPush    = "pf.notify.push"
 	// ConsumerCropCycle: nhật ký chờ duyệt, kết quả duyệt, nông dân mở vụ (App HTX, G2).
 	ConsumerCropCycle = "pf.notify.cropcycle"
 	// ConsumerIntegration: cảnh báo Admin về đồng bộ tích hợp — sự kiện vào DLQ (GIS US-SYNC-02),
@@ -106,11 +93,11 @@ const (
 	ConsumerIntegration = "pf.notify.integration"
 	// ConsumerMRV: cảnh báo MRV (pf.mrv.alert.raised) — nhãn khẩn, bất thường AWD, leo thang quá hạn (G3).
 	ConsumerMRV = "pf.notify.mrv"
-	// ConsumerWorkSchedule: lịch công tác tuần (KN v7.7 P5) — gửi duyệt, kết quả duyệt, nhắc hạn.
-	ConsumerWorkSchedule = "pf.notify.work_schedule"
 	// ConsumerEgressAnomaly: cảnh báo DLP pf.metering.egress.anomaly_detected (G5, ADR-0024) — cùng tên
 	// với meteringport.NotifyEgressAnomalyQueue.
 	ConsumerEgressAnomaly = "pf.notify.egress_anomaly"
+	// ConsumerAccounts: báo trước khóa tài khoản không hoạt động (pf.accounts.user.dormant_warning, D24).
+	ConsumerAccounts = "pf.notify.accounts"
 )
 
 // EgressAnomalyRoles là người nhận cảnh báo xuất dữ liệu bất thường trong tenant chủ dữ liệu: người
@@ -125,9 +112,6 @@ var EgressAnomalyRoles = []string{meteringport.RoleMeteringViewer, authz.RolePla
 type AreaFarmers interface {
 	FarmersInCommunes(ctx context.Context, tenantID uuid.UUID, communes []string) ([]uuid.UUID, error)
 }
-
-// JobEmailDigest là tên job gửi email tóm tắt chỉ đạo khẩn trong cmd/worker (-jobs).
-const JobEmailDigest = "notify_email_digest"
 
 // NotificationCreatedV1 là payload của pf.notify.notification.created: một thông
 // báo đã vào hộp thư. Không có tiêu đề/nội dung (đọc qua API) và không có dữ liệu

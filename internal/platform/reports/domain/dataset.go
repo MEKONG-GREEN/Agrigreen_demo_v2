@@ -89,7 +89,10 @@ func Display(c DataColumn, v Value) string {
 
 // Build dựng Dataset từ các dòng nguồn theo cột của mẫu ở cấp tổng hợp level.
 func Build(def Definition, level string, rows []Row, total Row) Dataset {
-	src := Sources[def.Source]
+	return BuildWithSources(def, level, rows, total, Sources)
+}
+func BuildWithSources(def Definition, level string, rows []Row, total Row, sources map[string]SourceSpec) Dataset {
+	src := sources[def.Source]
 	ds := Dataset{Title: def.Title, Empty: EmptyMessage}
 	for _, c := range def.Columns {
 		spec, ok := src.Column(c.Key)

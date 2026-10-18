@@ -1,0 +1,528 @@
+paths:
+# @ag-order: 12
+  /v1/me/contexts:
+    get:
+      summary: "FN-CH-00.01 B3: các lần gán vai trò còn hiệu lực của người gọi (thẻ vai trò + thẻ phòng ban, Hình 3b) — rỗng với tài khoản không có vai trò KN"
+      operationId: knMyContexts
+      tags: [accounts]
+      responses:
+        "200":
+          description: Lần gán (phòng ban chưa mở có status not_open — hiện mờ, không chọn được)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assignments]
+                properties:
+                  assignments: {type: array, items: {$ref: "#/components/schemas/KNAssignment"}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: accounts.account_locked, $ref: "#/components/responses/Problem"}
+# @ag-order: 13
+  /v1/me/context:
+    get:
+      summary: "Ngữ cảnh phiên của request (header X-AG-Context)"
+      operationId: knCurrentContext
+      tags: [accounts]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Ngữ cảnh
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNSessionContext"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "428": {description: accounts.context_required, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "FN-CH-00.01 B4: chọn vai trò + phòng ban → context_id (Admin: department_code = null, bắt buộc MFA)"
+      operationId: knSelectContext
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignment_id, department_code]
+              properties:
+                assignment_id: {type: string, format: uuid}
+                department_code: {type: [string, "null"]}
+      responses:
+        "201":
+          description: Ngữ cảnh mới (hết hạn sau 24 giờ hoặc khi lần gán hết hiệu lực)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNSessionContext"}
+        "403": {description: "accounts.account_locked, mfa_required (Admin)", $ref: "#/components/responses/Problem"}
+        "404": {description: accounts.assignment_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: accounts.department_not_open, $ref: "#/components/responses/Problem"}
+        "422": {description: accounts.department_required, $ref: "#/components/responses/Problem"}
+# @ag-order: 16
+  /v1/me/delegations:
+    get:
+      summary: "W11.07 Ủy quyền có hạn người gọi đã giao hoặc đã nhận"
+      operationId: knMyDelegations
+      tags: [accounts]
+      responses:
+        "200":
+          description: Mới nhất trước
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDelegationList"}
+    post:
+      summary: "W11.07 Lãnh đạo phòng ủy quyền có hạn (≤ 30 ngày) cho cán bộ Cấp Tỉnh cùng đơn vị, cùng phòng ban của phiên"
+      operationId: knCreateDelegation
+      tags: [accounts]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grantee_ref, power, valid_to, reason]
+              properties:
+                grantee_ref: {type: string, format: uuid}
+                department_code: {type: string, description: "Vắng = phòng ban của ngữ cảnh; khác → 403"}
+                power: {type: string, enum: [mo_lai_ky, duyet_bao_cao]}
+                valid_from: {type: string, format: date-time}
+                valid_to: {type: string, format: date-time}
+                reason: {type: string}
+      responses:
+        "201":
+          description: Đã ủy quyền
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDelegation"}
+        "200":
+          description: Gọi lặp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDelegation"}
+        "403": {description: "accounts.delegation_forbidden, accounts.context_read_only", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed, accounts.delegation_grantee_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 17
+  /v1/me/delegations/{id}/revoke:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: "W11.07 Người giao thu hồi ủy quyền còn hiệu lực (lý do ≥ 10 ký tự)"
+      operationId: knRevokeDelegation
+      tags: [accounts]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [reason], properties: {reason: {type: string}}}
+      responses:
+        "200":
+          description: Đã thu hồi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDelegation"}
+        "404": {description: "accounts.delegation_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.delegation_state", $ref: "#/components/responses/Problem"}
+# @ag-order: 18
+  /v1/internal-units:
+    get:
+      summary: "W11.07 Đơn vị nội bộ của đơn vị (đọc)"
+      operationId: knListInternalUnits
+      tags: [accounts]
+      parameters:
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Theo thứ tự hiển thị
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InternalUnitList"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 200
+  /v1/farmer-accounts:
+    get:
+      summary: Tài khoản nông dân của một HTX (HTX US-ACC-01) — không dữ liệu cá nhân
+      description: Vai coop_manager (mặc định HTX của mình, không xem HTX khác), kn_officer/kn_province_admin (trong phạm vi), platform_admin.
+      operationId: listFarmerAccounts
+      tags: [accounts]
+      parameters:
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FarmerAccount"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {description: "accounts.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo tài khoản nông dân cho nông hộ của HTX (HTX US-ACC-01, US-LOGIN-01) và phát lượt kích hoạt QR/liên kết một lần
+      description: |
+        Tên đăng nhập = SĐT chuẩn hóa 0xxxxxxxxx; SĐT phải là SĐT chủ hộ trong kho định danh (household_ref bỏ trống → tra theo SĐT).
+        Vai farmer, required action UPDATE_PASSWORD, KHÔNG org_ref, không mật khẩu, không email/SMS (g2-conventions §1).
+        activation.link chỉ có ở phản hồi đầu (Cache-Control no-store); gọi lặp cùng Idempotency-Key trả bản đã lược liên kết.
+      operationId: createFarmerAccount
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                household_ref: {type: [string, "null"], format: uuid}
+                phone: {type: string, description: "SĐT chủ hộ (0xxxxxxxxx hoặc +84…)"}
+                full_name: {type: string}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FarmerCreated"}
+        "200":
+          description: Phát lại (không có liên kết)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FarmerCreated"}
+        "403": {description: "forbidden | accounts.out_of_scope", $ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.farmer_exists | accounts.phone_taken | accounts.org_inactive", $ref: "#/components/responses/Problem"}
+        "422": {description: "accounts.household_invalid | accounts.phone_household_mismatch", $ref: "#/components/responses/Problem"}
+        "503": {description: "accounts.dependency_unavailable", $ref: "#/components/responses/Problem"}
+# @ag-order: 201
+  /v1/farmer-accounts/import:
+    post:
+      summary: Nhập tài khoản nông dân hàng loạt từ CSV/XLSX (HTX US-ACC-02) — kết quả theo từng dòng, dòng hợp lệ nhận liên kết kích hoạt
+      description: Cột phone (SĐT, bắt buộc), household_ref (Mã nông hộ, tùy chọn), full_name (Họ tên). Tối đa 200 dòng, 2 MB.
+      operationId: importFarmerAccounts
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          text/csv: {schema: {type: string, format: binary}}
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, rejected, rows]
+                properties:
+                  created: {type: integer}
+                  rejected: {type: integer}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [row, status]
+                      properties:
+                        row: {type: integer}
+                        status: {type: string, enum: [created, rejected]}
+                        reason: {type: [string, "null"]}
+                        user_ref: {type: [string, "null"], format: uuid}
+                        household_ref: {type: [string, "null"], format: uuid}
+                        activation: {oneOf: [{$ref: "#/components/schemas/FarmerActivation"}, {type: "null"}]}
+        "422": {description: "accounts.import_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 202
+  /v1/farmer-accounts/{id}/activation:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: "user_ref (id Keycloak) của nông dân"}
+    get:
+      summary: Lượt kích hoạt của tài khoản nông dân — chỉ siêu dữ liệu (ai phát, lúc nào, hạn, đã dùng/thu hồi)
+      operationId: listFarmerActivations
+      tags: [accounts]
+      responses:
+        "200":
+          description: Mới nhất trước
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_ref: {type: string, format: uuid}
+                  items: {type: array, items: {$ref: "#/components/schemas/FarmerGrant"}}
+        "404": {description: "accounts.farmer_not_found", $ref: "#/components/responses/Problem"}
+    post:
+      summary: Phát lại liên kết/QR kích hoạt (mất QR, hết hạn, quên mật khẩu) — lượt đang mở bị thu hồi (reissued)
+      operationId: reissueFarmerActivation
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Lượt mới (link chỉ có ở phản hồi đầu)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  activation: {$ref: "#/components/schemas/FarmerActivation"}
+        "404": {description: "accounts.farmer_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.state_conflict — tài khoản đang khóa", $ref: "#/components/responses/Problem"}
+        "503": {description: "accounts.activation_link_unavailable", $ref: "#/components/responses/Problem"}
+# @ag-order: 203
+  /v1/farmer/households:
+    get:
+      summary: Nông hộ liên kết với tài khoản nông dân gọi (vai farmer)
+      operationId: myFarmerHouseholds
+      tags: [accounts]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        household_ref: {type: string, format: uuid}
+                        cooperative_ref: {type: string, format: uuid}
+                        commune_code: {type: string}
+# @ag-order: 204
+  /v1/farmer/coop-staff:
+    get:
+      summary: Danh bạ cán bộ HTX của nông dân, tìm theo tên hoặc chức vụ (HTX US-SUPPORT-02) — không có SĐT
+      operationId: farmerCoopStaff
+      tags: [accounts]
+      parameters:
+        - {name: q, in: query, schema: {type: string}, description: "Tên hoặc chức vụ, không phân biệt dấu"}
+      responses:
+        "200":
+          description: Danh sách (Cache-Control private, no-store)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        user_ref: {type: string, format: uuid}
+                        cooperative_ref: {type: string, format: uuid}
+                        display_name: {type: string}
+                        title: {type: string}
+                        has_phone: {type: boolean, description: "false → ẩn nút gọi nhanh (AC-2)"}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 205
+  /v1/farmer/coop-staff/{id}/contact:
+    get:
+      summary: SĐT của cán bộ HTX lúc bấm gọi/copy (HTX US-SUPPORT-02 AC-1) — đọc từ Keycloak, không lưu, Cache-Control no-store
+      operationId: farmerCoopStaffContact
+      tags: [accounts]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: SĐT
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_ref: {type: string, format: uuid}
+                  phone: {type: string}
+        "404": {description: "accounts.staff_not_found | accounts.contact_unavailable", $ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 549
+    KNCommune:
+      type: object
+      required: [code, name]
+      properties:
+        code: {type: string}
+        name: {type: string}
+# @ag-order: 550
+    KNDepartmentRef:
+      type: object
+      required: [code, name, description, status]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        description: {type: [string, "null"]}
+        status: {type: string, enum: [active, not_open, suspended]}
+        read_only: {type: boolean, description: "W11.07: phòng ban ngoài lần gán, chọn được ở chế độ chỉ xem (Lãnh đạo đơn vị, Ban Giám đốc)"}
+# @ag-order: 551
+    KNAssignment:
+      type: object
+      required: [assignment_id, user_ref, role, org_ref, org_name, mgmt_level, mgmt_level_code, communes, departments, valid_from, valid_to, active,
+        created_by, created_at, updated_by, updated_at]
+      properties:
+        assignment_id: {type: string, format: uuid}
+        user_ref: {type: string, format: uuid}
+        role: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}
+        org_ref: {type: [string, "null"], format: uuid, description: "null: Admin không gắn Nút"}
+        org_name: {type: string, description: "Admin không Nút: \"Toàn hệ thống\""}
+        mgmt_level: {type: [string, "null"], description: "Nhãn cấp quản lý (tạm Q-05), vd \"Chuyên viên\""}
+        mgmt_level_code: {type: [string, "null"]}
+        communes: {type: array, items: {$ref: "#/components/schemas/KNCommune"}, description: "Xã phụ trách (Cấp Xã)"}
+        departments: {type: array, items: {$ref: "#/components/schemas/KNDepartmentRef"}, description: "Admin: rỗng"}
+        valid_from: {type: string, format: date-time}
+        valid_to: {type: [string, "null"], format: date-time}
+        active: {type: boolean}
+        created_by: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+        updated_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+        attributes: {$ref: "#/components/schemas/KNAssignmentAttrs"}
+# @ag-order: 552
+    KNSessionContext:
+      type: object
+      required: [context_id, assignment_id, role, department_code, department_name, org_ref, org_name, communes, default_route, expires_at,
+        support_session_id, on_behalf_of]
+      properties:
+        context_id: {type: string, format: uuid, description: "Gửi lại qua header X-AG-Context"}
+        assignment_id: {type: [string, "null"], format: uuid, description: "null: ngữ cảnh hỗ trợ không gắn tài khoản"}
+        role: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}
+        department_code: {type: [string, "null"], description: "null với Admin"}
+        department_name: {type: [string, "null"]}
+        org_ref: {type: [string, "null"], format: uuid}
+        org_name: {type: string}
+        communes: {type: array, items: {$ref: "#/components/schemas/KNCommune"}}
+        default_route: {type: string, description: "Trang mặc định theo vai trò (Dashboard / Công việc cần làm / Tổng quan hệ thống)"}
+        expires_at: {type: string, format: date-time}
+        support_session_id: {type: [string, "null"], format: uuid, description: "Khác null: Admin đang hỗ trợ (FN-AD-04.07) — dải cảnh báo vàng"}
+        on_behalf_of: {type: [string, "null"], format: uuid}
+        read_only: {type: boolean, description: "W11.07: ngữ cảnh chỉ xem (Cấp TW, Lãnh đạo đơn vị ở phòng ban khác, Ban Giám đốc) — mọi thao tác ghi 403 accounts.context_read_only"}
+        mgmt_level_code: {type: [string, "null"]}
+        manager: {type: boolean, description: "Lãnh đạo (≥ phó phòng/phụ trách/lãnh đạo đơn vị, hoặc nhóm Lãnh đạo phòng)"}
+        province_group: {type: [string, "null"]}
+        duties: {type: array, items: {type: string}}
+        internal_unit_code: {type: [string, "null"]}
+        powers: {type: array, items: {type: string}, description: "Quyền nhận qua ủy quyền có hạn còn hiệu lực (đầy đủ ở GET /v1/me/context)"}
+    # --- W11.07: phân quyền trong vai + đơn vị nội bộ (cùng định nghĩa ở admin.yaml/application.yaml) ---
+# @ag-order: 553
+    KNAssignmentAttrs:
+      type: object
+      description: "Thuộc tính phân quyền trong vai (sổ phụ pf_accounts.assignment_attr_event, W11.07)"
+      required: [province_group, province_group_label, duties, internal_unit_code, facility_refs, household_refs]
+      properties:
+        province_group: {type: [string, "null"], enum: [vien_chuc, tong_hop, chu_nhiem, lanh_dao_phong, ban_giam_doc, null], description: "Nhóm Cấp Tỉnh (chỉ kn_tinh; tạm Q-059)"}
+        province_group_label: {type: [string, "null"]}
+        duties: {type: array, items: {type: string, enum: [qtnv_bao_gia, phu_trach_bieu]}, description: "Cờ nhiệm vụ (chỉ kn_tinh)"}
+        internal_unit_code: {type: [string, "null"], description: "Đơn vị nội bộ; Cấp Xã: đơn vị quản lý (HS-37)"}
+        facility_refs: {type: array, items: {type: string, format: uuid}, description: "Cấp Xã: giới hạn cơ sở (rỗng = cả xã)"}
+        household_refs: {type: array, items: {type: string, format: uuid}, description: "Cấp Xã: giới hạn hộ (rỗng = cả xã)"}
+# @ag-order: 554
+    KNDelegation:
+      type: object
+      required: [delegation_id, grantor_ref, grantee_ref, department_code, power, power_label, valid_from, valid_to, revoked, status, reason, created_at]
+      properties:
+        delegation_id: {type: string, format: uuid}
+        grantor_ref: {type: string, format: uuid}
+        grantee_ref: {type: string, format: uuid}
+        department_code: {type: string}
+        power: {type: string, enum: [mo_lai_ky, duyet_bao_cao]}
+        power_label: {type: string}
+        valid_from: {type: string, format: date-time}
+        valid_to: {type: string, format: date-time}
+        revoked: {type: boolean}
+        status: {type: string, enum: [active, scheduled, expired, revoked]}
+        reason: {type: string}
+        created_at: {type: string, format: date-time}
+# @ag-order: 555
+    KNDelegationList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNDelegation"}}
+# @ag-order: 556
+    InternalUnit:
+      type: object
+      required: [id, org_ref, code, kind, kind_label, name, department_code, sort_order, active, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid}
+        code: {type: string}
+        kind: {type: string, enum: [ban_giam_doc, van_phong, phong, tram, trai, tang_cuong]}
+        kind_label: {type: string}
+        name: {type: string}
+        department_code: {type: [string, "null"], description: "kind = phong: mã phòng ban P2"}
+        sort_order: {type: integer}
+        active: {type: boolean}
+        updated_at: {type: string, format: date-time}
+# @ag-order: 557
+    InternalUnitList:
+      type: object
+      required: [org_ref, items, kinds]
+      properties:
+        org_ref: {type: string, format: uuid}
+        items: {type: array, items: {$ref: "#/components/schemas/InternalUnit"}}
+        kinds: {type: array, items: {type: object, required: [code, label], properties: {code: {type: string}, label: {type: string}}}}
+# @ag-order: 726
+    FarmerGrant:
+      type: object
+      description: Siêu dữ liệu lượt kích hoạt — không có token
+      required: [grant_id, status, channel, issued_by, issued_at, expires_at]
+      properties:
+        grant_id: {type: string, format: uuid}
+        status: {type: string, enum: [active, used, revoked, expired]}
+        channel: {type: string, enum: [link_qr]}
+        issued_by: {type: string, format: uuid}
+        issued_at: {type: string, format: date-time}
+        expires_at: {type: string, format: date-time}
+        used_at: {type: [string, "null"], format: date-time}
+        revoked_at: {type: [string, "null"], format: date-time}
+        revoke_reason: {type: [string, "null"], enum: [reissued, account_locked, null]}
+        replaced_by: {type: [string, "null"], format: uuid}
+# @ag-order: 727
+    FarmerActivation:
+      allOf:
+        - {$ref: "#/components/schemas/FarmerGrant"}
+        - type: object
+          properties:
+            link: {type: [string, "null"], description: "Liên kết action token một lần (Keycloak) — chỉ ở phản hồi đầu, không lưu"}
+            qr:
+              oneOf:
+                - type: object
+                  properties:
+                    format: {type: string, enum: [url]}
+                    data: {type: string}
+                    error_correction: {type: string}
+                    min_module_px: {type: integer}
+                - {type: "null"}
+            replayed: {type: boolean}
+# @ag-order: 728
+    FarmerAccount:
+      type: object
+      required: [user_ref, household_ref, cooperative_ref, commune_code, linked_at]
+      properties:
+        user_ref: {type: string, format: uuid}
+        household_ref: {type: string, format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        linked_at: {type: string, format: date-time}
+        enabled: {type: boolean}
+        latest_activation: {$ref: "#/components/schemas/FarmerGrant"}
+# @ag-order: 729
+    FarmerCreated:
+      type: object
+      properties:
+        farmer: {$ref: "#/components/schemas/FarmerAccount"}
+        replayed: {type: boolean}
+        activation: {oneOf: [{$ref: "#/components/schemas/FarmerActivation"}, {type: "null"}]}
+        activation_error: {type: [string, "null"], description: "Mã lỗi khi chưa phát được liên kết (vd accounts.activation_link_unavailable)"}

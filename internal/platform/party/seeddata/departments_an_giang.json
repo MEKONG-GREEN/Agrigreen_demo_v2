@@ -1,13 +1,12 @@
 {
  "format": "agrigreen.departments/v1",
- "status": "tạm, chờ khách (Q-02)",
- "source": "BRD KN Phòng Trồng trọt v7.7 FN-AD-04.03 và Hình 3c: TTKN An Giang khai báo 6 phòng ban, Phòng Trồng trọt Đang áp dụng. Tên, mã, thứ tự 2 phòng ban còn lại chưa có — TTKN An Giang xác nhận (Q-02).",
+ "status": "tạm, chờ khách (Q-051)",
+ "source": "W11.06: BRD KN Trồng trọt Final (FN-AD-04.03), Hành chính - Tổng hợp v3.0 (FN-03), Chăn nuôi - Thủy sản v3.7, Kế hoạch - Tài chính v2.2, Báo giá nông sản v1.3. Năm phòng ban được BRD nêu tên; mã tạm phong_ban_5 → hanh_chinh_tong_hop, phong_ban_6 bỏ (port.CanonicalDepartmentCode). Tên Phòng Thông tin theo BRD Báo giá/KHTC (\"Thông tin Tuyên truyền\"), mã thong_tin_truyen_thong giữ từ v7.7 — chờ khách xác nhận (Q-051). Mã ổn định: docs/kn/phong-ban-seed.md.",
  "departments": [
   {"code": "trong_trot", "name": "Phòng Trồng trọt", "description": "Báo cáo tuần/tháng/vụ cây trồng; thu thập HTX, máy móc, thửa ruộng, vật tư", "sort_order": 10, "status": "active", "menu_profile": "trong_trot"},
-  {"code": "chan_nuoi_thuy_san", "name": "Phòng Chăn nuôi - Thủy sản", "description": "Báo cáo Chăn nuôi, Nuôi trồng & Đánh bắt Thủy sản", "sort_order": 20, "status": "not_open", "menu_profile": "generic"},
-  {"code": "ke_hoach_tai_chinh", "name": "Phòng Kế hoạch - Tài chính", "description": "Tổng hợp báo cáo liên phòng; Dự án khuyến nông", "sort_order": 30, "status": "not_open", "menu_profile": "generic"},
-  {"code": "thong_tin_truyen_thong", "name": "Phòng Thông tin - Truyền thông", "description": "Thư viện kỹ thuật & tin tức; Quản trị đào tạo; Giá cả thị trường", "sort_order": 40, "status": "not_open", "menu_profile": "generic"},
-  {"code": "phong_ban_5", "name": "Phòng ban 5 (tạm, chờ khách Q-02)", "description": "Tên chưa có trong BRD v7.7", "sort_order": 50, "status": "not_open", "menu_profile": "generic"},
-  {"code": "phong_ban_6", "name": "Phòng ban 6 (tạm, chờ khách Q-02)", "description": "Tên chưa có trong BRD v7.7", "sort_order": 60, "status": "not_open", "menu_profile": "generic"}
+  {"code": "chan_nuoi_thuy_san", "name": "Phòng Chăn nuôi - Thủy sản", "description": "Báo cáo Chăn nuôi, Nuôi trồng & Đánh bắt Thủy sản; KSGM, dịch bệnh, dự án KNQG", "sort_order": 20, "status": "not_open", "menu_profile": "chan_nuoi_thuy_san"},
+  {"code": "ke_hoach_tai_chinh", "name": "Phòng Kế hoạch - Tài chính", "description": "Kế hoạch năm, tổng hợp báo cáo liên phòng; dự án khuyến nông", "sort_order": 30, "status": "not_open", "menu_profile": "ke_hoach_tai_chinh"},
+  {"code": "thong_tin_truyen_thong", "name": "Phòng Thông tin Tuyên truyền", "description": "Báo giá nông sản; thư viện kỹ thuật & tin tức; quản trị đào tạo", "sort_order": 40, "status": "not_open", "menu_profile": "thong_tin_truyen_thong"},
+  {"code": "hanh_chinh_tong_hop", "name": "Phòng Hành chính - Tổng hợp", "description": "Hồ sơ nhân sự, đánh giá xếp loại, kho tài liệu nhân sự; Contact dùng chung", "sort_order": 50, "status": "not_open", "menu_profile": "hanh_chinh_tong_hop"}
  ]
 }
