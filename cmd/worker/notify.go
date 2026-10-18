@@ -63,7 +63,8 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	}
 	clk := clock.System{}
 	md := masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
-	kn := extension.New(extPool, clk, extension.Deps{Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs()})
+	knUnits := extension.NewPublishedAdminUnits(extPool)
+	kn := extension.New(extPool, clk, extension.Deps{Units: knUnits, Params: md.Params(), Catalogs: md.Catalogs()})
 	log.Info("kênh thông báo", "event", "startup", "push", ch.Pusher.Name(), "email", ch.Mailer != nil, "outcome", "ok")
 	// pf/cooperative (W3.3): nông hộ có thửa theo xã (schema pf_coop, r_cooperative).
 	coop := cooperative.New(coopPool, clk, cooperative.Deps{})
@@ -76,7 +77,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	acc := accounts.New(accPool, clk, accounts.Deps{Directory: kc})
 	farmers := assembly.AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}
 	ownedDesk := knprice.NewNotificationDirectory(acc.RoleHolders(), assembly.PriceProfiles())
-	d := notify.Deps{Kinds: assembly.NotificationKinds(), Digests: assembly.NotificationDigests(), Builders: assembly.NotificationBuilders(ownedDesk, kn.Staff(), md.AdminUnits()), Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
+	d := notify.Deps{Kinds: assembly.NotificationKinds(), Digests: assembly.NotificationDigests(), Builders: assembly.NotificationBuilders(ownedDesk, kn.Staff(), knUnits), Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
 		EmailMailer: ch.EmailMailer, DigestTo: ch.DigestTo, Log: log, LinkBase: os.Getenv("AG_WEB_OPS_URL"),
 	}
 	if dir := acc.MailDirectory(); dir != nil {

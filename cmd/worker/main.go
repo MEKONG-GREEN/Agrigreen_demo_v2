@@ -473,7 +473,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		md := masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 		pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits()})
 		kn := extension.New(extPool, clk, extension.Deps{
-			Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
+			Scope: pty.ScopeResolver(), Orgs: extension.NewPublishedOrganizations(extPool), Units: extension.NewPublishedAdminUnits(extPool), Params: md.Params(), Catalogs: md.Catalogs(),
 		})
 		if selected(jobs, extension.JobEscalation) {
 			js = append(js, kn.Jobs(extension.OverdueTenants(out.pools[migrations.PF]), log)...)

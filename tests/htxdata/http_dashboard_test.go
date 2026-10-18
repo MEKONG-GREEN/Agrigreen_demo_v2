@@ -11,7 +11,6 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	kn "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -48,9 +47,8 @@ func TestKNHTTPDashboardPublishedHTXData(t *testing.T) {
 	}
 	pool := pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform)
 	clk := clock.NewFixed(time.Date(2026, 10, 15, 3, 0, 0, 0, time.UTC))
-	md := masterdata.New(pool, clk)
 	reader := extension.NewPublishedHTXData(pool)
-	mod := extension.New(pool, clk, extension.Deps{Scope: dashboardScope{}, Units: md.AdminUnits(), Plots: reader, Coops: reader})
+	mod := extension.New(pool, clk, extension.Deps{Scope: dashboardScope{}, Units: extension.NewPublishedAdminUnits(pool), Orgs: extension.NewPublishedOrganizations(pool), Plots: reader, Coops: reader})
 	mod.UseHTXConfirmations(reader)
 	issuer := authztest.New(t)
 	engine := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)

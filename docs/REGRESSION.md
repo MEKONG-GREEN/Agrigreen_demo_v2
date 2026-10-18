@@ -1052,3 +1052,12 @@ Nguồn11419 actualexit0: platformdata9PASS118.483s (330 địa bàn+294tổ ch�
 
 
 Bằng chứng trước tích hợp: Source11419 actual0/platform9-118.483s/HTX14-227.518s;624đối chiếu và native111/38 giữ, noSKIP/FAIL. Pure/static59214actual0/lint0/boundary314/fmt đúng2fixture cũ. Full5PG15863 actual0: {"internal/shared/dbadmin": 2.214, "internal/platform/metrics/handler": 123.336, "tests/kn77": 354.14, "cmd/api-platform/assembly": 124.944, "cmd/worker": 3.081}; noSKIP/FAIL. Private62505/4c8275c8c978 và63236/10a38f24261f đã dọn/Go0. Coreb159b0a2 không đổi;33golden nềncaa nguyên, chỉ thêm file ACL1/1 đã rà soát; không native Go/SQLDDL/RLS/private grant thay đổi. Fetchdev vẫncaa, main27 sạch. Chờ helper11 với hardACL59/24 trước khi claimdev; A chưa wiring.
+
+
+PLATFORM-READERS-A đã tích hợp deve6a54bcc8cd50b894b76d2c1cc9e1512e52674bb. Helper64116exit0/11migration535.139s/platform9-115.399s/HTX14-208.161s/noFAIL/SKIP; exactACL26flags59SELECT24membership; private49301/566fc3c3d827 removed/Go0; main27clean. Old33goldens giữ, chỉ thêm reviewedACL1/1; không lặp A.
+
+## KNSPLIT-2-PLATFORM-READERS-B
+Downstream consumers: extension handler/dashboard và report-cycle/KHTC; reports owned builder/session; notification captured directive builder; Contact labels; API assembly và worker; platform/HTX source conformance, dbadmin/pubreaders/migration11.
+Dependency evidence: rg -n 'extension\.(New|ReportBuilders|ReportSessionResolver)|NotificationBuilders|KNContactLabels|NewPublishedAdminUnits|NewPublishedOrganizations' cmd -g '*.go'. Chỉ thay deps/application callbacks KN, các cổng generic native HTX/MKG giữ.
+Regression acceptance command: privatePG go test -v -count=1 -p 1 -timeout 55m ./tests/platformdata ./tests/htxdata ./internal/kn/extension/handler ./tests/reports ./tests/notify; pure modreg/modgen/pubreaders/contracts/extension/closedfig/notifyconsumers và dbadminroles; staticfull; privatePG full5 ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker; helper11migration+source/consumerrealPG.
+Propagation rule: wiring đổi phải chạy các nguồn/caller và downstream thật. Native MD/party HTTP miễn vì source/private/publicQuery/roles không đổi; shared metadata native được giữ và reports/notify suites bao phủ phần còn dùng chung. No API/web/mobile đổi nên miễn web/mobile. Timeout55m/p1/fail-on-SKIP, fake SMTP/privatePG/no shared5432, GoALLfreeze; toàn bộ trong ủy quyền G1.34goldens/ACL59-24/boundary314 phải nguyên. Evidence chưa chạy.
