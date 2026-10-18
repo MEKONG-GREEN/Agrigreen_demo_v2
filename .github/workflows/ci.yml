@@ -298,7 +298,12 @@ jobs:
       - name: Giấy phép npm (RB-4)
         run: npx --yes license-checker-rseidelsohn --production --excludePrivatePackages --excludePackages "sharp;@img/sharp-libvips-linux-x64;@img/sharp-libvips-linuxmusl-x64" --onlyAllow "MIT;BSD-2-Clause;BSD-3-Clause;Apache-2.0;ISC;MPL-2.0;0BSD;BlueOak-1.0.0;CC0-1.0;Python-2.0;CC-BY-4.0"
       - name: Docker image (build thử)
-        run: docker build -t agrigreen/web-internal:ci .
+        run: >-
+          docker build -t agrigreen/web-internal:ci
+          --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.ci.invalid
+          --build-arg NEXT_PUBLIC_ADMIN_API_BASE=https://admin.ci.invalid
+          --build-arg NEXT_PUBLIC_OIDC_ISSUER=https://auth.ci.invalid/realms/agrigreen
+          .
 
   web-internal-e2e:
     name: Web nội bộ MKG — E2E (Playwright, dữ liệu giả lập)

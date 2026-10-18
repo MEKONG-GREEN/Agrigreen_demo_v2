@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"slices"
@@ -454,7 +455,7 @@ func MigrateV1(baseURL string, c migrations.Cluster, dbSuffix string) error {
 			return err
 		}
 		if repaired {
-			fmt.Printf("%s: schema_migrations_pf 151 (tệp của main) → 136 để áp pf 137–151 của dev\n", DatabaseName(c, dbSuffix))
+			slog.Info("schema_migrations_pf 151 (tệp của main) → 136 để áp pf 137–151 của dev", "database", DatabaseName(c, dbSuffix))
 		}
 	}
 	for _, step := range []struct{ dir, table string }{
