@@ -25,7 +25,7 @@ func pubRoles() []string {
 // vai phân tích; chỉ r_metrics (cap/analytics), r_agg và bên đọc đã rà soát (consumes.publications, ADR-0053) là thành viên;
 // không thuộc ag_shared_user, không vượt RLS. PFPUB: + r_forms_pub (pf_forms_pub, pf 20261013150108).
 func TestPubRoles_W63(t *testing.T) {
-	want := []string{"r_cooperative_pub", "r_cropcycle_pub", "r_extension_pub", "r_forms_pub", "r_geo_pub", "r_mechanization_pub", "r_price_pub"}
+	want := []string{"r_cooperative_pub", "r_cropcycle_pub", "r_extension_pub", "r_forms_pub", "r_geo_pub", "r_masterdata_pub", "r_mechanization_pub", "r_party_pub", "r_price_pub"}
 	if got := pubRoles(); !slices.Equal(got, want) {
 		t.Fatalf("vai _pub: %v, muốn %v", got, want)
 	}

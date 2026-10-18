@@ -1,0 +1,70 @@
+{
+  "view": "pf_masterdata_pub.v1_admin_units",
+  "directive": "pf_masterdata_pub.admin_units/v1",
+  "owner": "pf/masterdata",
+  "status": "published",
+  "package": "KNSPLIT-2-PLATFORM-DATA-A",
+  "migration": "pf 20261018041412",
+  "consumers": [
+    "r_metrics, r_agg under existing publication policy; KN not granted in A"
+  ],
+  "purpose": "admin_units_v1: all effective versions; valid_from inclusive/valid_to exclusive. Consumers resolve the query date in Vietnam timezone, preserve successor chains and empty arrays; no actor/source/free text.",
+  "grain": "tenant x code x valid_from",
+  "key": [
+    "tenant_id",
+    "code",
+    "valid_from"
+  ],
+  "closed_rule": "Source current projections and administrative effective history; no synthetic current-time substitution.",
+  "personal_data": false,
+  "columns": [
+    {
+      "name": "tenant_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "tenant id"
+    },
+    {
+      "name": "code",
+      "type": "text",
+      "nullable": false,
+      "description": "code"
+    },
+    {
+      "name": "valid_from",
+      "type": "date",
+      "nullable": false,
+      "description": "valid from"
+    },
+    {
+      "name": "valid_to",
+      "type": "date",
+      "nullable": true,
+      "description": "valid to"
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "nullable": false,
+      "description": "name"
+    },
+    {
+      "name": "level",
+      "type": "text",
+      "nullable": false,
+      "description": "level"
+    },
+    {
+      "name": "parent_code",
+      "type": "text",
+      "nullable": true,
+      "description": "parent code"
+    },
+    {
+      "name": "successor_codes",
+      "type": "text[]",
+      "nullable": false,
+      "description": "successor codes"
+    }
+  ]
+}

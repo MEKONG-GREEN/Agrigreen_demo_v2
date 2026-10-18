@@ -1,0 +1,39 @@
+{
+  "Roles": [],
+  "Access": [
+    {
+      "Reader": "r_agg",
+      "View": "pf_masterdata_pub.v1_admin_units"
+    },
+    {
+      "Reader": "r_agg",
+      "View": "pf_party_pub.v1_org_tree"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_masterdata_pub.v1_admin_units"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_party_pub.v1_org_tree"
+    }
+  ],
+  "Memberships": [
+    {
+      "Reader": "r_agg",
+      "Granted": "r_masterdata_pub"
+    },
+    {
+      "Reader": "r_agg",
+      "Granted": "r_party_pub"
+    },
+    {
+      "Reader": "r_metrics",
+      "Granted": "r_masterdata_pub"
+    },
+    {
+      "Reader": "r_metrics",
+      "Granted": "r_party_pub"
+    }
+  ]
+}

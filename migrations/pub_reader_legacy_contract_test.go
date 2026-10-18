@@ -133,6 +133,19 @@ func TestLegacyPublishedReaderAccessContract(t *testing.T) {
 	if len(additions.Roles) != 0 {
 		t.Fatal("role flag changes are not approved additions")
 	}
+	platformRaw, err := os.ReadFile("../tests/golden/platform-published-access-additions.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var platform snapshot
+	if err := json.Unmarshal(platformRaw, &platform); err != nil {
+		t.Fatal(err)
+	}
+	if len(platform.Roles) != 0 {
+		t.Fatal("platform role flag changes are not approved")
+	}
+	additions.Access = append(additions.Access, platform.Access...)
+	additions.Memberships = append(additions.Memberships, platform.Memberships...)
 	want.Access = append(want.Access, additions.Access...)
 	want.Memberships = append(want.Memberships, additions.Memberships...)
 	slices.SortFunc(want.Access, func(a, b access) int {

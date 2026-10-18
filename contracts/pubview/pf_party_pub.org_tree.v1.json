@@ -1,0 +1,69 @@
+{
+  "view": "pf_party_pub.v1_org_tree",
+  "directive": "pf_party_pub.org_tree/v1",
+  "owner": "pf/party",
+  "status": "published",
+  "package": "KNSPLIT-2-PLATFORM-DATA-A",
+  "migration": "pf 20261018041437",
+  "consumers": [
+    "r_metrics, r_agg under existing publication policy; KN not granted in A"
+  ],
+  "purpose": "org_tree_v1: current organization adjacency and activity, including inactive and unassigned orgs. Consumer applies kind/unit/activity filters and computes hierarchy from parent_ref. Names are organizational labels; no representative or actor references.",
+  "grain": "tenant x org",
+  "key": [
+    "tenant_id",
+    "org_ref"
+  ],
+  "closed_rule": "Source current projections and administrative effective history; no synthetic current-time substitution.",
+  "personal_data": false,
+  "columns": [
+    {
+      "name": "tenant_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "tenant id"
+    },
+    {
+      "name": "org_ref",
+      "type": "uuid",
+      "nullable": false,
+      "description": "org ref"
+    },
+    {
+      "name": "kind",
+      "type": "text",
+      "nullable": false,
+      "description": "kind"
+    },
+    {
+      "name": "code",
+      "type": "text",
+      "nullable": false,
+      "description": "code"
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "nullable": false,
+      "description": "name"
+    },
+    {
+      "name": "admin_unit_code",
+      "type": "text",
+      "nullable": true,
+      "description": "admin unit code"
+    },
+    {
+      "name": "parent_ref",
+      "type": "uuid",
+      "nullable": true,
+      "description": "parent ref"
+    },
+    {
+      "name": "active",
+      "type": "boolean",
+      "nullable": false,
+      "description": "active"
+    }
+  ]
+}

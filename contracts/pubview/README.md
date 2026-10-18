@@ -71,3 +71,7 @@ View công bố `pf_<module>_pub.v<N>_<tên>` (R-DB-10, W6.3 — [modules.md](..
 ## HTX data v1 (KNSPLIT-2-HTX-DATA-A)
 
 Bốn hợp đồng pf_cooperative_pub: cooperatives, plots, seasons, confirmations/v1 do pf/cooperative sở hữu. A chỉ công bố đọc cho analytics/agg hiện hành; KN chưa nhận quyền mới hay đổi đường đọc. Phân loại dữ liệu theo R-14/R-41: không tên người/actor/GPS thô; household_ref của seasons là mã tham chiếu vault cho count distinct. Seasons giữ riêng hai bảng chiếu bằng cờ present và production_*; confirmations chỉ đưa claim đã có + timestamp, không dùng thời gian hiện tại thay ngày chốt. Xem JSON từng view và docs/kn/gia-dinh/KNSPLIT-2-HTX-DATA-A.md.
+
+## Dữ liệu nền tảng v1
+
+pf_masterdata_pub.v1_admin_units giữ toàn bộ phiên bản hiệu lực và mã kế thừa; pf_party_pub.v1_org_tree giữ cạnh cha/trạng thái hiện hành. Hai view do module sở hữu nguồn công bố, không chứa actor/representative. Chưa cấp quyền mới cho KN trong PLATFORM-DATA-A; xem hai hợp đồng JSON tương ứng.

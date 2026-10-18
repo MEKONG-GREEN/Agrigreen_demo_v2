@@ -16,11 +16,11 @@ provides:
   ports: [AdminUnitHistory, Catalogs, EffectiveCatalogs, FormUsage, StaffNames]
   events: [pf.masterdata.admin_unit.changed/v1, pf.masterdata.param.approved/v1]
   internal_events: []
-  publications: []
+  publications: [pf_masterdata_pub.admin_units/v1]
   data_products: []
 consumes:
   events: []
 permissions: [masterdata_admin]
 shares: []
-owns_schema: [pf_masterdata]
+owns_schema: [pf_masterdata, pf_masterdata_pub]
 enable: per_tenant
