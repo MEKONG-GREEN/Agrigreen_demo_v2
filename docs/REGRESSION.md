@@ -925,12 +925,15 @@ Quyền OLD tests/golden/pub-reader-access.json bất biến26roles/41access/15m
 DDL thêm mới chỉschema pf_cooperative_pub, lock_timeout5s, khôngDML/đổisổ/cột/RLS/tableprivateACL. Bản lùi ứng dụng dùng đường cũ còn nguyên; nếu cần gỡ views dùng migration tiến mới sau gỡ reader, không chạy down production. G1tenant perCenter/MRVHTX-MKG/D2ownKNrecordsafterG1proposal/M1–M7 giữ. ChưaDDL/metadata/fulltest/helper/dev ở mốc capture.
 
 
-PublishedPG-verified30117actualexit0/5testsPASS/noFAIL-SKIP111.362s, private52534/93fd447d19eađãdọn/Go0. OLD38byte goldenPASS0.40s; source↔pub0.38s;missingSides0.07s;permission0.02s;1000oldrows/8count+checksums1.73s. Early80174exit1/loggiữ; test[]googleUUIDencoderOID0; sửa2testquery[]string/text[]uuid[]; DDL/production/assertion/goldengiữ。Sourceobjectsgiữ; metadatachỉcooperative.module.yaml+catalog_gen;CallDepends unchanged. Native7pubroles/20views/9contracts reviewed; giữassertioncũ。
+PostgreSQL xác minh 30117: exit 0, 5 ca PASS, không SKIP/FAIL, 111.362 giây. Nguồn native/frozen38, đối chiếu view, quyền và nâng cấp 1.000 dòng đều đạt; 8 bảng nguồn giữ số dòng/checksum. Log lỗi 80174 do tham số mảng trong test được giữ riêng. Không đổi DDL hay golden để sửa lỗi đó.
 
 
 ## KNSPLIT-2-HTX-DATA-A — pf/cooperative publications
 Downstream consumers: dbadmin/catalog bootstrap, contracts/pubview, metrics/handler (all _pub read roles and column contracts), KN77/KHTC current readers, API assembly and worker.
 Dependency evidence: pub declarations in internal/platform/cooperative/port/pub.go; reproducible scans: rg -n "pubReaderRoles|PubReadOwners|g.Pub|pubs" internal/shared/dbadmin internal/shared/modreg; rg -n "pubViews|countViews|PubViewsDeclared" internal/platform/metrics/handler. Existing native HTX ports/source Go and private RLS/ACL remain unchanged; tests/htxdata runs the frozen 38 native outputs plus independent published/native reconciliation.
-Regression acceptance command: go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./tests/htxdata ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker
+Regression acceptance commands:
+- Source/new views (already executed on the exact core source, verified 30117): go test -v -count=1 -p 1 -timeout 55m ./tests/htxdata
+- Required downstream run: go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker
+The source command need not repeat in the downstream batch while its Go/SQL/metadata/golden inputs remain unchanged; the required integration helper still runs it with real PG.
 Environment: scripts/pg-ephemeral.ps1 private PostgreSQL17/PostGIS; no shared5432 mutation or SMTP/network calls. Native HTX HTTP routes are exempt in this additive schema-only step: their Go/source/private grants are unchanged and no existing consumer reads the new views. This exemption ends when KN wiring/readers change.
 Propagation rule: any change to private data, RLS, existing native ports, event payloads or wiring requires that affected native module and its consumers; this package adds only versioned publications and explicit reviewed native analytics grants. Full static gates plus helper11 migrations and tests/htxdata actual PG remain required before dev.
