@@ -73,7 +73,9 @@ func TestTimestampMigrations_WHB(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	const c = migrations.Vault
-	const probe = "vault/20261013000000_vault_whb_ts_probe.up.sql"
+	// Mốc thăm dò phải sau MỌI tệp thật của cụm (vault có tệp mốc thật từ W11.23: 20261013165158) — dùng năm 2099.
+	const probeV = 20991231000000
+	const probe = "vault/20991231000000_vault_whb_ts_probe.up.sql"
 	const late = "vault/000005_vault_whb_late.up.sql"
 	withProbe := overlay(t, map[string]string{probe: "CREATE TABLE vault.whb_ts_probe (id int PRIMARY KEY);\n"})
 	withLate := overlay(t, map[string]string{
@@ -94,7 +96,7 @@ func TestTimestampMigrations_WHB(t *testing.T) {
 
 	t.Run("fresh_db", func(t *testing.T) {
 		upV1(t, withProbe, migratorDSN(t, admin, c, sfx["v1new"]), c)
-		if v := v1Version(t, admin, c, sfx["v1new"]); v != 20261013000000 || !tableExists(t, admin, c, sfx["v1new"], "vault.whb_ts_probe") {
+		if v := v1Version(t, admin, c, sfx["v1new"]); v != probeV || !tableExists(t, admin, c, sfx["v1new"], "vault.whb_ts_probe") {
 			t.Fatalf("v1: phiên bản %d", v)
 		}
 		res, err := migrator.Up(ctx, migratorDSN(t, admin, c, sfx["v2new"]), c, migrator.Options{FS: withProbe})
@@ -107,10 +109,10 @@ func TestTimestampMigrations_WHB(t *testing.T) {
 		var v int64
 		var mod string
 		if err := connDB(t, admin, dbadmin.DatabaseName(c, sfx["v2new"])).QueryRow(ctx,
-			"SELECT version, module FROM shared.schema_migrations WHERE dir = 'vault' AND file = $1", probe[6:]).Scan(&v, &mod); err != nil || v != 20261013000000 {
+			"SELECT version, module FROM shared.schema_migrations WHERE dir = 'vault' AND file = $1", probe[6:]).Scan(&v, &mod); err != nil || v != probeV {
 			t.Fatalf("sổ v2: %d %q %v", v, mod, err)
 		}
-		if v := v1Version(t, admin, c, sfx["v2new"]); v != 20261013000000 {
+		if v := v1Version(t, admin, c, sfx["v2new"]); v != probeV {
 			t.Errorf("v2 phải đồng bộ phiên bản golang-migrate: %d", v)
 		}
 	})
@@ -122,7 +124,7 @@ func TestTimestampMigrations_WHB(t *testing.T) {
 		}
 		before := v1Version(t, admin, c, sfx["v1old"])
 		upV1(t, withProbe, migratorDSN(t, admin, c, sfx["v1old"]), c)
-		if v := v1Version(t, admin, c, sfx["v1old"]); before >= 20261013000000 || v != 20261013000000 || !tableExists(t, admin, c, sfx["v1old"], "vault.whb_ts_probe") {
+		if v := v1Version(t, admin, c, sfx["v1old"]); before >= probeV || v != probeV || !tableExists(t, admin, c, sfx["v1old"], "vault.whb_ts_probe") {
 			t.Fatalf("v1: %d → %d", before, v)
 		}
 		// Chuyển DB đó sang v2: chỉ ghi sổ (import), không chạy lại gì — kể cả tệp mốc.

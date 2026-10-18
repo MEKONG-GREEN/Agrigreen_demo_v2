@@ -97,7 +97,9 @@ jobs:
       - name: PostgreSQL 17 + PostGIS + pgRouting
         run: |
           docker build -q -t agrigreen/postgres:ci deploy/compose/postgres
-          docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=ci-superuser agrigreen/postgres:ci -c max_locks_per_transaction=256
+          # max_connections: các gói kiểm thử chạy song song, mỗi gói DB riêng + pool theo vai qua PgBouncer (10 kết nối
+          # máy chủ mỗi cặp DB/vai) — mặc định 100 cạn ("remaining connection slots are reserved", SQLSTATE 53300).
+          docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=ci-superuser agrigreen/postgres:ci -c max_locks_per_transaction=256 -c max_connections=400
           for i in $(seq 1 60); do
             docker exec pg pg_isready -h 127.0.0.1 -U postgres > /dev/null 2>&1 && break
             sleep 2
