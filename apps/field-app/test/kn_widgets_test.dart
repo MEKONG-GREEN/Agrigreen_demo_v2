@@ -201,6 +201,9 @@ void main() {
       expect(find.text('Cấp Xã · Chăn nuôi'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('kn-choice-a-2|chan_nuoi')));
       await settle(tester, rounds: 20);
+      // Chọn ngữ cảnh + tải menu/việc cần làm là I/O thật: số vòng cố định không đủ trên máy CI chậm.
+      await waitForWidget(tester, find.byType(KnHomeScreen));
+      await waitForWidget(tester, find.text('Chưa có công việc'));
       expect(env.kn.selects.single, {
         'assignment_id': 'a-2',
         'department_code': 'chan_nuoi',
@@ -210,6 +213,11 @@ void main() {
       // Menu Cấp Xã từ GET /v1/menu: khóa lạ bị ẩn, badge việc cần làm.
       await tester.tap(find.byTooltip('Open navigation menu'));
       await settle(tester);
+      await waitForWidget(
+        tester,
+        find.byKey(const ValueKey('kn-menu-xa.thu_thap.htx')),
+      );
+      await waitForWidget(tester, find.text('3'));
       expect(
         find.byKey(const ValueKey('kn-menu-xa.thu_thap.htx')),
         findsOneWidget,
