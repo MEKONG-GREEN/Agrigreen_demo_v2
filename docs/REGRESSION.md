@@ -1109,3 +1109,16 @@ Source4 thực tế18788exit0/noFAILSKIP: authz1.392s/context8tests211.253s (nat
 
 
 Bằng chứng trước tích hợp: full5PG8100actualexit0/noFAILSKIP trên core62dfecfd: dbadmin4.325s, metrics128.793s, KN77/KHTC295.762s, APIassembly124.347s, worker2.311s. Private57405/689cdba8ad75 đã dọn/Go0; source4 actual0 giữ (authz1.392/context211.253/sharedDB121.537/HTX130.695s), pure-verified0/static12500exit0/lint0/boundary314/gofmt2old. Không đổi nguồn sau khi kiểm;35goldens nguyên nền d96. Chờ helper11migration+authz/context/HTX trước dev; B vẫn chưa wiring runtime và không coi G1 hoàn tất.
+
+
+## KNSPLIT-2-CONTEXT-C
+Downstream consumers: accounts HTTP context/MFA/support/idempotency; API assembly owner registration; ForModule projection; KN77/KHTC/metrics/worker default-context behavior; HTX published scopes.
+Dependency evidence: rg -n 'Sessions|ResolveSelected|SelectedSession|SessionProjection|WithAuthorizationScope' internal/platform/accounts cmd/api-platform/assembly -g '*.go'. TEST-CTX-007/008 in gia-dinh.
+Regression acceptance command: privatePG authz/accounts-handler-full/APIassembly-new-root-HTTP-target/contextdata-full/HTX14; staticfull; privatePG full5 dbadmin/metrics/KN77/APIassembly-full/worker; helper authz/accounts-handler/APIassembly/contextdata + default migration gates/LegacyPublishedReaderAccessContract.
+Propagation rule: runtime context binding changed, so must prove signed JWT->server resolve->owner->actualPG and full existing account lifecycle/support/MFA/idempotency. Compile-only is not behavioral evidence. No SQL/ACL/golden changes; catalog/notify upgrade gates already PASS on unchanged SQL inB and need not rerun inC.35goldens/boundary314 immutable, no web/mobile/API schema change. PrivatePG/Go1.26.9/noSMTP/GoALLfreeze/main and worktrees retained.
+
+
+Source5 thực tế92958actualexit0/noFAILSKIP: authz2.671s/accounts-handler-full176.649s/rootHTTP-target121.049s/contextdata8-121.368s/HTX14-134.251s. Account lifecycle/MFA/support/idempotency và5newfailed-provider HTTPcases đạt; root Build+JWT+actualPG profilekn/adminNoTokenOrgFallback/rawActorTenantHasMFA/foreignActorTenantMissingMFA đềuPASS. APIassembly trong source chỉ chạy test mới, không ghi thành proof fullsuite. Private50778/c9fbb3fa50d8 đã dọn. Static92402exit0/build-vet-modgen-migratecheck-archlint-contract-docs-MFA-boundary314/lint0/gofmt2old. Core6b63cd0d không đổi. Full5guard95230 đã được mở sau các điều kiện, private60070/0a42205ce8bd đang chạy, dbadmin4.858s đã PASS. Chưa kết luận full5/helper/dev; giữ GoALLfreeze.35goldens/SQL/ACL nguyên và không tạo Principal cho job.
+
+
+Bằng chứng trước tích hợp: full5PG95230 actualexit0/noFAILSKIP trên core6b63cd0d, dbadmin4.858s/metrics120.778s/KN77-KHTC295.380s/APIassembly-full123.544s/worker2.365s. RootHTTP mới cũng PASS trong assemblyfull, không chỉ targeted source. Private60070/0a42205ce8bd đã dọn/Go0; source5 và static0/lint0/boundary314/gofmt2old giữ. Nguồn không đổi sau core,35goldens không đổi, noDDL/ACL/API mới. Chờ helper9migration+authz/accounts-handler/APIassembly/contextdata trước khi claimdev. Owner projection đã nối request trong C nhưng các sharedKNtypes/legacy fallback/route ownership/ownrecords/productionbinding/tenant/client/reminders vẫn chưa hoàn tất; không coi G1 đạt.

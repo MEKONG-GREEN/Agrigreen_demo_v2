@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-CONTEXT-B: registry/KNprojection chưawire; native+owned268/source4/static/full5PG đã đạt, chờhelper11 trướcdev;35goldens/boundary314 nguyên.
+- [x] KNSPLIT-2-CONTEXT-B: tích hợp14a7a0a3; source4/full5/static/helper11migration442.431s/authz+context+HTX đạt;35goldens/boundary314 giữ, chưa wire ởB.
