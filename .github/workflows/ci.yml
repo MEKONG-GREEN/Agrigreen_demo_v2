@@ -38,8 +38,14 @@ jobs:
         run: go run ./tools/archlint ./...
       - name: migratecheck — R-23/R-25, tên tệp mốc UTC + không xếp trước nhánh đích (WH-B)
         run: |
+          # Quy tắc tên mốc UTC (WH-B) áp ở cửa vào dev. PR vào main đi qua dev nên so với origin/dev — số tuần tự
+          # đã được dev chấp nhận không bị coi là tệp mới.
           BASE=""
-          if [ "${{ github.event_name }}" = "pull_request" ]; then BASE="-base origin/${{ github.base_ref }}"; fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            REF="${{ github.base_ref }}"
+            if [ "$REF" = "main" ]; then REF=dev; fi
+            BASE="-base origin/$REF"
+          fi
           go run ./tools/migratecheck $BASE migrations
       - name: knboundary — ranh giới hệ thống Khuyến nông, baseline chỉ co lại (KNSPLIT-0, ADR-0055)
         run: |
