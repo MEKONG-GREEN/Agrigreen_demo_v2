@@ -603,6 +603,15 @@ jobs:
       COMPOSE_FILE: deploy/compose/docker-compose.yml
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Giải phóng dung lượng runner (build song song ~12 image Go + 2 web)
+        run: |
+          # Mỗi image Go dựng cả module trong stage riêng; runner chuẩn hết đĩa giữa chừng ("no space left on device").
+          # Job chỉ dùng docker/sh nên xoá được cả hostedtoolcache.
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache \
+            /usr/share/swift /usr/local/share/powershell /usr/local/share/chromium /usr/local/lib/node_modules \
+            /opt/microsoft /opt/google /opt/az
+          sudo docker image prune -af > /dev/null || true
+          df -h /
       - name: Sinh bí mật dev (deploy/compose/.env, không commit)
         run: sh scripts/gen-dev-secrets.sh --force
       - name: docker compose config (kiểm cú pháp và biến)
