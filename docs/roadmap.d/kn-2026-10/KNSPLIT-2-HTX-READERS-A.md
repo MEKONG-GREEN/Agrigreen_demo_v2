@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-HTX-READERS-A: bộ đọc HTX riêng qua view và quyền đọc tường minh; chờ PostgreSQL/static/hồi quy/helper trước tích hợp.

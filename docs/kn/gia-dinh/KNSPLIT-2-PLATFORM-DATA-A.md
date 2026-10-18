@@ -15,3 +15,6 @@ Lượt 84940 đỏ được giữ riêng: test converter cần chuẩn hóa UTC
 
 
 Xác minh trước tích hợp ngày 18/10/2026: pure và static phiên 66447 đều exit 0. Build/vet/modgen/migratecheck/archlint/contractcheck/docscheck/MFA/knboundary đạt; baseline 318, lint 0, định dạng chỉ còn đúng hai fixture archlint có sẵn. Hồi quy PostgreSQL phiên 35799 exit 0, không FAIL/SKIP: dbadmin 1.137s, metrics/handler 163.375s (22 view), KN77 456.533s, API assembly 113.334s, worker 2.100s. Lượt nguồn/view 73356 đã đạt 4 ca trên cùng Go/SQL/metadata; chỉ bổ sung bằng chứng tài liệu sau đó. Helper còn phải chạy hai bộ tests/platformdata và tests/htxdata trên PostgreSQL thật cùng 11 cổng migration, gồm so ACL chính xác 26 cờ vai, 53 SELECT và 21 membership. Chưa tích hợp tại mốc này.
+
+
+PLATFORM-DATA-A tích hợp dev b0eeae1180c0afc8c0a001ebdc41e03ae079064b: helper71135 exit0, 11migrationPASS586.768s, platformdata4PASS166.433s/111native, htxdata5PASS151.703s, khôngFAIL/SKIP. Private61075/929bb698f2da đã dọn/Go0. Main27afd593 sạch, worktrees giữ. Full5PG35799/static66447 đều0, 30oldgoldens giữ. Không lặp gói.
