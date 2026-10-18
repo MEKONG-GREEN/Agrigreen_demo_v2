@@ -75,3 +75,8 @@ Bốn hợp đồng pf_cooperative_pub: cooperatives, plots, seasons, confirmati
 ## Dữ liệu nền tảng v1
 
 pf_masterdata_pub.v1_admin_units giữ toàn bộ phiên bản hiệu lực và mã kế thừa; pf_party_pub.v1_org_tree giữ cạnh cha/trạng thái hiện hành. Hai view do module sở hữu nguồn công bố, không chứa actor/representative. Chưa cấp quyền mới cho KN trong PLATFORM-DATA-A; xem hai hợp đồng JSON tương ứng.
+
+
+## KN HTX readers v1 (KNSPLIT-2-HTX-READERS-A)
+
+Bộ đọc riêng của KN dùng cooperatives/plots/confirmations và org_tree. R_extension nhận hai chủ công bố cooperative/party qua readpubview; quyền theo chủ nên đọc được cả seasons, tổng5SELECT/2membership thêm mới. Phần quyền này được khóa riêng trong tests/golden/kn-htx-reader-access-additions.json, không sửa các tập OLD/HTX/platform. RLS và quyền bảng nguồn/ghi giữ nguyên, masterdata publication vẫn chưa cấp cho extension. NewPublishedHTXData trả DTO/cổng KN, giao dịch chỉ đọc theo tenant; không gọi HTX in-process. A chưa chuyển wiring đang dùng, bước B phải đối chiếu tiếp trước khi xóa đường cũ.
