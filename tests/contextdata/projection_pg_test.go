@@ -50,7 +50,7 @@ const rowSQL = `SELECT current_user,
 type savepointBeginner struct{ pgx.Tx }
 
 func (s savepointBeginner) BeginTx(ctx context.Context, _ pgx.TxOptions) (pgx.Tx, error) {
-	return s.Tx.Begin(ctx)
+	return s.Begin(ctx)
 }
 
 type rowQuerier interface {
@@ -176,7 +176,7 @@ func TestNestedProjectionResetsEverySetting(t *testing.T) {
 					})
 					if abort {
 						if !errors.Is(err, rollback) {
-							return fmt.Errorf("savepoint rollback: %v", err)
+							return fmt.Errorf("savepoint rollback: %w", err)
 						}
 						if err := checkRow(outer, tx, "r_content", tid.String(), want.Settings); err != nil {
 							return err
