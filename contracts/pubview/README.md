@@ -14,7 +14,7 @@ View công bố `pf_<module>_pub.v<N>_<tên>` (R-DB-10, W6.3 — [modules.md](..
 
 ## Họ hợp đồng `closed_figures/v1` (ADR-0053)
 
-- Hai view, hai module chủ, **cột và thứ tự giống hệt** (`family` trong tệp JSON; `pubview.FamilyProblems` kiểm). KHTC đọc qua MỘT port `extension/port.KHTCSources` (vai `r_extension`, thành viên `r_extension_pub`, `r_forms_pub`, `r_price_pub` — `dbadmin.PubReaders`), không rẽ nhánh theo cột `source`.
+- Hai view, hai module chủ, **cột và thứ tự giống hệt** (`family` trong tệp JSON; `pubview.FamilyProblems` kiểm). KHTC đọc qua MỘT port `extension/port.KHTCSources` (vai `r_extension`, thành viên `r_extension_pub`, `r_forms_pub`, `r_price_pub` — khai báo consumes.publications của module), không rẽ nhánh theo cột `source`.
 - `rows`: `[{key, unit, unit_kind, parent, region, indicator, nil_report, cells, confirmation}]`, chỉ ô số; `totals`: dòng tổng của nguồn hoặc `[]` (kỳ native — bên đọc cộng `rows`).
 - Danh tính kỳ nguồn (D8 — mỗi phòng một lịch tuần): `(calendar_id, calendar_version, period_key)` — khóa GỐC, chưa quy đổi. Quy đổi sang tuần KHTC: bảng chuyển đổi có phiên bản sau port (`ClosedFigures.Converted`, `kn.crosswalk/v1;attribution=source_end` — ADR-0053 §6).
 - `key_closed` của từng view chỉ tính trong nguồn đó; port tính `KeyClosedAll` trên cả họ.
@@ -66,3 +66,8 @@ View công bố `pf_<module>_pub.v<N>_<tên>` (R-DB-10, W6.3 — [modules.md](..
 3. `//ag:pubview pf_price_pub.board_daily v1` và `//ag:pubview pf_price_pub.ticket_week v1` trong `internal/kn/price/port/port.go`, chạy `go run ./tools/modgen`.
 4. Đổi `status` hai tệp thành `published`, sửa `migration`; số view trong `TestPubViewsDeclaredAndPrivileges_W63` +2 và số module công bố 4 → 5; `TestContracts_W1110` không đổi số hợp đồng.
 5. `days_scheduled` tính theo lịch báo giá có phiên bản (pf 000139: ngày trong tuần + ngoại lệ) tại ngày đó; `week_closed` = `days_approved = days_scheduled` và không ngày nào đang mở duyệt.
+
+
+## HTX data v1 (KNSPLIT-2-HTX-DATA-A)
+
+Bốn hợp đồng pf_cooperative_pub: cooperatives, plots, seasons, confirmations/v1 do pf/cooperative sở hữu. A chỉ công bố đọc cho analytics/agg hiện hành; KN chưa nhận quyền mới hay đổi đường đọc. Phân loại dữ liệu theo R-14/R-41: không tên người/actor/GPS thô; household_ref của seasons là mã tham chiếu vault cho count distinct. Seasons giữ riêng hai bảng chiếu bằng cờ present và production_*; confirmations chỉ đưa claim đã có + timestamp, không dùng thời gian hiện tại thay ngày chốt. Xem JSON từng view và docs/kn/gia-dinh/KNSPLIT-2-HTX-DATA-A.md.

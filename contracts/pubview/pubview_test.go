@@ -13,7 +13,7 @@ func TestContracts_W1110(t *testing.T) {
 		t.Fatal(err)
 	}
 	// W11.10: 3 hợp đồng; PFPUB: + họ closed_figures/v1 (pf_extension_pub, pf_forms_pub).
-	if len(cs) != 5 {
+	if len(cs) != 9 { // HTX-DATA-A: +4 owned HTX contracts
 		t.Fatalf("số hợp đồng view _pub: %d", len(cs))
 	}
 	reg, err := modreg.Load("../..")

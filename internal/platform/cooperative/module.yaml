@@ -46,11 +46,15 @@ provides:
     - pf.party.household.membership_changed/v1
     - pf.party.household.registered/v1
   internal_events: []
-  publications: []
-  data_products: []
+  publications:
+    - pf_cooperative_pub.confirmations/v1
+    - pf_cooperative_pub.cooperatives/v1
+    - pf_cooperative_pub.plots/v1
+    - pf_cooperative_pub.seasons/v1
+  data_products: [confirmations_v1, cooperatives_v1, plots_v1, seasons_v1]
 consumes:
   events: []
 permissions: [coop_manager, farmer, plot_editor, plot_viewer, sop_admin]
 shares: [diary_entry, household, plot, season]
-owns_schema: [pf_coop]
+owns_schema: [pf_coop, pf_cooperative_pub]
 enable: per_tenant

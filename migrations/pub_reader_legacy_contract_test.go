@@ -109,27 +109,47 @@ func TestLegacyPublishedReaderAccessContract(t *testing.T) {
 	if len(flags) != len(readers) || len(allowed) == 0 || len(members) == 0 {
 		t.Fatal("missing actual ACL snapshot")
 	}
-	raw, err := json.Marshal(struct {
+	type snapshot struct {
 		Roles       []roleFlags
 		Access      []access
 		Memberships []membership
-	}{flags, allowed, members})
-	if err != nil {
-		t.Fatal(err)
 	}
 	wantRaw, err := os.ReadFile("../tests/golden/pub-reader-access.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var want, got any
+	var want, additions snapshot
 	if err := json.Unmarshal(wantRaw, &want); err != nil {
 		t.Fatal(err)
 	}
-	if err := json.Unmarshal(raw, &got); err != nil {
+	// Keep all frozen OLD flags/access/memberships and permit only separately reviewed additions.
+	addRaw, err := os.ReadFile("../tests/golden/htx-published-access-additions.json")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(want, got) {
-		t.Fatalf("publication access changed from frozen old contract: %s", raw)
+	if err := json.Unmarshal(addRaw, &additions); err != nil {
+		t.Fatal(err)
 	}
-
+	if len(additions.Roles) != 0 {
+		t.Fatal("role flag changes are not approved additions")
+	}
+	want.Access = append(want.Access, additions.Access...)
+	want.Memberships = append(want.Memberships, additions.Memberships...)
+	slices.SortFunc(want.Access, func(a, b access) int {
+		if d := strings.Compare(a.Reader, b.Reader); d != 0 {
+			return d
+		}
+		return strings.Compare(a.View, b.View)
+	})
+	slices.SortFunc(want.Memberships, func(a, b membership) int {
+		if d := strings.Compare(a.Reader, b.Reader); d != 0 {
+			return d
+		}
+		return strings.Compare(a.Granted, b.Granted)
+	})
+	got := snapshot{flags, allowed, members}
+	if !reflect.DeepEqual(want, got) {
+		raw, _ := json.Marshal(got)
+		t.Fatalf("publication access differs from frozen OLD plus reviewed additions: %s", raw)
+	}
 }

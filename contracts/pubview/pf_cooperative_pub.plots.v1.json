@@ -1,0 +1,57 @@
+{
+  "view": "pf_cooperative_pub.v1_plots",
+  "directive": "pf_cooperative_pub.plots/v1",
+  "owner": "pf/cooperative",
+  "status": "published",
+  "package": "KNSPLIT-2-HTX-DATA-A",
+  "migration": "pf 20261018030844",
+  "consumers": [
+    "r_metrics, r_agg through existing published-schema policy; no KN reader grant yet"
+  ],
+  "purpose": "Plot statistics source. Keep draft/active/retired rows; consumer applies native status <> retired and numeric(14,4) sum. No geometry, name, household or actor.",
+  "grain": "tenant x plot",
+  "key": [
+    "tenant_id",
+    "plot_ref"
+  ],
+  "closed_rule": "Current native projections. Reporting cutoffs and frozen KN snapshots belong to the consumer; confirmations use immutable claimed_at.",
+  "personal_data": false,
+  "columns": [
+    {
+      "name": "tenant_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "tenant id"
+    },
+    {
+      "name": "plot_ref",
+      "type": "uuid",
+      "nullable": false,
+      "description": "plot ref"
+    },
+    {
+      "name": "cooperative_ref",
+      "type": "uuid",
+      "nullable": true,
+      "description": "cooperative ref"
+    },
+    {
+      "name": "commune_code",
+      "type": "text",
+      "nullable": false,
+      "description": "commune code"
+    },
+    {
+      "name": "status",
+      "type": "text",
+      "nullable": false,
+      "description": "status"
+    },
+    {
+      "name": "area_ha",
+      "type": "numeric(14,4)",
+      "nullable": false,
+      "description": "area ha"
+    }
+  ]
+}

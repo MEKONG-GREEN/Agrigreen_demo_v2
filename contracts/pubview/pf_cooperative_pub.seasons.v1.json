@@ -1,0 +1,219 @@
+{
+  "view": "pf_cooperative_pub.v1_seasons",
+  "directive": "pf_cooperative_pub.seasons/v1",
+  "owner": "pf/cooperative",
+  "status": "published",
+  "package": "KNSPLIT-2-HTX-DATA-A",
+  "migration": "pf 20261018030844",
+  "consumers": [
+    "r_metrics, r_agg through existing published-schema policy; no KN reader grant yet"
+  ],
+  "purpose": "Independent season_current and yield_summary facts by season_ref. FULL JOIN retains missing sides; season_present/production_present choose the native source. Production dimensions/status remain separate, including cancelled and null actual_kg vs zero; consumer keeps native distinct household, mass and ratio rules.",
+  "grain": "tenant x season",
+  "key": [
+    "tenant_id",
+    "season_ref"
+  ],
+  "closed_rule": "Current native projections. Reporting cutoffs and frozen KN snapshots belong to the consumer; confirmations use immutable claimed_at.",
+  "personal_data": false,
+  "columns": [
+    {
+      "name": "tenant_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "tenant id"
+    },
+    {
+      "name": "season_ref",
+      "type": "uuid",
+      "nullable": false,
+      "description": "season ref"
+    },
+    {
+      "name": "season_present",
+      "type": "boolean",
+      "nullable": false,
+      "description": "season present"
+    },
+    {
+      "name": "production_present",
+      "type": "boolean",
+      "nullable": false,
+      "description": "production present"
+    },
+    {
+      "name": "plot_ref",
+      "type": "uuid",
+      "nullable": true,
+      "description": "plot ref"
+    },
+    {
+      "name": "cooperative_ref",
+      "type": "uuid",
+      "nullable": true,
+      "description": "cooperative ref"
+    },
+    {
+      "name": "commune_code",
+      "type": "text",
+      "nullable": true,
+      "description": "commune code"
+    },
+    {
+      "name": "season_code",
+      "type": "text",
+      "nullable": true,
+      "description": "season code"
+    },
+    {
+      "name": "season_year",
+      "type": "integer",
+      "nullable": true,
+      "description": "season year"
+    },
+    {
+      "name": "variety_code",
+      "type": "text",
+      "nullable": true,
+      "description": "variety code"
+    },
+    {
+      "name": "household_ref",
+      "type": "uuid",
+      "nullable": true,
+      "description": "household ref"
+    },
+    {
+      "name": "status",
+      "type": "text",
+      "nullable": true,
+      "description": "status"
+    },
+    {
+      "name": "area_ha",
+      "type": "numeric(14,4)",
+      "nullable": true,
+      "description": "area ha"
+    },
+    {
+      "name": "opened_at",
+      "type": "timestamp with time zone",
+      "nullable": true,
+      "description": "opened at"
+    },
+    {
+      "name": "sowing_date",
+      "type": "date",
+      "nullable": true,
+      "description": "sowing date"
+    },
+    {
+      "name": "expected_harvest_date",
+      "type": "date",
+      "nullable": true,
+      "description": "expected harvest date"
+    },
+    {
+      "name": "harvest_open_date",
+      "type": "date",
+      "nullable": true,
+      "description": "harvest open date"
+    },
+    {
+      "name": "completed_at",
+      "type": "timestamp with time zone",
+      "nullable": true,
+      "description": "completed at"
+    },
+    {
+      "name": "production_plot_ref",
+      "type": "uuid",
+      "nullable": true,
+      "description": "production plot ref"
+    },
+    {
+      "name": "production_cooperative_ref",
+      "type": "uuid",
+      "nullable": true,
+      "description": "production cooperative ref"
+    },
+    {
+      "name": "production_commune_code",
+      "type": "text",
+      "nullable": true,
+      "description": "production commune code"
+    },
+    {
+      "name": "production_season_code",
+      "type": "text",
+      "nullable": true,
+      "description": "production season code"
+    },
+    {
+      "name": "production_season_year",
+      "type": "integer",
+      "nullable": true,
+      "description": "production season year"
+    },
+    {
+      "name": "production_variety_code",
+      "type": "text",
+      "nullable": true,
+      "description": "production variety code"
+    },
+    {
+      "name": "production_household_ref",
+      "type": "uuid",
+      "nullable": true,
+      "description": "production household ref"
+    },
+    {
+      "name": "production_status",
+      "type": "text",
+      "nullable": true,
+      "description": "production status"
+    },
+    {
+      "name": "production_area_ha",
+      "type": "numeric(14,4)",
+      "nullable": true,
+      "description": "production area ha"
+    },
+    {
+      "name": "expected_kg",
+      "type": "numeric(14,3)",
+      "nullable": true,
+      "description": "expected kg"
+    },
+    {
+      "name": "actual_kg",
+      "type": "numeric(14,3)",
+      "nullable": true,
+      "description": "actual kg"
+    },
+    {
+      "name": "sop_steps",
+      "type": "integer",
+      "nullable": true,
+      "description": "sop steps"
+    },
+    {
+      "name": "sop_steps_done",
+      "type": "integer",
+      "nullable": true,
+      "description": "sop steps done"
+    },
+    {
+      "name": "approved_logs",
+      "type": "integer",
+      "nullable": true,
+      "description": "approved logs"
+    },
+    {
+      "name": "pending_logs",
+      "type": "integer",
+      "nullable": true,
+      "description": "pending logs"
+    }
+  ]
+}

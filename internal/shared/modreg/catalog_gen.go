@@ -15,7 +15,7 @@ var catalog = []CatalogEntry{
 	{Name: "pf/apiclient", Kind: "kernel", Enable: "always", Permissions: []string{"api_client_admin", "api_client_approver"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_apiclient"}, Shares: []string{}},
 	{Name: "pf/contact", Kind: "capability", Enable: "always", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_contact"}, Shares: []string{}},
 	{Name: "pf/content", Kind: "capability", Enable: "per_tenant", Permissions: []string{"content_editor_national", "content_editor_province", "content_reviewer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_content"}, Shares: []string{}},
-	{Name: "pf/cooperative", Kind: "domain", Enable: "per_tenant", Permissions: []string{"coop_manager", "farmer", "plot_editor", "plot_viewer", "sop_admin"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_coop"}, Shares: []string{"diary_entry", "household", "plot", "season"}},
+	{Name: "pf/cooperative", Kind: "domain", Enable: "per_tenant", Permissions: []string{"coop_manager", "farmer", "plot_editor", "plot_viewer", "sop_admin"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_coop", "pf_cooperative_pub"}, Shares: []string{"diary_entry", "household", "plot", "season"}},
 	{Name: "pf/cropcycle", Kind: "domain", Enable: "per_tenant", Permissions: []string{"coop_manager", "mkg_sync"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_cropcycle", "pf_cropcycle_pub"}, Shares: []string{}},
 	{Name: "pf/evidence", Kind: "capability", Enable: "always", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_files"}, Shares: []string{}},
 	{Name: "pf/extdata", Kind: "capability", Enable: "always", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{}, Shares: []string{}},
