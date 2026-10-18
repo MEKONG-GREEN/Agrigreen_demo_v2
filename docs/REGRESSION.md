@@ -1096,3 +1096,16 @@ Lượt PG kiểm lại đầu dừng trước Go test vì PowerShell flatten ar
 
 
 Context PG final24018 actualexit0/noFAIL-SKIP trên d842f3f5: cả4testPASS124.309s, 268vectors/1072transactions và savepoint/identity đều đạt, private64436/49817b171d5e đã dọn/Go0. Static-verified0; sharedDB/HTX source3 đã0 trên production nguyên. Source/golden bắt đầu7f624 giữ; chỉ teststyle hai dòng đã kiểm lại. Chờ helper11migration+contextdata trước khi claimdev; main/worktrees/lịch giữ. Genericprojection/registry và chuyển owner KN chưa thực hiện ở gói capture này.
+
+
+## KNSPLIT-2-CONTEXT-B
+Downstream consumers: authz Principal/session port; shared/db ForModule; context native+owner conformance; HTX published RLS; APIassembly/worker/metrics/KN77 due shared context infrastructure.
+Dependency evidence: rg -n 'SelectedSession|ContextVarsFrom|RequiresNode|ForModule' internal/shared internal/kn/extension/module_session_projection.go cmd -g '*.go'. Runtime owner registration chưa nối middleware; native fallback giữ.
+Regression acceptance command: authz unit và exact context pure allowlist; privatePG full tests/contextdata + shared/db W24/FD/T4 + tests/htxdata; staticfull; privatePG full5 ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker; helper11migration+authz/contextdata. TEST-CTX-004/005/006 trong gia-dinh.
+Propagation rule: production shared authz/db đổi nên full5 thật trước dev, không suy pure xanh thành PG xanh.35goldens/ACL26-59-24/boundary314 nguyên; noHTTP/web/mobile/DDL nên miễn các client suites. Lượt pure-first regex rộng có SKIP phải giữ và không tính đạt; các ca đó phải PASS trong PGfull. PrivatePG/Go1.26.9/fail-on-SKIP/GoALLfreeze.
+
+
+Source4 thực tế18788exit0/noFAILSKIP: authz1.392s/context8tests211.253s (native268 và owner238selected+30job/unselected giữ fallback, tổng2144giao dịch ma trận; invalidzero session/owner errors PASS), sharedDB W24/FD/T4 121.537s, HTX14-130.695s. Private65368/609f209ccbd6 đã dọn. Pure-verified0/authz0.922s/contextpure1.929s; static12500exit0/lint0/boundary314/gofmt đúng2fixture cũ. Core62dfecfd chưa thay đổi nguồn. Full5guard8100 đã được mở sau đủ các cổng thật, private57405/689cdba8ad75 đang chạy: dbadmin4.325s đã PASS, chưa kết luận các phần còn lại/helper/dev. Không thêm Principal giả cho job, không thay các35goldens/ACL/DDL/API. GoALLfreeze đến full5end+Go0, rồi chốt docs/fetchremote/helper11.
+
+
+Bằng chứng trước tích hợp: full5PG8100actualexit0/noFAILSKIP trên core62dfecfd: dbadmin4.325s, metrics128.793s, KN77/KHTC295.762s, APIassembly124.347s, worker2.311s. Private57405/689cdba8ad75 đã dọn/Go0; source4 actual0 giữ (authz1.392/context211.253/sharedDB121.537/HTX130.695s), pure-verified0/static12500exit0/lint0/boundary314/gofmt2old. Không đổi nguồn sau khi kiểm;35goldens nguyên nền d96. Chờ helper11migration+authz/context/HTX trước dev; B vẫn chưa wiring runtime và không coi G1 hoàn tất.
