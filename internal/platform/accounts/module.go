@@ -25,6 +25,7 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -38,6 +39,8 @@ const DBRole = "accounts_app"
 
 // Deps là phụ thuộc của module.
 type Deps struct {
+	// Sessions contains trusted application-owned projections for selected requests.
+	Sessions *authz.SessionRegistry
 	// Directory: Keycloak Admin REST. Nil → mọi route trả 503 accounts.dependency_unavailable.
 	Directory port.Directory
 	// Scope, Orgs: pf/party — phạm vi theo cây phân cấp và tra tổ chức (ADR-0009).
@@ -59,14 +62,17 @@ type Deps struct {
 }
 
 // Module là pf/accounts đã nối.
-type Module struct{ svc *app.Service }
+type Module struct {
+	svc      *app.Service
+	sessions *authz.SessionRegistry
+}
 
 // New tạo module với pool của vai accounts_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs,
 		Households: d.Households, Vault: d.Vault, Params: d.Params, Departments: d.Departments, Units: d.Units, Names: d.Names,
-		Modules: d.Modules, DormantDryRun: d.DormantDryRun}}
+		Modules: d.Modules, DormantDryRun: d.DormantDryRun}, sessions: d.Sessions}
 }
 
 // RegisterApp gắn route Application API của App HTX: tài khoản nông dân (quản lý
@@ -93,7 +99,9 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {
 
 // Middleware thực hiện httpx.RequestMiddleware: ngữ cảnh phiên KN v7.7 (header X-AG-Context) cho MỌI
 // route của hai bề mặt — vai, phòng ban, phạm vi giải ở server (gap §4.5).
-func (m *Module) Middleware() gin.HandlerFunc { return handler.Handler{Svc: m.svc}.Middleware() }
+func (m *Module) Middleware() gin.HandlerFunc {
+	return handler.Handler{Svc: m.svc, Sessions: m.sessions}.Middleware()
+}
 
 // UseDepartments nối phòng ban của pf/party sau khi dựng (gốc lắp ráp).
 func (m *Module) UseDepartments(d partyport.Departments) { m.svc.Departments = d }

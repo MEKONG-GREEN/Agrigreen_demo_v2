@@ -28,7 +28,10 @@ import (
 const MaxImportBytes = app.MaxImportBytes
 
 // Handler gói app.Service cho HTTP.
-type Handler struct{ Svc *app.Service }
+type Handler struct {
+	Svc      *app.Service
+	Sessions *authz.SessionRegistry
+}
 
 // RegisterAdmin gắn route Admin API.
 func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {

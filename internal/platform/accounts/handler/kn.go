@@ -120,6 +120,12 @@ func (h Handler) Middleware() gin.HandlerFunc {
 			kc.Support.Reason = strings.TrimSpace(reason)
 		}
 		p.KN = kc
+		binding, err := h.Sessions.ResolveSelected(ctx, p)
+		if err != nil {
+			httpx.Fail(c, app.ErrContextInvalid.WithCause(err))
+			return
+		}
+		p.SelectedSession = &binding
 		// Dấu quyền lấy từ ngữ cảnh vừa giải ở server, gồm cả thuộc tính/ủy quyền/phạm vi mới nhất.
 		scope, err := json.Marshal(kc)
 		if err != nil {
