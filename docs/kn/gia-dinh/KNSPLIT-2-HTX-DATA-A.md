@@ -20,3 +20,6 @@ Mốc đối chiếu: xã 89001 có 2 HTX/3 hộ và 3 thửa/6.5679 ha; xã 920
 Lượt PostgreSQL xác minh 30117 đạt cả 5 ca, exit 0, không SKIP/FAIL (111.362 giây): 38 kết quả cũ giữ nguyên; view khớp nguồn native; hai bảng chiếu thiếu nhau hoặc khác dữ kiện vẫn độc lập; quyền không được cấp bị từ chối; áp DDL trên 1.000 dòng thửa cũ giữ nguyên số dòng/checksum của 8 bảng nguồn. Cụm tạm 52534/93fd447d19ea đã dọn. Lượt đầu 80174 đỏ do tham số mảng UUID trong test; đã sửa riêng test sang []string và text[]::uuid[], giữ log lỗi và giữ nguyên DDL/assertion/golden.
 
 Kiểm tra thuần 78301 đã đạt: 7 gói thuần cùng các unit DBadmin được chọn, không SKIP. Chưa hoàn tất static, hồi quy các bên tiêu thụ, helper và tích hợp dev ở mốc ghi này. M1–M7, tenant theo Trung tâm tỉnh, MRV HTX/MKG và phạm vi D2 đã chốt giữ nguyên.
+
+
+Cổng static 67089 dừng với exit 1 tại migratecheck: ADR-0028 cấm SET/RESET mức phiên. Migration mới chưa tích hợp được sửa riêng sang SET LOCAL lock_timeout='5s' và bỏ RESET, đúng mẫu đang dùng của repo. Giữ nguyên view, dữ liệu, assertion và golden; không sửa cổng. Log static cũ được giữ. Phải xác minh PostgreSQL lại trên DDL mới rồi chạy static-verified trước hồi quy bên tiêu thụ và helper.

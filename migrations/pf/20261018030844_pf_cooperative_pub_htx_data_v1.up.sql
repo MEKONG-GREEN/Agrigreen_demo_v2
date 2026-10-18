@@ -1,7 +1,7 @@
 -- KNSPLIT-2-HTX-DATA-A: add only the pf/cooperative published schema; forward-only.
 -- No data writes, private grants, RLS changes or ledger changes. Owner is the migration role,
 -- NOBYPASSRLS; every private source is FORCE RLS. Readers must still have tenant/share context.
-SET lock_timeout = '5s';
+SET LOCAL lock_timeout = '5s';
 
 DO $$
 BEGIN
@@ -68,4 +68,3 @@ GRANT SELECT ON pf_cooperative_pub.v1_cooperatives,pf_cooperative_pub.v1_plots,
   pf_cooperative_pub.v1_seasons,pf_cooperative_pub.v1_confirmations TO r_cooperative_pub;
 COMMENT ON SCHEMA pf_cooperative_pub IS
   'Versioned read contracts of pf/cooperative; private schema pf_coop unchanged. KNSPLIT-2-HTX-DATA-A.';
-RESET lock_timeout;

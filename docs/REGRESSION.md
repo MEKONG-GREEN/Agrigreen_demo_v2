@@ -937,3 +937,6 @@ Regression acceptance commands:
 The source command need not repeat in the downstream batch while its Go/SQL/metadata/golden inputs remain unchanged; the required integration helper still runs it with real PG.
 Environment: scripts/pg-ephemeral.ps1 private PostgreSQL17/PostGIS; no shared5432 mutation or SMTP/network calls. Native HTX HTTP routes are exempt in this additive schema-only step: their Go/source/private grants are unchanged and no existing consumer reads the new views. This exemption ends when KN wiring/readers change.
 Propagation rule: any change to private data, RLS, existing native ports, event payloads or wiring requires that affected native module and its consumers; this package adds only versioned publications and explicit reviewed native analytics grants. Full static gates plus helper11 migrations and tests/htxdata actual PG remain required before dev.
+
+
+Cổng static 67089 dừng với exit 1 tại migratecheck: ADR-0028 cấm SET/RESET mức phiên. Migration mới chưa tích hợp được sửa riêng sang SET LOCAL lock_timeout='5s' và bỏ RESET, đúng mẫu đang dùng của repo. Giữ nguyên view, dữ liệu, assertion và golden; không sửa cổng. Log static cũ được giữ. Phải xác minh PostgreSQL lại trên DDL mới rồi chạy static-verified trước hồi quy bên tiêu thụ và helper.
