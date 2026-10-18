@@ -13,7 +13,7 @@ import (
 // ClosedFigures là bộ đọc "số liệu đã chốt" thống nhất cho KHTC (ADR-0053, gói PFPUB): đọc họ hợp đồng
 // closed_figures/v1 — pf_extension_pub.v1_closed_figures (vòng đời báo cáo cũ, Trồng trọt) và
 // pf_forms_pub.v1_closed_figures (kỳ native cap/forms, CNTS) — trong MỘT giao dịch chỉ đọc của tenant, bằng vai
-// r_extension (thành viên r_extension_pub, r_forms_pub — dbadmin.PubReaders). Port mức thấp (chẩn đoán, kiểm thử); KHTC
+// r_extension (thành viên r_extension_pub, r_forms_pub — khai báo readpubview của module). Port mức thấp (chẩn đoán, kiểm thử); KHTC
 // dùng KHTCSources. Bên gọi KHÔNG rẽ nhánh theo nguồn (hai nguồn lâu dài — Trồng trọt giữ vòng đời báo cáo).
 //
 // Không kiểm quyền người dùng: dữ liệu là số đã chốt của tenant; bên gọi kiểm vai (KHTC Cấp Tỉnh) trước khi đọc.

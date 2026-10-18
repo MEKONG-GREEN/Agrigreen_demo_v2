@@ -2,7 +2,7 @@
 // hợp đồng closed_figures/v1 — hai view công bố cùng cột: pf_extension_pub.v1_closed_figures (pf 20261013150110, vòng đời báo
 // cáo cũ) và pf_forms_pub.v1_closed_figures (pf 20261013150108, kỳ native cap/forms). Giao dịch chỉ đọc của tenant trên pool
 // của module (db.ForModule → SET LOCAL ROLE r_extension; quyền đọc hai view qua thành viên r_extension_pub, r_forms_pub
-// do bootstrap cấp — dbadmin.PubReaders). Không đọc bảng nội bộ của nguồn nào.
+// do bootstrap cấp — khai báo readpubview của module). Không đọc bảng nội bộ của nguồn nào.
 package closedfig
 
 import (

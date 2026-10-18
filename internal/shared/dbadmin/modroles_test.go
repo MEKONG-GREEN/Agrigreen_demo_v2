@@ -22,7 +22,7 @@ func pubRoles() []string {
 }
 
 // W6.3 (§14, ADR-0031 §2, R-DB-10): r_<module>_pub NOLOGIN cho đúng các module sở hữu schema _pub, tạo trước
-// vai phân tích; chỉ r_metrics (cap/analytics), r_agg và bên đọc đã rà soát (PubReaders, ADR-0053) là thành viên;
+// vai phân tích; chỉ r_metrics (cap/analytics), r_agg và bên đọc đã rà soát (consumes.publications, ADR-0053) là thành viên;
 // không thuộc ag_shared_user, không vượt RLS. PFPUB: + r_forms_pub (pf_forms_pub, pf 20261013150108).
 func TestPubRoles_W63(t *testing.T) {
 	want := []string{"r_cropcycle_pub", "r_extension_pub", "r_forms_pub", "r_geo_pub", "r_mechanization_pub", "r_price_pub"}
@@ -459,13 +459,13 @@ func TestLaterGroupsGrantKRef(t *testing.T) {
 	}
 }
 
-// pubReader: vai nhóm reader là thành viên vai _pub pub theo PubReaders (ADR-0053 §4).
+// pubReader: vai nhóm reader là thành viên vai _pub theo khai báo hợp đồng (ADR-0053 §4).
 func pubReader(reader, pub string) bool {
-	for mod, owners := range PubReaders {
-		if modreg.DBRole(mod) != reader {
+	for _, entry := range modreg.Catalog() {
+		if modreg.DBRole(entry.Name) != reader {
 			continue
 		}
-		for _, o := range owners {
+		for _, o := range entry.PubReadOwners {
 			if modreg.PubRole(o) == pub {
 				return true
 			}
@@ -475,7 +475,7 @@ func pubReader(reader, pub string) bool {
 }
 
 // ADR-0053 §4 (PFPUB): KHTC trong pf/extension đọc họ hợp đồng closed_figures/v1 của hai nguồn — r_extension là thành
-// viên r_extension_pub, r_forms_pub, r_price_pub (tạo trước r_extension), không thành viên vai _pub nào khác; mục PubReaders chỉ trỏ
+// viên r_extension_pub, r_forms_pub, r_price_pub (tạo trước r_extension), không thành viên vai _pub nào khác; khai báo chỉ trỏ
 // module có schema _pub.
 func TestPubReaders_PFPUB(t *testing.T) {
 	r, ri := roleByName(t, "r_extension")
@@ -491,12 +491,38 @@ func TestPubReaders_PFPUB(t *testing.T) {
 		}
 	}
 	groups := ModuleGroups()
-	for mod, owners := range PubReaders {
-		if mod == AnalyticsModule {
-			t.Errorf("PubReaders không chứa cap/analytics (đã đọc mọi view)")
+	for _, entry := range modreg.Catalog() {
+		if got := pubReaderRoles(entry.Name, groups); len(got) != len(entry.PubReadOwners) {
+			t.Errorf("%s: chủ khai báo không có vai _pub (%v / %v)", entry.Name, entry.PubReadOwners, got)
 		}
-		if got := pubReaderRoles(mod, groups); len(got) != len(owners) {
-			t.Errorf("PubReaders[%s] = %v: chủ không có schema _pub (%v)", mod, owners, got)
+	}
+}
+
+// Một module mới chỉ cần khai báo hợp đồng; tên reader không chọn mặc định hay fallback.
+func TestPublicationReaderRolesFollowDeclaration(t *testing.T) {
+	groups := []ModuleGroup{
+		{Module: "pf/alpha", Pub: "r_alpha_pub"},
+		{Module: "pf/beta", Pub: "r_beta_pub"},
+		{Module: "pf/other", Pub: "r_other_pub"},
+		{Module: "pf/extension", Pub: "r_extension_pub"},
+		{Module: "pf/forms", Pub: "r_forms_pub"},
+		{Module: "pf/price", Pub: "r_price_pub"},
+	}
+	reader := modreg.CatalogEntry{Name: "pf/example", PubReadOwners: []string{"pf/beta", "pf/alpha"}}
+	if got, want := declaredPubReaderRoles(reader, groups), []string{"r_beta_pub", "r_alpha_pub"}; !slices.Equal(got, want) {
+		t.Fatalf("vai theo khai báo = %v, muốn %v", got, want)
+	}
+	for _, name := range []string{"pf/extension", "pf/example", "pf/other"} {
+		if got := declaredPubReaderRoles(modreg.CatalogEntry{Name: name}, groups); len(got) != 0 {
+			t.Errorf("%s không khai nhưng được cấp %v", name, got)
 		}
+	}
+	got := declaredPubReaderRoles(reader, groups)
+	got[0] = "changed"
+	if reader.PubReadOwners[0] != "pf/beta" || groups[1].Pub != "r_beta_pub" {
+		t.Fatal("kết quả làm thay đổi metadata đầu vào")
+	}
+	if got := pubReaderRoles("pf/unregistered", groups); len(got) != 0 {
+		t.Fatalf("module không đăng ký được cấp %v", got)
 	}
 }

@@ -891,3 +891,14 @@ Cold-fixed17510actualexit0/khôngFAIL-SKIP, toàn packageDBadminPASS1.376s, cold
 
 
 Full5PG-verified46746actualexit0/khôngFAIL-SKIP: [('github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin', '1.788s'), ('github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/handler', '133.115s'), ('github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/kn77', '306.207s'), ('github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly', '131.158s'), ('github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/worker', '3.163s')]; private61463/9638662f6696 đãdọn/Go0. Static-verified83954actual0/boundary318/lint0/gofmt2old; cold-fixed17510actual0. Giữ 27 oldgoldenGitblobs, toàn tools/knboundary và oldDDL nguyên9df8d64d. Source c10fed41 + cold fix d6eb3260. Chưa helper11/dev, sắp chạy sau guard; initialfull75296exit1/baseline48780exit1 vẫn giữ.
+
+
+Helper20803actualexit0/11migrationPASS/noFAIL-SKIP450.487s, ACLcontract0.09s; private59464/297cec1d3eb7cleanup/Go0. LocalHEAD=remoteDev14f266a2c02fd9b20267f7cc75a888017690e5a3, main27afd593nguyênsạch. Full5PG46746verifiedactual0(1.788/133.115/306.207/131.158/3.163s), static83954verifiedactual0, coldFixed17510actual0. Rebase chỉ2docs ERP/TMS nên mã đãtest khôngđổi. 27oldgoldens/baseline318/rules/DDLgiữ. A hoàn tất; B thay legacyPubReaders bằng metadata.
+
+## KNSPLIT-2-PUB-READERS-B — Quyền đọc theo khai báo module
+
+Nền14f266a2 (A đã đủ helper11, full5PG, static và remote verify). B xóa map PubReaders chứa cấu hình KN trong dbadmin. Bootstrap chỉ dùng catalog.PubReadOwners đã sinh từ consumes.publications/readpubview. Không có mặc định theo tên module. Metadata không thêm phụ thuộc gọi in-process. Generic fixture kiểm reader bất kỳ, thiếu khai báo kể cả tên reader cũ không sinh quyền, kết quả không sửa metadata; blackbox kiểm mọi runtime module role có đúng membership _pub đã khai (analytics giữ chính sách cũ riêng).
+
+Giữ quyền OLD thực tế 26roleflags/41viewaccess/15membership trong tests/golden/pub-reader-access.json; không sinh lại hay ghi đè golden. Giữ mọi khai báo, source SQL, DDL, contract JSON và call depends của A. Không thay OpenAPI/UI/mobile/M1–M7/D2/tenant perCenter/MRV HTX-MKG. Không tuyên bố thu hồi grant từng cấp trước khi metadata đổi: Bootstrap vẫn cấp idempotent như cũ, không thêm cơ chế REVOKE mới ở B.
+
+Kiểm: pure 7package (DBadmin PG ở full, không claim skip), static full/boundary chỉ giảm, full5PG (DBadmin/metrics/KN77/APIassembly/worker), helper11 có ACL actual. Chưa chạy, chưa tích hợp. G1 còn dữ liệu HTX/policy/auth/accounts/party/routes/tenant/client/KHTC; lịch/main/worktrees giữ.

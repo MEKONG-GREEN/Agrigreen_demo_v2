@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-PUB-READERS-B: bootstrap theo khai báo module, xóa cấu hình KN cố định; đang kiểm thử, chưa tích hợp.
