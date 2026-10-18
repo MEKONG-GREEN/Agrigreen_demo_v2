@@ -684,7 +684,7 @@ jobs:
           dc exec -T ingest /app -healthcheck http://127.0.0.1:8091/readyz
           # 8443 chỉ publish trên 127.0.0.1; 8091 không publish.
           test "$(dc port ingest 8443)" = "127.0.0.1:8443"
-          if dc port ingest 8091 2>/dev/null | grep -q .; then echo "8091 (ops ingest) bị publish ra máy chủ" >&2; exit 1; fi
+          if dc port ingest 8091 2>/dev/null | grep -qE ':[1-9][0-9]*$'; then echo "8091 (ops ingest) bị publish ra máy chủ" >&2; exit 1; fi
           # mTLS bắt buộc: không chứng thư client → bắt tay hỏng.
           if curl -fsS --max-time 5 --cacert deploy/compose/.certs/ca.crt -o /dev/null -X POST https://localhost:8443/v1/ingest/batches; then
             echo "ingest nhận kết nối không có chứng thư client" >&2; exit 1
