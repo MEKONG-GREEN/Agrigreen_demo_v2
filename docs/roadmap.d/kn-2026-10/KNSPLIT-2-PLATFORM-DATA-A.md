@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-PLATFORM-DATA-A: hai hợp đồng nền tảng; đã khóa 111 kết quả cũ, chưa DDL/metadata/tích hợp.
+- [ ] KNSPLIT-2-PLATFORM-DATA-A: hai hợp đồng nền tảng, nguồn/view 4 ca và 111 kết quả, pure/static/full5 PostgreSQL đã đạt; chờ helper11 và tích hợp dev.

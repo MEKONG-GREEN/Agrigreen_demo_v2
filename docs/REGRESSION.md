@@ -972,3 +972,12 @@ Giữ OLD ACL và tệp bổ sung HTX bất biến. Tệp bổ sung nền tảng
 PostgreSQL xác minh 73356 đã đạt 4 ca, exit 0, không SKIP/FAIL, 121.013s. Giữ 111 kết quả native; đối chiếu ngày hiệu lực theo giờ Việt Nam và tổ chức; kiểm từ chối quyền; nâng cấp 1.000 dòng trên mỗi bảng nguồn giữ số dòng/checksum và đọc đủ 1009 đơn vị/1007 tổ chức. Cụm65343/a256d8ec42b5 đã dọn.
 
 Lượt 84940 đỏ được giữ riêng: test converter cần chuẩn hóa UTC đúng native wire; fixture nâng cấp phải để DB cấp sync_seq thay vì chép số cũ. Chỉ sửa test, giữ DDL/golden/assertion. Chưa pure/static/fullconsumer/helper/dev.
+
+
+Downstream consumers: shared/dbadmin và modreg, hợp đồng pubview, metrics/handler, KN77/KHTC, API assembly và worker.
+Dependency evidence: rg -n 'PubReadOwners|pubReaderRoles|g.Pub' internal/shared/dbadmin internal/shared/modreg; rg -n 'pubViews|countViews|PubViewsDeclared' internal/platform/metrics/handler; rg -n 'AdminUnits|OrgDirectory' cmd/api-platform/assembly internal/kn/extension. Hai khai báo pubview mới trong masterdata/port và party/port sinh chủ schema; không đổi cổng dữ liệu native hay wiring.
+Regression acceptance commands: go test -v -count=1 -p 1 -timeout 55m ./tests/platformdata; go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker.
+Propagation rule: thay source/RLS/ACL nội bộ, cổng native hoặc wiring thì chạy thêm các module native và bên tiêu thụ tương ứng. Bước bổ sung view này giữ các thành phần đó, chưa bên tiêu thụ nào đọc view mới; miễn lặp native HTTP routes. Bộ nguồn đã đạt trên cùng mã không cần lặp trong batch downstream; helper bắt buộc chạy lại nguồn/view và HTX trên PostgreSQL thật. Môi trường private PostgreSQL17/PostGIS, không shared5432, không SMTP. Build/static và helper11 migration là điều kiện tích hợp dev.
+
+
+Xác minh trước tích hợp ngày 18/10/2026: pure và static phiên 66447 đều exit 0. Build/vet/modgen/migratecheck/archlint/contractcheck/docscheck/MFA/knboundary đạt; baseline 318, lint 0, định dạng chỉ còn đúng hai fixture archlint có sẵn. Hồi quy PostgreSQL phiên 35799 exit 0, không FAIL/SKIP: dbadmin 1.137s, metrics/handler 163.375s (22 view), KN77 456.533s, API assembly 113.334s, worker 2.100s. Lượt nguồn/view 73356 đã đạt 4 ca trên cùng Go/SQL/metadata; chỉ bổ sung bằng chứng tài liệu sau đó. Helper còn phải chạy hai bộ tests/platformdata và tests/htxdata trên PostgreSQL thật cùng 11 cổng migration, gồm so ACL chính xác 26 cờ vai, 53 SELECT và 21 membership. Chưa tích hợp tại mốc này.
