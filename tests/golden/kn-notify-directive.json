@@ -1547,7 +1547,7 @@
     "Name": "bad-id",
     "Drafts": null,
     "Digests": null,
-    "Error": "notify: payload pf.extension.directive.issued hỏng: json: cannot unmarshal bool into Go struct field DirectiveIssuedV1.directive_id of type uuid.UUID: JSON value must be string type",
+    "Error": "notify: payload pf.extension.directive.issued hỏng: json: cannot unmarshal bool into Go struct field DirectiveIssuedV1.directive_id of type uuid.UUID",
     "Calls": null
   },
   {
