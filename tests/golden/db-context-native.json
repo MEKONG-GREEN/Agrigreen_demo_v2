@@ -1,0 +1,3218 @@
+[
+  {
+    "name": "job",
+    "settings": {
+      "app.actor_ref": "",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "job-purpose",
+    "settings": {
+      "app.actor_ref": "",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "kn.report",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/none/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/none/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/none/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/none/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/none/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/kn-user/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/kn-user/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/kn-user/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/kn-user/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/kn-user/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/viewer/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/viewer/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/viewer/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/viewer/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/viewer/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/admin/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/admin/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/admin/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/admin/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/admin/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/province/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/province/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/province/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/province/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/province/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/national/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/national/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/national/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/national/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/national/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-admin/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-admin/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-admin/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-admin/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-admin/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer-province/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer-province/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer-province/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer-province/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-province/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer-national/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer-national/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer-national/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/officer-national/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/officer-national/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-officer/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-officer/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-officer/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-officer/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-officer/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-officer/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-officer/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-officer/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-officer/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-officer/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-officer/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-officer/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-officer/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-officer/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-officer/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-officer/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-officer/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-officer/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-province/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-province/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-province/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/coop-province/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/coop-province/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/false/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/false/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/all/token-node/false/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/all/token-node/false/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/false/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/false/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/false/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/false/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/false/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/true/session//selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000003",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/true/session/kn_xa/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/all/token-node/true/session/kn_xa/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "realm/all/token-node/true/session/kn_tinh/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/true/session/kn_tinh/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/true/session/kn_tw/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/true/session/kn_tw/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/true/session/admin/selected-node/false",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "realm/all/token-node/true/session/admin/selected-node/true",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "trong_trot",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": false
+  },
+  {
+    "name": "values/nil-communes",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "values/empty-communes",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": ""
+    },
+    "requires_node": true
+  },
+  {
+    "name": "values/escaped-communes",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": "{\"a,b\",\"\",\"x\\\"y\",\"z\\\\w\",\"x}y\",\"NULL\",\"đơn vị\"}"
+    },
+    "requires_node": true
+  },
+  {
+    "name": "values/duplicate-communes",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": "{\"89011\",\"89011\",\"92001\"}"
+    },
+    "requires_node": true
+  },
+  {
+    "name": "values/blank-department",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": "{\"89011\",\"89012\"}"
+    },
+    "requires_node": true
+  },
+  {
+    "name": "values/support",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "00000000-0000-7000-8000-000000000009",
+      "app.purpose": "",
+      "app.xa_ids": "{\"89011\",\"89012\"}"
+    },
+    "requires_node": true
+  },
+  {
+    "name": "values/support-without-account",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": "{\"89011\",\"89012\"}"
+    },
+    "requires_node": true
+  },
+  {
+    "name": "values/zero-actor",
+    "settings": {
+      "app.actor_ref": "",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": "{\"89011\",\"89012\"}"
+    },
+    "requires_node": true
+  },
+  {
+    "name": "values/zero-token-tenant",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": "{\"89011\",\"89012\"}"
+    },
+    "requires_node": true
+  },
+  {
+    "name": "values/purpose",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "kn.report",
+      "app.xa_ids": "{\"89011\",\"89012\"}"
+    },
+    "requires_node": true
+  },
+  {
+    "name": "values/empty-purpose",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": "{\"89011\",\"89012\"}"
+    },
+    "requires_node": true
+  },
+  {
+    "name": "values/view-only",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": "{\"89011\",\"89012\"}"
+    },
+    "requires_node": true
+  },
+  {
+    "name": "values/admin-ignores-token-node",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": "{\"89011\",\"89012\"}"
+    },
+    "requires_node": false
+  },
+  {
+    "name": "values/empty-realm-roles",
+    "settings": {
+      "app.actor_ref": "00000000-0000-7000-8000-000000000001",
+      "app.dept": "chan_nuoi",
+      "app.node_id": "00000000-0000-7000-8000-000000000007",
+      "app.on_behalf_of_ref": "",
+      "app.purpose": "",
+      "app.xa_ids": "{\"89011\",\"89012\"}"
+    },
+    "requires_node": true
+  }
+]
