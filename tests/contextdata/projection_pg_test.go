@@ -77,8 +77,11 @@ func checkRow(ctx context.Context, q rowQuerier, role, tid string, want map[stri
 	return nil
 }
 
-func TestFrozenContextProjectionOnPostgres(t *testing.T) {
-	cases, expected := nativeCases(), golden(t)
+func TestFrozenContextProjectionOnPostgres(t *testing.T) { runProjectionOnPostgres(t, nativeCases()) }
+
+func runProjectionOnPostgres(t *testing.T, cases []contextCase) {
+	t.Helper()
+	expected := golden(t)
 	if len(cases) != len(expected) {
 		t.Fatal("fixture/input count differs")
 	}

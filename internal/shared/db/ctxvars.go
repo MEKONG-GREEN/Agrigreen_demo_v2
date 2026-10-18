@@ -40,8 +40,8 @@ type ContextVars struct {
 	OnBehalfOfRef uuid.UUID // tài khoản được hỗ trợ (chế độ hỗ trợ Admin, ADR-0037)
 }
 
-// ContextVarsFrom suy biến ngữ cảnh từ authz.Principal (kèm KNContext) và mục đích trong ctx. Không có
-// Principal (consumer, job) → mọi biến rỗng.
+// ContextVarsFrom ưu tiên projection của selected session do server cung cấp; chưa gắn projection thì
+// giữ đường Principal/KNContext cũ. Không Principal (consumer, job) → chỉ mục đích có thể còn giá trị.
 func ContextVarsFrom(ctx context.Context) ContextVars {
 	v := ContextVars{Purpose: authz.PurposeFrom(ctx)}
 	p, ok := authz.FromContext(ctx)
@@ -49,6 +49,11 @@ func ContextVarsFrom(ctx context.Context) ContextVars {
 		return v
 	}
 	v.ActorRef = p.ActorRef
+	if p.SelectedSession != nil {
+		scope := p.SelectedSession.Scope()
+		v.NodeID, v.Dept, v.XaIDs, v.OnBehalfOfRef = scope.NodeID, scope.Department, scope.UnitCodes, scope.OnBehalfOfRef
+		return v
+	}
 	if p.KN == nil {
 		v.NodeID = p.OrgRef
 		return v
@@ -87,6 +92,9 @@ var (
 // RequiresNode cho biết Principal người dùng phải có Nút (app.node_id) khi mở giao dịch của module. Có ngữ
 // cảnh phiên KN thì chỉ xét vai của ngữ cảnh (vai realm không dùng cho phạm vi KN v7.7).
 func RequiresNode(p authz.Principal) bool {
+	if p.SelectedSession != nil {
+		return p.SelectedSession.Scope().RequiresNode
+	}
 	if p.KN != nil {
 		return slices.Contains(NodeBoundContextRoles, p.KN.Role)
 	}
