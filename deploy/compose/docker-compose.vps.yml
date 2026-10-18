@@ -160,6 +160,8 @@ services:
   web-ops:
     build:
       args:
+        # Ghi đè dev của docker-compose.yml: bản VPS là production (URL https bắt buộc).
+        NEXT_PUBLIC_DEPLOY_ENV: production
         NEXT_PUBLIC_API_BASE_URL: https://api.${AG_DOMAIN}
         NEXT_PUBLIC_ADMIN_API_BASE: https://admin.${AG_DOMAIN}
         NEXT_PUBLIC_OIDC_ISSUER: https://auth.${AG_DOMAIN}/realms/agrigreen
