@@ -425,6 +425,15 @@ func MigrateV2(ctx context.Context, baseURL string, c migrations.Cluster, dbSuff
 	if err != nil {
 		return err
 	}
+	if c == migrations.PF {
+		repaired, err := repairMainPF151(ctx, dsn)
+		if err != nil {
+			return err
+		}
+		if repaired {
+			log("%s: schema_migrations_pf 151 (tệp của main) → 136 để áp pf 137–151 của dev", DatabaseName(c, dbSuffix))
+		}
+	}
 	if _, err := migrator.Up(ctx, dsn, c, migrator.Options{Log: log}); err != nil {
 		return fmt.Errorf("dbadmin: migration v2 → %s: %w", DatabaseName(c, dbSuffix), err)
 	}
@@ -436,6 +445,17 @@ func MigrateV1(baseURL string, c migrations.Cluster, dbSuffix string) error {
 	dsn, err := RoleURL(baseURL, c, dbSuffix, Migrator)
 	if err != nil {
 		return err
+	}
+	if c == migrations.PF {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		repaired, err := repairMainPF151(ctx, dsn)
+		cancel()
+		if err != nil {
+			return err
+		}
+		if repaired {
+			fmt.Printf("%s: schema_migrations_pf 151 (tệp của main) → 136 để áp pf 137–151 của dev\n", DatabaseName(c, dbSuffix))
+		}
 	}
 	for _, step := range []struct{ dir, table string }{
 		{"shared", "schema_migrations_shared"},
