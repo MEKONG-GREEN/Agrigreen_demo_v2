@@ -1019,3 +1019,6 @@ Source đầu79279 exit1: tests/htxdata chưa dựng được vì test HTTP impo
 
 
 Source xác minh51601 exit0: HTX10PASS158.238s (HTTP0.58s, 120 đối chiếu scope0.94s), handler toàn bộ124.707s; không FAIL/SKIP, cụm63017/223e865fd9e7 đã dọn/Go0. Cổng static-verified57508 chỉ còn errcheck ở lệnh đóng response của test HTTP; sửa riêng defer sang hàm bỏ qua lỗi Close một cách tường minh, giữ nguyên việc đóng cùng response/cùng lúc, không đổi request/assertion/logic/SQL/wiring hay metadata. Không cần lặp lại lệnh PG đã đạt chỉ vì cleanup giữ cùng ngữ nghĩa; helper bắt buộc chạy lại HTX10/handler trên mã cuối. Pure83732=0 trên mã production không đổi. Static-final vẫn phải qua đầy đủ cổng, formatter; fullwait23871 exit1 trước PG do staticverified1. Giữ logs cũ, chưa tích hợp.
+
+
+Full5 PostgreSQL xác minh86206 exit0, không FAIL/SKIP: dbadmin0.855s, metrics107.683s, KN77/KHTC427.138s, API assembly134.817s, worker2.870s; cụm64848/f67cf3022caf đã dọn/Go0. Mã hiện tại c9aa03c8, phần cleanup test chỉ tường minh bỏ qua CloseError cùng ngữ nghĩa; phần production đã được đối chiếu source51601 exit0/HTX10-158.238s/handler124.707s. Staticfinal27940 exit0/lint0/boundary314/gofmt2old; pure83732 exit0. Giữ33golden nền945 và quyền26flags/58SELECT/23membership không đổi. Fetchdev vẫn945, không rebase mã mới. Chờ helper11, có HTX10/handler/platform4 PG thật trên mã cuối trước dev.
