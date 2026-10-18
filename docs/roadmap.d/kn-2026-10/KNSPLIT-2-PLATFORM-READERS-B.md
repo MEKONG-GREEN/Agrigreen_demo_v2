@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-PLATFORM-READERS-B: nối đúng deps KN qua pub, giữ native HTX/MKG; chờ source/static/fullPG/helper.
+- [ ] KNSPLIT-2-PLATFORM-READERS-B: source5/pure/static/full5PG đạt,34goldens/ACL giữ; chờ helper11 và tích hợp dev.
