@@ -76,6 +76,6 @@ func bindCapabilityTestPrincipal(t *testing.T, p authz.Principal) authz.Principa
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.SelectedSession = selected
+	p.SelectedSession = &selected
 	return p
 }
