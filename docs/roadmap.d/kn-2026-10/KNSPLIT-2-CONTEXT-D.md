@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-CONTEXT-D: owner payload và KHTC reader, chờ source/full5/static/helper PG thật; không claim G1 hoàn tất.
+- [ ] KNSPLIT-2-CONTEXT-D: owner payload và KHTC reader đã qua source/static/full5 PG thật; chờ helper9 migration trước dev. Giữ35goldens/boundary314, G1 còn.
