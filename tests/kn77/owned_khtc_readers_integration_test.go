@@ -73,7 +73,7 @@ func TestKHTCReadersRequireOwnedSessionThroughHTTP(t *testing.T) {
 		name, path    string
 		allowedStatus int
 	}{
-		{"catalog", "/v1/kn/khtc/catalogs/unit", 200},
+		{"catalog", "/v1/kn/khtc/catalogs?kind=unit", 200},
 		{"periods", "/v1/extension/khtc/periods?year=2026", 200},
 		{"department inbox", "/v1/extension/khtc/department-forms?year=2026", 200},
 		{"department form", "/v1/extension/khtc/periods/" + pid + "/forms/trong_trot", 404},
