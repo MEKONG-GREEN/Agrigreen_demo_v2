@@ -31,7 +31,6 @@ import (
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 
 	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -97,8 +96,8 @@ func (s *Service) aggScope(ctx context.Context, province string) (actor, string,
 	if err != nil {
 		return a, "", err
 	}
-	ok := a.k.Role == authz.KNAdmin ||
-		(a.k.Department == domain.DeptChanNuoiThuySan && (a.k.Role == authz.KNTinh || a.k.Role == authz.KNTW))
+	ok := a.k.Role == knport.SessionRoleAdmin ||
+		(a.k.Department == domain.DeptChanNuoiThuySan && (a.k.Role == knport.SessionRoleProvince || a.k.Role == knport.SessionRoleNational))
 	if !ok {
 		return a, "", errNotCNTS
 	}
@@ -118,7 +117,7 @@ func (s *Service) aggWriter(ctx context.Context) (actor, string, error) {
 	if a.k.ReadOnly() {
 		return a, p, ErrReadOnly
 	}
-	if a.k.Role != authz.KNTinh || a.k.Department != domain.DeptChanNuoiThuySan {
+	if a.k.Role != knport.SessionRoleProvince || a.k.Department != domain.DeptChanNuoiThuySan {
 		return a, p, errNotCNTSWriter
 	}
 	return a, p, nil

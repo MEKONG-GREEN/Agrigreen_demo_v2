@@ -18,7 +18,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -359,7 +358,7 @@ type OfficerView struct {
 
 // provinceOfCaller: tỉnh của Cấp Tỉnh — đơn vị đầu của phạm vi (không có → rỗng).
 func provinceOfCaller(c caller) string {
-	if c.k.Role == authz.KNTinh && len(c.k.Scope.Units) > 0 {
+	if c.k.Role == port.SessionRoleProvince && len(c.k.Scope.Units) > 0 {
 		return c.k.Scope.Units[0]
 	}
 	return ""

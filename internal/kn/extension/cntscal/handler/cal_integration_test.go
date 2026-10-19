@@ -172,6 +172,10 @@ func newFix(t *testing.T, multi ...bool) *fix {
 }
 
 func (f *fix) knMiddleware() gin.HandlerFunc {
+	registry, err := authz.NewSessionRegistry(extension.SessionProjection())
+	if err != nil {
+		f.t.Fatal(err)
+	}
 	return func(c *gin.Context) {
 		p, ok := authz.FromContext(c.Request.Context())
 		id, err := uuid.Parse(c.GetHeader(authz.ContextHeader))
@@ -184,6 +188,13 @@ func (f *fix) knMiddleware() gin.HandlerFunc {
 		}
 		cp := *kc
 		p.KN = &cp
+		selected, err := registry.ResolveSelected(c.Request.Context(), p)
+		if err != nil {
+			f.t.Errorf("owner session projection: %v", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		p.SelectedSession = &selected
 		scope, _ := json.Marshal(cp)
 		ctx := idempotency.WithAuthorizationScope(c.Request.Context(), scope)
 		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, p))

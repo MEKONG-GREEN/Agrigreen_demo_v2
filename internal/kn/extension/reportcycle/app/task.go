@@ -15,7 +15,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -64,7 +63,7 @@ func (s *Service) ListTasks(ctx context.Context, q TaskQuery) (TaskList, error) 
 	}
 	f := store.TaskFilter{Department: a.dept(), Province: a.province, BatchID: q.BatchID, PeriodID: q.PeriodID, FormCode: q.FormCode,
 		PeriodType: q.PeriodType, OrderByDue: true, Limit: 5000}
-	if a.k.Role == authz.KNXa {
+	if a.k.Role == port.SessionRoleCommune {
 		f.Communes = slices.Clone(a.k.Communes)
 		if f.Communes == nil {
 			f.Communes = []string{}
@@ -115,7 +114,7 @@ func (s *Service) ListTasks(ctx context.Context, q TaskQuery) (TaskList, error) 
 			}
 			out.Items = append(out.Items, v)
 		}
-		if a.k.Role == authz.KNXa && len(a.k.Communes) > 0 {
+		if a.k.Role == port.SessionRoleCommune && len(a.k.Communes) > 0 {
 			out.LastReminder, err = store.LatestReminderFor(ctx, tx, a.k.Communes, a.k.Department)
 		}
 		return err
@@ -235,7 +234,7 @@ type SubmissionResult struct {
 // Submit ghi một phiên bản bài nộp BẤT BIẾN (RB-1): "Lưu nháp" luôn ghi (kèm vấn đề), "Gửi báo cáo" chỉ ghi khi
 // đạt yêu cầu của mẫu; sau chốt kỳ → từ chối nếu chưa mở lại. Admin nhập thay mang on_behalf_of (FN-AD-04.07).
 func (s *Service) Submit(ctx context.Context, taskID uuid.UUID, in SubmissionInput, idem string) (SubmissionResult, error) {
-	a, err := s.writer(ctx, authz.KNXa)
+	a, err := s.writer(ctx, port.SessionRoleCommune)
 	if err != nil {
 		return SubmissionResult{}, err
 	}

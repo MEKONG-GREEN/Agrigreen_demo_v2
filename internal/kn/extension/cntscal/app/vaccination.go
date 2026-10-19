@@ -21,7 +21,6 @@ import (
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -41,7 +40,7 @@ type BatchView struct {
 }
 
 func (c caller) canPlanVaccination() bool {
-	return c.admin() || (c.k.Role == authz.KNTinh && !c.k.ReadOnly() &&
+	return c.admin() || (c.k.Role == knport.SessionRoleProvince && !c.k.ReadOnly() &&
 		(c.k.ProvinceGroup == "" || c.k.ProvinceGroup == accport.GroupChuNhiem))
 }
 
@@ -50,7 +49,7 @@ func (c caller) seesBatch(b store.Batch) bool {
 	if !c.sees(b.CommuneCode) {
 		return false
 	}
-	if c.k.Role == authz.KNXa && b.HouseholdRef != nil && !c.k.AllowsHousehold(*b.HouseholdRef) {
+	if c.k.Role == knport.SessionRoleCommune && b.HouseholdRef != nil && !c.k.AllowsHousehold(*b.HouseholdRef) {
 		return false
 	}
 	return true
@@ -60,7 +59,7 @@ func (c caller) canRecord(b store.Batch) bool {
 	if c.k.ReadOnly() || b.Event == domain.BatchCancelled {
 		return false
 	}
-	return c.canPlanVaccination() || (c.k.Role == authz.KNXa && c.seesBatch(b))
+	return c.canPlanVaccination() || (c.k.Role == knport.SessionRoleCommune && c.seesBatch(b))
 }
 
 func (s *Service) view(c caller, b store.Batch) BatchView {
@@ -105,7 +104,7 @@ func (s *Service) ListBatches(ctx context.Context, q BatchQuery) ([]BatchView, m
 	}
 	f := store.BatchFilter{All: c.admin() || c.k.Scope.All, Communes: c.k.Scope.Units, Commune: strings.TrimSpace(q.Commune),
 		Household: q.Household, From: q.From, To: q.To, Limit: q.Limit}
-	if c.k.Role == authz.KNTinh && !c.k.Scope.All {
+	if c.k.Role == knport.SessionRoleProvince && !c.k.Scope.All {
 		// Cấp Tỉnh: Scope là Nút tỉnh — mọi xã của tỉnh; lọc theo phạm vi ở tầng ứng dụng.
 		f.All = true
 	}

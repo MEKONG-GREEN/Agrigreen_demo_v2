@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-CONTEXT-G: owner context cho cảnh báo/lịch CNTS/vòng đời báo cáo và giao phạm vi đồng bộ; chờ bằng chứng PG, static và helper trước dev.

@@ -15,7 +15,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -365,7 +364,7 @@ type ConsolidateResult struct {
 
 // Consolidate là nút "Cập nhật" của Cấp Tỉnh (FN-TI-02.05 B3).
 func (s *Service) Consolidate(ctx context.Context, periodID uuid.UUID, templateIDs []uuid.UUID, idem string) (ConsolidateResult, error) {
-	a, err := s.writer(ctx, authz.KNTinh)
+	a, err := s.writer(ctx, port.SessionRoleProvince)
 	if err != nil {
 		return ConsolidateResult{}, err
 	}
@@ -428,7 +427,7 @@ type ConsolidationView struct {
 
 // GetConsolidation trả bảng tổng hợp theo mẫu (Cấp Tỉnh; Cấp Quốc gia chỉ xem — FN-TW-01.02).
 func (s *Service) GetConsolidation(ctx context.Context, q ConsolidationQuery, compare bool) (ConsolidationView, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return ConsolidationView{}, err
 	}
@@ -639,7 +638,7 @@ func pendingOf(ctx context.Context, tx pgx.Tx, p store.Period, tpl uuid.UUID, sn
 
 // PendingChanges trả "Thay đổi chờ cập nhật" của mọi biểu trong kỳ.
 func (s *Service) PendingChanges(ctx context.Context, periodID uuid.UUID) (PendingSummary, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return PendingSummary{}, err
 	}
@@ -678,7 +677,7 @@ func (s *Service) PendingChanges(ctx context.Context, periodID uuid.UUID) (Pendi
 
 // RunsOf trả "Nhật ký cập nhật" (mọi lần chạy, không xóa).
 func (s *Service) RunsOf(ctx context.Context, periodID uuid.UUID, templateID *uuid.UUID) ([]store.Run, map[uuid.UUID]string, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -703,7 +702,7 @@ func (s *Service) RunsOf(ctx context.Context, periodID uuid.UUID, templateID *uu
 
 // RunChanges trả chi tiết ô thay đổi của một lần chạy (cursor theo id).
 func (s *Service) RunChanges(ctx context.Context, runID uuid.UUID, after *uuid.UUID, limit int) (store.Run, []store.CellChange, map[uuid.UUID]string, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return store.Run{}, nil, nil, err
 	}

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"slices"
 	"sort"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -113,7 +113,7 @@ type Dashboard struct {
 // KNDashboard dựng dashboard từ bảng chỉ số dựng sẵn khi "Cập nhật" (consolidation_metric) + trạng thái nộp —
 // 6–8 truy vấn theo chỉ mục, không quét bài nộp (mục tiêu < 5 s, xem docs/runbooks/kn-report-cycle-load.md).
 func (s *Service) KNDashboard(ctx context.Context, q DashboardQuery) (Dashboard, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return Dashboard{}, err
 	}
@@ -504,7 +504,7 @@ func (s *Service) CommuneStatsOf(ctx context.Context, commune string, batchID *u
 	if err != nil {
 		return CommuneStats{}, err
 	}
-	if a.k.Role == authz.KNXa && !slices.Contains(a.k.Communes, commune) {
+	if a.k.Role == port.SessionRoleCommune && !slices.Contains(a.k.Communes, commune) {
 		return CommuneStats{}, ErrOutOfScope
 	}
 	out := CommuneStats{Commune: commune}

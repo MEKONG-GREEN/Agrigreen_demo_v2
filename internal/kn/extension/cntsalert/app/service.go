@@ -9,7 +9,7 @@
 //     buộc); quá hạn xử lý → Quá hạn, báo Lãnh đạo phòng (job).
 //   - Cấu hình nhắc nộp theo biểu (UR-TINH-08) và job nhắc trước hạn / khi trễ / nhắc lặp, trễ liên tiếp (FN-13 AC-06).
 //
-// Quyền theo ngữ cảnh phiên KN (authz.RequireKN), phòng CNTS: Cấp Tỉnh xem, giao, đóng, cấu hình; Cấp Xã xem cảnh báo
+// Quyền theo ngữ cảnh phiên KN (port.RequireSession), phòng CNTS: Cấp Tỉnh xem, giao, đóng, cấu hình; Cấp Xã xem cảnh báo
 // của các xã phụ trách và xử lý cảnh báo được giao; Admin toàn quyền; nhóm chỉ xem chỉ đọc.
 package app
 
@@ -101,11 +101,11 @@ func newID() uuid.UUID { return ids.New() }
 
 type caller struct {
 	p authz.Principal
-	k authz.KNContext
+	k port.SessionContext
 }
 
-func (c caller) admin() bool { return c.k.Role == authz.KNAdmin }
-func (c caller) tinh() bool  { return c.k.Role == authz.KNTinh }
+func (c caller) admin() bool { return c.k.Role == port.SessionRoleAdmin }
+func (c caller) tinh() bool  { return c.k.Role == port.SessionRoleProvince }
 
 // sees cho biết người gọi thấy cảnh báo a: Admin; Cấp Tỉnh trong phạm vi Nút (cảnh báo không gắn xã — mọi Cấp Tỉnh của
 // phòng và đúng tỉnh); Cấp Xã: cảnh báo của các xã phụ trách hoặc được giao cho mình.
@@ -125,14 +125,14 @@ func (c caller) sees(a store.Alert) bool {
 
 // reader: Admin; Cấp Tỉnh, Cấp Xã của phòng Chăn nuôi – Thủy sản (ma trận FN-13).
 func (s *Service) reader(ctx context.Context) (caller, error) {
-	p, k, err := authz.RequireKN(ctx)
+	p, k, err := port.RequireSession(ctx)
 	if err != nil {
 		return caller{}, err
 	}
 	c := caller{p: p, k: k}
 	switch {
-	case k.Role == authz.KNAdmin:
-	case (k.Role == authz.KNTinh || k.Role == authz.KNXa) && k.AllowsDepartment(DeptCNTS):
+	case k.Role == port.SessionRoleAdmin:
+	case (k.Role == port.SessionRoleProvince || k.Role == port.SessionRoleCommune) && k.AllowsDepartment(DeptCNTS):
 	default:
 		return c, problem.Forbidden.WithDetail("Cảnh báo CNTS thuộc phòng Chăn nuôi – Thủy sản (Admin, Cấp Tỉnh, Cấp Xã)")
 	}

@@ -15,7 +15,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -60,7 +59,7 @@ func (s *Service) reviewable(ctx context.Context, tx pgx.Tx, a actor, taskID uui
 // RequestAdjustment yêu cầu xã điều chỉnh, LÝ DO BẮT BUỘC (FN-TI-02.04). Cấp Tỉnh không sửa số gốc; kỳ đã chốt
 // → phải mở lại kỳ trước.
 func (s *Service) RequestAdjustment(ctx context.Context, taskID uuid.UUID, reason, idem string) (ReviewResult, error) {
-	a, err := s.writer(ctx, authz.KNTinh)
+	a, err := s.writer(ctx, port.SessionRoleProvince)
 	if err != nil {
 		return ReviewResult{}, err
 	}
@@ -104,7 +103,7 @@ func (s *Service) RequestAdjustment(ctx context.Context, taskID uuid.UUID, reaso
 
 // Confirm "Xác nhận" (tùy chọn) bản đã gửi.
 func (s *Service) Confirm(ctx context.Context, taskID uuid.UUID, note, idem string) (ReviewResult, error) {
-	a, err := s.writer(ctx, authz.KNTinh)
+	a, err := s.writer(ctx, port.SessionRoleProvince)
 	if err != nil {
 		return ReviewResult{}, err
 	}
@@ -188,7 +187,7 @@ func (s *Service) GetPeriod(ctx context.Context, id uuid.UUID) (PeriodView, erro
 			return err
 		}
 		for _, t := range ts {
-			if a.k.Role == authz.KNXa && !slices.Contains(a.k.Communes, t.CommuneCode) {
+			if a.k.Role == port.SessionRoleCommune && !slices.Contains(a.k.Communes, t.CommuneCode) {
 				continue
 			}
 			v.Total++
@@ -208,7 +207,7 @@ func (s *Service) GetPeriod(ctx context.Context, id uuid.UUID) (PeriodView, erro
 // ClosePeriod "Chốt kỳ ngay" (FN-TI-02.04 B4). Kỳ đã chốt nhưng còn xã/biểu đang mở lại → chốt lại (reclosed).
 // Hệ thống tự cập nhật tổng hợp MỘT lần lúc chốt (FN-TI-02.05, nhật ký "Hệ thống").
 func (s *Service) ClosePeriod(ctx context.Context, id uuid.UUID, idem string) (PeriodView, error) {
-	a, err := s.writer(ctx, authz.KNTinh)
+	a, err := s.writer(ctx, port.SessionRoleProvince)
 	if err != nil {
 		return PeriodView{}, err
 	}
@@ -331,7 +330,7 @@ type ReopenResult struct {
 // ReopenPeriod mở lại kỳ đã chốt cho một xã/biểu — sự kiện bù, lý do + thời hạn mở bắt buộc (FN-TI-02.04 B5);
 // hết hạn mở → job tự chốt lại.
 func (s *Service) ReopenPeriod(ctx context.Context, id uuid.UUID, in ReopenInput, idem string) (ReopenResult, error) {
-	a, err := s.writer(ctx, authz.KNTinh)
+	a, err := s.writer(ctx, port.SessionRoleProvince)
 	if err != nil {
 		return ReopenResult{}, err
 	}
@@ -474,7 +473,7 @@ type StatusBoard struct {
 
 // Status trả trạng thái nộp theo xã thời gian thực (đọc thẳng bảng chiếu công việc).
 func (s *Service) Status(ctx context.Context, batchID uuid.UUID, periodID, templateID *uuid.UUID, status string) (StatusBoard, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return StatusBoard{}, err
 	}
@@ -565,7 +564,7 @@ type RemindResult struct {
 
 // Remind gửi nhắc tới cán bộ phụ trách xã chưa nộp/trễ hạn (thông báo trong app + đẩy chỉ dữ liệu — tới tay < 1 phút).
 func (s *Service) Remind(ctx context.Context, batchID uuid.UUID, in RemindInput, idem string) (RemindResult, error) {
-	a, err := s.writer(ctx, authz.KNTinh)
+	a, err := s.writer(ctx, port.SessionRoleProvince)
 	if err != nil {
 		return RemindResult{}, err
 	}
@@ -662,7 +661,7 @@ func (s *Service) recordReminder(ctx context.Context, tx pgx.Tx, tid uuid.UUID, 
 
 // RemindersOf trả lịch sử nhắc của đợt.
 func (s *Service) RemindersOf(ctx context.Context, batchID uuid.UUID, periodID *uuid.UUID) ([]store.Reminder, map[uuid.UUID]string, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return nil, nil, err
 	}

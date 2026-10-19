@@ -173,7 +173,7 @@ func (s *Service) rosterReader(ctx context.Context) (caller, error) {
 	if err != nil {
 		return c, err
 	}
-	if !c.admin() && c.k.Role != authz.KNTinh {
+	if !c.admin() && c.k.Role != port.SessionRoleProvince {
 		return c, problem.Forbidden.WithDetail("Cấp Xã xem lịch trực của mình (Lịch trực của tôi)")
 	}
 	if s.Catalogs == nil {
@@ -183,7 +183,7 @@ func (s *Service) rosterReader(ctx context.Context) (caller, error) {
 }
 
 func (c caller) canPlanRoster() bool {
-	return c.admin() || (c.k.Role == authz.KNTinh && !c.k.ReadOnly() &&
+	return c.admin() || (c.k.Role == port.SessionRoleProvince && !c.k.ReadOnly() &&
 		(c.k.ProvinceGroup == "" || c.k.ProvinceGroup == accport.GroupTongHop))
 }
 
