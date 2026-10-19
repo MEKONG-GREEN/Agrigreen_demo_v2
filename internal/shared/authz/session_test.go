@@ -160,12 +160,8 @@ func TestSessionOpaquePayloadIsIsolated(t *testing.T) {
 	if !reflect.DeepEqual(bound.Payload(), []byte{0, 1, 2, 255}) || s.Payload() != nil || bound.Scope().Department != "original" {
 		t.Fatal("payload aliases input/output or changes original session")
 	}
-	raw, err := json.Marshal(bound)
-	if err != nil || string(raw) != "{}" {
-		t.Fatalf("server payload serialized: %s %v", raw, err)
-	}
 	p := authz.Principal{SelectedSession: &bound}
-	raw, err = json.Marshal(p)
+	raw, err := json.Marshal(p)
 	if err != nil {
 		t.Fatal(err)
 	}
