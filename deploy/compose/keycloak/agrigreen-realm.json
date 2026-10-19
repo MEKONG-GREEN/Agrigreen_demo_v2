@@ -346,6 +346,25 @@
       "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"]
     },
     {
+      "clientId": "kn-web",
+      "name": "Web Khuyến nông (G1)",
+      "description": "Client công khai riêng cho KN trên web-ops; dùng luồng TOTP D24 và ngữ cảnh nghiệp vụ của KN. Frontend riêng sau G1.",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": true,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
+      "webOrigins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+      "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:3000/*##http://127.0.0.1:3000/*", "client.session.idle.timeout": "14400", "client.session.max.lifespan": "36000" },
+      "authenticationFlowBindingOverrides": {},
+      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
+      "optionalClientScopes": []
+    },
+    {
       "clientId": "agrigreen-web-internal",
       "name": "Web nội bộ Mekong Green (Next.js, vùng mkg) — chỉ gọi api-internal; màn hình quản trị cần MFA",
       "enabled": true,
