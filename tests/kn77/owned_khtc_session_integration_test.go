@@ -8,12 +8,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	sourceapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcsource/app"
-	sourcehandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcsource/handler"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -39,8 +38,9 @@ func (d *countedSessionDB) BeginTx(ctx context.Context, opts pgx.TxOptions) (pgx
 func TestKHTCSourceRequiresOwnedSessionThroughHTTP(t *testing.T) {
 	env := pgtest.Get(t)
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
-	counted := &countedSessionDB{Beginner: db.ForModule(pool, db.Module("pf/extension"))}
-	service := &sourceapp.Service{DB: counted, Sources: &goldenReader{}}
+	counted := &countedSessionDB{Beginner: pool}
+	module := extension.New(counted, clock.System{}, extension.Deps{})
+	module.UseKHTCSourceReader(&goldenReader{})
 	actor, tid := ids.New(), ids.New()
 	makeSession := func(role string) authz.Session {
 		s, err := extport.NewSessionContext(extport.SessionContext{ID: ids.New(), Role: role, Department: partyport.DeptKeHoachTaiChinh, OrgRef: ids.New()})
@@ -86,7 +86,7 @@ func TestKHTCSourceRequiresOwnedSessionThroughHTTP(t *testing.T) {
 				}
 				c.Request = c.Request.WithContext(ctx)
 			})
-			sourcehandler.Handler{Svc: service}.RegisterApp(group)
+			module.RegisterApp(group)
 			request := httptest.NewRequest(http.MethodGet, "/v1/extension/khtc/periods/"+ids.New().String()+"/sources", nil)
 			response := httptest.NewRecorder()
 			engine.ServeHTTP(response, request)
