@@ -1,0 +1,13 @@
+## KNSPLIT-2-CONTEXT-D — Payload phiên do KN sở hữu và consumer KHTC đầu tiên
+
+Nền dev66d88069 đã nối SessionRegistry vào accounts middleware và root thật. Gói này thêm Session.WithPayload/Payload bất biến, opaque bytes không diễn giải trong kernel, không alias input/output, không xuất HTTP JSON và không quyền thay actor/tenant/raw roles/MFA/purpose/DB scope. Không thêm registry toàn cục, không tạo Principal giả cho worker.
+
+KN tự định nghĩa port.SessionContext/SessionSupport, role/duty/power và các policy. Payload owner có version1, chỉ được tạo từ state đã server kiểm qua extension.SessionProjection. Root adapter sao chép rõ mọi trường legacy; không alias/type alias từ shared KNContext. ReadSessionContext kiểm profile, version, ID, role và khớp DB scope, từ chối malformed/unknown/trailing/mismatch; RequireSession không fallback p.KN hay realm roles. Shared KNContext/RequireKN còn cho các consumer chưa chuyển, không coi KNSPLIT-2 đã xong.
+
+Consumer đầu tiên khtcsource reader chuyển sang port.RequireSession và owner context. Quyền owner-only Refresh/M5, read-only/M1–M7 và byte golden giữ nguyên. Fixtures KN77 thay middleware accounts mới gắn registry thật; chỉ fixture tạo ID synthetic khi ngữ cảnh test cũ không có ID, không làm vậy trong production. Root HTTP probe bỏ p.KN trước đọc owner và ForModule thật. Không đổi schema/ACL/35goldens/API/routes/D2/tenant.
+
+TEST-CTX-009: dữ liệu owner khớp đủ238selected trong268vector đóng băng, cộng256 tổ hợp role/manager/view-only/support/facility/household/scope so với policy legacy độc lập. Mutate legacy/returned slices/support không sửa owner snapshot. Raw authentication giữ.
+TEST-CTX-010: nil/zero/wrongowner/missingpayload/malformed/version/unknown/trailing/ID/role và5DBscope mismatch failclosed. Generic arbitrary bytes không leak JSON/alias. Root Build+JWT+accounts HTTP+ForModule PG đọc owner sau khi bỏlegacy.
+TEST-CTX-011: reader KHTC HTTP+PG thật từ chối legacy admin/noowner trước mở giao dịch, owner commune không được mở rộng bởi legacyadmin/rawplatformadmin; ownerprovince quaDB dù legacycommune/nil. Full KN77/KHTC đối chiếu Excel/source snapshots/owner refresh unchanged.
+
+Cổng: Go1.26.9/privatePG/fail-on-SKIP; source authz + contextdata + port + khtcsource/domain + accounts/handler + HTX14; rootHTTP và toànKN77 trong full5PG cùng dbadmin/metrics/worker. Staticfull/lint/boundary không tăng/gofmt đúng2fixture cũ;35goldens frozen. Helper9migration+hardACL và authz/contextdata/port/khtcsource-domain/rootHTTP, không lặp upgradecatalog/notify vì không SQL/metadata đổi. Không sửa Go/SQL/TEMP Go khi còn bất kỳ Go process. Chỉdev, giữmain/worktrees/lịch vàPO.

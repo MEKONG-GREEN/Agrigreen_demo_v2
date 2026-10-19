@@ -146,3 +146,34 @@ func TestSessionRegistryDoesNotMutateRealmRoles(t *testing.T) {
 		t.Fatal("provider mutated token permissions")
 	}
 }
+
+func TestSessionOpaquePayloadIsIsolated(t *testing.T) {
+	s, err := authz.NewSession("example", uuid.New(), authz.SessionScope{Department: "original"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := []byte{0, 1, 2, 255}
+	bound := s.WithPayload(original)
+	original[0] = 99
+	read := bound.Payload()
+	read[1] = 99
+	if !reflect.DeepEqual(bound.Payload(), []byte{0, 1, 2, 255}) || s.Payload() != nil || bound.Scope().Department != "original" {
+		t.Fatal("payload aliases input/output or changes original session")
+	}
+	raw, err := json.Marshal(bound)
+	if err != nil || string(raw) != "{}" {
+		t.Fatalf("server payload serialized: %s %v", raw, err)
+	}
+	p := authz.Principal{SelectedSession: &bound}
+	raw, err = json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := fields["SelectedSession"]; ok {
+		t.Fatal("payload leaked to principal JSON")
+	}
+}

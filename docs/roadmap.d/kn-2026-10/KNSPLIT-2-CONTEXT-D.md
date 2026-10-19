@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-CONTEXT-D: owner payload và KHTC reader, chờ source/full5/static/helper PG thật; không claim G1 hoàn tất.

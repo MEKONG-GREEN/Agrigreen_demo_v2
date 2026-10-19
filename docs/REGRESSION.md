@@ -1122,3 +1122,10 @@ Source5 thực tế92958actualexit0/noFAILSKIP: authz2.671s/accounts-handler-ful
 
 
 Bằng chứng trước tích hợp: full5PG95230 actualexit0/noFAILSKIP trên core6b63cd0d, dbadmin4.858s/metrics120.778s/KN77-KHTC295.380s/APIassembly-full123.544s/worker2.365s. RootHTTP mới cũng PASS trong assemblyfull, không chỉ targeted source. Private60070/0a42205ce8bd đã dọn/Go0; source5 và static0/lint0/boundary314/gofmt2old giữ. Nguồn không đổi sau core,35goldens không đổi, noDDL/ACL/API mới. Chờ helper9migration+authz/accounts-handler/APIassembly/contextdata trước khi claimdev. Owner projection đã nối request trong C nhưng các sharedKNtypes/legacy fallback/route ownership/ownrecords/productionbinding/tenant/client/reminders vẫn chưa hoàn tất; không coi G1 đạt.
+
+
+## KNSPLIT-2-CONTEXT-D — owner session payload / KHTC source
+Downstream consumers: owner KN projection, khtcsource reader, API assembly, accounts middleware, contextdata RLS, KN77/KHTC, HTX readers; shared dbadmin/metrics/worker full5 guards.
+Dependency evidence: `rg -n 'SessionProjection|SelectedSession|RequireKN|RequireSession|khtcsource|UseKHTCSourceReader' internal cmd tests -g '*.go'` và diff nền66d88069.
+Regression acceptance command: private PostgreSQL + Go1.26.9 `go test -v -count=1 -p 1 -timeout 55m ./internal/shared/authz ./tests/contextdata ./internal/kn/extension/port ./internal/kn/extension/khtcsource/domain ./internal/platform/accounts/handler ./tests/htxdata`; full5 `go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker` và static đầy đủ.
+Propagation rule: owner projection đổi → source và tất cả full5, không dùng compile-only/skip làm bằng chứng; SQL/ACL/API/35goldens không đổi → helper scoped9 migrations, không lặp upgradecatalog/notify đã kiểm ởB. TEST-CTX-009/010/011 trong gia-dinh; giữ policy legacy ở consumer chưa chuyển, không đổi D2 hay tenant bằngpayload.

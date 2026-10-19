@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-CONTEXT-C: server registry/wiring rootHTTP+source5/static/full5PG đạt; chờhelper9migration trướcdev,35goldens/boundary314 giữ.
+- [x] KNSPLIT-2-CONTEXT-C: đã tích hợp dev66d88069; source5/static/full5PG và helper9migration thật PASS,35goldens/boundary314 giữ.

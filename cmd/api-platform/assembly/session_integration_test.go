@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -63,6 +64,19 @@ func TestBuildBindsOwnedSessionThroughHTTP(t *testing.T) {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
+		ownerRole := ""
+		if p.SelectedSession != nil {
+			// A migrated consumer works with the owner payload after the legacy field is removed.
+			p.KN = nil
+			ctx = authz.WithPrincipal(ctx, p)
+			_, owned, err := extport.RequireSession(ctx)
+			if err != nil {
+				t.Error(err)
+				c.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
+			ownerRole = owned.Role
+		}
 		var node, dbActor, dbTenant string
 		err := db.WithContextTx(ctx, env.Pool(t, migrations.PF, dbadmin.AppPlatform), db.Module("pf/content"), func(tx pgx.Tx) error {
 			return tx.QueryRow(ctx, `SELECT coalesce(current_setting('app.node_id',true),''),current_setting('app.actor_ref'),current_setting('app.tenant_id')`).Scan(&node, &dbActor, &dbTenant)
@@ -76,7 +90,7 @@ func TestBuildBindsOwnedSessionThroughHTTP(t *testing.T) {
 		if p.SelectedSession != nil {
 			profile, sessionID = p.SelectedSession.Profile(), p.SelectedSession.ID().String()
 		}
-		c.JSON(http.StatusOK, gin.H{"actor": p.ActorRef.String(), "tenant": p.TenantID.String(), "org": p.OrgRef.String(), "mfa": p.MFA, "kn_user": p.Has("kn_user"), "kn_officer": p.Has("kn_officer"), "profile": profile, "session": sessionID, "node": node, "db_actor": dbActor, "db_tenant": dbTenant})
+		c.JSON(http.StatusOK, gin.H{"owner_role": ownerRole, "actor": p.ActorRef.String(), "tenant": p.TenantID.String(), "org": p.OrgRef.String(), "mfa": p.MFA, "kn_user": p.Has("kn_user"), "kn_officer": p.Has("kn_officer"), "profile": profile, "session": sessionID, "node": node, "db_actor": dbActor, "db_tenant": dbTenant})
 	})
 	server := httptest.NewServer(engine)
 	t.Cleanup(server.Close)
@@ -103,7 +117,7 @@ func TestBuildBindsOwnedSessionThroughHTTP(t *testing.T) {
 		return res.StatusCode, body
 	}
 	status, body := request(actor, tid, true, true)
-	if status != http.StatusOK || body["profile"] != "kn" || body["session"] != selected.String() || body["node"] != "" || body["actor"] != actor.String() || body["db_actor"] != actor.String() || body["tenant"] != tid.String() || body["db_tenant"] != tid.String() || body["org"] != tokenOrg.String() || body["mfa"] != true || body["kn_user"] != true || body["kn_officer"] != false {
+	if status != http.StatusOK || body["owner_role"] != extport.SessionRoleAdmin || body["profile"] != "kn" || body["session"] != selected.String() || body["node"] != "" || body["actor"] != actor.String() || body["db_actor"] != actor.String() || body["tenant"] != tid.String() || body["db_tenant"] != tid.String() || body["org"] != tokenOrg.String() || body["mfa"] != true || body["kn_user"] != true || body["kn_officer"] != false {
 		t.Fatalf("selected root binding: %d %v", status, body)
 	}
 	status, body = request(actor, tid, true, false)

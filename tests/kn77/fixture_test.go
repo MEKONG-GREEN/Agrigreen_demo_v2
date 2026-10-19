@@ -328,6 +328,7 @@ func (f *fixture) knMiddleware() gin.HandlerFunc {
 			cp.Support = &s
 		}
 		p.KN = &cp
+		p = bindKNTestSession(f.t, p)
 		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
 		c.Next()
 	}
@@ -504,3 +505,27 @@ func (f *fixture) count(q string, args ...any) int {
 
 // setClock đặt đồng hồ giả tới t.
 func (f *fixture) setClock(t time.Time) { f.clk.Advance(t.Sub(f.clk.Now())) }
+
+// These fixtures replace account middleware only. Use the actual owner registry
+// for the selected-session contract; synthetic IDs are test-only resolved state.
+func bindKNTestSession(t *testing.T, p authz.Principal) authz.Principal {
+	t.Helper()
+	if p.KN == nil {
+		return p
+	}
+	copyContext := *p.KN
+	if copyContext.ID == uuid.Nil {
+		copyContext.ID = ids.New()
+	}
+	p.KN = &copyContext
+	registry, err := authz.NewSessionRegistry(extension.SessionProjection())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := registry.ResolveSelected(context.Background(), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.SelectedSession = &s
+	return p
+}

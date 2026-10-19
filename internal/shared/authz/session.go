@@ -20,12 +20,13 @@ type SessionScope struct {
 	RequiresNode  bool
 }
 
-// Session is an immutable projection of a selected application session. It is
+// Session is an immutable projection of a selected application session.
 // Its scope comes from validated server state, never client input.
 type Session struct {
 	profile string
 	id      uuid.UUID
 	scope   SessionScope
+	payload []byte
 }
 
 var (
@@ -47,6 +48,17 @@ func NewSession(profile string, id uuid.UUID, scope SessionScope) (Session, erro
 func (s Session) Profile() string { return s.profile }
 func (s Session) ID() uuid.UUID   { return s.id }
 func (s Session) Valid() bool     { return s.profile != "" && s.id != uuid.Nil }
+
+// WithPayload attaches opaque, server-owned application data. The shared kernel
+// does not interpret it or use it to change authentication or database scope.
+func (s Session) WithPayload(payload []byte) Session {
+	s.payload = slices.Clone(payload)
+	return s
+}
+
+// Payload returns an independent copy; application owners validate their own
+// format and version. It is not a request or public HTTP serialization format.
+func (s Session) Payload() []byte { return slices.Clone(s.payload) }
 
 // Scope returns a copy. An accidentally bound zero Session denies database
 // access through the node guard, even when token permissions would be broader.
