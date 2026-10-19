@@ -12,6 +12,7 @@ package app
 
 import (
 	"context"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"slices"
 	"time"
 
@@ -21,7 +22,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/store"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -109,17 +109,17 @@ func (s *Service) deptCaller(ctx context.Context, want string) (caller, string, 
 	if s.DB == nil || s.Forms == nil || s.Control == nil {
 		return caller{}, "", ErrDependency.WithDetail("chưa nối cap/forms cho Kỳ KHTC")
 	}
-	p, k, err := authz.RequireKN(ctx)
+	p, k, err := extport.RequireSession(ctx)
 	if err != nil {
 		return caller{}, "", err
 	}
 	switch k.Role {
-	case authz.KNAdmin:
+	case extport.SessionRoleAdmin:
 		if !deptRe.MatchString(want) {
 			return caller{}, "", errInboxDept
 		}
 		return caller{p: p, k: k}, want, nil
-	case authz.KNTinh:
+	case extport.SessionRoleProvince:
 		if k.Department == "" || (want != "" && want != k.Department) {
 			return caller{}, "", problem.Forbidden.WithDetail("chỉ xem phiếu KHTC của phòng mình")
 		}
@@ -183,7 +183,7 @@ func (s *Service) DepartmentForms(ctx context.Context, q InboxQuery) (Inbox, err
 		in.DepartmentName = names[dept]
 	}
 	now := s.now()
-	admin := c.k.Role == authz.KNAdmin
+	admin := c.k.Role == extport.SessionRoleAdmin
 	for _, p := range ps {
 		row, ok := s.inboxRow(ctx, p, evs[p.ID], dept, now, in.ReadOnly, admin)
 		if !ok {

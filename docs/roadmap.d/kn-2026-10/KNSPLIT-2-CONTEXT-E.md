@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-CONTEXT-E: chuyển các consumer KHTC sang owner context; chờ45HTTP/PG, source/full5/static/helper thật trước dev.

@@ -1,12 +1,13 @@
 // Package app: use case Phòng Kế hoạch – Tài chính (W11.61, D4 KH1, BRD KHTC v2.2): Danh mục KHTC (FN-AD-04.01), danh
 // sách CT/DA chủ (quyết định D20 — KHTC là chủ, module khác tham chiếu qua extension/port.KHTCPrograms), Kế hoạch năm
 // 6 tab có phiên bản theo quyết định + ngày hiệu lực (FN-TI-02.02, BR-DL-13, BR-DL-21), sao chép từ năm trước, xuất /
-// nhập Excel. Quyền theo ngữ cảnh phiên KN (authz.RequireKN), không theo vai realm.
+// nhập Excel. Quyền theo ngữ cảnh phiên KN (port.RequireSession), không theo vai realm.
 package app
 
 import (
 	"context"
 	"errors"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -80,18 +81,18 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 
 type caller struct {
 	p authz.Principal
-	k authz.KNContext
+	k port.SessionContext
 }
 
 // reader: Admin; Cấp Tỉnh mọi phòng ban (phòng chuyên môn xem kế hoạch của phòng — FN-PN-03.03; lãnh đạo chỉ xem).
 // Cấp Quốc gia, Cấp Xã không có chức năng KHTC (ma trận BRD KHTC §VI).
 func (s *Service) reader(ctx context.Context) (caller, error) {
-	p, k, err := authz.RequireKN(ctx)
+	p, k, err := port.RequireSession(ctx)
 	if err != nil {
 		return caller{}, err
 	}
 	c := caller{p: p, k: k}
-	if k.Role != authz.KNAdmin && k.Role != authz.KNTinh {
+	if k.Role != port.SessionRoleAdmin && k.Role != port.SessionRoleProvince {
 		return c, problem.Forbidden.WithDetail("chỉ Admin và Cấp Tỉnh xem dữ liệu KHTC")
 	}
 	return c, nil
@@ -113,7 +114,7 @@ func (s *Service) planWriter(ctx context.Context) (caller, error) {
 	if err != nil {
 		return c, err
 	}
-	if c.k.Role != authz.KNAdmin && c.k.Department != DeptKHTC {
+	if c.k.Role != port.SessionRoleAdmin && c.k.Department != DeptKHTC {
 		return c, problem.Forbidden.WithDetail("chỉ Phòng Kế hoạch – Tài chính lập, điều chỉnh kế hoạch năm và danh sách CT/DA")
 	}
 	return c, c.checkWrite()
@@ -125,7 +126,7 @@ func (s *Service) catalogWriter(ctx context.Context) (caller, error) {
 	if err != nil {
 		return c, err
 	}
-	if c.k.Role != authz.KNAdmin {
+	if c.k.Role != port.SessionRoleAdmin {
 		return c, problem.Forbidden.WithDetail("chỉ Admin quản lý Danh mục KHTC")
 	}
 	return c, c.checkWrite()
