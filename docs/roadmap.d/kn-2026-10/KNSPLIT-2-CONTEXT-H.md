@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-CONTEXT-H: forms/reports dùng owner session KN; resolver xét trước native role; chờ kiểm thử thật và tích hợp dev.
