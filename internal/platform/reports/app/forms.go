@@ -56,24 +56,23 @@ var formAdmins = []string{port.RoleReportsAdmin, authz.RolePlatformAdmin}
 // formReader retains native realm roles; applications register their session
 // policy separately. A resolver error or explicit denial never falls back.
 func (s *Service) formReader(ctx context.Context, extra ...string) (authz.Principal, *port.SessionActor, error) {
-	p, err := authz.Require(ctx, append(append([]string{}, s.formReaderRoles()...), extra...)...)
-	if err == nil {
-		return p, nil, nil
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return authz.Principal{}, nil, problem.Unauthenticated
 	}
-	if q, ok := authz.FromContext(ctx); ok {
-		if s.ResolveSession != nil {
-			actor, handled, e := s.ResolveSession(ctx, q, port.SessionReadForms)
-			if e != nil {
-				return q, nil, e
+	if s.ResolveSession != nil {
+		actor, handled, err := s.ResolveSession(ctx, p, port.SessionReadForms)
+		if err != nil {
+			return p, nil, err
+		}
+		if handled {
+			if !actor.Allowed || actor.AllowsDepartment == nil {
+				return p, nil, problem.Forbidden
 			}
-			if handled {
-				if !actor.Allowed || actor.AllowsDepartment == nil {
-					return q, nil, problem.Forbidden
-				}
-				return q, &actor, nil
-			}
+			return p, &actor, nil
 		}
 	}
+	p, err := authz.Require(ctx, append(append([]string{}, s.formReaderRoles()...), extra...)...)
 	return p, nil, err
 }
 

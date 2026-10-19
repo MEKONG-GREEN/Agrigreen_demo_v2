@@ -78,9 +78,9 @@ func setupCNTS(t *testing.T, f *fixture) *cntsFx {
 	f.mu.Lock()
 	tinhKC := *f.ctxs[x.tinh.ctxID]
 	f.mu.Unlock()
-	x.tinhCtx = authz.WithPrincipal(ctx, authz.Principal{ActorRef: x.tinh.actor, TenantID: f.tenant, KN: &tinhKC})
-	adminCtx := authz.WithPrincipal(ctx, authz.Principal{ActorRef: ids.New(), TenantID: f.tenant,
-		KN: &authz.KNContext{ID: ids.New(), Role: authz.KNAdmin, Scope: authz.Scope{All: true}}})
+	x.tinhCtx = authz.WithPrincipal(ctx, bindKNTestSession(t, authz.Principal{ActorRef: x.tinh.actor, TenantID: f.tenant, KN: &tinhKC}))
+	adminCtx := authz.WithPrincipal(ctx, bindKNTestSession(t, authz.Principal{ActorRef: ids.New(), TenantID: f.tenant,
+		KN: &authz.KNContext{ID: ids.New(), Role: authz.KNAdmin, Scope: authz.Scope{All: true}}}))
 	fields := json.RawMessage(`[{"key":"heo","label":"Heo","type":"integer","required":true},
 	  {"key":"heo_luy_ke","label":"Heo lũy kế","type":"integer"},{"key":"ty_le","label":"Tỷ lệ","type":"decimal"},
 	  {"key":"ghi_chu","label":"Ghi chú","type":"text"}]`)

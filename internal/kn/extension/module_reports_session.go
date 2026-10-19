@@ -2,6 +2,8 @@ package extension
 
 import (
 	"context"
+
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -15,31 +17,35 @@ import (
 // permissions and filters; the capability binds Principal actor and tenant.
 func ReportSessionResolver(orgs partyport.Orgs) reportsport.SessionResolver {
 	return func(ctx context.Context, p authz.Principal, operation string) (reportsport.SessionActor, bool, error) {
-		if p.KN == nil {
+		// Keep native realm requests unhandled; the legacy marker supplies no permissions.
+		if p.SelectedSession == nil && p.KN == nil {
 			return reportsport.SessionActor{}, false, nil
 		}
-		k := *p.KN
-		a := reportsport.SessionActor{Department: k.Department, AllDepartments: k.Role == authz.KNAdmin,
-			AllowsDepartment: k.AllowsDepartment, UnmaskRecipients: k.Role == authz.KNTinh}
+		_, k, err := extport.RequireSession(authz.WithPrincipal(ctx, p))
+		if err != nil {
+			return reportsport.SessionActor{}, true, err
+		}
+		a := reportsport.SessionActor{Department: k.Department, AllDepartments: k.Role == extport.SessionRoleAdmin,
+			AllowsDepartment: k.AllowsDepartment, UnmaskRecipients: k.Role == extport.SessionRoleProvince}
 		if k.Support != nil {
 			id := k.Support.OnBehalfOf
 			a.OnBehalfOf = &id
 		}
 		switch operation {
 		case reportsport.SessionReadForms:
-			a.Allowed = slices.Contains([]string{authz.KNAdmin, authz.KNTW, authz.KNTinh, authz.KNXa}, k.Role)
+			a.Allowed = slices.Contains([]string{extport.SessionRoleAdmin, extport.SessionRoleNational, extport.SessionRoleProvince, extport.SessionRoleCommune}, k.Role)
 			return a, true, nil
 		case reportsport.SessionReadDispatch:
-			a.Allowed = slices.Contains([]string{authz.KNAdmin, authz.KNTW, authz.KNTinh}, k.Role)
+			a.Allowed = slices.Contains([]string{extport.SessionRoleAdmin, extport.SessionRoleNational, extport.SessionRoleProvince}, k.Role)
 		case reportsport.SessionWriteDispatch:
-			a.Allowed = k.Role == authz.KNTinh && !k.ReadOnly()
+			a.Allowed = k.Role == extport.SessionRoleProvince && !k.ReadOnly()
 		default:
 			return a, true, problem.Forbidden
 		}
 		if !a.Allowed {
 			return a, true, problem.Forbidden
 		}
-		if k.Role == authz.KNTW || k.Role == authz.KNAdmin || k.OrgRef == uuid.Nil {
+		if k.Role == extport.SessionRoleNational || k.Role == extport.SessionRoleAdmin || k.OrgRef == uuid.Nil {
 			a.AllProvinces = true
 			return a, true, nil
 		}
