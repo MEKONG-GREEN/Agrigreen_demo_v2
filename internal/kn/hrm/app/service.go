@@ -71,11 +71,15 @@ func (s *Service) resolve(ctx context.Context, write bool) (caller, error) {
 	}
 	c := caller{ref: p.ActorRef, tenant: p.TenantID}
 	read := false
-	if p.KN != nil {
-		r := p.KN.Role
-		c.manage = slices.Contains(s.Access.ManageBy, r) && !p.KN.ReadOnly()
+	if s.Access.Session != nil {
+		k, err := s.Access.Session(ctx)
+		if err != nil {
+			return c, err
+		}
+		r := k.Role
+		c.manage = slices.Contains(s.Access.ManageBy, r) && !k.ReadOnly
 		read = c.manage || slices.Contains(s.Access.ManageBy, r) ||
-			(slices.Contains(s.Access.ReadBy, r) && (s.Access.Department == "" || p.KN.Department == s.Access.Department))
+			(slices.Contains(s.Access.ReadBy, r) && (s.Access.Department == "" || k.Department == s.Access.Department))
 	} else {
 		for _, r := range p.Roles {
 			if slices.Contains(s.Access.ManageBy, r) {

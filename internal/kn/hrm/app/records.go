@@ -61,18 +61,29 @@ type rc struct {
 	m                    domain.Matrix
 }
 
+func (s *Service) recordSession(ctx context.Context) (port.SessionContext, error) {
+	if s.Access.Session == nil {
+		return port.SessionContext{}, problem.Forbidden.WithDetail("hồ sơ nhân sự: cần ngữ cảnh phiên Khuyến nông")
+	}
+	k, err := s.Access.Session(ctx)
+	if err != nil {
+		return port.SessionContext{}, problem.Forbidden.WithDetail("hồ sơ nhân sự: cần ngữ cảnh phiên Khuyến nông").WithCause(err)
+	}
+	return k, nil
+}
+
 // group suy nhóm vai của ma trận từ ngữ cảnh phiên KN (không lấy từ client).
-func (s *Service) group(k *authz.KNContext) string {
+func (s *Service) group(k port.SessionContext) string {
 	switch {
 	case slices.Contains(s.Access.ManageBy, k.Role):
 		return domain.GroupAdmin
 	case slices.Contains(s.Access.ReadBy, k.Role) && k.Department == s.Access.Department && !k.ViewOnly:
 		return domain.GroupHCTH
-	case k.Role == authz.KNTinh && k.Manager:
+	case k.Role == "kn_tinh" && k.Manager:
 		return domain.GroupManager
-	case k.Role == authz.KNTinh:
+	case k.Role == "kn_tinh":
 		return domain.GroupTinh
-	case k.Role == authz.KNXa:
+	case k.Role == "kn_xa":
 		return domain.GroupXa
 	}
 	return domain.GroupTW
@@ -90,12 +101,13 @@ func (s *Service) recCaller(ctx context.Context) (rc, error) {
 	if s.Rec.Vault == nil || s.Rec.Profiles == nil {
 		return rc{}, client.ProblemProfilesUnsupported
 	}
-	if p.KN == nil {
-		return rc{}, problem.Forbidden.WithDetail("hồ sơ nhân sự: cần ngữ cảnh phiên Khuyến nông")
+	k, err := s.recordSession(ctx)
+	if err != nil {
+		return rc{}, err
 	}
-	c := rc{ref: p.ActorRef, tenant: p.TenantID, unitRef: p.KN.UnitRef, group: s.group(p.KN), unit: p.KN.InternalUnit,
-		readOnly: p.KN.ReadOnly()}
-	err := s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
+	c := rc{ref: p.ActorRef, tenant: p.TenantID, unitRef: k.UnitRef, group: s.group(k), unit: k.InternalUnit,
+		readOnly: k.ReadOnly}
+	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
 		m, e := s.matrixOf(ctx, tx, c.group, c.ref)
 		c.m = m
 		return e

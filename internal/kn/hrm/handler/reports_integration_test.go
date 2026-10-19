@@ -250,7 +250,7 @@ func TestHRMDashboardBenchmark_W1128(t *testing.T) {
 	}
 	f := newRecFixture(t, true)
 	f.call("admin", http.MethodPost, "/v1/hrm/defaults", nil, http.StatusCreated)
-	ctx := authz.WithPrincipal(context.Background(), f.who["hcth"])
+	ctx := authz.WithPrincipal(context.Background(), bindTestSession(t, f.who["hcth"]))
 	units := []string{"trong_trot", "chan_nuoi", "hcth", "tram_cho_moi"}
 	const n = 1000
 	for i := 0; i < n; i++ {

@@ -77,11 +77,12 @@ func (s *Service) docCaller(ctx context.Context, tx pgx.Tx) (dc, error) {
 	if !ok {
 		return dc{}, problem.Unauthenticated
 	}
-	if p.KN == nil {
-		return dc{}, problem.Forbidden.WithDetail("kho tài liệu nhân sự: cần ngữ cảnh phiên Khuyến nông")
+	k, err := s.recordSession(ctx)
+	if err != nil {
+		return dc{}, problem.Forbidden.WithDetail("kho tài liệu nhân sự: cần ngữ cảnh phiên Khuyến nông").WithCause(err)
 	}
-	c := dc{rc: rc{ref: p.ActorRef, tenant: p.TenantID, unitRef: p.KN.UnitRef, group: s.group(p.KN), unit: p.KN.InternalUnit,
-		readOnly: p.KN.ReadOnly()}, recordsOn: s.recordsOn(), mine: map[string]bool{}}
+	c := dc{rc: rc{ref: p.ActorRef, tenant: p.TenantID, unitRef: k.UnitRef, group: s.group(k), unit: k.InternalUnit,
+		readOnly: k.ReadOnly}, recordsOn: s.recordsOn(), mine: map[string]bool{}}
 	m, err := s.matrixOf(ctx, tx, c.group, c.ref)
 	if err != nil {
 		return dc{}, err

@@ -9,12 +9,15 @@ zones: [pf]
 version: 1.0.0
 depends:
   pf/accounts: ">=1.0 <2"
+  pf/contact: ">=1.0 <2"
   pf/forms: ">=1.0 <2"
   pf/geo: ">=2.0 <3"
+  pf/hrm: ">=1.0 <2"
   pf/masterdata: ">=1.0 <2"
   pf/metrics: ">=1.0 <2"
   pf/notify: ">=1.0 <2"
   pf/party: ">=2.0 <3"
+  pf/price: ">=1.0 <2"
   pf/reports: ">=1.0 <2"
   pf/sync: ">=1.0 <2"
 provides:

@@ -69,8 +69,12 @@ func (s *Service) who(ctx context.Context) (caller, error) {
 	}
 	c := caller{ref: p.ActorRef, tenant: p.TenantID}
 	a := s.Access
-	if p.KN != nil {
-		r := p.KN.Role
+	if a.Session != nil {
+		k, err := a.Session(ctx)
+		if err != nil {
+			return c, err
+		}
+		r := k.Role
 		switch {
 		case slices.Contains(a.FullBy, r):
 			c.set = domain.SetFull
@@ -79,8 +83,8 @@ func (s *Service) who(ctx context.Context) (caller, error) {
 		default:
 			return c, problem.Forbidden.WithDetail("Contact: vai trò không có quyền xem danh bạ")
 		}
-		c.manage = !p.KN.ReadOnly() && (slices.Contains(a.ManageBy, r) ||
-			(slices.Contains(a.ManageDeptBy, r) && a.ManageDepartment != "" && p.KN.Department == a.ManageDepartment))
+		c.manage = !k.ReadOnly && (slices.Contains(a.ManageBy, r) ||
+			(slices.Contains(a.ManageDeptBy, r) && a.ManageDepartment != "" && k.Department == a.ManageDepartment))
 		return c, nil
 	}
 	for _, r := range p.Roles {

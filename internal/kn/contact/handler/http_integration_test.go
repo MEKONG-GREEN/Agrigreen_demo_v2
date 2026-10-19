@@ -57,7 +57,8 @@ func (labelsStub) CommuneNames(_ context.Context, codes []string) (map[string]st
 }
 
 var testAccess = port.Access{
-	FullBy: []string{authz.KNTinh, authz.KNAdmin}, BasicBy: []string{authz.KNTW, authz.KNXa},
+	Session: testOwnerSession,
+	FullBy:  []string{authz.KNTinh, authz.KNAdmin}, BasicBy: []string{authz.KNTW, authz.KNXa},
 	ManageBy: []string{authz.KNAdmin}, ManageDeptBy: []string{authz.KNTinh}, ManageDepartment: "hanh_chinh_tong_hop",
 	RealmFull: []string{"platform_admin"}, RealmBasic: []string{"kn_officer"}, RealmManage: []string{"platform_admin"},
 }
@@ -133,7 +134,7 @@ func newFixture(t *testing.T) *fixture {
 	lg := slog.New(slog.NewJSONHandler(f.logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	f.r.Use(func(c *gin.Context) {
 		if p, ok := f.who[c.GetHeader("X-Test-As")]; ok {
-			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
+			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindTestSession(t, p)))
 		}
 		c.Next()
 		lg.Info("request", "method", c.Request.Method, "path", c.FullPath(), "status", c.Writer.Status(), "errors", c.Errors.String())
@@ -189,13 +190,14 @@ func (f *fixture) seed() (mai, binh uuid.UUID) {
 // FN-13 B3, BR-03, AC-01, AC-03, AC-04: lọc trường ở API theo vai.
 func TestContact_FieldFiltering(t *testing.T) {
 	f := newFixture(t)
+	f.call("realm", http.MethodGet, "/v1/contacts/access", nil, http.StatusPreconditionRequired)
 	mai, binh := f.seed()
 	f.call("hcth", http.MethodPost, "/v1/contacts/persons", map[string]any{"full_name": "Nguyễn Văn Trung Ương", "phone": "0243000999",
 		"email": "tw@khuyennong.gov.vn", "birth_year": "1975", "level": "tw", "organization": "Trung tâm Khuyến nông Quốc gia",
 		"title": "Phó Giám đốc"}, http.StatusCreated)
 
 	// Cấp TW, Cấp Xã: đúng 4 khóa (id + 3 trường); không email, địa chỉ, chức danh, đơn vị, cấp, nguồn — kể cả ở mức byte.
-	for _, as := range []string{"tw", "xa", "realm"} {
+	for _, as := range []string{"tw", "xa"} {
 		raw := f.raw(as, http.MethodGet, "/v1/contacts/persons", nil, http.StatusOK)
 		var m map[string]any
 		_ = json.Unmarshal(raw, &m)

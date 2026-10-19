@@ -29,7 +29,9 @@ const PubSchema = "pf_price_pub"
 
 // Profile là cấu hình cap/price của một bên dùng (KN: cmd/api-platform/assembly/price.go).
 type Profile struct {
-	Name string
+	// Session is the configured owner policy. Nil selects native realm roles only.
+	Session SessionResolver `json:"-"`
+	Name    string
 	// Department: mã phòng ban chủ dữ liệu giá của bên dùng (KN: Phòng Thông tin – Truyền thông). Menu là cấu hình
 	// phòng ban của dom/extension; dữ liệu do pf/price sở hữu. Thông tin cho bên dùng — khung chưa lọc theo phòng ban.
 	Department string

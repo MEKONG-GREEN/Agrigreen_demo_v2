@@ -20,6 +20,8 @@ import (
 
 // Access là cấu hình quyền của bên dùng (KN: cmd/api-platform/assembly/hrm.go) — không so tên ứng dụng.
 type Access struct {
+	// Session is the configured owner policy. Nil selects native realm roles only.
+	Session SessionResolver `json:"-"`
 	// Department: mã phòng ban chủ (KN: hanh_chinh_tong_hop). Vai đọc phải có ngữ cảnh ở phòng ban này.
 	Department string
 	// ManageBy: vai ghi danh mục (FN-19: Admin — CRUD).

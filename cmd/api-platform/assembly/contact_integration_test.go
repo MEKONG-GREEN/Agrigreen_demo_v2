@@ -2,6 +2,7 @@ package assembly
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/contact"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -49,6 +51,18 @@ func TestContactOverHRM_W1123(t *testing.T) {
 		r := gin.New()
 		r.Use(func(c *gin.Context) {
 			if p, ok := who[c.GetHeader("X-Test-As")]; ok {
+				k := *p.KN
+				k.ID = ids.New() // synthetic fixture ID; production gets the server-resolved ID
+				p.KN = &k
+				registry, err := authz.NewSessionRegistry(extension.SessionProjection())
+				if err != nil {
+					t.Fatal(err)
+				}
+				selected, err := registry.ResolveSelected(context.Background(), p)
+				if err != nil {
+					t.Fatal(err)
+				}
+				p.SelectedSession = &selected
 				c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
 			}
 		})
