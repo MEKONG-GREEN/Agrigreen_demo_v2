@@ -1142,3 +1142,10 @@ Propagation rule: changed owner reader→all KHTC/KN77/API/worker/contextdata; n
 CONTEXT-E rerun scope: initial full5 exit1 chỉdo9catalog testcase mới gọiGETsaiURL/405,36owner cases khác+luồngcũPASS; dbadmin4.426/metrics112.782/API110.365/worker2.086s actualPASS. Sửa1URLtest theo route hiệnhành, khôngproductionđổi: rerun fullKN77+static-verified, giữ4siblingPASS trêncùngproduction và original failedlog; helpergate cần composite từngpackageactual0, không ghi aggregatefull5 đầu thànhPASS.
 
 CONTEXT-E accepted pre-helper: source35625 actual0; static-verified55017 codegatesactual0/lint0/boundary314+gofmt2old(GitblobunchangedLFfix). KN77-final34216 actual0/261.174s/noSKIP,45casesPASS. Full5 composite giữ4siblings actualPASS ởcore8def7127 vàKN77rerun0 sau1URLtestfixf415; khôngproductiondiff và35goldens/SQL/contracts giữ. PrivatePG đã dọn/Go0, originalfailedlog giữ. Helper9 cònphải đạttrướctíchtợp.
+
+
+## KNSPLIT-2-CONTEXT-F — material/outbreak owner consumers
+Downstream consumers: two module handlers, CNTS aggregate +KN77/KHTC, API/worker, contextdata. Sourcecodec/kernel/views/contracts unchanged base2f55c6a6.
+Dependency evidence: `rg -n 'authz.KN|RequireKN|WithPrincipal|outbreak|material' internal/kn/extension/material internal/kn/extension/outbreak tests/kn77 -g '*.go'` vàdiff.
+Regression acceptance command: privatePG/Go1.26.9 `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/extension/material/handler ./internal/kn/extension/outbreak/handler ./tests/contextdata`; full5 `go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker`.
+Propagation rule: changed security caller→all listed; unchanged KHTC/kernel/accounts/HTX source E/D exempt, full5 still root consumer guard. TEST-CTX-01312no-ownerHTTPcases; positive lifecycle existingPGsuite. Helper9+2handlers/contextdata/APIassembly; actualexit/noSKIP/clustercleanup/Go0/frozen35goldens required beforedev.

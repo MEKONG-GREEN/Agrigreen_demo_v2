@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-CONTEXT-F: vật tư/dịch bệnh dùngowner; chờsource/static/full5/helper PG thật trướcdev.

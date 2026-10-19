@@ -1,6 +1,6 @@
 // Package app: use case Báo cáo dịch bệnh BM-10 và báo nghi dịch (W11.49, D4 CN9, BRD CNTS v3.7 FN-11, UR-XA-10).
 //
-// Quyền theo ngữ cảnh phiên KN (authz.RequireKN), phòng Chăn nuôi – Thủy sản (ma trận FN-11: Admin CRU, Cấp Tỉnh R,
+// Quyền theo ngữ cảnh phiên KN (port.RequireSession), phòng Chăn nuôi – Thủy sản (ma trận FN-11: Admin CRU, Cấp Tỉnh R,
 // Cấp Xã CRU, Cấp TW không có): Cấp Xã lập/cập nhật ổ dịch, ghi nhận/xác nhận/bác bỏ báo nghi dịch trong các xã phụ
 // trách; Cấp Tỉnh xem toàn phạm vi và xác nhận kết thúc / mở lại ổ dịch (vòng đời BM-10); nhóm chỉ xem (Ban Giám đốc,
 // lãnh đạo xem phòng khác) chỉ đọc.
@@ -84,24 +84,24 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 
 type caller struct {
 	p authz.Principal
-	k authz.KNContext
+	k port.SessionContext
 }
 
-func (c caller) admin() bool { return c.k.Role == authz.KNAdmin }
+func (c caller) admin() bool { return c.k.Role == port.SessionRoleAdmin }
 
 // sees cho biết người gọi thấy dữ liệu của xã code.
 func (c caller) sees(code string) bool { return c.admin() || c.k.Scope.Allows(code) }
 
 // reader: Admin; Cấp Tỉnh, Cấp Xã của phòng Chăn nuôi – Thủy sản (FN-11). Cấp TW không có chức năng.
 func (s *Service) reader(ctx context.Context) (caller, error) {
-	p, k, err := authz.RequireKN(ctx)
+	p, k, err := port.RequireSession(ctx)
 	if err != nil {
 		return caller{}, err
 	}
 	c := caller{p: p, k: k}
 	switch {
-	case k.Role == authz.KNAdmin:
-	case (k.Role == authz.KNTinh || k.Role == authz.KNXa) && k.AllowsDepartment(DeptCNTS):
+	case k.Role == port.SessionRoleAdmin:
+	case (k.Role == port.SessionRoleProvince || k.Role == port.SessionRoleCommune) && k.AllowsDepartment(DeptCNTS):
 	default:
 		return c, problem.Forbidden.WithDetail("Báo cáo dịch bệnh thuộc phòng Chăn nuôi – Thủy sản (Admin, Cấp Tỉnh, Cấp Xã)")
 	}
@@ -124,7 +124,7 @@ func (s *Service) reporter(ctx context.Context) (caller, error) {
 	if err != nil {
 		return c, err
 	}
-	if !c.admin() && c.k.Role != authz.KNXa {
+	if !c.admin() && c.k.Role != port.SessionRoleCommune {
 		return c, problem.Forbidden.WithDetail("chỉ Cấp Xã lập, cập nhật báo cáo dịch bệnh; Cấp Tỉnh xem và xác nhận kết thúc")
 	}
 	if err := c.checkWrite(); err != nil {
@@ -142,7 +142,7 @@ func (s *Service) closer(ctx context.Context) (caller, error) {
 	if err != nil {
 		return c, err
 	}
-	if !c.admin() && c.k.Role != authz.KNTinh {
+	if !c.admin() && c.k.Role != port.SessionRoleProvince {
 		return c, problem.Forbidden.WithDetail("chỉ Cấp Tỉnh xác nhận kết thúc, mở lại ổ dịch")
 	}
 	return c, c.checkWrite()
