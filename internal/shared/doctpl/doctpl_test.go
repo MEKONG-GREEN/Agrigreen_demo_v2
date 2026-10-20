@@ -130,7 +130,7 @@ func TestRenderData(t *testing.T) {
 	if !strings.Contains(c.Text(), "Không có chỉ tiêu") || strings.Contains(c.Text(), "II. Địa bàn") {
 		t.Fatalf("danh sách rỗng:\n%s", c.Text())
 	}
-	if demoData().Hash() != demoData().Hash() || demo().Hash() == (Template{}).Hash() {
+	if a, b := demoData(), demoData(); a.Hash() != b.Hash() || demo().Hash() == (Template{}).Hash() {
 		t.Fatal("băm không ổn định")
 	}
 }

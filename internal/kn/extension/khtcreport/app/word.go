@@ -343,12 +343,13 @@ func priceItems(metrics []domain.SourceMetric) []doctpl.Item {
 			continue
 		}
 		it := doctpl.Item{"mat_hang": metric.Label, "dvt": metric.Unit, "ngay_truoc": "–", "tu_1": "–", "den_1": "–", "ngay_sau": "–", "tu_2": "–", "den_2": "–"}
-		keys := [][3]string{{"ngay_truoc", "tu_1", "den_1"}, {"ngay_sau", "tu_2", "den_2"}}
-		for i, day := range metric.Value.PriceDays {
-			if i >= 2 {
+		keys := [2][3]string{{"ngay_truoc", "tu_1", "den_1"}, {"ngay_sau", "tu_2", "den_2"}}
+		for i, k := range keys {
+			if i >= len(metric.Value.PriceDays) {
 				break
 			}
-			it[keys[i][0]], it[keys[i][1]], it[keys[i][2]] = vnDay(day.Day), VNNumber(day.Min.String()), VNNumber(day.Max.String())
+			day := metric.Value.PriceDays[i]
+			it[k[0]], it[k[1]], it[k[2]] = vnDay(day.Day), VNNumber(day.Min.String()), VNNumber(day.Max.String())
 		}
 		out = append(out, it)
 	}

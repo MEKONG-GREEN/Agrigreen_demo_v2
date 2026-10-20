@@ -18,11 +18,10 @@ const (
 )
 
 type renderer struct {
-	t     Template
-	d     Data
-	cur   map[string]Item // danh sách đang lặp → phần tử hiện tại
-	out   []docx.Block
-	items int
+	t   Template
+	d   Data
+	cur map[string]Item // danh sách đang lặp → phần tử hiện tại
+	out []docx.Block
 }
 
 // Render dựng tài liệu từ mẫu (đã Validate) và dữ liệu. Thiếu biến bắt buộc → ErrData.
