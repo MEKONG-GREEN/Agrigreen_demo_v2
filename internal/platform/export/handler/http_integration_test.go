@@ -31,11 +31,17 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/docx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
 func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
+
+// isProblem so mã lỗi (WithDetail tạo giá trị mới nên errors.Is không khớp).
+func isProblem(err error, want *problem.Problem) bool {
+	return err != nil && problem.From(err).Code == want.Code
+}
 
 func letter(version int, closing string) doctpl.Template {
 	return doctpl.Template{Key: "thu.cong_van", Version: version, Title: "Công văn thử", Owner: "pf/export",
@@ -198,7 +204,7 @@ func TestDocNumberGapSafe_W10_17(t *testing.T) {
 	// Thiếu biến bắt buộc → dựng lỗi SAU khi đã cấp số trong giao dịch → hủy cả giao dịch.
 	bad := request("thu:loi", "k1", nil)
 	delete(bad.Data.Vars, "noi_dung")
-	if _, err := f.svc.Export(ctx, bad); !errors.Is(err, port.ErrInvalid) {
+	if _, err := f.svc.Export(ctx, bad); !isProblem(err, port.ErrInvalid) {
 		t.Fatalf("thiếu biến phải export.invalid, có %v", err)
 	}
 	const n = 12
@@ -268,7 +274,7 @@ func TestTemplateVersionsImmutable_W10_17(t *testing.T) {
 		t.Fatal(err)
 	}
 	drift := f.service(letter(1, "Nội dung khác, cùng phiên bản."))
-	if _, err := drift.Export(ctx, request("thu:mau", "k2", nil)); !errors.Is(err, port.ErrTemplateDrift) {
+	if _, err := drift.Export(ctx, request("thu:mau", "k2", nil)); !isProblem(err, port.ErrTemplateDrift) {
 		t.Fatalf("cần export.template_drift, có %v", err)
 	}
 	v2 := f.service(letter(1, "Trân trọng./."), letter(2, "Trân trọng (bản 2)./."))
@@ -289,16 +295,21 @@ func TestTemplateVersionsImmutable_W10_17(t *testing.T) {
 			t.Fatalf("sổ chỉ ghi thêm phải chặn: %s", sql)
 		}
 	}
-	// Ghi thẳng bằng vai module: băm sai và mẫu không có trong sổ đều bị DB từ chối.
-	err = db.WithModuleTenantTx(context.Background(), f.b, app.DBModule, f.tid, func(tx pgx.Tx) error {
-		_, e := tx.Exec(context.Background(), `INSERT INTO pf_export.export_run (id, tenant_id, stream_key, subject, template_key, template_version,
+	// Ghi thẳng bằng vai module: mẫu không có trong sổ và băm byte sai đều bị DB từ chối.
+	insert := func(templateHash, bodyHash string) error {
+		return db.WithModuleTenantTx(context.Background(), f.b, app.DBModule, f.tid, func(tx pgx.Tx) error {
+			_, e := tx.Exec(context.Background(), `INSERT INTO pf_export.export_run (id, tenant_id, stream_key, subject, template_key, template_version,
   template_hash, input_hash, file_name, content_type, body, body_hash, event_time, actor_ref, idem_key, rule_version)
-  VALUES ($1, $2, 'run:thu:x', 'thu:x', 'thu.cong_van', 1, $3, $3, 'x.docx', $4, '\x00'::bytea, $3, now(), $1, 'x1', 'test')`,
-			ids.New(), f.tid, strings.Repeat("a", 64), docx.ContentType)
-		return e
-	})
-	if err == nil || !strings.Contains(err.Error(), "export_run_body_hash") {
-		t.Fatalf("băm sai phải bị CHECK chặn, có %v", err)
+  VALUES ($1, $2, 'run:thu:x', 'thu:x', 'thu.cong_van', 1, $3, $4, 'x.docx', $5, '\x00'::bytea, $4, now(), $1, $6, 'test')`,
+				ids.New(), f.tid, templateHash, bodyHash, docx.ContentType, "x-"+bodyHash[:8]+templateHash[:8])
+			return e
+		})
+	}
+	if err := insert(strings.Repeat("a", 64), strings.Repeat("b", 64)); err == nil || !strings.Contains(err.Error(), "recorded template version") {
+		t.Fatalf("mẫu không có trong sổ phải bị trigger chặn, có %v", err)
+	}
+	if err := insert(letter(1, "Trân trọng./.").Hash(), strings.Repeat("b", 64)); err == nil || !strings.Contains(err.Error(), "export_run_body_hash") {
+		t.Fatalf("băm byte sai phải bị CHECK chặn, có %v", err)
 	}
 }
 
