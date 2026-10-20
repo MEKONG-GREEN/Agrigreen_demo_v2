@@ -1142,6 +1142,283 @@ paths:
         "403": {description: "forbidden (thiếu vai vault_evidence_viewer) | hrm.records_disabled | mfa_required", $ref: "#/components/responses/Problem"}
         "404": {description: hrm.doc_not_found, $ref: "#/components/responses/Problem"}
         "503": {description: hrm.docs_unavailable, $ref: "#/components/responses/Problem"}
+  # W11.27 (BRD HCTH v3.0 FN-11, D3 H7): KẾ HOẠCH NHÂN LỰC NĂM — kỳ native cap/forms profile hrm_plan (đơn vị lá = đơn vị nội bộ
+  # W11.07). Phòng HCTH/Admin mở kỳ năm, tổng hợp, yêu cầu điều chỉnh/xác nhận, chốt, điều chỉnh sau chốt có lý do; lãnh đạo
+  # đơn vị lập, lưu nháp, gửi kế hoạch của đơn vị mình. Số hiện có, dự kiến nghỉ hưu tự tính từ hồ sơ tại ngày chốt (BR-01).
+# @ag-order: 487
+  /v1/hrm/plans:
+    get:
+      summary: Các kỳ kế hoạch nhân lực năm người gọi thấy (lãnh đạo đơn vị — kỳ có đơn vị mình), năm mới trước
+      operationId: hrmPlanList
+      tags: [hrm]
+      responses:
+        "200":
+          description: Danh sách kỳ
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmPlanPeriod"}}
+        "401": {description: unauthenticated, $ref: "#/components/responses/Problem"}
+        "403": {description: forbidden (chỉ Phòng HCTH, Admin, lãnh đạo đơn vị), $ref: "#/components/responses/Problem"}
+        "503": {description: hrm.plan_disabled, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Mở kỳ kế hoạch năm (B1) — hạn gửi, ngày chốt số liệu hiện có, đơn vị (vắng → mọi đơn vị nội bộ đang dùng)
+      operationId: hrmPlanOpen
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [year, due_on]
+              additionalProperties: false
+              properties:
+                year: {type: integer, minimum: 2020, maximum: 2100}
+                due_on: {type: string, format: date, description: "Hạn các đơn vị gửi (hết ngày, giờ VN)"}
+                cutoff_on: {type: string, format: date, description: "Ngày chốt số liệu hiện có (vắng → hôm nay)"}
+                units: {type: array, maxItems: 200, items: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$"}}
+      responses:
+        "201":
+          description: Đã mở kỳ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPlanPeriod"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.plan_exists, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 488
+  /v1/hrm/plans/{year}:
+    parameters:
+      - $ref: "#/components/parameters/HrmPlanYear"
+    get:
+      summary: Bảng tổng hợp đơn vị × chỉ tiêu (B3) kèm dòng Toàn Trung tâm (AC-02); lãnh đạo đơn vị chỉ thấy dòng đơn vị mình
+      operationId: hrmPlanSummary
+      tags: [hrm]
+      responses:
+        "200":
+          description: Bảng tổng hợp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPlanSummary"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.plan_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 489
+  /v1/hrm/plans/{year}/export:
+    parameters:
+      - $ref: "#/components/parameters/HrmPlanYear"
+    get:
+      summary: Xuất bảng tổng hợp ra Excel (Phòng HCTH, Admin)
+      operationId: hrmPlanExport
+      tags: [hrm]
+      responses:
+        "200":
+          description: Tệp .xlsx (Cache-Control no-store)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.plan_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 490
+  /v1/hrm/plans/{year}/close:
+    parameters:
+      - $ref: "#/components/parameters/HrmPlanYear"
+    post:
+      summary: Chốt kế hoạch năm — ảnh chụp đóng băng cap/forms; đơn vị chưa gửi thành "Không gửi"; trả bảng tổng hợp
+      operationId: hrmPlanClose
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Đã chốt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPlanSummary"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.plan_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.plan_closed, $ref: "#/components/responses/Problem"}
+# @ag-order: 491
+  /v1/hrm/plans/{year}/units/{unit}:
+    parameters:
+      - $ref: "#/components/parameters/HrmPlanYear"
+      - $ref: "#/components/parameters/HrmPlanUnit"
+    get:
+      summary: Kế hoạch của một đơn vị — số tự tính tại ngày chốt (kèm danh sách dự kiến nghỉ hưu), nháp, các lần gửi, điều chỉnh sau chốt
+      operationId: hrmPlanUnit
+      tags: [hrm]
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPlanUnit"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: "hrm.plan_not_found | hrm.plan_unit", $ref: "#/components/responses/Problem"}
+# @ag-order: 492
+  /v1/hrm/plans/{year}/units/{unit}/previous:
+    parameters:
+      - $ref: "#/components/parameters/HrmPlanYear"
+      - $ref: "#/components/parameters/HrmPlanUnit"
+    get:
+      summary: Sao chép từ năm trước (luồng phụ) — phần nhập của đơn vị ở kế hoạch năm trước (sau điều chỉnh); không ghi
+      operationId: hrmPlanPrevious
+      tags: [hrm]
+      responses:
+        "200":
+          description: Phần nhập năm trước
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [from_year, values]
+                properties:
+                  from_year: {type: integer}
+                  values: {$ref: "#/components/schemas/HrmPlanInput"}
+        "404": {description: "hrm.plan_no_previous | hrm.plan_unit", $ref: "#/components/responses/Problem"}
+# @ag-order: 493
+  /v1/hrm/plans/{year}/units/{unit}/draft:
+    parameters:
+      - $ref: "#/components/parameters/HrmPlanYear"
+      - $ref: "#/components/parameters/HrmPlanUnit"
+    put:
+      summary: Lưu nháp kế hoạch của đơn vị (lãnh đạo đơn vị; kỳ đang nhận bài)
+      operationId: hrmPlanDraft
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmPlanInput"}
+      responses:
+        "200":
+          description: Đã lưu nháp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [values, recorded_at]
+                properties:
+                  values: {$ref: "#/components/schemas/HrmPlanInput"}
+                  recorded_at: {type: string, format: date-time}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.plan_closed, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 494
+  /v1/hrm/plans/{year}/units/{unit}/submit:
+    parameters:
+      - $ref: "#/components/parameters/HrmPlanYear"
+      - $ref: "#/components/parameters/HrmPlanUnit"
+    post:
+      summary: Gửi kế hoạch cho Phòng HCTH (bài nộp cap/forms; số hiện có, dự kiến nghỉ hưu do máy chủ điền — BR-01; gửi sau hạn = Trễ hạn)
+      operationId: hrmPlanSubmit
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - {$ref: "#/components/schemas/HrmPlanInput"}
+                - type: object
+                  properties:
+                    base_version: {type: integer, minimum: 0, description: "Số lần gửi người dùng đã thấy (khóa lạc quan)"}
+      responses:
+        "201":
+          description: Đã gửi
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, version, values, submitted_at, late]
+                properties:
+                  id: {type: string, format: uuid}
+                  version: {type: integer}
+                  values: {$ref: "#/components/schemas/HrmPlanValues"}
+                  submitted_at: {type: string, format: date-time}
+                  late: {type: boolean}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: "forms.period_closed | forms.submission_accepted | forms.submission_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | forms.values_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 495
+  /v1/hrm/plans/{year}/units/{unit}/review:
+    parameters:
+      - $ref: "#/components/parameters/HrmPlanYear"
+      - $ref: "#/components/parameters/HrmPlanUnit"
+    post:
+      summary: Xác nhận (accepted) hoặc yêu cầu điều chỉnh (returned, ghi chú bắt buộc) bài gửi cuối — người rà soát khác người gửi
+      operationId: hrmPlanReview
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              additionalProperties: false
+              properties:
+                decision: {type: string, enum: [accepted, returned]}
+                note: {type: string, maxLength: 500}
+      responses:
+        "200":
+          description: Đã rà soát
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, version, decision]
+                properties:
+                  id: {type: string, format: uuid}
+                  version: {type: integer}
+                  decision: {type: string, enum: [accepted, returned]}
+                  review_note: {type: string}
+                  reviewed_at: {type: [string, "null"], format: date-time}
+        "403": {description: "forbidden | self_approval_forbidden", $ref: "#/components/responses/Problem"}
+        "404": {description: forms.submission_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: forms.already_reviewed, $ref: "#/components/responses/Problem"}
+# @ag-order: 496
+  /v1/hrm/plans/{year}/units/{unit}/adjustments:
+    parameters:
+      - $ref: "#/components/parameters/HrmPlanYear"
+      - $ref: "#/components/parameters/HrmPlanUnit"
+    post:
+      summary: Điều chỉnh sau chốt có lý do (BR-02) — Phòng HCTH, Admin; ảnh chụp chốt giữ nguyên, lịch sử điều chỉnh đầy đủ
+      operationId: hrmPlanAdjust
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - {$ref: "#/components/schemas/HrmPlanInput"}
+                - type: object
+                  required: [reason]
+                  properties:
+                    reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi điều chỉnh
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPlanAdjustment"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.plan_not_closed, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   # --- hết pf/hrm ---
   # --- pf/contact (cap/directory, W11.23 — BRD HCTH v3.0 FN-13 Contact; Q-071, Q-072): danh bạ liên hệ dùng chung. Một người =
   # một bản ghi = một chủ thể kho định danh (BR-01); cán bộ thuộc tỉnh chiếu từ hồ sơ nhân sự pf/hrm (cổng AG_HRM_RECORDS), liên
@@ -1205,6 +1482,20 @@ components:
       in: path
       required: true
       schema: {type: string, format: uuid}
+# @ag-order: 498
+    HrmPlanYear:
+      name: year
+      in: path
+      required: true
+      description: Năm kế hoạch (W11.27)
+      schema: {type: integer, minimum: 2020, maximum: 2100}
+# @ag-order: 499
+    HrmPlanUnit:
+      name: unit
+      in: path
+      required: true
+      description: Mã đơn vị nội bộ (W11.07)
+      schema: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$"}
   responses:
 # @ag-order: 508
     HrmEventWritten:
@@ -1953,3 +2244,152 @@ components:
             properties:
               award_code: {type: string, description: "Mã hình thức khen thưởng (award_form) đang dùng"}
               months: {type: integer, minimum: 1, maximum: 36}
+# @ag-order: 1111
+    HrmPlanPosition:
+      type: object
+      additionalProperties: false
+      required: [title, count]
+      properties:
+        title: {type: string, minLength: 1, maxLength: 200}
+        level: {type: string, maxLength: 100}
+        count: {type: integer, minimum: 1, maximum: 9999}
+        when: {type: string, maxLength: 100}
+        reason: {type: string, maxLength: 500}
+# @ag-order: 1112
+    HrmPlanInput:
+      type: object
+      description: Phần lãnh đạo đơn vị nhập (W11.27)
+      required: [leaving, additional]
+      properties:
+        leaving: {type: integer, minimum: 0, maximum: 9999, description: "Dự kiến nghỉ, chuyển công tác khác"}
+        additional: {type: integer, minimum: 0, maximum: 9999, description: "Số cần bổ sung"}
+        positions: {type: array, maxItems: 10, items: {$ref: "#/components/schemas/HrmPlanPosition"}}
+        note: {type: string, maxLength: 500}
+# @ag-order: 1113
+    HrmPlanValues:
+      allOf:
+        - {$ref: "#/components/schemas/HrmPlanInput"}
+        - type: object
+          required: [current, retiring, demand]
+          properties:
+            current: {type: integer, description: "Số nhân sự hiện có (tự tính tại ngày chốt)"}
+            retiring: {type: integer, description: "Dự kiến nghỉ hưu trong năm (tự tính)"}
+            demand: {type: integer, description: "Nhu cầu theo kế hoạch = hiện có − nghỉ hưu − nghỉ/chuyển khác + cần bổ sung"}
+# @ag-order: 1114
+    HrmPlanPeriod:
+      type: object
+      required: [year, label, period_ref, status, due_at, cutoff_on, units, submitted, opened_at]
+      properties:
+        year: {type: integer}
+        label: {type: string}
+        period_ref: {type: string, format: uuid, description: "Kỳ native cap/forms (profile hrm_plan)"}
+        status: {type: string, enum: [open, closed, reopened, cancelled]}
+        due_at: {type: string, format: date-time}
+        cutoff_on: {type: string, format: date}
+        units: {type: array, items: {type: string}}
+        submitted: {type: integer}
+        opened_at: {type: string, format: date-time}
+# @ag-order: 1115
+    HrmPlanStatus:
+      type: string
+      description: "not_started Chưa lập · draft Đang lập · submitted Đã gửi · returned Yêu cầu điều chỉnh · accepted Đã xác nhận · closed Đã chốt · missed Không gửi"
+      enum: [not_started, draft, submitted, returned, accepted, closed, missed]
+# @ag-order: 1116
+    HrmPlanRow:
+      type: object
+      required: [unit, unit_name, status, late, versions, decision, values, source, adjusted]
+      properties:
+        unit: {type: string}
+        unit_name: {type: string}
+        status: {$ref: "#/components/schemas/HrmPlanStatus"}
+        late: {type: boolean, description: "Gửi sau hạn (Trễ hạn)"}
+        versions: {type: integer}
+        decision: {type: string, enum: ["", accepted, returned]}
+        review_note: {type: string}
+        submitted_at: {type: [string, "null"], format: date-time}
+        values: {$ref: "#/components/schemas/HrmPlanValues"}
+        source: {type: string, enum: [auto, submitted, adjusted]}
+        adjusted: {type: boolean}
+# @ag-order: 1117
+    HrmPlanSummary:
+      type: object
+      required: [period, rows, totals, figures_available, can_manage, my_unit]
+      properties:
+        period: {$ref: "#/components/schemas/HrmPlanPeriod"}
+        rows: {type: array, items: {$ref: "#/components/schemas/HrmPlanRow"}}
+        totals:
+          type: object
+          required: [current, retiring, leaving, additional, demand]
+          properties:
+            current: {type: integer}
+            retiring: {type: integer}
+            leaving: {type: integer}
+            additional: {type: integer}
+            demand: {type: integer}
+        figures_available: {type: boolean, description: "false: hồ sơ nhân sự chưa bật (AG_HRM_RECORDS) — số tự tính = 0"}
+        can_manage: {type: boolean}
+        my_unit: {type: string, description: "Đơn vị người gọi lập kế hoạch (lãnh đạo đơn vị); rỗng nếu không"}
+# @ag-order: 1118
+    HrmPlanAdjustment:
+      type: object
+      required: [seq, values, reason, actor_ref, recorded_at]
+      properties:
+        seq: {type: integer}
+        values: {$ref: "#/components/schemas/HrmPlanValues"}
+        reason: {type: string}
+        actor_ref: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+# @ag-order: 1119
+    HrmPlanDraft:
+      type: object
+      required: [values, recorded_at]
+      properties:
+        values: {$ref: "#/components/schemas/HrmPlanInput"}
+        recorded_at: {type: string, format: date-time}
+# @ag-order: 1120
+    HrmPlanUnit:
+      type: object
+      required: [period, row, figures, draft, submissions, adjustments, can_edit, can_review, can_adjust]
+      properties:
+        period: {$ref: "#/components/schemas/HrmPlanPeriod"}
+        row: {$ref: "#/components/schemas/HrmPlanRow"}
+        figures:
+          type: object
+          required: [available, current, retiring, unknown, retirees]
+          properties:
+            available: {type: boolean}
+            current: {type: integer}
+            retiring: {type: integer}
+            unknown: {type: integer, description: "Người thiếu giới tính/ngày sinh — không tính được tuổi nghỉ hưu"}
+            retirees:
+              type: array
+              items:
+                type: object
+                required: [staff_id, code, full_name, retire_on]
+                properties:
+                  staff_id: {type: string, format: uuid}
+                  code: {type: string}
+                  full_name: {type: string, description: "Rỗng khi người gọi không được xem hồ sơ (FN-20)"}
+                  retire_on: {type: string, format: date}
+        draft:
+          oneOf:
+            - {$ref: "#/components/schemas/HrmPlanDraft"}
+            - {type: "null"}
+        submissions:
+          type: array
+          items:
+            type: object
+            required: [id, version, values, submitted_at, late, decision]
+            properties:
+              id: {type: string, format: uuid}
+              version: {type: integer}
+              values: {$ref: "#/components/schemas/HrmPlanValues"}
+              submitted_at: {type: string, format: date-time}
+              late: {type: boolean}
+              decision: {type: string, enum: ["", accepted, returned]}
+              review_note: {type: string}
+              reviewed_at: {type: [string, "null"], format: date-time}
+        adjustments: {type: array, items: {$ref: "#/components/schemas/HrmPlanAdjustment"}}
+        can_edit: {type: boolean}
+        can_review: {type: boolean}
+        can_adjust: {type: boolean}

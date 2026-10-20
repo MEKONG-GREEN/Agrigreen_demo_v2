@@ -8781,6 +8781,216 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/hrm/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các kỳ kế hoạch nhân lực năm người gọi thấy (lãnh đạo đơn vị — kỳ có đơn vị mình), năm mới trước */
+        get: operations["hrmPlanList"];
+        put?: never;
+        /** Mở kỳ kế hoạch năm (B1) — hạn gửi, ngày chốt số liệu hiện có, đơn vị (vắng → mọi đơn vị nội bộ đang dùng) */
+        post: operations["hrmPlanOpen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/plans/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+            };
+            cookie?: never;
+        };
+        /** Bảng tổng hợp đơn vị × chỉ tiêu (B3) kèm dòng Toàn Trung tâm (AC-02); lãnh đạo đơn vị chỉ thấy dòng đơn vị mình */
+        get: operations["hrmPlanSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/plans/{year}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+            };
+            cookie?: never;
+        };
+        /** Xuất bảng tổng hợp ra Excel (Phòng HCTH, Admin) */
+        get: operations["hrmPlanExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/plans/{year}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chốt kế hoạch năm — ảnh chụp đóng băng cap/forms; đơn vị chưa gửi thành "Không gửi"; trả bảng tổng hợp */
+        post: operations["hrmPlanClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/plans/{year}/units/{unit}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+                /** @description Mã đơn vị nội bộ (W11.07) */
+                unit: components["parameters"]["HrmPlanUnit"];
+            };
+            cookie?: never;
+        };
+        /** Kế hoạch của một đơn vị — số tự tính tại ngày chốt (kèm danh sách dự kiến nghỉ hưu), nháp, các lần gửi, điều chỉnh sau chốt */
+        get: operations["hrmPlanUnit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/plans/{year}/units/{unit}/previous": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+                /** @description Mã đơn vị nội bộ (W11.07) */
+                unit: components["parameters"]["HrmPlanUnit"];
+            };
+            cookie?: never;
+        };
+        /** Sao chép từ năm trước (luồng phụ) — phần nhập của đơn vị ở kế hoạch năm trước (sau điều chỉnh); không ghi */
+        get: operations["hrmPlanPrevious"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/plans/{year}/units/{unit}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+                /** @description Mã đơn vị nội bộ (W11.07) */
+                unit: components["parameters"]["HrmPlanUnit"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Lưu nháp kế hoạch của đơn vị (lãnh đạo đơn vị; kỳ đang nhận bài) */
+        put: operations["hrmPlanDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/plans/{year}/units/{unit}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+                /** @description Mã đơn vị nội bộ (W11.07) */
+                unit: components["parameters"]["HrmPlanUnit"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gửi kế hoạch cho Phòng HCTH (bài nộp cap/forms; số hiện có, dự kiến nghỉ hưu do máy chủ điền — BR-01; gửi sau hạn = Trễ hạn) */
+        post: operations["hrmPlanSubmit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/plans/{year}/units/{unit}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+                /** @description Mã đơn vị nội bộ (W11.07) */
+                unit: components["parameters"]["HrmPlanUnit"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xác nhận (accepted) hoặc yêu cầu điều chỉnh (returned, ghi chú bắt buộc) bài gửi cuối — người rà soát khác người gửi */
+        post: operations["hrmPlanReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/plans/{year}/units/{unit}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+                /** @description Mã đơn vị nội bộ (W11.07) */
+                unit: components["parameters"]["HrmPlanUnit"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Điều chỉnh sau chốt có lý do (BR-02) — Phòng HCTH, Admin; ảnh chụp chốt giữ nguyên, lịch sử điều chỉnh đầy đủ */
+        post: operations["hrmPlanAdjust"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/hrm/promotion": {
         parameters: {
             query?: never;
@@ -19501,6 +19711,140 @@ export interface components {
             /** @description Cần xử lý: Chưa nhập, Lưu nháp (nút Tiếp tục), Trễ hạn, Yêu cầu bổ sung */
             actionable: boolean;
         };
+        HrmPlanPosition: {
+            title: string;
+            level?: string;
+            count: number;
+            when?: string;
+            reason?: string;
+        };
+        /** @description Phần lãnh đạo đơn vị nhập (W11.27) */
+        HrmPlanInput: {
+            /** @description Dự kiến nghỉ, chuyển công tác khác */
+            leaving: number;
+            /** @description Số cần bổ sung */
+            additional: number;
+            positions?: components["schemas"]["HrmPlanPosition"][];
+            note?: string;
+        };
+        HrmPlanValues: components["schemas"]["HrmPlanInput"] & {
+            /** @description Số nhân sự hiện có (tự tính tại ngày chốt) */
+            current: number;
+            /** @description Dự kiến nghỉ hưu trong năm (tự tính) */
+            retiring: number;
+            /** @description Nhu cầu theo kế hoạch = hiện có − nghỉ hưu − nghỉ/chuyển khác + cần bổ sung */
+            demand: number;
+        };
+        HrmPlanPeriod: {
+            year: number;
+            label: string;
+            /**
+             * Format: uuid
+             * @description Kỳ native cap/forms (profile hrm_plan)
+             */
+            period_ref: string;
+            /** @enum {string} */
+            status: "open" | "closed" | "reopened" | "cancelled";
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date */
+            cutoff_on: string;
+            units: string[];
+            submitted: number;
+            /** Format: date-time */
+            opened_at: string;
+        };
+        /**
+         * @description not_started Chưa lập · draft Đang lập · submitted Đã gửi · returned Yêu cầu điều chỉnh · accepted Đã xác nhận · closed Đã chốt · missed Không gửi
+         * @enum {string}
+         */
+        HrmPlanStatus: "not_started" | "draft" | "submitted" | "returned" | "accepted" | "closed" | "missed";
+        HrmPlanRow: {
+            unit: string;
+            unit_name: string;
+            status: components["schemas"]["HrmPlanStatus"];
+            /** @description Gửi sau hạn (Trễ hạn) */
+            late: boolean;
+            versions: number;
+            /** @enum {string} */
+            decision: "" | "accepted" | "returned";
+            review_note?: string;
+            /** Format: date-time */
+            submitted_at?: string | null;
+            values: components["schemas"]["HrmPlanValues"];
+            /** @enum {string} */
+            source: "auto" | "submitted" | "adjusted";
+            adjusted: boolean;
+        };
+        HrmPlanSummary: {
+            period: components["schemas"]["HrmPlanPeriod"];
+            rows: components["schemas"]["HrmPlanRow"][];
+            totals: {
+                current: number;
+                retiring: number;
+                leaving: number;
+                additional: number;
+                demand: number;
+            };
+            /** @description false: hồ sơ nhân sự chưa bật (AG_HRM_RECORDS) — số tự tính = 0 */
+            figures_available: boolean;
+            can_manage: boolean;
+            /** @description Đơn vị người gọi lập kế hoạch (lãnh đạo đơn vị); rỗng nếu không */
+            my_unit: string;
+        };
+        HrmPlanAdjustment: {
+            seq: number;
+            values: components["schemas"]["HrmPlanValues"];
+            reason: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmPlanDraft: {
+            values: components["schemas"]["HrmPlanInput"];
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmPlanUnit: {
+            period: components["schemas"]["HrmPlanPeriod"];
+            row: components["schemas"]["HrmPlanRow"];
+            figures: {
+                available: boolean;
+                current: number;
+                retiring: number;
+                /** @description Người thiếu giới tính/ngày sinh — không tính được tuổi nghỉ hưu */
+                unknown: number;
+                retirees: {
+                    /** Format: uuid */
+                    staff_id: string;
+                    code: string;
+                    /** @description Rỗng khi người gọi không được xem hồ sơ (FN-20) */
+                    full_name: string;
+                    /** Format: date */
+                    retire_on: string;
+                }[];
+            };
+            draft: components["schemas"]["HrmPlanDraft"] | null;
+            submissions: {
+                /** Format: uuid */
+                id: string;
+                version: number;
+                values: components["schemas"]["HrmPlanValues"];
+                /** Format: date-time */
+                submitted_at: string;
+                late: boolean;
+                /** @enum {string} */
+                decision: "" | "accepted" | "returned";
+                review_note?: string;
+                /** Format: date-time */
+                reviewed_at?: string | null;
+            }[];
+            adjustments: components["schemas"]["HrmPlanAdjustment"][];
+            can_edit: boolean;
+            can_review: boolean;
+            can_adjust: boolean;
+        };
         /**
          * @description nltx — thường xuyên (Mẫu số 1); nlth — trước thời hạn (Mẫu số 2); tnvk — thâm niên vượt khung (Mẫu số 4)
          * @enum {string}
@@ -21797,8 +22141,12 @@ export interface components {
         HrmEventId: string;
         HrmFolderId: string;
         HrmDocId: string;
+        /** @description Năm kế hoạch (W11.27) */
+        HrmPlanYear: number;
         /** @description Ngày báo giá (giờ VN) */
         PriceBoardDay: string;
+        /** @description Mã đơn vị nội bộ (W11.07) */
+        HrmPlanUnit: string;
         /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
         PriceProfile: string;
         /** @description Ngày báo giá YYYY-MM-DD (vắng → hôm nay, giờ VN) */
@@ -39911,6 +40259,401 @@ export interface operations {
                 };
             };
             /** @description extension.khtc_import_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách kỳ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmPlanPeriod"][];
+                    };
+                };
+            };
+            /** @description unauthenticated */
+            401: components["responses"]["Problem"];
+            /** @description forbidden (chỉ Phòng HCTH */
+            403: components["responses"]["Problem"];
+            /** @description hrm.plan_disabled */
+            503: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanOpen: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    year: number;
+                    /**
+                     * Format: date
+                     * @description Hạn các đơn vị gửi (hết ngày, giờ VN)
+                     */
+                    due_on: string;
+                    /**
+                     * Format: date
+                     * @description Ngày chốt số liệu hiện có (vắng → hôm nay)
+                     */
+                    cutoff_on?: string;
+                    units?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã mở kỳ */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPlanPeriod"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.plan_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng tổng hợp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPlanSummary"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.plan_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.plan_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanClose: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã chốt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPlanSummary"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.plan_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.plan_closed */
+            409: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanUnit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+                /** @description Mã đơn vị nội bộ (W11.07) */
+                unit: components["parameters"]["HrmPlanUnit"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPlanUnit"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.plan_not_found | hrm.plan_unit */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanPrevious: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+                /** @description Mã đơn vị nội bộ (W11.07) */
+                unit: components["parameters"]["HrmPlanUnit"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phần nhập năm trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        from_year: number;
+                        values: components["schemas"]["HrmPlanInput"];
+                    };
+                };
+            };
+            /** @description hrm.plan_no_previous | hrm.plan_unit */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+                /** @description Mã đơn vị nội bộ (W11.07) */
+                unit: components["parameters"]["HrmPlanUnit"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmPlanInput"];
+            };
+        };
+        responses: {
+            /** @description Đã lưu nháp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        values: components["schemas"]["HrmPlanInput"];
+                        /** Format: date-time */
+                        recorded_at: string;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.plan_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanSubmit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+                /** @description Mã đơn vị nội bộ (W11.07) */
+                unit: components["parameters"]["HrmPlanUnit"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmPlanInput"] & {
+                    /** @description Số lần gửi người dùng đã thấy (khóa lạc quan) */
+                    base_version?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã gửi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        version: number;
+                        values: components["schemas"]["HrmPlanValues"];
+                        /** Format: date-time */
+                        submitted_at: string;
+                        late: boolean;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.period_closed | forms.submission_accepted | forms.submission_conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | forms.values_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanReview: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+                /** @description Mã đơn vị nội bộ (W11.07) */
+                unit: components["parameters"]["HrmPlanUnit"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "accepted" | "returned";
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã rà soát */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        version: number;
+                        /** @enum {string} */
+                        decision: "accepted" | "returned";
+                        review_note?: string;
+                        /** Format: date-time */
+                        reviewed_at?: string | null;
+                    };
+                };
+            };
+            /** @description forbidden | self_approval_forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.submission_not_found */
+            404: components["responses"]["Problem"];
+            /** @description forms.already_reviewed */
+            409: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanAdjust: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+                /** @description Mã đơn vị nội bộ (W11.07) */
+                unit: components["parameters"]["HrmPlanUnit"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmPlanInput"] & {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi điều chỉnh */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPlanAdjustment"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.plan_not_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
             422: components["responses"]["Problem"];
         };
     };
