@@ -148,7 +148,7 @@ func TestScheduleViewOnlyCannotWriteOrApprove(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !a.ReadOnly || a.mayApprove(ScheduleSettings{ApproverRule: port.ApproverRuleFollower}) {
+			if !a.ReadOnly || a.mayApprove(ScheduleSettings{ApproverRule: port.ApproverRuleFollower}) || a.mayApprove(ScheduleSettings{ApproverRule: port.ApproverRuleLevels}) {
 				t.Fatal("view-only retained approval")
 			}
 			sc := domain.Schedule{Department: a.Department, ProvinceCode: a.ProvinceCode, OwnerRef: uuid.New()}

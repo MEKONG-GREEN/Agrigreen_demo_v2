@@ -108,6 +108,9 @@ func (s *Service) deptSettings(ctx context.Context, st *ScheduleSettings, dept, 
 // mayApprove: người gọi (Cấp Tỉnh) có thẩm quyền duyệt theo quy tắc của phòng ban. "levels": cấp quản lý được duyệt
 // (Q-05). "follower": người theo dõi được phân công (cờ nhiệm vụ) hoặc lãnh đạo phòng (FN-12 BR-04).
 func (a knActor) mayApprove(st ScheduleSettings) bool {
+	if a.ReadOnly {
+		return false
+	}
 	if st.ApproverRule != port.ApproverRuleFollower {
 		return domain.ApproverLevelAllowed(a.MgmtLevel, st.ApproverLevels)
 	}
