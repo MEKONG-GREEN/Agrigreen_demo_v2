@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-4B-NOTIFY: resolver hộp thư công vụ theo tenant do KN sở hữu, worker luôn nối/thiếu mapping giữ pending không fallback global; generic nilresolver giữnative. Core07d904fc/test0bda992c, chờchecks thật/helperdev. [Giả định](../../kn/gia-dinh/KNSPLIT-4B-NOTIFY.md), [runbook](../../runbooks/kn-digest-recipients.md). Không phải hoàn tất tenantmove/G1.

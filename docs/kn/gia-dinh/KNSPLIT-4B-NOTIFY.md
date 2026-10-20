@@ -1,0 +1,11 @@
+## KNSPLIT-4B-NOTIFY — Người nhận email KN theo tenant
+
+Nền a4dbc7e2, core07d904fc và test0bda992c. Bổ sung callback generic notify/port.DigestRecipients(ctx,tenantID). Có resolver thì kết quả là nguồn duy nhất; lỗi/rỗng giữ queue và không fallback DigestTo. Không resolver giữ hành vi native cũ. Notify không nhận thêm KN kind/role/tenant rule, không DDL/ACL/golden/API đổi.
+
+KN sở hữu NewDigestRecipients: đọc startup JSON strict array tenant_id/to, UUID chuẩn khôngzero, objectkeys khôngtrùng/unknown, khôngtrailing, mỗi tenantduynhất, mailboxexact khôngdisplayname/CRLF, addresscasefold khôngtrùng trong/crossCenter, tốiđa1MiB/1024tenant/50mailbox mỗiCenter. Configrỗng/[] tạo denyresolver; parsererrors chỉsentinel không inJSON/mailbox. Mapfrozen closure, sliceout clone, contextcancel được giữ. Chỉ hộp thưcôngvụ đãduyệt; parser không thể tự chứngminh mộtemail làcôngvụ, trách nhiệm cấu hình vận hành.
+
+Worker buildNotify dùng notifyDeliveryDeps chung cho lazyconsumer và job; luôn nối KN resolver từ AG_KN_DIGEST_RECIPIENTS_JSON trước mởpool. Queue hiện đăngký một nguồn KN NotificationDigest; core không tự phân loại tenant/kind. Existing AG_SMTP_DIGEST_TO không còn làfallback cho queue KN, kểcả legacytenant. Cần mappingtenant KN hiện tại trước tiếp tục email; pendingkhôngmất khi thiếu. Không sửa env triển khai, không gửiemailthật.
+
+HaiTenantPG actualrootnotify + eventinbox/digestqueue/schedulejob vàcapturingMailer: địa chỉ/nộidungriêng, unknown/emptyresolverkhôngglobalfallback, SMTPlỗi giữpending/retry, khônggửilại,sangtrang201mục (200+1), nativecallbacknil giữglobal. Parserunit kiểmmalformed/collision/defensiveclones; workerunit chạy actualfactory vàbuildNotifyinvalidconfig trướcDB. Không claim delivery exactlyonce nếuSMTP nhậnthư rồiDBcommitlỗi: cơ chếtransaction+retrycũ vẫn có cửa sổ gửi lại, không đổi tronggói này.
+
+Cổng: privatePG Go1.26.9 go test-v-count1-p1-timeout55m cho extensionroot/notify.../testsnotify/worker/notifyconsumers; staticfullnolint trước, lint theođiềuphối root. Sourcefreeze own tree suốtchecks. 35goldens/migrations/contracts khôngđổi; boundary314. Chưa có kết quả ởcommit tài liệu đầu. Rootduynhất helper/rebase/pushdev, giữmain/worktrees; khôngreset/muausage. Đây chỉgói chặnngườinhậnsai trướctenantmove; G1/4bchưaxong. POtenantmỗiTrungtâmtỉnh/MRVHTX-MKG/D2chỉhồsơKN/M1–M7/mẫunạpsẵngiữ.
