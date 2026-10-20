@@ -210,6 +210,17 @@
               "Children": null
             }
           ]
+        },
+        {
+          "Key": "admin.qt.mau_van_ban",
+          "Label": "Mẫu văn bản & lịch sử xuất",
+          "Route": "/kn/quan-tri/mau-van-ban",
+          "Icon": "report",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
         }
       ]
     },

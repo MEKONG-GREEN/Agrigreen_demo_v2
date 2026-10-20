@@ -9159,6 +9159,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/periods/{id}/report/exports/{exportID}/word": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xuất Word (.docx) từ nội dung đóng băng của một bản Excel — qua pf/export, tự cấp số {n}/BC-TTKN khi ô số trống (W10.17) */
+        post: operations["extensionKhtcReportWordExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/words": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử các lần xuất Word của báo cáo (mới nhất trước) */
+        get: operations["extensionKhtcReportWordHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/words/{runID}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải nguyên tệp Word đã lưu (kiểm băm SHA-256) */
+        get: operations["extensionKhtcReportWordDownload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/exports/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mẫu văn bản (cap/export): khóa, phiên bản đăng ký và đã ghi sổ trong đơn vị, biến, danh sách, mục — W10.17 */
+        get: operations["exportTemplatesList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/exports/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử lần xuất văn bản của đơn vị (không kèm tệp), mới nhất trước */
+        get: operations["exportRunsList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/exports/runs/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải lại tệp .docx đã lưu của một lần xuất (kiểm băm SHA-256) */
+        get: operations["exportRunDownload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/projects": {
         parameters: {
             query?: never;
@@ -19793,6 +19895,78 @@ export interface components {
         };
         KHTCReportExportList: {
             items: components["schemas"]["KHTCReportExport"][];
+        };
+        KHTCReportWord: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            template: string;
+            template_version: number;
+            template_hash: string;
+            input_hash: string;
+            doc_number: string;
+            doc_number_auto: boolean;
+            file_name: string;
+            body_hash: string;
+            size: number;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCReportWordList: {
+            items: components["schemas"]["KHTCReportWord"][];
+        };
+        ExportTemplateVersion: {
+            version: number;
+            hash: string;
+            registered: boolean;
+            /** Format: date-time */
+            recorded_at: string | null;
+            drift: boolean;
+        };
+        ExportTemplate: {
+            key: string;
+            title: string;
+            owner: string;
+            latest: number;
+            vars: {
+                key: string;
+                label: string;
+                required?: boolean;
+            }[];
+            lists: {
+                key: string;
+                label: string;
+                fields: string[];
+            }[];
+            sections: string[];
+            versions: components["schemas"]["ExportTemplateVersion"][];
+        };
+        ExportTemplateList: {
+            items: components["schemas"]["ExportTemplate"][];
+        };
+        ExportRun: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            subject: string;
+            template: string;
+            template_version: number;
+            template_hash: string;
+            input_hash: string;
+            doc_number: string;
+            doc_number_auto: boolean;
+            file_name: string;
+            body_hash: string;
+            size: number;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        ExportRunList: {
+            items: components["schemas"]["ExportRun"][];
         };
         CNTSPoint: {
             lat: number;
@@ -40137,6 +40311,171 @@ export interface operations {
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportWordExport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                exportID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportWord"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportWordHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportWordList"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportWordDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                runID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    exportTemplatesList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportTemplateList"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    exportRunsList: {
+        parameters: {
+            query?: {
+                template?: string;
+                subject?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRunList"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    exportRunDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };

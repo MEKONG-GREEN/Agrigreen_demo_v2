@@ -4267,6 +4267,15 @@
           "children": []
          }
         ]
+       },
+       {
+        "key": "admin.qt.mau_van_ban",
+        "label": "Mẫu văn bản \u0026 lịch sử xuất",
+        "route": "/kn/quan-tri/mau-van-ban",
+        "icon": "report",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      },

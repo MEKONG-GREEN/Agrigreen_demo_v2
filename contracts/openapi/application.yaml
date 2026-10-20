@@ -12901,6 +12901,117 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/report/exports/{exportID}/word:
+    post:
+      summary: "Xuất Word (.docx) từ nội dung đóng băng của một bản Excel — qua pf/export, tự cấp số {n}/BC-TTKN khi ô số trống (W10.17)"
+      operationId: extensionKhtcReportWordExport
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: exportID, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type": "object", "properties": {}, "required": [], "additionalProperties": false}
+      responses:
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCReportWord"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/report/words:
+    get:
+      summary: "Lịch sử các lần xuất Word của báo cáo (mới nhất trước)"
+      operationId: extensionKhtcReportWordHistory
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCReportWordList"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/report/words/{runID}/download:
+    get:
+      summary: "Tải nguyên tệp Word đã lưu (kiểm băm SHA-256)"
+      operationId: extensionKhtcReportWordDownload
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: runID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: {type: string, format: binary}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/exports/templates:
+    get:
+      summary: "Mẫu văn bản (cap/export): khóa, phiên bản đăng ký và đã ghi sổ trong đơn vị, biến, danh sách, mục — W10.17"
+      operationId: exportTemplatesList
+      tags: [export]
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/ExportTemplateList"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/exports/runs:
+    get:
+      summary: "Lịch sử lần xuất văn bản của đơn vị (không kèm tệp), mới nhất trước"
+      operationId: exportRunsList
+      tags: [export]
+      parameters:
+        - {name: template, in: query, required: false, schema: {type: string}}
+        - {name: subject, in: query, required: false, schema: {type: string}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/ExportRunList"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/exports/runs/{id}/download:
+    get:
+      summary: "Tải lại tệp .docx đã lưu của một lần xuất (kiểm băm SHA-256)"
+      operationId: exportRunDownload
+      tags: [export]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: {type: string, format: binary}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/projects:
     get:
       summary: "Chương trình, dự án CNTS trong phạm vi (UR-TINH-19, W11.47)"
@@ -22522,6 +22633,13 @@ components:
     KHTCReportExportInput: {"type":"object","properties":{"base_version":{"type":"integer","minimum":1},"acknowledge_provisional":{"type":"boolean"},"filter":{"$ref":"#/components/schemas/KHTCReportFilter"}},"required":["base_version"],"additionalProperties":false}
     KHTCReportExport: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"period_id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"draft_id":{"type":"string","format":"uuid"},"file_name":{"type":"string"},"body_hash":{"type":"string"},"input_hash":{"type":"string"},"provisional":{"type":"boolean"},"filter":{"$ref":"#/components/schemas/KHTCReportFilter"},"actor_ref":{"type":"string","format":"uuid"},"at":{"type":"string","format":"date-time"}},"required":["id","period_id","version","draft_id","file_name","body_hash","input_hash","provisional","filter","actor_ref","at"],"additionalProperties":false}
     KHTCReportExportList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportExport"}}},"required":["items"],"additionalProperties":false}
+    KHTCReportWord: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"seq":{"type":"integer"},"template":{"type":"string"},"template_version":{"type":"integer"},"template_hash":{"type":"string"},"input_hash":{"type":"string"},"doc_number":{"type":"string"},"doc_number_auto":{"type":"boolean"},"file_name":{"type":"string"},"body_hash":{"type":"string"},"size":{"type":"integer"},"actor_ref":{"type":"string","format":"uuid"},"at":{"type":"string","format":"date-time"}},"required":["id","seq","template","template_version","template_hash","input_hash","doc_number","doc_number_auto","file_name","body_hash","size","actor_ref","at"],"additionalProperties":false}
+    KHTCReportWordList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportWord"}}},"required":["items"],"additionalProperties":false}
+    ExportTemplateVersion: {"type":"object","properties":{"version":{"type":"integer"},"hash":{"type":"string"},"registered":{"type":"boolean"},"recorded_at":{"type":["string","null"],"format":"date-time"},"drift":{"type":"boolean"}},"required":["version","hash","registered","recorded_at","drift"],"additionalProperties":false}
+    ExportTemplate: {"type":"object","properties":{"key":{"type":"string"},"title":{"type":"string"},"owner":{"type":"string"},"latest":{"type":"integer"},"vars":{"type":"array","items":{"type":"object","properties":{"key":{"type":"string"},"label":{"type":"string"},"required":{"type":"boolean"}},"required":["key","label"],"additionalProperties":false}},"lists":{"type":"array","items":{"type":"object","properties":{"key":{"type":"string"},"label":{"type":"string"},"fields":{"type":"array","items":{"type":"string"}}},"required":["key","label","fields"],"additionalProperties":false}},"sections":{"type":"array","items":{"type":"string"}},"versions":{"type":"array","items":{"$ref":"#/components/schemas/ExportTemplateVersion"}}},"required":["key","title","owner","latest","vars","lists","sections","versions"],"additionalProperties":false}
+    ExportTemplateList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/ExportTemplate"}}},"required":["items"],"additionalProperties":false}
+    ExportRun: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"seq":{"type":"integer"},"subject":{"type":"string"},"template":{"type":"string"},"template_version":{"type":"integer"},"template_hash":{"type":"string"},"input_hash":{"type":"string"},"doc_number":{"type":"string"},"doc_number_auto":{"type":"boolean"},"file_name":{"type":"string"},"body_hash":{"type":"string"},"size":{"type":"integer"},"actor_ref":{"type":"string","format":"uuid"},"at":{"type":"string","format":"date-time"}},"required":["id","seq","subject","template","template_version","template_hash","input_hash","doc_number","doc_number_auto","file_name","body_hash","size","actor_ref","at"],"additionalProperties":false}
+    ExportRunList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/ExportRun"}}},"required":["items"],"additionalProperties":false}
     CNTSPoint: {"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"source":{"type":"string","enum":["gps","map"]}},"required":["lat","lng","source"],"additionalProperties":false}
     CNTSProjectVersion: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"province_code":{"type":"string"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string","enum":["tinh","knqg","hop_tac"]},"basis":{"type":["string","null"]},"scale_note":{"type":["string","null"]},"start_date":{"type":"string","format":"date"},"end_date":{"type":["string","null"],"format":"date"},"budget":{"type":["string","null"]},"manager_ref":{"type":"string","format":"uuid"},"program_ref":{"type":["string","null"],"format":"uuid"},"training_note":{"type":["string","null"]},"supplies_note":{"type":["string","null"]},"attachment_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"actor_display":{"type":["string","null"]}},"required":["ref","event","province_code","code","name","kind","basis","scale_note","start_date","end_date","budget","manager_ref","program_ref","training_note","supplies_note","attachment_refs","status_reason","version","updated_at","updated_by","actor_display"],"additionalProperties":false}
     CNTSProject: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"province_code":{"type":"string"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string","enum":["tinh","knqg","hop_tac"]},"basis":{"type":["string","null"]},"scale_note":{"type":["string","null"]},"start_date":{"type":"string","format":"date"},"end_date":{"type":["string","null"],"format":"date"},"budget":{"type":["string","null"]},"manager_ref":{"type":"string","format":"uuid"},"program_ref":{"type":["string","null"],"format":"uuid"},"training_note":{"type":["string","null"]},"supplies_note":{"type":["string","null"]},"attachment_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"status":{"type":"string","enum":["active","closed"]},"site_count":{"type":"integer"},"household_count":{"type":"integer"},"can_edit":{"type":"boolean"},"manager_display":{"type":["string","null"]}},"required":["ref","event","province_code","code","name","kind","basis","scale_note","start_date","end_date","budget","manager_ref","program_ref","training_note","supplies_note","attachment_refs","status_reason","version","updated_at","updated_by","status","site_count","household_count","can_edit","manager_display"],"additionalProperties":false}

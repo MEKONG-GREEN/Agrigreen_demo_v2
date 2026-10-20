@@ -2088,6 +2088,12 @@ const ADMIN_SYSTEM: Group = {
           "icon": "shield"
         }
       ]
+    },
+    {
+      "key": "admin.qt.mau_van_ban",
+      "label": "Mẫu văn bản & lịch sử xuất",
+      "route": "/kn/quan-tri/mau-van-ban",
+      "icon": "report"
     }
   ]
 };
