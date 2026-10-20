@@ -14,7 +14,6 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/integration-gateway/gateway"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/integration"
-	apiclientdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/domain"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
@@ -148,6 +147,7 @@ func TestPriceBoardFeedOverGateway_W1181(t *testing.T) {
 		t.Fatalf("trang feed không lộ tenant đơn vị công bố: %s", r.raw)
 	}
 	next := r.body["next_cursor"].(string)
+	first := next // seq 2 — dưới phần sẽ dọn ở cuối kiểm thử
 	_, _, otherKey := e.onboard(100)
 	if r := get("/v1/feeds/"+feedPrice, otherKey); r.status != http.StatusForbidden || r.code() != apiclientport.ErrForbidden.Code {
 		t.Fatalf("thiếu scope feed → 403: %d %s", r.status, r.raw)
@@ -202,7 +202,7 @@ func TestPriceBoardFeedOverGateway_W1181(t *testing.T) {
 	if _, err := admin.Exec(ctx, `UPDATE pf_apiclient.feed_head SET purged_through = 3 WHERE tenant_id = $1::uuid AND feed = $2::text`, e.operator, feedPrice); err != nil {
 		t.Fatal(err)
 	}
-	r = get("/v1/feeds/"+feedPrice+"?cursor="+apiclientdomain.EncodeCursor(1), key)
+	r = get("/v1/feeds/"+feedPrice+"?cursor="+first, key)
 	if r.status != http.StatusGone || r.code() != apiclientport.ErrCursorExpired.Code || !strings.Contains(string(r.raw), "/v1/snapshots/"+feedPrice+"/3") {
 		t.Fatalf("cursor quá hạn → 410 kèm snapshot: %d %s", r.status, r.raw)
 	}

@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -159,8 +160,8 @@ func TestPricePublicFeed_W1181(t *testing.T) {
 	op("approve", 1)
 	m, raw := recs(tid)
 	l := line(m, "MH00001")
-	if len(m) != 2 || l["price_min"] != "8000" || l["price_max"] != "10000" || l["price_avg"] != "9000" || l["points_reported"] != float64(2) ||
-		l["board_version"] != float64(1) || l["updating"] != false || l["week_key"] != "2026-W41" || l["province_code"] != "89" ||
+	if len(m) != 2 || l["price_min"] != "8000" || l["price_max"] != "10000" || l["price_avg"] != "9000" || fmt.Sprint(l["points_reported"]) != "2" ||
+		fmt.Sprint(l["board_version"]) != "1" || l["updating"] != false || l["week_key"] != "2026-W41" || l["province_code"] != "89" ||
 		l["item_name"] != "Dưa leo Loại 1" || l["group_code"] != "rau_mau" || l["unit_code"] != "kg" || l["approved_at"] == "" {
 		t.Fatalf("v1: %v", m)
 	}
@@ -175,12 +176,12 @@ func TestPricePublicFeed_W1181(t *testing.T) {
 	// Mở duyệt (BR-04 FN-TI-02.06): vẫn số v1, nhãn "Đang cập nhật"; hủy mở duyệt → bỏ nhãn.
 	op("reopen", 2)
 	m, _ = recs(tid)
-	if l = line(m, "MH00001"); l["updating"] != true || l["board_version"] != float64(1) || l["price_min"] != "8000" {
+	if l = line(m, "MH00001"); l["updating"] != true || fmt.Sprint(l["board_version"]) != "1" || l["price_min"] != "8000" {
 		t.Fatalf("mở duyệt: %v", l)
 	}
 	op("cancel-reopen", 3)
 	m, _ = recs(tid)
-	if l = line(m, "MH00001"); l["updating"] != false || l["board_version"] != float64(1) {
+	if l = line(m, "MH00001"); l["updating"] != false || fmt.Sprint(l["board_version"]) != "1" {
 		t.Fatalf("hủy mở duyệt: %v", l)
 	}
 
@@ -195,7 +196,7 @@ func TestPricePublicFeed_W1181(t *testing.T) {
 	op("lock", 5)
 	op("approve", 6)
 	m, _ = recs(tid)
-	if l = line(m, "MH00001"); len(m) != 2 || l["board_version"] != float64(2) || l["price_min"] != "8800" || l["price_max"] != "9000" ||
+	if l = line(m, "MH00001"); len(m) != 2 || fmt.Sprint(l["board_version"]) != "2" || l["price_min"] != "8800" || l["price_max"] != "9000" ||
 		l["price_avg"] != "8900" || l["updating"] != false {
 		t.Fatalf("duyệt lại v2: %v", m)
 	}
