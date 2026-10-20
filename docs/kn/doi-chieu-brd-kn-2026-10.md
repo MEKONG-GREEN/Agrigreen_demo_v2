@@ -213,7 +213,7 @@ Ký hiệu nguồn: `D1 §2.1#4` = bản D1, mục 2.1, dòng 4. `v4.3 §21.1`, 
 | W11.75 | Nhập báo giá + xác minh | Web responsive, cảnh báo tạm tính, xác minh hai chiều, nhập thay, hiệu chỉnh/xóa mềm, in File 2 | D4 BG5 | W11.72–W11.74 | L | pf 000144 | Mã được | 1 | |
 | W11.76 | Duyệt/mở duyệt bảng giá | Phiên bản, khóa "đang duyệt", `price.published` | D4 BG6 | W11.75 | M | pf 000145 | Mã được | 1 | |
 | W11.77 | Báo cáo giá | Tiến độ, bảng giá tổng hợp, biến động, dashboard vùng, thống kê phiếu CTV | D4 BG7 | W11.76 | M | `_pub` | Mã được; phần Đợt 2 BRD ở đợt 4 | 2 | |
-| W11.78 | Điều tra giá thành | Đợt, nhập file hai bước (có thể kích hoạt tách `cap/import`), PII → vault, chống trùng, CT-05/06 | D4 BG8 | W11.71, W11.73 | XL | pf 000176 | Chờ Q-083, Q-005 | 2 | |
+| W11.78 | Điều tra giá thành | Đợt, nhập file hai bước (có thể kích hoạt tách `cap/import`), PII → vault, chống trùng, CT-05/06 | D4 BG8 | W11.71, W11.73 | XL | pf 20261020161354 | **Mã xong (21/10/2026, giả định tạm Q-083, Q-005 — [W11.78.md](gia-dinh/W11.78.md)):** đợt + xã, chỉ tiêu, cán bộ điều tra; nhập tệp xem trước → ghi nhận, chống trùng SĐT + mặt hàng; rà soát CT-06, chốt / mở lại; báo cáo giá thành CT-05; PII ở kho định danh (`price.cost_survey`, cổng `AG_PRICE_SURVEY_PII`); chưa tách `cap/import` | 2 | |
 | W11.79 | Chuyển dữ liệu báo giá cũ | ≥ 3 tháng + Hè Thu 2026 | D4 BG9 | W11.75, W11.78 | M | — | Chờ dữ liệu khách (A5) | 2 | |
 | W11.81 | Website (Đợt 2 BRD) | Tập dữ liệu `price_board_daily` qua cổng tích hợp | D4 BG11 | W11.76 | M | hợp đồng `contracts/integration` | Chờ A2 (khách) | 4 | |
 
