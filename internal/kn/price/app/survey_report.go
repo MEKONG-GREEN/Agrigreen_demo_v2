@@ -117,7 +117,7 @@ func (s *SurveyService) Cost(ctx context.Context, profile string, f CostFilter) 
 		return CostReport{}, problem.Forbidden.WithDetail("chỉ Cấp TW, Cấp Tỉnh, Admin xem báo cáo giá thành")
 	}
 	out := CostReport{CanExport: a.read}
-	err = s.ctxTx(ctx, func(tx pgx.Tx) error {
+	err = s.tx(ctx, a.c.tenant, func(tx pgx.Tx) error {
 		cc, err := s.loadCost(ctx, tx, a.prof.Name)
 		if err != nil {
 			return err

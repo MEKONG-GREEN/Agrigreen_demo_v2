@@ -53,7 +53,7 @@ func InsertSurveyRound(ctx context.Context, tx pgx.Tx, id, tid uuid.UUID, r Surv
 	var seq int64
 	err := tx.QueryRow(ctx, `INSERT INTO pf_price.survey_round (id, tenant_id, stream_key, round_id, profile, name, season, year, collect_from,
 	    collect_to, crops, note, status, op, reason, event_time, actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, 'sround:' || $3::text, $3, $4, $5, $6, $7, $8::date, $9::date, $10::text[], $11, $12, $13, $14, $15, $16, $17, $18)
+	  VALUES ($1, $2, 'sround:' || $3::uuid::text, $3::uuid, $4, $5, $6, $7, $8::date, $9::date, $10::text[], $11, $12, $13, $14, $15, $16, $17, $18)
 	  RETURNING seq`,
 		id, tid, r.RoundID, r.Profile, r.Name, r.Season, r.Year, dateOnly(r.CollectFrom), dateOnly(r.CollectTo), r.Crops, nullText(r.Note),
 		r.Status, r.Op, nullText(r.Reason), at.UTC(), actor, idem, domain.RuleVersion).Scan(&seq)
@@ -100,7 +100,7 @@ type SurveyCommune struct {
 func InsertSurveyCommune(ctx context.Context, tx pgx.Tx, id, tid, round uuid.UUID, c SurveyCommune, at time.Time, actor uuid.UUID, idem string) error {
 	_, err := tx.Exec(ctx, `INSERT INTO pf_price.survey_commune (id, tenant_id, stream_key, round_id, commune_code, target_lua, target_rau_mau,
 	    target_nam, target_cay_an_trai, active, event_time, actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, 'scommune:' || $3::text || ':' || $4::text, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+	  VALUES ($1, $2, 'scommune:' || $3::uuid::text || ':' || $4::text, $3::uuid, $4::text, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		id, tid, round, c.Commune, c.Targets[domain.CropRice], c.Targets[domain.CropVeg], c.Targets[domain.CropMush],
 		c.Targets[domain.CropFruit], c.Active, at.UTC(), actor, idem, domain.RuleVersion)
 	return err
@@ -109,7 +109,7 @@ func InsertSurveyCommune(ctx context.Context, tx pgx.Tx, id, tid, round uuid.UUI
 // SurveyCommunes đọc phiên bản hiện hành của xã điều tra của các đợt (kể cả đã bỏ — Active = false), theo mã.
 func SurveyCommunes(ctx context.Context, tx pgx.Tx, rounds []uuid.UUID) (map[uuid.UUID][]SurveyCommune, error) {
 	rows, err := tx.Query(ctx, `SELECT DISTINCT ON (round_id, commune_code) round_id, commune_code, target_lua, target_rau_mau, target_nam,
-	    target_cay_an_trai, active FROM pf_price.survey_commune WHERE round_id = ANY($1) ORDER BY round_id, commune_code, seq DESC`, rounds)
+	    target_cay_an_trai, active FROM pf_price.survey_commune WHERE round_id = ANY($1::uuid[]) ORDER BY round_id, commune_code, seq DESC`, uuidStrs(rounds))
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ type SurveyOfficer struct {
 func InsertSurveyOfficer(ctx context.Context, tx pgx.Tx, id, tid, round uuid.UUID, o SurveyOfficer, at time.Time, actor uuid.UUID, idem string) error {
 	_, err := tx.Exec(ctx, `INSERT INTO pf_price.survey_officer (id, tenant_id, stream_key, round_id, officer_id, commune_code, subject_ref,
 	    unit_name, active, event_time, actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, 'sofficer:' || $3::text || ':' || $4::text, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+	  VALUES ($1, $2, 'sofficer:' || $3::uuid::text || ':' || $4::uuid::text, $3::uuid, $4::uuid, $5, $6, $7, $8, $9, $10, $11, $12)`,
 		id, tid, round, o.OfficerID, o.Commune, o.SubjectRef, o.UnitName, o.Active, at.UTC(), actor, idem, domain.RuleVersion)
 	return err
 }
@@ -199,7 +199,7 @@ func InsertSurveyForm(ctx context.Context, tx pgx.Tx, id, tid uuid.UUID, f Surve
 	    crop, item_code, farmer_ref, has_phone, officer_id, area_ha, output_kg, sale_price, other_income, cost_seed, cost_fertilizer,
 	    cost_pesticide, cost_labor, cost_machine, cost_other, status, op, note, verified_price, unverifiable, event_time, actor_ref,
 	    idem_key, rule_version)
-	  VALUES ($1, $2, 'sform:' || $3::text, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::numeric, $14::numeric, $15::numeric,
+	  VALUES ($1, $2, 'sform:' || $3::uuid::text, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::numeric, $14::numeric, $15::numeric,
 	    $16::numeric, $17::numeric, $18::numeric, $19::numeric, $20::numeric, $21::numeric, $22::numeric, $23, $24, $25, $26::numeric,
 	    $27, $28, $29, $30, $31)`,
 		id, tid, f.FormID, f.RoundID, f.ImportID, f.RowNo, f.Commune, f.Crop, f.Item, f.FarmerRef, f.HasPhone, f.OfficerID,
@@ -247,7 +247,7 @@ func scanForm(r pgx.CollectableRow) (SurveyForm, error) {
 // SurveyForms đọc phiên bản hiện hành của mọi phiếu của các đợt (kể cả Đã xóa), theo đợt rồi thứ tự nhập.
 func SurveyForms(ctx context.Context, tx pgx.Tx, rounds []uuid.UUID) ([]SurveyForm, error) {
 	rows, err := tx.Query(ctx, `SELECT `+formCols+` FROM (SELECT DISTINCT ON (form_id) * FROM pf_price.survey_form
-	    WHERE round_id = ANY($1) ORDER BY form_id, seq DESC) v ORDER BY round_id, form_id`, rounds)
+	    WHERE round_id = ANY($1::uuid[]) ORDER BY form_id, seq DESC) v ORDER BY round_id, form_id`, uuidStrs(rounds))
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +282,7 @@ type SurveyImport struct {
 func InsertSurveyImport(ctx context.Context, tx pgx.Tx, id, tid uuid.UUID, im SurveyImport, at time.Time, actor uuid.UUID, idem string) error {
 	_, err := tx.Exec(ctx, `INSERT INTO pf_price.survey_import (id, tenant_id, stream_key, import_id, round_id, file_sha256, file_name,
 	    rows_total, created, skipped, warnings, errors, event_time, actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, 'simport:' || $3::text, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+	  VALUES ($1, $2, 'simport:' || $3::uuid::text, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
 		id, tid, im.ImportID, im.RoundID, im.SHA256, im.FileName, im.Rows, im.Created, im.Skipped, im.Warnings, im.Errors, at.UTC(), actor,
 		idem, domain.RuleVersion)
 	return err
@@ -314,7 +314,7 @@ type SurveyIssue struct {
 func InsertSurveyIssue(ctx context.Context, tx pgx.Tx, id, tid, imp uuid.UUID, is SurveyIssue, at time.Time, actor uuid.UUID, idem string) error {
 	_, err := tx.Exec(ctx, `INSERT INTO pf_price.survey_issue (id, tenant_id, stream_key, import_id, row_no, level, message, event_time,
 	    actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, 'sissue:' || $3::text || ':' || $4::int::text, $3, $4, $5, $6, $7, $8, $9, $10)`,
+	  VALUES ($1, $2, 'sissue:' || $3::uuid::text || ':' || $4::int::text, $3::uuid, $4::int, $5, $6, $7, $8, $9, $10)`,
 		id, tid, imp, is.RowNo, is.Level, is.Message, at.UTC(), actor, idem, domain.RuleVersion)
 	return err
 }
@@ -338,7 +338,7 @@ func InsertSurveySynonym(ctx context.Context, tx pgx.Tx, id, tid uuid.UUID, kind
 	actor uuid.UUID, idem string) error {
 	_, err := tx.Exec(ctx, `INSERT INTO pf_price.survey_synonym (id, tenant_id, stream_key, kind, raw_key, target_code, active, event_time,
 	    actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, 'ssyn:' || $3::text || ':' || $4::text, $3, $4, $5, $6, $7, $8, $9, $10)`,
+	  VALUES ($1, $2, 'ssyn:' || $3::text || ':' || $4::text, $3::text, $4::text, $5, $6, $7, $8, $9, $10)`,
 		id, tid, kind, key, target, active, at.UTC(), actor, idem, domain.RuleVersion)
 	return err
 }
@@ -363,4 +363,12 @@ func SurveySynonyms(ctx context.Context, tx pgx.Tx) (map[string]map[string]strin
 		return struct{}{}, nil
 	})
 	return out, err
+}
+
+func uuidStrs(ids []uuid.UUID) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = id.String()
+	}
+	return out
 }

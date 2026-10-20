@@ -36,6 +36,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
@@ -283,7 +284,7 @@ func (s *SurveyService) prepare(ctx context.Context, profile string, round uuid.
 			pv.Missing = append(pv.Missing, "output")
 		}
 	}
-	_, _, surveyPct, err := s.AlertParams(ctx, a.prof.Name)
+	_, _, surveyPct, err := s.AlertParams(tenant.WithID(ctx, a.c.tenant), a.prof.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +298,7 @@ func (s *SurveyService) prepare(ctx context.Context, profile string, round uuid.
 		imports []store.SurveyImport
 	)
 	today := s.today()
-	if err := s.ctxTx(ctx, func(tx pgx.Tx) error {
+	if err := s.tx(ctx, a.c.tenant, func(tx pgx.Tx) error {
 		if p.sn, err = s.loadRound(ctx, tx, a.prof.Name, round, true); err != nil {
 			return err
 		}
@@ -792,7 +793,7 @@ func (s *SurveyService) ListImports(ctx context.Context, profile string, round u
 		return nil, err
 	}
 	var out []store.SurveyImport
-	err = s.ctxTx(ctx, func(tx pgx.Tx) error {
+	err = s.tx(ctx, a.c.tenant, func(tx pgx.Tx) error {
 		if _, err := s.loadRound(ctx, tx, a.prof.Name, round, false); err != nil {
 			return err
 		}
@@ -816,7 +817,7 @@ func (s *SurveyService) ExportImportIssues(ctx context.Context, profile string, 
 		issues []store.SurveyIssue
 		found  bool
 	)
-	err = s.ctxTx(ctx, func(tx pgx.Tx) error {
+	err = s.tx(ctx, a.c.tenant, func(tx pgx.Tx) error {
 		if _, err := s.loadRound(ctx, tx, a.prof.Name, round, false); err != nil {
 			return err
 		}

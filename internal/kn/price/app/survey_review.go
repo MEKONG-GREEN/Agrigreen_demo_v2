@@ -27,6 +27,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // FormFilter là bộ lọc danh sách phiếu.
@@ -147,8 +148,8 @@ func figures(f store.SurveyForm) domain.FormFigures {
 	return domain.FormFigures{AreaHa: f.AreaHa, OutputKg: f.OutputKg, SalePrice: effPrice(f), OtherIncome: f.OtherIncome, Costs: f.Costs}
 }
 
-func (s *SurveyService) surveyPct(ctx context.Context, profile string) (decimal.Decimal, error) {
-	_, _, pct, err := s.AlertParams(ctx, profile)
+func (s *SurveyService) surveyPct(ctx context.Context, a surveyAccess) (decimal.Decimal, error) {
+	_, _, pct, err := s.AlertParams(tenant.WithID(ctx, a.c.tenant), a.prof.Name)
 	if err != nil {
 		return decimal.Zero, err
 	}
@@ -171,7 +172,7 @@ func (s *SurveyService) listForms(ctx context.Context, profile string, round uui
 	if err := a.needRead(); err != nil {
 		return FormList{}, err
 	}
-	pct, err := s.surveyPct(ctx, a.prof.Name)
+	pct, err := s.surveyPct(ctx, a)
 	if err != nil {
 		return FormList{}, err
 	}
@@ -186,7 +187,7 @@ func (s *SurveyService) listForms(ctx context.Context, profile string, round uui
 		rc  *reviewCtx
 	)
 	today := s.today()
-	err = s.ctxTx(ctx, func(tx pgx.Tx) error {
+	err = s.tx(ctx, a.c.tenant, func(tx pgx.Tx) error {
 		rc, err = s.loadReview(ctx, tx, a, round, pct)
 		return err
 	})
@@ -346,7 +347,7 @@ func (s *SurveyService) GetForm(ctx context.Context, profile string, round, form
 	if err := a.needRead(); err != nil {
 		return FormDetail{}, err
 	}
-	pct, err := s.surveyPct(ctx, a.prof.Name)
+	pct, err := s.surveyPct(ctx, a)
 	if err != nil {
 		return FormDetail{}, err
 	}
@@ -354,7 +355,7 @@ func (s *SurveyService) GetForm(ctx context.Context, profile string, round, form
 		d                   FormDetail
 		farmerRef, offerRef uuid.UUID
 	)
-	err = s.ctxTx(ctx, func(tx pgx.Tx) error {
+	err = s.tx(ctx, a.c.tenant, func(tx pgx.Tx) error {
 		rc, err := s.loadReview(ctx, tx, a, round, pct)
 		if err != nil {
 			return err
@@ -427,7 +428,7 @@ func (s *SurveyService) ReviewForm(ctx context.Context, profile string, round, f
 	if err := a.needTinh(); err != nil {
 		return err
 	}
-	pct, err := s.surveyPct(ctx, a.prof.Name)
+	pct, err := s.surveyPct(ctx, a)
 	if err != nil {
 		return err
 	}
@@ -534,7 +535,7 @@ func (s *SurveyService) ApproveUnflagged(ctx context.Context, profile string, ro
 	if err := a.needTinh(); err != nil {
 		return 0, err
 	}
-	pct, err := s.surveyPct(ctx, a.prof.Name)
+	pct, err := s.surveyPct(ctx, a)
 	if err != nil {
 		return 0, err
 	}

@@ -369,7 +369,7 @@ func (s *SurveyService) ListRounds(ctx context.Context, profile string) ([]Round
 	}
 	today := s.today()
 	var out []RoundSummary
-	err = s.ctxTx(ctx, func(tx pgx.Tx) error {
+	err = s.tx(ctx, a.c.tenant, func(tx pgx.Tx) error {
 		rs, err := store.SurveyRounds(ctx, tx, a.prof.Name)
 		if err != nil {
 			return err
@@ -427,7 +427,7 @@ func (s *SurveyService) GetRound(ctx context.Context, profile string, id uuid.UU
 		refs []uuid.UUID
 	)
 	today := s.today()
-	err = s.ctxTx(ctx, func(tx pgx.Tx) error {
+	err = s.tx(ctx, a.c.tenant, func(tx pgx.Tx) error {
 		sn, err := s.loadRound(ctx, tx, a.prof.Name, id, true)
 		if err != nil {
 			return err
