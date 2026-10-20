@@ -43,7 +43,7 @@ Issue #98, xếp chồng trên #76 (`knsplit2-menu-kn`). Nguồn: PRD `kn-bugfix
 | CNTS xã | Dữ liệu | Lịch tiêm phòng | `/kn/cnts/lich-tiem` | Có màn |
 | CNTS xã | Dữ liệu | Bản đồ vùng dịch | `/kn/cnts/ban-do-dich` | Có màn (W11.52, màn bản đồ vùng nuôi, vùng dịch; nhãn giữ theo hình) |
 | CNTS xã | Dữ liệu | Điểm trình diễn | `/kn/cnts/ho-mo-hinh` (màn hộ mô hình, điểm trình diễn của xã) | Có màn |
-| CNTS xã | Dữ liệu | Quy trình, văn bản | `/kn/cnts/quy-trinh` | Sắp có |
+| CNTS xã | Dữ liệu | Quy trình, văn bản | `/kn/van-ban` (kho văn bản phòng, chỉ văn bản có đối tượng xã) | Có màn (W11.54) |
 | CNTS tỉnh (UP-10) | Điều hành | Trang chủ | `/kn/dashboard` | Có màn |
 | CNTS tỉnh | Điều hành | Cảnh báo | `/kn/cnts/canh-bao` | Có màn |
 | CNTS tỉnh | Điều hành | Biểu mẫu › Thiết kế biểu mẫu | `/kn/cnts/thiet-ke-bieu-mau` | Sắp có |
@@ -62,7 +62,7 @@ Issue #98, xếp chồng trên #76 (`knsplit2-menu-kn`). Nguồn: PRD `kn-bugfix
 | CNTS tỉnh | Dữ liệu | Bản đồ vùng dịch | `/kn/cnts/ban-do-dich` | Có màn (W11.52, màn bản đồ vùng nuôi, vùng dịch; nhãn giữ theo hình) |
 | CNTS tỉnh | Dữ liệu | Dự án KNQG › Dự án, điểm trình diễn | `/kn/cnts/du-an` | Có màn |
 | CNTS tỉnh | Dữ liệu | Dự án KNQG › Mẫu biểu dự án | `/kn/cnts/du-an-mau-bieu` | Sắp có (W11.53) |
-| CNTS tỉnh | Dữ liệu | Quy trình, văn bản | `/kn/cnts/quy-trinh` | Sắp có |
+| CNTS tỉnh | Dữ liệu | Quy trình, văn bản | `/kn/van-ban` (kho văn bản phòng) | Có màn (W11.54) |
 | CNTS TW | Dữ liệu | Dự án KNQG (khung TW chung giữ nguyên) | `/kn/cnts/du-an` | Có màn |
 | KHTC tỉnh | Điều hành | khung chung + Kỳ báo cáo & phiếu các phòng; Kế hoạch năm | `/kn/khtc/ky-bao-cao`; `/kn/khtc/ke-hoach-nam` | Có màn |
 | KHTC tỉnh | Báo cáo | khung chung + Soạn báo cáo (Mẫu 1–5); Tiến độ các chương trình; Báo cáo đã xuất | `/kn/khtc/bao-cao`; `/tien-do`; `/bao-cao-da-xuat` | Có màn |
@@ -78,9 +78,12 @@ Issue #98, xếp chồng trên #76 (`knsplit2-menu-kn`). Nguồn: PRD `kn-bugfix
 | HCTH tỉnh | Báo cáo | khung chung + Biểu mẫu báo cáo Sở | `/kn/nhan-su/bao-cao-so` | Có màn |
 | HCTH tỉnh | Dữ liệu | Hồ sơ nhân sự; Hồ sơ dữ liệu; Danh mục nhân sự | `/kn/nhan-su/ho-so`, `/kho-tai-lieu`, `/danh-muc` | Có màn |
 | HCTH xã | Điều hành | khung chung + Đánh giá của tôi | `/kn/nhan-su/danh-gia-cua-toi` | Sắp có |
+| Mọi phòng, Cấp Tỉnh (W11.54) | Điều hành | Trang chủ phòng (đầu nhóm) | `/kn/trang-chu` | Có màn |
+| Trồng trọt, KHTC, Báo giá, HCTH — Cấp Tỉnh; Trồng trọt, Báo giá, HCTH — Cấp Xã (W11.54) | Dữ liệu | Quy trình, văn bản (cuối nhóm; HCTH xã thêm nhóm Dữ liệu) | `/kn/van-ban` | Có màn |
 
 ### Lệch so với hình, cần khách xác nhận
 
+- W11.54 (gộp sau #98): thêm "Trang chủ phòng" đầu Điều hành của Cấp Tỉnh mọi phòng (CNTS tỉnh vẫn giữ "Trang chủ" → Dashboard theo hình, nên có hai mục trang chủ — để mọi màn còn mở được; chờ PO chọn gộp) và "Quy trình, văn bản" cuối nhóm Dữ liệu (W11.54 trước #98 đặt ở Điều hành cho Trồng trọt tỉnh; gộp đưa về Dữ liệu như CNTS). Hình chưa có hai mục này.
 - TT tỉnh: hình file v2 không có T02 trong "Báo cáo tuần" (TT xã có T02 · Lúa mùa). Làm đúng hình.
 - TT tỉnh: PRD UP-02 ghi "Dữ liệu: Thửa ruộng"; hình có đủ Thu thập dữ liệu (HTX, Máy móc, Thửa ruộng, Vật tư). Làm theo hình.
 - Mục cũ không có trong hình nên bỏ khỏi menu (màn vẫn còn, mở qua Admin hoặc đường dẫn): CNTS tỉnh "Danh mục CNTS" (`/kn/cnts/danh-muc`; Admin còn `Danh mục CNTS` theo phòng ban), "Hộ mô hình" (`/kn/cnts/ho-mo-hinh`), "Duyệt báo cáo" (Sắp có); CNTS xã "Cảnh báo" (`/kn/cnts/canh-bao`, xã xử lý cảnh báo được giao), "Quyền của tôi" (`/kn/cnts/cap-quyen`), và khung báo cáo theo kỳ của Trồng trọt mà CNTS xã nhận nhầm trước đây.

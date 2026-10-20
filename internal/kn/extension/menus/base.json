@@ -559,6 +559,17 @@
             "Label": "Điều hành",
             "Items": [
               {
+                "Key": "tinh.trang_chu",
+                "Label": "Trang chủ phòng",
+                "Route": "/kn/trang-chu",
+                "Icon": "dashboard",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
                 "Key": "tinh.cnts.trang_chu",
                 "Label": "Trang chủ",
                 "Route": "/kn/dashboard",
@@ -897,11 +908,11 @@
               {
                 "Key": "tinh.cnts.quy_trinh",
                 "Label": "Quy trình, văn bản",
-                "Route": "/kn/cnts/quy-trinh",
+                "Route": "/kn/van-ban",
                 "Icon": "sop",
                 "BadgeSource": "",
                 "Requires": null,
-                "ComingSoon": true,
+                "ComingSoon": false,
                 "Needs": "",
                 "Children": null
               }
@@ -1094,11 +1105,11 @@
               {
                 "Key": "xa.cnts.quy_trinh",
                 "Label": "Quy trình, văn bản",
-                "Route": "/kn/cnts/quy-trinh",
+                "Route": "/kn/van-ban",
                 "Icon": "sop",
                 "BadgeSource": "",
                 "Requires": null,
-                "ComingSoon": true,
+                "ComingSoon": false,
                 "Needs": "",
                 "Children": null
               }
@@ -1198,6 +1209,17 @@
             "Key": "dieu_hanh",
             "Label": "Điều hành",
             "Items": [
+              {
+                "Key": "tinh.trang_chu",
+                "Label": "Trang chủ phòng",
+                "Route": "/kn/trang-chu",
+                "Icon": "dashboard",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
               {
                 "Key": "tinh.dashboard",
                 "Label": "Dashboard",
@@ -1367,6 +1389,17 @@
                 "ComingSoon": true,
                 "Needs": "",
                 "Children": null
+              },
+              {
+                "Key": "tinh.van_ban",
+                "Label": "Quy trình, văn bản",
+                "Route": "/kn/van-ban",
+                "Icon": "library",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
               }
             ]
           }
@@ -1458,6 +1491,17 @@
             "Key": "dieu_hanh",
             "Label": "Điều hành",
             "Items": [
+              {
+                "Key": "tinh.trang_chu",
+                "Label": "Trang chủ phòng",
+                "Route": "/kn/trang-chu",
+                "Icon": "dashboard",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
               {
                 "Key": "tinh.dashboard",
                 "Label": "Dashboard",
@@ -1647,6 +1691,17 @@
                 "BadgeSource": "",
                 "Requires": null,
                 "ComingSoon": true,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "tinh.van_ban",
+                "Label": "Quy trình, văn bản",
+                "Route": "/kn/van-ban",
+                "Icon": "library",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
                 "Needs": "",
                 "Children": null
               }
@@ -1918,6 +1973,17 @@
                 "ComingSoon": false,
                 "Needs": "",
                 "Children": null
+              },
+              {
+                "Key": "xa.van_ban",
+                "Label": "Quy trình, văn bản",
+                "Route": "/kn/van-ban",
+                "Icon": "library",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
               }
             ]
           }
@@ -1935,6 +2001,17 @@
           "Key": "dieu_hanh",
           "Label": "Điều hành",
           "Items": [
+            {
+              "Key": "tinh.trang_chu",
+              "Label": "Trang chủ phòng",
+              "Route": "/kn/trang-chu",
+              "Icon": "dashboard",
+              "BadgeSource": "",
+              "Requires": null,
+              "ComingSoon": false,
+              "Needs": "",
+              "Children": null
+            },
             {
               "Key": "tinh.dashboard",
               "Label": "Dashboard",
@@ -2235,6 +2312,17 @@
           "Key": "dieu_hanh",
           "Label": "Điều hành",
           "Items": [
+            {
+              "Key": "tinh.trang_chu",
+              "Label": "Trang chủ phòng",
+              "Route": "/kn/trang-chu",
+              "Icon": "dashboard",
+              "BadgeSource": "",
+              "Requires": null,
+              "ComingSoon": false,
+              "Needs": "",
+              "Children": null
+            },
             {
               "Key": "tinh.dashboard",
               "Label": "Dashboard",
@@ -2584,6 +2672,17 @@
                   "Children": null
                 }
               ]
+            },
+            {
+              "Key": "tinh.van_ban",
+              "Label": "Quy trình, văn bản",
+              "Route": "/kn/van-ban",
+              "Icon": "library",
+              "BadgeSource": "",
+              "Requires": null,
+              "ComingSoon": false,
+              "Needs": "",
+              "Children": null
             }
           ]
         }
@@ -2966,6 +3065,17 @@
                   "Children": null
                 }
               ]
+            },
+            {
+              "Key": "xa.van_ban",
+              "Label": "Quy trình, văn bản",
+              "Route": "/kn/van-ban",
+              "Icon": "library",
+              "BadgeSource": "",
+              "Requires": null,
+              "ComingSoon": false,
+              "Needs": "",
+              "Children": null
             }
           ]
         }

@@ -9227,6 +9227,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/dept-home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trang chủ phòng (FN-17): thẻ chỉ số, số liệu đã chốt, sơ đồ tổ chức, giới thiệu, văn bản mới */
+        get: operations["extensionDeptHomeGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/exports/runs": {
         parameters: {
             query?: never;
@@ -9244,6 +9261,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/dept-home/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lãnh đạo phòng lưu giới thiệu, chức năng nhiệm vụ (phiên bản mới, khóa lạc quan) */
+        post: operations["extensionDeptHomeProfileSave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/exports/runs/{id}/download": {
         parameters: {
             query?: never;
@@ -9253,6 +9287,212 @@ export interface paths {
         };
         /** Tải lại tệp .docx đã lưu của một lần xuất (kiểm băm SHA-256) */
         get: operations["exportRunDownload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dept-home/profile/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử giới thiệu phòng (mới nhất trước) */
+        get: operations["extensionDeptHomeProfileHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dept-docs/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thư mục kho văn bản phòng */
+        get: operations["extensionDeptDocFolders"];
+        put?: never;
+        /** Tạo thư mục (Cấp Tỉnh, Admin) */
+        post: operations["extensionDeptDocFolderCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dept-docs/folders/{ref}/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đổi tên thư mục */
+        post: operations["extensionDeptDocFolderRename"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dept-docs/folders/{ref}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ẩn thư mục rỗng (Lãnh đạo phòng, có lý do) */
+        post: operations["extensionDeptDocFolderHide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dept-docs/folders/{ref}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hiện lại thư mục (Lãnh đạo phòng) */
+        post: operations["extensionDeptDocFolderRestore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dept-docs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Văn bản của phòng (FN-20: lọc, tìm; hết hiệu lực vẫn có, nhãn validity) */
+        get: operations["extensionDeptDocList"];
+        put?: never;
+        /** Thêm văn bản: multipart meta (JSON DeptDocInput) + file (PDF, DOCX, XLSX ≤ 20 MB) */
+        post: operations["extensionDeptDocCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dept-docs/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết văn bản và mọi phiên bản */
+        get: operations["extensionDeptDocGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dept-docs/{ref}/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa thuộc tính, chuyển thư mục (giữ tệp) */
+        post: operations["extensionDeptDocUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dept-docs/{ref}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tải tệp mới (phiên bản tệp + 1; tệp cũ vẫn tải được) */
+        post: operations["extensionDeptDocReplaceFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dept-docs/{ref}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ẩn (xóa) văn bản — Lãnh đạo phòng, có lý do */
+        post: operations["extensionDeptDocHide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dept-docs/{ref}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hiện lại văn bản — Lãnh đạo phòng */
+        post: operations["extensionDeptDocRestore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dept-docs/{ref}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nội dung tệp (xem/tải; version = phiên bản văn bản) */
+        get: operations["extensionDeptDocContent"];
         put?: never;
         post?: never;
         delete?: never;
@@ -19925,6 +20165,11 @@ export interface components {
             recorded_at: string | null;
             drift: boolean;
         };
+        DeptActor: {
+            /** Format: uuid */
+            ref: string;
+            display: string | null;
+        };
         ExportTemplate: {
             key: string;
             title: string;
@@ -19943,8 +20188,23 @@ export interface components {
             sections: string[];
             versions: components["schemas"]["ExportTemplateVersion"][];
         };
+        DeptProfile: {
+            department_code: string;
+            intro: string;
+            duties: string;
+            version: number;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["DeptActor"];
+        };
         ExportTemplateList: {
             items: components["schemas"]["ExportTemplate"][];
+        };
+        DeptProfileInput: {
+            intro?: string;
+            duties?: string;
+            /** @description 0 khi chưa có bản nào */
+            base_version: number;
         };
         ExportRun: {
             /** Format: uuid */
@@ -19965,8 +20225,202 @@ export interface components {
             /** Format: date-time */
             at: string;
         };
+        DeptProfileList: {
+            items: components["schemas"]["DeptProfile"][];
+        };
         ExportRunList: {
             items: components["schemas"]["ExportRun"][];
+        };
+        DeptKPI: {
+            key: string;
+            label: string;
+            value: number;
+            /** @enum {string} */
+            tone: "neutral" | "ok" | "warn" | "bad" | "info";
+        };
+        DeptClosedPeriod: {
+            form_code: string;
+            period_type: string;
+            period_key: string;
+            period_label: string;
+            /** Format: date */
+            period_to: string | null;
+            units_total: number | null;
+            units_with_data: number | null;
+            closed: boolean;
+            /** Format: date-time */
+            closed_at: string | null;
+        };
+        DeptOfficer: {
+            actor: components["schemas"]["DeptActor"];
+            mgmt_level: string | null;
+            leader: boolean;
+        };
+        DeptPrice: {
+            /** Format: date */
+            board_date: string | null;
+            items: number;
+            week_key: string | null;
+            tickets: number;
+            week_days_approved: number;
+        };
+        DeptLibraryStats: {
+            total: number;
+            expired: number;
+            new_30d: number;
+        };
+        DeptHome: {
+            department_code: string;
+            /** Format: date-time */
+            as_of: string;
+            manager: boolean;
+            read_only: boolean;
+            can_edit_profile: boolean;
+            profile: components["schemas"]["DeptProfile"] | null;
+            kpis: components["schemas"]["DeptKPI"][];
+            closed_periods: components["schemas"]["DeptClosedPeriod"][];
+            price: components["schemas"]["DeptPrice"] | null;
+            officers: components["schemas"]["DeptOfficer"][];
+            library: components["schemas"]["DeptLibraryStats"];
+            latest_docs: components["schemas"]["DeptDoc"][];
+        };
+        DeptDocFolder: {
+            /** Format: uuid */
+            ref: string;
+            department_code: string;
+            /** Format: uuid */
+            parent_ref: string | null;
+            name: string;
+            path: string[];
+            hidden: boolean;
+            status_reason: string | null;
+            docs: number;
+            version: number;
+            /** @enum {string} */
+            event: "created" | "renamed" | "hidden" | "restored";
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        DeptDocFolderList: {
+            department_code: string;
+            can_write: boolean;
+            can_manage: boolean;
+            items: components["schemas"]["DeptDocFolder"][];
+        };
+        DeptDocFolderInput: {
+            /** Format: uuid */
+            parent_ref?: string | null;
+            name: string;
+        };
+        DeptDocFolderChange: {
+            name?: string;
+            reason?: string;
+            base_version: number;
+        };
+        DeptDocFile: {
+            version: number;
+            name: string;
+            content_type: string;
+            size_bytes: number;
+            sha256: string;
+        };
+        DeptDocVersion: {
+            /** Format: uuid */
+            ref: string;
+            version: number;
+            /** @enum {string} */
+            event: "created" | "updated" | "file_replaced" | "hidden" | "restored";
+            department_code: string;
+            /** Format: uuid */
+            folder_ref: string | null;
+            title: string;
+            /** @enum {string} */
+            kind: "quy_trinh_ky_thuat" | "van_ban_phap_quy" | "van_ban_chi_dao" | "ke_hoach" | "mau_bieu" | "tai_lieu_tap_huan" | "khac";
+            field: string | null;
+            number: string | null;
+            issuer: string | null;
+            summary: string | null;
+            /** Format: date */
+            issued_on: string | null;
+            /** Format: date */
+            effective_from: string | null;
+            /** Format: date */
+            effective_to: string | null;
+            audience: ("xa" | "nong_ho")[];
+            file: components["schemas"]["DeptDocFile"];
+            hidden: boolean;
+            status_reason: string | null;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["DeptActor"];
+        };
+        DeptDoc: {
+            /** Format: uuid */
+            ref: string;
+            version: number;
+            /** @enum {string} */
+            event: "created" | "updated" | "file_replaced" | "hidden" | "restored";
+            department_code: string;
+            /** Format: uuid */
+            folder_ref: string | null;
+            title: string;
+            /** @enum {string} */
+            kind: "quy_trinh_ky_thuat" | "van_ban_phap_quy" | "van_ban_chi_dao" | "ke_hoach" | "mau_bieu" | "tai_lieu_tap_huan" | "khac";
+            field: string | null;
+            number: string | null;
+            issuer: string | null;
+            summary: string | null;
+            /** Format: date */
+            issued_on: string | null;
+            /** Format: date */
+            effective_from: string | null;
+            /** Format: date */
+            effective_to: string | null;
+            audience: ("xa" | "nong_ho")[];
+            file: components["schemas"]["DeptDocFile"];
+            hidden: boolean;
+            status_reason: string | null;
+            /** Format: date-time */
+            recorded_at: string;
+            actor: components["schemas"]["DeptActor"];
+            /** @enum {string} */
+            validity: "active" | "pending" | "expired";
+            folder_path: string[];
+            can_edit: boolean;
+            can_manage: boolean;
+            versions?: components["schemas"]["DeptDocVersion"][];
+        };
+        DeptDocList: {
+            department_code: string;
+            can_write: boolean;
+            can_manage: boolean;
+            total: number;
+            kinds: string[];
+            extensions: string[];
+            max_bytes: number;
+            items: components["schemas"]["DeptDoc"][];
+        };
+        DeptDocInput: {
+            /** Format: uuid */
+            folder_ref?: string | null;
+            title: string;
+            /** @enum {string} */
+            kind: "quy_trinh_ky_thuat" | "van_ban_phap_quy" | "van_ban_chi_dao" | "ke_hoach" | "mau_bieu" | "tai_lieu_tap_huan" | "khac";
+            field?: string;
+            number?: string;
+            issuer?: string;
+            summary?: string;
+            /** @description YYYY-MM-DD hoặc rỗng */
+            issued_on?: string;
+            effective_from?: string;
+            effective_to?: string;
+            audience?: ("xa" | "nong_ho")[];
+            /** @description Bắt buộc khi sửa (khóa lạc quan) */
+            base_version?: number;
+        };
+        DeptDocHide: {
+            reason: string;
+            base_version: number;
         };
         CNTSPoint: {
             lat: number;
@@ -40426,6 +40880,36 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionDeptHomeGet: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptHome"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     exportRunsList: {
         parameters: {
             query?: {
@@ -40453,6 +40937,42 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionDeptHomeProfileSave: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeptProfileInput"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptProfile"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     exportRunDownload: {
         parameters: {
             query?: never;
@@ -40476,6 +40996,521 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptHomeProfileHistory: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptProfileList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocFolders: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+                include_hidden?: "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptDocFolderList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocFolderCreate: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeptDocFolderInput"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptDocFolder"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocFolderRename: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeptDocFolderChange"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptDocFolder"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocFolderHide: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeptDocFolderChange"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptDocFolder"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocFolderRestore: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeptDocFolderChange"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptDocFolder"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocList: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+                folder?: string;
+                /** @description Tìm trong tên, số hiệu, cơ quan ban hành, lĩnh vực, trích yếu */
+                q?: string;
+                kind?: string;
+                validity?: "active" | "pending" | "expired";
+                include_hidden?: "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptDocList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocCreate: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** @description JSON của DeptDocInput */
+                    meta: string;
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptDoc"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocGet: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptDoc"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocUpdate: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeptDocInput"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptDoc"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocReplaceFile: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    /** @description Phiên bản hiện hành (khóa lạc quan) */
+                    base_version: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptDoc"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocHide: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeptDocHide"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptDoc"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocRestore: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeptDocHide"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeptDoc"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionDeptDocContent: {
+        parameters: {
+            query?: {
+                /** @description Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh */
+                department?: string;
+                version?: number;
+                download?: "1";
+            };
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };

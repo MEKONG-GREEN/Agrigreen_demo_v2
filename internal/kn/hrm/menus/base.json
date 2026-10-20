@@ -47,6 +47,17 @@
             "Label": "Điều hành",
             "Items": [
               {
+                "Key": "tinh.trang_chu",
+                "Label": "Trang chủ phòng",
+                "Route": "/kn/trang-chu",
+                "Icon": "dashboard",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
                 "Key": "tinh.dashboard",
                 "Label": "Dashboard",
                 "Route": "/kn/dashboard",
@@ -226,6 +237,17 @@
                 "ComingSoon": false,
                 "Needs": "",
                 "Children": null
+              },
+              {
+                "Key": "tinh.van_ban",
+                "Label": "Quy trình, văn bản",
+                "Route": "/kn/van-ban",
+                "Icon": "library",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
               }
             ]
           }
@@ -329,6 +351,23 @@
                   "ReportType": "dot_xuat",
                   "Level": "commune"
                 },
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              }
+            ]
+          },
+          {
+            "Key": "du_lieu",
+            "Label": "Dữ liệu",
+            "Items": [
+              {
+                "Key": "xa.van_ban",
+                "Label": "Quy trình, văn bản",
+                "Route": "/kn/van-ban",
+                "Icon": "library",
+                "BadgeSource": "",
+                "Requires": null,
                 "ComingSoon": false,
                 "Needs": "",
                 "Children": null

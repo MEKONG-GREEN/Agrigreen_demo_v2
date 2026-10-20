@@ -75,7 +75,7 @@ describe("fromKnMenu — trình bày Hình 3c", () => {
     const admin = cases.find((c) => c.name === "admin")!.menu;
     const pb = fromKnMenu(admin).groups.find((g) => g.key === "phong_ban")!;
     expect(pb.items.map((i) => [i.label, i.status ?? "active", i.children?.length ?? 0])).toEqual([
-      ["Phòng Trồng trọt", "active", 8], // W11.11: + Báo cáo cho KHTC
+      ["Phòng Trồng trọt", "active", 10], // W11.11: + Báo cáo cho KHTC; W11.54: + Trang chủ phòng, Quy trình, văn bản
       ["Chăn nuôi - TS", "not_open", 0],
       ["Kế hoạch - TC", "not_open", 0],
       ["2 phòng khác", "not_open", 0],
@@ -114,27 +114,27 @@ describe("kn.menu/v6 (BF-MENU #98, R-A6): menu theo Update prototype và hình k
     expect(groupsOf("kn_xa/trong_trot")).toEqual({
       "Điều hành": [["Nhiệm vụ", ["Công việc cần làm", "Lịch công tác"]]],
       "Báo cáo": [["Báo cáo tuần", T(true)], "Báo cáo tháng", ["Báo cáo hàng vụ", V], "Báo cáo của xã"],
-      "Dữ liệu": [["Thu thập dữ liệu", ["Danh sách HTX", "Máy móc HTX", "Vẽ thửa ruộng", "Vật tư"]]],
+      "Dữ liệu": [["Thu thập dữ liệu", ["Danh sách HTX", "Máy móc HTX", "Vẽ thửa ruộng", "Vật tư"]], "Quy trình, văn bản"], // W11.54
       "Dùng chung": ["Contact"],
     });
   });
 
   it("UP-02 Trồng trọt Cấp Tỉnh đúng hình file v2 (3 cấp)", () => {
     const g = groupsOf("kn_tinh/trong_trot");
-    expect(g["Điều hành"]).toEqual(["Dashboard", ["Nhiệm vụ", ["Phát hành biểu mẫu", "Trạng thái nộp", "Rà soát & chốt kỳ", "Lịch công tác"]]]);
+    expect(g["Điều hành"]).toEqual(["Trang chủ phòng", "Dashboard", ["Nhiệm vụ", ["Phát hành biểu mẫu", "Trạng thái nộp", "Rà soát & chốt kỳ", "Lịch công tác"]]]);
     expect(g["Báo cáo"]).toEqual([
       ["Báo cáo tổng hợp các xã", [["Báo cáo tuần", T(false)], "Báo cáo tháng", ["Báo cáo hàng vụ", V], "Báo cáo năm"]],
       "Báo cáo Chi cục",
       KHTC,
     ]);
-    expect(g["Dữ liệu"]).toEqual([["Thu thập dữ liệu", ["Danh sách HTX", "Máy móc HTX", "Thửa ruộng", "Vật tư"]]]);
+    expect(g["Dữ liệu"]).toEqual([["Thu thập dữ liệu", ["Danh sách HTX", "Máy móc HTX", "Thửa ruộng", "Vật tư"]], "Quy trình, văn bản"]); // W11.54
   });
 
   it("UP-03 CNTS Cấp Xã đúng hình file v1", () => {
     expect(groupsOf("kn_xa/chan_nuoi_thuy_san")).toEqual({
       "Điều hành": ["Việc cần làm", "Lịch trực KSGM của tôi", "Lịch công tác"],
       "Báo cáo": ["KSGM hằng ngày", "Nhập liệu tuần chăn nuôi", "Khai thác thủy sản tuần", "Báo cáo công việc tuần", "Báo cáo dịch bệnh"],
-      "Dữ liệu": ["Hộ mô hình", ["Nhật ký sản xuất", ["Thủy sản", "Chăn nuôi"]], "Lịch tiêm phòng", "Bản đồ vùng dịch", "Điểm trình diễn", "Quy trình, văn bản*"],
+      "Dữ liệu": ["Hộ mô hình", ["Nhật ký sản xuất", ["Thủy sản", "Chăn nuôi"]], "Lịch tiêm phòng", "Bản đồ vùng dịch", "Điểm trình diễn", "Quy trình, văn bản"],
       "Dùng chung": ["Contact"],
     });
     expect(menuOf("kn_xa/chan_nuoi_thuy_san").default_route).toBe("/kn/cnts/bao-cao-ky");
@@ -143,6 +143,7 @@ describe("kn.menu/v6 (BF-MENU #98, R-A6): menu theo Update prototype và hình k
   it("UP-10 CNTS Cấp Tỉnh đúng hình khách gửi 23/10", () => {
     const g = groupsOf("kn_tinh/chan_nuoi_thuy_san");
     expect(g["Điều hành"]).toEqual([
+      "Trang chủ phòng", // W11.54: trang chủ phòng (FN-17); "Trang chủ" theo hình giữ Dashboard
       "Trang chủ",
       "Cảnh báo",
       ["Biểu mẫu", ["Thiết kế biểu mẫu*", "Phát hành, theo dõi nộp", "Cấu hình nhắc nhở", "Rà soát nhật ký", "Cấp quyền"]],
@@ -154,7 +155,7 @@ describe("kn.menu/v6 (BF-MENU #98, R-A6): menu theo Update prototype và hình k
       ["Số liệu cấp xã", ["Nhập liệu tuần*", "Khai thác thủy sản*", "Nhật ký sản xuất*", "Lịch tiêm (thực tế)"]],
       "Bản đồ vùng dịch",
       ["Dự án KNQG", ["Dự án, điểm trình diễn", "Mẫu biểu dự án*"]],
-      "Quy trình, văn bản*",
+      "Quy trình, văn bản",
     ]);
     // Số đếm lịch chờ duyệt giữ ở "Lịch công tác cán bộ xã".
     const lich = menuOf("kn_tinh/chan_nuoi_thuy_san").groups[0]!.items.find((i) => i.label === "Lịch")!;
@@ -177,9 +178,18 @@ describe("kn.menu/v6 (BF-MENU #98, R-A6): menu theo Update prototype và hình k
       expect.arrayContaining(["dieu_hanh:tinh.hcth.dashboard", "dieu_hanh:tinh.hcth.nang_bac", "dieu_hanh:tinh.hcth.quyet_dinh_nang_bac", "bao_cao:tinh.hcth.bao_cao_so",
         "du_lieu:tinh.hcth.ho_so", "du_lieu:tinh.hcth.kho_tai_lieu", "du_lieu:tinh.hcth.danh_muc"]),
     );
-    expect(groupsOf("kn_tinh/ke_hoach_tai_chinh")["Dữ liệu"]).toEqual(["Số liệu nguồn ngoài*"]);
-    expect(groupsOf("kn_tinh/thong_tin_truyen_thong")["Dữ liệu"]).toEqual(["Điều tra giá thành*", "Mặt hàng*"]);
+    expect(groupsOf("kn_tinh/ke_hoach_tai_chinh")["Dữ liệu"]).toEqual(["Số liệu nguồn ngoài*", "Quy trình, văn bản"]);
+    expect(groupsOf("kn_tinh/thong_tin_truyen_thong")["Dữ liệu"]).toEqual(["Điều tra giá thành*", "Mặt hàng*", "Quy trình, văn bản"]);
     expect(groupsOf("kn_tw/chan_nuoi_thuy_san")["Dữ liệu"]).toEqual(["Dự án KNQG"]);
+    // W11.54: Trang chủ phòng đầu Điều hành Cấp Tỉnh mọi phòng; Quy trình, văn bản (/kn/van-ban) cuối Dữ liệu; Cấp Xã/TW không có Trang chủ phòng.
+    for (const code of ["trong_trot", "chan_nuoi_thuy_san", "ke_hoach_tai_chinh", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) {
+      expect(leaves(`kn_tinh/${code}`)[0]).toBe("dieu_hanh:tinh.trang_chu");
+      expect(leaves(`kn_xa/${code}`)).not.toContain("dieu_hanh:tinh.trang_chu");
+      expect(leaves(`kn_tw/${code}`)).not.toContain("dieu_hanh:tinh.trang_chu");
+    }
+    expect(leaves("kn_tinh/hanh_chinh_tong_hop").filter((l) => l.startsWith("du_lieu:")).at(-1)).toBe("du_lieu:tinh.van_ban");
+    for (const code of ["trong_trot", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) expect(leaves(`kn_xa/${code}`).filter((l) => l.startsWith("du_lieu:")).at(-1)).toBe("du_lieu:xa.van_ban");
+    expect(menuOf("kn_xa/chan_nuoi_thuy_san").groups.find((g) => g.key === "du_lieu")!.items.find((i) => i.key === "xa.cnts.quy_trinh")!.route).toBe("/kn/van-ban");
   });
 
   it("W11.11: Báo cáo cho KHTC cuối nhóm Báo cáo của Cấp Tỉnh 4 phòng chuyên môn; không ở KHTC, Cấp Xã", () => {

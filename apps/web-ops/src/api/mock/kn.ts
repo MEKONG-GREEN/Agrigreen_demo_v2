@@ -87,6 +87,12 @@ const TRONG_TROT: Record<Exclude<KnRole, "admin">, Group[]> = {
       "label": "Điều hành",
       "items": [
         {
+          "key": "tinh.trang_chu",
+          "label": "Trang chủ phòng",
+          "route": "/kn/trang-chu",
+          "icon": "dashboard"
+        },
+        {
           "key": "tinh.dashboard",
           "label": "Dashboard",
           "route": "/kn/dashboard",
@@ -287,6 +293,12 @@ const TRONG_TROT: Record<Exclude<KnRole, "admin">, Group[]> = {
               "icon": "package"
             }
           ]
+        },
+        {
+          "key": "tinh.van_ban",
+          "label": "Quy trình, văn bản",
+          "route": "/kn/van-ban",
+          "icon": "library"
         }
       ]
     }
@@ -514,6 +526,12 @@ const TRONG_TROT: Record<Exclude<KnRole, "admin">, Group[]> = {
               "icon": "package"
             }
           ]
+        },
+        {
+          "key": "xa.van_ban",
+          "label": "Quy trình, văn bản",
+          "route": "/kn/van-ban",
+          "icon": "library"
         }
       ]
     }
@@ -526,6 +544,12 @@ const GENERIC: Record<Exclude<KnRole, "admin">, Group[]> = {
       "key": "dieu_hanh",
       "label": "Điều hành",
       "items": [
+        {
+          "key": "tinh.trang_chu",
+          "label": "Trang chủ phòng",
+          "route": "/kn/trang-chu",
+          "icon": "dashboard"
+        },
         {
           "key": "tinh.dashboard",
           "label": "Dashboard",
@@ -734,6 +758,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
         "label": "Điều hành",
         "items": [
           {
+            "key": "tinh.trang_chu",
+            "label": "Trang chủ phòng",
+            "route": "/kn/trang-chu",
+            "icon": "dashboard"
+          },
+          {
             "key": "tinh.cnts.trang_chu",
             "label": "Trang chủ",
             "route": "/kn/dashboard",
@@ -936,9 +966,8 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
           {
             "key": "tinh.cnts.quy_trinh",
             "label": "Quy trình, văn bản",
-            "route": "/kn/cnts/quy-trinh",
-            "icon": "sop",
-            "soon": true
+            "route": "/kn/van-ban",
+            "icon": "sop"
           }
         ]
       }
@@ -1054,9 +1083,8 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
           {
             "key": "xa.cnts.quy_trinh",
             "label": "Quy trình, văn bản",
-            "route": "/kn/cnts/quy-trinh",
-            "icon": "sop",
-            "soon": true
+            "route": "/kn/van-ban",
+            "icon": "sop"
           }
         ]
       }
@@ -1124,6 +1152,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
         "key": "dieu_hanh",
         "label": "Điều hành",
         "items": [
+          {
+            "key": "tinh.trang_chu",
+            "label": "Trang chủ phòng",
+            "route": "/kn/trang-chu",
+            "icon": "dashboard"
+          },
           {
             "key": "tinh.dashboard",
             "label": "Dashboard",
@@ -1226,6 +1260,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "route": "/kn/khtc/so-lieu-ngoai",
             "icon": "database",
             "soon": true
+          },
+          {
+            "key": "tinh.van_ban",
+            "label": "Quy trình, văn bản",
+            "route": "/kn/van-ban",
+            "icon": "library"
           }
         ]
       }
@@ -1288,6 +1328,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
         "key": "dieu_hanh",
         "label": "Điều hành",
         "items": [
+          {
+            "key": "tinh.trang_chu",
+            "label": "Trang chủ phòng",
+            "route": "/kn/trang-chu",
+            "icon": "dashboard"
+          },
           {
             "key": "tinh.dashboard",
             "label": "Dashboard",
@@ -1402,6 +1448,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "route": "/kn/bao-gia/mat-hang",
             "icon": "package",
             "soon": true
+          },
+          {
+            "key": "tinh.van_ban",
+            "label": "Quy trình, văn bản",
+            "route": "/kn/van-ban",
+            "icon": "library"
           }
         ]
       }
@@ -1567,6 +1619,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "label": "Lịch sử báo giá",
             "route": "/kn/bao-gia/lich-su",
             "icon": "journal"
+          },
+          {
+            "key": "xa.van_ban",
+            "label": "Quy trình, văn bản",
+            "route": "/kn/van-ban",
+            "icon": "library"
           }
         ]
       }
@@ -1578,6 +1636,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
         "key": "dieu_hanh",
         "label": "Điều hành",
         "items": [
+          {
+            "key": "tinh.trang_chu",
+            "label": "Trang chủ phòng",
+            "route": "/kn/trang-chu",
+            "icon": "dashboard"
+          },
           {
             "key": "tinh.dashboard",
             "label": "Dashboard",
@@ -1685,6 +1749,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "label": "Danh mục nhân sự",
             "route": "/kn/nhan-su/danh-muc",
             "icon": "catalog"
+          },
+          {
+            "key": "tinh.van_ban",
+            "label": "Quy trình, văn bản",
+            "route": "/kn/van-ban",
+            "icon": "library"
           }
         ]
       }
@@ -1752,6 +1822,18 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "icon": "zap",
             "badge": "extension.report_tasks.ad_hoc_todo",
             "adHoc": true
+          }
+        ]
+      },
+      {
+        "key": "du_lieu",
+        "label": "Dữ liệu",
+        "items": [
+          {
+            "key": "xa.van_ban",
+            "label": "Quy trình, văn bản",
+            "route": "/kn/van-ban",
+            "icon": "library"
           }
         ]
       }
@@ -1880,6 +1962,18 @@ const ADMIN_DEPT_BASE: Record<string, Item[]> = {
       "label": "Mẫu báo cáo",
       "route": "/kn/phong-ban/{department}/mau-bao-cao",
       "icon": "table"
+    },
+    {
+      "key": "admin.pb.trang_chu",
+      "label": "Trang chủ phòng",
+      "route": "/kn/phong-ban/{department}/trang-chu",
+      "icon": "dashboard"
+    },
+    {
+      "key": "admin.pb.van_ban",
+      "label": "Quy trình, văn bản",
+      "route": "/kn/phong-ban/{department}/van-ban",
+      "icon": "library"
     }
   ],
   "trong_trot": [
@@ -1924,6 +2018,18 @@ const ADMIN_DEPT_BASE: Record<string, Item[]> = {
       "label": "Mẫu báo cáo",
       "route": "/kn/phong-ban/{department}/mau-bao-cao",
       "icon": "table"
+    },
+    {
+      "key": "admin.pb.trang_chu",
+      "label": "Trang chủ phòng",
+      "route": "/kn/phong-ban/{department}/trang-chu",
+      "icon": "dashboard"
+    },
+    {
+      "key": "admin.pb.van_ban",
+      "label": "Quy trình, văn bản",
+      "route": "/kn/phong-ban/{department}/van-ban",
+      "icon": "library"
     }
   ]
 };
