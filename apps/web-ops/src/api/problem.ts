@@ -192,6 +192,17 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "hrm.report_unknown": "Không có biểu báo cáo Sở này. Chọn một biểu từ NS01 đến NS06.",
   "hrm.report_blocked": "Số liệu chưa đạt quy tắc kiểm tra bắt buộc. Sửa các lỗi trước khi xuất báo cáo.",
   "hrm.export_not_found": "Không tìm thấy lần xuất báo cáo này.",
+  "hrm.promotion_case_not_found": "Không tìm thấy kỳ nâng bậc này (đã xử lý hoặc dữ liệu hồ sơ đã đổi).",
+  "hrm.promotion_conflict": "Kỳ nâng bậc không ở trạng thái cho phép thao tác này.",
+  "hrm.promotion_export_blocked": "Danh sách không xuất được: có người bị chặn theo quy tắc nâng bậc.",
+  "hrm.nlth_quota_exceeded": "Vượt chỉ tiêu nâng bậc trước thời hạn của năm.",
+  "hrm.promotion_rules_missing": "Chưa có tham số nâng bậc hoặc bảng quy đổi thành tích có hiệu lực. Admin cài ở Danh mục nhân sự.",
+  "hrm.promotion_export_not_found": "Không tìm thấy lần xuất danh sách nâng bậc này.",
+  "hrm.decision_not_found": "Không tìm thấy quyết định nâng bậc này.",
+  "hrm.decision_warnings": "Quyết định có cảnh báo (số quyết định đã có trong sổ).",
+  "hrm.decision_stale": "Bậc trong hồ sơ đã đổi sau khi xuất danh sách. Kiểm tra lại người trong quyết định.",
+  "hrm.decision_cancelled": "Quyết định đã bị hủy.",
+  "hrm.decision_cancel_order": "Có quyết định nâng bậc sau cho cùng người. Hủy quyết định sau trước.",
   "vault.batch_unsupported": "Chưa thể đọc hồ sơ nhân sự. Vui lòng liên hệ bộ phận hỗ trợ.",
   // pf/notify
   "notify.notification_not_found": "Thông báo không còn (đã quá 90 ngày hoặc ngoài phạm vi).",
@@ -506,7 +517,7 @@ export function parseRetryAfter(value: string | null | undefined, now: number = 
 }
 
 /** Thông báo cho người dùng: ưu tiên bảng mã; mã lạ thì dùng detail/title của server. */
-const PREFER_DETAIL: ReadonlySet<string> = new Set(["party.out_of_scope", "party.import_invalid", "hrm.report_blocked"]);
+const PREFER_DETAIL: ReadonlySet<string> = new Set(["party.out_of_scope", "party.import_invalid", "hrm.report_blocked", "hrm.promotion_export_blocked", "hrm.nlth_quota_exceeded", "hrm.decision_warnings", "hrm.decision_stale", "hrm.decision_cancel_order", "hrm.promotion_conflict"]);
 
 export function problemMessage(p: Pick<ProblemDetails, "code" | "status" | "detail" | "title">): string {
   // Thông báo nghiệp vụ của 422 (vd "Vui lòng nhập đầy đủ Tên tuyến và Phân loại." — docs/errors.md) nằm ở `detail`.

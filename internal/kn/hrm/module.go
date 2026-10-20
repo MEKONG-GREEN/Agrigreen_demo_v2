@@ -22,7 +22,11 @@
 // cho docs.view/docs.manage), tệp qua pf/evidence (mục đích hr_records, khóa của chủ thể "kho tài liệu" ở kho định danh),
 // xóa = ẩn, nhật ký xem trước/tải xuống. Bật bằng UseDocs; tài liệu gắn nhân viên theo cờ AG_HRM_RECORDS.
 //
-// Gói sau của cùng module: W11.25 nâng bậc, W11.26 đánh giá. Module khác chỉ import hrm/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
+// W11.25 (pf 20261020161259) — NÂNG BẬC LƯƠNG (FN-09, FN-10): kỳ NLTX/TNVK/NLTH tính từ mốc xếp bậc + bảng hệ số + tham
+// số, xếp loại năm, trạng thái xử lý, xuất Mẫu số 1/2/4 (Excel, dựng lại + SHA-256), sổ quyết định (áp bậc cùng giao dịch,
+// hủy = sự kiện bù), job hrm_promotion_scan (module_promotion.go).
+//
+// Gói sau của cùng module: W11.26 đánh giá. Module khác chỉ import hrm/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
 package hrm
 
 import (
