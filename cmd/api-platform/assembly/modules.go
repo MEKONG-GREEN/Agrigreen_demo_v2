@@ -316,6 +316,9 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	// W11.76: khóa tuần (lịch kỳ hệ thống W11.03) lưu lúc duyệt bảng giá.
 	pr.UseWeeks(PriceWeeks{Calendar: kn})
+	// W11.78: điều tra giá thành — họ tên, SĐT nông hộ / cán bộ điều tra qua kho định danh; mặc định TẮT ở production
+	// (AG_PRICE_SURVEY_PII, chờ DPIA — Q-005).
+	pr.UseSurvey(ext.Vault, price.SurveyEnabled(os.Getenv, residency.Production(os.Getenv)))
 	hr, err := hrm.New(unit, clk, KNHRMAccess) // W11.21: dom/hrm (/v1/hrm/*), danh mục nhân sự — ADR-0050
 	if err != nil {
 		return Modules{}, pools, err

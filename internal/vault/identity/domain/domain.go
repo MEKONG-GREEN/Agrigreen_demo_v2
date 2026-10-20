@@ -196,12 +196,12 @@ func ValidPurpose(s string) bool { return purposeRe.MatchString(s) }
 // cho ngăn hrm.sensitive (thẻ Thống kê BC Sở) — ngăn gắn cứng với mục đích (SectionPurpose).
 var opPurposes = map[string]map[string]bool{
 	OpCreate: set("registry.admin", "registry.dedup", "extension.contact", "mechanization.owner", PurposeHRMProfile,
-		PurposeContactDirectory),
+		PurposeContactDirectory, PurposePriceSurvey),
 	OpLookup: set("registry.admin", "registry.dedup", PurposeHRMProfile),
 	// Resolve (định danh đầy đủ): quản trị hồ sơ, liên hệ hộ, khuyến nông hỗ trợ hộ, hồ sơ nhân sự.
-	OpResolve: set("registry.admin", "extension.contact", "extension.field_support", PurposeHRMProfile),
+	OpResolve: set("registry.admin", "extension.contact", "extension.field_support", PurposeHRMProfile, PurposePriceSurvey),
 	OpDisplay: set("registry.admin", "extension.contact", "extension.field_support",
-		"mechanization.owner", "mrv.evidence", PurposeHRMProfile),
+		"mechanization.owner", "mrv.evidence", PurposeHRMProfile, PurposePriceSurvey),
 	OpAmend:        set(PurposeHRMProfile, PurposeContactDirectory),
 	OpSectionWrite: set(PurposeHRMProfile, PurposeHRMSensitive, PurposeContactDirectory),
 	OpSectionRead:  set(PurposeHRMProfile, PurposeHRMSensitive, PurposeContactDirectory),
@@ -247,6 +247,10 @@ const (
 	// PurposeContactDirectory (W11.23, Q-071 — đề xuất của dev: mục đích riêng "danh bạ liên hệ", có thông báo chủ thể):
 	// thẻ danh bạ của pf/contact và định danh + ngăn contact.card của liên hệ ngoài tỉnh.
 	PurposeContactDirectory = "contact.directory"
+	// PurposePriceSurvey (W11.78, BRD Báo giá v1.3 FN-TI-02.11 BR-03): phiếu điều tra giá thành — tạo chủ thể nông hộ / cán
+	// bộ điều tra khi Cấp Tỉnh nhập tệp, đọc họ tên / SĐT khi rà soát. Không tra theo SĐT (Lookup) — kho tự chống trùng khi
+	// tạo. Chờ DPIA (Q-005 (iv)) trước dữ liệu thật.
+	PurposePriceSurvey = "price.cost_survey"
 )
 
 // Ngăn hồ sơ (vault.section, vault 000004).
