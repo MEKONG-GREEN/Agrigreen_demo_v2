@@ -9,6 +9,7 @@ package domain
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -195,7 +196,8 @@ func ValidatePlanForm(templateCode string, values map[string]string) [][2]string
 		return [][2]string{{"template", "profile hrm_plan chỉ nhận biểu " + PlanTemplateCode}}
 	}
 	if _, err := PlanValuesFromForm(values); err != nil {
-		if fe, ok := err.(PlanFieldError); ok {
+		var fe PlanFieldError
+		if errors.As(err, &fe) {
 			return [][2]string{{fe.Field, fe.Msg}}
 		}
 		return [][2]string{{"values", err.Error()}}
