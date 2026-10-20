@@ -36,7 +36,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
@@ -284,21 +283,18 @@ func (s *SurveyService) prepare(ctx context.Context, profile string, round uuid.
 			pv.Missing = append(pv.Missing, "output")
 		}
 	}
-	_, _, surveyPct, err := s.AlertParams(tenant.WithID(ctx, a.c.tenant), a.prof.Name)
-	if err != nil {
-		return nil, err
-	}
-	if !surveyPct.IsPositive() {
-		surveyPct = decimal.NewFromInt(40)
-	}
 	var (
-		states  map[string]domain.ItemState
-		syn     map[string]map[string]string
-		names   map[string]string
-		imports []store.SurveyImport
+		surveyPct decimal.Decimal
+		states    map[string]domain.ItemState
+		syn       map[string]map[string]string
+		names     map[string]string
+		imports   []store.SurveyImport
 	)
 	today := s.today()
 	if err := s.tx(ctx, a.c.tenant, func(tx pgx.Tx) error {
+		if surveyPct, err = s.surveyPct(ctx, tx, a.prof.Name); err != nil {
+			return err
+		}
 		if p.sn, err = s.loadRound(ctx, tx, a.prof.Name, round, true); err != nil {
 			return err
 		}

@@ -27,7 +27,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // FormFilter là bộ lọc danh sách phiếu.
@@ -95,7 +94,11 @@ type reviewCtx struct {
 	devs   map[uuid.UUID]domain.Deviation
 }
 
-func (s *SurveyService) loadReview(ctx context.Context, tx pgx.Tx, a surveyAccess, round uuid.UUID, pct decimal.Decimal) (*reviewCtx, error) {
+func (s *SurveyService) loadReview(ctx context.Context, tx pgx.Tx, a surveyAccess, round uuid.UUID) (*reviewCtx, error) {
+	pct, err := s.surveyPct(ctx, tx, a.prof.Name)
+	if err != nil {
+		return nil, err
+	}
 	sn, err := s.loadRound(ctx, tx, a.prof.Name, round, true)
 	if err != nil {
 		return nil, err
@@ -148,10 +151,19 @@ func figures(f store.SurveyForm) domain.FormFigures {
 	return domain.FormFigures{AreaHa: f.AreaHa, OutputKg: f.OutputKg, SalePrice: effPrice(f), OtherIncome: f.OtherIncome, Costs: f.Costs}
 }
 
-func (s *SurveyService) surveyPct(ctx context.Context, a surveyAccess) (decimal.Decimal, error) {
-	_, _, pct, err := s.AlertParams(tenant.WithID(ctx, a.c.tenant), a.prof.Name)
+// surveyPct đọc ngưỡng phiếu điều tra (CT-06) của cấu hình ngưỡng (W11.74) trong giao dịch tx; chưa cấu hình → 40 %.
+func (s *SurveyService) surveyPct(ctx context.Context, tx pgx.Tx, profile string) (decimal.Decimal, error) {
+	prof, ok := s.calendarProfile(profile)
+	if !ok {
+		return decimal.Zero, port.ErrProfileNotFound
+	}
+	set, _, _, err := s.thresholdSet(ctx, tx, prof)
 	if err != nil {
 		return decimal.Zero, err
+	}
+	pct := decimal.Zero
+	if set.Default.Params != nil {
+		pct = set.Default.Params.SurveyPct
 	}
 	if !pct.IsPositive() {
 		pct = decimal.NewFromInt(40)
@@ -172,10 +184,6 @@ func (s *SurveyService) listForms(ctx context.Context, profile string, round uui
 	if err := a.needRead(); err != nil {
 		return FormList{}, err
 	}
-	pct, err := s.surveyPct(ctx, a)
-	if err != nil {
-		return FormList{}, err
-	}
 	if f.Limit <= 0 || f.Limit > 500 {
 		f.Limit = 200
 	}
@@ -188,14 +196,14 @@ func (s *SurveyService) listForms(ctx context.Context, profile string, round uui
 	)
 	today := s.today()
 	err = s.tx(ctx, a.c.tenant, func(tx pgx.Tx) error {
-		rc, err = s.loadReview(ctx, tx, a, round, pct)
+		rc, err = s.loadReview(ctx, tx, a, round)
 		return err
 	})
 	if err != nil {
 		return FormList{}, err
 	}
 	d := s.detail(rc.sn, today, rc.names)
-	out.Round, out.ThresholdPct = d.RoundSummary, pct
+	out.Round, out.ThresholdPct = d.RoundSummary, rc.pct
 	st := out.Round.Status
 	out.CanReview = a.tinh && (st == domain.RoundCollecting || st == domain.RoundReviewing)
 	items, communes := map[string]bool{}, map[string]bool{}
@@ -347,16 +355,12 @@ func (s *SurveyService) GetForm(ctx context.Context, profile string, round, form
 	if err := a.needRead(); err != nil {
 		return FormDetail{}, err
 	}
-	pct, err := s.surveyPct(ctx, a)
-	if err != nil {
-		return FormDetail{}, err
-	}
 	var (
 		d                   FormDetail
 		farmerRef, offerRef uuid.UUID
 	)
 	err = s.tx(ctx, a.c.tenant, func(tx pgx.Tx) error {
-		rc, err := s.loadReview(ctx, tx, a, round, pct)
+		rc, err := s.loadReview(ctx, tx, a, round)
 		if err != nil {
 			return err
 		}
@@ -428,10 +432,6 @@ func (s *SurveyService) ReviewForm(ctx context.Context, profile string, round, f
 	if err := a.needTinh(); err != nil {
 		return err
 	}
-	pct, err := s.surveyPct(ctx, a)
-	if err != nil {
-		return err
-	}
 	act.Note = strings.TrimSpace(act.Note)
 	if utf8.RuneCountInString(act.Note) > 1000 {
 		return problem.Validation.WithField("note", "tối đa 1000 ký tự")
@@ -440,7 +440,7 @@ func (s *SurveyService) ReviewForm(ctx context.Context, profile string, round, f
 		if err := store.LockSurveyRound(ctx, tx, a.c.tenant, round); err != nil {
 			return err
 		}
-		rc, err := s.loadReview(ctx, tx, a, round, pct)
+		rc, err := s.loadReview(ctx, tx, a, round)
 		if err != nil {
 			return err
 		}
@@ -535,16 +535,12 @@ func (s *SurveyService) ApproveUnflagged(ctx context.Context, profile string, ro
 	if err := a.needTinh(); err != nil {
 		return 0, err
 	}
-	pct, err := s.surveyPct(ctx, a)
-	if err != nil {
-		return 0, err
-	}
 	n := 0
 	err = s.tx(ctx, a.c.tenant, func(tx pgx.Tx) error {
 		if err := store.LockSurveyRound(ctx, tx, a.c.tenant, round); err != nil {
 			return err
 		}
-		rc, err := s.loadReview(ctx, tx, a, round, pct)
+		rc, err := s.loadReview(ctx, tx, a, round)
 		if err != nil {
 			return err
 		}
