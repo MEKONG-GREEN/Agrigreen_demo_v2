@@ -189,7 +189,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	knUnits := extension.NewPublishedAdminUnits(unit)
 	knOrgs := extension.NewPublishedOrganizations(unit)
 	kn := extension.New(unit, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: knOrgs, Units: knUnits, Params: md.Params(), Catalogs: md.Catalogs(),
-		Plots: knHTXData, Coops: knHTXData})
+		Plots: knHTXData, Coops: knHTXData, Store: store})
 	md.UseStaffDirectory(kn.StaffNames()) // G-07: tên người đặt/duyệt tham số
 	pty.UseActorNames(kn.StaffNames())    // KN v7.7 P2: tên người thao tác trong Log phòng ban/khu vực
 

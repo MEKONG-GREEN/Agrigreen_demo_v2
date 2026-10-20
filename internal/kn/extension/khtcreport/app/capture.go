@@ -10,6 +10,7 @@ import (
 
 	kd "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/domain"
 	ks "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/store"
+	extapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcext/app"
 	form "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcform/domain"
 	fs "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcform/store"
 	pd "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/domain"
@@ -204,6 +205,27 @@ func (s *Service) capture(ctx context.Context, c caller, p ps.Period) (domain.Da
 	sort.Slice(metrics, func(i, j int) bool { return metrics[i].Key < metrics[j].Key })
 	data, err := domain.Compose(domain.Period{ID: p.ID, No: p.No, Scope: p.Scope, Type: p.Type, Year: p.Year, Name: p.Name, From: p.From, To: p.To, Cutoff: p.Cutoff, Departments: append([]string{}, p.Departments...)}, plan, sheets, snapshot, metrics, s.now())
 	if err != nil {
+		return domain.Data{}, nil, err
+	}
+	// W11.67: ô Nhập ngoài — giá trị hiệu lực của kỳ ở Số liệu nguồn ngoài (cùng module, cùng giao dịch tenant).
+	var external []extapp.ReportFigure
+	if err := s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error { var e error; external, e = extapp.ReportFigures(ctx, tx, p.ID); return e }); err != nil {
+		return domain.Data{}, nil, err
+	}
+	figures := make([]domain.ExternalFigure, 0, len(external))
+	for _, f := range external {
+		x := domain.ExternalFigure{EntryID: f.Entry.ID, Version: f.Entry.Seq, IndicatorID: f.Indicator.ID, Code: f.Indicator.Code, Name: f.Indicator.Name,
+			Group: f.Indicator.Group, Value: f.Entry.Value.String(), Unit: f.Entry.Unit, Agency: f.Entry.Agency, Document: f.Entry.Document,
+			Evidence: []domain.ExternalEvidence{}, At: f.Entry.At.UTC()}
+		if f.Entry.SourceDate != nil {
+			x.SourceDate = f.Entry.SourceDate.Format("2006-01-02")
+		}
+		for _, ev := range f.Evidence {
+			x.Evidence = append(x.Evidence, domain.ExternalEvidence{ID: ev.ID, FileName: ev.FileName})
+		}
+		figures = append(figures, x)
+	}
+	if data, err = domain.WithExternal(data, figures); err != nil {
 		return domain.Data{}, nil, err
 	}
 	for _, sheet := range data.Submissions {

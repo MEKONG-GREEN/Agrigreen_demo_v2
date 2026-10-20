@@ -40,6 +40,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -66,6 +67,8 @@ type Deps struct {
 	// Plots, Coops (tùy chọn): cổng thống kê hẹp do KN sở hữu; gốc lắp ráp nối bộ đọc publication v1.
 	Plots port.PlotStatistics
 	Coops port.CooperativeStatistics
+	// Store (tùy chọn): kho đối tượng cho tệp minh chứng số liệu nguồn ngoài KHTC (W11.67); thiếu → tải tệp trả 503.
+	Store objstore.Store
 }
 
 // Module là pf/extension đã nối.
@@ -86,6 +89,8 @@ type Module struct {
 	// W11.63: phiếu Báo cáo cho KHTC (extension/khtcform, module_khtc.go).
 	khtcForms   *khtcFormService
 	khtcReports *khtcReportService
+	khtcExt     *khtcExternalService // W11.67: số liệu nguồn ngoài (extension/khtcext, module_khtcext.go)
+	objects     objstore.Store
 	// W11.43 (D4 CN3): quy tắc liên biểu + 12 cảnh báo CNTS, vòng đời cảnh báo, nhắc nộp theo biểu (module_cntsalert.go).
 	alert *alertapp.Service
 	// W11.46 (D4 CN6): lịch trực KSGM BM-03, lịch tiêm phòng BM-07 (extension/cntscal).
@@ -98,7 +103,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m := &Module{svc: &app.Service{
 		DB: db, Clock: clk, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
 		Plots: d.Plots, Coops: d.Coops,
-	}, rc: &rcapp.Service{DB: db, Clock: clk, Orgs: d.Orgs, Units: d.Units, Params: d.Params}}
+	}, rc: &rcapp.Service{DB: db, Clock: clk, Orgs: d.Orgs, Units: d.Units, Params: d.Params}, objects: d.Store}
 	// Tên người thao tác của sổ vật tư dùng chung danh bạ của vòng đời báo cáo (UseReportCycle nối sau).
 	m.mat = &matapp.Service{DB: db, Clock: clk, Catalogs: d.Catalogs, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.khtc = &khtcapp.Service{DB: db, Clock: clk, Names: func() partyport.ActorNames { return m.rc.Names }}
@@ -169,6 +174,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	obhandler.Handler{Svc: m.ob}.RegisterApp(rg)
 	m.registerKHTCReports(rg)                          // W11.66
 	m.registerKHTCSources(rg)                          // W11.64
+	m.registerKHTCExternal(rg)                         // W11.67
 	alerthandler.Handler{Svc: m.alert}.RegisterApp(rg) // W11.43
 	calhandler.Handler{Svc: m.cal}.RegisterApp(rg)
 }
