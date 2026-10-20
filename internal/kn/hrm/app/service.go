@@ -39,6 +39,8 @@ type Service struct {
 	Rep ReportsConfig
 	// Docs: kho tài liệu nhân sự (W11.24, docs.go) — nil cho tới UseDocs.
 	Docs *DocStore
+	// Promo: nâng bậc W11.25 (promotion*.go) — thông báo job, cổng ghi Word (W10.17).
+	Promo PromotionConfig
 }
 
 var _ port.Catalog = (*Service)(nil)
@@ -679,6 +681,12 @@ func (s *Service) RuleAt(ctx context.Context, key string, at time.Time) (port.Ru
 }
 
 // classify đổi lỗi DB của pf_hrm sang mã lỗi chung.
+// isUnique: lỗi trùng khóa (23505) — vd chạy lại job cùng ngày.
+func isUnique(err error) bool {
+	var pg *pgconn.PgError
+	return errors.As(err, &pg) && pg.Code == "23505"
+}
+
 func classify(err error) error {
 	var pg *pgconn.PgError
 	if errors.As(err, &pg) && pg.Code == "23505" {

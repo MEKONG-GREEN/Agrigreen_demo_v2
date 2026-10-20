@@ -25,6 +25,7 @@ const (
 type xlsxMeta struct {
 	Agency, Org      string
 	Preparer, Signer string
+	SignerTitle      string // W11.25: chức danh người ký (rỗng → GIÁM ĐỐC)
 	Exporter         string
 	ExportedAt       time.Time
 }
@@ -143,7 +144,11 @@ func renderXLSX(t domain.Table, m xlsxMeta) ([]byte, error) {
 	merge(half+1, r, n, r, "An Giang, ngày "+local.Format("02")+" tháng "+local.Format("01")+" năm "+local.Format("2006"), italic)
 	r++
 	merge(1, r, half, r, "NGƯỜI LẬP BIỂU", bold)
-	merge(half+1, r, n, r, "GIÁM ĐỐC", bold)
+	signer := m.SignerTitle
+	if signer == "" {
+		signer = "GIÁM ĐỐC"
+	}
+	merge(half+1, r, n, r, signer, bold)
 	r += 4
 	merge(1, r, half, r, m.Preparer, bold)
 	merge(half+1, r, n, r, m.Signer, bold)
