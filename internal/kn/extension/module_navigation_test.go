@@ -1,6 +1,7 @@
 package extension
 
 import (
+	"encoding/json"
 	"testing"
 
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -24,5 +25,24 @@ func TestNavigationRegistrationKeepsRoleDefaultsAndOwnsProfiles(t *testing.T) {
 		if err != nil || len(got) == 0 || got[0] != tc.want {
 			t.Fatalf("%s/%s:%v %v", tc.role, tc.profile, got, err)
 		}
+	}
+}
+
+// The owner route must be removed by the existing tenant-module menu filter.
+func TestNavigationTargetRegistersTenantModule(t *testing.T) {
+	raw, err := navigationRegistration.ReadFile("menus/base.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var registration struct {
+		Tables struct {
+			Modules map[string]string `json:"menuModules"`
+		}
+	}
+	if err := json.Unmarshal(raw, &registration); err != nil {
+		t.Fatal(err)
+	}
+	if got := registration.Tables.Modules["/kn/khtc"]; got != "pf/extension" {
+		t.Fatalf("KHTC target must follow tenant enablement, got %q", got)
 	}
 }
