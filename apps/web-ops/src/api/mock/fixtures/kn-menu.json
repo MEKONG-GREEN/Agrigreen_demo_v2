@@ -868,12 +868,10 @@
        {
         "key": "tw.cnts.du_an_knqg",
         "label": "Dự án KNQG",
-        "route": "/kn/cnts/du-an-knqg",
+        "route": "/kn/cnts/du-an",
         "icon": "report",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -1118,13 +1116,11 @@
        },
        {
         "key": "tinh.cnts.du_an_knqg",
-        "label": "Dự án KNQG / Điểm trình diễn",
-        "route": "/kn/cnts/du-an-knqg",
+        "label": "Chương trình, dự án",
+        "route": "/kn/cnts/du-an",
         "icon": "report",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -1143,6 +1139,24 @@
         "label": "Danh mục CNTS",
         "route": "/kn/cnts/danh-muc",
         "icon": "catalog",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.cnts.ho_mo_hinh",
+        "label": "Hộ mô hình",
+        "route": "/kn/cnts/ho-mo-hinh",
+        "icon": "sprout",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.cnts.cap_quyen",
+        "label": "Cấp quyền xã, nông hộ",
+        "route": "/kn/cnts/cap-quyen",
+        "icon": "key",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -1383,13 +1397,11 @@
        },
        {
         "key": "xa.cnts.diem_trinh_dien",
-        "label": "Điểm trình diễn",
-        "route": "/kn/cnts/du-an-knqg",
+        "label": "Điểm trình diễn, hộ mô hình",
+        "route": "/kn/cnts/ho-mo-hinh",
         "icon": "report",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -1401,6 +1413,15 @@
         "enabled": false,
         "status": "coming_soon",
         "status_label": "Sắp có",
+        "children": []
+       },
+       {
+        "key": "xa.cnts.quyen_cua_toi",
+        "label": "Quyền của tôi",
+        "route": "/kn/cnts/cap-quyen",
+        "icon": "key",
+        "badge_source": null,
+        "enabled": true,
         "children": []
        }
       ]

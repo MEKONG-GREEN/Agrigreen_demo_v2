@@ -1,0 +1,139 @@
+{
+  "id": "extension-cnts-model",
+  "order": 110,
+  "tables": {
+    "deptBusiness": {
+      "chan_nuoi_thuy_san": {
+        "kn_tinh": [
+          {
+            "Key": "tinh.cnts.ho_mo_hinh",
+            "Label": "Hộ mô hình",
+            "Route": "/kn/cnts/ho-mo-hinh",
+            "Icon": "sprout",
+            "BadgeSource": "",
+            "Requires": null,
+            "ComingSoon": false,
+            "Needs": "",
+            "Children": null
+          },
+          {
+            "Key": "tinh.cnts.cap_quyen",
+            "Label": "Cấp quyền xã, nông hộ",
+            "Route": "/kn/cnts/cap-quyen",
+            "Icon": "key",
+            "BadgeSource": "",
+            "Requires": null,
+            "ComingSoon": false,
+            "Needs": "",
+            "Children": null
+          }
+        ],
+        "kn_xa": [
+          {
+            "Key": "xa.cnts.quyen_cua_toi",
+            "Label": "Quyền của tôi",
+            "Route": "/kn/cnts/cap-quyen",
+            "Icon": "key",
+            "BadgeSource": "",
+            "Requires": null,
+            "ComingSoon": false,
+            "Needs": "",
+            "Children": null
+          }
+        ]
+      }
+    }
+  },
+  "replacements": [
+    {
+      "path": [
+        "deptBusiness",
+        "chan_nuoi_thuy_san",
+        "kn_tinh",
+        11
+      ],
+      "before": {
+        "Key": "tinh.cnts.du_an_knqg",
+        "Label": "Dự án KNQG / Điểm trình diễn",
+        "Route": "/kn/cnts/du-an-knqg",
+        "Icon": "report",
+        "BadgeSource": "",
+        "Requires": null,
+        "ComingSoon": true,
+        "Needs": "",
+        "Children": null
+      },
+      "after": {
+        "Key": "tinh.cnts.du_an_knqg",
+        "Label": "Chương trình, dự án",
+        "Route": "/kn/cnts/du-an",
+        "Icon": "report",
+        "BadgeSource": "",
+        "Requires": null,
+        "ComingSoon": false,
+        "Needs": "",
+        "Children": null
+      }
+    },
+    {
+      "path": [
+        "deptBusiness",
+        "chan_nuoi_thuy_san",
+        "kn_tw",
+        0
+      ],
+      "before": {
+        "Key": "tw.cnts.du_an_knqg",
+        "Label": "Dự án KNQG",
+        "Route": "/kn/cnts/du-an-knqg",
+        "Icon": "report",
+        "BadgeSource": "",
+        "Requires": null,
+        "ComingSoon": true,
+        "Needs": "",
+        "Children": null
+      },
+      "after": {
+        "Key": "tw.cnts.du_an_knqg",
+        "Label": "Dự án KNQG",
+        "Route": "/kn/cnts/du-an",
+        "Icon": "report",
+        "BadgeSource": "",
+        "Requires": null,
+        "ComingSoon": false,
+        "Needs": "",
+        "Children": null
+      }
+    },
+    {
+      "path": [
+        "deptBusiness",
+        "chan_nuoi_thuy_san",
+        "kn_xa",
+        8
+      ],
+      "before": {
+        "Key": "xa.cnts.diem_trinh_dien",
+        "Label": "Điểm trình diễn",
+        "Route": "/kn/cnts/du-an-knqg",
+        "Icon": "report",
+        "BadgeSource": "",
+        "Requires": null,
+        "ComingSoon": true,
+        "Needs": "",
+        "Children": null
+      },
+      "after": {
+        "Key": "xa.cnts.diem_trinh_dien",
+        "Label": "Điểm trình diễn, hộ mô hình",
+        "Route": "/kn/cnts/ho-mo-hinh",
+        "Icon": "report",
+        "BadgeSource": "",
+        "Requires": null,
+        "ComingSoon": false,
+        "Needs": "",
+        "Children": null
+      }
+    }
+  ]
+}

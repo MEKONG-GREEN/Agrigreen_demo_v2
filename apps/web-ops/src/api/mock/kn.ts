@@ -582,10 +582,9 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       },
       {
         "key": "tinh.cnts.du_an_knqg",
-        "label": "Dự án KNQG / Điểm trình diễn",
-        "route": "/kn/cnts/du-an-knqg",
-        "icon": "report",
-        "soon": true
+        "label": "Chương trình, dự án",
+        "route": "/kn/cnts/du-an",
+        "icon": "report"
       },
       {
         "key": "tinh.cnts.quy_trinh",
@@ -599,15 +598,26 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
         "label": "Danh mục CNTS",
         "route": "/kn/cnts/danh-muc",
         "icon": "catalog"
+      },
+      {
+        "key": "tinh.cnts.ho_mo_hinh",
+        "label": "Hộ mô hình",
+        "route": "/kn/cnts/ho-mo-hinh",
+        "icon": "sprout"
+      },
+      {
+        "key": "tinh.cnts.cap_quyen",
+        "label": "Cấp quyền xã, nông hộ",
+        "route": "/kn/cnts/cap-quyen",
+        "icon": "key"
       }
     ],
     "kn_tw": [
       {
         "key": "tw.cnts.du_an_knqg",
         "label": "Dự án KNQG",
-        "route": "/kn/cnts/du-an-knqg",
-        "icon": "report",
-        "soon": true
+        "route": "/kn/cnts/du-an",
+        "icon": "report"
       }
     ],
     "kn_xa": [
@@ -663,10 +673,9 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
       },
       {
         "key": "xa.cnts.diem_trinh_dien",
-        "label": "Điểm trình diễn",
-        "route": "/kn/cnts/du-an-knqg",
-        "icon": "report",
-        "soon": true
+        "label": "Điểm trình diễn, hộ mô hình",
+        "route": "/kn/cnts/ho-mo-hinh",
+        "icon": "report"
       },
       {
         "key": "xa.cnts.quy_trinh",
@@ -674,6 +683,12 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
         "route": "/kn/cnts/quy-trinh",
         "icon": "sop",
         "soon": true
+      },
+      {
+        "key": "xa.cnts.quyen_cua_toi",
+        "label": "Quyền của tôi",
+        "route": "/kn/cnts/cap-quyen",
+        "icon": "key"
       }
     ]
   },
