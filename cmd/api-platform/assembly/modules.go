@@ -202,6 +202,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 
 	// PFPUB/D2 (ADR-0053 §8): nhãn "Chưa xác nhận" của dòng HTX trong số đã chốt cho KHTC.
 	kn.UseHTXConfirmations(knHTXData)
+	kn.UseDeptLibrary(store) // W11.54: tệp kho văn bản phòng ở kho đối tượng
 
 	mech := mechanization.New(unit, clk, mechanization.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Vault: ext.Vault,

@@ -26,6 +26,7 @@ import (
 	zmaphandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/handler"
 	modelapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/app"
 	modelhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/handler"
+	dhapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/depthome/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/handler"
 	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/app"
 	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/handler"
@@ -102,6 +103,8 @@ type Module struct {
 	diary *diaryapp.Service
 	// W11.52 (D4 CN12): bản đồ vùng nuôi, vùng dịch (extension/cntsmap, module_cntsmap.go).
 	zmap *zmapapp.Service
+	// W11.54 (D4 CN14): trang chủ phòng + kho văn bản phòng (extension/depthome, module_depthome.go).
+	home *dhapp.Service
 }
 
 // New tạo module với pool của vai extension_app.
@@ -122,6 +125,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.diary = &diaryapp.Service{DB: db, Clock: clk, Units: d.Units, Params: d.Params, Alerts: m.alert,
 		Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.zmap = &zmapapp.Service{DB: db, Clock: clk, Units: d.Units, Plots: d.Plots, Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.home = m.newDeptHome()
 	return m
 }
 
@@ -194,6 +198,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	modelhandler.Handler{Svc: m.model}.RegisterApp(rg) // W11.47
 	diaryhandler.Handler{Svc: m.diary}.RegisterApp(rg) // W11.48
 	zmaphandler.Handler{Svc: m.zmap}.RegisterApp(rg)   // W11.52
+	m.registerDeptHome(rg)                             // W11.54
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham
