@@ -27,8 +27,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/docx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/doctpl"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/docx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -39,7 +39,7 @@ func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
 
 func letter(version int, closing string) doctpl.Template {
 	return doctpl.Template{Key: "thu.cong_van", Version: version, Title: "Công văn thử", Owner: "pf/export",
-		Vars: []doctpl.Var{{Key: "so", Label: "Số"}, {Key: "ngay", Label: "Ngày", Required: true}, {Key: "noi_dung", Label: "Nội dung", Required: true}},
+		Vars:  []doctpl.Var{{Key: "so", Label: "Số"}, {Key: "ngay", Label: "Ngày", Required: true}, {Key: "noi_dung", Label: "Nội dung", Required: true}},
 		Lists: []doctpl.List{{Key: "dong", Label: "Dòng", Fields: []string{"ten", "gia_tri"}}},
 		Body: []doctpl.Block{
 			{Kind: doctpl.KindColumns, Left: []doctpl.Line{{Text: "Số: {so}"}}, Right: []doctpl.Line{{Text: "{ngay}", Italic: true}}},
