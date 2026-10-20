@@ -175,5 +175,11 @@ describe("KHTC default navigation uses registered owner menu policy",()=>{
     expect(current.default_route).toBe(selected.default_route);
     expect(selected.default_route).toBe("/kn/bao-cao-khtc");
     expect(menu.default_route).toBe(selected.default_route);
+    for (const [token, context, status] of [[mockToken("kn-an"), null, 428], [mockToken("kn-admin"), id, 403]] as const) {
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (context) headers["X-AG-Context"] = context;
+      const denied = await mockFetchNoDelay(new Request("http://x/v1/me/context", { headers }));
+      expect(denied.status).toBe(status);
+    }
   });
 });

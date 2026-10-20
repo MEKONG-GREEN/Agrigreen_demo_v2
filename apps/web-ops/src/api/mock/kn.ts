@@ -1463,6 +1463,17 @@ export const knAppRoutes: Route[] = [
     handler: ({ persona }) => json({ assignments: accountOf(persona)?.assignments ?? [] }),
   },
   {
+    method: "GET",
+    pattern: /^\/v1\/me\/context$/,
+    handler: ({ request }) => {
+      // The mock middleware has already rejected foreign or invalid contexts.
+      const id = request.headers.get("X-AG-Context");
+      if (!id) return problem(428, "accounts.context_required", "Cần chọn vai trò và phòng ban (header X-AG-Context)");
+      const current = knContext(id);
+      return current ? json(current, 200, NO_STORE) : problem(403, "accounts.context_invalid", "Ngữ cảnh phiên không hợp lệ");
+    },
+  },
+  {
     method: "POST",
     pattern: /^\/v1\/me\/context$/,
     handler: ({ persona, body }) => {

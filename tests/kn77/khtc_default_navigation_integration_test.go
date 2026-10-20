@@ -79,9 +79,10 @@ func TestKH_FN_CH_00_01_DefaultRouteKHTC(t *testing.T) {
 	}
 	s.wantCode(supporter.post("/v1/extension/khtc/periods", map[string]any{}), 422, "accounts.support_reason_required", "support write still requires reason")
 	// An administrator remains on the existing overview page.
-	adminUser, adminAssignments := s.createKN("Admin điều hướng", "nav-admin@vi-du.vn", "0912000703", map[string]any{"role": authz.KNAdmin, "department_codes": []string{}, "commune_codes": []string{}})
-	adminUser.token = st.Issuer.Sign(t, authztest.Token{Subject: adminUser.id, TenantID: s.tid, Roles: s.realm(adminUser.id), MFA: true, TTL: 3 * time.Hour})
-	adminContext := adminUser.as(adminAssignments[authz.KNAdmin], "")
+	adminID := st.Directory.Seed(accport.NewUser{Username: "nav-admin", Email: "nav-admin@vi-du.vn", FirstName: "Admin", LastName: "Điều hướng", TenantID: s.tid}, true, authz.RolePlatformAdmin)
+	adminAssignment := s.want(s.rootA.adm(http.MethodPost, "/v1/accounts/users/"+adminID.String()+"/assignments", map[string]any{"role": authz.KNAdmin, "department_codes": []string{}, "commune_codes": []string{}}), 201, "grant existing platform admin")
+	adminUser := &agUser{s: s, id: adminID, tid: s.tid, token: st.Issuer.Sign(t, authztest.Token{Subject: adminID, TenantID: s.tid, Roles: s.realm(adminID), MFA: true, TTL: 3 * time.Hour})}
+	adminContext := adminUser.as(str(obj(adminAssignment.body, "assignment"), "assignment_id"), "")
 	adminCurrent := s.want(adminContext.get("/v1/me/context"), 200, "admin current")
 	if adminCurrent.body["default_route"] != "/kn/tong-quan" {
 		t.Fatalf("admin default changed:%s", adminCurrent.raw)

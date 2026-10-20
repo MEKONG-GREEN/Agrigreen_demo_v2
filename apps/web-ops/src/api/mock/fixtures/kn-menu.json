@@ -100,7 +100,7 @@
    "ad_hoc": false,
    "menu": {
     "audience": "kn_tinh",
-    "default_route": "/kn/dashboard",
+    "default_route": "/kn/bao-cao-khtc",
     "department": {
      "code": "trong_trot",
      "name": "Phòng Trồng trọt",
@@ -460,7 +460,7 @@
    "ad_hoc": true,
    "menu": {
     "audience": "kn_tinh",
-    "default_route": "/kn/dashboard",
+    "default_route": "/kn/bao-cao-khtc",
     "department": {
      "code": "trong_trot",
      "name": "Phòng Trồng trọt",
@@ -947,7 +947,7 @@
    "ad_hoc": false,
    "menu": {
     "audience": "kn_tinh",
-    "default_route": "/kn/dashboard",
+    "default_route": "/kn/bao-cao-khtc",
     "department": {
      "code": "chan_nuoi_thuy_san",
      "name": "Phòng Chăn nuôi - Thủy sản",
@@ -1583,7 +1583,7 @@
    "ad_hoc": false,
    "menu": {
     "audience": "kn_tinh",
-    "default_route": "/kn/dashboard",
+    "default_route": "/kn/khtc/ky-bao-cao",
     "department": {
      "code": "ke_hoach_tai_chinh",
      "name": "Phòng Kế hoạch - Tài chính",
@@ -2023,7 +2023,7 @@
    "ad_hoc": false,
    "menu": {
     "audience": "kn_tinh",
-    "default_route": "/kn/dashboard",
+    "default_route": "/kn/bao-cao-khtc",
     "department": {
      "code": "thong_tin_truyen_thong",
      "name": "Phòng Thông tin Tuyên truyền",
@@ -2538,7 +2538,7 @@
    "ad_hoc": false,
    "menu": {
     "audience": "kn_tinh",
-    "default_route": "/kn/dashboard",
+    "default_route": "/kn/bao-cao-khtc",
     "department": {
      "code": "hanh_chinh_tong_hop",
      "name": "Phòng Hành chính - Tổng hợp",
