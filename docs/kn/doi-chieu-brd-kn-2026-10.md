@@ -185,7 +185,7 @@ Ký hiệu nguồn: `D1 §2.1#4` = bản D1, mục 2.1, dòng 4. `v4.3 §21.1`, 
 | W11.50 | Chiến dịch điều tra | Đợt trên kỳ `adhoc`, tách khỏi lũy kế | D4 CN10 | W11.42 | M | pf 000165 | Chờ Q-058 | 2 | |
 | W11.52 | Bản đồ vùng nuôi/dịch (GĐ2) | Vẽ vùng, bán kính, hướng di chuyển, theo ngày | D4 CN12 | W11.49, W11.47 | L | pf 20261024090947 | Đã làm 21/10/2026 (kéo vào G1) — giả định bán kính 500 m/3 km/10 km ([gia-dinh/W11.52](gia-dinh/W11.52.md)) | 4 | |
 | W11.53 | Dự án KNQG Mẫu 01–07 (GĐ2) | Ký scan, TW xác nhận | D4 CN13 | W11.47, W11.48, W10.17 | L | pf 000178 | GĐ2; chờ Q-055, Q-027 | 4 | |
-| W11.54 | Trang chủ phòng + kho văn bản (GĐ2) | `pf/content`, `_pub` | D4 CN14 | W11.44, W11.10 | M | `_pub` | GĐ2 | 4 | |
+| W11.54 | Trang chủ phòng + kho văn bản (GĐ2) | `pf/content`, `_pub` | D4 CN14 | W11.44, W11.10 | M | `_pub` | GĐ2 | 4 | Kéo vào G1: làm trong `pf/extension` (`extension/depthome`), pf 20261020175048 — [giả định](gia-dinh/W11.54.md) |
 | W11.55 | Nông hộ Mobile (GĐ2) | OTP SMS, nhật ký hộ, lịch tiêm + nhắc, báo nghi dịch | D4 CN15 | W11.48, W11.49, W10.06 | L | pf 000179 | GĐ2; Chặn Q-020, Q-080 | 4 | |
 
 **Kế hoạch – Tài chính**

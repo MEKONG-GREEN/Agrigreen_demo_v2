@@ -101,3 +101,22 @@ Nguồn và giới hạn: [giả định W11.52](../kn/gia-dinh/W11.52.md) (bán
 Chưa nghiệm thu: tải KML, xuất ảnh, lớp cơ sở giết mổ, ranh giới xã, hình thửa/ranh giới HTX (cần công bố có hình học — ticket
 làn shared); cảnh báo "vẽ ngoài ranh giới" chỉ hoạt động khi `pf/geo` có ranh giới xã (chưa có kiểm thử DB với ranh giới thật);
 luồng trình duyệt chưa có Playwright.
+
+## Trang chủ phòng + kho văn bản W11.54 (FN-17, FN-20 — kéo từ GĐ2 vào G1)
+
+Áp dụng cho cả 5 phòng KN (thẻ theo phòng); giới hạn: [giả định W11.54](../kn/gia-dinh/W11.54.md).
+
+| Tiêu chí | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| FN-17: Cấp Tỉnh mở trang chủ phòng mình; Admin chọn phòng (mỗi phòng có trang chủ); Cấp Xã 403 | `TestFN17_DeptHome` | G1 |
+| FN-17: thẻ CNTS (cảnh báo, quá hạn, ổ dịch), lịch công tác, văn bản; thẻ "chờ duyệt" chỉ Lãnh đạo phòng/Ban Giám đốc; bấm thẻ mở màn chi tiết | `TestFN17_DeptHome`; Vitest `src/kn/depthome/depthome.test.ts` | G1 |
+| FN-17 luồng phụ, BR-02/AC-02: Lãnh đạo phòng sửa giới thiệu, chức năng nhiệm vụ (phiên bản, khóa lạc quan); viên chức, Ban Giám đốc không sửa | `TestFN17_DeptHome` | G1 |
+| FN-20 B1–B3: thư mục, thêm văn bản, lọc loại/hiệu lực/thư mục, tìm số hiệu; xem, tải; phát hiện sai định dạng theo nội dung | `TestFN20_DeptLibrary`, `TestFileType` | G1 |
+| FN-20 AC-01: văn bản mới hiện ngay cho người được xem (kể cả Cấp Xã khi đối tượng "xa"); phòng khác không thấy | `TestFN20_DeptLibrary`, `TestFN17_DeptHome` | G1 |
+| FN-20 AC-02: tệp > 20 MB bị chặn | `TestFN20_DeptLibrary`; Vitest `fileError` | G1 |
+| FN-20 AC-03, BR-01: văn bản hết hiệu lực vẫn tìm được, nhãn "Hết hiệu lực" | `TestFN20_DeptLibrary`, `TestValidity` | G1 |
+| Phiên bản tệp (tệp cũ tải được), ẩn = xóa có lý do (Lãnh đạo phòng), sổ chặn UPDATE | `TestFN20_DeptLibrary` | G1 |
+| Menu: Trang chủ phòng, Quy trình, văn bản cho Tỉnh/Xã/Admin các phòng | `TestWebMenuFixture`; `kn-menu.contract.test.ts` | G1 |
+
+Chưa nghiệm thu: AC-01 FN-17 (500 người dùng, < 5 giây trên 3G — cần đo tải trên môi trường triển khai), chỉ số tổng đàn/tiêm
+phòng/KSGM tuần trên trang chủ, bộ lọc kỳ/khu vực/lĩnh vực, Nông hộ xem quy trình trên Mobile (W11.55).

@@ -170,7 +170,7 @@ func (s *Service) Folders(ctx context.Context, dept string, includeHidden bool) 
 	}
 	out := FolderList{Department: c.dept, CanWrite: c.writer(), CanManage: c.manager(), Items: []FolderView{}}
 	for _, f := range fs {
-		if hidden[f.Ref] && !(includeHidden && c.manager()) {
+		if hidden[f.Ref] && (!includeHidden || !c.manager()) {
 			continue
 		}
 		out.Items = append(out.Items, FolderView{FolderRow: f, Path: folderPath(fs, &f.Ref), Docs: count[f.Ref], HiddenChain: hidden[f.Ref]})
