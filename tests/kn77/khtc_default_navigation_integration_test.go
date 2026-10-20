@@ -96,7 +96,7 @@ func TestKH_FN_CH_00_01_DefaultRouteKHTC(t *testing.T) {
 	if route == "/kn/khtc/ky-bao-cao" || route == "" || menu.body["default_route"] != route || !navigationMenuHasRoute(menu.body, route) {
 		t.Fatalf("disabled target used:%s /%s", current.raw, menu.raw)
 	}
-	// Foreign actors and tenants still cannot use the selected context.
+	// A foreign actor still cannot use the selected context.
 	foreign := *planningContext
 	foreign.token = st.Issuer.Sign(t, authztest.Token{Subject: uuid.New(), TenantID: s.tid, Roles: []string{accport.RoleKNUser}})
 	s.wantCode(foreign.get("/v1/me/context"), 403, "accounts.context_invalid", "foreign actor")

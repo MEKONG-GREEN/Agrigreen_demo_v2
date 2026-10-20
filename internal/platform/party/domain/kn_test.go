@@ -123,7 +123,7 @@ var implementedMenu = map[string]bool{"admin.pb.bao_cao_khtc": true, "admin.pb.b
 // "Dùng chung" (Contact) cuối mọi đối tượng; mục module chưa có là "Sắp có"; bộ Trồng trọt giữ nguyên các
 // nhóm cũ; phòng ban seed cũ (menu_profile generic) nhận khuôn riêng theo mã.
 func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
-	if domain.MenuVersion != "kn.menu/v4" {
+	if domain.MenuVersion != "kn.menu/v5" {
 		t.Fatal(domain.MenuVersion)
 	}
 	keys := func(gs []domain.MenuGroup) []string {

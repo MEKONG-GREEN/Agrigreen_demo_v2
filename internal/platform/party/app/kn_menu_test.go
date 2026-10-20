@@ -18,7 +18,7 @@ func TestW1106_MenuViewComingSoonAndAlias(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v.Version != "kn.menu/v4" || len(v.Groups) < 2 || v.Groups[1].Key != domain.GroupNghiepVu {
+	if v.Version != "kn.menu/v5" || len(v.Groups) < 2 || v.Groups[1].Key != domain.GroupNghiepVu {
 		t.Fatalf("menu HCTH: %+v", v.Groups)
 	}
 	var it MenuItemView
