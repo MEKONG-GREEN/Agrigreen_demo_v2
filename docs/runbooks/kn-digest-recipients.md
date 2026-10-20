@@ -1,10 +1,10 @@
 # Email tóm tắt KN: hộp thư công vụ theo tenant
 
-KNSPLIT-4B-NOTIFY thay người nhận toàn process bằng mapping tin cậy theo tenant cho queue digest KN. Trước khi triển khai, người vận hành phải khai cả **tenant KN hiện tại** (có thể vẫn là tenant lưu ký trước chuyển) và từng tenant Trung tâm tỉnh được bật. Thiếu mapping giữ hàng chờ, job báo lỗi và không dùng AG_SMTP_DIGEST_TO. Không có email nào tự chuyển người nhận theo nội dung sự kiện, phòng ban từ client hoặc tenant trong body.
+KNSPLIT-4B-NOTIFY dùng mapping tin cậy theo tenant cho queue email tóm tắt KN. Trước triển khai, cần khai cả **tenant KN hiện tại** (có thể vẫn là tenant lưu ký trước chuyển) và từng tenant Trung tâm tỉnh được bật. Thiếu mapping giữ hàng chờ, job báo lỗi và không dùng `AG_SMTP_DIGEST_TO`. Nội dung sự kiện và dữ liệu từ client không quyết định địa chỉ nhận thư.
 
 ## Cấu hình được duyệt
 
-Worker đọc một lần khi dựng module từ `AG_KN_DIGEST_RECIPIENTS_JSON`, dạng array dưới đây (UUID/địa chỉ chỉ là ví dụ giả):
+Worker đọc `AG_KN_DIGEST_RECIPIENTS_JSON` khi dựng module. Ví dụ dưới đây dùng UUID và địa chỉ giả:
 
 ```json
 [
@@ -13,19 +13,19 @@ Worker đọc một lần khi dựng module từ `AG_KN_DIGEST_RECIPIENTS_JSON`,
 ]
 ```
 
-Chỉ hộp thư công vụ đúng Trung tâm được duyệt, tránh email cá nhân. Không sao chép ví dụ vào production. Mỗi tenant một entry; ít nhất một, tối đa50 địa chỉ. Không dùng display name, nhiều mailbox trong mộtchuỗi, CRLF hoặc khoảngtrắng ngoàiđịa chỉ. Địa chỉ so khôngphânbiệthoathường khôngđược lặplại trongcùngtenant hoặc giữaTrungtâm; nếu mộtmailboxchung cần nhận nhiềuTrungtâm phải chốt mộtthiếtkếquyền mới, khônglách bằng đổichoahoa. Tốiđa1024entry/1MiB. JSONkhôngcófieldthừa/trùng vàkhôngtrailing. Rỗng hoặc[]tạoresolverchặn, khôngphảichếđộtoàncục.
+Chỉ dùng hộp thư công vụ đúng Trung tâm đã duyệt. Không chép ví dụ vào production. Mỗi tenant có một entry với 1–50 địa chỉ. Mỗi chuỗi chứa một địa chỉ, không display name, CRLF hoặc khoảng trắng bên ngoài. Địa chỉ so không phân biệt hoa thường không được lặp trong một tenant hoặc giữa hai Trung tâm. Hộp thư chung nhận nhiều Trung tâm cần thiết kế quyền riêng; không lách kiểm tra bằng đổi chữ hoa/thường. Giới hạn 1024 entry, 1 MiB. JSON không có trường thừa/trùng hoặc dữ liệu phía sau array. Giá trị rỗng hoặc [] chặn gửi, không bật người nhận toàn cục.
 
-SMTP AG_SMTP_HOST/PORT/USERNAME/PASSWORD/FROM tiếp tục theo cấu hìnhhiện có; không in mật khẩu, rawJSONhoặc danh sáchngườinhận vào log. Parsererrors chỉ mãlỗichung; kiểm cấu hình ởkhovậnhành cóquyền. AG_SMTP_DIGEST_TO chỉcòn ýnghĩavớibản genericnotifykhôngnốiresolver; worker hiệnnốiresolverKN **luônluôn**, nên biếnnày khôngcứu queueKNkhi thiếumapping. Cácemailcánhân/price/accountkhác dùngkênhhiệnhành khôngđổi.
+Các biến SMTP HOST/PORT/USERNAME/PASSWORD/FROM tiếp tục theo cấu hình hiện có. Giữ mật khẩu trong nguồn bí mật hiện hành; không ghi mật khẩu, JSON hoặc địa chỉ vào log. Parser chỉ trả lỗi chung. `AG_SMTP_DIGEST_TO` vẫn phục vụ cấu hình generic notify không nối resolver; worker hiện luôn nối resolver KN nên biến này không thay thế mapping thiếu. Email theo người nhận của Báo giá và tài khoản dùng kênh hiện hữu.
 
 ## Áp dụng và kiểm chứng
 
-1. Đối chiếu tenant UUID với hồ sơ Trung tâm/bản chụp mapping đã duyệt; không suy tenant chỉ từ tên tỉnh hoặc địa chỉemail.
-2. Sao lưu cấu hình vận hành trước thay đổi. Đặt JSON đã duyệt trong cấu hình worker, giữ credentials SMTP ởnguồnbímật hiệncó. Không thayrealmuser hoặcDBtenant tronggói này.
-3. Khởi động lại worker theo quy trình triển khai. JSON sai làm buildNotify lỗi trước mởpool; JSONrỗng chặn delivery cho tới cómapping. Lazy consumer/job đều dùng cùng builder, không reload từevent/request.
-4. Trên staging, với hai tenant thử và nguồn KN riêng, kiểm chỉ hộp thưđúngtenant nhận đúngthamchiếu; queue thiếu mapping vẫn pending. Không đưa token/nội dung/địa chỉ thật vào biênbản côngkhai. Test tự động dùng fakeMailer vàPG, khônggửi SMTP thật.
-5. Log job hiện giữ sent/outcome, không có mailbox. Khi mapping thiếu: sửa đúng cấu hình, restart worker rồi job xử lý pending. Không mark sent thủcông hoặc xóa queue để làm báo lỗi biếnmất.
-6. Mỗi lượt xửlý tốiđa200mục/tenant; mục dư xửlý lượt kếtiếp. SMTPlỗi hủyTX, giữpending. SMTP cóthểđãnhận nhưngDBcommitthấtbại: retrycóthểgửilại nhưcơchếcũ; gói này chưa thêm outboxSMTP/receiptđểbảođảmexactlyonce.
+1. Đối chiếu tenant UUID với hồ sơ Trung tâm và mapping đã duyệt. Không suy tenant từ tên tỉnh hoặc địa chỉ email.
+2. Lưu bản cấu hình vận hành trước thay đổi. Đặt JSON đã duyệt trong cấu hình worker. Gói này không đổi realm user hoặc tenant trong DB.
+3. Khởi động lại worker theo quy trình triển khai. JSON sai làm `buildNotify` lỗi trước mở pool; JSON rỗng chặn delivery tới khi có mapping. Consumer dựng muộn và job dùng cùng builder, không đọc địa chỉ từ request/sự kiện.
+4. Trên staging, dùng hai tenant thử và dữ liệu KN riêng, kiểm hộp thư từng tenant nhận đúng tham chiếu. Tenant thiếu mapping phải giữ pending. Kiểm thử tự động dùng Mailer giả và PostgreSQL, chưa chứng minh SMTP thật đã giao thư.
+5. Log job giữ `sent`/`outcome`, không ghi mailbox. Khi thiếu mapping, sửa cấu hình và khởi động lại để xử lý pending. Không đánh dấu sent thủ công hoặc xóa queue để làm mất lỗi.
+6. Mỗi lượt xử lý tối đa 200 mục/tenant; phần còn lại xử lý lượt kế tiếp. SMTP lỗi hủy giao dịch và giữ pending. Nếu SMTP đã nhận thư nhưng DB commit thất bại, retry có thể gửi lại như cơ chế cũ; gói này chưa bổ sung xác nhận giao thư để bảo đảm đúng một lần.
 
 ## Lùi cấu hình
 
-Giữ nguyên cơ chế resolver; đưa mapping về bản trước đãduyệt hoặc dừng riêng job digest bằng quy trình vận hành nếu chưa rõ ngườinhận. Không chuyểnvềglobalfallback trong môi trường nhiềutenant. Pendingqueue giữnguyên; sửa mapping/restart sẽtiếptục. Không sửa nguồnHTX/MKG/MRV, không sửaMFA hay các quyếtđịnhPO.
+Giữ resolver, đưa mapping về bản trước đã duyệt hoặc dừng riêng job digest theo quy trình vận hành nếu chưa xác định người nhận. Không chuyển về global fallback trong môi trường nhiều tenant. Hàng chờ giữ nguyên; sửa mapping và khởi động lại để tiếp tục. Không sửa dữ liệu HTX/MKG/MRV, MFA hoặc quyết định PO.
