@@ -105,6 +105,8 @@ type Module struct {
 	zmap *zmapapp.Service
 	// W11.54 (D4 CN14): trang chủ phòng + kho văn bản phòng (extension/depthome, module_depthome.go).
 	home *dhapp.Service
+	// W11.50 (D4 CN10): chiến dịch điều tra mở rộng (extension/cntscampaign, module_cntscampaign.go).
+	campaigns *campaignService
 }
 
 // New tạo module với pool của vai extension_app.
@@ -199,6 +201,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	diaryhandler.Handler{Svc: m.diary}.RegisterApp(rg) // W11.48
 	zmaphandler.Handler{Svc: m.zmap}.RegisterApp(rg)   // W11.52
 	m.registerDeptHome(rg)                             // W11.54
+	m.registerCNTSCampaigns(rg)                        // W11.50
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham

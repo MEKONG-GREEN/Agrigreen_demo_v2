@@ -120,6 +120,20 @@ func (r *resolver) resolve(ctx context.Context, roles []string, commune string, 
 	return dedupRefs(out)
 }
 
+// periodAdhoc là loại kỳ native của đợt điều tra CNTS (W11.50 — extension/cntscampaign).
+const periodAdhoc = "adhoc"
+
+// regular bỏ bài nộp của kỳ `adhoc` (đợt điều tra) khỏi chuỗi so sánh của báo cáo định kỳ.
+func regular(rs []formsport.RecordedSubmission) []formsport.RecordedSubmission {
+	out := rs[:0:0]
+	for _, r := range rs {
+		if r.PeriodKind != periodAdhoc {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 func containsStr(xs []string, v string) bool {
 	for _, x := range xs {
 		if x == v {
@@ -181,6 +195,9 @@ func (s *Service) verdict(ctx context.Context, tx pgx.Tx, tid uuid.UUID, r Raise
 }
 
 func (s *Service) onSubmission(ctx context.Context, tx pgx.Tx, tid uuid.UUID, sub formsport.RecordedSubmission) error {
+	if sub.PeriodKind == periodAdhoc {
+		return nil // W11.50: bài của đợt điều tra không so với báo cáo định kỳ (FN-21 BR-02)
+	}
 	at := sub.EventTime
 	province := s.provinceOf(ctx, sub.Parent, at)
 	rs := &resolver{s: s, tid: tid, province: province}
@@ -232,6 +249,7 @@ func (s *Service) previous(ctx context.Context, tid uuid.UUID, sub formsport.Rec
 	to := sub.From.AddDate(0, 0, -1)
 	rs, err := s.Feed.Latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: sub.TemplateCode, Units: []string{sub.Unit},
 		From: &from, To: &to, Limit: int(n) + 1})
+	rs = regular(rs)
 	if err != nil || len(rs) == 0 {
 		return nil, err
 	}
@@ -249,6 +267,7 @@ func (s *Service) spikeCheck(ctx context.Context, tx pgx.Tx, tid uuid.UUID, sub 
 	if err != nil {
 		return err
 	}
+	hs = regular(hs)
 	var hist []map[string]string
 	for _, h := range hs {
 		if !h.NilReport {
@@ -271,6 +290,7 @@ func (s *Service) ksgmCheck(ctx context.Context, tx pgx.Tx, tid uuid.UUID, bm04 
 	if err != nil {
 		return err
 	}
+	ds = regular(ds)
 	vals := make([]map[string]string, 0, len(ds))
 	for _, d := range ds {
 		vals = append(vals, d.Values)
@@ -293,6 +313,7 @@ func (s *Service) bm01ChangedWeek(ctx context.Context, tx pgx.Tx, tid uuid.UUID,
 	if err != nil {
 		return err
 	}
+	ws = regular(ws)
 	for _, w := range ws {
 		if w.From != nil && w.To != nil && !day.Before(*w.From) && !day.After(*w.To) {
 			return s.ksgmCheck(ctx, tx, tid, w, rs)

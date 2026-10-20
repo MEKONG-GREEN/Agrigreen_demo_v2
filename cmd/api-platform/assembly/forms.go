@@ -50,5 +50,7 @@ func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extens
 		MaxSubmissions: KNKHTCProfile.MaxSubmissions})
 	// PFPUB (ADR-0053 §7): kỳ KHTC mở kèm kỳ nguồn quy đổi theo lịch D8; "Đủ dữ liệu" theo cờ chốt của nguồn.
 	kn.UseKHTCSourceCrosswalk(kn.KHTCSourceCrosswalk())
+	// W11.50: chiến dịch điều tra CNTS — đợt là kỳ native kn_cnts loại `adhoc` (không vào lũy kế, không vào tổng KHTC).
+	kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control(), Figures: fm.Figures()})
 	return fm, nil
 }

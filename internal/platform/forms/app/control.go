@@ -44,6 +44,13 @@ func (c Control) CancelPeriod(ctx context.Context, profile string, id uuid.UUID,
 	return err
 }
 
+// ReopenPeriod mở lại cả kỳ đã chốt (close_by của Nút phát hành, lý do 10–500 ký tự) — ảnh chụp đã chốt không đổi.
+// Ngoài port.PeriodControl: module nghiệp vụ dùng qua interface hẹp của mình (W11.50, đợt điều tra mở lại).
+func (c Control) ReopenPeriod(ctx context.Context, profile string, id uuid.UUID, reason, idem string) error {
+	_, err := c.Svc.Reopen(ctx, profile, id, ReopenInput{Reason: reason}, idem)
+	return err
+}
+
 // ChangeDue đổi hạn nộp của kỳ (cấp close_by của Nút phát hành; kỳ đang nhận bài).
 func (c Control) ChangeDue(ctx context.Context, profile string, id uuid.UUID, due time.Time, reason, idem string) error {
 	s := c.Svc
