@@ -58,9 +58,11 @@ type Deps struct {
 	Pusher  channel.Pusher // chỉ worker cần
 	Mailer  channel.Mailer // nil → tắt email tóm tắt
 	// DigestTo: hộp thư công vụ nhận email tóm tắt chỉ đạo khẩn (AG_SMTP_DIGEST_TO).
-	DigestTo      []string
-	NudgeCooldown time.Duration
-	NudgeHourly   int
+	DigestTo []string
+	// DigestRecipients, when configured, replaces DigestTo for every queue tenant.
+	DigestRecipients port.DigestRecipients
+	NudgeCooldown    time.Duration
+	NudgeHourly      int
 	// SyncEntities: entity của pf/sync (chiều xuống) — kiểm entities[] của nudge; rỗng → chỉ kiểm dạng tên.
 	SyncEntities []string
 	Log          *slog.Logger

@@ -62,11 +62,12 @@ type Deps struct {
 	Staff     port.StaffDirectory
 	Units     partyport.AdminUnits
 	// Farmers (tùy chọn): nông dân có thửa trong địa bàn cảnh báo khẩn (HTX US-NEWS-03).
-	Farmers  port.AreaFarmers
-	Pusher   channel.Pusher
-	Mailer   channel.Mailer
-	DigestTo []string
-	Log      *slog.Logger
+	Farmers          port.AreaFarmers
+	Pusher           channel.Pusher
+	Mailer           channel.Mailer
+	DigestTo         []string
+	DigestRecipients port.DigestRecipients
+	Log              *slog.Logger
 	// NudgeCooldown, NudgeHourly: giới hạn đồng bộ ngay (mặc định 5 phút/đích, 30 lần/giờ/người).
 	NudgeCooldown time.Duration
 	NudgeHourly   int
@@ -120,7 +121,7 @@ type Module struct {
 func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m := &Module{svc: app.NewService(db.ForModule(b, DBModule), clk, app.Deps{
 		Scope: d.Scope, Devices: d.Devices, Staff: d.Staff, Units: d.Units, Farmers: d.Farmers, Pusher: d.Pusher, Mailer: d.Mailer,
-		DigestTo: d.DigestTo, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
+		DigestTo: d.DigestTo, DigestRecipients: d.DigestRecipients, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
 		SyncEntities: d.SyncEntities, Emails: d.Emails, EmailMailer: d.EmailMailer, LinkBase: d.LinkBase,
 	})}
 	m.svc.RegisterKinds(d.Kinds, nativeNotificationKinds())
