@@ -89,7 +89,7 @@ func (s *Service) Checkin(ctx context.Context, in CheckinRequest) (CheckinResult
 	if err := a.registrant(); err != nil {
 		return CheckinResult{}, err
 	}
-	if a.KN != nil && a.KN.ReadOnly() {
+	if a.ReadOnly {
 		return CheckinResult{}, problem.Forbidden.WithDetail("ngữ cảnh chỉ xem")
 	}
 	if strings.TrimSpace(in.IdemKey) == "" {

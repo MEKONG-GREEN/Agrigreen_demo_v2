@@ -1201,3 +1201,8 @@ Downstream consumers: API assembly (KN config và Contact→HRM), KN77/KHTC, wor
 Dependency evidence: `rg -n 'kn/(price|hrm|contact)|KNPriceProfile|KNHRMAccess|KNContactAccess' cmd tests/kn77 internal/kn` và `go run ./tools/modgen -check`.
 Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/price/... ./internal/kn/hrm/... ./internal/kn/contact/... ./tests/contextdata ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker` với PostgreSQL riêng thực.
 Propagation rule: production quyền/profile đổi → bắt buộc cả ba nguồn và các consumer trên; root chạy full5 và migration gate/helper sau rebase. Thiếu exit thật hoặc có SKIP không được coi xanh. Không đổi 35 golden/DDL/ACL/API.
+
+
+## KNSPLIT-2-CONTEXT-J
+
+Lịch công tác giải phiên owner trước resolver/realm; follower/manager không vay legacy. Lưu/sao chép/duyệt/check-in chỉ xem bị chặn trước I/O. Kiểm tra app policy, toàn handler lịch có dữ liệu, HTTP public root chín trạng thái phiên và contextdata/KN77/API. Không đổi SQL/ACL/OpenAPI/golden hay hành vi GPS. Đang chờ kết quả thực.

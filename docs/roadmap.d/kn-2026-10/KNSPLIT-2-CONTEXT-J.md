@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-CONTEXT-J: lịch công tác dùng owner session và quyền chỉ xem; kiểm thử PostgreSQL, cổng tĩnh rồi tích hợp dev.

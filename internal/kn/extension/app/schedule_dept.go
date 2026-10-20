@@ -111,8 +111,8 @@ func (a knActor) mayApprove(st ScheduleSettings) bool {
 	if st.ApproverRule != port.ApproverRuleFollower {
 		return domain.ApproverLevelAllowed(a.MgmtLevel, st.ApproverLevels)
 	}
-	if k := a.KN; k != nil {
-		return k.Manager || k.HasDuty(authz.DutyScheduleFollower)
+	if k := a.ownedSession; k != nil {
+		return !k.ReadOnly() && (k.Manager || k.HasDuty(port.SessionDutyScheduleFollower))
 	}
 	return accountsport.IsManager(a.MgmtLevel, "")
 }
