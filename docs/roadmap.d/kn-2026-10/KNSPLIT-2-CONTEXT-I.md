@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-CONTEXT-I: Phiên chủ KN cho Báo giá, HCTH và Contact qua callback cấu hình; giữ native realm riêng; chờ đủ source/consumer PostgreSQL, cổng tĩnh và root tích hợp dev.
+- [ ] KNSPLIT-2-CONTEXT-I: Callback phiên chủ KN cho Báo giá/HCTH/Contact đã wired; source composite, 34 owner/native HTTP-PG, static/lint và full5 thực PASS; giữ35golden/boundary314; chờ root rebase/helper9 + full KN77/API và tích hợp dev.
