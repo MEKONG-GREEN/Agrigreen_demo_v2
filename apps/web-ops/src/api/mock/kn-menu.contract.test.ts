@@ -8,7 +8,7 @@ import { fromKnMenu } from "@/kn/menuAdapter";
 import { menuLinks } from "@/shell/menu";
 import fixture from "./fixtures/kn-menu.json";
 import { mockFetchNoDelay } from "./handler";
-import { DEFAULT_ROUTE, knMenu, MENU_VERSION } from "./kn";
+import { DEFAULT_ROUTE, knMenu, MENU_VERSION, navigationRoute } from "./kn";
 import { KN_DEPARTMENTS, KN_MENU_PROFILE } from "./kn-accounts";
 import { mockToken } from "./personas";
 
@@ -143,5 +143,33 @@ describe("kn.menu/v3 (W11.06): khuôn theo phòng ban + Dùng chung", () => {
     );
     expect(res.status).toBe(200);
     expect(((await res.json()) as KnMenu).department?.code).toBe("hanh_chinh_tong_hop");
+  });
+});
+
+
+describe("KHTC default navigation uses registered owner menu policy",()=>{
+  it("KHTC and professional profile contexts land on their enabled pages",()=>{
+    for(const [department,expected] of [["ke_hoach_tai_chinh","/kn/khtc/ky-bao-cao"],["trong_trot","/kn/bao-cao-khtc"],["chan_nuoi_thuy_san","/kn/bao-cao-khtc"],["thong_tin_truyen_thong","/kn/bao-cao-khtc"],["hanh_chinh_tong_hop","/kn/bao-cao-khtc"]] as const){
+      const menu=knMenu("kn_tinh",department);
+      expect(menu.default_route).toBe(expected);
+      expect(menuLinks(fromKnMenu(menu)).some((item)=>item.node.href===expected)).toBe(true);
+    }
+  });
+  it("disabled and parent routes cannot become landing pages",()=>{
+    const groups:KnMenu["groups"]=[{key:"test",label:"test",items:[
+      {key:"closed",label:"closed",route:"/kn/khtc/ky-bao-cao",icon:"",badge_source:null,enabled:false,children:[]},
+      {key:"parent",label:"parent",route:"/parent",icon:"",badge_source:null,enabled:true,children:[{key:"leaf",label:"leaf",route:"/enabled",icon:"",badge_source:null,enabled:true,children:[]}]},
+    ]}];
+    expect(navigationRoute("kn_tinh","ke_hoach_tai_chinh",groups)).toBe("/enabled");
+    expect(()=>navigationRoute("kn_tinh","ke_hoach_tai_chinh",[])).toThrow("no enabled");
+  });
+  it("select, current context and menu return the same canonical route",async()=>{
+    let id:string|null=null;
+    const api=createKnApi({baseUrl:"http://x",getAccessToken:()=>mockToken("kn-an"),getContextId:()=>id,fetch:mockFetchNoDelay});
+    const selected=await api.selectContext({assignment_id:"asg-an-tinh",department_code:"trong_trot"});
+    id=selected.context_id;
+    const menu=await api.menu();
+    expect(selected.default_route).toBe("/kn/bao-cao-khtc");
+    expect(menu.default_route).toBe(selected.default_route);
   });
 });

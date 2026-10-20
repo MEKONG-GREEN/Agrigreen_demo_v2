@@ -1300,6 +1300,23 @@ function adminDeptItem(d: DepartmentRef): KnMenuItem {
   };
 }
 
+/** Select only enabled leaf routes, using generated owner preferences. */
+export function navigationRoute(audience: KnRole, profile: KnMenuProfile | null, groups: readonly KnMenuGroup[]): string {
+  const routes: string[] = [];
+  const visit = (items: readonly KnMenuItem[]) => {
+    for (const item of items) {
+      if (!item.enabled) continue;
+      if (item.children.length) { visit(item.children); continue; }
+      if (item.route?.startsWith("/") && !item.route.startsWith("//")) routes.push(item.route);
+    }
+  };
+  groups.forEach((group) => visit(group.items));
+  const preferred = profile ? CONTEXT_DEFAULT_ROUTES[profile]?.[audience] : undefined;
+  for (const route of [preferred, DEFAULT_ROUTE[audience]]) if (route && routes.includes(route)) return route;
+  if (!routes[0]) throw new Error("navigation: no enabled menu page");
+  return routes[0];
+}
+
 /**
  * KNMenu trên dây (= Go app.DepartmentMenu / app.AdminMenu). Admin: Điều hành / Phòng ban (mọi phòng ban, chưa mở
  * enabled = false) / Quản trị hệ thống / Dùng chung (kn.menu/v3). Phòng ban chưa mở → 409 ở handler.
@@ -1312,7 +1329,7 @@ export function knMenu(audience: KnRole, departmentCode: string | null, opts: { 
       { key: ADMIN_SYSTEM.key, label: ADMIN_SYSTEM.label, items: wire(ADMIN_SYSTEM.items, true, false) },
       { key: SHARED.key, label: SHARED.label, items: wire(SHARED.items, true, false) },
     ];
-    return { menu_version: MENU_VERSION, audience, org_ref: opts.orgRef ?? null, department: null, default_route: DEFAULT_ROUTE.admin, groups };
+    return { menu_version: MENU_VERSION, audience, org_ref: opts.orgRef ?? null, department: null, default_route: navigationRoute(audience, null, groups), groups };
   }
   const d = KN_DEPARTMENTS.find((x) => x.code === (departmentCode ?? "trong_trot")) ?? KN_DEPARTMENTS[0]!;
   const adHoc = opts.adHoc ?? ADHOC_FORMS[d.code] ?? false;
@@ -1320,7 +1337,7 @@ export function knMenu(audience: KnRole, departmentCode: string | null, opts: { 
   const groups = [...profileGroups(profileOf(d.code), audience), shared]
     .map((g) => ({ key: g.key, label: g.label, items: wire(g.items, true, adHoc) }))
     .filter((g) => g.items.length > 0);
-  return { menu_version: MENU_VERSION, audience, org_ref: opts.orgRef ?? null, department: deptWire(d), default_route: DEFAULT_ROUTE[audience], groups };
+  return { menu_version: MENU_VERSION, audience, org_ref: opts.orgRef ?? null, department: deptWire(d), default_route: navigationRoute(audience, profileOf(d.code), groups), groups };
 }
 
 /** Cây menu của khung (cho kiểm thử khung/Sidebar). */
@@ -1405,7 +1422,8 @@ export function contextProblem(base: MockPersona, contextId: string | null): Res
 
 /** Context đã lưu (cho kiểm thử và khôi phục sau tải lại trong cùng tab). */
 export function knContext(contextId: string): SessionContext | undefined {
-  return CONTEXTS.get(contextId)?.ctx;
+  const stored = CONTEXTS.get(contextId);
+  return stored ? { ...stored.ctx, default_route: knMenu(stored.ctx.role, stored.ctx.department_code, { orgRef: stored.ctx.org_ref }).default_route } : undefined;
 }
 
 const NO_STORE = { "Cache-Control": "no-store" };
@@ -1467,7 +1485,7 @@ export const knAppRoutes: Route[] = [
         org_ref: asg.org_ref,
         org_name: asg.org_name,
         communes: asg.communes,
-        default_route: DEFAULT_ROUTE[asg.role],
+        default_route: knMenu(asg.role, dept?.code ?? null, { orgRef: asg.org_ref }).default_route,
         // Server: 24 giờ hoặc tới khi lần gán hết hiệu lực (P1 domain.ContextTTL).
         expires_at: new Date(Date.now() + 24 * 3_600_000).toISOString(),
         support_session_id: null,

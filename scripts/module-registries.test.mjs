@@ -59,3 +59,13 @@ test("WH-A-OAS-001: fragment assembly preserves YAML bytes and rejects conflicti
   assert.throws(() => assembleOpenAPI("", [...blocks, ...parseFragment(b, "other")]), /duplicate OpenAPI definition/u);
   assert.throws(() => parseFragment("paths:\n  /unregistered:\n", "bad"), /without order marker/u);
 });
+
+
+test("KHTC-NAV-REG-001: contextual navigation requires registered profiles, audiences and internal paths", () => {
+  const base=registration("navigation-base",{MenuProfiles:["generic"],defaultRoutes:{reader:"/overview"}});
+  const config=(profiles)=>registration("navigation-profile",{contextDefaultRoutes:profiles},1);
+  assert.deepEqual(compileMenus([base,config({generic:{reader:"/periods"}})]).contextDefaultRoutes.generic,{reader:"/periods"});
+  assert.throws(()=>compileMenus([base,config({unknown:{reader:"/page"}})]),/profile is not registered/u);
+  assert.throws(()=>compileMenus([base,config({generic:{unknown:"/page"}})]),/invalid navigation route/u);
+  assert.throws(()=>compileMenus([base,config({generic:{reader:"//external.test"}})]),/invalid navigation route/u);
+});

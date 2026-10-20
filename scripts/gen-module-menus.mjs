@@ -63,6 +63,12 @@ export function compileMenus(documents) {
   for (const profile of tables.MenuProfiles ?? []) {
     if (!["trong_trot", "generic"].includes(profile) && !tables.deptBusiness?.[profile]) throw Error(`profile has no registered business menu: ${profile}`);
   }
+  for (const [profile, roles] of Object.entries(tables.contextDefaultRoutes ?? {})) {
+    if (!tables.MenuProfiles?.includes(profile)) throw Error(`navigation profile is not registered: ${profile}`);
+    for (const [audience, route] of Object.entries(roles)) {
+      if (!tables.defaultRoutes?.[audience] || typeof route !== "string" || !/^\/(?!\/)[^\\?#\r\n]*$/u.test(route)) throw Error(`invalid navigation route: ${profile}/${audience}`);
+    }
+  }
   return tables;
 }
 export function readyItems(tables) {

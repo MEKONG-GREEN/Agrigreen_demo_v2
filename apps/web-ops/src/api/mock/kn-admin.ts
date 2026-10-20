@@ -15,7 +15,7 @@ import type { DepartmentRef, KnRole, RoleAssignment, SessionContext } from "@/kn
 import { NATIONAL_REF, provinceOrgRef } from "./data";
 import { hasRole, json, problem, problemOf, type Ctx, type Route } from "./http";
 import { findKnAccount, KN_ACCOUNTS, KN_DEPARTMENTS, KN_MENU_PROFILE, type MockKnAccount } from "./kn-accounts";
-import { dropSupportContexts, knStoredContext, registerKnContext, DEFAULT_ROUTE } from "./kn";
+import { dropSupportContexts, knStoredContext, registerKnContext, knMenu } from "./kn";
 import { stableUuid } from "./kn-schedules";
 import { AG_COMMUNES, AG_PROVINCE, AG_REGIONS, communeName, regionName } from "./kn-reports/store";
 
@@ -390,7 +390,7 @@ function startSupport(ctx: Ctx): Response {
     org_ref: asg.org_ref,
     org_name: asg.org_name,
     communes: asg.communes,
-    default_route: DEFAULT_ROUTE[asg.role],
+    default_route: knMenu(asg.role, dept.code, { orgRef: asg.org_ref }).default_route,
     expires_at: new Date(Date.now() + 4 * 3_600_000).toISOString(),
     support_session_id: sessionId,
     on_behalf_of: target ? userId(target) : null,
