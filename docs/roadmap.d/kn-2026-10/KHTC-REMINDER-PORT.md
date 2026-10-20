@@ -1,0 +1,1 @@
+- [ ] KHTC-REMINDER-PORT: cổng forms đọc tiến độ hệ thống theo tenant/profile/kỳ, giữ RLS/read-only và OwnerRef nút phát hành; không dựng Principal. Core5f1c1690/tests637fd033, kiểm PG/static đang chạy, chưa job nhắc hạn hay Feed phân trang. [Giả định](../../kn/gia-dinh/KHTC-REMINDER-PORT.md). Chờ bằng chứng và helper dev.
