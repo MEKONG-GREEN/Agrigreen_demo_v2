@@ -1809,9 +1809,7 @@
           "route": "/kn/cnts/chien-dich",
           "icon": "megaphone",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          },
          {

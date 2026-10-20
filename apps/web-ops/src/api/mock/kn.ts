@@ -860,8 +860,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
                 "key": "tinh.cnts.chien_dich.quan_ly",
                 "label": "Quản lý chiến dịch",
                 "route": "/kn/cnts/chien-dich",
-                "icon": "megaphone",
-                "soon": true
+                "icon": "megaphone"
               },
               {
                 "key": "tinh.cnts.chien_dich.tao",

@@ -148,7 +148,7 @@ describe("kn.menu/v6 (BF-MENU #98, R-A6): menu theo Update prototype và hình k
       "Cảnh báo",
       ["Biểu mẫu", ["Thiết kế biểu mẫu*", "Phát hành, theo dõi nộp", "Cấu hình nhắc nhở", "Rà soát nhật ký", "Cấp quyền"]],
       ["Lịch", ["Lịch trực KSGM", "Lịch tiêm phòng", "Lịch công tác cán bộ xã", "Lịch công tác phòng"]],
-      ["Chiến dịch điều tra", ["Quản lý chiến dịch*", "Tạo chiến dịch*"]],
+      ["Chiến dịch điều tra", ["Quản lý chiến dịch", "Tạo chiến dịch*"]],
     ]);
     expect(g["Báo cáo"]).toEqual(["Báo cáo định kỳ*", "KSGM tuần, tháng", "Thủy sản (Phụ lục 2)", "Báo cáo dịch bệnh", KHTC]);
     expect(g["Dữ liệu"]).toEqual([
