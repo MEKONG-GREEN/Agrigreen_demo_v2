@@ -13,6 +13,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
 	source "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcsource/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
 	forms "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	party "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -44,6 +45,8 @@ type Service struct {
 	Sources    *source.Service
 	Egress     meter.Checkpoint
 	EgressMode meter.Mode
+	// Exporter: pf/export (`cap/export`, W10.17) — xuất Word từ bản Excel đã đóng băng; nil → 503.
+	Exporter exportport.Exporter
 }
 type caller struct {
 	principal authz.Principal

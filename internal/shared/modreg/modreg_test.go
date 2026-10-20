@@ -1,6 +1,7 @@
 package modreg
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -266,11 +267,18 @@ func TestRepoManifests(t *testing.T) {
 			t.Fatalf("%s phải là kernel (ADR-0027)", name)
 		}
 	}
-	// W6.6: cap/import, cap/task, cap/export chưa đủ điều kiện tách (R-MOD-09) — khai hosts ở module đang cài.
-	for _, c := range []string{"cap/import", "cap/task", "cap/export"} {
+	// W6.6: cap/import, cap/task chưa đủ điều kiện tách (R-MOD-09) — khai hosts ở module đang cài.
+	for _, c := range []string{"cap/import", "cap/task"} {
 		if len(r.Hosts(c)) == 0 {
 			t.Fatalf("%s: không module nào khai hosts (docs/dev/modules.md, W6.6)", c)
 		}
+	}
+	// W10.17 (ADR-0051): cap/export đã tách thành pf/export (điều kiện (i)) — không module nào còn khai hosts.
+	if m, ok := r.Get("pf/export"); !ok || m.Kind != KindCapability || !slices.Contains(m.Aka, "cap/export") {
+		t.Fatal("pf/export phải là capability aka cap/export (ADR-0051)")
+	}
+	if got := r.Hosts("cap/export"); len(got) != 0 {
+		t.Fatalf("cap/export đã tách nhưng còn hosts: %v", got)
 	}
 }
 

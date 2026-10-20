@@ -3,7 +3,6 @@
 # Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
 name: pf/mrv
 aka: [dom/mrv]
-hosts: [cap/export]
 kind: domain
 zones: [pf]
 version: 1.0.0

@@ -3,7 +3,6 @@
 # Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
 name: mkg/acctbridge
 aka: [mkg/acctbridge]
-hosts: [cap/export]
 kind: domain
 zones: [mkg]
 version: 1.0.0

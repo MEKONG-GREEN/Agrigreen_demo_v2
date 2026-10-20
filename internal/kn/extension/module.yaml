@@ -3,7 +3,7 @@
 # Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
 name: pf/extension
 aka: [dom/extension]
-hosts: [cap/export, cap/task]
+hosts: [cap/task]
 kind: domain
 zones: [pf]
 version: 1.0.0
@@ -11,6 +11,7 @@ depends:
   pf/accounts: ">=1.0 <2"
   pf/contact: ">=1.0 <2"
   pf/evidence: ">=1.0 <2"
+  pf/export: ">=1.0 <2"
   pf/forms: ">=1.0 <2"
   pf/geo: ">=2.0 <3"
   pf/hrm: ">=1.0 <2"

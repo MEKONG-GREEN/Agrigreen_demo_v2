@@ -23,6 +23,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port/farmerid"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
@@ -100,6 +101,7 @@ type Modules struct {
 	Price         *price.Module     // W11.71 cap/price: khung giá — danh mục nền, /v1/price/* (ADR-0049)
 	HRM           *hrm.Module       // W11.21 dom/hrm: danh mục nhân sự HCTH (FN-19), /v1/hrm/* (ADR-0050)
 	Contact       *contact.Module   // W11.23 cap/directory: Contact dùng chung (FN-13), /v1/contacts/*
+	Export        *export.Module    // W10.17 cap/export: mẫu văn bản có phiên bản, .docx có băm, /v1/exports/*
 }
 
 // Named trả module kèm tên repo (module.yaml) theo thứ tự gắn route.
@@ -111,6 +113,7 @@ func (m Modules) Named() []NamedModule {
 		{"pf/simulation", m.Simulation}, {"pf/cropcycle", m.CropCycle}, {"pf/cooperative", m.Cooperative}, {"pf/metrics", m.Metrics},
 		{"pf/extdata", m.ExtData}, {"pf/metering", m.Metering}, {"pf/apiclient", m.APIClient}, {"pf/forms", m.Forms},
 		{"pf/price", m.Price}, {"pf/hrm", m.HRM}, {"pf/contact", m.Contact},
+		{"pf/export", m.Export},
 	}
 }
 
@@ -327,6 +330,11 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	ct.UseStaff(KNContactStaff{Dir: hr.Directory()}, KNContactLabels{Units: acc.InternalUnits(), AdminUnits: knUnits})
 	kn.UseContactNames(ct.Names())
+	// W10.17: cap/export — Word KHTC Mẫu 1–5 (mẫu có phiên bản, lần xuất có băm, số văn bản {n}/BC-TTKN).
+	exp, err := wireExport(unit, clk, kn)
+	if err != nil {
+		return Modules{}, pools, err
+	}
 	wireHRMDocs(hr, ev) // W11.24: kho tài liệu nhân sự — tệp qua pf/evidence (hr_records)
 	pty.UseOrgImpact(kn.OpenPeriodsImpact())
 	pty.UseDepartmentUsage(kn.ReportUsage())
@@ -443,7 +451,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
 		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Cooperative: coop, Metrics: met, ExtData: ed, Metering: meter, APIClient: apic,
-		Forms: fm, Price: pr, HRM: hr, Contact: ct}, pools, nil
+		Forms: fm, Price: pr, HRM: hr, Contact: ct, Export: exp}, pools, nil
 }
 
 // EgressModeFromEnv đọc AG_EGRESS_MODE (ADR-0024 mục 2): rỗng → observe; giá trị lạ → lỗi khởi động.
