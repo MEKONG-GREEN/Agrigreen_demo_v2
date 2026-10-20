@@ -73,7 +73,7 @@ func TestPriceFrameHTTP_W1171(t *testing.T) {
 	}
 
 	call("", http.MethodGet, "/v1/price/status", http.StatusUnauthorized)
-	call("nobody", http.MethodGet, "/v1/price/status", http.StatusForbidden)
+	call("nobody", http.MethodGet, "/v1/price/status", http.StatusPreconditionRequired)
 	call("tw", http.MethodGet, "/v1/price/status", http.StatusForbidden) // profile thử không có kn_tw
 	call("tinh", http.MethodGet, "/v1/price/status?profile=htx", http.StatusNotFound)
 	st := call("tinh", http.MethodGet, "/v1/price/status", http.StatusOK)

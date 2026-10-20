@@ -272,7 +272,7 @@ func TestContact_FieldFiltering(t *testing.T) {
 		t.Fatalf("cán bộ đã nghỉ: %v", m)
 	}
 	// Vai không có quyền danh bạ.
-	f.call("farmer", http.MethodGet, "/v1/contacts/persons", nil, http.StatusForbidden)
+	f.call("farmer", http.MethodGet, "/v1/contacts/persons", nil, http.StatusPreconditionRequired)
 	f.call("", http.MethodGet, "/v1/contacts/persons", nil, http.StatusUnauthorized)
 }
 
@@ -360,7 +360,7 @@ func TestContact_StaffGate(t *testing.T) {
 	if a := f.call("tw", http.MethodGet, "/v1/contacts/access", nil, http.StatusOK); a["staff_source"] != "disabled" {
 		t.Fatalf("access: %v", a)
 	}
-	names, err := f.svc.DisplayNames(authz.WithPrincipal(context.Background(), f.who["hcth"]), []uuid.UUID{ids.New()})
+	names, err := f.svc.DisplayNames(authz.WithPrincipal(context.Background(), bindTestSession(t, f.who["hcth"])), []uuid.UUID{ids.New()})
 	if err != nil || len(names) != 0 {
 		t.Fatalf("tên khi cổng tắt: %v %v", names, err)
 	}
@@ -449,7 +449,7 @@ func TestContact_RLSNoPII(t *testing.T) {
 
 	// Tên theo tài khoản (thay display_name dạng rõ của pf_extension.staff).
 	acc := f.staff.entries[0].AccountRef
-	names, err := f.svc.DisplayNames(authz.WithPrincipal(ctx, f.who["xa"]), []uuid.UUID{acc, ids.New()})
+	names, err := f.svc.DisplayNames(authz.WithPrincipal(ctx, bindTestSession(t, f.who["xa"])), []uuid.UUID{acc, ids.New()})
 	if err != nil || len(names) != 1 || names[acc] != "Trần Thị Mai" {
 		t.Fatalf("DisplayNames: %v %v", names, err)
 	}
