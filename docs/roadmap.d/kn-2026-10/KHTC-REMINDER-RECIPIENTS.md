@@ -1,0 +1,1 @@
+- [ ] KHTC-REMINDER-RECIPIENTS: generic accounts ScopedDutyHolders giữ duty/role/phòng/effective node cùng assignment, read-only r_accounts và tenant identity guard. Core313192ff/tests eac36320, privatePG/static đang chạy; lint chờ slot. [Giả định](../../kn/gia-dinh/KHTC-REMINDER-RECIPIENTS.md). Local-only, ticket con/review/lock chờ root; chưa job nhắc hạn hoặc dev.
