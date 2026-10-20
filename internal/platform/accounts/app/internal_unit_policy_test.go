@@ -44,7 +44,7 @@ func (d *unitPolicyDB) BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error) {
 // A configured provider may decline native traffic, but cannot turn a selected
 // owner into token-org authority. Reject before native lookup or transaction.
 func TestListInternalUnitsRejectsUnhandledSelectedOwner(t *testing.T) {
-	selected, err := authz.NewSession("synthetic-owner", uuid.New(), authz.SessionScope{})
+	selected, err := authz.NewSession("synthetic_owner", uuid.New(), authz.SessionScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
