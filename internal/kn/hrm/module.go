@@ -26,6 +26,9 @@
 // số, xếp loại năm, trạng thái xử lý, xuất Mẫu số 1/2/4 (Excel, dựng lại + SHA-256), sổ quyết định (áp bậc cùng giao dịch,
 // hủy = sự kiện bù), job hrm_promotion_scan (module_promotion.go).
 //
+// W11.27 (pf 20261020161354) — KẾ HOẠCH NHÂN LỰC NĂM (FN-11, D3 H7): profile "hrm_plan" của cap/forms (đơn vị lá = đơn vị
+// nội bộ), số hiện có/dự kiến nghỉ hưu tự tính từ hồ sơ tại ngày chốt, nháp và điều chỉnh sau chốt ở sổ pf_hrm.
+//
 // Gói sau của cùng module: W11.26 đánh giá. Module khác chỉ import hrm/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
 package hrm
 
@@ -38,6 +41,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/port"
 	evport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/port"
+	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
@@ -99,6 +103,20 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 
 // RegisterAdmin: không có route Admin API.
 func (m *Module) RegisterAdmin(*gin.RouterGroup) {}
+
+// FormProfiles trả cấu hình cap/forms do pf/hrm sở hữu (W11.27: "hrm_plan" — kế hoạch nhân lực năm, đơn vị lá = đơn vị nội
+// bộ). Gốc lắp ráp nối vào forms.Deps.Profiles cùng PlanValidator.
+func FormProfiles(acc port.Access) []formsport.Profile {
+	return []formsport.Profile{app.PlanFormProfile(acc)}
+}
+
+// PlanValidator là quy tắc chặn bài nộp của profile hrm_plan (forms.Deps.Validators[port.PlanProfile]).
+func PlanValidator() formsport.Validator { return app.PlanValidator{} }
+
+// UsePlans bật kế hoạch nhân lực năm (W11.27, FN-11): cổng phát hành, điều khiển kỳ và nhập/rà soát của cap/forms.
+func (m *Module) UsePlans(pub formsport.Publisher, ctl formsport.PeriodControl, entry formsport.Entry) {
+	m.svc.UsePlans(app.PlanDeps{Forms: pub, Control: ctl, Entry: entry})
+}
 
 // Directory cho pf/contact (W11.23): cán bộ thuộc tỉnh — mã tham chiếu kho, đơn vị, chức vụ; tôn trọng AG_HRM_RECORDS.
 func (m *Module) Directory() port.Directory { return m.svc }

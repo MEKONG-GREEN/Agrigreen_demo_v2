@@ -4,6 +4,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm"
+	hrmport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/workflow"
@@ -24,13 +26,16 @@ var (
 	KNProfile     = KNProfiles[0]
 	KNCNTSProfile = KNProfiles[1]
 	KNKHTCProfile = KNProfiles[2]
+	// W11.27: kế hoạch nhân lực năm (HCTH FN-11) — profile "hrm_plan" do pf/hrm sở hữu, đơn vị lá = đơn vị nội bộ.
+	KNHRMProfiles = hrm.FormProfiles(KNHRMAccess)
 )
 
 // wireForms dựng pf/forms (rà soát bốn mắt qua cap/workflow) và nối ghi song song vào vòng đời báo cáo KN. W11.42: danh
 // mục cơ sở giết mổ (đơn vị lá BM-01), quy tắc chặn biểu kỳ CNTS, cổng phát hành kỳ native cho pf/extension.
 func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extension.Module, facilities formsport.FacilityDirectory) (*forms.Module, error) {
-	fm, err := forms.New(p, clk, forms.Deps{Approvals: wf.Approvals(), Profiles: KNProfiles, Facilities: facilities,
-		Validators: map[string]formsport.Validator{KNCNTSProfile.Name: kn.CNTSValidator(), KNKHTCProfile.Name: kn.KHTCFormValidator()}})
+	fm, err := forms.New(p, clk, forms.Deps{Approvals: wf.Approvals(), Profiles: append(append([]formsport.Profile{}, KNProfiles...), KNHRMProfiles...),
+		Facilities: facilities, Validators: map[string]formsport.Validator{KNCNTSProfile.Name: kn.CNTSValidator(),
+			KNKHTCProfile.Name: kn.KHTCFormValidator(), hrmport.PlanProfile: hrm.PlanValidator()}})
 	if err != nil {
 		return nil, err
 	}

@@ -40,6 +40,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	h.registerReports(rg)   // W11.28: báo cáo Sở NS01–06, dashboard nhân sự (reports.go)
 	h.registerDocs(rg)      // W11.24: kho tài liệu nhân sự (docs.go)
 	h.registerPromotion(rg) // W11.25: nâng bậc lương, sổ quyết định (promotion.go)
+	h.registerPlans(rg)     // W11.27: kế hoạch nhân lực năm (plan.go)
 }
 
 // decode đọc thân JSON, chặn trường lạ.

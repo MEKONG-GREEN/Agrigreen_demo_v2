@@ -41,6 +41,8 @@ type Service struct {
 	Docs *DocStore
 	// Promo: nâng bậc W11.25 (promotion*.go) — thông báo job, cổng ghi Word (W10.17).
 	Promo PromotionConfig
+	// Plans: kế hoạch nhân lực năm (W11.27, plan.go) — cổng cap/forms; nil cho tới UsePlans.
+	Plans *PlanDeps
 }
 
 var _ port.Catalog = (*Service)(nil)
