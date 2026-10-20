@@ -41,6 +41,6 @@ landing: # FN-CH-00.01: accounts/domain.DefaultRoute, party/domain.defaultRoutes
   kn_tinh: /kn/dashboard
   kn_xa: /kn/nhiem-vu/cong-viec
   admin: /kn/tong-quan
-deployment_units: [api-platform, worker, formimport]
+deployment_units: [api-platform, worker, formimport, hrmimport] # hrmimport: chuyển đổi nhân sự HCTH một lần (W11.30), ghi qua /v1/hrm
 frontends: [apps/web-ops, apps/field-app]
 clients: [agrigreen-web-ops, agrigreen-field-app]

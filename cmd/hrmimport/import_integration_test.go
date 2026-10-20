@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -95,25 +96,35 @@ func (f *fixture) cfg(as, report string, commit, skip bool) Config {
 		Token: as, HTTP: f.srv.Client()}
 }
 
-// count đếm dòng sổ của tenant (vai quản trị — bỏ qua RLS).
-func (f *fixture) count(table string) int {
-	var n int
-	if err := f.env.AdminPool(f.t, migrations.PF).QueryRow(context.Background(),
-		`SELECT count(*) FROM pf_hrm.`+table+` WHERE tenant_id = $1`, f.tid).Scan(&n); err != nil {
+// ledger đếm hồ sơ và dòng quá trình qua Application API (Admin) — mã ngoài module KN không truy vấn thẳng schema pf_hrm
+// (knboundary sql-into-kn); kiểm "sổ không chứa dữ liệu cá nhân" thuộc kiểm thử của pf/hrm (TestHRMRecordsHTTP_W1122).
+func (f *fixture) ledger() (staff, events int, byCode map[string]map[string]any) {
+	f.t.Helper()
+	ctx := context.Background()
+	a := &api{base: f.srv.URL + "/v1", token: "admin", hc: f.srv.Client()}
+	var list struct {
+		Total int `json:"total"`
+		Items []struct {
+			ID   string `json:"id"`
+			Code string `json:"code"`
+		} `json:"items"`
+	}
+	if _, err := a.do(ctx, http.MethodGet, "/hrm/staff?limit=100", "", nil, &list); err != nil {
 		f.t.Fatal(err)
 	}
-	return n
-}
-
-// ledgerText trả toàn bộ dòng sổ hồ sơ + quá trình của tenant dạng JSON (để kiểm không có dữ liệu cá nhân).
-func (f *fixture) ledgerText() string {
-	var s string
-	if err := f.env.AdminPool(f.t, migrations.PF).QueryRow(context.Background(), `SELECT coalesce(string_agg(j, ' '), '') FROM (
-	    SELECT row_to_json(s)::text j FROM pf_hrm.staff s WHERE tenant_id = $1
-	    UNION ALL SELECT row_to_json(e)::text FROM pf_hrm.staff_event e WHERE tenant_id = $1) x`, f.tid).Scan(&s); err != nil {
-		f.t.Fatal(err)
+	byCode = map[string]map[string]any{}
+	for _, it := range list.Items {
+		var d struct {
+			Events  []any          `json:"events"`
+			Current map[string]any `json:"current"`
+		}
+		if _, err := a.do(ctx, http.MethodGet, "/hrm/staff/"+it.ID, "", nil, &d); err != nil {
+			f.t.Fatal(err)
+		}
+		events += len(d.Events)
+		byCode[it.Code] = d.Current
 	}
-	return s
+	return list.Total, events, byCode
 }
 
 func readReport(t *testing.T, path string) string {
@@ -166,7 +177,7 @@ func TestHRMImport_W1130(t *testing.T) {
 			t.Fatalf("báo cáo chứa dữ liệu cá nhân %q", pii)
 		}
 	}
-	if n := f.count("staff"); n != 0 {
+	if n, _, _ := f.ledger(); n != 0 {
 		t.Fatalf("chạy thử đã ghi %d hồ sơ", n)
 	}
 	for _, a := range f.vault.Accesses() {
@@ -179,7 +190,7 @@ func TestHRMImport_W1130(t *testing.T) {
 	if _, err := Run(ctx, f.cfg("hcth", filepath.Join(dir, "refuse.csv"), true, false)); err == nil || errors.Is(err, errRowErrors) {
 		t.Fatalf("ghi khi còn lỗi phải bị từ chối: %v", err)
 	}
-	if n := f.count("staff"); n != 0 {
+	if n, _, _ := f.ledger(); n != 0 {
 		t.Fatalf("ghi bị từ chối nhưng có %d hồ sơ", n)
 	}
 
@@ -196,17 +207,25 @@ func TestHRMImport_W1130(t *testing.T) {
 			t.Fatalf("dòng %s: mã %q, muốn %s (%v)", line, codes[line], code, codes)
 		}
 	}
-	staff, events := f.count("staff"), f.count("staff_event")
+	staff, events, cur := f.ledger()
 	if staff != 5 || events < 15 {
 		t.Fatalf("sổ: %d hồ sơ, %d dòng quá trình", staff, events)
 	}
-	// Sổ không chứa dữ liệu cá nhân (RB-3): họ tên, SĐT, ngày sinh, email, dân tộc chỉ ở kho định danh.
-	ledger := f.ledgerText()
-	for _, pii := range []string{"Nguyễn Văn An", "Lê Thị Bình", "Trần Thị Dung", "0900000101", "0900000102", "1985-03-15", "an@example.invalid", "kinh"} {
-		if strings.Contains(ledger, pii) {
-			t.Fatalf("sổ pf_hrm chứa dữ liệu cá nhân %q", pii)
+	// Quá trình ban đầu đúng như tệp: dòng 2 trưởng phòng HCTH, ngạch 01.003 bậc 4; dòng 6 đã nghỉ hưu; dòng 3 bậc đọc
+	// từ ô bị Excel đổi thành ngày; cán bộ xã gắn xã + đơn vị quản lý.
+	chk := func(code string, want map[string]any) {
+		for k, v := range want {
+			if got := cur[code][k]; fmt.Sprint(got) != fmt.Sprint(v) {
+				t.Fatalf("%s.%s = %v, muốn %v (%v)", code, k, got, v, cur[code])
+			}
 		}
 	}
+	chk("VC-00001", map[string]any{"status": "active", "unit": "hcth", "position": "truong_phong", "grade": "01.003", "step": 4,
+		"coefficient": "3.33", "step_since": "2023-01-01", "top_degree": "dai_hoc"})
+	chk("HD-00001", map[string]any{"status": "active", "unit": "trong_trot", "position": "vien_chuc", "grade": "V.05.02.07", "step": 3})
+	chk("XA-00001", map[string]any{"commune": "30001", "mgmt_unit": "trong_trot", "top_degree": "trung_cap"})
+	chk("VC-00002", map[string]any{"status": "left", "leave_reason": "nghi_huu", "grade": "01.002", "step": 8})
+	chk("VC-00003", map[string]any{"unit": "chan_nuoi", "started_on": "2020-01-01", "step": 2, "top_degree": "thac_si"})
 	pctx := authz.WithPrincipal(ctx, f.who["hcth"])
 	ref, err := f.vault.Lookup(pctx, client.PurposeHRMProfile, "0900000101")
 	if err != nil {
@@ -241,8 +260,8 @@ func TestHRMImport_W1130(t *testing.T) {
 	if !errors.Is(err, errRowErrors) || s.Created != 0 || s.Exists != 5 {
 		t.Fatalf("chạy lại: %+v %v", s, err)
 	}
-	if f.count("staff") != staff || f.count("staff_event") != events {
-		t.Fatal("chạy lại đã ghi thêm dòng sổ")
+	if s2, e2, _ := f.ledger(); s2 != staff || e2 != events {
+		t.Fatalf("chạy lại đã ghi thêm dòng sổ: %d/%d → %d/%d", staff, events, s2, e2)
 	}
 	if r := readReport(t, again); strings.Count(r, ","+StatusExists+",") < 5 {
 		t.Fatalf("báo cáo chạy lại:\n%s", r)

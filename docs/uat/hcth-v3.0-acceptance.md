@@ -47,3 +47,18 @@ Kết quả chạy từng lệnh và mã thoát: [sổ hồi quy](../REGRESSION.
 
 Tự lưu quyết định nâng bậc và bản ký đánh giá thuộc W11.25/W11.26 sau G1.
 Kiểm thử KMS cục bộ không thay thế diễn tập kho khóa và kho tệp trên môi trường triển khai.
+
+## W11.30 — Chuyển đổi dữ liệu nhân sự ban đầu (D3 H10, A2)
+
+Nguồn giả định: [W11.30](../kn/gia-dinh/W11.30.md); runbook [hrm-import.md](../runbooks/hrm-import.md).
+
+| Tiêu chí | Bằng chứng | Phạm vi kiểm tra |
+|---|---|---|
+| Chạy thử đọc Excel qua `shared/tabular`, chuẩn hóa, báo cáo dòng lỗi khớp tệp vàng; không ghi sổ, không ghi kho định danh; báo cáo không chứa dữ liệu cá nhân | `TestHRMImport_W1130` (`testdata/nhan-su-tong-hop.xlsx`, `bao-cao-chay-thu.golden.csv`) | PostgreSQL thật, HTTP `/v1/hrm`, kho định danh giả |
+| Ghi bị chặn khi còn dòng lỗi; `-skip-errors` ghi dòng hợp lệ qua `POST /v1/hrm/staff`, mã tự sinh theo thứ tự tệp, quá trình ban đầu (đơn vị, chức vụ, ngạch – bậc, văn bằng, vào làm/nghỉ việc) đúng như tệp | `TestHRMImport_W1130` | PostgreSQL thật |
+| PII (họ tên, SĐT, ngày sinh, email) ở kho định danh, thẻ TK ở ngăn `hrm.sensitive` | `TestHRMImport_W1130`; sổ `pf_hrm` không PII: `TestHRMRecordsHTTP_W1122` | Kho định danh giả |
+| Chạy lại không ghi đôi (báo "Đã có", số hồ sơ và dòng quá trình không đổi) | `TestHRMImport_W1130` | PostgreSQL thật |
+| Ngày nhiều định dạng, bậc bị đổi thành ngày, hệ số dạng chữ, ghi chú trong họ tên, SĐT mất số 0; ánh xạ cột; tệp mẫu gửi khách | `TestNormalize_W1130`, `TestTemplate_W1130` | Đơn vị |
+
+Giới hạn nghiệm thu: chưa có tệp nguồn thật (Q-069) — ánh xạ cột và bảng hệ số phải chỉnh theo tệp HCTH gửi; HCTH xác
+nhận báo cáo cuối (A2) là bước vận hành, không tự động.

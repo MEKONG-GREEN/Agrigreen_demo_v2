@@ -9,6 +9,7 @@ var assembly = map[string][]string{
 	"drill":               {"pf/kref", "pf/masterdata", "pf/mechanization", "pf/party"},
 	"edge-agent":          {},
 	"formimport":          {"pf/extension", "pf/reports"},
+	"hrmimport":           {},
 	"identity-vault":      {"vault/identity"},
 	"ingest":              {"mkg/measurement"},
 	"integration-gateway": {"pf/apiclient", "pf/cooperative", "pf/cropcycle", "pf/geo", "pf/masterdata", "pf/metering", "pf/mrv"},

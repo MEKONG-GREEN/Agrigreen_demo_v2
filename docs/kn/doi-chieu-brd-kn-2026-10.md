@@ -166,7 +166,7 @@ Ký hiệu nguồn: `D1 §2.1#4` = bản D1, mục 2.1, dòng 4. `v4.3 §21.1`, 
 | W11.27 | Kế hoạch nhân lực (FN-11) | Profile `hrm_plan` của `cap/forms` (lá = đơn vị nội bộ) | D3 H7 | W11.05, W11.22 | M | pf 000154 | Mã được | 3 | |
 | W11.28 | Báo cáo Sở NS01–06 + Dashboard | As-of tại ngày chốt, quy tắc kiểm chéo, nhấn ô xem người, lưu tệp + lịch sử xuất, nhật ký trường nhạy cảm; dashboard < 5 s | D3 H8 (trừ .docx → W10.17) | W11.21, W11.22 | L | pf 000151 | Mã được | 2 | |
 | W11.29 | web-ops HCTH | ~30 màn + Contact cho mọi vai; giả lập `src/api/mock/hrm*`; Playwright `hc-*.spec.ts` | D3 H9 | OpenAPI của W11.22–W11.28 | L | — | Mã được (theo hợp đồng) | 2–3 | |
-| W11.30 | Chuyển đổi dữ liệu HCTH | Công cụ một lần đọc Excel qua `shared/tabular`, chuẩn hóa, báo cáo dòng lỗi | D3 H10 | W11.21, W11.22 | M | — | Chặn Q-069 (cột nguồn) | 3 | |
+| W11.30 | Chuyển đổi dữ liệu HCTH | Công cụ một lần đọc Excel qua `shared/tabular`, chuẩn hóa, báo cáo dòng lỗi | D3 H10 | W11.21, W11.22 | M | — | Mã được (`cmd/hrmimport`, ánh xạ cột cấu hình được); nạp thật chờ tệp nguồn Q-069 | 3 | |
 | W11.31 | Nghiệm thu HCTH | `docs/uat/hc-v3.0-acceptance.md`, E2E `tests/hc30`, tải 500 lượt nộp/ngày | D3 H11 | tất cả | M | — | Mã được | 3 | |
 
 **Chăn nuôi – Thủy sản** (CN11 → W11.11)

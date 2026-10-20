@@ -152,7 +152,7 @@ func Run(ctx context.Context, cfg Config) (Summary, error) {
 		mode = "Ghi"
 	}
 	if cfg.ErrOut != nil {
-		fmt.Fprintf(cfg.ErrOut, "%s — %s\n", mode, s)
+		_, _ = fmt.Fprintf(cfg.ErrOut, "%s — %s\n", mode, s)
 	}
 	if runErr != nil {
 		return s, runErr
