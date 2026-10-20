@@ -61,9 +61,9 @@ type accountPolicyDB struct {
 	calls int
 }
 
-func (b *accountPolicyDB) Begin(ctx context.Context) (pgx.Tx, error) {
+func (b *accountPolicyDB) BeginTx(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, error) {
 	b.calls++
-	return b.Beginner.Begin(ctx)
+	return b.Beginner.BeginTx(ctx, opts)
 }
 
 // This is a read fixture for existing projections. Append-only internal-unit

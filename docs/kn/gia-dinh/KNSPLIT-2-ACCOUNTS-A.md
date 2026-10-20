@@ -9,3 +9,7 @@ Không sửa issuance/context/nav/attrs/delegation, job schedule, DDL/ACL/API/35
 ### Rà soát hai làn
 
 Đã đọc TWO-AGENT.md và issue cha KNSPLIT-REST #47 (agent:codex/lane:shared). Adapter duy nhất `internal/kn/extension/module_account_session_policy.go` cùng tài liệu KN là phần vượt làn cần ticket ngoại lệ/Claude Review OK trước tích hợp. Chỉ xây dựng local đủ reviewable theo phân công; agent không claim/comment/ready/push/merge, không bypass AG_INTEGRATION_LOCK. Root xử lý ticket và review chéo. Không sửa các file KN khác, nav/attrs/J.
+
+### Rà soát local trước kiểm chứng
+
+Static ban đầu exit1 tại vet và nguồn ban đầu exit1 khi biên dịch contextdata: test wrapper gọi Begin thay vì BeginTx. Toàn accounts đã PASS trước lỗi biên dịch; hồ sơ giữ nguyên kết quả đỏ, không gán aggregate thành PASS. Đã sửa wrapper và chặn cả callback cấu hình trả unhandled khi selected owner hiện diện; thêm kiểm thử generic không DB chứng minh không tra tổ tiên/mở giao dịch, đồng thời giữ native nil/unhandled và query tường minh. Callback có json:"-" để cấu hình không giải mã thành dữ liệu.

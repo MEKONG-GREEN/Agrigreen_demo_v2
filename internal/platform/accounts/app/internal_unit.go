@@ -303,8 +303,9 @@ func (s *Service) ListInternalUnits(ctx context.Context, unit uuid.UUID, include
 		if err != nil {
 			return nil, uuid.Nil, err
 		}
-	} else if p.SelectedSession != nil {
-		// A bound owner without its configured resolver is never native.
+	}
+	if p.SelectedSession != nil && !handled {
+		// A bound owner is never native, even if a configured resolver declines it.
 		return nil, uuid.Nil, problem.Forbidden
 	}
 	if unit == uuid.Nil && handled {

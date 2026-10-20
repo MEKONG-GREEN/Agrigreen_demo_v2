@@ -16,8 +16,8 @@ type SupportAuditContext struct {
 // SessionPolicies are instance-scoped owner projections. Nil callbacks select
 // native behavior only; a configured callback error is final, never a fallback.
 type SessionPolicies struct {
-	SupportAudit func(context.Context) (SupportAuditContext, error)
+	SupportAudit func(context.Context) (SupportAuditContext, error) `json:"-"`
 	// DefaultUnit reports handled for every selected owner, including invalid or
 	// empty owner state. Unhandled is reserved for genuinely native requests.
-	DefaultUnit func(context.Context) (unitRef uuid.UUID, handled bool, err error)
+	DefaultUnit func(context.Context) (unitRef uuid.UUID, handled bool, err error) `json:"-"`
 }
