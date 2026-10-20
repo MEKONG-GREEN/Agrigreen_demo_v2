@@ -135,6 +135,22 @@ Tập có nguồn: `admin_units` (bảng chiếu `k_ref.admin_unit` của tenant
 - Đối tác nhận 410 `integration.cursor_expired`: tải ảnh chụp ở `snapshot.href`, kiểm `checksum.sha256`, rồi đọc feed không tham số `cursor`.
 - Kho feed không được xóa tay: chỉ `pf_apiclient.purge_feed_entries` (job) xóa được mục đã quá 30 ngày.
 
+## W11.81 — Bảng giá ngày đã duyệt cho website (`price_board_daily`)
+
+BRD Báo giá v1.3 FN-TI-02.07 (Đợt 2, chờ A2). Feed lớp `reference` dựng ở job `apiclient_feed_build` từ `pf/price` — CHỈ phiên bản bảng giá đã duyệt hiện hành (ngày chưa duyệt / số đang sửa khi mở duyệt không bao giờ ra feed). Không có API công khai: website là một khách hàng API như mọi đối tác.
+
+| Biến | Ý nghĩa |
+|---|---|
+| `AG_INTEGRATION_PRICE_PUBLISHERS` | Đơn vị công bố: `<mã tỉnh 2 số>=<tenant UUID>[,…]`, vd `89=<tenant TTKN An Giang>`. Rỗng → không dựng `price_board_daily`. Sai dạng / trùng → worker không khởi động |
+
+**Cấp cho website.** Admin API (MFA, bốn mắt): khách hàng API của website → đăng ký sản phẩm `price_board_daily` với scope `feed:price_board_daily:read` → gói hạn mức → khóa API. Hợp đồng còn `proposed`: chỉ dev/test/UAT với `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`; production chờ PO duyệt hợp đồng.
+
+**Đọc.** `GET /v1/feeds/price_board_daily?cursor=` — `entity_key = <tỉnh>:<ngày>:<mặt hàng>`; bản ghi mới nhất thay bản cũ (duyệt lại → `board_version` tăng); `updating = true` = đang mở duyệt (hiện nhãn "Đang cập nhật"); `retract` = mặt hàng bị bỏ khỏi phiên bản duyệt lại. Mỗi trang ghi `usage_event` + `egress_event` (`public_api`, tenant vận hành).
+
+**Sự cố.**
+- Log `integration.dataset_build_failed` dataset `price_board_daily` với `price.unknown_public_dataset`: sai `AG_INTEGRATION_PRICE_PUBLISHERS` hoặc thiếu bên dùng `kn` trong `PriceProfiles`. Một đơn vị lỗi → không phiên bản mới (feed giữ trạng thái cũ, không retract).
+- Website báo thiếu bảng giá ngày D: kiểm bảng giá ngày D đã **Đã duyệt** chưa (màn Kiểm duyệt & công bố); feed chỉ có sau lần dựng kế tiếp (≤ 15 phút).
+
 ## W5.5 — MKG đọc danh bạ HTX/thửa qua feed
 
 ADR-0033 §2, §5. Feed lớp `partner` `cooperative_directory`, `plot_directory` thay `/v1/partner/cooperatives`, `/plots`; chạy **song song** với bề mặt cũ một kỳ phát hành (W5.10 gỡ).
