@@ -19,6 +19,7 @@ provides:
     - Officers
     - Points
     - PriceDesk
+    - PublicBoardFeed
     - ReminderTargets
     - TablePDF
     - Thresholds

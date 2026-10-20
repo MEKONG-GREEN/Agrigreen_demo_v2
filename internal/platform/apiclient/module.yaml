@@ -20,6 +20,7 @@ provides:
     - PartnerGrantors
     - PartnerSource
     - Plans
+    - PublishedSource
     - TokenAuthenticator
   events: [pf.apiclient.export.requested/v1]
   internal_events: []
