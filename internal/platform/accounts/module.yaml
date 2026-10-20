@@ -26,6 +26,7 @@ provides:
     - ProfileUpdater
     - RecipientDirectory
     - RoleHolders
+    - ScopedDutyHolders
     - SessionReader
     - StaffContacts
     - XaScopes
