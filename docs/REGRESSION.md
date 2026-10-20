@@ -1206,3 +1206,5 @@ Propagation rule: production quyền/profile đổi → bắt buộc cả ba ngu
 ## KNSPLIT-2-CONTEXT-J
 
 Lịch công tác giải phiên owner trước resolver/realm; follower/manager không vay legacy. Lưu/sao chép/duyệt/check-in chỉ xem bị chặn trước I/O. Kiểm tra app policy, toàn handler lịch có dữ liệu, HTTP public root chín trạng thái phiên và contextdata/KN77/API. Không đổi SQL/ACL/OpenAPI/golden hay hành vi GPS. Đang chờ kết quả thực.
+
+KNSPLIT-2-CONTEXT-J: source35581/static65527/pure95493/currentstatic40610/full5-28682 đều actual0, chín HTTP cases PASS/noSKIP. Readonly hint guard99409f32 kiểm cả levels/follower. Hai cụm PG riêng đã dọn; 35 golden/DDL/ACL/API không đổi. Chờ review/ticket merge; log gốc mixed-encoding được giữ, normalized chỉ dùng xác minh marker ASCII.
