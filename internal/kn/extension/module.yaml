@@ -20,6 +20,7 @@ depends:
   pf/price: ">=1.0 <2"
   pf/reports: ">=1.0 <2"
   pf/sync: ">=1.0 <2"
+  vault/identity: ">=1.0 <2"
 provides:
   ports:
     - AdministrativeUnits

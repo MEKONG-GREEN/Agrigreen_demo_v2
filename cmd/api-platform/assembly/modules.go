@@ -341,6 +341,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	kn.UseCNTSAlerts(extension.CNTSAlertDeps{Feed: fm.SubmissionFeed(), Directory: acc.ExtensionKNDirectory(), Holders: acc.RoleHolders()})
 	kn.UseRoleHolders(acc.RoleHolders()) // W11.46: người theo dõi lịch công tác
 	kn.UseXaScopes(acc.XaScopes())       // W11.46: viên chức Cấp Xã CNTS của lịch trực KSGM BM-03
+	kn.UseCNTSModelVault(ext.Vault)      // W11.47: chủ hộ mô hình CNTS ở kho định danh
 
 	// pf/waterway (G2): API ghi sổ đoạn/công trình, tạo job dựng và phát hành; worker dựng đồ thị (cmd/worker).
 	ww := waterway.New(unit, clk, waterway.Deps{Params: md.Params(), Catalogs: md.Catalogs()})
