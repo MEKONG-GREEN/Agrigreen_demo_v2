@@ -103,3 +103,22 @@ Chỉ web (giả lập API theo hợp đồng có sẵn), không đổi backend.
 
 Giới hạn nghiệm thu: nhóm màn Đánh giá (W11.26) và Kế hoạch nhân lực (W11.27) chưa có API; xuất Excel danh sách, xuất
 Contact, lọc giới tính/tuổi/trình độ/chuyên ngành, chỉ số Đảng viên/DTTS chờ API (liệt kê ở giả định W11.29).
+
+## W11.27 — Kế hoạch nhân lực năm (FN-11)
+
+Nguồn giả định: [W11.27](../kn/gia-dinh/W11.27.md). Kỳ kế hoạch là kỳ native `cap/forms` profile `hrm_plan` (đơn vị lá = đơn vị nội bộ).
+
+| Tiêu chí | Bằng chứng | Trạng thái |
+|---|---|---|
+| B1: Phòng HCTH mở kỳ năm (hạn gửi, ngày chốt số liệu, đơn vị); một kỳ mỗi năm; lãnh đạo phòng không mở kỳ; đơn vị ngừng dùng bị chặn | `TestHRMPlansHTTP_W1127` (cap/forms + pf/hrm thật, PostgreSQL) | Đạt |
+| AC-01 / BR-01: kế hoạch phòng hiển thị đúng số hiện có và dự kiến nghỉ hưu tự tính tại ngày chốt (cán bộ xã không tính), danh sách người dự kiến nghỉ hưu | `TestHRMPlansHTTP_W1127`, `TestRetiringIn_W1127` | Đạt |
+| B2: lãnh đạo đơn vị lưu nháp ("Đang lập"), gửi; đơn vị khác/HCTH không phải lãnh đạo không gửi thay; lãnh đạo Phòng HCTH lập kế hoạch của HCTH; khóa lạc quan khi gửi lại | `TestHRMPlansHTTP_W1127` | Đạt |
+| B3: HCTH yêu cầu điều chỉnh (ghi chú) → gửi lại → xác nhận; người gửi không tự rà soát (bốn mắt) | `TestHRMPlansHTTP_W1127` | Đạt |
+| AC-02: bảng tổng hợp cộng đúng các phòng (dòng Toàn Trung tâm); lãnh đạo phòng chỉ thấy đơn vị mình | `TestHRMPlansHTTP_W1127`; Vitest `src/kn/hrm/plans.test.tsx` | Đạt |
+| Chốt: đơn vị chưa gửi → "Không gửi"; sau chốt không gửi/nháp được; BR-02 chỉ HCTH điều chỉnh có lý do, lưu lịch sử, ảnh chụp chốt giữ nguyên | `TestHRMPlansHTTP_W1127` | Đạt |
+| Luồng phụ: xuất Excel (HCTH), sao chép từ năm trước (sau điều chỉnh) | `TestHRMPlansHTTP_W1127` | Đạt |
+| Validator profile hrm_plan chặn bài nộp sai hình dạng gửi thẳng qua cap/forms; cách ly tenant | `TestHRMPlansHTTP_W1127`, `TestPlanValuesRoundTrip_W1127` | Đạt |
+| Màn web: bảng tổng hợp, mở kỳ, chốt, chi tiết đơn vị theo bố cục prototype HCTH; menu HCTH và "Kế hoạch của phòng" | Vitest `src/kn/hrm/plans.test.tsx`, `src/api/mock/kn-menu.contract.test.ts`; `TestWebMenuFixture` | Đạt |
+
+Giới hạn: "Nhắc phòng chưa lập" (pf/notify) chưa làm; trạm/trại không có lãnh đạo có phiên chỉ được ghi qua điều chỉnh
+sau chốt; tuổi nghỉ hưu dùng tham số mẫu Q-070 tại ngày chốt (chưa theo lộ trình từng năm).

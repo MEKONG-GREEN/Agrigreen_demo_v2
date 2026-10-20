@@ -231,6 +231,14 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "hrm.decision_cancelled": "Quyết định đã bị hủy.",
   "hrm.decision_cancel_order": "Có quyết định nâng bậc sau cho cùng người. Hủy quyết định sau trước.",
   "vault.batch_unsupported": "Chưa thể đọc hồ sơ nhân sự. Vui lòng liên hệ bộ phận hỗ trợ.",
+  // W11.27: kế hoạch nhân lực năm.
+  "hrm.plan_not_found": "Chưa mở kỳ kế hoạch nhân lực của năm này.",
+  "hrm.plan_exists": "Kỳ kế hoạch nhân lực của năm này đã mở.",
+  "hrm.plan_unit": "Đơn vị không thuộc kỳ kế hoạch hoặc bạn không có quyền xem.",
+  "hrm.plan_closed": "Kế hoạch đã chốt — chỉ Phòng HCTH điều chỉnh, kèm lý do.",
+  "hrm.plan_not_closed": "Kế hoạch chưa chốt — đơn vị sửa và gửi lại, không cần điều chỉnh.",
+  "hrm.plan_disabled": "Kế hoạch nhân lực chưa sẵn sàng. Vui lòng liên hệ bộ phận hỗ trợ.",
+  "hrm.plan_no_previous": "Năm trước đơn vị chưa có kế hoạch để sao chép.",
   // pf/notify
   "notify.notification_not_found": "Thông báo không còn (đã quá 90 ngày hoặc ngoài phạm vi).",
   "notify.out_of_scope": "Đơn vị đã chọn nằm ngoài phạm vi phụ trách.",
