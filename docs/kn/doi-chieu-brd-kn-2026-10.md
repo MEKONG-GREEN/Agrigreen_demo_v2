@@ -179,7 +179,7 @@ Ký hiệu nguồn: `D1 §2.1#4` = bản D1, mục 2.1, dòng 4. `v4.3 §21.1`, 
 | W11.44 | Tổng hợp BM-02, BM-18, lũy kế | Dòng điều chỉnh, file Chi cục có phiên bản, Phụ lục 2 | D4 CN4 | W11.42, W11.10 | L | pf 000162 | Chờ Q-078, Q-079 | 2 | |
 | W11.45 | Báo cáo phòng BM-11 | Soạn tự động + phần viết, LĐ duyệt, gửi theo nơi nhận, phiên bản | D4 CN5 | W11.44, W10.17 | L | pf 000166 | Chặn Q-046 | 3 | |
 | W11.46 | Lịch trực, lịch tiêm, lịch công tác + check-in GPS | BM-03, BM-07, BM-05/06 | D4 CN6 | W11.41, W11.07 | L | pf 000163 | Chờ Q-057 | 2 | |
-| W11.47 | Hộ mô hình, điểm, CT/DA, cấp quyền | `pf_coop` site/batch + `pf_extension` CT/DA | D4 CN7 | W10.13, W11.61 | L | pf 000167 | Chặn Q-023, Q-076, Q-061 | 3 | |
+| W11.47 | Hộ mô hình, điểm, CT/DA, cấp quyền | ~~`pf_coop` site/batch~~ → bản ghi KN `pf_extension` (CT/DA, điểm, hộ mô hình, quyền CNTS; ADR-0055, Q-KNS-04: không ghi HTX) | D4 CN7 | W10.13, W11.61 | L | pf 20261020161323 | Đã làm 20/10/2026 — giả định tạm Q-023, Q-076, Q-061 ([gia-dinh/W11.47](gia-dinh/W11.47.md)) | 3 | |
 | W11.48 | Nhật ký BM-08/09/19 | Lứa, lần ghi có chỉ số, GPS bất biến + 200 m + phát hiện giả lập, ảnh, offline, xác thực, hạch toán NC-15 | D4 CN8 | W11.47, W11.43 | XL | pf 000168 | Chặn Q-005, Q-077 (phần thủy sản) | 3 | |
 | W11.49 | Dịch bệnh BM-10 | Ổ dịch có phiên bản diễn biến + báo nghi dịch | D4 CN9 | W11.41, W11.07 | M | pf 000164 | Mã được | 2 | |
 | W11.50 | Chiến dịch điều tra | Đợt trên kỳ `adhoc`, tách khỏi lũy kế | D4 CN10 | W11.42 | M | pf 000165 | Chờ Q-058 | 2 | |
