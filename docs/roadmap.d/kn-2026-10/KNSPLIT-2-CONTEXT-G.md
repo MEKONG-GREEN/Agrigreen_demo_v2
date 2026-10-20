@@ -1,1 +1,1 @@
-- [ ] KNSPLIT-2-CONTEXT-G: owner context cho cảnh báo/lịch CNTS/vòng đời báo cáo và giao phạm vi đồng bộ; chờ bằng chứng PG, static và helper trước dev.
+- [ ] KNSPLIT-2-CONTEXT-G: source/static/full5PG đạt,27ownerHTTPcase và11giao xã đồngbộ; chờhelper9 trướcdev.
