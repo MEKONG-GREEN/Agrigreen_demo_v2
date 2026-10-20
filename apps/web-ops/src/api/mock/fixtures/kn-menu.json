@@ -1671,9 +1671,7 @@
         "route": "/kn/khtc/so-lieu-ngoai",
         "icon": "database",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {

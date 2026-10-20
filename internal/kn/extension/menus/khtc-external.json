@@ -1,0 +1,37 @@
+{
+  "id": "extension-khtc-external",
+  "order": 110,
+  "tables": {},
+  "replacements": [
+    {
+      "path": [
+        "deptBusiness",
+        "ke_hoach_tai_chinh",
+        "kn_tinh",
+        2
+      ],
+      "before": {
+        "Key": "tinh.khtc.so_lieu_ngoai",
+        "Label": "Số liệu nguồn ngoài",
+        "Route": "/kn/khtc/so-lieu-ngoai",
+        "Icon": "database",
+        "BadgeSource": "",
+        "Requires": null,
+        "ComingSoon": true,
+        "Needs": "",
+        "Children": null
+      },
+      "after": {
+        "Key": "tinh.khtc.so_lieu_ngoai",
+        "Label": "Số liệu nguồn ngoài",
+        "Route": "/kn/khtc/so-lieu-ngoai",
+        "Icon": "database",
+        "BadgeSource": "",
+        "Requires": null,
+        "ComingSoon": false,
+        "Needs": "",
+        "Children": null
+      }
+    }
+  ]
+}

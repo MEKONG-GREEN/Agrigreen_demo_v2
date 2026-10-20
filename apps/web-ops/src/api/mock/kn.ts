@@ -676,8 +676,7 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
         "key": "tinh.khtc.so_lieu_ngoai",
         "label": "Số liệu nguồn ngoài",
         "route": "/kn/khtc/so-lieu-ngoai",
-        "icon": "database",
-        "soon": true
+        "icon": "database"
       },
       {
         "key": "tinh.khtc.mau_bao_cao",
