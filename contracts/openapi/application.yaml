@@ -12087,6 +12087,348 @@ paths:
   # --- hết pf/price W11.77 ---
   # --- hết pf/price ---
   # --- W11.61 (D4 KH1, BRD KHTC v2.2 FN-AD-04.01, FN-TI-02.02): Danh mục KHTC, danh sách CT/DA chủ (D20), Kế hoạch năm. Mọi route cần header X-AG-Context (client tự gắn) ---
+  /v1/price/survey-report:
+    get:
+      summary: "FN-TW-01.04 Báo cáo giá thành sản xuất theo vụ — chỉ phiếu Đã duyệt của đợt Đã chốt; bình quân + trung vị giá bán, giá thành; theo mặt hàng, nhóm vùng, xã; so sánh hai đợt; nhãn Mẫu nhỏ (< 3 phiếu). Không dữ liệu cá nhân. Cấp TW, Cấp Tỉnh, Admin"
+      operationId: priceSurveyReport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: round, in: query, required: false, description: Đợt đã chốt (vắng → đợt chốt gần nhất), schema: {type: string, format: uuid}}
+        - {name: compare, in: query, required: false, description: Đợt đã chốt để so sánh, schema: {type: string, format: uuid}}
+        - {name: crop, in: query, required: false, schema: {type: string, enum: [lua, rau_mau, nam, cay_an_trai]}}
+        - {name: item, in: query, required: false, schema: {type: string}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: commune, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Báo cáo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyCostReport"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/survey-report/export:
+    get:
+      summary: Xuất Excel báo cáo giá thành (BR-04 — Cấp Tỉnh, Admin; không SĐT nông hộ)
+      operationId: priceSurveyReportExport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: round, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: crop, in: query, required: false, schema: {type: string, enum: [lua, rau_mau, nam, cay_an_trai]}}
+        - {name: item, in: query, required: false, schema: {type: string}}
+        - {name: region, in: query, required: false, schema: {type: string}}
+        - {name: commune, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/surveys:
+    get:
+      summary: "FN-TI-02.10 Danh sách đợt điều tra giá thành theo vụ (W11.78) — trạng thái hiệu lực (hết thời gian thu thập → Đang rà soát), số xã, phiếu đã nhập / chỉ tiêu, phiếu chờ rà soát. Cấp Tỉnh, Admin"
+      operationId: priceSurveyList
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+      responses:
+        "200":
+          description: Danh sách đợt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyRoundList"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "FN-TI-02.10 Tạo đợt điều tra (3 bước: Thông tin – Xã & chỉ tiêu – Cán bộ điều tra; open = true → mở ngay). Họ tên, SĐT cán bộ điều tra ghi vào kho định danh (mục đích price.cost_survey). Trùng vụ, năm, nhóm cây → 409 trừ khi confirm. Cấp Tỉnh"
+      operationId: priceSurveyCreate
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceSurveyRoundInput"}
+      responses:
+        "201":
+          description: Chi tiết đợt vừa tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyRoundDetail"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "409": {description: price.survey_round_duplicate, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.survey_round_incomplete | price.admin_unit_invalid, $ref: "#/components/responses/Problem"}
+        "503": {description: price.survey_pii_disabled, $ref: "#/components/responses/Problem"}
+  /v1/price/surveys/{id}:
+    get:
+      summary: Chi tiết đợt điều tra — xã + chỉ tiêu + tiến độ theo nhóm cây (AC-03), cán bộ điều tra (họ tên, SĐT cho Cấp Tỉnh, Admin), nhật ký
+      operationId: priceSurveyGet
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết đợt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyRoundDetail"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found, $ref: "#/components/responses/Problem"}
+    put:
+      summary: Sửa đợt chưa chốt (thông tin, xã + chỉ tiêu, cán bộ điều tra — id có thì giữ chủ thể cũ). Cấp Tỉnh
+      operationId: priceSurveyUpdate
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceSurveyRoundInput"}
+      responses:
+        "200":
+          description: Chi tiết đợt sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyRoundDetail"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.survey_round_state | price.survey_round_duplicate | price.survey_stale, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.survey_round_incomplete, $ref: "#/components/responses/Problem"}
+        "503": {description: price.survey_pii_disabled, $ref: "#/components/responses/Problem"}
+  /v1/price/surveys/{id}/actions:
+    post:
+      summary: "Đổi trạng thái đợt (bảng 3.4): open (Nháp → Đang thu thập), close_early (→ Đang rà soát), extend (gia hạn, lý do), close (Chốt đợt — mọi phiếu Đã duyệt / Loại), reopen (Đã chốt → Đang rà soát; Quản trị nghiệp vụ, lý do)"
+      operationId: priceSurveyAction
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceSurveyRoundAction"}
+      responses:
+        "200":
+          description: Chi tiết đợt sau thao tác
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyRoundDetail"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.survey_round_state | price.survey_round_pending | price.survey_stale, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.survey_round_incomplete, $ref: "#/components/responses/Problem"}
+  /v1/price/surveys/{id}/clone:
+    post:
+      summary: Nhân bản đợt làm điểm bắt đầu (Nháp, cùng nhóm cây, xã + chỉ tiêu, cán bộ điều tra). Cấp Tỉnh
+      operationId: priceSurveyClone
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: Đợt mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyRoundDetail"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found, $ref: "#/components/responses/Problem"}
+  /v1/price/surveys/{id}/forms:
+    get:
+      summary: "FN-TI-02.12 Rà soát phiếu: thẻ chỉ số, danh sách phiếu (xã, cán bộ điều tra, nông hộ, mặt hàng, giá bán, trung vị đợt, % lệch, cờ CT-06, giá thành, trạng thái), phân bố giá theo xã khi lọc một mặt hàng. Họ tên chỉ cho Cấp Tỉnh, Admin"
+      operationId: priceSurveyForms
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: crop, in: query, required: false, schema: {type: string, enum: [lua, rau_mau, nam, cay_an_trai]}}
+        - {name: item, in: query, required: false, schema: {type: string}}
+        - {name: commune, in: query, required: false, schema: {type: string}}
+        - {name: flag, in: query, required: false, schema: {type: string, enum: [flag, noflag]}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [imported, verify, verified, approved, rejected]}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 500}}
+        - {name: offset, in: query, required: false, schema: {type: integer, minimum: 0}}
+      responses:
+        "200":
+          description: Màn rà soát phiếu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyFormList"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found, $ref: "#/components/responses/Problem"}
+  /v1/price/surveys/{id}/forms/{form}:
+    get:
+      summary: Chi tiết phiếu — các khoản chi phí, giá trị tự tính (CT-05), nông hộ + cán bộ điều tra (họ tên, SĐT — Cấp Tỉnh, Admin), nhật ký
+      operationId: priceSurveyForm
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: form, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết phiếu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyForm"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found | price.survey_form_not_found, $ref: "#/components/responses/Problem"}
+  /v1/price/surveys/{id}/forms/{form}/actions:
+    post:
+      summary: "Thao tác rà soát: request_verify (Cần xác minh), record_verify (nội dung bắt buộc, giá đúng nếu có — giữ giá gốc; unverifiable), approve (ghi chú bắt buộc nếu có cờ chưa xác minh), reject (lý do), delete (lý do, đợt chưa chốt). Cấp Tỉnh"
+      operationId: priceSurveyFormAction
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: form, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceSurveyFormAction"}
+      responses:
+        "200":
+          description: Chi tiết phiếu sau thao tác
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyForm"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found | price.survey_form_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.survey_round_state | price.survey_form_state | price.survey_stale, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/price/surveys/{id}/forms/approve-unflagged:
+    post:
+      summary: Duyệt hàng loạt các phiếu Đã nhập không có cờ (B4 FN-TI-02.12). Cấp Tỉnh
+      operationId: priceSurveyApproveUnflagged
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Số phiếu đã duyệt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [approved]
+                properties:
+                  approved: {type: integer}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.survey_round_state, $ref: "#/components/responses/Problem"}
+  /v1/price/surveys/{id}/forms/export:
+    get:
+      summary: Xuất danh sách phiếu và cờ bất thường ra Excel (không họ tên, SĐT nông hộ). Cấp Tỉnh, Admin
+      operationId: priceSurveyFormsExport
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found, $ref: "#/components/responses/Problem"}
+  /v1/price/surveys/{id}/imports:
+    get:
+      summary: Các lần nhập tệp của đợt (mới nhất trước)
+      operationId: priceSurveyImportList
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Lần nhập
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyImportList"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "FN-TI-02.11 bước 3 Ghi nhận: cùng tệp + ánh xạ + sha256 của lần xem trước; nông hộ ghi vào kho định danh, phiếu trùng (cùng đợt, SĐT, mặt hàng) bỏ qua; chỉ dòng hợp lệ được ghi; lỗi / cảnh báo được lưu; lưu từ đồng nghĩa khi save_synonyms"
+      operationId: priceSurveyImportCommit
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: {$ref: "#/components/schemas/PriceSurveyImportUpload"}
+      responses:
+        "201":
+          description: Kết quả ghi nhận
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyImportResult"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.survey_import_changed | price.survey_round_state, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.survey_import_invalid, $ref: "#/components/responses/Problem"}
+        "503": {description: price.survey_pii_disabled, $ref: "#/components/responses/Problem"}
+  /v1/price/surveys/{id}/imports/{imp}/issues:
+    get:
+      summary: Tải danh sách lỗi / cảnh báo của một lần nhập ra Excel (số dòng + nội dung — không có giá trị của tệp)
+      operationId: priceSurveyImportIssues
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: imp, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found | price.survey_import_not_found, $ref: "#/components/responses/Problem"}
+  /v1/price/surveys/{id}/imports/preview:
+    post:
+      summary: "FN-TI-02.11 bước 1–2 (Tải tệp – Ánh xạ – Xem trước): đọc CSV / Excel (gồm tệp câu trả lời Google Form), gợi ý ánh xạ cột, chuẩn hóa mặt hàng / xã / cán bộ điều tra, kiểm từng dòng, trùng trong tệp, cờ CT-06 dự kiến. KHÔNG ghi. Không trả họ tên, SĐT. Cấp Tỉnh, Admin"
+      operationId: priceSurveyImportPreview
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: {$ref: "#/components/schemas/PriceSurveyImportUpload"}
+      responses:
+        "200":
+          description: Kết quả xem trước
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceSurveyImportPreview"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: price.survey_round_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.survey_round_state, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | price.survey_import_invalid, $ref: "#/components/responses/Problem"}
+        "503": {description: price.survey_pii_disabled, $ref: "#/components/responses/Problem"}
   /v1/kn/khtc/catalogs:
     get:
       summary: "FN-AD-04.01: Danh mục KHTC — mục hiện hành của một loại + số lượng mọi loại (Admin, Cấp Tỉnh)"
@@ -22501,6 +22843,388 @@ components:
         seq: {type: integer, description: Phiên bản khóa tháng đã thấy (0 = chưa khóa lần nào)}
         reason: {type: string, description: Bắt buộc khi mở lại}
     # --- W11.61: Danh mục KHTC, CT/DA, Kế hoạch năm ---
+    # --- W11.78: Điều tra giá thành sản xuất theo vụ (FN-TI-02.10…02.12, FN-TW-01.04) ---
+    PriceSurveyCostBlock:
+      type: object
+      required: [round, kpis, rows, regions, communes]
+      properties:
+        round: {$ref: "#/components/schemas/PriceSurveyRound"}
+        kpis:
+          type: object
+          required: [forms, avg_cost_per_kg, avg_price, avg_profit_per_ha]
+          properties:
+            forms: {type: integer}
+            avg_cost_per_kg: {type: [string, "null"]}
+            avg_price: {type: [string, "null"]}
+            avg_profit_per_ha: {type: [string, "null"]}
+        rows: {type: array, items: {$ref: "#/components/schemas/PriceSurveyCostRow"}}
+        regions:
+          type: array
+          items:
+            type: object
+            required: [item, item_name, region, region_name, n, avg_cost_per_kg, avg_price]
+            properties:
+              item: {type: string}
+              item_name: {type: string}
+              region: {type: string}
+              region_name: {type: string}
+              n: {type: integer}
+              avg_cost_per_kg: {type: string}
+              avg_price: {type: string}
+        communes:
+          type: array
+          items:
+            type: object
+            required: [commune, commune_name, n, min_price, max_price, median_price, avg_cost_per_kg, median_cost_per_kg]
+            properties:
+              commune: {type: string}
+              commune_name: {type: string}
+              n: {type: integer}
+              min_price: {type: string}
+              max_price: {type: string}
+              median_price: {type: string}
+              avg_cost_per_kg: {type: string}
+              median_cost_per_kg: {type: string}
+    PriceSurveyCostReport:
+      type: object
+      required: [rounds, main, compare, regions, can_export]
+      properties:
+        rounds: {type: array, items: {$ref: "#/components/schemas/PriceSurveyRound"}}
+        main:
+          oneOf:
+            - $ref: "#/components/schemas/PriceSurveyCostBlock"
+            - type: "null"
+        compare:
+          oneOf:
+            - $ref: "#/components/schemas/PriceSurveyCostBlock"
+            - type: "null"
+        regions: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+        can_export: {type: boolean}
+    PriceSurveyCostRow:
+      type: object
+      required: [item, item_name, crop, n, small_sample, avg_costs, avg_total_cost, avg_yield_ha, avg_price, median_price, avg_cost_per_kg,
+        median_cost_per_kg, avg_profit, avg_profit_per_ha, avg_margin_pct]
+      properties:
+        item: {type: string}
+        item_name: {type: string}
+        crop: {type: string}
+        n: {type: integer}
+        small_sample: {type: boolean, description: Dưới 3 phiếu — nhãn "Mẫu nhỏ" (Q-083)}
+        avg_costs: {type: object, additionalProperties: {type: string}}
+        avg_total_cost: {type: string}
+        avg_yield_ha: {type: string}
+        avg_price: {type: string}
+        median_price: {type: string}
+        avg_cost_per_kg: {type: string}
+        median_cost_per_kg: {type: string}
+        avg_profit: {type: string}
+        avg_profit_per_ha: {type: string}
+        avg_margin_pct: {type: [string, "null"]}
+    PriceSurveyCropCounts:
+      type: object
+      required: [lua, rau_mau, nam, cay_an_trai]
+      properties:
+        lua: {type: integer}
+        rau_mau: {type: integer}
+        nam: {type: integer}
+        cay_an_trai: {type: integer}
+    PriceSurveyForm:
+      allOf:
+        - $ref: "#/components/schemas/PriceSurveyFormRow"
+        - type: object
+          required: [area_ha, output_kg, other_income, costs, calc, note, unverifiable, farmer_phone, officer_phone, officer_unit, import_id, log]
+          properties:
+            area_ha: {type: string}
+            output_kg: {type: string}
+            other_income: {type: string}
+            costs: {type: object, additionalProperties: {type: string}}
+            calc:
+              type: object
+              required: [total_cost, cost_per_kg, yield_ha, revenue, profit, profit_per_ha, margin_pct]
+              properties:
+                total_cost: {type: string}
+                cost_per_kg: {type: string}
+                yield_ha: {type: string}
+                revenue: {type: string}
+                profit: {type: string}
+                profit_per_ha: {type: string}
+                margin_pct: {type: [string, "null"]}
+            note: {type: string}
+            unverifiable: {type: boolean}
+            farmer_phone: {type: string, description: Chỉ Cấp Tỉnh, Admin}
+            officer_phone: {type: string, description: Chỉ Cấp Tỉnh, Admin}
+            officer_unit: {type: string}
+            import_id: {type: string, format: uuid}
+            log:
+              type: array
+              items:
+                type: object
+                required: [seq, op, status, note, price, at, actor_ref]
+                properties:
+                  seq: {type: integer}
+                  op: {type: string}
+                  status: {type: string}
+                  note: {type: string}
+                  price: {type: [string, "null"]}
+                  at: {type: string, format: date-time}
+                  actor_ref: {type: string, format: uuid}
+    PriceSurveyFormAction:
+      type: object
+      required: [op]
+      properties:
+        op: {type: string, enum: [request_verify, record_verify, approve, reject, delete]}
+        note: {type: string, maxLength: 1000}
+        price: {type: string, description: record_verify — giá bán đúng (nếu có)}
+        unverifiable: {type: boolean, description: record_verify — "Không xác minh được"}
+        seq: {type: integer}
+    PriceSurveyFormList:
+      type: object
+      required: [round, kpis, total, rows, distribution, items, communes, threshold_pct, can_review, can_close]
+      properties:
+        round: {$ref: "#/components/schemas/PriceSurveyRound"}
+        kpis:
+          type: object
+          required: [sent, flagged, verify, approved, rejected, pending]
+          properties:
+            sent: {type: integer}
+            flagged: {type: integer}
+            verify: {type: integer}
+            approved: {type: integer}
+            rejected: {type: integer}
+            pending: {type: integer}
+        total: {type: integer}
+        rows: {type: array, items: {$ref: "#/components/schemas/PriceSurveyFormRow"}}
+        distribution:
+          type: array
+          items:
+            type: object
+            required: [commune, commune_name, n, min, max, median]
+            properties:
+              commune: {type: string}
+              commune_name: {type: string}
+              n: {type: integer}
+              min: {type: string}
+              max: {type: string}
+              median: {type: string}
+        items: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+        communes: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+        threshold_pct: {type: string}
+        can_review: {type: boolean}
+        can_close: {type: boolean}
+    PriceSurveyFormRow:
+      type: object
+      required: [id, seq, row_no, commune, commune_name, crop, item, item_name, officer_id, officer_name, farmer_name, price, orig_price,
+        corrected, median, pct, flag, cost_per_kg, status]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        row_no: {type: integer}
+        commune: {type: string}
+        commune_name: {type: string}
+        crop: {type: string}
+        item: {type: string}
+        item_name: {type: string}
+        officer_id: {type: [string, "null"], format: uuid}
+        officer_name: {type: string, description: Chỉ Cấp Tỉnh, Admin}
+        farmer_name: {type: string, description: Chỉ Cấp Tỉnh, Admin}
+        price: {type: string, description: Giá bán dùng để tính (giá hiệu chỉnh sau xác minh nếu có)}
+        orig_price: {type: string}
+        corrected: {type: boolean}
+        median: {type: [string, "null"], description: Trung vị giá bán cùng mặt hàng trong đợt (≥ 5 phiếu)}
+        pct: {type: [string, "null"]}
+        flag: {type: string, enum: ["", high, low]}
+        cost_per_kg: {type: string}
+        status: {type: string, enum: [imported, verify, verified, approved, rejected, deleted]}
+    PriceSurveyImportLine:
+      type: object
+      required: [row, level, messages, skip, commune, commune_name, crop, item, item_name, officer_id, cost_per_kg, flag]
+      properties:
+        row: {type: integer, description: Số dòng trong tệp (tiêu đề là dòng 1)}
+        level: {type: string, enum: [ok, warning, error]}
+        messages: {type: array, items: {type: string}}
+        skip: {type: boolean, description: Trùng phiếu — bỏ qua}
+        commune: {type: string}
+        commune_name: {type: string}
+        crop: {type: string}
+        item: {type: string}
+        item_name: {type: string}
+        officer_id: {type: [string, "null"], format: uuid}
+        cost_per_kg: {type: [string, "null"], description: Giá thành / kg tự tính (CT-05)}
+        flag: {type: string, enum: ["", high, low]}
+    PriceSurveyImportList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, file_name, sha256, rows, created, skipped, warnings, errors, at, actor_ref]
+            properties:
+              id: {type: string, format: uuid}
+              file_name: {type: string}
+              sha256: {type: string}
+              rows: {type: integer}
+              created: {type: integer}
+              skipped: {type: integer}
+              warnings: {type: integer}
+              errors: {type: integer}
+              at: {type: string, format: date-time}
+              actor_ref: {type: string, format: uuid}
+    PriceSurveyImportPreview:
+      type: object
+      required: [sha256, file_name, columns, mapping, fields, missing, unknown, lines, ok, warnings, errors, skipped, already_imported_at]
+      properties:
+        sha256: {type: string}
+        file_name: {type: string}
+        columns: {type: array, items: {type: string}}
+        mapping: {type: object, additionalProperties: {type: integer}}
+        fields:
+          type: array
+          items:
+            type: object
+            required: [key, label, required]
+            properties:
+              key: {type: string}
+              label: {type: string}
+              required: {type: boolean}
+        missing: {type: array, items: {type: string}, description: Trường bắt buộc chưa ánh xạ}
+        unknown:
+          type: object
+          description: Giá trị chưa khớp danh mục (để ánh xạ thủ công)
+          additionalProperties: {type: array, items: {type: string}}
+        lines: {type: array, items: {$ref: "#/components/schemas/PriceSurveyImportLine"}}
+        ok: {type: integer}
+        warnings: {type: integer}
+        errors: {type: integer}
+        skipped: {type: integer}
+        already_imported_at: {type: [string, "null"], format: date-time}
+    PriceSurveyImportResult:
+      type: object
+      required: [import_id, rows, created, skipped, warnings, errors, issues]
+      properties:
+        import_id: {type: string, format: uuid}
+        rows: {type: integer}
+        created: {type: integer}
+        skipped: {type: integer}
+        warnings: {type: integer}
+        errors: {type: integer}
+        issues: {type: array, items: {$ref: "#/components/schemas/PriceSurveyImportLine"}}
+    PriceSurveyImportUpload:
+      type: object
+      required: [file]
+      properties:
+        file: {type: string, format: binary}
+        mapping: {type: string, description: "JSON {trường: chỉ số cột (0 = cột đầu, -1 = không dùng)}; vắng → gợi ý theo tên cột"}
+        names: {type: string, description: "JSON {item|commune: {giá trị trong tệp: mã}} — ánh xạ tên thủ công"}
+        sha256: {type: string, description: Mã băm của tệp ở lần xem trước (bắt buộc khi ghi nhận)}
+        save_synonyms: {type: string, enum: ["true", "false"]}
+    PriceSurveyRound:
+      type: object
+      required: [id, name, season, year, collect_from, collect_to, crops, status, communes, forms, target, pending, seq]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        season: {type: string, enum: [dong_xuan, he_thu, thu_dong, khac]}
+        year: {type: integer}
+        collect_from: {type: [string, "null"], format: date}
+        collect_to: {type: [string, "null"], format: date}
+        crops: {type: array, items: {type: string, enum: [lua, rau_mau, nam, cay_an_trai]}}
+        status: {type: string, enum: [draft, collecting, reviewing, closed], description: Trạng thái hiệu lực (hết thời gian thu thập → reviewing)}
+        communes: {type: integer}
+        forms: {type: integer, description: Phiếu đã nhập (không kể Đã xóa); ở báo cáo là số phiếu Đã duyệt}
+        target: {type: integer, description: Tổng chỉ tiêu của các nhóm cây áp dụng}
+        pending: {type: integer, description: Phiếu chờ rà soát / xác minh}
+        seq: {type: integer}
+    PriceSurveyRoundAction:
+      type: object
+      required: [op]
+      properties:
+        op: {type: string, enum: [open, close_early, extend, close, reopen]}
+        reason: {type: string, description: Bắt buộc khi extend, reopen}
+        collect_to: {type: string, format: date, description: extend — thu thập đến ngày}
+        seq: {type: integer}
+    PriceSurveyRoundDetail:
+      type: object
+      required: [round, note, communes, log, warnings, can_edit, can_reopen]
+      properties:
+        round: {$ref: "#/components/schemas/PriceSurveyRound"}
+        note: {type: string}
+        communes:
+          type: array
+          items:
+            type: object
+            required: [code, name, targets, imported, officers]
+            properties:
+              code: {type: string}
+              name: {type: string}
+              targets: {$ref: "#/components/schemas/PriceSurveyCropCounts"}
+              imported: {$ref: "#/components/schemas/PriceSurveyCropCounts"}
+              officers:
+                type: array
+                items:
+                  type: object
+                  required: [id, commune, full_name, phone, unit, forms]
+                  properties:
+                    id: {type: string, format: uuid}
+                    commune: {type: string}
+                    full_name: {type: string, description: Rỗng với vai không xem dữ liệu cá nhân}
+                    phone: {type: string}
+                    unit: {type: string}
+                    forms: {type: integer}
+        log:
+          type: array
+          items:
+            type: object
+            required: [seq, op, status, reason, at, actor_ref]
+            properties:
+              seq: {type: integer}
+              op: {type: string, enum: [create, edit, open, close_early, extend, close, reopen]}
+              status: {type: string}
+              reason: {type: string}
+              at: {type: string, format: date-time}
+              actor_ref: {type: string, format: uuid}
+        warnings: {type: array, items: {type: string}, description: "Xã chưa giao cán bộ điều tra"}
+        can_edit: {type: boolean}
+        can_reopen: {type: boolean}
+    PriceSurveyRoundInput:
+      type: object
+      required: [name, season, year, collect_from, collect_to, crops, communes, officers]
+      properties:
+        name: {type: string, maxLength: 120}
+        season: {type: string, enum: [dong_xuan, he_thu, thu_dong, khac]}
+        year: {type: integer}
+        collect_from: {type: string, format: date}
+        collect_to: {type: string, format: date}
+        crops: {type: array, items: {type: string, enum: [lua, rau_mau, nam, cay_an_trai]}}
+        note: {type: string, maxLength: 500}
+        communes:
+          type: array
+          items:
+            type: object
+            required: [code, targets]
+            properties:
+              code: {type: string, description: Mã ĐVHC cấp xã}
+              targets: {type: object, additionalProperties: {type: integer, minimum: 0}, description: Chỉ tiêu số phiếu theo nhóm cây}
+        officers:
+          type: array
+          items:
+            type: object
+            required: [commune, unit]
+            properties:
+              id: {type: string, format: uuid, description: Cán bộ đã khai báo (giữ chủ thể kho định danh); vắng → khai báo mới}
+              commune: {type: string}
+              full_name: {type: string, description: Bắt buộc khi khai báo mới}
+              phone: {type: string, description: Bắt buộc khi khai báo mới}
+              unit: {type: string, description: Đơn vị công tác}
+        confirm: {type: boolean, description: Lưu dù trùng vụ, năm, nhóm cây}
+        open: {type: boolean, description: Tạo và mở đợt ngay}
+        seq: {type: integer, description: Sửa — phiên bản đang xem (khóa lạc quan; 0 = không kiểm)}
+    PriceSurveyRoundList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/PriceSurveyRound"}}
     KhtcCatalogKind: {type: string, enum: [report_type, unit, field, funding_source, signer, recipient, basis], description: "Mặt hàng giá cả ở cap/price (Q-082)"}
     KhtcActor:
       type: object

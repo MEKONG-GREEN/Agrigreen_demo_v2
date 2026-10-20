@@ -8575,6 +8575,247 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/price/survey-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TW-01.04 Báo cáo giá thành sản xuất theo vụ — chỉ phiếu Đã duyệt của đợt Đã chốt; bình quân + trung vị giá bán, giá thành; theo mặt hàng, nhóm vùng, xã; so sánh hai đợt; nhãn Mẫu nhỏ (< 3 phiếu). Không dữ liệu cá nhân. Cấp TW, Cấp Tỉnh, Admin */
+        get: operations["priceSurveyReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/survey-report/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel báo cáo giá thành (BR-04 — Cấp Tỉnh, Admin; không SĐT nông hộ) */
+        get: operations["priceSurveyReportExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/surveys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TI-02.10 Danh sách đợt điều tra giá thành theo vụ (W11.78) — trạng thái hiệu lực (hết thời gian thu thập → Đang rà soát), số xã, phiếu đã nhập / chỉ tiêu, phiếu chờ rà soát. Cấp Tỉnh, Admin */
+        get: operations["priceSurveyList"];
+        put?: never;
+        /** FN-TI-02.10 Tạo đợt điều tra (3 bước: Thông tin – Xã & chỉ tiêu – Cán bộ điều tra; open = true → mở ngay). Họ tên, SĐT cán bộ điều tra ghi vào kho định danh (mục đích price.cost_survey). Trùng vụ, năm, nhóm cây → 409 trừ khi confirm. Cấp Tỉnh */
+        post: operations["priceSurveyCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/surveys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết đợt điều tra — xã + chỉ tiêu + tiến độ theo nhóm cây (AC-03), cán bộ điều tra (họ tên, SĐT cho Cấp Tỉnh, Admin), nhật ký */
+        get: operations["priceSurveyGet"];
+        /** Sửa đợt chưa chốt (thông tin, xã + chỉ tiêu, cán bộ điều tra — id có thì giữ chủ thể cũ). Cấp Tỉnh */
+        put: operations["priceSurveyUpdate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/surveys/{id}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đổi trạng thái đợt (bảng 3.4): open (Nháp → Đang thu thập), close_early (→ Đang rà soát), extend (gia hạn, lý do), close (Chốt đợt — mọi phiếu Đã duyệt / Loại), reopen (Đã chốt → Đang rà soát; Quản trị nghiệp vụ, lý do) */
+        post: operations["priceSurveyAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/surveys/{id}/clone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nhân bản đợt làm điểm bắt đầu (Nháp, cùng nhóm cây, xã + chỉ tiêu, cán bộ điều tra). Cấp Tỉnh */
+        post: operations["priceSurveyClone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/surveys/{id}/forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TI-02.12 Rà soát phiếu: thẻ chỉ số, danh sách phiếu (xã, cán bộ điều tra, nông hộ, mặt hàng, giá bán, trung vị đợt, % lệch, cờ CT-06, giá thành, trạng thái), phân bố giá theo xã khi lọc một mặt hàng. Họ tên chỉ cho Cấp Tỉnh, Admin */
+        get: operations["priceSurveyForms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/surveys/{id}/forms/{form}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết phiếu — các khoản chi phí, giá trị tự tính (CT-05), nông hộ + cán bộ điều tra (họ tên, SĐT — Cấp Tỉnh, Admin), nhật ký */
+        get: operations["priceSurveyForm"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/surveys/{id}/forms/{form}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thao tác rà soát: request_verify (Cần xác minh), record_verify (nội dung bắt buộc, giá đúng nếu có — giữ giá gốc; unverifiable), approve (ghi chú bắt buộc nếu có cờ chưa xác minh), reject (lý do), delete (lý do, đợt chưa chốt). Cấp Tỉnh */
+        post: operations["priceSurveyFormAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/surveys/{id}/forms/approve-unflagged": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt hàng loạt các phiếu Đã nhập không có cờ (B4 FN-TI-02.12). Cấp Tỉnh */
+        post: operations["priceSurveyApproveUnflagged"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/surveys/{id}/forms/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất danh sách phiếu và cờ bất thường ra Excel (không họ tên, SĐT nông hộ). Cấp Tỉnh, Admin */
+        get: operations["priceSurveyFormsExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/surveys/{id}/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các lần nhập tệp của đợt (mới nhất trước) */
+        get: operations["priceSurveyImportList"];
+        put?: never;
+        /** FN-TI-02.11 bước 3 Ghi nhận: cùng tệp + ánh xạ + sha256 của lần xem trước; nông hộ ghi vào kho định danh, phiếu trùng (cùng đợt, SĐT, mặt hàng) bỏ qua; chỉ dòng hợp lệ được ghi; lỗi / cảnh báo được lưu; lưu từ đồng nghĩa khi save_synonyms */
+        post: operations["priceSurveyImportCommit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/surveys/{id}/imports/{imp}/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải danh sách lỗi / cảnh báo của một lần nhập ra Excel (số dòng + nội dung — không có giá trị của tệp) */
+        get: operations["priceSurveyImportIssues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/surveys/{id}/imports/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** FN-TI-02.11 bước 1–2 (Tải tệp – Ánh xạ – Xem trước): đọc CSV / Excel (gồm tệp câu trả lời Google Form), gợi ý ánh xạ cột, chuẩn hóa mặt hàng / xã / cán bộ điều tra, kiểm từng dòng, trùng trong tệp, cờ CT-06 dự kiến. KHÔNG ghi. Không trả họ tên, SĐT. Cấp Tỉnh, Admin */
+        post: operations["priceSurveyImportPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/kn/khtc/catalogs": {
         parameters: {
             query?: never;
@@ -19072,6 +19313,371 @@ export interface components {
             seq: number;
             /** @description Bắt buộc khi mở lại */
             reason?: string;
+        };
+        PriceSurveyCostBlock: {
+            round: components["schemas"]["PriceSurveyRound"];
+            kpis: {
+                forms: number;
+                avg_cost_per_kg: string | null;
+                avg_price: string | null;
+                avg_profit_per_ha: string | null;
+            };
+            rows: components["schemas"]["PriceSurveyCostRow"][];
+            regions: {
+                item: string;
+                item_name: string;
+                region: string;
+                region_name: string;
+                n: number;
+                avg_cost_per_kg: string;
+                avg_price: string;
+            }[];
+            communes: {
+                commune: string;
+                commune_name: string;
+                n: number;
+                min_price: string;
+                max_price: string;
+                median_price: string;
+                avg_cost_per_kg: string;
+                median_cost_per_kg: string;
+            }[];
+        };
+        PriceSurveyCostReport: {
+            rounds: components["schemas"]["PriceSurveyRound"][];
+            main: components["schemas"]["PriceSurveyCostBlock"] | null;
+            compare: components["schemas"]["PriceSurveyCostBlock"] | null;
+            regions: components["schemas"]["PriceRef"][];
+            can_export: boolean;
+        };
+        PriceSurveyCostRow: {
+            item: string;
+            item_name: string;
+            crop: string;
+            n: number;
+            /** @description Dưới 3 phiếu — nhãn "Mẫu nhỏ" (Q-083) */
+            small_sample: boolean;
+            avg_costs: {
+                [key: string]: string;
+            };
+            avg_total_cost: string;
+            avg_yield_ha: string;
+            avg_price: string;
+            median_price: string;
+            avg_cost_per_kg: string;
+            median_cost_per_kg: string;
+            avg_profit: string;
+            avg_profit_per_ha: string;
+            avg_margin_pct: string | null;
+        };
+        PriceSurveyCropCounts: {
+            lua: number;
+            rau_mau: number;
+            nam: number;
+            cay_an_trai: number;
+        };
+        PriceSurveyForm: components["schemas"]["PriceSurveyFormRow"] & {
+            area_ha: string;
+            output_kg: string;
+            other_income: string;
+            costs: {
+                [key: string]: string;
+            };
+            calc: {
+                total_cost: string;
+                cost_per_kg: string;
+                yield_ha: string;
+                revenue: string;
+                profit: string;
+                profit_per_ha: string;
+                margin_pct: string | null;
+            };
+            note: string;
+            unverifiable: boolean;
+            /** @description Chỉ Cấp Tỉnh */
+            farmer_phone: string;
+            /** @description Chỉ Cấp Tỉnh */
+            officer_phone: string;
+            officer_unit: string;
+            /** Format: uuid */
+            import_id: string;
+            log: {
+                seq: number;
+                op: string;
+                status: string;
+                note: string;
+                price: string | null;
+                /** Format: date-time */
+                at: string;
+                /** Format: uuid */
+                actor_ref: string;
+            }[];
+        };
+        PriceSurveyFormAction: {
+            /** @enum {string} */
+            op: "request_verify" | "record_verify" | "approve" | "reject" | "delete";
+            note?: string;
+            /** @description record_verify — giá bán đúng (nếu có) */
+            price?: string;
+            /** @description record_verify — "Không xác minh được" */
+            unverifiable?: boolean;
+            seq?: number;
+        };
+        PriceSurveyFormList: {
+            round: components["schemas"]["PriceSurveyRound"];
+            kpis: {
+                sent: number;
+                flagged: number;
+                verify: number;
+                approved: number;
+                rejected: number;
+                pending: number;
+            };
+            total: number;
+            rows: components["schemas"]["PriceSurveyFormRow"][];
+            distribution: {
+                commune: string;
+                commune_name: string;
+                n: number;
+                min: string;
+                max: string;
+                median: string;
+            }[];
+            items: components["schemas"]["PriceRef"][];
+            communes: components["schemas"]["PriceRef"][];
+            threshold_pct: string;
+            can_review: boolean;
+            can_close: boolean;
+        };
+        PriceSurveyFormRow: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            row_no: number;
+            commune: string;
+            commune_name: string;
+            crop: string;
+            item: string;
+            item_name: string;
+            /** Format: uuid */
+            officer_id: string | null;
+            /** @description Chỉ Cấp Tỉnh */
+            officer_name: string;
+            /** @description Chỉ Cấp Tỉnh */
+            farmer_name: string;
+            /** @description Giá bán dùng để tính (giá hiệu chỉnh sau xác minh nếu có) */
+            price: string;
+            orig_price: string;
+            corrected: boolean;
+            /** @description Trung vị giá bán cùng mặt hàng trong đợt (≥ 5 phiếu) */
+            median: string | null;
+            pct: string | null;
+            /** @enum {string} */
+            flag: "" | "high" | "low";
+            cost_per_kg: string;
+            /** @enum {string} */
+            status: "imported" | "verify" | "verified" | "approved" | "rejected" | "deleted";
+        };
+        PriceSurveyImportLine: {
+            /** @description Số dòng trong tệp (tiêu đề là dòng 1) */
+            row: number;
+            /** @enum {string} */
+            level: "ok" | "warning" | "error";
+            messages: string[];
+            /** @description Trùng phiếu — bỏ qua */
+            skip: boolean;
+            commune: string;
+            commune_name: string;
+            crop: string;
+            item: string;
+            item_name: string;
+            /** Format: uuid */
+            officer_id: string | null;
+            /** @description Giá thành / kg tự tính (CT-05) */
+            cost_per_kg: string | null;
+            /** @enum {string} */
+            flag: "" | "high" | "low";
+        };
+        PriceSurveyImportList: {
+            items: {
+                /** Format: uuid */
+                id: string;
+                file_name: string;
+                sha256: string;
+                rows: number;
+                created: number;
+                skipped: number;
+                warnings: number;
+                errors: number;
+                /** Format: date-time */
+                at: string;
+                /** Format: uuid */
+                actor_ref: string;
+            }[];
+        };
+        PriceSurveyImportPreview: {
+            sha256: string;
+            file_name: string;
+            columns: string[];
+            mapping: {
+                [key: string]: number;
+            };
+            fields: {
+                key: string;
+                label: string;
+                required: boolean;
+            }[];
+            /** @description Trường bắt buộc chưa ánh xạ */
+            missing: string[];
+            /** @description Giá trị chưa khớp danh mục (để ánh xạ thủ công) */
+            unknown: {
+                [key: string]: string[];
+            };
+            lines: components["schemas"]["PriceSurveyImportLine"][];
+            ok: number;
+            warnings: number;
+            errors: number;
+            skipped: number;
+            /** Format: date-time */
+            already_imported_at: string | null;
+        };
+        PriceSurveyImportResult: {
+            /** Format: uuid */
+            import_id: string;
+            rows: number;
+            created: number;
+            skipped: number;
+            warnings: number;
+            errors: number;
+            issues: components["schemas"]["PriceSurveyImportLine"][];
+        };
+        PriceSurveyImportUpload: {
+            /** Format: binary */
+            file: string;
+            /** @description JSON {trường: chỉ số cột (0 = cột đầu, -1 = không dùng)}; vắng → gợi ý theo tên cột */
+            mapping?: string;
+            /** @description JSON {item|commune: {giá trị trong tệp: mã}} — ánh xạ tên thủ công */
+            names?: string;
+            /** @description Mã băm của tệp ở lần xem trước (bắt buộc khi ghi nhận) */
+            sha256?: string;
+            /** @enum {string} */
+            save_synonyms?: "true" | "false";
+        };
+        PriceSurveyRound: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            season: "dong_xuan" | "he_thu" | "thu_dong" | "khac";
+            year: number;
+            /** Format: date */
+            collect_from: string | null;
+            /** Format: date */
+            collect_to: string | null;
+            crops: ("lua" | "rau_mau" | "nam" | "cay_an_trai")[];
+            /**
+             * @description Trạng thái hiệu lực (hết thời gian thu thập → reviewing)
+             * @enum {string}
+             */
+            status: "draft" | "collecting" | "reviewing" | "closed";
+            communes: number;
+            /** @description Phiếu đã nhập (không kể Đã xóa); ở báo cáo là số phiếu Đã duyệt */
+            forms: number;
+            /** @description Tổng chỉ tiêu của các nhóm cây áp dụng */
+            target: number;
+            /** @description Phiếu chờ rà soát / xác minh */
+            pending: number;
+            seq: number;
+        };
+        PriceSurveyRoundAction: {
+            /** @enum {string} */
+            op: "open" | "close_early" | "extend" | "close" | "reopen";
+            /** @description Bắt buộc khi extend */
+            reason?: string;
+            /**
+             * Format: date
+             * @description extend — thu thập đến ngày
+             */
+            collect_to?: string;
+            seq?: number;
+        };
+        PriceSurveyRoundDetail: {
+            round: components["schemas"]["PriceSurveyRound"];
+            note: string;
+            communes: {
+                code: string;
+                name: string;
+                targets: components["schemas"]["PriceSurveyCropCounts"];
+                imported: components["schemas"]["PriceSurveyCropCounts"];
+                officers: {
+                    /** Format: uuid */
+                    id: string;
+                    commune: string;
+                    /** @description Rỗng với vai không xem dữ liệu cá nhân */
+                    full_name: string;
+                    phone: string;
+                    unit: string;
+                    forms: number;
+                }[];
+            }[];
+            log: {
+                seq: number;
+                /** @enum {string} */
+                op: "create" | "edit" | "open" | "close_early" | "extend" | "close" | "reopen";
+                status: string;
+                reason: string;
+                /** Format: date-time */
+                at: string;
+                /** Format: uuid */
+                actor_ref: string;
+            }[];
+            /** @description Xã chưa giao cán bộ điều tra */
+            warnings: string[];
+            can_edit: boolean;
+            can_reopen: boolean;
+        };
+        PriceSurveyRoundInput: {
+            name: string;
+            /** @enum {string} */
+            season: "dong_xuan" | "he_thu" | "thu_dong" | "khac";
+            year: number;
+            /** Format: date */
+            collect_from: string;
+            /** Format: date */
+            collect_to: string;
+            crops: ("lua" | "rau_mau" | "nam" | "cay_an_trai")[];
+            note?: string;
+            communes: {
+                /** @description Mã ĐVHC cấp xã */
+                code: string;
+                /** @description Chỉ tiêu số phiếu theo nhóm cây */
+                targets: {
+                    [key: string]: number;
+                };
+            }[];
+            officers: {
+                /**
+                 * Format: uuid
+                 * @description Cán bộ đã khai báo (giữ chủ thể kho định danh); vắng → khai báo mới
+                 */
+                id?: string;
+                commune: string;
+                /** @description Bắt buộc khi khai báo mới */
+                full_name?: string;
+                /** @description Bắt buộc khi khai báo mới */
+                phone?: string;
+                /** @description Đơn vị công tác */
+                unit: string;
+            }[];
+            /** @description Lưu dù trùng vụ */
+            confirm?: boolean;
+            /** @description Tạo và mở đợt ngay */
+            open?: boolean;
+            /** @description Sửa — phiên bản đang xem (khóa lạc quan; 0 = không kiểm) */
+            seq?: number;
+        };
+        PriceSurveyRoundList: {
+            items: components["schemas"]["PriceSurveyRound"][];
         };
         /**
          * @description Mặt hàng giá cả ở cap/price (Q-082)
@@ -40122,6 +40728,584 @@ export interface operations {
             409: components["responses"]["Problem"];
             /** @description validation_failed | price.reason_required */
             422: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyReport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                /** @description Đợt đã chốt (vắng → đợt chốt gần nhất) */
+                round?: string;
+                /** @description Đợt đã chốt để so sánh */
+                compare?: string;
+                crop?: "lua" | "rau_mau" | "nam" | "cay_an_trai";
+                item?: string;
+                region?: string;
+                commune?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Báo cáo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyCostReport"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyReportExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                round?: string;
+                crop?: "lua" | "rau_mau" | "nam" | "cay_an_trai";
+                item?: string;
+                region?: string;
+                commune?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyList: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách đợt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyRoundList"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyCreate: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceSurveyRoundInput"];
+            };
+        };
+        responses: {
+            /** @description Chi tiết đợt vừa tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyRoundDetail"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_duplicate */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.survey_round_incomplete | price.admin_unit_invalid */
+            422: components["responses"]["Problem"];
+            /** @description price.survey_pii_disabled */
+            503: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyGet: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết đợt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyRoundDetail"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyUpdate: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceSurveyRoundInput"];
+            };
+        };
+        responses: {
+            /** @description Chi tiết đợt sau khi sửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyRoundDetail"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.survey_round_state | price.survey_round_duplicate | price.survey_stale */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.survey_round_incomplete */
+            422: components["responses"]["Problem"];
+            /** @description price.survey_pii_disabled */
+            503: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyAction: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceSurveyRoundAction"];
+            };
+        };
+        responses: {
+            /** @description Chi tiết đợt sau thao tác */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyRoundDetail"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.survey_round_state | price.survey_round_pending | price.survey_stale */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.survey_round_incomplete */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyClone: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đợt mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyRoundDetail"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyForms: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                crop?: "lua" | "rau_mau" | "nam" | "cay_an_trai";
+                item?: string;
+                commune?: string;
+                flag?: "flag" | "noflag";
+                status?: "imported" | "verify" | "verified" | "approved" | "rejected";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Màn rà soát phiếu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyFormList"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyForm: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+                form: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết phiếu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyForm"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found | price.survey_form_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyFormAction: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                form: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceSurveyFormAction"];
+            };
+        };
+        responses: {
+            /** @description Chi tiết phiếu sau thao tác */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyForm"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found | price.survey_form_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.survey_round_state | price.survey_form_state | price.survey_stale */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyApproveUnflagged: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số phiếu đã duyệt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        approved: number;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.survey_round_state */
+            409: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyFormsExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyImportList: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lần nhập */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyImportList"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyImportCommit: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["PriceSurveyImportUpload"];
+            };
+        };
+        responses: {
+            /** @description Kết quả ghi nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyImportResult"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.survey_import_changed | price.survey_round_state */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.survey_import_invalid */
+            422: components["responses"]["Problem"];
+            /** @description price.survey_pii_disabled */
+            503: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyImportIssues: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+                imp: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found | price.survey_import_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceSurveyImportPreview: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["PriceSurveyImportUpload"];
+            };
+        };
+        responses: {
+            /** @description Kết quả xem trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSurveyImportPreview"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description price.survey_round_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.survey_round_state */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | price.survey_import_invalid */
+            422: components["responses"]["Problem"];
+            /** @description price.survey_pii_disabled */
+            503: components["responses"]["Problem"];
         };
     };
     knKhtcListCatalog: {
