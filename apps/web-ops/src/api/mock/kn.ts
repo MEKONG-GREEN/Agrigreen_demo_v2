@@ -1423,6 +1423,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "icon": "layers"
           },
           {
+            "key": "tinh.bao_gia.gia_thanh",
+            "label": "Giá thành sản xuất",
+            "route": "/kn/bao-gia/gia-thanh",
+            "icon": "report"
+          },
+          {
             "key": "tinh.bao_gia.dashboard",
             "label": "Dashboard theo vùng",
             "route": "/kn/bao-gia/dashboard-vung",
@@ -1444,8 +1450,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tinh.bao_gia.dieu_tra",
             "label": "Điều tra giá thành",
             "route": "/kn/bao-gia/dieu-tra",
-            "icon": "season",
-            "soon": true
+            "icon": "season"
           },
           {
             "key": "tinh.bao_gia.mat_hang",
@@ -1526,8 +1531,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tw.bao_gia.gia_thanh",
             "label": "Giá thành sản xuất",
             "route": "/kn/bao-gia/gia-thanh",
-            "icon": "report",
-            "soon": true
+            "icon": "report"
           }
         ]
       }

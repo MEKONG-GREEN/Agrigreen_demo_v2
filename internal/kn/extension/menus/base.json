@@ -1645,6 +1645,17 @@
                 "Children": null
               },
               {
+                "Key": "tinh.bao_gia.gia_thanh",
+                "Label": "Giá thành sản xuất",
+                "Route": "/kn/bao-gia/gia-thanh",
+                "Icon": "report",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
                 "Key": "tinh.bao_gia.dashboard",
                 "Label": "Dashboard theo vùng",
                 "Route": "/kn/bao-gia/dashboard-vung",
@@ -1679,7 +1690,7 @@
                 "Icon": "season",
                 "BadgeSource": "",
                 "Requires": null,
-                "ComingSoon": true,
+                "ComingSoon": false,
                 "Needs": "",
                 "Children": null
               },
@@ -1814,7 +1825,7 @@
                 "Icon": "report",
                 "BadgeSource": "",
                 "Requires": null,
-                "ComingSoon": true,
+                "ComingSoon": false,
                 "Needs": "",
                 "Children": null
               }

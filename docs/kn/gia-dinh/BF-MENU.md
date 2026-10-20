@@ -71,8 +71,9 @@ Issue #98, xếp chồng trên #76 (`knsplit2-menu-kn`). Nguồn: PRD `kn-bugfix
 | KHTC TW | Báo cáo | khung TW + Báo cáo Tỉnh (KHTC) | `/kn/khtc/bao-cao-da-xuat` | Sắp có |
 | Báo giá tỉnh | Điều hành | khung chung + Tiến độ nhập giá; Kiểm duyệt & công bố; Cấu hình báo giá (QTNV) | `/kn/bao-gia/tien-do`; `/kiem-duyet`; `/cau-hinh` | Có màn |
 | Báo giá tỉnh | Báo cáo | khung chung + Bảng giá tổng hợp; Báo cáo biến động giá; Dashboard theo vùng; Thống kê phiếu báo giá | `/kn/bao-gia/bang-gia`; `/bien-dong`; `/dashboard-vung`; `/thong-ke` | Có màn |
-| Báo giá tỉnh | Dữ liệu | Điều tra giá thành; Mặt hàng | `/kn/bao-gia/dieu-tra`; `/kn/bao-gia/mat-hang` | Sắp có (giữ như trước) |
-| Báo giá TW | Báo cáo | khung TW + Bảng giá tổng hợp; Dashboard theo vùng; Báo cáo biến động giá; Giá thành sản xuất (Sắp có) | `/kn/bao-gia/…` | như trước |
+| Báo giá tỉnh (W11.78) | Báo cáo | Giá thành sản xuất (sau Báo cáo biến động giá) | `/kn/bao-gia/gia-thanh` | Có màn |
+| Báo giá tỉnh | Dữ liệu | Điều tra giá thành; Mặt hàng | `/kn/bao-gia/dieu-tra`; `/kn/bao-gia/mat-hang` | Điều tra giá thành: Có màn (W11.78); Mặt hàng: Sắp có |
+| Báo giá TW | Báo cáo | khung TW + Bảng giá tổng hợp; Dashboard theo vùng; Báo cáo biến động giá; Giá thành sản xuất (có màn, W11.78) | `/kn/bao-gia/…` | như trước |
 | Báo giá xã | Điều hành / Báo cáo / Dữ liệu | khung chung + Nhập báo giá, Yêu cầu xác minh / Bảng giá tổng hợp, Báo cáo biến động giá / Lịch sử báo giá | `/kn/bao-gia/nhap`, `/xac-minh` / `/bang-gia`, `/bien-dong` / `/lich-su` | Có màn |
 | HCTH tỉnh | Điều hành | khung chung + Dashboard nhân sự; Danh sách nâng bậc; Quyết định nâng bậc; Đánh giá (Sắp có) | `/kn/nhan-su/dashboard`, `/nang-bac`, `/quyet-dinh-nang-bac`, `/danh-gia` | như trước |
 | HCTH tỉnh (W11.27) | Điều hành | Kế hoạch nhân lực năm (sau Quyết định nâng bậc); Dùng chung: Kế hoạch của phòng (Lãnh đạo phòng mọi phòng, như trước) | `/kn/nhan-su/ke-hoach`; `/kn/nhan-su/ke-hoach-phong` | Có màn |

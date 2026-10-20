@@ -1065,9 +1065,10 @@ import { priceBoardRoutes as route31 } from "./kn-price-boards";
 import { priceItemRoutes as route32 } from "./kn-price-items";
 import { pricePointRoutes as route33 } from "./kn-price-points";
 import { priceReportRoutes as route34 } from "./kn-price-reports";
-import { priceTicketRoutes as route35 } from "./kn-price-tickets";
-import { reportCycleAppRoutes as route36 } from "./kn-reports/routes";
-import { workScheduleAppRoutes as route37 } from "./kn-schedules";
+import { priceSurveyRoutes as route35 } from "./kn-price-surveys";
+import { priceTicketRoutes as route36 } from "./kn-price-tickets";
+import { reportCycleAppRoutes as route37 } from "./kn-reports/routes";
+import { workScheduleAppRoutes as route38 } from "./kn-schedules";
 
 export function registeredKnRoutes(): RouteRegistration[] {
   return [
@@ -1106,9 +1107,10 @@ export function registeredKnRoutes(): RouteRegistration[] {
   { surface: "app", order: 8, routes: route32 },
   { surface: "app", order: 9, routes: route33 },
   { surface: "app", order: 27, routes: route34 },
-  { surface: "app", order: 13, routes: route35 },
-  { surface: "app", order: 6, routes: route36 },
-  { surface: "app", order: 4, routes: route37 },
+  { surface: "app", order: 78, routes: route35 },
+  { surface: "app", order: 13, routes: route36 },
+  { surface: "app", order: 6, routes: route37 },
+  { surface: "app", order: 4, routes: route38 },
   ];
 }
 // END GENERATED MOCK ROUTES

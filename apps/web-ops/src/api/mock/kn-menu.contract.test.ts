@@ -169,17 +169,19 @@ describe("kn.menu/v6 (BF-MENU #98, R-A6): menu theo Update prototype và hình k
     );
     expect(leaves("kn_tinh/thong_tin_truyen_thong")).toEqual(
       expect.arrayContaining(["dieu_hanh:tinh.bao_gia.tien_do", "dieu_hanh:tinh.bao_gia.kiem_duyet", "dieu_hanh:tinh.bao_gia.cau_hinh", "bao_cao:tinh.bao_gia.bang_gia",
-        "bao_cao:tinh.bao_gia.bien_dong", "bao_cao:tinh.bao_gia.dashboard", "bao_cao:tinh.bao_gia.thong_ke"]),
+        "bao_cao:tinh.bao_gia.bien_dong", "bao_cao:tinh.bao_gia.gia_thanh" /* W11.78 */, "bao_cao:tinh.bao_gia.dashboard", "bao_cao:tinh.bao_gia.thong_ke",
+        "du_lieu:tinh.bao_gia.dieu_tra" /* W11.78 */]),
     );
     expect(leaves("kn_xa/thong_tin_truyen_thong")).toEqual(
       expect.arrayContaining(["dieu_hanh:xa.bao_gia.nhap", "dieu_hanh:xa.bao_gia.xac_minh", "bao_cao:xa.bao_gia.bang_gia", "du_lieu:xa.bao_gia.lich_su"]),
     );
+    expect(leaves("kn_tw/thong_tin_truyen_thong")).toContain("bao_cao:tw.bao_gia.gia_thanh"); // W11.78: Giá thành sản xuất (TW) có màn
     expect(leaves("kn_tinh/hanh_chinh_tong_hop")).toEqual(
       expect.arrayContaining(["dieu_hanh:tinh.hcth.dashboard", "dieu_hanh:tinh.hcth.nang_bac", "dieu_hanh:tinh.hcth.quyet_dinh_nang_bac", "dieu_hanh:tinh.hcth.ke_hoach" /* W11.27 */, "bao_cao:tinh.hcth.bao_cao_so",
         "du_lieu:tinh.hcth.ho_so", "du_lieu:tinh.hcth.kho_tai_lieu", "du_lieu:tinh.hcth.danh_muc"]),
     );
     expect(groupsOf("kn_tinh/ke_hoach_tai_chinh")["Dữ liệu"]).toEqual(["Số liệu nguồn ngoài*", "Quy trình, văn bản"]);
-    expect(groupsOf("kn_tinh/thong_tin_truyen_thong")["Dữ liệu"]).toEqual(["Điều tra giá thành*", "Mặt hàng*", "Quy trình, văn bản"]);
+    expect(groupsOf("kn_tinh/thong_tin_truyen_thong")["Dữ liệu"]).toEqual(["Điều tra giá thành", "Mặt hàng*", "Quy trình, văn bản"]); // W11.78: Điều tra giá thành có màn
     expect(groupsOf("kn_tw/chan_nuoi_thuy_san")["Dữ liệu"]).toEqual(["Dự án KNQG"]);
     // W11.54: Trang chủ phòng đầu Điều hành Cấp Tỉnh mọi phòng; Quy trình, văn bản (/kn/van-ban) cuối Dữ liệu; Cấp Xã/TW không có Trang chủ phòng.
     for (const code of ["trong_trot", "chan_nuoi_thuy_san", "ke_hoach_tai_chinh", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) {

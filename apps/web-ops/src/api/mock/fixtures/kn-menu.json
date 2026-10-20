@@ -2818,9 +2818,7 @@
         "route": "/kn/bao-gia/gia-thanh",
         "icon": "report",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -2980,6 +2978,15 @@
         "children": []
        },
        {
+        "key": "tinh.bao_gia.gia_thanh",
+        "label": "Giá thành sản xuất",
+        "route": "/kn/bao-gia/gia-thanh",
+        "icon": "report",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
         "key": "tinh.bao_gia.dashboard",
         "label": "Dashboard theo vùng",
         "route": "/kn/bao-gia/dashboard-vung",
@@ -3059,9 +3066,7 @@
         "route": "/kn/bao-gia/dieu-tra",
         "icon": "season",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
