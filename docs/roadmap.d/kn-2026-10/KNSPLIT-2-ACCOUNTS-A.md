@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-ACCOUNTS-A: Callback chủ phiên cho nhật ký hỗ trợ và đơn vị mặc định accounts; chờ nguồn/consumer PostgreSQL, full5, static/lint và helper dev do root thực hiện.

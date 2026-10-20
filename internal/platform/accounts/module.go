@@ -39,6 +39,7 @@ const DBRole = "accounts_app"
 
 // Deps là phụ thuộc của module.
 type Deps struct {
+	SessionPolicies port.SessionPolicies // trusted application-owned request projections
 	// Sessions contains trusted application-owned projections for selected requests.
 	Sessions *authz.SessionRegistry
 	// Directory: Keycloak Admin REST. Nil → mọi route trả 503 accounts.dependency_unavailable.
@@ -71,7 +72,7 @@ type Module struct {
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs,
-		Households: d.Households, Vault: d.Vault, Params: d.Params, Departments: d.Departments, Units: d.Units, Names: d.Names,
+		Households: d.Households, Vault: d.Vault, Params: d.Params, SessionPolicies: d.SessionPolicies, Departments: d.Departments, Units: d.Units, Names: d.Names,
 		Modules: d.Modules, DormantDryRun: d.DormantDryRun}, sessions: d.Sessions}
 }
 

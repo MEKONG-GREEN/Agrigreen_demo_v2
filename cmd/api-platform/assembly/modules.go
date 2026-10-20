@@ -260,7 +260,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	acc := accounts.New(unit, clk, accounts.Deps{Sessions: sessionRegistry, Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
+	acc := accounts.New(unit, clk, accounts.Deps{Sessions: sessionRegistry, SessionPolicies: extension.AccountSessionPolicies(), Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
 		Households: coop.PartyHouseholds(), Vault: ext.Vault, Params: md.Params(),
 		Departments: pty.Departments(), Units: md.AdminUnits(), Names: kn.StaffNames(), // KN v7.7 P1
 		Modules: pty.ModuleEnablement()}) // W1.4: vai của module đã tắt không cấp được

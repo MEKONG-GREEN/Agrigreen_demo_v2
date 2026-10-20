@@ -1178,3 +1178,11 @@ Propagation rule: resolver precedence changed, native and registered authorizati
 
 
 CONTEXT-H actual evidence: source-composite0 preserves originalsourceaggregate1/roothelpercompilefailure plus verifiedKN77target1/2missing-provinceURL test cases. Unchangedproduction3f6: forms/app225.029 +forms/handler150.397 realPG, reports/app3.023 unit, extensionroot4.191, PFPUBClosedFigures11.38 actualPASS; reports/handler compile-only. Final45HTTP22885 actual0/211.732s/noSKIP aftersingleURLliteralfixda0f2c1d, privatePG removed. Fullstatic40421actual0/lint27006actual0/boundary314; currentKN77vet84710actual0+gofmt2old aftertestliteralfix. Full5 29844actual0/noFAILSKIP: dbadmin9.040/metrics208.548/KN77627.503/API212.962/worker3.977s, private51870/9c67707125be removed/GoH0.35goldens/SQL/contracts unchanged; helper9+extensionroot/reportsapp/fullKN77 still required beforedev. Do not replay passedsource/full5 solelyforquota interruption.
+
+
+## KNSPLIT-2-ACCOUNTS-A — Nhật ký hỗ trợ và đơn vị mặc định
+
+Downstream consumers: accounts handler, API assembly middleware/support audit, contextdata, KN77 và worker native.
+Dependency evidence: `rg -n 'LogSupportAction|ListInternalUnits|SessionPolicies|AccountSessionPolicies' internal cmd` và modgen/archlint.
+Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/accounts/... ./tests/contextdata ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker` với PostgreSQL riêng thực.
+Propagation rule: owner authority đổi → nguồn accounts đầy đủ, public-root HTTP/PG mới + contextdata, rồi full5; không FAIL/SKIP/INFRA. Golden35/DDL/ACL/API giữ, boundary chỉ giảm. Native unselected ancestor lookup và support403/audit actor nguyên là bất biến.
