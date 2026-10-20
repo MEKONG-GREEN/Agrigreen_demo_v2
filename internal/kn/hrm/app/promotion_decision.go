@@ -11,6 +11,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -636,9 +637,9 @@ func (s *Service) PromotionScan(ctx context.Context, tid uuid.UUID, now time.Tim
 		return err
 	})
 	switch {
-	case err == errAlreadyScanned:
+	case errors.Is(err, errAlreadyScanned):
 		return res, nil
-	case err == port.ErrPromotionRules:
+	case errors.Is(err, port.ErrPromotionRules):
 		return res, nil
 	case err != nil:
 		return res, err
@@ -652,7 +653,7 @@ func (s *Service) PromotionScan(ctx context.Context, tid uuid.UUID, now time.Tim
 	return res, nil
 }
 
-var errAlreadyScanned = fmt.Errorf("hrm: đã tính mốc trong ngày")
+var errAlreadyScanned = errors.New("hrm: đã tính mốc trong ngày")
 
 // PromotionScanAll chạy job cho mọi tenant (tenants: danh sách từ pool vai ag_ops_jobs).
 func (s *Service) PromotionScanAll(ctx context.Context, tenants []uuid.UUID, log *slog.Logger) (int, error) {
