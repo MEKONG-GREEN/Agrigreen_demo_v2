@@ -29,7 +29,7 @@ func TestNavigationSelectsOnlyEnabledLeavesAndPreservesNative(t *testing.T) {
 		t.Fatalf("fallback:%+v %v", selected, err)
 	}
 	selected, err = ApplyNavigation(MenuView{Groups: []MenuGroupView{{Items: []MenuItemView{{Route: "/closed-parent", Enabled: false, Children: []MenuItemView{{Route: "/child", Enabled: true}}}}}}}, policy)
-	if !errors.Is(err, problem.Forbidden) || selected.DefaultRoute != "" {
+	if err == nil || problem.From(err).Code != problem.Forbidden.Code || problem.From(err).Status != problem.Forbidden.Status || selected.DefaultRoute != "" {
 		t.Fatalf("disabled branch escaped:%+v %v", selected, err)
 	}
 	sentinel := errors.New("owner policy denied")

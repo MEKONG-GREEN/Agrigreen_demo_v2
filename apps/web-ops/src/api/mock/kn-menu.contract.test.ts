@@ -168,7 +168,9 @@ describe("KHTC default navigation uses registered owner menu policy",()=>{
     const api=createKnApi({baseUrl:"http://x",getAccessToken:()=>mockToken("kn-an"),getContextId:()=>id,fetch:mockFetchNoDelay});
     const selected=await api.selectContext({assignment_id:"asg-an-tinh",department_code:"trong_trot"});
     id=selected.context_id;
+    const current=await api.currentContext();
     const menu=await api.menu();
+    expect(current.default_route).toBe(selected.default_route);
     expect(selected.default_route).toBe("/kn/bao-cao-khtc");
     expect(menu.default_route).toBe(selected.default_route);
   });
