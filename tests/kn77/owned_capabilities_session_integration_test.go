@@ -78,7 +78,7 @@ func TestCapabilitiesRequireOwnedSessionThroughHTTP(t *testing.T) {
 		{"CNTS forms", "/v1/forms/templates?profile=kn_cnts", 200},
 		{"KHTC forms", "/v1/forms/templates?profile=kn_khtc", 200},
 		{"report forms", "/v1/reports/forms/available?department=chan_nuoi_thuy_san&level=TINH", 200},
-		{"report dispatch", "/v1/reports/dispatch-recipients", 403},
+		{"report dispatch", "/v1/reports/dispatch-recipients?province=89", 403},
 	}
 	for _, route := range routes {
 		t.Run(route.name, func(t *testing.T) {
