@@ -1,6 +1,9 @@
 package domain
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+)
 
 // catalogValue decodes an independent value for each consumer. Module-owned JSON
 // registrations are compiled by scripts/gen-module-menus.mjs, never loaded from disk at runtime.
@@ -18,4 +21,9 @@ func catalogValue[T any](name string) T {
 		panic(err)
 	}
 	return value
+}
+
+// RegisteredNavigation uses the same compiled owner registration for fixtures.
+func RegisteredNavigation() (port.NavigationPolicy, error) {
+	return port.RegisteredNavigation(catalogValue[map[string]string]("defaultRoutes"), catalogValue[map[string]map[string]string]("contextDefaultRoutes"))
 }

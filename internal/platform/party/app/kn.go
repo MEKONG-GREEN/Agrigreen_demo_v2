@@ -56,12 +56,13 @@ type KN struct {
 	Reg   *Registry // cây tổ chức: phạm vi, tạo Nút xã, đơn vị hành chính, thống kê thửa
 
 	// Cổng tùy chọn do gốc lắp ráp nối (module khác, qua port).
-	Usage   []port.DepartmentUsage // P1 (tài khoản), P3/P4/P5/P7 (bản ghi có department_code)
-	Impact  []port.OrgImpactSource // P1 (tài khoản), P4 (kỳ chưa chốt)
-	Forms   port.FormAvailability  // P3: menu "Báo cáo đột xuất"
-	Session port.SessionContext    // P1: ngữ cảnh phiên
-	Names   port.ActorNames        // tên người thao tác cho Log
-	Modules port.ModuleEnablement  // W1.4: menu bỏ mục của module đã tắt (nil = không lọc)
+	Usage            []port.DepartmentUsage // P1 (tài khoản), P3/P4/P5/P7 (bản ghi có department_code)
+	Impact           []port.OrgImpactSource // P1 (tài khoản), P4 (kỳ chưa chốt)
+	Forms            port.FormAvailability  // P3: menu "Báo cáo đột xuất"
+	Session          port.SessionContext    // P1: ngữ cảnh phiên
+	NavigationPolicy port.NavigationPolicy  // trusted application registration
+	Names            port.ActorNames        // tên người thao tác cho Log
+	Modules          port.ModuleEnablement  // W1.4: menu bỏ mục của module đã tắt (nil = không lọc)
 }
 
 var (

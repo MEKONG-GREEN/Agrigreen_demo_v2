@@ -304,17 +304,20 @@ func (s *Service) SelectContext(ctx context.Context, assignment uuid.UUID, dept 
 			return ContextView{}, err
 		}
 	}
-	v, err := s.contextView(ctx, row, asg.Communes)
-	v.Replayed = replayed
-	if err == nil && row.SupportID == uuid.Nil && asg.ID != uuid.Nil {
+	var selected *authz.KNContext
+	if row.SupportID == uuid.Nil && asg.ID != uuid.Nil {
 		attrs, aerr := s.attrsByUser(ctx, p.ActorRef)
 		if aerr != nil {
 			return ContextView{}, aerr
 		}
-		k := &authz.KNContext{Role: asg.Role}
+		selected = &authz.KNContext{Role: asg.Role}
 		ro, _ := domain.ViewOnlyDepartment(asg, attrs[asg.ID].ProvinceGroup, row.Department)
-		applyAttrs(k, asg, attrs[asg.ID], ro, nil)
-		withAttrs(&v, *k)
+		applyAttrs(selected, asg, attrs[asg.ID], ro, nil)
+	}
+	v, err := s.contextView(ctx, row, asg.Communes, selected)
+	v.Replayed = replayed
+	if selected != nil {
+		withAttrs(&v, *selected)
 	}
 	return v, err
 }
@@ -325,7 +328,8 @@ func withAttrs(v *ContextView, k authz.KNContext) {
 	v.Duties, v.InternalUnit, v.Powers = slices.Clone(k.Duties), k.InternalUnit, slices.Clone(k.Powers)
 }
 
-func (s *Service) contextView(ctx context.Context, row store.Context, communes []string) (ContextView, error) {
+func (s *Service) contextView(ctx context.Context, row store.Context, communes []string, selected ...*authz.KNContext) (ContextView, error) {
+	var department partyport.Department
 	v := ContextView{ContextID: row.ID, AssignmentID: row.AssignmentID, Role: row.Role, OrgRef: row.OrgRef, OrgName: s.orgName(ctx, row.OrgRef),
 		Communes: s.communeViews(ctx, communes), DefaultRoute: domain.DefaultRoute(row.Role), ExpiresAt: row.ExpiresAt,
 		SupportID: row.SupportID, OnBehalfOf: row.OnBehalfOf}
@@ -334,8 +338,20 @@ func (s *Service) contextView(ctx context.Context, row store.Context, communes [
 		if err != nil && !errors.Is(err, partyport.ErrDepartmentNotFound) {
 			return ContextView{}, err
 		}
+		department = d
 		dv := DepartmentView{Code: row.Department, Name: d.Name, Description: d.Description, Status: d.Status}
 		v.Department = &dv
+	}
+	var selectedContext *authz.KNContext
+	if len(selected) > 0 {
+		selectedContext = selected[0]
+	}
+	if s.Navigation != nil {
+		var err error
+		v.DefaultRoute, err = s.Navigation(ctx, navigationRequest(row.Role, row.UnitRef, department, selectedContext, row.SupportID != uuid.Nil))
+		if err != nil {
+			return ContextView{}, err
+		}
 	}
 	return v, nil
 }
@@ -355,7 +371,7 @@ func (s *Service) CurrentContext(ctx context.Context) (ContextView, error) {
 	if k.Support != nil {
 		row.SupportID, row.OnBehalfOf = k.Support.SessionID, k.Support.OnBehalfOf
 	}
-	v, err := s.contextView(ctx, row, k.Communes)
+	v, err := s.contextView(ctx, row, k.Communes, k)
 	withAttrs(&v, *k)
 	return v, err
 }
@@ -443,6 +459,7 @@ func (s *Service) ResolveContext(ctx context.Context, id uuid.UUID) (*authz.KNCo
 		communes, k.OrgRef, k.UnitRef = asg.Communes, asg.OrgRef, asg.UnitRef
 		applyAttrs(k, *asg, attrs, viewOnly, powers)
 	}
+	var navigationDepartment partyport.Department
 	if row.Role != port.KNAdmin {
 		d, err := s.Departments.DepartmentByCode(ctx, k.UnitRef, row.Department)
 		if errors.Is(err, partyport.ErrDepartmentNotFound) {
@@ -454,6 +471,7 @@ func (s *Service) ResolveContext(ctx context.Context, id uuid.UUID) (*authz.KNCo
 		if !d.Selectable() {
 			return nil, ErrContextRevoked.WithDetail(d.Name + ": phòng ban không còn Đang áp dụng")
 		}
+		navigationDepartment = d
 	}
 	switch row.Role {
 	case port.KNAdmin:
@@ -477,7 +495,25 @@ func (s *Service) ResolveContext(ctx context.Context, id uuid.UUID) (*authz.KNCo
 		}
 		k.Scope = sc
 	}
+	if s.Navigation != nil {
+		k.DefaultRoute, err = s.Navigation(ctx, navigationRequest(k.Role, k.UnitRef, navigationDepartment, k, k.Support != nil))
+		if err != nil {
+			return nil, err
+		}
+	}
 	return k, nil
+}
+
+func navigationRequest(role string, unit uuid.UUID, department partyport.Department, k *authz.KNContext, support bool) partyport.NavigationRequest {
+	request := partyport.NavigationRequest{Audience: role, UnitRef: unit, Department: department}
+	if k != nil && !support {
+		request.FilterTraits = true
+		request.Manager = k.Manager
+		if !k.ReadOnly() {
+			request.Duties = slices.Clone(k.Duties)
+		}
+	}
+	return request
 }
 
 // ---------------------------------------------------------------------------

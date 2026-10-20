@@ -161,7 +161,11 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 
 	md := masterdata.New(unit, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 
-	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
+	navigationPolicy, err := extension.NavigationPolicy()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault, NavigationPolicy: navigationPolicy})
 	wf := wireWorkflow(unit, clk, md, pty) // W6.1: cap/workflow cho duyệt tham số, cấp quyền (r_workflow, W2.6: cùng pool đơn vị)
 
 	g := geo.New(unit, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits()})
@@ -260,7 +264,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	acc := accounts.New(unit, clk, accounts.Deps{Sessions: sessionRegistry, Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
+	acc := accounts.New(unit, clk, accounts.Deps{Sessions: sessionRegistry, Navigation: pty.ContextNavigation(), Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
 		Households: coop.PartyHouseholds(), Vault: ext.Vault, Params: md.Params(),
 		Departments: pty.Departments(), Units: md.AdminUnits(), Names: kn.StaffNames(), // KN v7.7 P1
 		Modules: pty.ModuleEnablement()}) // W1.4: vai của module đã tắt không cấp được

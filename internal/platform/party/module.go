@@ -27,6 +27,7 @@ const DBRole = "party_app"
 
 // Deps là port của module khác mà party cần.
 type Deps struct {
+	NavigationPolicy port.NavigationPolicy
 	// AdminUnits: đơn vị hành chính có hiệu lực theo thời gian (pf/masterdata) —
 	// kiểm mã đơn vị khi tạo/di chuyển tổ chức và tính phạm vi TTKN tỉnh.
 	AdminUnits port.AdminUnits
@@ -54,7 +55,7 @@ func New(db tenant.Beginner, clk clock.Clock, deps ...Deps) *Module {
 		d = deps[0]
 	}
 	reg := &app.Registry{DB: db, Clock: clk, Units: d.AdminUnits, Vault: d.Vault}
-	kn := &app.KN{DB: db, Clock: clk, Reg: reg}
+	kn := &app.KN{DB: db, Clock: clk, Reg: reg, NavigationPolicy: d.NavigationPolicy}
 	mods := &app.Modules{DB: db, Clock: clk, Names: func() port.ActorNames { return kn.Names }}
 	kn.Modules = mods
 	return &Module{
@@ -170,6 +171,9 @@ func (m *Module) UseOrgImpact(s port.OrgImpactSource) { m.kn.Impact = append(m.k
 
 // UseFormAvailability nối P3 cho menu "Báo cáo đột xuất" (FN-AD-04.06).
 func (m *Module) UseFormAvailability(f port.FormAvailability) { m.kn.Forms = f }
+
+// ContextNavigation returns the validated server-context landing resolver.
+func (m *Module) ContextNavigation() port.Navigation { return m.kn.ContextNavigation }
 
 // UseSessionContext nối ngữ cảnh phiên của P1 (X-AG-Context) cho menu.
 func (m *Module) UseSessionContext(s port.SessionContext) { m.kn.Session = s }

@@ -1,0 +1,23 @@
+{
+  "id": "extension-context-navigation",
+  "order": 110,
+  "tables": {
+    "contextDefaultRoutes": {
+      "ke_hoach_tai_chinh": {
+        "kn_tinh": "/kn/khtc/ky-bao-cao"
+      },
+      "trong_trot": {
+        "kn_tinh": "/kn/bao-cao-khtc"
+      },
+      "chan_nuoi_thuy_san": {
+        "kn_tinh": "/kn/bao-cao-khtc"
+      },
+      "thong_tin_truyen_thong": {
+        "kn_tinh": "/kn/bao-cao-khtc"
+      },
+      "hanh_chinh_tong_hop": {
+        "kn_tinh": "/kn/bao-cao-khtc"
+      }
+    }
+  }
+}

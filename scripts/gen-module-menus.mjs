@@ -41,7 +41,7 @@ function merge(target, source, location) {
 }
 export function compileMenus(documents) {
   const tables = {}, ids = new Set();
-  const names = new Set(["trongTrotMenus", "genericMenus", "adminDeptItems", "AdminOverview", "AdminSystem", "defaultRoutes", "MenuProfiles", "khtcReportProfiles", "KHTCReportItem", "KHTCReportAdminItem", "SharedGroup", "sharedByAudience", "deptBusiness", "adminDeptBusiness", "deptProfileByCode", "menuModules", "menuDeptModules"]);
+  const names = new Set(["trongTrotMenus", "genericMenus", "adminDeptItems", "AdminOverview", "AdminSystem", "defaultRoutes", "contextDefaultRoutes", "MenuProfiles", "khtcReportProfiles", "KHTCReportItem", "KHTCReportAdminItem", "SharedGroup", "sharedByAudience", "deptBusiness", "adminDeptBusiness", "deptProfileByCode", "menuModules", "menuDeptModules"]);
   for (const doc of [...documents].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id, "en"))) {
     if (!doc.id || ids.has(doc.id) || !Number.isInteger(doc.order)) throw Error("menu registration needs a unique id and integer order");
     ids.add(doc.id);
@@ -104,6 +104,8 @@ function webMenu(tables) {
   const map = (value, fn) => Object.fromEntries(Object.entries(value).map(([key, child]) => [key, fn(child)]));
   const list = (value) => value.map(item);
   const definitions = [
+    ["DEFAULT_ROUTE", "Record<KnRole, string>", tables.defaultRoutes],
+    ["CONTEXT_DEFAULT_ROUTES", "Partial<Record<KnMenuProfile, Partial<Record<KnRole, string>>>>", tables.contextDefaultRoutes ?? {}],
     ["TRONG_TROT", 'Record<Exclude<KnRole, "admin">, Group[]>', map(tables.trongTrotMenus, (value) => value.map(group))],
     ["GENERIC", 'Record<Exclude<KnRole, "admin">, Group[]>', map(tables.genericMenus, (value) => value.map(group))],
     ["SHARED", "Group", group(tables.SharedGroup)],
@@ -116,7 +118,7 @@ function webMenu(tables) {
     ["ADMIN_OVERVIEW", "Group", group(tables.AdminOverview)],
     ["ADMIN_SYSTEM", "Group", group(tables.AdminSystem)],
   ];
-  return definitions.map(([name, type, value]) => `const ${name}: ${type} = ${JSON.stringify(value, null, 2)};`).join("\n\n") +
+  return definitions.map(([name, type, value]) => `${name === "DEFAULT_ROUTE" || name === "CONTEXT_DEFAULT_ROUTES" ? "export " : ""}const ${name}: ${type} = ${JSON.stringify(value, null, 2)};`).join("\n\n") +
     `\n\nconst KHTC_REPORT_PROFILES = new Set<KnMenuProfile>(${JSON.stringify(Object.keys(tables.khtcReportProfiles).filter((key) => tables.khtcReportProfiles[key]))});`;
 }
 export function generateMenus(root, check = false) {

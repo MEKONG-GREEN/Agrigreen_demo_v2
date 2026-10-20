@@ -27,13 +27,7 @@ export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
 /** Nguồn số đếm menu theo hợp đồng P5 (ExtWorkScheduleCounts.pending_open_weeks) và menu P2 (domain.BadgeScheduleApprovals). */
 export const WORK_SCHEDULE_BADGE = "extension.work_schedules.pending";
 
-/** Trang mặc định theo vai trò (FN-CH-00.01) — domain.DefaultRoute (P2) = accounts DefaultRoute (P1). */
-export const DEFAULT_ROUTE: Record<KnRole, string> = {
-  kn_tw: "/kn/dashboard",
-  kn_tinh: "/kn/dashboard",
-  kn_xa: "/kn/nhiem-vu/cong-viec",
-  admin: "/kn/tong-quan",
-};
+// Default routes below are generated from the application registration.
 
 /** Cờ "Báo cáo đột xuất": chỉ hiện khi phòng ban đã có mẫu loại này (FN-AD-04.06). Mặc định tắt như Hình 3e/3f. */
 const ADHOC_FORMS: Record<string, boolean> = { trong_trot: false };
@@ -60,6 +54,31 @@ interface Group {
 }
 
 // BEGIN GENERATED WEB MENU
+export const DEFAULT_ROUTE: Record<KnRole, string> = {
+  "admin": "/kn/tong-quan",
+  "kn_tinh": "/kn/dashboard",
+  "kn_tw": "/kn/dashboard",
+  "kn_xa": "/kn/nhiem-vu/cong-viec"
+};
+
+export const CONTEXT_DEFAULT_ROUTES: Partial<Record<KnMenuProfile, Partial<Record<KnRole, string>>>> = {
+  "ke_hoach_tai_chinh": {
+    "kn_tinh": "/kn/khtc/ky-bao-cao"
+  },
+  "trong_trot": {
+    "kn_tinh": "/kn/bao-cao-khtc"
+  },
+  "chan_nuoi_thuy_san": {
+    "kn_tinh": "/kn/bao-cao-khtc"
+  },
+  "thong_tin_truyen_thong": {
+    "kn_tinh": "/kn/bao-cao-khtc"
+  },
+  "hanh_chinh_tong_hop": {
+    "kn_tinh": "/kn/bao-cao-khtc"
+  }
+};
+
 const TRONG_TROT: Record<Exclude<KnRole, "admin">, Group[]> = {
   "kn_tinh": [
     {

@@ -167,15 +167,14 @@ func (k *KN) Menu(ctx context.Context, q MenuQuery) (MenuView, error) {
 
 // withModules bỏ mục menu của module đã tắt cho tenant (W1.4, R-MOD-08: menu không hiện).
 func (k *KN) withModules(ctx context.Context, tid uuid.UUID, view MenuView) (MenuView, error) {
-	if k.Modules == nil {
-		return view, nil
+	if k.Modules != nil {
+		disabled, err := k.Modules.DisabledModules(ctx, tid)
+		if err != nil {
+			return MenuView{}, err
+		}
+		view.Groups = FilterMenuGroups(view.Groups, disabled)
 	}
-	disabled, err := k.Modules.DisabledModules(ctx, tid)
-	if err != nil {
-		return MenuView{}, err
-	}
-	view.Groups = FilterMenuGroups(view.Groups, disabled)
-	return view, nil
+	return ApplyNavigation(view, k.NavigationPolicy)
 }
 
 // FilterMenuGroups bỏ mục lá có màn thuộc module đã tắt (domain.MenuModule), mục cha không còn mục con
@@ -304,6 +303,11 @@ func findDepartment(depts []port.Department, code string) (port.Department, bool
 
 // departmentGroups giải điều kiện mục (FormAvailability) và bỏ mục cha không còn mục con.
 func departmentGroups(ctx context.Context, forms port.FormAvailability, d port.Department, audience string) ([]MenuGroupView, error) {
+	traits, filter := menuTraits(ctx)
+	return departmentGroupsWithTraits(ctx, forms, d, audience, traits, filter)
+}
+
+func departmentGroupsWithTraits(ctx context.Context, forms port.FormAvailability, d port.Department, audience string, traits domain.MenuTraits, filter bool) ([]MenuGroupView, error) {
 	level := domain.LevelProvince
 	if audience == port.AudienceXa {
 		level = domain.LevelCommune
@@ -352,8 +356,8 @@ func departmentGroups(ctx context.Context, forms port.FormAvailability, d port.D
 	}
 	var out []MenuGroupView
 	groups := domain.DepartmentMenu(d.MenuProfile, audience, d.Code)
-	if t, ok := menuTraits(ctx); ok {
-		groups = domain.FilterNeeds(groups, t)
+	if filter {
+		groups = domain.FilterNeeds(groups, traits)
 	}
 	for _, g := range groups {
 		items, err := conv(g.Items)

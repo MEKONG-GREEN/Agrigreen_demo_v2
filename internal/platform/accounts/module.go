@@ -39,6 +39,7 @@ const DBRole = "accounts_app"
 
 // Deps là phụ thuộc của module.
 type Deps struct {
+	Navigation partyport.Navigation // registered application context landing
 	// Sessions contains trusted application-owned projections for selected requests.
 	Sessions *authz.SessionRegistry
 	// Directory: Keycloak Admin REST. Nil → mọi route trả 503 accounts.dependency_unavailable.
@@ -70,7 +71,7 @@ type Module struct {
 // New tạo module với pool của vai accounts_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	db = forModule(db)
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs,
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs, Navigation: d.Navigation,
 		Households: d.Households, Vault: d.Vault, Params: d.Params, Departments: d.Departments, Units: d.Units, Names: d.Names,
 		Modules: d.Modules, DormantDryRun: d.DormantDryRun}, sessions: d.Sessions}
 }
