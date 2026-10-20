@@ -889,6 +889,18 @@ const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "ad
         "icon": "report"
       },
       {
+        "key": "tinh.hcth.nang_bac",
+        "label": "Danh sách nâng bậc",
+        "route": "/kn/nhan-su/nang-bac",
+        "icon": "chart"
+      },
+      {
+        "key": "tinh.hcth.quyet_dinh_nang_bac",
+        "label": "Quyết định nâng bậc",
+        "route": "/kn/nhan-su/quyet-dinh-nang-bac",
+        "icon": "journal"
+      },
+      {
         "key": "tinh.hcth.kho_tai_lieu",
         "label": "Hồ sơ dữ liệu",
         "route": "/kn/nhan-su/kho-tai-lieu",

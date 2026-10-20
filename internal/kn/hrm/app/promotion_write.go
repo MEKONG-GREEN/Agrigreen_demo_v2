@@ -584,6 +584,14 @@ func (s *Service) ExportPromotion(ctx context.Context, in PromoExportInput, idem
 		return nil, err
 	}
 	params := map[string]string{"signer_title": in.SignerTitle}
+	if in.Preparer == nil { // người lập mặc định = hồ sơ gắn tài khoản người xuất
+		for _, h := range w0.order {
+			if h.AccountRef != nil && *h.AccountRef == c.ref {
+				id := h.StaffID
+				in.Preparer = &id
+			}
+		}
+	}
 	if in.Preparer != nil {
 		if _, ok := w0.heads[*in.Preparer]; !ok {
 			return nil, problem.Validation.WithField("preparer_id", "người lập phải là mã hồ sơ nhân sự")

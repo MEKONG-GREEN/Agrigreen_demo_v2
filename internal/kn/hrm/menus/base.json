@@ -76,6 +76,28 @@
             "Children": null
           },
           {
+            "Key": "tinh.hcth.nang_bac",
+            "Label": "Danh sách nâng bậc",
+            "Route": "/kn/nhan-su/nang-bac",
+            "Icon": "chart",
+            "BadgeSource": "",
+            "Requires": null,
+            "ComingSoon": false,
+            "Needs": "",
+            "Children": null
+          },
+          {
+            "Key": "tinh.hcth.quyet_dinh_nang_bac",
+            "Label": "Quyết định nâng bậc",
+            "Route": "/kn/nhan-su/quyet-dinh-nang-bac",
+            "Icon": "journal",
+            "BadgeSource": "",
+            "Requires": null,
+            "ComingSoon": false,
+            "Needs": "",
+            "Children": null
+          },
+          {
             "Key": "tinh.hcth.kho_tai_lieu",
             "Label": "Hồ sơ dữ liệu",
             "Route": "/kn/nhan-su/kho-tai-lieu",

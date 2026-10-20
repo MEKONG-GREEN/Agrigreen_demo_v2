@@ -97,10 +97,10 @@ describe("kn.menu/v3 (W11.06): khuôn theo phòng ban + Dùng chung", () => {
       const tree = fromKnMenu(m);
       const biz = tree.groups.find((g) => g.key === "nghiep_vu")!;
       // Mục đã có màn bấm được (W11.72 Cấu hình báo giá QTNV, W11.41 Danh mục CNTS, W11.21 Danh mục nhân sự, W11.75 Kiểm duyệt & công bố,
-      // W11.42 Biểu mẫu & cấp quyền, W11.49 Báo cáo dịch bệnh, W11.43 Cảnh báo, W11.22 Hồ sơ nhân sự, W11.77 báo cáo giá, W11.44 KSGM tuần, tháng + Thủy sản (Phụ lục 2), W11.47 CT/DA, hộ mô hình, cấp quyền); còn lại "Sắp có".
+      // W11.42 Biểu mẫu & cấp quyền, W11.49 Báo cáo dịch bệnh, W11.43 Cảnh báo, W11.22 Hồ sơ nhân sự, W11.77 báo cáo giá, W11.44 KSGM tuần, tháng + Thủy sản (Phụ lục 2), W11.47 CT/DA, hộ mô hình, cấp quyền, W11.25 nâng bậc + quyết định); còn lại "Sắp có".
       const open = new Set(["tinh.bao_gia.cau_hinh", "tinh.bao_gia.kiem_duyet", "tinh.bao_gia.tien_do", "tinh.bao_gia.bang_gia",
         "tinh.bao_gia.bien_dong", "tinh.bao_gia.dashboard", "tinh.bao_gia.thong_ke", "tinh.cnts.danh_muc", "tinh.cnts.bieu_mau", "tinh.cnts.dich_benh", "tinh.cnts.canh_bao", "tinh.hcth.danh_muc", "tinh.hcth.ho_so",
-        "tinh.cnts.ksgm", "tinh.cnts.phu_luc_2", "tinh.hcth.dashboard", "tinh.hcth.bao_cao_so", "tinh.hcth.kho_tai_lieu", "tinh.cnts.lich", "tinh.cnts.lich_tiem", "tinh.cnts.lich_cong_tac",
+        "tinh.cnts.ksgm", "tinh.cnts.phu_luc_2", "tinh.hcth.dashboard", "tinh.hcth.bao_cao_so", "tinh.hcth.nang_bac", "tinh.hcth.quyet_dinh_nang_bac", "tinh.hcth.kho_tai_lieu", "tinh.cnts.lich", "tinh.cnts.lich_tiem", "tinh.cnts.lich_cong_tac",
         "tinh.cnts.du_an_knqg", "tinh.cnts.ho_mo_hinh", "tinh.cnts.cap_quyen"]);
       expect(biz.items.filter((i) => !open.has(i.key)).every((i) => i.status === "coming_soon")).toBe(true);
       const links = menuLinks(tree).map((l) => l.node.key);
@@ -112,7 +112,7 @@ describe("kn.menu/v3 (W11.06): khuôn theo phòng ban + Dùng chung", () => {
           : code === "chan_nuoi_thuy_san"
             ? ["tinh.cnts.canh_bao", "tinh.cnts.bieu_mau", "tinh.cnts.dich_benh", "tinh.cnts.ksgm", "tinh.cnts.phu_luc_2", "tinh.cnts.lich", "tinh.cnts.lich_tiem", "tinh.cnts.lich_cong_tac", "tinh.cnts.du_an_knqg", "tinh.cnts.danh_muc", "tinh.cnts.ho_mo_hinh", "tinh.cnts.cap_quyen"]
             : code === "hanh_chinh_tong_hop"
-              ? ["tinh.hcth.dashboard", "tinh.hcth.ho_so", "tinh.hcth.bao_cao_so", "tinh.hcth.kho_tai_lieu", "tinh.hcth.danh_muc"]
+              ? ["tinh.hcth.dashboard", "tinh.hcth.ho_so", "tinh.hcth.bao_cao_so", "tinh.hcth.nang_bac", "tinh.hcth.quyet_dinh_nang_bac", "tinh.hcth.kho_tai_lieu", "tinh.hcth.danh_muc"]
               : [],
       );
     }

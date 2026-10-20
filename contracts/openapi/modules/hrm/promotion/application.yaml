@@ -1,0 +1,812 @@
+paths:
+# @ag-order: 1200
+  /v1/hrm/promotion:
+    get:
+      summary: Danh sách nâng bậc (FN-09 B1, B2) — kỳ NLTX/TNVK/NLTH có ngày đến kỳ ≤ ngày xét + window tháng (kể cả quá hạn) và kỳ đã có quyết định trong 3 tháng gần đây; khối chỉ số, chỉ tiêu NLTH, người thiếu ngạch/bậc, lần tính gần nhất của job. Cấp Tỉnh – HCTH, Admin
+      operationId: hrmPromotionList
+      tags: [hrm]
+      parameters:
+        - {name: at, in: query, required: false, description: "Ngày xét YYYY-MM-DD (vắng → hôm nay, giờ VN)", schema: {type: string, format: date}}
+        - {name: window, in: query, required: false, description: "Khung tháng tới: 1, 3, 6, 12 (mặc định 3)", schema: {type: integer, enum: [1, 3, 6, 12]}}
+      responses:
+        "200":
+          description: Danh sách (Cache-Control no-store — có họ tên)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPromotionList"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "422": {description: hrm.promotion_rules_missing, $ref: "#/components/responses/Problem"}
+# @ag-order: 1201
+  /v1/hrm/promotion/cases/{key}:
+    get:
+      summary: Chi tiết một kỳ nâng bậc (FN-09 B3) — kỳ, căn cứ điều kiện, lịch sử xử lý, xếp loại năm, thành tích
+      operationId: hrmPromotionCase
+      tags: [hrm]
+      parameters:
+        - {name: key, in: path, required: true, description: "Khóa kỳ '<staff_id>:<nltx|nlth|tnvk>:<khóa>'", schema: {type: string}}
+        - {name: at, in: query, required: false, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPromoCaseDetail"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.promotion_case_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 1202
+  /v1/hrm/promotion/cases/include:
+    post:
+      summary: Đưa kỳ NLTX/TNVK vào danh sách ("Đã đưa vào danh sách"); kỳ "Chưa đủ"/"Cần xem xét" bắt buộc lý do; người đã có trong Mẫu số 2 cùng lần nâng → 409
+      operationId: hrmPromotionInclude
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmPromoKeysInput"}
+      responses:
+        "200":
+          description: Số kỳ đã đổi trạng thái
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPromoChanged"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.promotion_case_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.promotion_conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed (thiếu lý do), $ref: "#/components/responses/Problem"}
+# @ag-order: 1203
+  /v1/hrm/promotion/cases/exclude:
+    post:
+      summary: Bỏ kỳ NLTX/TNVK khỏi danh sách (về "Chưa xử lý"); chỉ kỳ "Đã đưa vào danh sách"
+      operationId: hrmPromotionExclude
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmPromoKeysInput"}
+      responses:
+        "200":
+          description: Số kỳ đã đổi trạng thái
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPromoChanged"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.promotion_case_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.promotion_conflict, $ref: "#/components/responses/Problem"}
+# @ag-order: 1204
+  /v1/hrm/promotion/nlth-pool:
+    get:
+      summary: Danh sách chọn NLTH (FN-09 bước 3) — viên chức đang công tác trừ người đang đến kỳ thường xuyên trong window tháng và người đã có kỳ NLTH đang mở; mỗi người các thành tích quy đổi được kèm ngày nâng, điều kiện
+      operationId: hrmPromotionPool
+      tags: [hrm]
+      parameters:
+        - {name: window, in: query, required: false, schema: {type: integer, enum: [1, 3, 6, 12]}}
+      responses:
+        "200":
+          description: Danh sách chọn (Cache-Control no-store)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmNLTHPool"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "422": {description: hrm.promotion_rules_missing, $ref: "#/components/responses/Problem"}
+# @ag-order: 1205
+  /v1/hrm/promotion/proposals:
+    post:
+      summary: Lập danh sách NLTH từ thành tích — quy đổi số tháng, kiểm điều kiện (người chưa đủ bắt buộc lý do), kiểm tỷ lệ chỉ tiêu năm (ngày nâng năm sau → "dự kiến", không tính chỉ tiêu)
+      operationId: hrmPromotionPropose
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [staff_id, award_event_id]
+                    properties:
+                      staff_id: {type: string, format: uuid}
+                      award_event_id: {type: string, format: uuid, description: "Dòng khen thưởng trong hồ sơ (staff_event kind award)"}
+                reason: {type: string, maxLength: 1000}
+      responses:
+        "201":
+          description: Khóa các kỳ NLTH đã lập
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keys]
+                properties:
+                  keys: {type: array, items: {type: string}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.staff_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.promotion_conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: hrm.nlth_quota_exceeded | hrm.promotion_export_blocked | validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 1206
+  /v1/hrm/promotion/proposals/withdraw:
+    post:
+      summary: Gỡ kỳ NLTH chưa xuất khỏi danh sách (thành tích vẫn giữ, chưa tính đã dùng)
+      operationId: hrmPromotionWithdraw
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmPromoKeysInput"}
+      responses:
+        "200":
+          description: Số kỳ đã gỡ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPromoChanged"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.promotion_case_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.promotion_conflict, $ref: "#/components/responses/Problem"}
+# @ag-order: 1207
+  /v1/hrm/promotion/exports:
+    get:
+      summary: File đã xuất (FN-09 luồng phụ; AC-04) — mới trước, có ngày và người xuất, quyết định đã lập từ danh sách (không PII)
+      operationId: hrmPromotionExports
+      tags: [hrm]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200}}
+      responses:
+        "200":
+          description: Lịch sử xuất
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmPromoExportSummary"}}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Xuất danh sách đã chọn (FN-09 B4) — hệ thống tự chia theo loại thành Mẫu số 1 (NLTX), 2 (NLTH), 4 (TNVK); chặn Mẫu số 2 khi vượt chỉ tiêu, thành tích đã dùng, ngày nâng ngoài năm chỉ tiêu, bậc cuối. Trả tóm tắt KHÔNG PII; tệp tải ở …/exports/{id}/file
+      operationId: hrmPromotionExport
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmPromoExportInput"}
+      responses:
+        "201":
+          description: Các tệp đã xuất
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmPromoExported"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.promotion_case_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.promotion_conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: hrm.promotion_export_blocked | validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 1208
+  /v1/hrm/promotion/exports/{id}:
+    get:
+      summary: Một lần xuất kèm họ tên và trạng thái từng kỳ — nguồn của khung "Thêm quyết định từ danh sách" (FN-10 B2, B3)
+      operationId: hrmPromotionExportGet
+      tags: [hrm]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Lần xuất (Cache-Control no-store)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPromoExportDetail"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.promotion_export_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 1209
+  /v1/hrm/promotion/exports/{id}/file:
+    get:
+      summary: Tải lại tệp Excel của một lần xuất — dựng lại từ dòng đã lưu + định danh hiện hành, so SHA-256 (X-Export-Drift); ghi sổ download + nhật ký hồ sơ
+      operationId: hrmPromotionExportFile
+      tags: [hrm]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp .xlsx (Cache-Control no-store)
+          headers:
+            X-Export-Drift: {schema: {type: string, enum: ["true", "false"]}}
+            X-Export-Sha256: {schema: {type: string}}
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.promotion_export_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 1210
+  /v1/hrm/promotion/decisions:
+    get:
+      summary: Sổ quyết định nâng bậc (FN-10 B1) — lọc năm, loại, cơ quan ban hành; q tìm theo số quyết định hoặc tên viên chức (AC-02)
+      operationId: hrmDecisionList
+      tags: [hrm]
+      parameters:
+        - {name: year, in: query, required: false, schema: {type: integer, minimum: 1975, maximum: 2100}}
+        - {name: kind, in: query, required: false, schema: {$ref: "#/components/schemas/HrmPromoKind"}}
+        - {name: issuer, in: query, required: false, schema: {type: string}}
+        - {name: q, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Sổ (Cache-Control no-store — có họ tên)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmDecision"}}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Lưu quyết định (FN-10 B2–B4) — từ danh sách đã xuất (export_id + người có tên) hoặc nhập quyết định đã ban hành (kind + staff_id, bậc/% sau quyết định, ngày hưởng). Cập nhật bậc, hệ số trong hồ sơ CÙNG giao dịch; người trong danh sách gốc không có tên trở lại bảng theo dõi (BR-02). Số trùng → 409 hrm.decision_warnings trừ khi acknowledge_warnings
+      operationId: hrmDecisionCreate
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmDecisionInput"}
+      responses:
+        "201":
+          description: Đã lưu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, updated, returned, warnings]
+                properties:
+                  id: {type: string, format: uuid}
+                  updated: {type: integer, description: "Số hồ sơ được ghi bậc mới"}
+                  returned: {type: integer, description: "Số người không có tên trong quyết định"}
+                  warnings: {type: array, items: {type: string}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.promotion_export_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.decision_warnings | hrm.decision_stale | hrm.promotion_conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: hrm.step_out_of_range | validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 1211
+  /v1/hrm/promotion/decision-book:
+    get:
+      summary: Xuất sổ quyết định ra Excel (FN-10 luồng phụ; AC-03) — số, ngày, cơ quan, loại, danh sách gốc, số người, tệp, trạng thái (không PII)
+      operationId: hrmDecisionBook
+      tags: [hrm]
+      parameters:
+        - {name: year, in: query, required: false, schema: {type: integer, minimum: 1975, maximum: 2100}}
+        - {name: kind, in: query, required: false, schema: {$ref: "#/components/schemas/HrmPromoKind"}}
+        - {name: issuer, in: query, required: false, schema: {type: string}}
+        - {name: q, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+# @ag-order: 1212
+  /v1/hrm/promotion/decisions/{id}:
+    get:
+      summary: Chi tiết quyết định (FN-10 Hình 20) — người có tên, bậc/hệ số cũ → mới, ngày hưởng, tệp, lịch sử dòng sổ
+      operationId: hrmDecisionGet
+      tags: [hrm]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Quyết định (Cache-Control no-store)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmDecision"}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.decision_not_found, $ref: "#/components/responses/Problem"}
+# @ag-order: 1213
+  /v1/hrm/promotion/decisions/{id}/cancel:
+    post:
+      summary: Hủy quyết định (BR-03) — SỰ KIỆN BÙ, không xóa; lý do 10–500 ký tự; khôi phục bậc, hệ số trước đó; kỳ về "Đã xuất danh sách"; có quyết định sau cho cùng người → 409 hrm.decision_cancel_order
+      operationId: hrmDecisionCancel
+      tags: [hrm]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "200":
+          description: Đã hủy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status]
+                properties:
+                  id: {type: string, format: uuid}
+                  status: {type: string, enum: [cancelled]}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.decision_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.decision_cancelled | hrm.decision_cancel_order, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 1214
+  /v1/hrm/promotion/decisions/{id}/file:
+    post:
+      summary: Đính kèm tệp quyết định — lưu vào Kho tài liệu nhân sự (FN-14, thư mục hệ thống "Quyết định nâng bậc", gắn người có tên, số, ngày quyết định)
+      operationId: hrmDecisionFile
+      tags: [hrm]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        "201":
+          description: Đã lưu tệp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [doc_id]
+                properties:
+                  doc_id: {type: string, format: uuid}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.decision_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: hrm.decision_cancelled, $ref: "#/components/responses/Problem"}
+        "413": {description: hrm.doc_too_large, $ref: "#/components/responses/Problem"}
+        "503": {description: hrm.docs_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 1215
+  /v1/hrm/staff/{id}/ratings:
+    get:
+      summary: Xếp loại năm của một hồ sơ (dùng kiểm điều kiện nâng bậc — FN-09 BR-02) — mọi dòng sổ, cũ trước
+      operationId: hrmRatingList
+      tags: [hrm]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Xếp loại
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HrmAnnualRating"}}
+        "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.staff_not_found, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Ghi xếp loại năm (nguồn chuyển đổi ban đầu hoặc nhập tay; FN-18 W11.26 ghi nguồn evaluation) — năm đã có → thay, cần lý do ≥ 10 ký tự; rating rỗng = hủy
+      operationId: hrmRatingSet
+      tags: [hrm]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [year, rating]
+              properties:
+                year: {type: integer, minimum: 1990, maximum: 2100}
+                rating: {type: string, enum: ["", HTXSNV, HTTNV, HTNV, KHTNV]}
+                source: {type: string, enum: [manual, conversion]}
+                reason: {type: string, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmAnnualRating"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.staff_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 1240
+    HrmPromoKind:
+      type: string
+      enum: [nltx, nlth, tnvk]
+      description: "nltx — thường xuyên (Mẫu số 1); nlth — trước thời hạn (Mẫu số 2); tnvk — thâm niên vượt khung (Mẫu số 4)"
+# @ag-order: 1241
+    HrmPromoStatus:
+      type: string
+      enum: [pending, listed, exported, decided]
+      description: "Chưa xử lý | Đã đưa vào danh sách | Đã xuất danh sách | Đã có quyết định"
+# @ag-order: 1242
+    HrmPromoCond:
+      type: string
+      enum: [ok, review, fail]
+      description: "Đủ | Cần xem xét | Chưa đủ"
+# @ag-order: 1243
+    HrmPromoBasis:
+      type: object
+      required: [label, value, result, note]
+      properties:
+        label: {type: string}
+        value: {type: string}
+        result: {$ref: "#/components/schemas/HrmPromoCond"}
+        note: {type: string}
+# @ag-order: 1244
+    HrmPromoAward:
+      type: object
+      required: [event_id, form, label, year, months, used]
+      properties:
+        event_id: {type: string, format: uuid}
+        form: {type: string}
+        label: {type: string, description: "Nhãn thành tích (NL03-05)"}
+        year: {type: integer}
+        months: {type: integer, description: "Số tháng quy đổi (0 = không thuộc bảng quy đổi)"}
+        used: {type: boolean}
+# @ag-order: 1245
+    HrmPromoCase:
+      type: object
+      required: [key, staff_id, code, name, unit, unit_name, kind, form, due, grade, grade_name, steps, from_step, to_step, from_coeff, to_coeff,
+        diff, step_since, reserved, next_due, normal_due, early_months, pct_from, pct_to, pct_since, cond, why, basis, planned_year, blocked,
+        status, reason, note, months_enjoyed, decision_id, decision_no, award]
+      properties:
+        key: {type: string}
+        staff_id: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string, description: "Họ tên (rỗng khi người gọi không có vai kho)"}
+        unit: {type: string}
+        unit_name: {type: string}
+        kind: {$ref: "#/components/schemas/HrmPromoKind"}
+        form: {type: string, enum: [mau1, mau2, mau4]}
+        due: {type: string, format: date, description: "Ngày đến kỳ (NLTH: ngày nâng trước hạn; đã có quyết định: ngày hưởng)"}
+        grade: {type: string}
+        grade_name: {type: string}
+        steps: {type: integer}
+        from_step: {type: integer}
+        to_step: {type: integer}
+        from_coeff: {type: string}
+        to_coeff: {type: string}
+        diff: {type: string, description: "Hệ số chênh lệch (NL02-12, NL04-07)"}
+        step_since: {type: [string, "null"], format: date}
+        reserved: {type: string}
+        next_due: {type: [string, "null"], format: date}
+        normal_due: {type: [string, "null"], format: date}
+        early_months: {type: integer}
+        pct_from: {type: [string, "null"]}
+        pct_to: {type: [string, "null"]}
+        pct_since: {type: [string, "null"], format: date}
+        cond: {$ref: "#/components/schemas/HrmPromoCond"}
+        why: {type: array, items: {type: string}}
+        basis: {type: array, items: {$ref: "#/components/schemas/HrmPromoBasis"}}
+        planned_year: {type: integer, description: "NLTH: năm dự kiến khi ngày nâng ngoài năm chỉ tiêu (0 = trong năm)"}
+        blocked: {type: array, items: {type: string}, description: "NLTH: lý do chặn xuất Mẫu số 2"}
+        status: {$ref: "#/components/schemas/HrmPromoStatus"}
+        reason: {type: string, description: "Lý do đưa người chưa đủ vào danh sách"}
+        note: {type: string, description: "Ghi chú trả về (không có tên trong quyết định)"}
+        months_enjoyed: {type: string, description: "Số tháng được hưởng gợi ý (1 | 0.5)"}
+        decision_id: {type: [string, "null"], format: uuid}
+        decision_no: {type: string}
+        award: {oneOf: [{$ref: "#/components/schemas/HrmPromoAward"}, {type: "null"}]}
+# @ag-order: 1246
+    HrmPromoEvent:
+      type: object
+      required: [id, action, due_on, export_id, decision_id, reason, actor, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        action: {type: string, enum: [include, exclude, propose, withdraw, export, decide, undecide, return]}
+        due_on: {type: [string, "null"], format: date}
+        export_id: {type: [string, "null"], format: uuid}
+        decision_id: {type: [string, "null"], format: uuid}
+        reason: {type: string}
+        actor: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+# @ag-order: 1247
+    HrmAnnualRating:
+      type: object
+      required: [id, year, rating, source, void, supersedes_id, reason, actor, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        year: {type: integer}
+        rating: {type: string}
+        source: {type: string, enum: [conversion, manual, evaluation]}
+        void: {type: boolean}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        reason: {type: string}
+        actor: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+# @ag-order: 1248
+    HrmPromoCaseDetail:
+      allOf:
+        - $ref: "#/components/schemas/HrmPromoCase"
+        - type: object
+          required: [history, ratings, awards]
+          properties:
+            history: {type: array, items: {$ref: "#/components/schemas/HrmPromoEvent"}}
+            ratings: {type: array, items: {$ref: "#/components/schemas/HrmAnnualRating"}}
+            awards: {type: array, items: {$ref: "#/components/schemas/HrmPromoAward"}}
+# @ag-order: 1249
+    HrmPromoQuota:
+      type: object
+      required: [year, total, used, pending]
+      properties:
+        year: {type: integer}
+        total: {type: integer, description: "Chỉ tiêu NLTH = ⌊tỷ lệ % × viên chức đang công tác⌋ (giả định Q-070)"}
+        used: {type: integer, description: "Người trong quyết định NLTH còn hiệu lực của năm"}
+        pending: {type: integer, description: "Kỳ NLTH đang trong danh sách của năm"}
+# @ag-order: 1250
+    HrmPromotionList:
+      type: object
+      required: [as_of, window, items, missing, last_scan, summary, rules]
+      properties:
+        as_of: {type: string, format: date}
+        window: {type: integer}
+        items: {type: array, items: {$ref: "#/components/schemas/HrmPromoCase"}}
+        missing: {type: array, items: {$ref: "#/components/schemas/HrmPersonBrief"}, description: "Viên chức đang công tác chưa tính được kỳ (thiếu ngạch, bậc, bảng hệ số, mốc)"}
+        last_scan:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [day, counts, recorded_at]
+              properties:
+                day: {type: string, format: date}
+                counts: {type: object, additionalProperties: {type: integer}}
+                recorded_at: {type: string, format: date-time}
+        summary:
+          type: object
+          required: [total, nltx, tnvk, nlth, by_status, by_month, quota]
+          properties:
+            total: {type: integer}
+            nltx: {type: integer}
+            tnvk: {type: integer}
+            nlth: {type: integer}
+            by_status: {type: object, additionalProperties: {type: integer}}
+            by_month: {type: object, additionalProperties: {type: integer}}
+            quota: {$ref: "#/components/schemas/HrmPromoQuota"}
+        rules:
+          type: object
+          required: [min_rating, rating_years, achievement_years, tnvk_start_pct, tnvk_step_pct, tnvk_cycle_months, tnvk_first_months, nlth_quota_pct,
+            remind_months]
+          properties:
+            min_rating: {type: string}
+            rating_years: {type: integer}
+            achievement_years: {type: integer}
+            tnvk_start_pct: {type: string}
+            tnvk_step_pct: {type: string}
+            tnvk_cycle_months: {type: integer}
+            tnvk_first_months: {type: integer}
+            nlth_quota_pct: {type: string}
+            remind_months: {type: [array, "null"], items: {type: integer}}
+# @ag-order: 1251
+    HrmNLTHPool:
+      type: object
+      required: [as_of, excluded, rows, quota]
+      properties:
+        as_of: {type: string, format: date}
+        excluded: {type: integer, description: "Số người đang trong danh sách đến kỳ thường xuyên (không vào danh sách chọn)"}
+        quota: {$ref: "#/components/schemas/HrmPromoQuota"}
+        rows:
+          type: array
+          items:
+            type: object
+            required: [staff_id, code, name, unit_name, step, steps, normal_due, block, options]
+            properties:
+              staff_id: {type: string, format: uuid}
+              code: {type: string}
+              name: {type: string}
+              unit_name: {type: string}
+              step: {type: integer}
+              steps: {type: integer}
+              normal_due: {type: [string, "null"], format: date}
+              block: {type: string, description: "Lý do không chọn được (rỗng = chọn được)"}
+              options:
+                type: array
+                items:
+                  type: object
+                  required: [award, key, due, early_months, cond, why, planned_year]
+                  properties:
+                    award: {$ref: "#/components/schemas/HrmPromoAward"}
+                    key: {type: string}
+                    due: {type: string, format: date}
+                    early_months: {type: integer}
+                    cond: {$ref: "#/components/schemas/HrmPromoCond"}
+                    why: {type: array, items: {type: string}}
+                    planned_year: {type: integer}
+# @ag-order: 1252
+    HrmPromoKeysInput:
+      type: object
+      additionalProperties: false
+      required: [keys]
+      properties:
+        keys: {type: array, minItems: 1, maxItems: 500, items: {type: string}}
+        reason: {type: string, maxLength: 1000}
+# @ag-order: 1253
+    HrmPromoChanged:
+      type: object
+      required: [changed]
+      properties:
+        changed: {type: integer}
+# @ag-order: 1254
+    HrmPromoExportInput:
+      type: object
+      additionalProperties: false
+      required: [keys, review_month]
+      properties:
+        keys: {type: array, minItems: 1, maxItems: 500, items: {type: string}}
+        review_month: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$", description: "Tháng xét YYYY-MM"}
+        preparer_id: {type: [string, "null"], format: uuid, description: "Người lập — mã hồ sơ"}
+        signer_title: {type: string, enum: ["Giám đốc", "Phó Giám đốc"]}
+        tnvk_pct: {type: object, additionalProperties: {type: string}, description: "Khóa kỳ TNVK → % TNVK đang hưởng (NL04-03; 0 hoặc vắng = lần đầu)"}
+        months: {type: object, additionalProperties: {type: string}, description: "Khóa kỳ → số tháng được hưởng (NL02-13, NL04-08)"}
+        notes: {type: object, additionalProperties: {type: string}, description: "Khóa kỳ → ghi chú"}
+        reserved_after: {type: object, additionalProperties: {type: string}, description: "Khóa kỳ → HS chênh lệch bảo lưu sau nâng (NL02-11)"}
+# @ag-order: 1255
+    HrmPromoExported:
+      type: object
+      required: [id, form, file_name, sha256, byte_size, count, download]
+      properties:
+        id: {type: string, format: uuid}
+        form: {type: string, enum: [mau1, mau2, mau4]}
+        file_name: {type: string}
+        sha256: {type: string}
+        byte_size: {type: integer}
+        count: {type: integer}
+        download: {type: string}
+# @ag-order: 1256
+    HrmPromoExportSummary:
+      type: object
+      required: [id, form, review_month, as_of, count, file_name, sha256, byte_size, actor, recorded_at, signer_title, preparer_id, decision_no]
+      properties:
+        id: {type: string, format: uuid}
+        form: {type: string, enum: [mau1, mau2, mau4]}
+        review_month: {type: string}
+        as_of: {type: string, format: date}
+        count: {type: integer}
+        file_name: {type: string}
+        sha256: {type: string}
+        byte_size: {type: integer}
+        actor: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+        signer_title: {type: string}
+        preparer_id: {type: string}
+        decision_no: {type: string, description: "Quyết định còn hiệu lực đã lập từ danh sách (rỗng = chưa có)"}
+# @ag-order: 1257
+    HrmPromoExportItem:
+      type: object
+      required: [case_key, staff_id, code, name, kind, due, unit_name, grade, grade_name, from_step, to_step, from_coeff, to_coeff, diff, pct_from,
+        pct_to, next_due, months_enjoyed, early_months, award_label, note, reason, status]
+      properties:
+        case_key: {type: string}
+        staff_id: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        kind: {$ref: "#/components/schemas/HrmPromoKind"}
+        due: {type: string, format: date}
+        unit_name: {type: string}
+        grade: {type: string}
+        grade_name: {type: string}
+        from_step: {type: integer}
+        to_step: {type: integer}
+        from_coeff: {type: string}
+        to_coeff: {type: string}
+        diff: {type: string}
+        pct_from: {type: string}
+        pct_to: {type: string}
+        next_due: {type: string}
+        months_enjoyed: {type: string}
+        early_months: {type: integer}
+        award_label: {type: string}
+        note: {type: string}
+        reason: {type: string}
+        status: {type: string}
+# @ag-order: 1258
+    HrmPromoExportDetail:
+      allOf:
+        - $ref: "#/components/schemas/HrmPromoExportSummary"
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: "#/components/schemas/HrmPromoExportItem"}}
+# @ag-order: 1259
+    HrmDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [decision_no, decided_on, issuer, people]
+      properties:
+        export_id: {type: [string, "null"], format: uuid, description: "Danh sách đã xuất (vắng = nhập quyết định đã ban hành)"}
+        kind: {$ref: "#/components/schemas/HrmPromoKind"}
+        decision_no: {type: string, maxLength: 60}
+        decided_on: {type: string, format: date}
+        issuer: {type: string, maxLength: 200}
+        acknowledge_warnings: {type: boolean}
+        people:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              case_key: {type: string, description: "Kỳ trong danh sách đã xuất"}
+              staff_id: {type: string, format: uuid, description: "Nhập quyết định đã ban hành"}
+              effective_on: {type: string, format: date, description: "Ngày hưởng (vắng → ngày đến kỳ của danh sách)"}
+              to_step: {type: integer, minimum: 1, maximum: 99}
+              pct_to: {type: string, description: "TNVK: % sau quyết định"}
+# @ag-order: 1260
+    HrmDecision:
+      type: object
+      required: [id, decision_no, decided_on, issuer, kind, export_id, source, count, doc_id, status, cancel_reason, recorded_at, actor, people]
+      properties:
+        id: {type: string, format: uuid}
+        decision_no: {type: string}
+        decided_on: {type: string, format: date}
+        issuer: {type: string}
+        kind: {$ref: "#/components/schemas/HrmPromoKind"}
+        export_id: {type: [string, "null"], format: uuid}
+        source: {type: string, description: "Danh sách gốc (tên tệp đã xuất) hoặc 'Nhập từ quyết định đã ban hành'"}
+        count: {type: integer}
+        doc_id: {type: [string, "null"], format: uuid, description: "Tệp ở Kho tài liệu nhân sự"}
+        status: {type: string, enum: [applied, cancelled]}
+        cancel_reason: {type: [string, "null"]}
+        recorded_at: {type: string, format: date-time}
+        actor: {type: string, format: uuid}
+        people:
+          type: array
+          items:
+            type: object
+            required: [staff_id, name, case_key, effective_on, grade, from_step, to_step, from_coeff, to_coeff, pct_from, pct_to]
+            properties:
+              staff_id: {type: string, format: uuid}
+              name: {type: string}
+              case_key: {type: string}
+              effective_on: {type: string, format: date}
+              grade: {type: string}
+              from_step: {type: integer}
+              to_step: {type: integer}
+              from_coeff: {type: string}
+              to_coeff: {type: string}
+              pct_from: {type: string}
+              pct_to: {type: string}
+        history:
+          type: array
+          items:
+            type: object
+            required: [id, action, doc_id, reason, actor, recorded_at]
+            properties:
+              id: {type: string, format: uuid}
+              action: {type: string, enum: [issue, attach, cancel]}
+              doc_id: {type: [string, "null"], format: uuid}
+              reason: {type: string}
+              actor: {type: string, format: uuid}
+              recorded_at: {type: string, format: date-time}

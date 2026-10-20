@@ -8781,6 +8781,281 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/hrm/promotion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách nâng bậc (FN-09 B1, B2) — kỳ NLTX/TNVK/NLTH có ngày đến kỳ ≤ ngày xét + window tháng (kể cả quá hạn) và kỳ đã có quyết định trong 3 tháng gần đây; khối chỉ số, chỉ tiêu NLTH, người thiếu ngạch/bậc, lần tính gần nhất của job. Cấp Tỉnh – HCTH, Admin */
+        get: operations["hrmPromotionList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/cases/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết một kỳ nâng bậc (FN-09 B3) — kỳ, căn cứ điều kiện, lịch sử xử lý, xếp loại năm, thành tích */
+        get: operations["hrmPromotionCase"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/cases/include": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đưa kỳ NLTX/TNVK vào danh sách ("Đã đưa vào danh sách"); kỳ "Chưa đủ"/"Cần xem xét" bắt buộc lý do; người đã có trong Mẫu số 2 cùng lần nâng → 409 */
+        post: operations["hrmPromotionInclude"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/cases/exclude": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bỏ kỳ NLTX/TNVK khỏi danh sách (về "Chưa xử lý"); chỉ kỳ "Đã đưa vào danh sách" */
+        post: operations["hrmPromotionExclude"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/nlth-pool": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách chọn NLTH (FN-09 bước 3) — viên chức đang công tác trừ người đang đến kỳ thường xuyên trong window tháng và người đã có kỳ NLTH đang mở; mỗi người các thành tích quy đổi được kèm ngày nâng, điều kiện */
+        get: operations["hrmPromotionPool"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lập danh sách NLTH từ thành tích — quy đổi số tháng, kiểm điều kiện (người chưa đủ bắt buộc lý do), kiểm tỷ lệ chỉ tiêu năm (ngày nâng năm sau → "dự kiến", không tính chỉ tiêu) */
+        post: operations["hrmPromotionPropose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/proposals/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gỡ kỳ NLTH chưa xuất khỏi danh sách (thành tích vẫn giữ, chưa tính đã dùng) */
+        post: operations["hrmPromotionWithdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** File đã xuất (FN-09 luồng phụ; AC-04) — mới trước, có ngày và người xuất, quyết định đã lập từ danh sách (không PII) */
+        get: operations["hrmPromotionExports"];
+        put?: never;
+        /** Xuất danh sách đã chọn (FN-09 B4) — hệ thống tự chia theo loại thành Mẫu số 1 (NLTX), 2 (NLTH), 4 (TNVK); chặn Mẫu số 2 khi vượt chỉ tiêu, thành tích đã dùng, ngày nâng ngoài năm chỉ tiêu, bậc cuối. Trả tóm tắt KHÔNG PII; tệp tải ở …/exports/{id}/file */
+        post: operations["hrmPromotionExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/exports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một lần xuất kèm họ tên và trạng thái từng kỳ — nguồn của khung "Thêm quyết định từ danh sách" (FN-10 B2, B3) */
+        get: operations["hrmPromotionExportGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/exports/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải lại tệp Excel của một lần xuất — dựng lại từ dòng đã lưu + định danh hiện hành, so SHA-256 (X-Export-Drift); ghi sổ download + nhật ký hồ sơ */
+        get: operations["hrmPromotionExportFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sổ quyết định nâng bậc (FN-10 B1) — lọc năm, loại, cơ quan ban hành; q tìm theo số quyết định hoặc tên viên chức (AC-02) */
+        get: operations["hrmDecisionList"];
+        put?: never;
+        /** Lưu quyết định (FN-10 B2–B4) — từ danh sách đã xuất (export_id + người có tên) hoặc nhập quyết định đã ban hành (kind + staff_id, bậc/% sau quyết định, ngày hưởng). Cập nhật bậc, hệ số trong hồ sơ CÙNG giao dịch; người trong danh sách gốc không có tên trở lại bảng theo dõi (BR-02). Số trùng → 409 hrm.decision_warnings trừ khi acknowledge_warnings */
+        post: operations["hrmDecisionCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/decision-book": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất sổ quyết định ra Excel (FN-10 luồng phụ; AC-03) — số, ngày, cơ quan, loại, danh sách gốc, số người, tệp, trạng thái (không PII) */
+        get: operations["hrmDecisionBook"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/decisions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết quyết định (FN-10 Hình 20) — người có tên, bậc/hệ số cũ → mới, ngày hưởng, tệp, lịch sử dòng sổ */
+        get: operations["hrmDecisionGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/decisions/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy quyết định (BR-03) — SỰ KIỆN BÙ, không xóa; lý do 10–500 ký tự; khôi phục bậc, hệ số trước đó; kỳ về "Đã xuất danh sách"; có quyết định sau cho cùng người → 409 hrm.decision_cancel_order */
+        post: operations["hrmDecisionCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/promotion/decisions/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đính kèm tệp quyết định — lưu vào Kho tài liệu nhân sự (FN-14, thư mục hệ thống "Quyết định nâng bậc", gắn người có tên, số, ngày quyết định) */
+        post: operations["hrmDecisionFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/ratings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xếp loại năm của một hồ sơ (dùng kiểm điều kiện nâng bậc — FN-09 BR-02) — mọi dòng sổ, cũ trước */
+        get: operations["hrmRatingList"];
+        put?: never;
+        /** Ghi xếp loại năm (nguồn chuyển đổi ban đầu hoặc nhập tay; FN-18 W11.26 ghi nguồn evaluation) — năm đã có → thay, cần lý do ≥ 10 ký tự; rating rỗng = hủy */
+        post: operations["hrmRatingSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/periods/{id}/report": {
         parameters: {
             query?: never;
@@ -18535,6 +18810,394 @@ export interface components {
             late: boolean;
             /** @description Cần xử lý: Chưa nhập, Lưu nháp (nút Tiếp tục), Trễ hạn, Yêu cầu bổ sung */
             actionable: boolean;
+        };
+        /**
+         * @description nltx — thường xuyên (Mẫu số 1); nlth — trước thời hạn (Mẫu số 2); tnvk — thâm niên vượt khung (Mẫu số 4)
+         * @enum {string}
+         */
+        HrmPromoKind: "nltx" | "nlth" | "tnvk";
+        /**
+         * @description Chưa xử lý | Đã đưa vào danh sách | Đã xuất danh sách | Đã có quyết định
+         * @enum {string}
+         */
+        HrmPromoStatus: "pending" | "listed" | "exported" | "decided";
+        /**
+         * @description Đủ | Cần xem xét | Chưa đủ
+         * @enum {string}
+         */
+        HrmPromoCond: "ok" | "review" | "fail";
+        HrmPromoBasis: {
+            label: string;
+            value: string;
+            result: components["schemas"]["HrmPromoCond"];
+            note: string;
+        };
+        HrmPromoAward: {
+            /** Format: uuid */
+            event_id: string;
+            form: string;
+            /** @description Nhãn thành tích (NL03-05) */
+            label: string;
+            year: number;
+            /** @description Số tháng quy đổi (0 = không thuộc bảng quy đổi) */
+            months: number;
+            used: boolean;
+        };
+        HrmPromoCase: {
+            key: string;
+            /** Format: uuid */
+            staff_id: string;
+            code: string;
+            /** @description Họ tên (rỗng khi người gọi không có vai kho) */
+            name: string;
+            unit: string;
+            unit_name: string;
+            kind: components["schemas"]["HrmPromoKind"];
+            /** @enum {string} */
+            form: "mau1" | "mau2" | "mau4";
+            /**
+             * Format: date
+             * @description Ngày đến kỳ (NLTH: ngày nâng trước hạn; đã có quyết định: ngày hưởng)
+             */
+            due: string;
+            grade: string;
+            grade_name: string;
+            steps: number;
+            from_step: number;
+            to_step: number;
+            from_coeff: string;
+            to_coeff: string;
+            /** @description Hệ số chênh lệch (NL02-12, NL04-07) */
+            diff: string;
+            /** Format: date */
+            step_since: string | null;
+            reserved: string;
+            /** Format: date */
+            next_due: string | null;
+            /** Format: date */
+            normal_due: string | null;
+            early_months: number;
+            pct_from: string | null;
+            pct_to: string | null;
+            /** Format: date */
+            pct_since: string | null;
+            cond: components["schemas"]["HrmPromoCond"];
+            why: string[];
+            basis: components["schemas"]["HrmPromoBasis"][];
+            /** @description NLTH: năm dự kiến khi ngày nâng ngoài năm chỉ tiêu (0 = trong năm) */
+            planned_year: number;
+            /** @description NLTH: lý do chặn xuất Mẫu số 2 */
+            blocked: string[];
+            status: components["schemas"]["HrmPromoStatus"];
+            /** @description Lý do đưa người chưa đủ vào danh sách */
+            reason: string;
+            /** @description Ghi chú trả về (không có tên trong quyết định) */
+            note: string;
+            /** @description Số tháng được hưởng gợi ý (1 | 0.5) */
+            months_enjoyed: string;
+            /** Format: uuid */
+            decision_id: string | null;
+            decision_no: string;
+            award: components["schemas"]["HrmPromoAward"] | null;
+        };
+        HrmPromoEvent: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            action: "include" | "exclude" | "propose" | "withdraw" | "export" | "decide" | "undecide" | "return";
+            /** Format: date */
+            due_on: string | null;
+            /** Format: uuid */
+            export_id: string | null;
+            /** Format: uuid */
+            decision_id: string | null;
+            reason: string;
+            /** Format: uuid */
+            actor: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmAnnualRating: {
+            /** Format: uuid */
+            id: string;
+            year: number;
+            rating: string;
+            /** @enum {string} */
+            source: "conversion" | "manual" | "evaluation";
+            void: boolean;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            reason: string;
+            /** Format: uuid */
+            actor: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmPromoCaseDetail: components["schemas"]["HrmPromoCase"] & {
+            history: components["schemas"]["HrmPromoEvent"][];
+            ratings: components["schemas"]["HrmAnnualRating"][];
+            awards: components["schemas"]["HrmPromoAward"][];
+        };
+        HrmPromoQuota: {
+            year: number;
+            /** @description Chỉ tiêu NLTH = ⌊tỷ lệ % × viên chức đang công tác⌋ (giả định Q-070) */
+            total: number;
+            /** @description Người trong quyết định NLTH còn hiệu lực của năm */
+            used: number;
+            /** @description Kỳ NLTH đang trong danh sách của năm */
+            pending: number;
+        };
+        HrmPromotionList: {
+            /** Format: date */
+            as_of: string;
+            window: number;
+            items: components["schemas"]["HrmPromoCase"][];
+            /** @description Viên chức đang công tác chưa tính được kỳ (thiếu ngạch, bậc, bảng hệ số, mốc) */
+            missing: components["schemas"]["HrmPersonBrief"][];
+            last_scan: null | {
+                /** Format: date */
+                day: string;
+                counts: {
+                    [key: string]: number;
+                };
+                /** Format: date-time */
+                recorded_at: string;
+            };
+            summary: {
+                total: number;
+                nltx: number;
+                tnvk: number;
+                nlth: number;
+                by_status: {
+                    [key: string]: number;
+                };
+                by_month: {
+                    [key: string]: number;
+                };
+                quota: components["schemas"]["HrmPromoQuota"];
+            };
+            rules: {
+                min_rating: string;
+                rating_years: number;
+                achievement_years: number;
+                tnvk_start_pct: string;
+                tnvk_step_pct: string;
+                tnvk_cycle_months: number;
+                tnvk_first_months: number;
+                nlth_quota_pct: string;
+                remind_months: number[] | null;
+            };
+        };
+        HrmNLTHPool: {
+            /** Format: date */
+            as_of: string;
+            /** @description Số người đang trong danh sách đến kỳ thường xuyên (không vào danh sách chọn) */
+            excluded: number;
+            quota: components["schemas"]["HrmPromoQuota"];
+            rows: {
+                /** Format: uuid */
+                staff_id: string;
+                code: string;
+                name: string;
+                unit_name: string;
+                step: number;
+                steps: number;
+                /** Format: date */
+                normal_due: string | null;
+                /** @description Lý do không chọn được (rỗng = chọn được) */
+                block: string;
+                options: {
+                    award: components["schemas"]["HrmPromoAward"];
+                    key: string;
+                    /** Format: date */
+                    due: string;
+                    early_months: number;
+                    cond: components["schemas"]["HrmPromoCond"];
+                    why: string[];
+                    planned_year: number;
+                }[];
+            }[];
+        };
+        HrmPromoKeysInput: {
+            keys: string[];
+            reason?: string;
+        };
+        HrmPromoChanged: {
+            changed: number;
+        };
+        HrmPromoExportInput: {
+            keys: string[];
+            /** @description Tháng xét YYYY-MM */
+            review_month: string;
+            /**
+             * Format: uuid
+             * @description Người lập — mã hồ sơ
+             */
+            preparer_id?: string | null;
+            /** @enum {string} */
+            signer_title?: "Giám đốc" | "Phó Giám đốc";
+            /** @description Khóa kỳ TNVK → % TNVK đang hưởng (NL04-03; 0 hoặc vắng = lần đầu) */
+            tnvk_pct?: {
+                [key: string]: string;
+            };
+            /** @description Khóa kỳ → số tháng được hưởng (NL02-13, NL04-08) */
+            months?: {
+                [key: string]: string;
+            };
+            /** @description Khóa kỳ → ghi chú */
+            notes?: {
+                [key: string]: string;
+            };
+            /** @description Khóa kỳ → HS chênh lệch bảo lưu sau nâng (NL02-11) */
+            reserved_after?: {
+                [key: string]: string;
+            };
+        };
+        HrmPromoExported: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            form: "mau1" | "mau2" | "mau4";
+            file_name: string;
+            sha256: string;
+            byte_size: number;
+            count: number;
+            download: string;
+        };
+        HrmPromoExportSummary: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            form: "mau1" | "mau2" | "mau4";
+            review_month: string;
+            /** Format: date */
+            as_of: string;
+            count: number;
+            file_name: string;
+            sha256: string;
+            byte_size: number;
+            /** Format: uuid */
+            actor: string;
+            /** Format: date-time */
+            recorded_at: string;
+            signer_title: string;
+            preparer_id: string;
+            /** @description Quyết định còn hiệu lực đã lập từ danh sách (rỗng = chưa có) */
+            decision_no: string;
+        };
+        HrmPromoExportItem: {
+            case_key: string;
+            /** Format: uuid */
+            staff_id: string;
+            code: string;
+            name: string;
+            kind: components["schemas"]["HrmPromoKind"];
+            /** Format: date */
+            due: string;
+            unit_name: string;
+            grade: string;
+            grade_name: string;
+            from_step: number;
+            to_step: number;
+            from_coeff: string;
+            to_coeff: string;
+            diff: string;
+            pct_from: string;
+            pct_to: string;
+            next_due: string;
+            months_enjoyed: string;
+            early_months: number;
+            award_label: string;
+            note: string;
+            reason: string;
+            status: string;
+        };
+        HrmPromoExportDetail: components["schemas"]["HrmPromoExportSummary"] & {
+            items: components["schemas"]["HrmPromoExportItem"][];
+        };
+        HrmDecisionInput: {
+            /**
+             * Format: uuid
+             * @description Danh sách đã xuất (vắng = nhập quyết định đã ban hành)
+             */
+            export_id?: string | null;
+            kind?: components["schemas"]["HrmPromoKind"];
+            decision_no: string;
+            /** Format: date */
+            decided_on: string;
+            issuer: string;
+            acknowledge_warnings?: boolean;
+            people: {
+                /** @description Kỳ trong danh sách đã xuất */
+                case_key?: string;
+                /**
+                 * Format: uuid
+                 * @description Nhập quyết định đã ban hành
+                 */
+                staff_id?: string;
+                /**
+                 * Format: date
+                 * @description Ngày hưởng (vắng → ngày đến kỳ của danh sách)
+                 */
+                effective_on?: string;
+                to_step?: number;
+                /** @description TNVK: % sau quyết định */
+                pct_to?: string;
+            }[];
+        };
+        HrmDecision: {
+            /** Format: uuid */
+            id: string;
+            decision_no: string;
+            /** Format: date */
+            decided_on: string;
+            issuer: string;
+            kind: components["schemas"]["HrmPromoKind"];
+            /** Format: uuid */
+            export_id: string | null;
+            /** @description Danh sách gốc (tên tệp đã xuất) hoặc 'Nhập từ quyết định đã ban hành' */
+            source: string;
+            count: number;
+            /**
+             * Format: uuid
+             * @description Tệp ở Kho tài liệu nhân sự
+             */
+            doc_id: string | null;
+            /** @enum {string} */
+            status: "applied" | "cancelled";
+            cancel_reason: string | null;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            actor: string;
+            people: {
+                /** Format: uuid */
+                staff_id: string;
+                name: string;
+                case_key: string;
+                /** Format: date */
+                effective_on: string;
+                grade: string;
+                from_step: number;
+                to_step: number;
+                from_coeff: string;
+                to_coeff: string;
+                pct_from: string;
+                pct_to: string;
+            }[];
+            history?: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                action: "issue" | "attach" | "cancel";
+                /** Format: uuid */
+                doc_id: string | null;
+                reason: string;
+                /** Format: uuid */
+                actor: string;
+                /** Format: date-time */
+                recorded_at: string;
+            }[];
         };
         KHTCReportPeriod: {
             /** Format: uuid */
@@ -37592,6 +38255,631 @@ export interface operations {
                 };
             };
             /** @description extension.khtc_import_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmPromotionList: {
+        parameters: {
+            query?: {
+                /** @description Ngày xét YYYY-MM-DD (vắng → hôm nay, giờ VN) */
+                at?: string;
+                /** @description Khung tháng tới: 1, 3, 6, 12 (mặc định 3) */
+                window?: 1 | 3 | 6 | 12;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách (Cache-Control no-store — có họ tên) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPromotionList"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.promotion_rules_missing */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmPromotionCase: {
+        parameters: {
+            query?: {
+                at?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Khóa kỳ '<staff_id>:<nltx|nlth|tnvk>:<khóa>' */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPromoCaseDetail"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.promotion_case_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmPromotionInclude: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmPromoKeysInput"];
+            };
+        };
+        responses: {
+            /** @description Số kỳ đã đổi trạng thái */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPromoChanged"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.promotion_case_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.promotion_conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed (thiếu lý do) */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmPromotionExclude: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmPromoKeysInput"];
+            };
+        };
+        responses: {
+            /** @description Số kỳ đã đổi trạng thái */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPromoChanged"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.promotion_case_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.promotion_conflict */
+            409: components["responses"]["Problem"];
+        };
+    };
+    hrmPromotionPool: {
+        parameters: {
+            query?: {
+                window?: 1 | 3 | 6 | 12;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách chọn (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmNLTHPool"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.promotion_rules_missing */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmPromotionPropose: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    items: {
+                        /** Format: uuid */
+                        staff_id: string;
+                        /**
+                         * Format: uuid
+                         * @description Dòng khen thưởng trong hồ sơ (staff_event kind award)
+                         */
+                        award_event_id: string;
+                    }[];
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Khóa các kỳ NLTH đã lập */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        keys: string[];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.promotion_conflict */
+            409: components["responses"]["Problem"];
+            /** @description hrm.nlth_quota_exceeded | hrm.promotion_export_blocked | validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmPromotionWithdraw: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmPromoKeysInput"];
+            };
+        };
+        responses: {
+            /** @description Số kỳ đã gỡ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPromoChanged"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.promotion_case_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.promotion_conflict */
+            409: components["responses"]["Problem"];
+        };
+    };
+    hrmPromotionExports: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử xuất */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmPromoExportSummary"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmPromotionExport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmPromoExportInput"];
+            };
+        };
+        responses: {
+            /** @description Các tệp đã xuất */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmPromoExported"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.promotion_case_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.promotion_conflict */
+            409: components["responses"]["Problem"];
+            /** @description hrm.promotion_export_blocked | validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmPromotionExportGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lần xuất (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPromoExportDetail"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.promotion_export_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmPromotionExportFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx (Cache-Control no-store) */
+            200: {
+                headers: {
+                    "X-Export-Drift"?: "true" | "false";
+                    "X-Export-Sha256"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.promotion_export_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDecisionList: {
+        parameters: {
+            query?: {
+                year?: number;
+                kind?: components["schemas"]["HrmPromoKind"];
+                issuer?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sổ (Cache-Control no-store — có họ tên) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmDecision"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmDecisionCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description Đã lưu */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** @description Số hồ sơ được ghi bậc mới */
+                        updated: number;
+                        /** @description Số người không có tên trong quyết định */
+                        returned: number;
+                        warnings: string[];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.promotion_export_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.decision_warnings | hrm.decision_stale | hrm.promotion_conflict */
+            409: components["responses"]["Problem"];
+            /** @description hrm.step_out_of_range | validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDecisionBook: {
+        parameters: {
+            query?: {
+                year?: number;
+                kind?: components["schemas"]["HrmPromoKind"];
+                issuer?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmDecisionGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quyết định (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmDecision"];
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.decision_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmDecisionCancel: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã hủy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** @enum {string} */
+                        status: "cancelled";
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.decision_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.decision_cancelled | hrm.decision_cancel_order */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmDecisionFile: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã lưu tệp */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        doc_id: string;
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.decision_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.decision_cancelled */
+            409: components["responses"]["Problem"];
+            /** @description hrm.doc_too_large */
+            413: components["responses"]["Problem"];
+            /** @description hrm.docs_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    hrmRatingList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Xếp loại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmAnnualRating"][];
+                    };
+                };
+            };
+            /** @description forbidden | hrm.records_disabled */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmRatingSet: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    year: number;
+                    /** @enum {string} */
+                    rating: "" | "HTXSNV" | "HTTNV" | "HTNV" | "KHTNV";
+                    /** @enum {string} */
+                    source?: "manual" | "conversion";
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmAnnualRating"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.staff_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed */
             422: components["responses"]["Problem"];
         };
     };
