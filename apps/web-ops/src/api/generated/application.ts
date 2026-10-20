@@ -8884,6 +8884,303 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chương trình, dự án CNTS trong phạm vi (UR-TINH-19, W11.47) */
+        get: operations["extensionCntsProjectList"];
+        put?: never;
+        /** Tạo chương trình, dự án — chủ nhiệm, lãnh đạo phòng Cấp Tỉnh, Admin */
+        post: operations["extensionCntsProjectCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/projects/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết dự án, điểm trình diễn, lịch sử phiên bản */
+        get: operations["extensionCntsProjectGet"];
+        put?: never;
+        /** Sửa dự án (base_version) — chủ nhiệm của dự án, lãnh đạo phòng, Admin (FN-19 BR-01) */
+        post: operations["extensionCntsProjectUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/projects/{ref}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Kết thúc dự án (lý do) */
+        post: operations["extensionCntsProjectClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/projects/{ref}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở lại dự án (lý do) */
+        post: operations["extensionCntsProjectReopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/khtc-programs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách CT/DA chủ của KHTC để gắn dự án (D20, Q-061 giả định) */
+        get: operations["extensionCntsKhtcPrograms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/demo-sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Điểm trình diễn trong phạm vi (Cấp Xã: xã phụ trách) */
+        get: operations["extensionCntsSiteList"];
+        put?: never;
+        /** Thêm điểm trình diễn vào dự án */
+        post: operations["extensionCntsSiteCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/demo-sites/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết điểm, hộ mô hình, lịch sử */
+        get: operations["extensionCntsSiteGet"];
+        put?: never;
+        /** Sửa điểm (base_version) */
+        post: operations["extensionCntsSiteUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/demo-sites/{ref}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đóng điểm (lý do) */
+        post: operations["extensionCntsSiteClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/demo-sites/{ref}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở lại điểm (lý do) */
+        post: operations["extensionCntsSiteReopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/model-households": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hộ mô hình trong phạm vi (UR-XA-04) */
+        get: operations["extensionCntsHouseholdList"];
+        put?: never;
+        /** Thêm hộ mô hình — chủ hộ ghi vào kho định danh, sổ KN chỉ giữ person_ref */
+        post: operations["extensionCntsHouseholdCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/model-households/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết hộ mô hình, lịch sử */
+        get: operations["extensionCntsHouseholdGet"];
+        put?: never;
+        /** Sửa hộ mô hình (base_version; không đổi chủ hộ) */
+        post: operations["extensionCntsHouseholdUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/model-households/{ref}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rút hộ khỏi mô hình (lý do; xóa tọa độ) */
+        post: operations["extensionCntsHouseholdWithdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/model-households/{ref}/reinstate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đưa hộ trở lại mô hình (lý do) */
+        post: operations["extensionCntsHouseholdReinstate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quyền đã cấp trong module CNTS (FN-14) — Cấp Tỉnh/Admin theo tỉnh; mine=true: quyền của tôi */
+        get: operations["extensionCntsGrantList"];
+        put?: never;
+        /** Cấp quyền cán bộ xã, nông hộ: vai, địa bàn, biểu mẫu, hiệu lực (UR-TINH-09) */
+        post: operations["extensionCntsGrantCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/grants/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết quyền và nhật ký thay đổi */
+        get: operations["extensionCntsGrantGet"];
+        put?: never;
+        /** Sửa phạm vi, biểu mẫu, hiệu lực (base_version) */
+        post: operations["extensionCntsGrantUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/grants/{ref}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thu hồi quyền; người nhận việc được cấp quyền cùng phạm vi (FN-14 AC-02) */
+        post: operations["extensionCntsGrantRevoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/grant-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tài khoản Cấp Xã CNTS có thể cấp quyền / làm cán bộ theo dõi */
+        get: operations["extensionCntsGrantCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -18485,6 +18782,570 @@ export interface components {
         };
         KHTCReportExportList: {
             items: components["schemas"]["KHTCReportExport"][];
+        };
+        CNTSPoint: {
+            lat: number;
+            lng: number;
+            /** @enum {string} */
+            source: "gps" | "map";
+        };
+        CNTSProjectVersion: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "closed" | "reopened";
+            province_code: string;
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "tinh" | "knqg" | "hop_tac";
+            basis: string | null;
+            scale_note: string | null;
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            end_date: string | null;
+            budget: string | null;
+            /** Format: uuid */
+            manager_ref: string;
+            /** Format: uuid */
+            program_ref: string | null;
+            training_note: string | null;
+            supplies_note: string | null;
+            attachment_refs: string[];
+            status_reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            actor_display: string | null;
+        };
+        CNTSProject: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "closed" | "reopened";
+            province_code: string;
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "tinh" | "knqg" | "hop_tac";
+            basis: string | null;
+            scale_note: string | null;
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            end_date: string | null;
+            budget: string | null;
+            /** Format: uuid */
+            manager_ref: string;
+            /** Format: uuid */
+            program_ref: string | null;
+            training_note: string | null;
+            supplies_note: string | null;
+            attachment_refs: string[];
+            status_reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            /** @enum {string} */
+            status: "active" | "closed";
+            site_count: number;
+            household_count: number;
+            can_edit: boolean;
+            manager_display: string | null;
+        };
+        CNTSProjectList: {
+            items: components["schemas"]["CNTSProject"][];
+            can_create: boolean;
+        };
+        CNTSKHTCProgram: {
+            /** Format: uuid */
+            ref: string;
+            code: string;
+            name: string;
+            kind: string;
+            active: boolean;
+        };
+        CNTSKHTCProgramList: {
+            items: components["schemas"]["CNTSKHTCProgram"][];
+        };
+        CNTSProjectDetail: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "closed" | "reopened";
+            province_code: string;
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "tinh" | "knqg" | "hop_tac";
+            basis: string | null;
+            scale_note: string | null;
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            end_date: string | null;
+            budget: string | null;
+            /** Format: uuid */
+            manager_ref: string;
+            /** Format: uuid */
+            program_ref: string | null;
+            training_note: string | null;
+            supplies_note: string | null;
+            attachment_refs: string[];
+            status_reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            /** @enum {string} */
+            status: "active" | "closed";
+            site_count: number;
+            household_count: number;
+            can_edit: boolean;
+            manager_display: string | null;
+            sites: components["schemas"]["CNTSSite"][];
+            versions: components["schemas"]["CNTSProjectVersion"][];
+            program: components["schemas"]["CNTSKHTCProgram"] | null;
+        };
+        CNTSProjectSave: {
+            /** Format: uuid */
+            id?: string;
+            base_version?: number;
+            province_code?: string;
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "tinh" | "knqg" | "hop_tac";
+            basis?: string | null;
+            scale_note?: string | null;
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            end_date?: string | null;
+            budget?: string | null;
+            /** Format: uuid */
+            manager_ref?: string | null;
+            /** Format: uuid */
+            program_ref?: string | null;
+            training_note?: string | null;
+            supplies_note?: string | null;
+            attachment_refs?: string[];
+        };
+        CNTSStatusChange: {
+            base_version: number;
+            reason: string;
+        };
+        CNTSSiteVersion: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "closed" | "reopened";
+            /** Format: uuid */
+            project_ref: string;
+            commune_code: string;
+            name: string;
+            model_type_code: string;
+            scale: string | null;
+            /** @enum {string|null} */
+            scale_unit: "con" | "m2" | "m3" | "ha" | "long" | "be" | null;
+            /** Format: uuid */
+            officer_ref: string | null;
+            /** @enum {string|null} */
+            diary_form: "BM-08" | "BM-09" | "BM-19" | null;
+            /** Format: uuid */
+            cooperative_ref: string | null;
+            note: string | null;
+            status_reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            actor_display: string | null;
+        };
+        CNTSSite: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "closed" | "reopened";
+            /** Format: uuid */
+            project_ref: string;
+            commune_code: string;
+            name: string;
+            model_type_code: string;
+            scale: string | null;
+            /** @enum {string|null} */
+            scale_unit: "con" | "m2" | "m3" | "ha" | "long" | "be" | null;
+            /** Format: uuid */
+            officer_ref: string | null;
+            /** @enum {string|null} */
+            diary_form: "BM-08" | "BM-09" | "BM-19" | null;
+            /** Format: uuid */
+            cooperative_ref: string | null;
+            note: string | null;
+            status_reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            project_code: string;
+            project_name: string;
+            /** @enum {string} */
+            status: "active" | "closed";
+            location: components["schemas"]["CNTSPoint"] | null;
+            household_count: number;
+            can_edit: boolean;
+            can_add_households: boolean;
+            officer_display: string | null;
+            model_type_name: string | null;
+        };
+        CNTSSiteList: {
+            items: components["schemas"]["CNTSSite"][];
+        };
+        CNTSSiteDetail: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "closed" | "reopened";
+            /** Format: uuid */
+            project_ref: string;
+            commune_code: string;
+            name: string;
+            model_type_code: string;
+            scale: string | null;
+            /** @enum {string|null} */
+            scale_unit: "con" | "m2" | "m3" | "ha" | "long" | "be" | null;
+            /** Format: uuid */
+            officer_ref: string | null;
+            /** @enum {string|null} */
+            diary_form: "BM-08" | "BM-09" | "BM-19" | null;
+            /** Format: uuid */
+            cooperative_ref: string | null;
+            note: string | null;
+            status_reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            project_code: string;
+            project_name: string;
+            /** @enum {string} */
+            status: "active" | "closed";
+            location: components["schemas"]["CNTSPoint"] | null;
+            household_count: number;
+            can_edit: boolean;
+            can_add_households: boolean;
+            officer_display: string | null;
+            model_type_name: string | null;
+            households: components["schemas"]["CNTSHousehold"][];
+            versions: components["schemas"]["CNTSSiteVersion"][];
+        };
+        CNTSSiteSave: {
+            /** Format: uuid */
+            id?: string;
+            base_version?: number;
+            /** Format: uuid */
+            project_ref?: string;
+            commune_code: string;
+            name: string;
+            model_type_code: string;
+            scale?: string | null;
+            /** @enum {string|null} */
+            scale_unit?: "con" | "m2" | "m3" | "ha" | "long" | "be" | null;
+            /** Format: uuid */
+            officer_ref?: string | null;
+            /** @enum {string|null} */
+            diary_form?: "BM-08" | "BM-09" | "BM-19" | null;
+            /** Format: uuid */
+            cooperative_ref?: string | null;
+            note?: string | null;
+            location?: components["schemas"]["CNTSPoint"] | null;
+            remove_location?: boolean;
+        };
+        CNTSHouseholdVersion: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "withdrawn" | "reinstated";
+            /** Format: uuid */
+            site_ref: string;
+            /** Format: uuid */
+            project_ref: string;
+            commune_code: string;
+            /** Format: uuid */
+            person_ref: string;
+            scale: string | null;
+            /** @enum {string|null} */
+            scale_unit: "con" | "m2" | "m3" | "ha" | "long" | "be" | null;
+            /** @enum {string} */
+            keeper_kind: "officer" | "self";
+            /** Format: uuid */
+            keeper_ref: string | null;
+            self_entry: boolean;
+            /** Format: date */
+            joined_on: string | null;
+            note: string | null;
+            status_reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            actor_display: string | null;
+        };
+        CNTSHousehold: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "withdrawn" | "reinstated";
+            /** Format: uuid */
+            site_ref: string;
+            /** Format: uuid */
+            project_ref: string;
+            commune_code: string;
+            /** Format: uuid */
+            person_ref: string;
+            scale: string | null;
+            /** @enum {string|null} */
+            scale_unit: "con" | "m2" | "m3" | "ha" | "long" | "be" | null;
+            /** @enum {string} */
+            keeper_kind: "officer" | "self";
+            /** Format: uuid */
+            keeper_ref: string | null;
+            self_entry: boolean;
+            /** Format: date */
+            joined_on: string | null;
+            note: string | null;
+            status_reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            site_name: string;
+            project_code: string;
+            /** @enum {string} */
+            status: "active" | "withdrawn";
+            location: components["schemas"]["CNTSPoint"] | null;
+            can_edit: boolean;
+            owner_label: string | null;
+            owner_phone_masked: string | null;
+            keeper_display: string | null;
+        };
+        CNTSHouseholdList: {
+            items: components["schemas"]["CNTSHousehold"][];
+        };
+        CNTSHouseholdDetail: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "withdrawn" | "reinstated";
+            /** Format: uuid */
+            site_ref: string;
+            /** Format: uuid */
+            project_ref: string;
+            commune_code: string;
+            /** Format: uuid */
+            person_ref: string;
+            scale: string | null;
+            /** @enum {string|null} */
+            scale_unit: "con" | "m2" | "m3" | "ha" | "long" | "be" | null;
+            /** @enum {string} */
+            keeper_kind: "officer" | "self";
+            /** Format: uuid */
+            keeper_ref: string | null;
+            self_entry: boolean;
+            /** Format: date */
+            joined_on: string | null;
+            note: string | null;
+            status_reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            site_name: string;
+            project_code: string;
+            /** @enum {string} */
+            status: "active" | "withdrawn";
+            location: components["schemas"]["CNTSPoint"] | null;
+            can_edit: boolean;
+            owner_label: string | null;
+            owner_phone_masked: string | null;
+            keeper_display: string | null;
+            versions: components["schemas"]["CNTSHouseholdVersion"][];
+        };
+        CNTSHouseholdSave: {
+            /** Format: uuid */
+            id?: string;
+            base_version?: number;
+            /** Format: uuid */
+            site_ref?: string;
+            /** Format: uuid */
+            person_ref?: string | null;
+            owner_name?: string | null;
+            owner_phone?: string | null;
+            scale?: string | null;
+            /** @enum {string|null} */
+            scale_unit?: "con" | "m2" | "m3" | "ha" | "long" | "be" | null;
+            /** @enum {string} */
+            keeper_kind?: "officer" | "self";
+            /** Format: uuid */
+            keeper_ref?: string | null;
+            self_entry?: boolean;
+            /** Format: date */
+            joined_on?: string | null;
+            note?: string | null;
+            location?: components["schemas"]["CNTSPoint"] | null;
+            remove_location?: boolean;
+        };
+        CNTSGrantVersion: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "granted" | "updated" | "revoked";
+            /** Format: uuid */
+            grantee_ref: string;
+            /** @enum {string} */
+            role: "tang_cuong" | "ksgm" | "theo_doi_mo_hinh" | "nong_ho";
+            province_code: string;
+            commune_codes: string[];
+            facility_refs: string[];
+            site_refs: string[];
+            household_refs: string[];
+            forms: string[];
+            /** Format: date */
+            valid_from: string;
+            /** Format: date */
+            valid_to: string | null;
+            /** Format: uuid */
+            successor_ref: string | null;
+            /** Format: uuid */
+            successor_grant_ref: string | null;
+            reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            actor_display: string | null;
+        };
+        CNTSGrant: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "granted" | "updated" | "revoked";
+            /** Format: uuid */
+            grantee_ref: string;
+            /** @enum {string} */
+            role: "tang_cuong" | "ksgm" | "theo_doi_mo_hinh" | "nong_ho";
+            province_code: string;
+            commune_codes: string[];
+            facility_refs: string[];
+            site_refs: string[];
+            household_refs: string[];
+            forms: string[];
+            /** Format: date */
+            valid_from: string;
+            /** Format: date */
+            valid_to: string | null;
+            /** Format: uuid */
+            successor_ref: string | null;
+            /** Format: uuid */
+            successor_grant_ref: string | null;
+            reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            /** @enum {string} */
+            status: "active" | "pending" | "expired" | "revoked";
+            can_edit: boolean;
+            grantee_display: string | null;
+            updated_by_display: string | null;
+            successor_display: string | null;
+        };
+        CNTSGrantList: {
+            items: components["schemas"]["CNTSGrant"][];
+            can_grant: boolean;
+        };
+        CNTSGrantDetail: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "granted" | "updated" | "revoked";
+            /** Format: uuid */
+            grantee_ref: string;
+            /** @enum {string} */
+            role: "tang_cuong" | "ksgm" | "theo_doi_mo_hinh" | "nong_ho";
+            province_code: string;
+            commune_codes: string[];
+            facility_refs: string[];
+            site_refs: string[];
+            household_refs: string[];
+            forms: string[];
+            /** Format: date */
+            valid_from: string;
+            /** Format: date */
+            valid_to: string | null;
+            /** Format: uuid */
+            successor_ref: string | null;
+            /** Format: uuid */
+            successor_grant_ref: string | null;
+            reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            /** @enum {string} */
+            status: "active" | "pending" | "expired" | "revoked";
+            can_edit: boolean;
+            grantee_display: string | null;
+            updated_by_display: string | null;
+            successor_display: string | null;
+            versions: components["schemas"]["CNTSGrantVersion"][];
+        };
+        CNTSGrantSave: {
+            base_version?: number;
+            /** Format: uuid */
+            grantee_ref?: string;
+            province_code?: string;
+            /** @enum {string} */
+            role?: "tang_cuong" | "ksgm" | "theo_doi_mo_hinh" | "nong_ho";
+            commune_codes: string[];
+            facility_refs?: string[];
+            site_refs?: string[];
+            household_refs?: string[];
+            forms?: string[];
+            /** Format: date */
+            valid_from?: string;
+            /** Format: date */
+            valid_to?: string | null;
+        };
+        CNTSGrantRevoke: {
+            base_version: number;
+            reason: string;
+            /** Format: uuid */
+            successor_ref?: string | null;
+        };
+        CNTSGrantCandidate: {
+            /** Format: uuid */
+            ref: string;
+            display: string | null;
+            commune_codes: string[];
+        };
+        CNTSGrantCandidateList: {
+            items: components["schemas"]["CNTSGrantCandidate"][];
         };
     };
     responses: {
@@ -36952,6 +37813,912 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KHTCReportDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsProjectList: {
+        parameters: {
+            query?: {
+                status?: "active" | "closed";
+                kind?: "tinh" | "knqg" | "hop_tac";
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSProjectList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsProjectCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSProjectSave"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp (Idempotency-Key) — trả bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSProjectDetail"];
+                };
+            };
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSProjectDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_project_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_project_version_conflict | extension.cnts_project_code_taken | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_project_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsProjectGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSProjectDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_project_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_project_version_conflict | extension.cnts_project_code_taken | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_project_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsProjectUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSProjectSave"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSProjectDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_project_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_project_version_conflict | extension.cnts_project_code_taken | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_project_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsProjectClose: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusChange"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSProjectDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_project_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_project_version_conflict | extension.cnts_project_code_taken | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_project_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsProjectReopen: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusChange"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSProjectDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_project_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_project_version_conflict | extension.cnts_project_code_taken | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_project_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKhtcPrograms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSKHTCProgramList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsSiteList: {
+        parameters: {
+            query?: {
+                project_ref?: string;
+                commune_code?: string;
+                status?: "active" | "closed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSiteList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsSiteCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSSiteSave"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp (Idempotency-Key) — trả bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSiteDetail"];
+                };
+            };
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSiteDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_site_not_found | extension.cnts_project_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_site_version_conflict | extension.cnts_site_closed | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_site_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsSiteGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSiteDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_site_not_found | extension.cnts_project_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_site_version_conflict | extension.cnts_site_closed | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_site_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsSiteUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSSiteSave"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSiteDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_site_not_found | extension.cnts_project_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_site_version_conflict | extension.cnts_site_closed | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_site_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsSiteClose: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusChange"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSiteDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_site_not_found | extension.cnts_project_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_site_version_conflict | extension.cnts_site_closed | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_site_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsSiteReopen: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusChange"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSSiteDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_site_not_found | extension.cnts_project_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_site_version_conflict | extension.cnts_site_closed | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_site_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsHouseholdList: {
+        parameters: {
+            query?: {
+                site_ref?: string;
+                project_ref?: string;
+                commune_code?: string;
+                status?: "active" | "withdrawn";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSHouseholdList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsHouseholdCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSHouseholdSave"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp (Idempotency-Key) — trả bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSHouseholdDetail"];
+                };
+            };
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSHouseholdDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_household_not_found | extension.cnts_site_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_household_version_conflict | extension.cnts_household_exists | extension.cnts_household_withdrawn | extension.cnts_site_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_household_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsHouseholdGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSHouseholdDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_household_not_found | extension.cnts_site_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_household_version_conflict | extension.cnts_household_exists | extension.cnts_household_withdrawn | extension.cnts_site_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_household_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsHouseholdUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSHouseholdSave"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSHouseholdDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_household_not_found | extension.cnts_site_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_household_version_conflict | extension.cnts_household_exists | extension.cnts_household_withdrawn | extension.cnts_site_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_household_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsHouseholdWithdraw: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusChange"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSHouseholdDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_household_not_found | extension.cnts_site_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_household_version_conflict | extension.cnts_household_exists | extension.cnts_household_withdrawn | extension.cnts_site_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_household_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsHouseholdReinstate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusChange"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSHouseholdDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_household_not_found | extension.cnts_site_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_household_version_conflict | extension.cnts_household_exists | extension.cnts_household_withdrawn | extension.cnts_site_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_household_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGrantList: {
+        parameters: {
+            query?: {
+                mine?: true | false;
+                grantee_ref?: string;
+                role?: "tang_cuong" | "ksgm" | "theo_doi_mo_hinh" | "nong_ho";
+                status?: "active" | "pending" | "expired" | "revoked";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSGrantList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGrantCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSGrantSave"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp (Idempotency-Key) — trả bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSGrantDetail"];
+                };
+            };
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSGrantDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_grant_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_grant_version_conflict | extension.cnts_grant_exists | extension.cnts_grant_revoked */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_grant_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGrantGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSGrantDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_grant_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_grant_version_conflict | extension.cnts_grant_exists | extension.cnts_grant_revoked */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_grant_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGrantUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSGrantSave"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSGrantDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_grant_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_grant_version_conflict | extension.cnts_grant_exists | extension.cnts_grant_revoked */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_grant_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGrantRevoke: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSGrantRevoke"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSGrantDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_grant_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_grant_version_conflict | extension.cnts_grant_exists | extension.cnts_grant_revoked */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_grant_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsGrantCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSGrantCandidateList"];
                 };
             };
             400: components["responses"]["Problem"];

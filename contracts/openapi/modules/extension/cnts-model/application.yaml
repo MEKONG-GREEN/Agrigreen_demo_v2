@@ -1,0 +1,678 @@
+paths:
+# @ag-order: 21000
+  /v1/extension/cnts/projects:
+    get:
+      summary: "Chương trình, dự án CNTS trong phạm vi (UR-TINH-19, W11.47)"
+      operationId: extensionCntsProjectList
+      tags: [extension]
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string, enum: [active, closed]}}
+        - {name: kind, in: query, required: false, schema: {type: string, enum: [tinh, knqg, hop_tac]}}
+        - {name: q, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSProjectList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Tạo chương trình, dự án — chủ nhiệm, lãnh đạo phòng Cấp Tỉnh, Admin"
+      operationId: extensionCntsProjectCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSProjectSave"}
+      responses:
+        "200":
+          description: Gọi lặp (Idempotency-Key) — trả bản đã ghi
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSProjectDetail"}
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSProjectDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_project_version_conflict | extension.cnts_project_code_taken | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_project_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21001
+  /v1/extension/cnts/projects/{ref}:
+    get:
+      summary: "Chi tiết dự án, điểm trình diễn, lịch sử phiên bản"
+      operationId: extensionCntsProjectGet
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSProjectDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_project_version_conflict | extension.cnts_project_code_taken | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_project_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Sửa dự án (base_version) — chủ nhiệm của dự án, lãnh đạo phòng, Admin (FN-19 BR-01)"
+      operationId: extensionCntsProjectUpdate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSProjectSave"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSProjectDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_project_version_conflict | extension.cnts_project_code_taken | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_project_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21002
+  /v1/extension/cnts/projects/{ref}/close:
+    post:
+      summary: "Kết thúc dự án (lý do)"
+      operationId: extensionCntsProjectClose
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSStatusChange"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSProjectDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_project_version_conflict | extension.cnts_project_code_taken | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_project_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21003
+  /v1/extension/cnts/projects/{ref}/reopen:
+    post:
+      summary: "Mở lại dự án (lý do)"
+      operationId: extensionCntsProjectReopen
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSStatusChange"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSProjectDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_project_version_conflict | extension.cnts_project_code_taken | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_project_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21004
+  /v1/extension/cnts/khtc-programs:
+    get:
+      summary: "Danh sách CT/DA chủ của KHTC để gắn dự án (D20, Q-061 giả định)"
+      operationId: extensionCntsKhtcPrograms
+      tags: [extension]
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSKHTCProgramList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21005
+  /v1/extension/cnts/demo-sites:
+    get:
+      summary: "Điểm trình diễn trong phạm vi (Cấp Xã: xã phụ trách)"
+      operationId: extensionCntsSiteList
+      tags: [extension]
+      parameters:
+        - {name: project_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: commune_code, in: query, required: false, schema: {type: string}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [active, closed]}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSSiteList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Thêm điểm trình diễn vào dự án"
+      operationId: extensionCntsSiteCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSSiteSave"}
+      responses:
+        "200":
+          description: Gọi lặp (Idempotency-Key) — trả bản đã ghi
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSSiteDetail"}
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSSiteDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_site_not_found | extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_site_version_conflict | extension.cnts_site_closed | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_site_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21006
+  /v1/extension/cnts/demo-sites/{ref}:
+    get:
+      summary: "Chi tiết điểm, hộ mô hình, lịch sử"
+      operationId: extensionCntsSiteGet
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSSiteDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_site_not_found | extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_site_version_conflict | extension.cnts_site_closed | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_site_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Sửa điểm (base_version)"
+      operationId: extensionCntsSiteUpdate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSSiteSave"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSSiteDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_site_not_found | extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_site_version_conflict | extension.cnts_site_closed | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_site_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21007
+  /v1/extension/cnts/demo-sites/{ref}/close:
+    post:
+      summary: "Đóng điểm (lý do)"
+      operationId: extensionCntsSiteClose
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSStatusChange"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSSiteDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_site_not_found | extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_site_version_conflict | extension.cnts_site_closed | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_site_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21008
+  /v1/extension/cnts/demo-sites/{ref}/reopen:
+    post:
+      summary: "Mở lại điểm (lý do)"
+      operationId: extensionCntsSiteReopen
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSStatusChange"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSSiteDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_site_not_found | extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_site_version_conflict | extension.cnts_site_closed | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_site_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21009
+  /v1/extension/cnts/model-households:
+    get:
+      summary: "Hộ mô hình trong phạm vi (UR-XA-04)"
+      operationId: extensionCntsHouseholdList
+      tags: [extension]
+      parameters:
+        - {name: site_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: project_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: commune_code, in: query, required: false, schema: {type: string}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [active, withdrawn]}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSHouseholdList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Thêm hộ mô hình — chủ hộ ghi vào kho định danh, sổ KN chỉ giữ person_ref"
+      operationId: extensionCntsHouseholdCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSHouseholdSave"}
+      responses:
+        "200":
+          description: Gọi lặp (Idempotency-Key) — trả bản đã ghi
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSHouseholdDetail"}
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_household_not_found | extension.cnts_site_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_household_version_conflict | extension.cnts_household_exists | extension.cnts_household_withdrawn | extension.cnts_site_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_household_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21010
+  /v1/extension/cnts/model-households/{ref}:
+    get:
+      summary: "Chi tiết hộ mô hình, lịch sử"
+      operationId: extensionCntsHouseholdGet
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_household_not_found | extension.cnts_site_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_household_version_conflict | extension.cnts_household_exists | extension.cnts_household_withdrawn | extension.cnts_site_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_household_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Sửa hộ mô hình (base_version; không đổi chủ hộ)"
+      operationId: extensionCntsHouseholdUpdate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSHouseholdSave"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_household_not_found | extension.cnts_site_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_household_version_conflict | extension.cnts_household_exists | extension.cnts_household_withdrawn | extension.cnts_site_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_household_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21011
+  /v1/extension/cnts/model-households/{ref}/withdraw:
+    post:
+      summary: "Rút hộ khỏi mô hình (lý do; xóa tọa độ)"
+      operationId: extensionCntsHouseholdWithdraw
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSStatusChange"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_household_not_found | extension.cnts_site_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_household_version_conflict | extension.cnts_household_exists | extension.cnts_household_withdrawn | extension.cnts_site_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_household_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21012
+  /v1/extension/cnts/model-households/{ref}/reinstate:
+    post:
+      summary: "Đưa hộ trở lại mô hình (lý do)"
+      operationId: extensionCntsHouseholdReinstate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSStatusChange"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_household_not_found | extension.cnts_site_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_household_version_conflict | extension.cnts_household_exists | extension.cnts_household_withdrawn | extension.cnts_site_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_household_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21013
+  /v1/extension/cnts/grants:
+    get:
+      summary: "Quyền đã cấp trong module CNTS (FN-14) — Cấp Tỉnh/Admin theo tỉnh; mine=true: quyền của tôi"
+      operationId: extensionCntsGrantList
+      tags: [extension]
+      parameters:
+        - {name: mine, in: query, required: false, schema: {type: string, enum: [true, false]}}
+        - {name: grantee_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: role, in: query, required: false, schema: {type: string, enum: [tang_cuong, ksgm, theo_doi_mo_hinh, nong_ho]}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [active, pending, expired, revoked]}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSGrantList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Cấp quyền cán bộ xã, nông hộ: vai, địa bàn, biểu mẫu, hiệu lực (UR-TINH-09)"
+      operationId: extensionCntsGrantCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSGrantSave"}
+      responses:
+        "200":
+          description: Gọi lặp (Idempotency-Key) — trả bản đã ghi
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSGrantDetail"}
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSGrantDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_grant_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_grant_version_conflict | extension.cnts_grant_exists | extension.cnts_grant_revoked", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_grant_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21014
+  /v1/extension/cnts/grants/{ref}:
+    get:
+      summary: "Chi tiết quyền và nhật ký thay đổi"
+      operationId: extensionCntsGrantGet
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSGrantDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_grant_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_grant_version_conflict | extension.cnts_grant_exists | extension.cnts_grant_revoked", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_grant_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Sửa phạm vi, biểu mẫu, hiệu lực (base_version)"
+      operationId: extensionCntsGrantUpdate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSGrantSave"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSGrantDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_grant_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_grant_version_conflict | extension.cnts_grant_exists | extension.cnts_grant_revoked", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_grant_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21015
+  /v1/extension/cnts/grants/{ref}/revoke:
+    post:
+      summary: "Thu hồi quyền; người nhận việc được cấp quyền cùng phạm vi (FN-14 AC-02)"
+      operationId: extensionCntsGrantRevoke
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSGrantRevoke"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSGrantDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_grant_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_grant_version_conflict | extension.cnts_grant_exists | extension.cnts_grant_revoked", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_grant_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21016
+  /v1/extension/cnts/grant-candidates:
+    get:
+      summary: "Tài khoản Cấp Xã CNTS có thể cấp quyền / làm cán bộ theo dõi"
+      operationId: extensionCntsGrantCandidates
+      tags: [extension]
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSGrantCandidateList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 31000
+    CNTSPoint: {"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"source":{"type":"string","enum":["gps","map"]}},"required":["lat","lng","source"],"additionalProperties":false}
+# @ag-order: 31001
+    CNTSProjectVersion: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"province_code":{"type":"string"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string","enum":["tinh","knqg","hop_tac"]},"basis":{"type":["string","null"]},"scale_note":{"type":["string","null"]},"start_date":{"type":"string","format":"date"},"end_date":{"type":["string","null"],"format":"date"},"budget":{"type":["string","null"]},"manager_ref":{"type":"string","format":"uuid"},"program_ref":{"type":["string","null"],"format":"uuid"},"training_note":{"type":["string","null"]},"supplies_note":{"type":["string","null"]},"attachment_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"actor_display":{"type":["string","null"]}},"required":["ref","event","province_code","code","name","kind","basis","scale_note","start_date","end_date","budget","manager_ref","program_ref","training_note","supplies_note","attachment_refs","status_reason","version","updated_at","updated_by","actor_display"],"additionalProperties":false}
+# @ag-order: 31002
+    CNTSProject: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"province_code":{"type":"string"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string","enum":["tinh","knqg","hop_tac"]},"basis":{"type":["string","null"]},"scale_note":{"type":["string","null"]},"start_date":{"type":"string","format":"date"},"end_date":{"type":["string","null"],"format":"date"},"budget":{"type":["string","null"]},"manager_ref":{"type":"string","format":"uuid"},"program_ref":{"type":["string","null"],"format":"uuid"},"training_note":{"type":["string","null"]},"supplies_note":{"type":["string","null"]},"attachment_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"status":{"type":"string","enum":["active","closed"]},"site_count":{"type":"integer"},"household_count":{"type":"integer"},"can_edit":{"type":"boolean"},"manager_display":{"type":["string","null"]}},"required":["ref","event","province_code","code","name","kind","basis","scale_note","start_date","end_date","budget","manager_ref","program_ref","training_note","supplies_note","attachment_refs","status_reason","version","updated_at","updated_by","status","site_count","household_count","can_edit","manager_display"],"additionalProperties":false}
+# @ag-order: 31003
+    CNTSProjectList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSProject"}},"can_create":{"type":"boolean"}},"required":["items","can_create"],"additionalProperties":false}
+# @ag-order: 31004
+    CNTSKHTCProgram: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string"},"active":{"type":"boolean"}},"required":["ref","code","name","kind","active"],"additionalProperties":false}
+# @ag-order: 31005
+    CNTSKHTCProgramList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSKHTCProgram"}}},"required":["items"],"additionalProperties":false}
+# @ag-order: 31006
+    CNTSProjectDetail: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"province_code":{"type":"string"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string","enum":["tinh","knqg","hop_tac"]},"basis":{"type":["string","null"]},"scale_note":{"type":["string","null"]},"start_date":{"type":"string","format":"date"},"end_date":{"type":["string","null"],"format":"date"},"budget":{"type":["string","null"]},"manager_ref":{"type":"string","format":"uuid"},"program_ref":{"type":["string","null"],"format":"uuid"},"training_note":{"type":["string","null"]},"supplies_note":{"type":["string","null"]},"attachment_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"status":{"type":"string","enum":["active","closed"]},"site_count":{"type":"integer"},"household_count":{"type":"integer"},"can_edit":{"type":"boolean"},"manager_display":{"type":["string","null"]},"sites":{"type":"array","items":{"$ref":"#/components/schemas/CNTSSite"}},"versions":{"type":"array","items":{"$ref":"#/components/schemas/CNTSProjectVersion"}},"program":{"anyOf":[{"$ref":"#/components/schemas/CNTSKHTCProgram"},{"type":"null"}]}},"required":["ref","event","province_code","code","name","kind","basis","scale_note","start_date","end_date","budget","manager_ref","program_ref","training_note","supplies_note","attachment_refs","status_reason","version","updated_at","updated_by","status","site_count","household_count","can_edit","manager_display","sites","versions","program"],"additionalProperties":false}
+# @ag-order: 31007
+    CNTSProjectSave: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"base_version":{"type":"integer"},"province_code":{"type":"string"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string","enum":["tinh","knqg","hop_tac"]},"basis":{"type":["string","null"]},"scale_note":{"type":["string","null"]},"start_date":{"type":"string","format":"date"},"end_date":{"type":["string","null"],"format":"date"},"budget":{"type":["string","null"]},"manager_ref":{"type":["string","null"],"format":"uuid"},"program_ref":{"type":["string","null"],"format":"uuid"},"training_note":{"type":["string","null"]},"supplies_note":{"type":["string","null"]},"attachment_refs":{"type":"array","items":{"type":"string","format":"uuid"}}},"required":["code","name","kind","start_date"],"additionalProperties":false}
+# @ag-order: 31008
+    CNTSStatusChange: {"type":"object","properties":{"base_version":{"type":"integer"},"reason":{"type":"string"}},"required":["base_version","reason"],"additionalProperties":false}
+# @ag-order: 31009
+    CNTSSiteVersion: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"project_ref":{"type":"string","format":"uuid"},"commune_code":{"type":"string"},"name":{"type":"string"},"model_type_code":{"type":"string"},"scale":{"type":["string","null"]},"scale_unit":{"type":["string","null"],"enum":["con","m2","m3","ha","long","be",null]},"officer_ref":{"type":["string","null"],"format":"uuid"},"diary_form":{"type":["string","null"],"enum":["BM-08","BM-09","BM-19",null]},"cooperative_ref":{"type":["string","null"],"format":"uuid"},"note":{"type":["string","null"]},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"actor_display":{"type":["string","null"]}},"required":["ref","event","project_ref","commune_code","name","model_type_code","scale","scale_unit","officer_ref","diary_form","cooperative_ref","note","status_reason","version","updated_at","updated_by","actor_display"],"additionalProperties":false}
+# @ag-order: 31010
+    CNTSSite: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"project_ref":{"type":"string","format":"uuid"},"commune_code":{"type":"string"},"name":{"type":"string"},"model_type_code":{"type":"string"},"scale":{"type":["string","null"]},"scale_unit":{"type":["string","null"],"enum":["con","m2","m3","ha","long","be",null]},"officer_ref":{"type":["string","null"],"format":"uuid"},"diary_form":{"type":["string","null"],"enum":["BM-08","BM-09","BM-19",null]},"cooperative_ref":{"type":["string","null"],"format":"uuid"},"note":{"type":["string","null"]},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"project_code":{"type":"string"},"project_name":{"type":"string"},"status":{"type":"string","enum":["active","closed"]},"location":{"anyOf":[{"$ref":"#/components/schemas/CNTSPoint"},{"type":"null"}]},"household_count":{"type":"integer"},"can_edit":{"type":"boolean"},"can_add_households":{"type":"boolean"},"officer_display":{"type":["string","null"]},"model_type_name":{"type":["string","null"]}},"required":["ref","event","project_ref","commune_code","name","model_type_code","scale","scale_unit","officer_ref","diary_form","cooperative_ref","note","status_reason","version","updated_at","updated_by","project_code","project_name","status","location","household_count","can_edit","can_add_households","officer_display","model_type_name"],"additionalProperties":false}
+# @ag-order: 31011
+    CNTSSiteList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSSite"}}},"required":["items"],"additionalProperties":false}
+# @ag-order: 31012
+    CNTSSiteDetail: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"project_ref":{"type":"string","format":"uuid"},"commune_code":{"type":"string"},"name":{"type":"string"},"model_type_code":{"type":"string"},"scale":{"type":["string","null"]},"scale_unit":{"type":["string","null"],"enum":["con","m2","m3","ha","long","be",null]},"officer_ref":{"type":["string","null"],"format":"uuid"},"diary_form":{"type":["string","null"],"enum":["BM-08","BM-09","BM-19",null]},"cooperative_ref":{"type":["string","null"],"format":"uuid"},"note":{"type":["string","null"]},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"project_code":{"type":"string"},"project_name":{"type":"string"},"status":{"type":"string","enum":["active","closed"]},"location":{"anyOf":[{"$ref":"#/components/schemas/CNTSPoint"},{"type":"null"}]},"household_count":{"type":"integer"},"can_edit":{"type":"boolean"},"can_add_households":{"type":"boolean"},"officer_display":{"type":["string","null"]},"model_type_name":{"type":["string","null"]},"households":{"type":"array","items":{"$ref":"#/components/schemas/CNTSHousehold"}},"versions":{"type":"array","items":{"$ref":"#/components/schemas/CNTSSiteVersion"}}},"required":["ref","event","project_ref","commune_code","name","model_type_code","scale","scale_unit","officer_ref","diary_form","cooperative_ref","note","status_reason","version","updated_at","updated_by","project_code","project_name","status","location","household_count","can_edit","can_add_households","officer_display","model_type_name","households","versions"],"additionalProperties":false}
+# @ag-order: 31013
+    CNTSSiteSave: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"base_version":{"type":"integer"},"project_ref":{"type":"string","format":"uuid"},"commune_code":{"type":"string"},"name":{"type":"string"},"model_type_code":{"type":"string"},"scale":{"type":["string","null"]},"scale_unit":{"type":["string","null"],"enum":["con","m2","m3","ha","long","be",null]},"officer_ref":{"type":["string","null"],"format":"uuid"},"diary_form":{"type":["string","null"],"enum":["BM-08","BM-09","BM-19",null]},"cooperative_ref":{"type":["string","null"],"format":"uuid"},"note":{"type":["string","null"]},"location":{"anyOf":[{"$ref":"#/components/schemas/CNTSPoint"},{"type":"null"}]},"remove_location":{"type":"boolean"}},"required":["commune_code","name","model_type_code"],"additionalProperties":false}
+# @ag-order: 31014
+    CNTSHouseholdVersion: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","withdrawn","reinstated"]},"site_ref":{"type":"string","format":"uuid"},"project_ref":{"type":"string","format":"uuid"},"commune_code":{"type":"string"},"person_ref":{"type":"string","format":"uuid"},"scale":{"type":["string","null"]},"scale_unit":{"type":["string","null"],"enum":["con","m2","m3","ha","long","be",null]},"keeper_kind":{"type":"string","enum":["officer","self"]},"keeper_ref":{"type":["string","null"],"format":"uuid"},"self_entry":{"type":"boolean"},"joined_on":{"type":["string","null"],"format":"date"},"note":{"type":["string","null"]},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"actor_display":{"type":["string","null"]}},"required":["ref","event","site_ref","project_ref","commune_code","person_ref","scale","scale_unit","keeper_kind","keeper_ref","self_entry","joined_on","note","status_reason","version","updated_at","updated_by","actor_display"],"additionalProperties":false}
+# @ag-order: 31015
+    CNTSHousehold: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","withdrawn","reinstated"]},"site_ref":{"type":"string","format":"uuid"},"project_ref":{"type":"string","format":"uuid"},"commune_code":{"type":"string"},"person_ref":{"type":"string","format":"uuid"},"scale":{"type":["string","null"]},"scale_unit":{"type":["string","null"],"enum":["con","m2","m3","ha","long","be",null]},"keeper_kind":{"type":"string","enum":["officer","self"]},"keeper_ref":{"type":["string","null"],"format":"uuid"},"self_entry":{"type":"boolean"},"joined_on":{"type":["string","null"],"format":"date"},"note":{"type":["string","null"]},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"site_name":{"type":"string"},"project_code":{"type":"string"},"status":{"type":"string","enum":["active","withdrawn"]},"location":{"anyOf":[{"$ref":"#/components/schemas/CNTSPoint"},{"type":"null"}]},"can_edit":{"type":"boolean"},"owner_label":{"type":["string","null"]},"owner_phone_masked":{"type":["string","null"]},"keeper_display":{"type":["string","null"]}},"required":["ref","event","site_ref","project_ref","commune_code","person_ref","scale","scale_unit","keeper_kind","keeper_ref","self_entry","joined_on","note","status_reason","version","updated_at","updated_by","site_name","project_code","status","location","can_edit","owner_label","owner_phone_masked","keeper_display"],"additionalProperties":false}
+# @ag-order: 31016
+    CNTSHouseholdList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSHousehold"}}},"required":["items"],"additionalProperties":false}
+# @ag-order: 31017
+    CNTSHouseholdDetail: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","withdrawn","reinstated"]},"site_ref":{"type":"string","format":"uuid"},"project_ref":{"type":"string","format":"uuid"},"commune_code":{"type":"string"},"person_ref":{"type":"string","format":"uuid"},"scale":{"type":["string","null"]},"scale_unit":{"type":["string","null"],"enum":["con","m2","m3","ha","long","be",null]},"keeper_kind":{"type":"string","enum":["officer","self"]},"keeper_ref":{"type":["string","null"],"format":"uuid"},"self_entry":{"type":"boolean"},"joined_on":{"type":["string","null"],"format":"date"},"note":{"type":["string","null"]},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"site_name":{"type":"string"},"project_code":{"type":"string"},"status":{"type":"string","enum":["active","withdrawn"]},"location":{"anyOf":[{"$ref":"#/components/schemas/CNTSPoint"},{"type":"null"}]},"can_edit":{"type":"boolean"},"owner_label":{"type":["string","null"]},"owner_phone_masked":{"type":["string","null"]},"keeper_display":{"type":["string","null"]},"versions":{"type":"array","items":{"$ref":"#/components/schemas/CNTSHouseholdVersion"}}},"required":["ref","event","site_ref","project_ref","commune_code","person_ref","scale","scale_unit","keeper_kind","keeper_ref","self_entry","joined_on","note","status_reason","version","updated_at","updated_by","site_name","project_code","status","location","can_edit","owner_label","owner_phone_masked","keeper_display","versions"],"additionalProperties":false}
+# @ag-order: 31018
+    CNTSHouseholdSave: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"base_version":{"type":"integer"},"site_ref":{"type":"string","format":"uuid"},"person_ref":{"type":["string","null"],"format":"uuid"},"owner_name":{"type":["string","null"]},"owner_phone":{"type":["string","null"]},"scale":{"type":["string","null"]},"scale_unit":{"type":["string","null"],"enum":["con","m2","m3","ha","long","be",null]},"keeper_kind":{"type":"string","enum":["officer","self"]},"keeper_ref":{"type":["string","null"],"format":"uuid"},"self_entry":{"type":"boolean"},"joined_on":{"type":["string","null"],"format":"date"},"note":{"type":["string","null"]},"location":{"anyOf":[{"$ref":"#/components/schemas/CNTSPoint"},{"type":"null"}]},"remove_location":{"type":"boolean"}},"required":[],"additionalProperties":false}
+# @ag-order: 31019
+    CNTSGrantVersion: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["granted","updated","revoked"]},"grantee_ref":{"type":"string","format":"uuid"},"role":{"type":"string","enum":["tang_cuong","ksgm","theo_doi_mo_hinh","nong_ho"]},"province_code":{"type":"string"},"commune_codes":{"type":"array","items":{"type":"string"}},"facility_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"site_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"household_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"forms":{"type":"array","items":{"type":"string"}},"valid_from":{"type":"string","format":"date"},"valid_to":{"type":["string","null"],"format":"date"},"successor_ref":{"type":["string","null"],"format":"uuid"},"successor_grant_ref":{"type":["string","null"],"format":"uuid"},"reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"actor_display":{"type":["string","null"]}},"required":["ref","event","grantee_ref","role","province_code","commune_codes","facility_refs","site_refs","household_refs","forms","valid_from","valid_to","successor_ref","successor_grant_ref","reason","version","updated_at","updated_by","actor_display"],"additionalProperties":false}
+# @ag-order: 31020
+    CNTSGrant: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["granted","updated","revoked"]},"grantee_ref":{"type":"string","format":"uuid"},"role":{"type":"string","enum":["tang_cuong","ksgm","theo_doi_mo_hinh","nong_ho"]},"province_code":{"type":"string"},"commune_codes":{"type":"array","items":{"type":"string"}},"facility_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"site_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"household_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"forms":{"type":"array","items":{"type":"string"}},"valid_from":{"type":"string","format":"date"},"valid_to":{"type":["string","null"],"format":"date"},"successor_ref":{"type":["string","null"],"format":"uuid"},"successor_grant_ref":{"type":["string","null"],"format":"uuid"},"reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"status":{"type":"string","enum":["active","pending","expired","revoked"]},"can_edit":{"type":"boolean"},"grantee_display":{"type":["string","null"]},"updated_by_display":{"type":["string","null"]},"successor_display":{"type":["string","null"]}},"required":["ref","event","grantee_ref","role","province_code","commune_codes","facility_refs","site_refs","household_refs","forms","valid_from","valid_to","successor_ref","successor_grant_ref","reason","version","updated_at","updated_by","status","can_edit","grantee_display","updated_by_display","successor_display"],"additionalProperties":false}
+# @ag-order: 31021
+    CNTSGrantList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSGrant"}},"can_grant":{"type":"boolean"}},"required":["items","can_grant"],"additionalProperties":false}
+# @ag-order: 31022
+    CNTSGrantDetail: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["granted","updated","revoked"]},"grantee_ref":{"type":"string","format":"uuid"},"role":{"type":"string","enum":["tang_cuong","ksgm","theo_doi_mo_hinh","nong_ho"]},"province_code":{"type":"string"},"commune_codes":{"type":"array","items":{"type":"string"}},"facility_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"site_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"household_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"forms":{"type":"array","items":{"type":"string"}},"valid_from":{"type":"string","format":"date"},"valid_to":{"type":["string","null"],"format":"date"},"successor_ref":{"type":["string","null"],"format":"uuid"},"successor_grant_ref":{"type":["string","null"],"format":"uuid"},"reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"status":{"type":"string","enum":["active","pending","expired","revoked"]},"can_edit":{"type":"boolean"},"grantee_display":{"type":["string","null"]},"updated_by_display":{"type":["string","null"]},"successor_display":{"type":["string","null"]},"versions":{"type":"array","items":{"$ref":"#/components/schemas/CNTSGrantVersion"}}},"required":["ref","event","grantee_ref","role","province_code","commune_codes","facility_refs","site_refs","household_refs","forms","valid_from","valid_to","successor_ref","successor_grant_ref","reason","version","updated_at","updated_by","status","can_edit","grantee_display","updated_by_display","successor_display","versions"],"additionalProperties":false}
+# @ag-order: 31023
+    CNTSGrantSave: {"type":"object","properties":{"base_version":{"type":"integer"},"grantee_ref":{"type":"string","format":"uuid"},"province_code":{"type":"string"},"role":{"type":"string","enum":["tang_cuong","ksgm","theo_doi_mo_hinh","nong_ho"]},"commune_codes":{"type":"array","items":{"type":"string"}},"facility_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"site_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"household_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"forms":{"type":"array","items":{"type":"string"}},"valid_from":{"type":"string","format":"date"},"valid_to":{"type":["string","null"],"format":"date"}},"required":["commune_codes"],"additionalProperties":false}
+# @ag-order: 31024
+    CNTSGrantRevoke: {"type":"object","properties":{"base_version":{"type":"integer"},"reason":{"type":"string"},"successor_ref":{"type":["string","null"],"format":"uuid"}},"required":["base_version","reason"],"additionalProperties":false}
+# @ag-order: 31025
+    CNTSGrantCandidate: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"display":{"type":["string","null"]},"commune_codes":{"type":"array","items":{"type":"string"}}},"required":["ref","display","commune_codes"],"additionalProperties":false}
+# @ag-order: 31026
+    CNTSGrantCandidateList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSGrantCandidate"}}},"required":["items"],"additionalProperties":false}

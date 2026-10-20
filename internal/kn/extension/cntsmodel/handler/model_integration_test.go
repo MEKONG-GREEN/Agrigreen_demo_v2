@@ -434,7 +434,9 @@ func TestCNTSModel_W1147(t *testing.T) {
 		"extension.cnts_site_closed", "hộ của dự án đã kết thúc")
 
 	// ADR-0055, Q-KNS-04: KN không ghi dữ liệu HTX.
-	if n := f.count(`SELECT (SELECT count(*) FROM pf_coop.household WHERE tenant_id = $1) + (SELECT count(*) FROM pf_coop.cooperative WHERE tenant_id = $1)`, f.tenant); n != 0 {
+	// Đọc qua công bố pf_cooperative_pub (knboundary: mã KN không nhắc bảng pf_coop).
+	if n := f.count(`SELECT (SELECT count(*) FROM pf_cooperative_pub.v1_cooperatives WHERE tenant_id = $1) +
+	    (SELECT count(*) FROM pf_cooperative_pub.v1_plots WHERE tenant_id = $1)`, f.tenant); n != 0 {
 		t.Fatalf("KN đã ghi dữ liệu HTX: %d", n)
 	}
 }
