@@ -272,4 +272,6 @@ func (r *renderer) columns(b Block) error {
 }
 
 // Title là khối tiêu đề văn bản chuẩn (đậm, giữa, 14pt) — tiện cho bên dựng mẫu.
-func Title(text string) Block { return Block{Kind: KindParagraph, Text: text, Align: AlignCenter, Bold: true} }
+func Title(text string) Block {
+	return Block{Kind: KindParagraph, Text: text, Align: AlignCenter, Bold: true}
+}
