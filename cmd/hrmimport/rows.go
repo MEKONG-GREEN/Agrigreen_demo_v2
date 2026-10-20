@@ -533,8 +533,13 @@ func (c *converter) grade(r *Row, tr tabular.Row, ev func(string, string, map[st
 		return
 	}
 	p := map[string]string{"grade": it.Code, "step": fmt.Sprint(step)}
+	from := since
 	if since != "" {
 		p["step_since"] = since
+	} else {
+		// Tệp ghi bậc HIỆN HƯỞNG: hiệu lực tại ngày chốt (bảng hệ số có ngày hiệu lực — ngày vào làm có thể trước bảng).
+		from = c.asOf
+		r.add(LevelWarn, "step_since", "Thiếu ngày xếp bậc — tạm dùng ngày chốt; cần bổ sung để tính mốc nâng bậc (Q-069)")
 	}
 	if rc := c.cell(tr, "reserved_coeff"); rc != "" {
 		if v, ok := normCoeff(rc); ok {
@@ -543,7 +548,7 @@ func (c *converter) grade(r *Row, tr tabular.Row, ev func(string, string, map[st
 			r.add(LevelError, "reserved_coeff", "Hệ số bảo lưu %q không đọc được", rc)
 		}
 	}
-	ev("grade", since, p)
+	ev("grade", from, p)
 }
 
 // degree dựng văn bằng (HS-24).
