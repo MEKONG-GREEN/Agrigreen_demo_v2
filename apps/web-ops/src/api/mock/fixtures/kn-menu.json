@@ -483,6 +483,15 @@
         "children": []
        },
        {
+        "key": "tinh.chung.ke_hoach_phong",
+        "label": "Kế hoạch của phòng",
+        "route": "/kn/nhan-su/ke-hoach-phong",
+        "icon": "calendar",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
         "key": "tinh.chung.dashboard_nhan_su",
         "label": "Dashboard nhân sự",
         "route": "/kn/nhan-su/dashboard",
@@ -1192,6 +1201,15 @@
         "label": "Nhân sự của phòng",
         "route": "/kn/nhan-su/cua-phong",
         "icon": "users",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chung.ke_hoach_phong",
+        "label": "Kế hoạch của phòng",
+        "route": "/kn/nhan-su/ke-hoach-phong",
+        "icon": "calendar",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -2034,6 +2052,15 @@
         "children": []
        },
        {
+        "key": "tinh.chung.ke_hoach_phong",
+        "label": "Kế hoạch của phòng",
+        "route": "/kn/nhan-su/ke-hoach-phong",
+        "icon": "calendar",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
         "key": "tinh.chung.dashboard_nhan_su",
         "label": "Dashboard nhân sự",
         "route": "/kn/nhan-su/dashboard",
@@ -2550,6 +2577,15 @@
         "label": "Nhân sự của phòng",
         "route": "/kn/nhan-su/cua-phong",
         "icon": "users",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chung.ke_hoach_phong",
+        "label": "Kế hoạch của phòng",
+        "route": "/kn/nhan-su/ke-hoach-phong",
+        "icon": "calendar",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -3075,6 +3111,15 @@
         "children": []
        },
        {
+        "key": "tinh.chung.ke_hoach_phong",
+        "label": "Kế hoạch của phòng",
+        "route": "/kn/nhan-su/ke-hoach-phong",
+        "icon": "calendar",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
         "key": "tinh.chung.dashboard_nhan_su",
         "label": "Dashboard nhân sự",
         "route": "/kn/nhan-su/dashboard",
@@ -3455,6 +3500,15 @@
         "children": []
        },
        {
+        "key": "tinh.hcth.ke_hoach",
+        "label": "Kế hoạch nhân lực năm",
+        "route": "/kn/nhan-su/ke-hoach",
+        "icon": "calendar",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
         "key": "tinh.hcth.danh_gia",
         "label": "Đánh giá",
         "route": "/kn/nhan-su/danh-gia",
@@ -3601,6 +3655,15 @@
         "label": "Nhân sự của phòng",
         "route": "/kn/nhan-su/cua-phong",
         "icon": "users",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chung.ke_hoach_phong",
+        "label": "Kế hoạch của phòng",
+        "route": "/kn/nhan-su/ke-hoach-phong",
+        "icon": "calendar",
         "badge_source": null,
         "enabled": true,
         "children": []

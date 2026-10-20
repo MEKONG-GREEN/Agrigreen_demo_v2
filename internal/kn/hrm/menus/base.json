@@ -147,6 +147,17 @@
                 "Children": null
               },
               {
+                "Key": "tinh.hcth.ke_hoach",
+                "Label": "Kế hoạch nhân lực năm",
+                "Route": "/kn/nhan-su/ke-hoach",
+                "Icon": "calendar",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
                 "Key": "tinh.hcth.danh_gia",
                 "Label": "Đánh giá",
                 "Route": "/kn/nhan-su/danh-gia",
@@ -398,6 +409,17 @@
           "Label": "Nhân sự của phòng",
           "Route": "/kn/nhan-su/cua-phong",
           "Icon": "users",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "manager",
+          "Children": null
+        },
+        {
+          "Key": "tinh.chung.ke_hoach_phong",
+          "Label": "Kế hoạch của phòng",
+          "Route": "/kn/nhan-su/ke-hoach-phong",
+          "Icon": "calendar",
           "BadgeSource": "",
           "Requires": null,
           "ComingSoon": false,

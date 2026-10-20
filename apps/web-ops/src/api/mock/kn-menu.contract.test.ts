@@ -175,7 +175,7 @@ describe("kn.menu/v6 (BF-MENU #98, R-A6): menu theo Update prototype và hình k
       expect.arrayContaining(["dieu_hanh:xa.bao_gia.nhap", "dieu_hanh:xa.bao_gia.xac_minh", "bao_cao:xa.bao_gia.bang_gia", "du_lieu:xa.bao_gia.lich_su"]),
     );
     expect(leaves("kn_tinh/hanh_chinh_tong_hop")).toEqual(
-      expect.arrayContaining(["dieu_hanh:tinh.hcth.dashboard", "dieu_hanh:tinh.hcth.nang_bac", "dieu_hanh:tinh.hcth.quyet_dinh_nang_bac", "bao_cao:tinh.hcth.bao_cao_so",
+      expect.arrayContaining(["dieu_hanh:tinh.hcth.dashboard", "dieu_hanh:tinh.hcth.nang_bac", "dieu_hanh:tinh.hcth.quyet_dinh_nang_bac", "dieu_hanh:tinh.hcth.ke_hoach" /* W11.27 */, "bao_cao:tinh.hcth.bao_cao_so",
         "du_lieu:tinh.hcth.ho_so", "du_lieu:tinh.hcth.kho_tai_lieu", "du_lieu:tinh.hcth.danh_muc"]),
     );
     expect(groupsOf("kn_tinh/ke_hoach_tai_chinh")["Dữ liệu"]).toEqual(["Số liệu nguồn ngoài*", "Quy trình, văn bản"]);

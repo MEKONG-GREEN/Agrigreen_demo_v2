@@ -734,6 +734,12 @@ const SHARED_BY_AUDIENCE: Partial<Record<KnRole, Item[]>> = {
       "icon": "users"
     },
     {
+      "key": "tinh.chung.ke_hoach_phong",
+      "label": "Kế hoạch của phòng",
+      "route": "/kn/nhan-su/ke-hoach-phong",
+      "icon": "calendar"
+    },
+    {
       "key": "tinh.chung.dashboard_nhan_su",
       "label": "Dashboard nhân sự",
       "route": "/kn/nhan-su/dashboard",
@@ -1692,6 +1698,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "label": "Quyết định nâng bậc",
             "route": "/kn/nhan-su/quyet-dinh-nang-bac",
             "icon": "journal"
+          },
+          {
+            "key": "tinh.hcth.ke_hoach",
+            "label": "Kế hoạch nhân lực năm",
+            "route": "/kn/nhan-su/ke-hoach",
+            "icon": "calendar"
           },
           {
             "key": "tinh.hcth.danh_gia",

@@ -75,6 +75,7 @@ Issue #98, xếp chồng trên #76 (`knsplit2-menu-kn`). Nguồn: PRD `kn-bugfix
 | Báo giá TW | Báo cáo | khung TW + Bảng giá tổng hợp; Dashboard theo vùng; Báo cáo biến động giá; Giá thành sản xuất (Sắp có) | `/kn/bao-gia/…` | như trước |
 | Báo giá xã | Điều hành / Báo cáo / Dữ liệu | khung chung + Nhập báo giá, Yêu cầu xác minh / Bảng giá tổng hợp, Báo cáo biến động giá / Lịch sử báo giá | `/kn/bao-gia/nhap`, `/xac-minh` / `/bang-gia`, `/bien-dong` / `/lich-su` | Có màn |
 | HCTH tỉnh | Điều hành | khung chung + Dashboard nhân sự; Danh sách nâng bậc; Quyết định nâng bậc; Đánh giá (Sắp có) | `/kn/nhan-su/dashboard`, `/nang-bac`, `/quyet-dinh-nang-bac`, `/danh-gia` | như trước |
+| HCTH tỉnh (W11.27) | Điều hành | Kế hoạch nhân lực năm (sau Quyết định nâng bậc); Dùng chung: Kế hoạch của phòng (Lãnh đạo phòng mọi phòng, như trước) | `/kn/nhan-su/ke-hoach`; `/kn/nhan-su/ke-hoach-phong` | Có màn |
 | HCTH tỉnh | Báo cáo | khung chung + Biểu mẫu báo cáo Sở | `/kn/nhan-su/bao-cao-so` | Có màn |
 | HCTH tỉnh | Dữ liệu | Hồ sơ nhân sự; Hồ sơ dữ liệu; Danh mục nhân sự | `/kn/nhan-su/ho-so`, `/kho-tai-lieu`, `/danh-muc` | Có màn |
 | HCTH xã | Điều hành | khung chung + Đánh giá của tôi | `/kn/nhan-su/danh-gia-cua-toi` | Sắp có |
