@@ -56,6 +56,7 @@ func TestBuildBindsOwnedSessionThroughHTTP(t *testing.T) {
 	issuer := authztest.New(t)
 	engine := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	rg := engine.Group("/v1", httpx.Authenticate(issuer.Verifier()), mods.Accounts.Middleware())
+	mods.Accounts.RegisterApp(rg)
 	rg.GET("/session-probe", func(c *gin.Context) {
 		ctx := c.Request.Context()
 		p, ok := authz.FromContext(ctx)
@@ -115,6 +116,16 @@ func TestBuildBindsOwnedSessionThroughHTTP(t *testing.T) {
 			t.Fatal(err)
 		}
 		return res.StatusCode, body
+	}
+	// A valid bound Admin has no unit; even a populated token org cannot
+	// become an implicit owner unit. This also verifies Build injected policy.
+	unitRequest := httptest.NewRequest(http.MethodGet, "/v1/internal-units", nil)
+	unitRequest.Header.Set("Authorization", "Bearer "+issuer.Sign(t, authztest.Token{Subject: actor, TenantID: tid, OrgRef: tokenOrg, Roles: []string{"kn_user"}, MFA: true}))
+	unitRequest.Header.Set(authz.ContextHeader, selected.String())
+	unitResponse := httptest.NewRecorder()
+	engine.ServeHTTP(unitResponse, unitRequest)
+	if unitResponse.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("owner default unit: %d %s", unitResponse.Code, unitResponse.Body.String())
 	}
 	status, body := request(actor, tid, true, true)
 	if status != http.StatusOK || body["owner_role"] != extport.SessionRoleAdmin || body["profile"] != "kn" || body["session"] != selected.String() || body["node"] != "" || body["actor"] != actor.String() || body["db_actor"] != actor.String() || body["tenant"] != tid.String() || body["db_tenant"] != tid.String() || body["org"] != tokenOrg.String() || body["mfa"] != true || body["kn_user"] != true || body["kn_officer"] != false {

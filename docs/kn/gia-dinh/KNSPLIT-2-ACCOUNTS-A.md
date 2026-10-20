@@ -5,3 +5,7 @@ Gói chuyển hai điểm lấy quyền từ Principal.KN trong accounts sang ca
 Nhật ký thiếu chủ/hỗ trợ vẫn403; attempted/completed, trace, lý do đã được middleware kiểm, ledger/idempotency/API không đổi. Đơn vị đọc tường minh giữ lựa chọn trong tenant; resolver lỗi là kết quả cuối kể cả có query. KN bound UnitRef rỗng không quay về token OrgRef; trả validation. Native thật không có selected/legacy giữ đường tổ tiên OrgRef. Callback chưa cấu hình mà có selected owner bị403. Legacy hiện diện ở adapter KN chỉ dùng để từ chối binding thiếu, không cấp quyền.
 
 Không sửa issuance/context/nav/attrs/delegation, job schedule, DDL/ACL/API/35 golden. Không đổi quyết định PO tenant từng Trung tâm tỉnh, MRV HTX/MKG, D2 chỉ hồ sơ KN, mẫu KHTC nạp sẵn, M1–M7. Kiểm thử nguồn/kernel generic fixture và public-root owner/PG sẽ ghi bằng chứng thực; chưa coi compile hoặc SKIP là PASS.
+
+### Rà soát hai làn
+
+Đã đọc TWO-AGENT.md và issue cha KNSPLIT-REST #47 (agent:codex/lane:shared). Adapter duy nhất `internal/kn/extension/module_account_session_policy.go` cùng tài liệu KN là phần vượt làn cần ticket ngoại lệ/Claude Review OK trước tích hợp. Chỉ xây dựng local đủ reviewable theo phân công; agent không claim/comment/ready/push/merge, không bypass AG_INTEGRATION_LOCK. Root xử lý ticket và review chéo. Không sửa các file KN khác, nav/attrs/J.
