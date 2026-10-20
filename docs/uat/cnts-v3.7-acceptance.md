@@ -120,3 +120,17 @@ luồng trình duyệt chưa có Playwright.
 
 Chưa nghiệm thu: AC-01 FN-17 (500 người dùng, < 5 giây trên 3G — cần đo tải trên môi trường triển khai), chỉ số tổng đàn/tiêm
 phòng/KSGM tuần trên trang chủ, bộ lọc kỳ/khu vực/lĩnh vực, Nông hộ xem quy trình trên Mobile (W11.55).
+
+## Chiến dịch điều tra W11.50
+
+Nguồn và giới hạn: [giả định W11.50](../kn/gia-dinh/W11.50.md) (chờ Q-058 — theo prototype).
+
+| Tiêu chí | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| FN-21 B1–B2: tạo đợt Nháp (tên, mục tiêu, lĩnh vực, biểu, phạm vi xã, thời gian, hạn), sửa nháp thành phiên bản mới, xem trước số việc, phát hành thành kỳ native `kn_cnts` loại `adhoc`; Cấp Xã thấy việc (UR-XA-14) | `TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150`; Vitest `src/kn/cnts/campaign/campaign.test.ts` | G1 |
+| AC-04, BR-02: số liệu đợt (dùng cùng biểu BM-17) không đổi lũy kế Phụ lục 2 (BM-18); bộ đọc/quy đổi số đã chốt của KHTC bỏ kỳ `adhoc` | `TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150` (CNTS-CAMPAIGN-CUMUL-001) | G1 |
+| B4: tiến độ theo khu vực/xã, nhắc xã chưa nộp, gia hạn có lý do (hạn mới sau hạn cũ) | `TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150` | G1 |
+| AC-03, BR-04: đóng đợt → xã chưa gửi "Không nộp", gửi sau đóng bị chặn; kết quả theo ảnh chụp, xuất Excel | `TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150` | G1 |
+| BR-01: mở lại chỉ Lãnh đạo phòng, lý do + thời hạn; sổ chỉ ghi thêm | `TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150`, `TestPeriodKeyAndState` | G1 |
+| Màn Cấp Tỉnh "Chiến dịch điều tra", menu `tinh.cnts.chien_dich.quan_ly` (mục "Tạo chiến dịch" còn Sắp có — tạo đợt ngay trên màn quản lý) | Vitest `campaign.test.ts`, `kn-menu.contract.test.ts`; `TestWebMenuFixture` | G1 |
+| AC-01 (102 xã thấy việc trong 1 phút), phạm vi theo hộ, nhắc tự động theo cấu hình đợt | — | Chưa nghiệm thu / chưa làm |
