@@ -1,1 +1,1 @@
-- KNSPLIT-2-MENU-REGISTRY (#75): thêm MenuBuilder/Menus theo instance, kiểm route/module và chọn landing sau availability/module; nil giữ compatibility. Test HTTP PostgreSQL + context navigation/tenant/node, golden giữ nguyên. Owner #76 và route cutover #67 còn chờ; không đóng #53.
+- [x] KNSPLIT-2-MENU-REGISTRY (#75): thêm MenuBuilder/Menus theo instance, kiểm route/module và chọn landing sau availability/module; nil giữ compatibility. Test HTTP PostgreSQL + context navigation/tenant/node, golden giữ nguyên. Owner #76 và route cutover #67 còn chờ; không đóng #53.
