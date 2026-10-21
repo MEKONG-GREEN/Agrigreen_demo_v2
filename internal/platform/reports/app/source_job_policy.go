@@ -11,11 +11,13 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func (r *SourceBuilderRegistry) jobPolicy(source string) (port.SourceJobPolicy, bool) {
@@ -211,4 +213,48 @@ func scopeContains(sc authz.Scope, j domain.Job) bool {
 		}
 	}
 	return true
+}
+
+// CheckExportReplay runs before the common HTTP response cache. Otherwise a
+// successful cached POST could outlive an owner's revocation without reaching
+// RequestExport. It does not create a job or bypass the common idempotency lock.
+func (s *Service) CheckExportReplay(ctx context.Context, in ExportInput) error {
+	p, err := authz.Require(ctx, s.readerRoles()...)
+	if err != nil {
+		return err
+	}
+	if in.IdemKey == "" {
+		return nil
+	} // common middleware reports its standard key error
+	return s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		prev, err := store.JobByIdemKey(ctx, tx, in.IdemKey)
+		if err != nil || prev == nil {
+			return err
+		}
+		if err = s.checkReplayTemplate(ctx, tx, in, *prev); err != nil {
+			return err
+		}
+		return s.checkSourceReplay(ctx, p, in, *prev)
+	})
+}
+func (s *Service) HasSourceJobPolicies() bool {
+	return s.Builders != nil && len(s.Builders.policies) > 0
+}
+func (s *Service) checkReplayTemplate(ctx context.Context, tx pgx.Tx, in ExportInput, prev domain.Job) error {
+	// Include policy inputs with an old native key even when source_args is omitted.
+	t, err := s.resolveTemplate(ctx, tx, strings.TrimSpace(in.TemplateKey))
+	if err != nil {
+		if prev.SourceArgs != nil {
+			return err
+		}
+		return nil
+	}
+	_, enabled := s.Builders.jobPolicy(t.Def.Source)
+	if enabled && (prev.Def.Source != t.Def.Source || prev.RequestedBy == uuid.Nil) {
+		return problem.IdempotencyConflict
+	}
+	if prev.SourceArgs != nil && t.Status != domain.TemplateActive {
+		return ErrTemplateRetired
+	}
+	return nil
 }

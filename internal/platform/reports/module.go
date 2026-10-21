@@ -143,6 +143,12 @@ func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode) {
 	m.svc.Egress, m.svc.EgressMode = cp, mode
 }
 
+// Middleware reauthorizes policy-enabled export replays before the common HTTP
+// idempotency cache. The assembly orders all module middleware before that cache.
+func (m *Module) Middleware() gin.HandlerFunc {
+	return handler.Handler{Svc: m.svc}.ExportAuthorization()
+}
+
 // RegisterApp gắn route Application API.
 func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }
 

@@ -162,6 +162,9 @@ func (s *Service) RequestExport(ctx context.Context, in ExportInput) (domain.Job
 		if prev, err := store.JobByIdemKey(ctx, tx, in.IdemKey); err != nil {
 			return err
 		} else if prev != nil {
+			if err := s.checkReplayTemplate(ctx, tx, in, *prev); err != nil {
+				return err
+			}
 			if err := s.checkSourceReplay(ctx, p, in, *prev); err != nil {
 				return err
 			}
@@ -197,7 +200,10 @@ func (s *Service) RequestExport(ctx context.Context, in ExportInput) (domain.Job
 		if rerr := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 			var e error
 			prev, e = store.JobByIdemKey(ctx, tx, in.IdemKey)
-			return e
+			if e != nil || prev == nil {
+				return e
+			}
+			return s.checkReplayTemplate(ctx, tx, in, *prev)
 		}); rerr == nil && prev != nil {
 			if e := s.checkSourceReplay(ctx, p, in, *prev); e != nil {
 				return domain.Job{}, false, e
