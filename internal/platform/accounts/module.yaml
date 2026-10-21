@@ -13,6 +13,7 @@ depends:
 provides:
   ports:
     - ActionLinks
+    - AssignmentRules
     - Assignments
     - Directory
     - FarmerAccounts

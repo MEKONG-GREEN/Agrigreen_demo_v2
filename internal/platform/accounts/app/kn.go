@@ -113,6 +113,11 @@ func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.Assig
 			if o == nil {
 				return checkedAssignment{}, ErrOrgInvalid
 			}
+			if s.AssignmentRules != nil {
+				if err := s.validateAssignmentNodeKind(in.Role, string(o.Kind)); err != nil {
+					return checkedAssignment{}, fieldProblem(err)
+				}
+			}
 		}
 		return out, nil
 	}

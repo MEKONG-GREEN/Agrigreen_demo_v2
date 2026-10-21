@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-ASSIGNMENT-RULES (#68): thêm cổng validation lần gán theo chủ ứng dụng; provider không đổi identity/thời hạn/dữ liệu, lỗi không fallback. Giữ bridge và kiểm node/tenant/MFA của accounts; chờ kiểm thử và Claude Review OK trước tích hợp.
