@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-3-CLIENT-VERIFY (#59): client kn-web đã tích hợp; kiểm static và discovery chỉ đọc. Live Keycloak/PKCE/MFA/tenant-routing chưa chạy, web request scope và ví dụ issuer cần owner đối chiếu; phụ thuộc IDENTITY-GRANTS #56, không coi G1 đã xong.
