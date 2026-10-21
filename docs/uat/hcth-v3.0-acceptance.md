@@ -118,6 +118,7 @@ Nguồn giả định: [W11.27](../kn/gia-dinh/W11.27.md). Kỳ kế hoạch là
 | Chốt: đơn vị chưa gửi → "Không gửi"; sau chốt không gửi/nháp được; BR-02 chỉ HCTH điều chỉnh có lý do, lưu lịch sử, ảnh chụp chốt giữ nguyên | `TestHRMPlansHTTP_W1127` | Đạt |
 | Luồng phụ: xuất Excel (HCTH), sao chép từ năm trước (sau điều chỉnh) | `TestHRMPlansHTTP_W1127` | Đạt |
 | Validator profile hrm_plan chặn bài nộp sai hình dạng gửi thẳng qua cap/forms; cách ly tenant | `TestHRMPlansHTTP_W1127`, `TestPlanValuesRoundTrip_W1127` | Đạt |
+| Phiên chỉ xem (lãnh đạo, Ban Giám đốc, Admin) bị từ chối khi gọi thẳng `/v1/forms` với profile `hrm_plan` (định nghĩa biểu, phát hành, đọc kỳ, nộp, rà soát, chốt, hủy) và ở `/v1/hrm/plans`; phiên thường vẫn làm được | `TestHRMPlanFormsDirectViewOnly_W1127` (PostgreSQL thật, HTTP) | Đạt |
 | Màn web: bảng tổng hợp, mở kỳ, chốt, chi tiết đơn vị theo bố cục prototype HCTH; menu HCTH và "Kế hoạch của phòng" | Vitest `src/kn/hrm/plans.test.tsx`, `src/api/mock/kn-menu.contract.test.ts`; `TestWebMenuFixture` | Đạt |
 
 Giới hạn: "Nhắc phòng chưa lập" (pf/notify) chưa làm; trạm/trại không có lãnh đạo có phiên chỉ được ghi qua điều chỉnh

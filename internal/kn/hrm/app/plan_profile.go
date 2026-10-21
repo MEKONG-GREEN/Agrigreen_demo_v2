@@ -26,32 +26,41 @@ func asPlanUnit(ctx context.Context) context.Context {
 
 func planUnitMode(ctx context.Context) bool { v, _ := ctx.Value(planUnitKey{}).(bool); return v }
 
-// planUnitOf trả đơn vị nội bộ của phiên (KNContext.InternalUnit; vắng → mã phòng ban — đơn vị loại phòng mang mã phòng
-// ban P2 ở seed W11.07).
-func planUnitOf(k *authz.KNContext) string {
+// planUnitOf trả đơn vị nội bộ của phiên (InternalUnit; vắng → mã phòng ban — đơn vị loại phòng mang mã phòng ban P2 ở
+// seed W11.07).
+func planUnitOf(k port.SessionContext) string {
 	if k.InternalUnit != "" {
 		return k.InternalUnit
 	}
 	return k.Department
 }
 
-// planRole suy vai hrm_plan từ ngữ cảnh phiên KN: Admin (ManageBy) và Cấp Tỉnh – HCTH (ReadBy ở phòng ban chủ, không chỉ
-// xem) là cấp Trung tâm; lãnh đạo đơn vị (Cấp Tỉnh, Manager) là cấp đơn vị của đơn vị nội bộ của phiên. asUnit: ưu tiên
-// tư cách đơn vị khi người gọi vừa là cấp Trung tâm vừa là lãnh đạo đơn vị. ok = false: không có vai trong kế hoạch.
-func planRole(acc port.Access, k *authz.KNContext, asUnit bool) (role, unit string, ok bool) {
+// planRole suy vai hrm_plan từ ngữ cảnh phiên của chủ phiên KN (port.SessionContext — KNSPLIT-2-CONTEXT-I, không đọc
+// Principal.KN): Admin (ManageBy) và Cấp Tỉnh – HCTH (ReadBy ở phòng ban chủ) là cấp Trung tâm; lãnh đạo đơn vị (Cấp Tỉnh,
+// Manager) là cấp đơn vị của đơn vị nội bộ của phiên. asUnit: ưu tiên tư cách đơn vị khi người gọi vừa là cấp Trung tâm vừa
+// là lãnh đạo đơn vị. Phiên CHỈ XEM (ViewOnly, Cấp TW — ReadOnly) không có vai nào: FN-11 (BRD HCTH §VI.4) không cấp
+// quyền xem kế hoạch cho ngữ cảnh chỉ xem, và cap/forms không có cờ chỉ xem nên mọi vai ở đây đều ghi được. ok = false:
+// không có vai trong kế hoạch.
+func planRole(acc port.Access, k port.SessionContext, asUnit bool) (role, unit string, ok bool) {
+	if k.ReadOnly || k.ViewOnly {
+		return "", "", false
+	}
 	manager := k.Role == authz.KNTinh && k.Manager && planUnitOf(k) != ""
 	switch {
 	case asUnit && manager:
 		return port.PlanRoleManager, planUnitOf(k), true
 	case slices.Contains(acc.ManageBy, k.Role):
 		return port.PlanRoleAdmin, "", true
-	case slices.Contains(acc.ReadBy, k.Role) && k.Department == acc.Department && !k.ViewOnly:
+	case slices.Contains(acc.ReadBy, k.Role) && k.Department == acc.Department:
 		return port.PlanRoleHCTH, "", true
 	case manager:
 		return port.PlanRoleManager, planUnitOf(k), true
 	}
 	return "", "", false
 }
+
+// errPlanForbidden: phiên không có vai trong kế hoạch nhân lực (kể cả phiên chỉ xem).
+var errPlanForbidden = problem.Forbidden.WithDetail("kế hoạch nhân lực: chỉ Phòng HCTH, Admin và lãnh đạo các đơn vị; phiên chỉ xem không thao tác (FN-11)")
 
 // PlanFormProfile là cấu hình cap/forms của kế hoạch nhân lực năm (FN-11): Trung tâm (TT: Phòng HCTH, Admin) mở kỳ năm,
 // rà soát ("yêu cầu điều chỉnh" = trả lại có ghi chú), chốt (ảnh chụp đóng băng); đơn vị nội bộ (DV, lá — mã đơn vị W11.07,
@@ -70,22 +79,28 @@ func PlanFormProfile(acc port.Access) formsport.Profile {
 	}
 }
 
-// planActorResolver chiếu phiên KN vào cap/forms. Không có ngữ cảnh KN → không áp (forms chỉ xét vai realm — không vai realm
-// nào ánh xạ vào hrm_plan nên bị từ chối). Có ngữ cảnh mà không có vai → từ chối, không rơi về realm.
+// planActorResolver chiếu phiên của chủ phiên KN (acc.Session) vào cap/forms — áp cho MỌI lời gọi profile hrm_plan, kể cả
+// REST /v1/forms gọi thẳng. Không có phiên được chọn (yêu cầu realm thuần) hoặc chưa cấu hình chủ phiên → không áp (forms chỉ
+// xét vai realm — không vai realm nào ánh xạ vào hrm_plan nên bị từ chối). Có phiên mà lỗi, chỉ xem hoặc không có vai → từ
+// chối, không rơi về realm.
 func planActorResolver(acc port.Access) formsport.ActorResolver {
 	return func(ctx context.Context, p authz.Principal, _ formsport.Profile) (formsport.ResolvedActor, bool, error) {
-		if p.KN == nil {
+		if acc.Session == nil || p.SelectedSession == nil {
 			return formsport.ResolvedActor{}, false, nil
 		}
-		role, unit, ok := planRole(acc, p.KN, planUnitMode(ctx))
+		k, err := acc.Session(authz.WithPrincipal(ctx, p))
+		if err != nil {
+			return formsport.ResolvedActor{}, true, problem.Forbidden.WithDetail("kế hoạch nhân lực: cần ngữ cảnh phiên Khuyến nông").WithCause(err)
+		}
+		role, unit, ok := planRole(acc, k, planUnitMode(ctx))
 		if !ok {
-			return formsport.ResolvedActor{}, true, problem.Forbidden.WithDetail("kế hoạch nhân lực: chỉ Phòng HCTH, Admin và lãnh đạo các đơn vị (FN-11)")
+			return formsport.ResolvedActor{}, true, errPlanForbidden
 		}
 		if role == port.PlanRoleManager {
-			return formsport.ResolvedActor{Role: role, Department: unit, Node: p.KN.OrgRef,
+			return formsport.ResolvedActor{Role: role, Department: unit,
 				AllowsTarget: func(string, uuid.UUID) bool { return false }}, true, nil
 		}
-		return formsport.ResolvedActor{Role: role, Department: acc.Department, Scope: authz.Scope{All: true}, Node: p.KN.OrgRef}, true, nil
+		return formsport.ResolvedActor{Role: role, Department: acc.Department, Scope: authz.Scope{All: true}}, true, nil
 	}
 }
 

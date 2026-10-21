@@ -55,8 +55,9 @@ func (s *Service) UsePlans(d PlanDeps) {
 type planCaller struct {
 	p        authz.Principal
 	role     string
-	unit     string // lãnh đạo đơn vị: đơn vị nội bộ của phiên
-	asUnit   string // đơn vị mà người gọi được lập/gửi (lãnh đạo đơn vị, kể cả lãnh đạo Phòng HCTH)
+	unit     string    // lãnh đạo đơn vị: đơn vị nội bộ của phiên
+	asUnit   string    // đơn vị mà người gọi được lập/gửi (lãnh đạo đơn vị, kể cả lãnh đạo Phòng HCTH)
+	unitRef  uuid.UUID // Nút sở hữu phòng ban của phiên (danh mục đơn vị nội bộ)
 	readOnly bool
 }
 
@@ -70,15 +71,19 @@ func (s *Service) planCaller(ctx context.Context) (planCaller, error) {
 	if s.Plans == nil {
 		return planCaller{}, port.ErrPlanDisabled
 	}
-	if p.KN == nil {
+	if s.Access.Session == nil {
 		return planCaller{}, problem.Forbidden.WithDetail("kế hoạch nhân lực: cần ngữ cảnh phiên Khuyến nông")
 	}
-	role, unit, ok := planRole(s.Access, p.KN, false)
-	if !ok {
-		return planCaller{}, problem.Forbidden.WithDetail("kế hoạch nhân lực: chỉ Phòng HCTH, Admin và lãnh đạo các đơn vị (FN-11)")
+	k, err := s.Access.Session(ctx)
+	if err != nil {
+		return planCaller{}, problem.Forbidden.WithDetail("kế hoạch nhân lực: cần ngữ cảnh phiên Khuyến nông").WithCause(err)
 	}
-	c := planCaller{p: p, role: role, unit: unit, readOnly: p.KN.ReadOnly()}
-	if r, u, _ := planRole(s.Access, p.KN, true); r == port.PlanRoleManager {
+	role, unit, ok := planRole(s.Access, k, false)
+	if !ok {
+		return planCaller{}, errPlanForbidden
+	}
+	c := planCaller{p: p, role: role, unit: unit, unitRef: k.UnitRef, readOnly: k.ReadOnly}
+	if r, u, _ := planRole(s.Access, k, true); r == port.PlanRoleManager {
 		c.asUnit = u
 	}
 	return c, nil
@@ -346,8 +351,8 @@ func (s *Service) OpenPlan(ctx context.Context, in OpenPlanInput, idem string) (
 // planUnits kiểm đơn vị của kỳ theo danh mục đơn vị nội bộ (W11.07); rỗng → mọi đơn vị đang dùng theo thứ tự danh mục.
 func (s *Service) planUnits(ctx context.Context, c planCaller, want []string) ([]string, error) {
 	var cat []port.Unit
-	if s.Rec != nil && s.Rec.Units != nil && c.p.KN.UnitRef != uuid.Nil {
-		us, err := s.Rec.Units.InternalUnits(ctx, c.p.KN.UnitRef)
+	if s.Rec != nil && s.Rec.Units != nil && c.unitRef != uuid.Nil {
+		us, err := s.Rec.Units.InternalUnits(ctx, c.unitRef)
 		if err != nil {
 			return nil, err
 		}
@@ -542,8 +547,8 @@ func (s *Service) loadPlan(ctx context.Context, c planCaller, year int) (planSta
 	if err != nil {
 		return st, err
 	}
-	if s.Rec != nil && s.Rec.Units != nil && c.p.KN.UnitRef != uuid.Nil {
-		us, err := s.Rec.Units.InternalUnits(ctx, c.p.KN.UnitRef)
+	if s.Rec != nil && s.Rec.Units != nil && c.unitRef != uuid.Nil {
+		us, err := s.Rec.Units.InternalUnits(ctx, c.unitRef)
 		if err != nil {
 			return st, err
 		}

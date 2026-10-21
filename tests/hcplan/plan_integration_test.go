@@ -18,6 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	sessionport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
@@ -69,7 +70,7 @@ func (f *fixture) call(as, method, path string, body any, want int) map[string]a
 func newPlanFixture(t *testing.T) (*fixture, *forms.Module) {
 	env := pgtest.Get(t)
 	clk := clock.NewFixed(time.Date(2026, 10, 12, 3, 0, 0, 0, time.UTC))
-	acc := port.Access{Department: "hanh_chinh_tong_hop", ManageBy: []string{"admin"}, ReadBy: []string{"kn_tinh"}}
+	acc := port.Access{Session: ownerSession, Department: "hanh_chinh_tong_hop", ManageBy: []string{"admin"}, ReadBy: []string{"kn_tinh"}}
 	hm, err := hrm.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clk, acc)
 	if err != nil {
 		t.Fatal(err)
@@ -100,7 +101,15 @@ func newPlanFixture(t *testing.T) (*fixture, *forms.Module) {
 		"tw":        {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "kn_tw"}},
 		"other":     {ActorRef: ids.New(), TenantID: ids.New(), KN: &authz.KNContext{Role: "admin", Scope: authz.Scope{All: true}}},
 		"realmonly": {ActorRef: ids.New(), TenantID: tid, Roles: []string{"admin"}},
+		// Phiên CHỈ XEM (ViewOnly — Lãnh đạo đơn vị xem phòng ban ngoài lần gán, nhóm Ban Giám đốc; Admin ở chế độ chỉ xem):
+		// không có vai nào trong kế hoạch, kể cả khi gọi thẳng /v1/forms.
+		"vo_mgr":   {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "kn_tinh", Department: "trong_trot", InternalUnit: "trong_trot", Manager: true, ViewOnly: true, UnitRef: org}},
+		"vo_hcth":  {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "kn_tinh", Department: "hanh_chinh_tong_hop", InternalUnit: "hcth", Manager: true, ViewOnly: true, UnitRef: org}},
+		"vo_admin": {ActorRef: ids.New(), TenantID: tid, KN: &authz.KNContext{Role: "admin", Scope: authz.Scope{All: true}, ViewOnly: true, UnitRef: org}},
 	}}
+	for k, p := range f.who {
+		f.who[k] = bindSession(t, p)
+	}
 	gin.SetMode(gin.TestMode)
 	f.r = gin.New()
 	f.r.Use(func(c *gin.Context) {
@@ -109,7 +118,48 @@ func newPlanFixture(t *testing.T) (*fixture, *forms.Module) {
 		}
 	})
 	hm.RegisterApp(f.r.Group("/v1"))
+	fm.RegisterApp(f.r.Group("/v1")) // REST /v1/forms dùng chung — profile hrm_plan gọi thẳng phải qua cùng chính sách phiên
 	return f, fm
+}
+
+// bindSession gắn ngữ cảnh fixture vào phiên chủ KN thật (registry + bộ mã chủ phiên của pf/extension), như middleware
+// pf/accounts ở production — mẫu của KNSPLIT-2-CONTEXT-I. Mã ngữ cảnh sinh ở đây chỉ dùng cho kiểm thử.
+func bindSession(t *testing.T, p authz.Principal) authz.Principal {
+	t.Helper()
+	if p.KN == nil {
+		return p
+	}
+	kc := *p.KN
+	if kc.ID == uuid.Nil {
+		kc.ID = ids.New()
+	}
+	p.KN = &kc
+	registry, err := authz.NewSessionRegistry(authz.SessionRegistration{Profile: "kn", Project: func(_ context.Context, p authz.Principal) (authz.Session, bool, error) {
+		k := p.KN
+		selected, err := sessionport.NewSessionContext(sessionport.SessionContext{ID: k.ID, Role: k.Role, Department: k.Department,
+			OrgRef: k.OrgRef, UnitRef: k.UnitRef, Communes: k.Communes, Scope: k.Scope, Duties: k.Duties, InternalUnit: k.InternalUnit,
+			Manager: k.Manager, ViewOnly: k.ViewOnly})
+		return selected, true, err
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := registry.ResolveSelected(context.Background(), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.SelectedSession = &selected
+	return p
+}
+
+// ownerSession là chính sách phiên của pf/hrm đọc từ phiên chủ KN (như assembly extension.HRMSession).
+func ownerSession(ctx context.Context) (port.SessionContext, error) {
+	_, k, err := sessionport.RequireSession(ctx)
+	if err != nil {
+		return port.SessionContext{}, err
+	}
+	return port.SessionContext{Role: k.Role, Department: k.Department, UnitRef: k.UnitRef, InternalUnit: k.InternalUnit,
+		Manager: k.Manager, ViewOnly: k.ViewOnly, ReadOnly: k.ReadOnly()}, nil
 }
 
 func newStaff(typ, name, phone string, events ...map[string]any) map[string]any {
