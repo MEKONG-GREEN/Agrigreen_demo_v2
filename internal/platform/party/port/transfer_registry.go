@@ -43,7 +43,7 @@ func NewTransferRegistry(adapters []TransferAdapter, verifier TransferTokenVerif
 		if !validTransferName(a.Namespace) || a.Version == "" || len(a.Version) > 128 || seen[a.Namespace] || a.MaxBatch < 1 || a.MaxBatch > 500 {
 			return nil, ErrTransferConfiguration
 		}
-		if a.RecoveryAuthority == nil || a.ReleaseSourceFence == nil || a.ReadSourceFenceRelease == nil || a.ReleaseTargetFence == nil || a.ReadTargetFenceRelease == nil || a.Authority == nil || a.FenceSource == nil || a.FenceTarget == nil || a.CheckSourceFence == nil || a.CheckTargetFence == nil || a.Scan == nil || a.Export == nil || a.ReadExport == nil || a.Apply == nil || a.ReadReceipt == nil || a.Verify == nil || a.Compensate == nil || a.ReadCompensation == nil {
+		if a.RecoveryAuthority == nil || a.ReleaseSourceFence == nil || a.ReadSourceFenceRelease == nil || a.ReleaseTargetFence == nil || a.ReadTargetFenceRelease == nil || a.Authority == nil || a.FenceSource == nil || a.FenceTarget == nil || a.CheckSourceFence == nil || a.CheckTargetFence == nil || a.Scan == nil || a.Export == nil || a.ReadExport == nil || a.Apply == nil || a.ReadReceipt == nil || a.Verify == nil || a.Compensate == nil || a.ReadCompensation == nil || a.VerifyCompensation == nil {
 			return nil, ErrTransferConfiguration
 		}
 		a.DependsOn = slices.Clone(a.DependsOn)
@@ -464,4 +464,33 @@ func transferVerifierMissing(v TransferTokenVerifier) bool {
 	default:
 		return false
 	}
+}
+
+// TransferLogicalRoot compares business commitments independently of target IDs,
+// tenant envelopes and ledger metadata. Owners canonicalize each LogicalHash.
+func TransferLogicalRoot(headers []TransferHeader) (TransferDigest, error) {
+	if len(headers) > 100000 {
+		return "", ErrTransferConflict
+	}
+	type item struct {
+		Key         TransferKey    `json:"key"`
+		LogicalHash TransferDigest `json:"logical_hash"`
+	}
+	out := make([]item, 0, len(headers))
+	for _, h := range headers {
+		if !validTransferName(h.Key.Namespace) || h.Key.Ref == uuid.Nil || !ValidTransferDigest(h.LogicalHash) {
+			return "", ErrTransferConflict
+		}
+		out = append(out, item{h.Key, h.LogicalHash})
+	}
+	slices.SortFunc(out, func(a, b item) int { return compareTransferKey(a.Key, b.Key) })
+	for i := 1; i < len(out); i++ {
+		if out[i].Key == out[i-1].Key {
+			return "", ErrTransferConflict
+		}
+	}
+	return transferHash(struct {
+		Version string
+		Items   []item
+	}{"party.transfer.logical/v1", out})
 }

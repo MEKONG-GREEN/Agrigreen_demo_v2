@@ -43,6 +43,7 @@ func transferTestAdapter(name string) TransferAdapter {
 		return TransferReceipt{}, ErrTransferNotReady
 	}
 	a.ReadCompensation = TransferCompensationReader(a.Compensate)
+	a.VerifyCompensation = func(context.Context, TransferCompensationRequest, TransferReceipt) error { return ErrTransferNotReady }
 	a.ReleaseSourceFence = func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferFenceRelease, error) {
 		return TransferFenceRelease{}, ErrTransferNotReady
 	}

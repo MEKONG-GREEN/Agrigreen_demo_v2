@@ -175,18 +175,25 @@ type TransferAppliedRef struct {
 	LogicalHash   TransferDigest `json:"logical_hash"`
 }
 type TransferReceipt struct {
-	Ref            uuid.UUID            `json:"ref"`
-	PlanID         uuid.UUID            `json:"plan_id"`
-	BatchID        uuid.UUID            `json:"batch_id"`
-	TargetTenant   uuid.UUID            `json:"target_tenant"`
-	TargetScopeRef uuid.UUID            `json:"target_scope_ref"`
-	BindingHash    TransferDigest       `json:"binding_hash"`
-	ManifestHash   TransferDigest       `json:"manifest_hash"`
-	MapHash        TransferDigest       `json:"map_hash"`
-	ArtifactHash   TransferDigest       `json:"artifact_hash"`
-	LogicalRoot    TransferDigest       `json:"logical_root"`
-	OwnerVersion   string               `json:"owner_version"`
-	Items          []TransferAppliedRef `json:"items"`
+	// Recovery fields are nil on apply; compensation binds its reserved operation,
+	// reason and original durable receipt. SourceLogicalRoot retains the source
+	// commitment while LogicalRoot describes the actual compensated result.
+	OperationID       uuid.UUID            `json:"operation_id,omitempty"`
+	ReasonRef         uuid.UUID            `json:"reason_ref,omitempty"`
+	CompensatesRef    uuid.UUID            `json:"compensates_ref,omitempty"`
+	SourceLogicalRoot TransferDigest       `json:"source_logical_root,omitempty"`
+	Ref               uuid.UUID            `json:"ref"`
+	PlanID            uuid.UUID            `json:"plan_id"`
+	BatchID           uuid.UUID            `json:"batch_id"`
+	TargetTenant      uuid.UUID            `json:"target_tenant"`
+	TargetScopeRef    uuid.UUID            `json:"target_scope_ref"`
+	BindingHash       TransferDigest       `json:"binding_hash"`
+	ManifestHash      TransferDigest       `json:"manifest_hash"`
+	MapHash           TransferDigest       `json:"map_hash"`
+	ArtifactHash      TransferDigest       `json:"artifact_hash"`
+	LogicalRoot       TransferDigest       `json:"logical_root"`
+	OwnerVersion      string               `json:"owner_version"`
+	Items             []TransferAppliedRef `json:"items"`
 }
 type TransferImporter func(context.Context, TransferApplyRequest) (TransferReceipt, error)
 type TransferReceiptReader func(context.Context, TransferApplyRequest) (TransferReceipt, error)
@@ -197,11 +204,12 @@ type TransferRecoveryRequest struct {
 	OperationID, ReasonRef uuid.UUID
 }
 type TransferFenceRelease struct {
-	Ref, IntentID, PlanID uuid.UUID
-	BindingHash           TransferDigest
-	Fence                 TransferFence
-	Side                  TransferSide
-	Namespace             string
+	Ref, IntentID, PlanID  uuid.UUID
+	OperationID, ReasonRef uuid.UUID
+	BindingHash            TransferDigest
+	Fence                  TransferFence
+	Side                   TransferSide
+	Namespace              string
 }
 type TransferFenceReleaser func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferFenceRelease, error)
 type TransferFenceReleaseReader func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferFenceRelease, error)
@@ -215,30 +223,33 @@ type TransferCompensationRequest struct {
 type TransferCompensator func(context.Context, TransferCompensationRequest) (TransferReceipt, error)
 type TransferCompensationReader func(context.Context, TransferCompensationRequest) (TransferReceipt, error)
 
+type TransferCompensationVerifier func(context.Context, TransferCompensationRequest, TransferReceipt) error
+
 // TransferAdapter is trusted owner code. No raw data or SQL crosses this port.
 // All source functions receive the actual source context; target functions the target context.
 type TransferAdapter struct {
 	Module, Namespace, Version string
 	DependsOn                  []string
 	MaxBatch                   int
-	Authority                  TransferAuthority          `json:"-"`
-	RecoveryAuthority          TransferAuthority          `json:"-"`
-	ReleaseSourceFence         TransferFenceReleaser      `json:"-"`
-	ReadSourceFenceRelease     TransferFenceReleaseReader `json:"-"`
-	ReleaseTargetFence         TransferFenceReleaser      `json:"-"`
-	ReadTargetFenceRelease     TransferFenceReleaseReader `json:"-"`
-	FenceSource                TransferFenceWriter        `json:"-"`
-	FenceTarget                TransferFenceWriter        `json:"-"`
-	CheckSourceFence           TransferFenceChecker       `json:"-"`
-	CheckTargetFence           TransferFenceChecker       `json:"-"`
-	Scan                       TransferScanner            `json:"-"`
-	Export                     TransferExporter           `json:"-"`
-	ReadExport                 TransferExportReader       `json:"-"`
-	Apply                      TransferImporter           `json:"-"`
-	ReadReceipt                TransferReceiptReader      `json:"-"`
-	Verify                     TransferVerifier           `json:"-"`
-	Compensate                 TransferCompensator        `json:"-"`
-	ReadCompensation           TransferCompensationReader `json:"-"`
+	Authority                  TransferAuthority            `json:"-"`
+	RecoveryAuthority          TransferAuthority            `json:"-"`
+	ReleaseSourceFence         TransferFenceReleaser        `json:"-"`
+	ReadSourceFenceRelease     TransferFenceReleaseReader   `json:"-"`
+	ReleaseTargetFence         TransferFenceReleaser        `json:"-"`
+	ReadTargetFenceRelease     TransferFenceReleaseReader   `json:"-"`
+	FenceSource                TransferFenceWriter          `json:"-"`
+	FenceTarget                TransferFenceWriter          `json:"-"`
+	CheckSourceFence           TransferFenceChecker         `json:"-"`
+	CheckTargetFence           TransferFenceChecker         `json:"-"`
+	Scan                       TransferScanner              `json:"-"`
+	Export                     TransferExporter             `json:"-"`
+	ReadExport                 TransferExportReader         `json:"-"`
+	Apply                      TransferImporter             `json:"-"`
+	ReadReceipt                TransferReceiptReader        `json:"-"`
+	Verify                     TransferVerifier             `json:"-"`
+	Compensate                 TransferCompensator          `json:"-"`
+	ReadCompensation           TransferCompensationReader   `json:"-"`
+	VerifyCompensation         TransferCompensationVerifier `json:"-"`
 }
 
 type TransferIntentInput struct {

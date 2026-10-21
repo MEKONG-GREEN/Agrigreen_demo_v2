@@ -140,6 +140,9 @@ func (o *transferProtocolOwner) adapter() port.TransferAdapter {
 		return port.TransferReceipt{}, port.ErrTransferNotReady
 	}
 	a.ReadCompensation = port.TransferCompensationReader(a.Compensate)
+	a.VerifyCompensation = func(context.Context, port.TransferCompensationRequest, port.TransferReceipt) error {
+		return port.ErrTransferNotReady
+	}
 	a.ReleaseSourceFence = func(context.Context, port.TransferRecoveryRequest, port.TransferFenceRequest, port.TransferFence) (port.TransferFenceRelease, error) {
 		return port.TransferFenceRelease{}, port.ErrTransferNotReady
 	}
