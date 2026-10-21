@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-4B-TRANSFER-CORE (#55): thiết kế generic plan/manifest/idmap/batches/receipts/fences theo hai ngữ cảnh xác thực thật; đang review trước Go/DDL. Typed owner importers, identity #56 và rehearsal #58 còn chờ; chưa chuyển dữ liệu/cutover/đạt5boundarygates.
