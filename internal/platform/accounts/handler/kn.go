@@ -126,8 +126,17 @@ func (h Handler) Middleware() gin.HandlerFunc {
 			return
 		}
 		p.SelectedSession = &binding
-		// Dấu quyền lấy từ ngữ cảnh vừa giải ở server, gồm cả thuộc tính/ủy quyền/phạm vi mới nhất.
-		scope, err := json.Marshal(kc)
+		// Bind both the existing context and the complete registered owner projection.
+		// Owner payload may carry current grants absent from the compatibility context.
+		stamp, err := binding.AuthorizationStamp()
+		if err != nil {
+			httpx.Fail(c, app.ErrContextInvalid.WithCause(err))
+			return
+		}
+		scope, err := json.Marshal(struct {
+			Context *authz.KNContext
+			Owner   []byte
+		}{kc, stamp})
 		if err != nil {
 			httpx.Fail(c, err)
 			return

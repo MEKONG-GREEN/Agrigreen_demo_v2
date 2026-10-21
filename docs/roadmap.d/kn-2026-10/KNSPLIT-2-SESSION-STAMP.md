@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-SESSION-STAMP (#69): dấu idempotency ghép ngữ cảnh legacy với digest profile/ID/scope/payload của phiên chủ; quyền đổi không phát lại cache cũ. Không giải mã payload hay đổi danh tính; chưa triển khai grants/nháp, chờ kiểm và review trước gộp.
