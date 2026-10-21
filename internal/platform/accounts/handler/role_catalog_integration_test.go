@@ -29,8 +29,13 @@ const catalogFixtureRole = "fixture_auditor"
 
 func newRoleCatalogFixture(t *testing.T) *fixture {
 	t.Helper()
+	return newRoleCatalogFixtureWithBase(t, nil)
+}
+
+func newRoleCatalogFixtureWithBase(t *testing.T, base *port.RoleCatalog) *fixture {
+	t.Helper()
 	f := newFixture(t)
-	catalog, err := port.ExtendRoleCatalog(nil, port.RoleRegistration{
+	catalog, err := port.ExtendRoleCatalog(base, port.RoleRegistration{
 		Role: catalogFixtureRole, MFARole: true, LoginTOTP: true,
 		OrgKinds: []string{string(partyport.OrgCooperative)}, Grantors: []string{port.RoleAccountAdmin},
 	})
@@ -68,6 +73,46 @@ func newRoleCatalogFixture(t *testing.T) *fixture {
 	t.Cleanup(srv.Close)
 	f.admin, f.mod = srv, mod
 	return f
+}
+
+func TestNativeRoleCatalogHTTPOptInRetainsMFAAndLegacyDefault(t *testing.T) {
+	f := newRoleCatalogFixtureWithBase(t, port.NativeRoleCatalog())
+	nat := f.nationalAdmin()
+	g := nat.do(http.MethodGet, "/v1/accounts/grants", nil)
+	if g.status != http.StatusOK || !slices.Contains(catalogStrings(t, g.body["grantable"]), catalogFixtureRole) ||
+		!slices.Contains(catalogStrings(t, g.body["grantable"]), "coop_manager") ||
+		!slices.Contains(catalogStrings(t, g.body["mfa_roles"]), "registry_admin") {
+		t.Fatalf("native plus owner catalog was not injected: %d %v", g.status, g.body)
+	}
+	for _, role := range port.KNOfficerRoles {
+		if slices.Contains(catalogStrings(t, g.body["grantable"]), role) {
+			t.Fatalf("unregistered application role leaked into native catalog: %s", role)
+		}
+	}
+	id := nat.create(person(f.coop30292, catalogFixtureRole))
+	u, err := f.dir.GetUser(context.Background(), id)
+	if err != nil || !slices.Contains(u.RequiredActions, port.ActionConfigureTOTP) ||
+		mfaOf(t, nat.do(http.MethodGet, "/v1/accounts/users/"+id.String(), nil))["required"] != true {
+		t.Fatalf("injected owner role lost MFA/enrollment: %v %v", u.RequiredActions, err)
+	}
+	if r := f.as(f.tenant, f.national, catalogFixtureRole).do(http.MethodGet, "/v1/accounts/grants", nil); r.status != http.StatusForbidden {
+		t.Fatalf("application-admin session became a realm account admin: %d %v", r.status, r.body)
+	}
+	noMFA := caller{f: f, token: f.iss.Sign(t, authztest.Token{Subject: ids.New(), TenantID: f.tenant,
+		OrgRef: f.national, Roles: []string{port.RoleAccountAdmin}})}
+	if r := noMFA.do(http.MethodGet, "/v1/accounts/grants", nil); r.status != http.StatusForbidden || r.body["code"] != "mfa_required" {
+		t.Fatalf("native composition bypassed Admin MFA: %d %v", r.status, r.body)
+	}
+	plain := newFixture(t)
+	g = plain.nationalAdmin().do(http.MethodGet, "/v1/accounts/grants", nil)
+	if g.status != http.StatusOK || slices.Contains(catalogStrings(t, g.body["grantable"]), catalogFixtureRole) {
+		t.Fatalf("native instance changed an unconfigured module: %d %v", g.status, g.body)
+	}
+	for _, role := range port.KNOfficerRoles {
+		if !slices.Contains(catalogStrings(t, g.body["grantable"]), role) {
+			t.Fatalf("unconfigured module retired its legacy role: %s", role)
+		}
+	}
 }
 
 func catalogStrings(t *testing.T, value any) []string {
