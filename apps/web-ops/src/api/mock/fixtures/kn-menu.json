@@ -1904,9 +1904,7 @@
         "route": "/kn/cnts/ban-do-dich",
         "icon": "map",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -2154,9 +2152,7 @@
         "route": "/kn/cnts/ban-do-dich",
         "icon": "map",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {

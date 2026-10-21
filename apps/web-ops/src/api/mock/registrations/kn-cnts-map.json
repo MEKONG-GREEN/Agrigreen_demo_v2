@@ -1,0 +1,11 @@
+{
+  "id": "kn-cnts-map",
+  "source": "./kn-cnts-map",
+  "app": [
+    {
+      "export": "cntsMapRoutes",
+      "order": 1049
+    }
+  ],
+  "admin": []
+}

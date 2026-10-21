@@ -911,8 +911,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tinh.cnts.ban_do_dich",
             "label": "Bản đồ vùng dịch",
             "route": "/kn/cnts/ban-do-dich",
-            "icon": "map",
-            "soon": true
+            "icon": "map"
           },
           {
             "key": "tinh.cnts.du_an_knqg",
@@ -1044,8 +1043,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "xa.cnts.ban_do_dich",
             "label": "Bản đồ vùng dịch",
             "route": "/kn/cnts/ban-do-dich",
-            "icon": "map",
-            "soon": true
+            "icon": "map"
           },
           {
             "key": "xa.cnts.diem_trinh_dien",

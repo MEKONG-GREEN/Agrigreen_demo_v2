@@ -41,7 +41,7 @@ Issue #98, xếp chồng trên #76 (`knsplit2-menu-kn`). Nguồn: PRD `kn-bugfix
 | CNTS xã | Dữ liệu | Hộ mô hình | `/kn/cnts/ho-mo-hinh` | Có màn |
 | CNTS xã | Dữ liệu | Nhật ký sản xuất › Thủy sản, Chăn nuôi | `/kn/cnts/nhat-ky` (cả hai mục, chọn lứa/biểu BM-08/09/19 trong màn) | Có màn (W11.48) |
 | CNTS xã | Dữ liệu | Lịch tiêm phòng | `/kn/cnts/lich-tiem` | Có màn |
-| CNTS xã | Dữ liệu | Bản đồ vùng dịch | `/kn/cnts/ban-do-dich` | Sắp có |
+| CNTS xã | Dữ liệu | Bản đồ vùng dịch | `/kn/cnts/ban-do-dich` | Có màn (W11.52, màn bản đồ vùng nuôi, vùng dịch; nhãn giữ theo hình) |
 | CNTS xã | Dữ liệu | Điểm trình diễn | `/kn/cnts/ho-mo-hinh` (màn hộ mô hình, điểm trình diễn của xã) | Có màn |
 | CNTS xã | Dữ liệu | Quy trình, văn bản | `/kn/cnts/quy-trinh` | Sắp có |
 | CNTS tỉnh (UP-10) | Điều hành | Trang chủ | `/kn/dashboard` | Có màn |
@@ -59,7 +59,7 @@ Issue #98, xếp chồng trên #76 (`knsplit2-menu-kn`). Nguồn: PRD `kn-bugfix
 | CNTS tỉnh | Báo cáo | KSGM tuần, tháng; Thủy sản (Phụ lục 2); Báo cáo dịch bệnh | `/kn/cnts/ksgm`; `/kn/cnts/phu-luc-2`; `/kn/cnts/dich-benh` | Có màn |
 | CNTS tỉnh | Dữ liệu | Số liệu cấp xã › Nhập liệu tuần; Khai thác thủy sản; Nhật ký sản xuất | `/kn/cnts/so-lieu-xa/nhap-lieu-tuan`, `/khai-thac-thuy-san`, `/nhat-ky` | Sắp có |
 | CNTS tỉnh | Dữ liệu | Số liệu cấp xã › Lịch tiêm (thực tế) | `/kn/cnts/lich-tiem` (cột ngày tiêm thực tế) | Có màn |
-| CNTS tỉnh | Dữ liệu | Bản đồ vùng dịch | `/kn/cnts/ban-do-dich` | Sắp có |
+| CNTS tỉnh | Dữ liệu | Bản đồ vùng dịch | `/kn/cnts/ban-do-dich` | Có màn (W11.52, màn bản đồ vùng nuôi, vùng dịch; nhãn giữ theo hình) |
 | CNTS tỉnh | Dữ liệu | Dự án KNQG › Dự án, điểm trình diễn | `/kn/cnts/du-an` | Có màn |
 | CNTS tỉnh | Dữ liệu | Dự án KNQG › Mẫu biểu dự án | `/kn/cnts/du-an-mau-bieu` | Sắp có (W11.53) |
 | CNTS tỉnh | Dữ liệu | Quy trình, văn bản | `/kn/cnts/quy-trinh` | Sắp có |
