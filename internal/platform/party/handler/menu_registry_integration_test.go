@@ -14,6 +14,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -30,7 +31,7 @@ func TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog(t *testing.T) {
 	f := newFixture(t)
 	root := f.root()
 	tr := f.seedTree(root)
-	for _, unit := range []uuid.UUID{tr.p89, tr.p91} {
+	for _, unit := range []uuid.UUID{tr.p89, tr.p92} {
 		body := deptBody(unit, "trong_trot")
 		body["status"] = port.DeptActive
 		wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments", body), http.StatusCreated, "seed active department")
@@ -50,7 +51,7 @@ func TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog(t *testing.T) {
 			return port.MenuDefinition{}, problem.Forbidden
 		}
 		if in.Mode == port.MenuDepartment {
-			if in.Department.ID == uuid.Nil || in.Department.OrgRef != tr.p89 || in.Department.MenuProfile != "generic" {
+			if in.Department.ID == uuid.Nil || in.Department.OrgRef != in.UnitRef || in.Department.MenuProfile != "generic" {
 				t.Fatal("builder did not receive current tenant metadata")
 			}
 		} else if len(in.Departments) == 0 || in.Departments[0].OrgRef != tr.p89 {
@@ -97,7 +98,7 @@ func TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog(t *testing.T) {
 	}
 	// The same instance's real enablement ledger removes a registered leaf before landing.
 	admin := httpx.NewEngine(log, 1<<20)
-	mod.RegisterAdmin(admin.Group("/v1", httpx.Authenticate(f.iss.Verifier()), httpx.RequireMFA()))
+	mod.RegisterAdmin(admin.Group("/v1", httpx.Authenticate(f.iss.Verifier()), httpx.RequireMFA(), idempotency.Middleware(f.env.Pool(t, migrations.PF, "platform_api"))))
 	adminServer := httptest.NewServer(admin)
 	defer adminServer.Close()
 	rr := root.call(adminServer.URL, http.MethodPost, "/v1/modules/pf/reports/enablement", key(), "application/json", []byte(`{"enabled":false,"reason":"Tạm ngưng module báo cáo của tenant"}`))
@@ -111,8 +112,16 @@ func TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog(t *testing.T) {
 	if err != nil || landing != "/registered/overview" {
 		t.Fatal("context bypassed disabled module", landing, err)
 	}
+	// Selecting a new validated assignment can still carry the old context header.
+	// The trusted producer request owns the new unit; the public query stays bound.
+	newSelection := request
+	newSelection.UnitRef, newSelection.Department.OrgRef = tr.p92, tr.p92
+	landing, err = mod.ContextNavigation()(ctx, newSelection)
+	if err != nil || landing != "/registered/overview" {
+		t.Fatal("old selected node blocked valid new selection", landing, err)
+	}
 	before := calls
-	wantStatus(t, get(user, "/v1/menu?org_ref="+tr.p91.String()), http.StatusForbidden, "selected node cannot escape")
+	wantStatus(t, get(user, "/v1/menu?org_ref="+tr.p92.String()), http.StatusForbidden, "selected node cannot escape")
 	foreign := f.as(uuid.New(), tr.p89, port.RoleKNProvinceAdmin)
 	wantStatus(t, get(foreign, "/v1/menu"), http.StatusNotFound, "foreign tenant cannot reuse department")
 	foreignPrincipal := principal

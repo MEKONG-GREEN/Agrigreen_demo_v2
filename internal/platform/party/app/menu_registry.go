@@ -86,13 +86,12 @@ func (k *KN) checkMenuUnit(ctx context.Context, p authz.Principal, unit uuid.UUI
 
 // registeredContextNavigation reloads metadata in the authenticated tenant before
 // using the same builder/module filters as HTTP. The owner validated the selected
-// assignment; no Principal or tenant is fabricated for presentation.
+// assignment, including a NEW selection while ctx may still carry the previous
+// session. Only HTTP query parameters bind to that old selected node. No
+// Principal or tenant is fabricated for presentation.
 func (k *KN) registeredContextNavigation(ctx context.Context, p authz.Principal, in port.NavigationRequest) (string, error) {
 	if p.TenantID == uuid.Nil || p.ActorRef == uuid.Nil {
 		return "", problem.Unauthenticated
-	}
-	if err := k.checkMenuUnit(ctx, p, in.UnitRef); err != nil {
-		return "", err
 	}
 	request := port.MenuBuildRequest{NavigationRequest: in, Mode: port.MenuDepartment}
 	err := tenant.WithTenantTx(ctx, k.DB, p.TenantID, func(tx pgx.Tx) error {
