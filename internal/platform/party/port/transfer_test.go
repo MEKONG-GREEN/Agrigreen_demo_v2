@@ -125,7 +125,7 @@ func TestTransferRegistryRequiresRealCredentialsAndFreshNativeClaims(t *testing.
 	}
 	p.source = sc
 	p.target = authz.WithRawToken(tc, "not-a-token")
-	if err := r.Authenticate(p); err != ErrTransferAuthority || strings.Contains(err.Error(), "not-a-token") {
+	if err := r.Authenticate(p); !errors.Is(err, ErrTransferAuthority) || err.Error() != ErrTransferAuthority.Error() || strings.Contains(err.Error(), "not-a-token") {
 		t.Fatal("verifier detail leaked", err)
 	}
 	cancelCtx, cancel := context.WithCancel(sc)

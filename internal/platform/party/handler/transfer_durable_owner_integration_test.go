@@ -1877,11 +1877,12 @@ func TestTenantTransferDurableOwnerMissingFenceGateOrReleaseWitnessNeverRewrites
 				durableAssertTargetFence(t, o, durableParentNS, true, "recovery")
 			}
 			gateCalls, releaseCalls, fenceCalls := o.gateCalls, o.releaseCalls, o.fenceCalls
-			if missing == "fence" {
+			switch missing {
+			case "fence":
 				o.hideFenceReceipt = true
-			} else if missing == "gate" {
+			case "gate":
 				o.hideGateReceipt = true
-			} else {
+			default:
 				o.hideReleaseReceipt = true
 			}
 			if _, err := svc.ReleaseFences(o.pair, port.TransferRef{ID: intent.ID}, reason); err == nil {

@@ -13,11 +13,11 @@ import (
 
 func TestTransferOwnerErrorIsOpaqueAndDoesNotMeanMissingReceipt(t *testing.T) {
 	marker := "private-owner-payload"
-	if got := transferOwnerError(errors.New(marker)); got != port.ErrTransferDependency || strings.Contains(got.Error(), marker) || errors.Is(got, port.ErrTransferNotReady) {
+	if got := transferOwnerError(errors.New(marker)); !errors.Is(got, port.ErrTransferDependency) || got.Error() != port.ErrTransferDependency.Error() || strings.Contains(got.Error(), marker) || errors.Is(got, port.ErrTransferNotReady) {
 		t.Fatal("unsafe owner error", got)
 	}
 	for _, safe := range []error{port.ErrTransferAuthority, port.ErrTransferConfiguration, port.ErrTransferConflict, port.ErrTransferNotReady, port.ErrTransferDependency} {
-		if got := transferOwnerError(fmt.Errorf("%s: %w", marker, safe)); got != safe {
+		if got := transferOwnerError(fmt.Errorf("%s: %w", marker, safe)); !errors.Is(got, safe) || got.Error() != safe.Error() || strings.Contains(got.Error(), marker) {
 			t.Fatal("safe code not normalized", got)
 		}
 	}
