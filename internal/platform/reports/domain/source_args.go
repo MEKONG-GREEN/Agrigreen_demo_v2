@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strconv"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -50,11 +52,15 @@ func CanonicalSourceArgs(raw json.RawMessage) (json.RawMessage, error) {
 	return canonicalObject(raw, MaxSourceArgsBytes, false)
 }
 func canonicalObject(raw []byte, limit int, allowReserved bool) (json.RawMessage, error) {
-	if len(raw) == 0 || len(raw) > limit || !utf8.Valid(raw) {
+	return canonicalObjectBudget(raw, limit, limit, allowReserved)
+}
+func canonicalObjectBudget(raw []byte, inputLimit, limit int, allowReserved bool) (json.RawMessage, error) {
+	if len(raw) == 0 || len(raw) > inputLimit || !utf8.Valid(raw) {
 		return nil, ErrSourceArgs
 	}
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.UseNumber()
+	expansionExtra := int64(0)
 	var parse func(int) (any, error)
 	parse = func(depth int) (any, error) {
 		if depth > 16 {
@@ -66,6 +72,19 @@ func canonicalObject(raw []byte, limit int, allowReserved bool) (json.RawMessage
 		}
 		delim, ok := tok.(json.Delim)
 		if !ok {
+			if number, isNumber := tok.(json.Number); isNumber {
+				normalized, expanded, err := canonicalJSONNumber(number)
+				if err != nil {
+					return nil, err
+				}
+				if extra := expanded - int64(len(normalized)); extra > 0 {
+					expansionExtra += extra
+				}
+				if expansionExtra > int64(limit) {
+					return nil, ErrSourceArgs
+				}
+				return normalized, nil
+			}
 			return tok, nil
 		}
 		switch delim {
@@ -123,10 +142,61 @@ func canonicalObject(raw []byte, limit int, allowReserved bool) (json.RawMessage
 		return nil, ErrSourceArgs
 	}
 	b, err := json.Marshal(v)
-	if err != nil || len(b) > limit {
+	if err != nil || int64(len(b))+expansionExtra > int64(limit) {
 		return nil, ErrSourceArgs
 	}
 	return b, nil
+}
+
+// canonicalJSONNumber normalizes exact JSON decimal values without float64 or
+// exponent expansion. expanded is the length PostgreSQL numeric may print.
+func canonicalJSONNumber(number json.Number) (json.Number, int64, error) {
+	text := number.String()
+	sign := ""
+	if strings.HasPrefix(text, "-") {
+		sign = "-"
+		text = text[1:]
+	}
+	exponent := int64(0)
+	if i := strings.IndexAny(text, "eE"); i >= 0 {
+		value, err := strconv.ParseInt(text[i+1:], 10, 32)
+		if err != nil {
+			return "", 0, ErrSourceArgs
+		}
+		exponent = value
+		text = text[:i]
+	}
+	if i := strings.IndexByte(text, '.'); i >= 0 {
+		exponent -= int64(len(text) - i - 1)
+		text = text[:i] + text[i+1:]
+	}
+	coefficient := strings.TrimLeft(text, "0")
+	if coefficient == "" {
+		return json.Number("0"), 1, nil
+	}
+	short := strings.TrimRight(coefficient, "0")
+	exponent += int64(len(coefficient) - len(short))
+	coefficient = short
+	point := int64(len(coefficient)) + exponent
+	expanded := int64(len(sign))
+	switch {
+	case point <= 0:
+		expanded += 2 - point + int64(len(coefficient))
+	case point < int64(len(coefficient)):
+		expanded += int64(len(coefficient)) + 1
+	default:
+		expanded += point
+	}
+	// Reject an exponent that PostgreSQL would expand beyond the snapshot budget,
+	// before allocating any expanded string.
+	if expanded > MaxSourceArgsBytes {
+		return "", 0, ErrSourceArgs
+	}
+	normalized := sign + coefficient
+	if exponent != 0 {
+		normalized += "e" + strconv.FormatInt(exponent, 10)
+	}
+	return json.Number(normalized), expanded, nil
 }
 
 // MarshalJobParams preserves the native Params encoding when no policy is used.
@@ -158,10 +228,10 @@ func UnmarshalJobParams(raw []byte, j *Job) error {
 		return err
 	}
 	if frozen, ok := fields["_reports_source"]; ok {
-		if _, err := canonicalObject(raw, MaxSourceArgsBytes+4096, true); err != nil {
+		if _, err := canonicalObjectBudget(raw, 2*MaxSourceArgsBytes+4096, MaxSourceArgsBytes+4096, true); err != nil {
 			return err
 		}
-		if _, err := canonicalObject(frozen, MaxSourceArgsBytes+2048, false); err != nil {
+		if _, err := canonicalObjectBudget(frozen, 2*MaxSourceArgsBytes+2048, MaxSourceArgsBytes+2048, false); err != nil {
 			return err
 		}
 		d := json.NewDecoder(bytes.NewReader(frozen))
@@ -170,7 +240,7 @@ func UnmarshalJobParams(raw []byte, j *Job) error {
 		if err := d.Decode(&f); err != nil {
 			return ErrSourceArgs
 		}
-		canonical, err := CanonicalSourceArgs(f.Args)
+		canonical, err := canonicalObjectBudget(f.Args, 2*MaxSourceArgsBytes, MaxSourceArgsBytes, false)
 		if err != nil {
 			return err
 		}

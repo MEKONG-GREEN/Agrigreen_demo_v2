@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -150,5 +151,33 @@ func TestSourcePolicyBindsRequestReplayAndHidesErrors(t *testing.T) {
 	}
 	if _, err = native.buildDataset(ctx, domain.Job{Def: tpl.Def, TenantID: p.TenantID}); err == nil || !strings.Contains(err.Error(), "private-marker") {
 		t.Fatal("native builder errors changed")
+	}
+}
+
+type sourceScopeFunc func(context.Context) (authz.Scope, error)
+
+func (f sourceScopeFunc) Scope(ctx context.Context) (authz.Scope, error) { return f(ctx) }
+
+var _ partyport.ScopeResolver = sourceScopeFunc(nil)
+
+func TestNativeSourceReplayRetainsCurrentScopePreconditions(t *testing.T) {
+	principal := sourceTestPrincipal()
+	principal.Roles = []string{port.RoleReportsAdmin}
+	ctx := sourceTestContext(principal)
+	job := domain.Job{TenantID: principal.TenantID, RequestedBy: principal.ActorRef, Def: domain.Definition{Source: "native.source"}}
+	svc := Service{}
+	input := ExportInput{IdemKey: "native-replay-01"}
+	for _, resolve := range []sourceScopeFunc{
+		func(context.Context) (authz.Scope, error) { return authz.Scope{}, nil },
+		func(context.Context) (authz.Scope, error) { return authz.Scope{}, ErrDependency },
+	} {
+		svc.Scope = resolve
+		if err := svc.checkSourceReplay(ctx, principal, input, job); err == nil {
+			t.Fatal("native replay bypassed lost/error current scope")
+		}
+	}
+	svc.Scope = sourceScopeFunc(func(context.Context) (authz.Scope, error) { return authz.Scope{Units: []string{"89"}}, nil })
+	if err := svc.checkSourceReplay(ctx, principal, input, job); err != nil {
+		t.Fatal(err)
 	}
 }

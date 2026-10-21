@@ -73,7 +73,7 @@ func TestSourceArgsCodecNativeAndPrivate(t *testing.T) {
 func TestSourceArgsRejectMalformedAndCanonicalize(t *testing.T) {
 	for _, raw := range []string{
 		"", "null", "[]", `{"a":1,"a":2}`, `{"nested":{"a":1,"a":2}}`, `{"_reports_source":{}}`,
-		`{"nested":[{"_reports_source":{}}]}`, `{} {}`, `{"n":NaN}`, `{"s":"` + strings.Repeat("x", MaxSourceArgsBytes) + `"}`,
+		`{"nested":[{"_reports_source":{}}]}`, `{} {}`, `{"n":NaN}`, `{"n":1e2147483647}`, `{"n":1e-2147483647}`, `{"s":"` + strings.Repeat("x", MaxSourceArgsBytes) + `"}`,
 		`{"a":` + strings.Repeat("[", 18) + "0" + strings.Repeat("]", 18) + "}",
 	} {
 		if _, err := CanonicalSourceArgs([]byte(raw)); err == nil {
@@ -89,5 +89,26 @@ func TestSourceArgsRejectMalformedAndCanonicalize(t *testing.T) {
 	}
 	if string(a) != `{"a":{"x":1,"y":3},"z":2}` {
 		t.Fatalf("not canonical: %s", a)
+	}
+}
+
+func TestSourceArgsNumericCanonicalForm(t *testing.T) {
+	for _, pair := range [][2]string{
+		{`{"n":1.230e-5}`, `{"n":0.00001230}`},
+		{`{"n":-0}`, `{"n":0.0000}`},
+		{`{"n":1.00}`, `{"n":1}`},
+		{`{"n":1234567890123456789012345678901234567890}`, `{"n":123456789012345678901234567890123456789e1}`},
+	} {
+		a, err := CanonicalSourceArgs([]byte(pair[0]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := CanonicalSourceArgs([]byte(pair[1]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(a, b) {
+			t.Fatalf("equivalent exact numeric value changed: %s != %s", a, b)
+		}
 	}
 }

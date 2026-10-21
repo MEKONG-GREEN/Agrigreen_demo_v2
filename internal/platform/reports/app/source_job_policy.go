@@ -158,7 +158,16 @@ func (s *Service) checkSourceReplay(ctx context.Context, p authz.Principal, in E
 		if len(in.SourceArgs) > 0 {
 			return problem.Validation.WithField("source_args", "nguồn này không nhận bộ lọc mở rộng")
 		}
-		return nil // preserve native replay behavior
+		// Preserve the native precondition that preceded JobByIdemKey:
+		// loss of the work unit, an empty scope or resolver failure cannot replay.
+		scope, err := s.reach(ctx, p)
+		if err != nil {
+			return err
+		}
+		if scope.Empty() && !s.coopOnly(p) {
+			return ErrOutOfScope.WithDetail("tài khoản chưa gắn đơn vị công tác")
+		}
+		return nil
 	}
 	if prev.TenantID != p.TenantID || prev.RequestedBy != p.ActorRef || prev.TemplateKey != strings.TrimSpace(in.TemplateKey) || prev.Format != in.Format {
 		return problem.IdempotencyConflict
