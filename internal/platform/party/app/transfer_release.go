@@ -65,6 +65,28 @@ func (t *Transfers) recoveryReleaseProof(p port.TransferParticipants, source *st
 	return proof, nil
 }
 
+// refreshReleaseProof uses only the immutable approved inventory. It runs again
+// at each pending owner write, because a previous side's release may outlast the
+// current identity/rehearsal proof. Historical receipt reads need no new proof.
+func (t *Transfers) refreshReleaseProof(p port.TransferParticipants, source, target *store.TransferState, recovery port.TransferRecoveryRequest) error {
+	if target.Release == nil {
+		return port.ErrTransferConflict
+	}
+	if !target.Release.RequiresIdentity {
+		return nil
+	}
+	report := port.TransferReport{PlanID: source.Plan.ID, Count: target.Release.Count, Root: target.Release.Root}
+	proof, err := t.recoveryReleaseProof(p, source, recovery, report)
+	if err != nil {
+		return err
+	}
+	if target.Release.Proof == nil || !sameTransferRecoveryProof(*target.Release.Proof, proof) {
+		target.Release.Proof = &proof
+		return t.write(p.Target(), target.Intent.ID, target.Plan.Scope.TargetScopeRef, "release_proof_refreshed", target)
+	}
+	return nil
+}
+
 // Abort records a terminal forward state only after actual owner receipts prove
 // no apply, or every applied item has a verified durable compensation. Fences stay
 // closed until the separate release operation has all required owner proofs.
@@ -117,6 +139,23 @@ func (t *Transfers) releaseOne(p port.TransferParticipants, source, target *stor
 	if err := validateTransferGate(gate, *target.RecoveryGateRequest, req, gate.Fence); err != nil {
 		return err
 	}
+	// Gate maps and proofs checkpoint together. Re-read immutable core history
+	// even after release_approved/released without checking a newer owner fence.
+	gateProof, err := t.proof(p, source.Plan.ID, uuid.Nil, "gate_"+string(side), a.Namespace)
+	if err != nil {
+		return err
+	}
+	if gateProof == nil {
+		return port.ErrTransferConflict
+	}
+	var historicalGate port.TransferRecoveryGate
+	if err := json.Unmarshal(gateProof.Document, &historicalGate); err != nil {
+		return port.ErrTransferConflict
+	}
+	gateHash, err := transferDigest(historicalGate)
+	if err != nil || gateHash != gateProof.Hash || historicalGate.Ref != gateProof.Ref || historicalGate != gate {
+		return port.ErrTransferConflict
+	}
 	fence := gate.Fence // Zero is an authoritative absent-fence tombstone, not a missing check.
 	operation := "release_" + string(side)
 	old, err := t.proof(p, source.Plan.ID, uuid.Nil, operation, a.Namespace)
@@ -147,6 +186,12 @@ func (t *Transfers) releaseOne(p port.TransferParticipants, source, target *stor
 	if errors.Is(err, port.ErrTransferNotReady) {
 		if old != nil {
 			return port.ErrTransferNotReady
+		}
+		if err := t.refreshReleaseProof(p, source, target, recovery); err != nil {
+			return err
+		}
+		if err := t.authenticate(p); err != nil {
+			return err
 		}
 		receipt, err = release(ctx, recovery, req, fence)
 		if err != nil {
@@ -232,18 +277,8 @@ func (t *Transfers) ReleaseFences(p port.TransferParticipants, ref port.Transfer
 		// Once releases start, old active fences/rows may legitimately have changed.
 		// Revalidate identity recovery against the immutable approved inventory,
 		// then replay exact durable release receipts rather than reopening gates.
-		if target.Release.RequiresIdentity {
-			report := port.TransferReport{PlanID: source.Plan.ID, Count: target.Release.Count, Root: target.Release.Root}
-			proof, err := t.recoveryReleaseProof(p, source, recovery, report)
-			if err != nil {
-				return port.TransferPlan{}, err
-			}
-			if target.Release.Proof == nil || !sameTransferRecoveryProof(*target.Release.Proof, proof) {
-				target.Release.Proof = &proof
-				if err := t.write(p.Target(), target.Intent.ID, target.Plan.Scope.TargetScopeRef, "release_proof_refreshed", target); err != nil {
-					return port.TransferPlan{}, err
-				}
-			}
+		if err := t.refreshReleaseProof(p, source, target, recovery); err != nil {
+			return port.TransferPlan{}, err
 		}
 	}
 	// Keep the source closed until every target holder has a durable release.

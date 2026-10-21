@@ -155,6 +155,7 @@ type durableOwner struct {
 	recoveryApplyReads   int
 	gateCalls            int
 	releaseCalls         int
+	denyRelease          bool
 	hideGateReceipt      bool
 	hideReleaseReceipt   bool
 	hideFenceReceipt     bool
@@ -642,6 +643,9 @@ func (o *durableOwner) readFenceRelease(ctx context.Context, recovery port.Trans
 }
 func (o *durableOwner) releaseFence(ctx context.Context, recovery port.TransferRecoveryRequest, req port.TransferFenceRequest, f port.TransferFence) (port.TransferFenceRelease, error) {
 	o.releaseCalls++
+	if o.denyRelease {
+		return port.TransferFenceRelease{}, errDurableOwnerInjected
+	}
 	if err := durableRecoveryBinding(recovery, req); err != nil {
 		return port.TransferFenceRelease{}, err
 	}
@@ -2254,4 +2258,56 @@ func TestTenantTransferDurableOwnerMissingWitnessNeverRepeatsWriter(t *testing.T
 	}
 	durableAssertCount(t, o, "imported", 1)
 	durableAssertCount(t, o, "compensated", 1)
+}
+
+// Hide retained evidence with an additional test-only SELECT policy instead of
+// mutating append-only history. Its predicate is limited to this test's plan.
+func TestTenantTransferDurableOwnerMissingCoreRecoveryHistoryNeverCallsWriter(t *testing.T) {
+	for _, phase := range []string{"pending-gate", "completed-release"} {
+		t.Run(phase, func(t *testing.T) {
+			o, issuer := newDurableOwner(t)
+			svc, intent := durableTargetOnly(t, o, issuer)
+			durableRevokeNormal(t, o)
+			plan, err := svc.Abort(o.pair, port.TransferRef{ID: intent.ID}, ids.New())
+			durableRequire(t, err)
+			reason := ids.New()
+			operation := "release_source"
+			if phase == "pending-gate" {
+				o.denyRelease = true
+				operation = "gate_target"
+				if _, err := svc.ReleaseFences(o.pair, port.TransferRef{ID: intent.ID}, reason); !errors.Is(err, port.ErrTransferDependency) {
+					t.Fatal("release was not interrupted after approval", err)
+				}
+				o.denyRelease = false
+			} else {
+				_, err := svc.ReleaseFences(o.pair, port.TransferRef{ID: intent.ID}, reason)
+				durableRequire(t, err)
+			}
+			admin := pgtest.Get(t).AdminPool(t, migrations.PF)
+			policy := "p_transfer55_test_hidden_history"
+			_, err = admin.Exec(context.Background(), fmt.Sprintf(`CREATE POLICY %s ON pf_party.transfer_receipt AS RESTRICTIVE FOR SELECT TO r_party USING(plan_id<>'%s'::uuid OR operation<>'%s')`, policy, plan.ID, operation))
+			durableRequire(t, err)
+			t.Cleanup(func() {
+				_, err := admin.Exec(context.Background(), `DROP POLICY IF EXISTS p_transfer55_test_hidden_history ON pf_party.transfer_receipt`)
+				if err != nil {
+					t.Errorf("remove private test policy: %v", err)
+				}
+			})
+			var visible, retained int
+			durableRequire(t, admin.QueryRow(context.Background(), `SELECT count(*) FROM pf_party.transfer_receipt WHERE plan_id=$1 AND operation=$2`, plan.ID, operation).Scan(&retained))
+			durableRequire(t, db.WithContextTx(o.pair.Target(), o.pool, db.Module("pf/party"), func(tx pgx.Tx) error {
+				return tx.QueryRow(o.pair.Target(), `SELECT count(*) FROM pf_party.transfer_receipt WHERE plan_id=$1 AND operation=$2`, plan.ID, operation).Scan(&visible)
+			}))
+			if retained != 2 || visible != 0 {
+				t.Fatal("test policy did not hide exactly the retained core witnesses", retained, visible)
+			}
+			gateCalls, releaseCalls, fenceCalls := o.gateCalls, o.releaseCalls, o.fenceCalls
+			if _, err := svc.ReleaseFences(o.pair, port.TransferRef{ID: intent.ID}, reason); !errors.Is(err, port.ErrTransferConflict) {
+				t.Fatal("missing core recovery history was accepted", err)
+			}
+			if o.gateCalls != gateCalls || o.releaseCalls != releaseCalls || o.fenceCalls != fenceCalls {
+				t.Fatal("missing core history invoked an owner writer")
+			}
+		})
+	}
 }
