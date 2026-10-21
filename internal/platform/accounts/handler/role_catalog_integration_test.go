@@ -91,9 +91,12 @@ func TestNativeRoleCatalogHTTPOptInRetainsMFAAndLegacyDefault(t *testing.T) {
 	}
 	id := nat.create(person(f.coop30292, catalogFixtureRole))
 	u, err := f.dir.GetUser(context.Background(), id)
-	if err != nil || !slices.Contains(u.RequiredActions, port.ActionConfigureTOTP) ||
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(u.RequiredActions, port.ActionConfigureTOTP) ||
 		mfaOf(t, nat.do(http.MethodGet, "/v1/accounts/users/"+id.String(), nil))["required"] != true {
-		t.Fatalf("injected owner role lost MFA/enrollment: %v %v", u.RequiredActions, err)
+		t.Fatalf("injected owner role lost MFA/enrollment: %v", u.RequiredActions)
 	}
 	if r := f.as(f.tenant, f.national, catalogFixtureRole).do(http.MethodGet, "/v1/accounts/grants", nil); r.status != http.StatusForbidden {
 		t.Fatalf("application-admin session became a realm account admin: %d %v", r.status, r.body)
