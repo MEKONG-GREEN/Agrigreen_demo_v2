@@ -143,7 +143,7 @@ func (f *files) OpenContent(ctx context.Context, ref uuid.UUID, purpose string) 
 		return "", nil, errors.New("không có tệp")
 	}
 	if allowed, err := f.resolver.(evport.FileAuthorizer).AuthorizeFile(ctx, file); err != nil || !allowed {
-		return "", nil, fmt.Errorf("từ chối: %v", err)
+		return "", nil, fmt.Errorf("từ chối: %w", err)
 	}
 	dek, err := f.vault.Unwrap(ctx, client.Purpose(purpose), file.SubjectRef, file.WrappedDEK)
 	if err != nil {
