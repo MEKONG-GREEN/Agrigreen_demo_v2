@@ -71,6 +71,9 @@ func TransferPlanByIntent(ctx context.Context, tx pgx.Tx, intent uuid.UUID) (uui
 	return id, err
 }
 func InsertTransferIntent(ctx context.Context, tx pgx.Tx, tid, actor, operation uuid.UUID, hash port.TransferDigest, intent port.TransferIntent, now time.Time) error {
+	if err := insertTransferEntity(ctx, tx, tid, intent.Scope.TargetScopeRef, intent.ID, "intent"); err != nil {
+		return err
+	}
 	raw, err := json.Marshal(intent)
 	if err != nil {
 		return err
@@ -82,6 +85,9 @@ func InsertTransferPlan(ctx context.Context, tx pgx.Tx, tid, actor uuid.UUID, si
 	scopeRef := plan.Scope.SourceScopeRef
 	if side == port.TransferTarget {
 		scopeRef = plan.Scope.TargetScopeRef
+	}
+	if err := insertTransferEntity(ctx, tx, tid, scopeRef, plan.ID, "plan"); err != nil {
+		return err
 	}
 	raw, err := json.Marshal(plan)
 	if err != nil {
@@ -148,9 +154,25 @@ func InsertTransferHeaders(ctx context.Context, tx pgx.Tx, tid, scopeRef, plan u
 	}
 	return nil
 }
+
+// InsertTransferBinding fixes a permanent Centre/tenant pair, not a single attempt.
+// A later plan for exactly this pair reuses it; owner fences/compensation must first
+// release the old holder. Global uniqueness still rejects any different pair under RLS.
 func InsertTransferBinding(ctx context.Context, tx pgx.Tx, actor uuid.UUID, plan port.TransferPlan, now time.Time) error {
 	s := plan.Scope
-	_, err := tx.Exec(ctx, `INSERT INTO pf_party.transfer_binding(tenant_id,scope_ref,plan_id,source_tenant,source_scope_ref,target_tenant,target_scope_ref,binding_hash,actor_ref,created_at)VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, s.TargetTenant, s.TargetScopeRef, plan.ID, s.SourceTenant, s.SourceScopeRef, s.TargetTenant, s.TargetScopeRef, s.BindingHash, actor, now)
+	var oldSource, oldScope, oldTargetScope uuid.UUID
+	var oldHash port.TransferDigest
+	err := tx.QueryRow(ctx, `SELECT source_tenant,source_scope_ref,target_scope_ref,binding_hash FROM pf_party.transfer_binding WHERE target_tenant=$1`, s.TargetTenant).Scan(&oldSource, &oldScope, &oldTargetScope, &oldHash)
+	if err == nil {
+		if oldSource != s.SourceTenant || oldScope != s.SourceScopeRef || oldTargetScope != s.TargetScopeRef || oldHash != s.BindingHash {
+			return port.ErrTransferConflict
+		}
+		return nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO pf_party.transfer_binding(tenant_id,scope_ref,first_plan_id,source_tenant,source_scope_ref,target_tenant,target_scope_ref,binding_hash,actor_ref,created_at)VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, s.TargetTenant, s.TargetScopeRef, plan.ID, s.SourceTenant, s.SourceScopeRef, s.TargetTenant, s.TargetScopeRef, s.BindingHash, actor, now)
 	return transferConstraint(err)
 }
 
@@ -187,4 +209,9 @@ func transferConstraint(err error) error {
 		return port.ErrTransferConflict
 	}
 	return err
+}
+
+func insertTransferEntity(ctx context.Context, tx pgx.Tx, tid, scopeRef, id uuid.UUID, kind string) error {
+	_, err := tx.Exec(ctx, `INSERT INTO pf_party.transfer_entity(tenant_id,scope_ref,id,kind)VALUES($1,$2,$3,$4)`, tid, scopeRef, id, kind)
+	return transferConstraint(err)
 }

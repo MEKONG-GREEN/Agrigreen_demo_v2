@@ -27,6 +27,8 @@ const DBRole = "party_app"
 
 // Deps là port của module khác mà party cần.
 type Deps struct {
+	// Transfers is optional; missing registrations keep the transfer facade closed.
+	Transfers        *port.TransferRegistry
 	NavigationPolicy port.NavigationPolicy
 	Menus            *port.Menus // instance-owned menu presentation; nil keeps compatibility
 	// AdminUnits: đơn vị hành chính có hiệu lực theo thời gian (pf/masterdata) —
@@ -38,12 +40,13 @@ type Deps struct {
 
 // Module là pf/party đã nối.
 type Module struct {
-	db    tenant.Beginner // nguồn k_ref (kref.go)
-	svc   *app.Service
-	reg   *app.Registry
-	share *app.Sharing
-	kn    *app.KN
-	mods  *app.Modules
+	db        tenant.Beginner // nguồn k_ref (kref.go)
+	svc       *app.Service
+	reg       *app.Registry
+	share     *app.Sharing
+	kn        *app.KN
+	mods      *app.Modules
+	transfers *app.Transfers
 }
 
 // New tạo module với pool của vai party_app. deps tùy chọn để giữ tương thích
@@ -60,12 +63,13 @@ func New(db tenant.Beginner, clk clock.Clock, deps ...Deps) *Module {
 	mods := &app.Modules{DB: db, Clock: clk, Names: func() port.ActorNames { return kn.Names }}
 	kn.Modules = mods
 	return &Module{
-		db:    db,
-		svc:   &app.Service{DB: db, Clock: clk},
-		reg:   reg,
-		share: &app.Sharing{DB: db, Clock: clk},
-		kn:    kn,
-		mods:  mods,
+		db:        db,
+		svc:       &app.Service{DB: db, Clock: clk},
+		reg:       reg,
+		share:     &app.Sharing{DB: db, Clock: clk},
+		kn:        kn,
+		mods:      mods,
+		transfers: app.NewTransfers(db, clk, d.Transfers),
 	}
 }
 
@@ -188,3 +192,6 @@ func (m *Module) UseActorNames(n port.ActorNames) { m.kn.Names = n }
 
 // CooperativeRegistrar tạo Nút HTX qua cổng nội bộ có kiểm vai cho luồng Neo D2.
 func (m *Module) CooperativeRegistrar() port.CooperativeRegistrar { return m.reg }
+
+// Transfers exposes only the generic protocol. It creates no HTTP/CLI route.
+func (m *Module) Transfers() port.TenantTransfers { return m.transfers }

@@ -186,3 +186,16 @@ Kiểm thử port thực tế: go1.26.9, `go test -count=1 -v ./internal/platfor
 Checkpoint store/DDL: migration timestamp do `migratecheck -new pf_party_tenant_transfer` cấp là `20261021160423_pf_party_tenant_transfer.up.sql`. Metadata riêng pf_party gồm intent/plan/binding/item/idmap/batch/member/receipt, permanent operation reservations và transfer_event qua shared.apply_ledger. FORCE tenant RLS + restrictive selected-node policy, append-only triggers và r_party SELECT/INSERT; binding giữ unique toàn DB cho nguồn tenant/scope và target tenant. Source/target cùng PlanID có PK local tenant khác nhau. Không sửa ledger cũ hoặc schema owner.
 
 Store compile (`go test -run '^$' ./internal/platform/party/store`) và migratecheck module pf/party/base origin/dev đã exit0. Đây chỉ là compile/static; chưa chạy migration/DB tests hoặc runtime transfer. State snapshots nằm ở ledger event, không bảng projection mutable; expected seq + advisory local lock kiểm concurrent transitions. Permanent operation table giữ semantic key/input hash/OperationID để recovery không đổi operation sau crash.
+
+
+## Checkpoint engine stage 1
+
+Đã có generic Intent/Propose/FreezeTarget/FreezeSource/ScanNext/Seal/Accept/Status/DryRun và facade tùy chọn, chưa có HTTP/CLI/owner adapters được bật. Reserve/export/apply/verify/compensate/release/cutover vẫn explicit unavailable trong stage này; không coi stage 1 là giao xong #55. Compile app/store/handler đạt; integration tests đã viết nhưng chưa chạy PG tại checkpoint này.
+
+Target fence giữ immutable holder IntentID+BindingHash (PlanID nil) từ FreezeTarget trước Propose. Source plan có PlanID riêng ổn định theo intent, target Accept thêm local plan association cùng ID; manifest kết hợp PlanID và target fence ref/epoch. CheckTargetFence luôn đọc bằng exact intent holder, không đổi nil→PlanID giữa retry.
+
+Centre–tenant binding là permanent exact pair; các plan là association riêng. Accept lần sau cùng exact pair được tái dùng, khác pair bị DB global unique chặn kể cả metadata bên khác bị RLS ẩn. Stable idmap giữ created_plan_id làm provenance; new batch/new plan phải tái dùng TargetRef nguồn cũ. Owner fence độc quyền không cho plan mới tiến trước bù/release plan cũ. Owner phải hỗ trợ append-only reactivation/revision bằng cùng target entity, không tạo entity trùng dưới PlanID khác. Chưa triển khai/xác nhận test recovery vòng đầy đủ ở stage 1.
+
+Peer review bổ sung immutable transfer_entity registry và composite FK tenant/entity/scope cho mọi child metadata. Nhãn scope_ref không đủ để gắn item/event/operation của Centre A dưới selected scope B. Restrictive policy dùng tên p_scope theo migration gate hiện có; không nới gate. Các ledger child partitions phải không có direct r_party rights nếu chỉ giữ p_tenant; test privilege được thêm.
+
+Owner TOCTOU contract: Export/Apply/ReadReceipt/Compensate/Release phải tự kiểm current authority + exact fence trong cùng r_owner transaction với read/write/receipt. Core callbacks authority nằm ngoài party transaction, không thể thay atomic owner check và không truyền raw Tx. Test production owner revoke/fence race thuộc owner implementation, chưa được suy diễn từ fixture metadata.
