@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -242,4 +243,127 @@ func TestTemplateScopeSnapshotBytesAndTargetRestriction(t *testing.T) {
 	f.want(err, port.ErrSnapshotNotFound.Code, "unknown mirror denied")
 	_, err = f.svc.Snapshots(boundedPub, "fx", mirrorRef)
 	f.want(err, "forbidden", "unknown mirror list denied")
+}
+
+// TestTargetScopeLifecycleAndMetadata exercises explicit target restrictions on
+// both global and owner-node actors, including reopened-state projection.
+func TestTargetScopeLifecycleAndMetadata(t *testing.T) {
+	f := newFx(t)
+	profile := fxProfile
+	profile.UnitKinds = []string{port.UnitFacility}
+	var err error
+	f.svc, err = NewService(f.own, f.clk, sqlApprovals{}, []port.Profile{profile})
+	f.must(err, "facility service")
+	node, a, b := ids.New(), ids.New(), ids.New()
+	pub := f.as(f.tid, ids.New(), "tinh", node, "U1", "U2")
+	tpls, err := f.svc.InstallFixtures(f.as(f.tid, ids.New(), "admin", node), "fx", "")
+	f.must(err, "install")
+	allowTemplate := func(string) bool { return true }
+	onlyA := func(_ string, ref uuid.UUID) bool { return ref == a }
+	for _, tc := range []struct {
+		name, key string
+		node      uuid.UUID
+		scope     authz.Scope
+	}{
+		{"global", "2026-W41", ids.New(), authz.Scope{All: true}},
+		{"owner", "2026-W42", node, authz.Scope{Units: []string{"U1", "U2"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			from, to := f.clk.Now(), f.clk.Now().Add(6*24*time.Hour)
+			v, err := f.svc.Publish(pub, PublishInput{Profile: "fx", TemplateID: tpls[0].ID, Label: tc.name,
+				DueAt: to, Units: []string{a.String(), b.String()}, UnitKind: port.UnitFacility,
+				UnitParents: []string{"U1", "U2"},
+				Period:      &PeriodKey{Kind: "week", Key: tc.key, From: &from, To: &to, Rule: "fixture"}}, "")
+			f.must(err, "publish")
+			bounded := templateScopeCtx(f, ids.New(), "tinh", tc.node, tc.scope, allowTemplate, onlyA)
+			_, err = f.svc.Close(bounded, "fx", v.Period.ID, "")
+			f.want(err, "forbidden", "whole close outside targets")
+			_, err = f.svc.Cancel(bounded, "fx", v.Period.ID, "cancel target regression", "")
+			f.want(err, "forbidden", "whole cancel outside targets")
+			err = (Control{Svc: f.svc}).ChangeDue(bounded, "fx", v.Period.ID, to.Add(time.Hour), "", "")
+			f.want(err, "forbidden", "whole due change outside targets")
+			unchanged, err := f.svc.Period(pub, "fx", v.Period.ID)
+			f.must(err, "unchanged")
+			if len(unchanged.Events) != 1 || !unchanged.Period.DueAt.Equal(to) {
+				t.Fatal("denied target write left an event or changed due date")
+			}
+			assertMetadata := func(view PeriodView) {
+				t.Helper()
+				if len(view.Period.Units) != 1 || view.Period.Units[0] != a.String() ||
+					len(view.Spec.UnitParents) != 1 || view.Spec.UnitParents[0] != "U1" || len(view.Units) != 1 {
+					t.Fatalf("target metadata not aligned: %+v %+v", view.Period.Units, view.Spec.UnitParents)
+				}
+				raw, err := json.Marshal(view)
+				f.must(err, "metadata json")
+				if strings.Contains(string(raw), b.String()) {
+					t.Fatal("forbidden target ID remains in response metadata")
+				}
+			}
+			pv, err := f.svc.Period(bounded, "fx", v.Period.ID)
+			f.must(err, "bounded view")
+			assertMetadata(pv)
+			ps, err := f.svc.Periods(bounded, "fx", 100)
+			f.must(err, "bounded list")
+			for _, period := range ps {
+				for _, unit := range period.Units {
+					if unit != a.String() {
+						t.Fatal("period list leaked target")
+					}
+				}
+			}
+			figs, err := (Figures{Svc: f.svc}).Figures(bounded, port.FiguresQuery{Profile: "fx", TemplateCode: "FX-01", From: from, To: to})
+			f.must(err, "bounded figures")
+			if len(figs) == 0 {
+				t.Fatal("allowed figures missing")
+			}
+			for _, figures := range figs {
+				if _, leaked := figures.Parents[b.String()]; leaked || len(figures.Parents) != 1 ||
+					figures.Parents[a.String()] != "U1" {
+					t.Fatal("figures parent map leaked a forbidden target")
+				}
+			}
+			_, err = f.svc.Close(pub, "fx", v.Period.ID, "")
+			f.must(err, "legacy close")
+			for _, units := range [][]string{nil, {b.String()}} {
+				_, err = f.svc.Reopen(bounded, "fx", v.Period.ID, ReopenInput{Units: units, Reason: "reopen target regression"}, "")
+				f.want(err, "forbidden", "reopen outside selected targets")
+			}
+			reopened, err := f.svc.Reopen(bounded, "fx", v.Period.ID, ReopenInput{Units: []string{a.String()}, Reason: "reopen allowed target"}, "")
+			f.must(err, "allowed subset reopen")
+			assertMetadata(reopened)
+			if !reopened.State.AcceptsUnit(a.String()) || reopened.State.Status != domain.PeriodReopened {
+				t.Fatal("allowed subset reopen became closed")
+			}
+			_, err = f.svc.Close(pub, "fx", v.Period.ID, "")
+			f.must(err, "legacy reclose")
+			_, err = f.svc.Reopen(pub, "fx", v.Period.ID, ReopenInput{Units: []string{b.String()}, Reason: "reopen other target only"}, "")
+			f.must(err, "legacy reopen B")
+			visible, err := f.svc.Period(bounded, "fx", v.Period.ID)
+			f.must(err, "bounded reopened view")
+			assertMetadata(visible)
+			if visible.State.AcceptsUnit(a.String()) || visible.State.Status != domain.PeriodClosed {
+				t.Fatal("hidden subset reopen became an all-target reopen")
+			}
+			tasks, err := f.svc.Tasks(bounded, "fx", TaskFilter{})
+			f.must(err, "bounded tasks")
+			for _, task := range tasks {
+				raw, err := json.Marshal(task)
+				f.must(err, "task json")
+				if task.Unit.Unit != a.String() || strings.Contains(string(raw), b.String()) {
+					t.Fatal("task metadata leaked a forbidden target")
+				}
+				if task.Period.ID == v.Period.ID && task.State.AcceptsUnit(a.String()) {
+					t.Fatal("task state widened a hidden subset reopen")
+				}
+			}
+			denied := templateScopeCtx(f, ids.New(), "tinh", tc.node, tc.scope, allowTemplate, func(string, uuid.UUID) bool { return false })
+			_, err = f.svc.Period(denied, "fx", v.Period.ID)
+			f.want(err, port.ErrPeriodNotFound.Code, "empty target scope")
+			// Explicit full permission still controls a period; the callback is
+			// a restriction, not an unconditional lifecycle ban.
+			full := templateScopeCtx(f, ids.New(), "tinh", tc.node, tc.scope, allowTemplate, func(string, uuid.UUID) bool { return true })
+			_, err = f.svc.Close(full, "fx", v.Period.ID, "")
+			f.must(err, "full explicit close")
+		})
+	}
 }

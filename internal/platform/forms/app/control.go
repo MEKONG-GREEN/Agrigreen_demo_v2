@@ -70,7 +70,7 @@ func (c Control) ChangeDue(ctx context.Context, profile string, id uuid.UUID, du
 		if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
 			return port.ErrPeriodNotFound
 		}
-		if !a.canClose(prof.CloseBy, v.Period) {
+		if !a.canClose(prof.CloseBy, v.Period, v.Spec, nil) {
 			return problem.Forbidden.WithDetail("đổi hạn nộp cần cấp " + prof.CloseBy + " của Nút phát hành")
 		}
 		switch v.State.Status {

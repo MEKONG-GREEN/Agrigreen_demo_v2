@@ -81,6 +81,13 @@ func (f Figures) Figures(ctx context.Context, q port.FiguresQuery) ([]port.Perio
 			}
 			pf := &out[j]
 			pf.Units = slices.DeleteFunc(pf.Units, func(u string) bool { return !a.allowsUnit(p.Spec, p.Units, u) })
+			if a.targetFilter != nil {
+				for u := range pf.Parents {
+					if !a.allowsUnit(p.Spec, p.Units, u) {
+						delete(pf.Parents, u)
+					}
+				}
+			}
 			for _, m := range []map[string]port.UnitFigures{pf.Submitted, pf.Closed} {
 				for u := range m {
 					if !a.allowsUnit(p.Spec, p.Units, u) {

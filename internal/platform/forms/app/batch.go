@@ -278,6 +278,7 @@ func (s *Service) Tasks(ctx context.Context, profile string, f TaskFilter) ([]Ta
 			if v == nil || !a.allowsTemplate(v.Period.TemplateCode) || v.State.Status == domain.PeriodCancelled {
 				continue
 			}
+			a.filterTargets(v)
 			full := a.scope.All || a.owns(v.Period)
 			var tpl *store.Template
 			for _, u := range v.Units {

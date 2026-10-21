@@ -262,15 +262,25 @@ func (a actor) canSee(p store.Period, spec domain.Spec) bool {
 	if !a.allowsTemplate(p.TemplateCode) {
 		return false
 	}
-	if a.scope.All || a.owns(p) {
+	if (a.scope.All || a.owns(p)) && a.targetFilter == nil {
 		return true
 	}
 	return slices.ContainsFunc(p.Units, func(u string) bool { return a.allowsUnit(spec, p.Units, u) })
 }
 
-// canClose: cấp close_by và (toàn quốc hoặc Nút chủ của kỳ).
-func (a actor) canClose(prof string, p store.Period) bool {
-	return a.allowsTemplate(p.TemplateCode) && a.level == prof && (a.scope.All || a.owns(p))
+// canClose checks the control level/node and every affected target.
+// An empty selection means the whole period, as for ReopenInput.
+func (a actor) canClose(prof string, p store.Period, spec domain.Spec, units []string) bool {
+	if !a.allowsTemplate(p.TemplateCode) || a.level != prof || (!a.scope.All && !a.owns(p)) {
+		return false
+	}
+	if a.targetFilter == nil {
+		return true
+	}
+	if len(units) == 0 {
+		units = p.Units
+	}
+	return !slices.ContainsFunc(units, func(u string) bool { return !a.allowsUnit(spec, p.Units, u) })
 }
 
 // canReadWholeSnapshot checks all bounded units before returning immutable bytes.
@@ -364,9 +374,10 @@ func (s *Service) Period(ctx context.Context, profile string, id uuid.UUID) (Per
 	if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
 		return PeriodView{}, port.ErrPeriodNotFound
 	}
-	if (!a.scope.All && !a.owns(v.Period)) || a.targetFilter != nil {
+	if !a.scope.All && !a.owns(v.Period) && a.targetFilter == nil {
 		v.Units = slices.DeleteFunc(v.Units, func(u UnitView) bool { return !a.allowsUnit(v.Spec, v.Period.Units, u.Unit) })
 	}
+	a.filterTargets(v)
 	return *v, nil
 }
 
@@ -387,13 +398,15 @@ func (s *Service) Periods(ctx context.Context, profile string, limit int) ([]sto
 		}
 		for _, p := range ps {
 			spec := domain.DefaultSpec()
-			if !a.scope.All && !a.owns(p) {
+			if (!a.scope.All && !a.owns(p)) || a.targetFilter != nil {
 				if spec, e = store.SpecOf(ctx, tx, p.ID); e != nil {
 					return e
 				}
 			}
 			if a.canSee(p, spec) {
-				out = append(out, p)
+				v := PeriodView{Period: p, Spec: spec}
+				a.filterTargets(&v)
+				out = append(out, v.Period)
 			}
 		}
 		return nil
@@ -826,7 +839,7 @@ func (s *Service) Close(ctx context.Context, profile string, periodID uuid.UUID,
 		if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
 			return port.ErrPeriodNotFound
 		}
-		if !a.canClose(prof.CloseBy, v.Period) {
+		if !a.canClose(prof.CloseBy, v.Period, v.Spec, nil) {
 			return problem.Forbidden.WithDetail("chốt kỳ cần cấp " + prof.CloseBy + " của Nút phát hành")
 		}
 		if v.State.Status == domain.PeriodCancelled {
@@ -912,7 +925,7 @@ func (s *Service) Reopen(ctx context.Context, profile string, periodID uuid.UUID
 		if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
 			return port.ErrPeriodNotFound
 		}
-		if !a.canClose(prof.CloseBy, v.Period) {
+		if !a.canClose(prof.CloseBy, v.Period, v.Spec, in.Units) {
 			return problem.Forbidden.WithDetail("mở lại kỳ cần cấp " + prof.CloseBy + " của Nút phát hành")
 		}
 		if v.State.Status == domain.PeriodCancelled {
@@ -959,7 +972,7 @@ func (s *Service) Cancel(ctx context.Context, profile string, periodID uuid.UUID
 		if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
 			return port.ErrPeriodNotFound
 		}
-		if !a.canClose(prof.CloseBy, v.Period) {
+		if !a.canClose(prof.CloseBy, v.Period, v.Spec, nil) {
 			return problem.Forbidden.WithDetail("hủy kỳ cần cấp " + prof.CloseBy + " của Nút phát hành")
 		}
 		switch v.State.Status {
