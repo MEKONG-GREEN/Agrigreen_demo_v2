@@ -181,3 +181,36 @@ func TestNativeSourceReplayRetainsCurrentScopePreconditions(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Shared canonicalization must preserve ordinary integer JSON for an owner's
+// strict decoder; converting 1000 to 1e3 would make encoding/json reject int.
+func TestSourceFreezeReceivesExactTypedIntegers(t *testing.T) {
+	now := time.Date(2026, 10, 21, 3, 0, 0, 0, time.UTC)
+	principal := sourceTestPrincipal()
+	ctx := sourceTestContext(principal)
+	for _, limit := range []int{100, 1000} {
+		svc := ownerPolicyService(now, func(context.Context, port.SourceJobAccess) error { return nil },
+			func(context.Context, port.SourceBuildQuery) (port.SourceData, error) { return port.SourceData{}, nil })
+		policy, _ := svc.Builders.jobPolicy("example.measure")
+		policy.Freeze = func(_ context.Context, q port.SourceFreezeRequest) (json.RawMessage, error) {
+			var args struct {
+				Limit int `json:"limit"`
+			}
+			d := json.NewDecoder(strings.NewReader(string(q.SourceArgs)))
+			d.DisallowUnknownFields()
+			if err := d.Decode(&args); err != nil {
+				t.Fatalf("typed int changed by shared normalization: %s: %v", q.SourceArgs, err)
+			}
+			if args.Limit != limit {
+				t.Fatalf("integer lost precision: %d", args.Limit)
+			}
+			return json.Marshal(args)
+		}
+		svc.Builders.policies["example.measure"] = policy
+		template, _ := svc.builtinTemplate("example.layout")
+		raw, _ := json.Marshal(map[string]int{"limit": limit})
+		if _, err := svc.sourceRequestJob(ctx, principal, template, ExportInput{TemplateKey: template.Key, Format: "xlsx", SourceArgs: raw}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

@@ -228,9 +228,9 @@ func scopeContains(sc authz.Scope, j domain.Job) bool {
 // successful cached POST could outlive an owner's revocation without reaching
 // RequestExport. It does not create a job or bypass the common idempotency lock.
 func (s *Service) CheckExportReplay(ctx context.Context, in ExportInput) error {
-	p, err := authz.Require(ctx, s.readerRoles()...)
-	if err != nil {
-		return err
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return problem.Unauthenticated
 	}
 	if in.IdemKey == "" {
 		return nil
@@ -238,6 +238,17 @@ func (s *Service) CheckExportReplay(ctx context.Context, in ExportInput) error {
 	return s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		prev, err := store.JobByIdemKey(ctx, tx, in.IdemKey)
 		if err != nil || prev == nil {
+			return err
+		}
+		// Keep the native HTTP cache path when no policy is configured, but
+		// private jobs must still fail closed after the last policy was removed.
+		if !s.HasSourceJobPolicies() && prev.SourceArgs == nil {
+			if len(in.SourceArgs) > 0 {
+				return problem.Validation.WithField("source_args", "nguồn này không nhận bộ lọc mở rộng")
+			}
+			return nil
+		}
+		if _, err := authz.Require(ctx, s.readerRoles()...); err != nil {
 			return err
 		}
 		if err = s.checkReplayTemplate(ctx, tx, in, *prev); err != nil {

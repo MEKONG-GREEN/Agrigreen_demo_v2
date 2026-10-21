@@ -148,8 +148,8 @@ func canonicalObjectBudget(raw []byte, inputLimit, limit int, allowReserved bool
 	return b, nil
 }
 
-// canonicalJSONNumber normalizes exact JSON decimal values without float64 or
-// exponent expansion. expanded is the length PostgreSQL numeric may print.
+// canonicalJSONNumber normalizes exact JSON decimal values without float64.
+// It checks the expanded length before allocating a bounded plain decimal.
 func canonicalJSONNumber(number json.Number) (json.Number, int64, error) {
 	text := number.String()
 	sign := ""
@@ -192,9 +192,14 @@ func canonicalJSONNumber(number json.Number) (json.Number, int64, error) {
 	if expanded > MaxSourceArgsBytes {
 		return "", 0, ErrSourceArgs
 	}
-	normalized := sign + coefficient
-	if exponent != 0 {
-		normalized += "e" + strconv.FormatInt(exponent, 10)
+	var normalized string
+	switch {
+	case point <= 0:
+		normalized = sign + "0." + strings.Repeat("0", int(-point)) + coefficient
+	case point < int64(len(coefficient)):
+		normalized = sign + coefficient[:int(point)] + "." + coefficient[int(point):]
+	default:
+		normalized = sign + coefficient + strings.Repeat("0", int(exponent))
 	}
 	return json.Number(normalized), expanded, nil
 }

@@ -16,9 +16,6 @@ import (
 // ExportAuthorization must be mounted after authentication/session resolution and
 // before idempotency.Middleware. The assembly's RequestMiddleware chain does this.
 func (h Handler) ExportAuthorization() gin.HandlerFunc {
-	if !h.Svc.HasSourceJobPolicies() {
-		return nil
-	}
 	return func(c *gin.Context) {
 		if c.Request.Method != http.MethodPost || c.FullPath() != "/v1/reports/exports" {
 			c.Next()

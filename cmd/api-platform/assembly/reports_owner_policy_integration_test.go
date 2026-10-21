@@ -73,8 +73,9 @@ func TestReportsOwnerAuthorizationPrecedesHTTPIdempotencyCache(t *testing.T) {
 	server := httptest.NewServer(router)
 	defer server.Close()
 	token := issuer.Sign(t, authztest.Token{Subject: actor, TenantID: tid, Roles: []string{authz.RolePlatformAdmin}, MFA: true})
+	requestBaseURL := server.URL
 	postRaw := func(key, raw string) (int, string, bool) {
-		req, e := http.NewRequest(http.MethodPost, server.URL+"/v1/reports/exports", strings.NewReader(raw))
+		req, e := http.NewRequest(http.MethodPost, requestBaseURL+"/v1/reports/exports", strings.NewReader(raw))
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -91,7 +92,7 @@ func TestReportsOwnerAuthorizationPrecedesHTTPIdempotencyCache(t *testing.T) {
 			}
 		}()
 		body, _ := io.ReadAll(response.Body)
-		if bytes.Contains(body, []byte("private-marker")) || bytes.Contains(body, []byte("source_args")) || bytes.Contains(body, []byte("_reports_source")) {
+		if bytes.Contains(body, []byte("private-marker")) || bytes.Contains(body, []byte(`"source_args":`)) || bytes.Contains(body, []byte("_reports_source")) {
 			t.Fatalf("HTTP body leaked filter: %s", body)
 		}
 		return response.StatusCode, string(body), response.Header.Get(idempotency.ReplayedHeader) == "true"
@@ -139,5 +140,15 @@ func TestReportsOwnerAuthorizationPrecedesHTTPIdempotencyCache(t *testing.T) {
 	status, body, _ = post("owner-http-cache-01", "different")
 	if status != http.StatusUnprocessableEntity {
 		t.Fatalf("changed filter was replayed: %d %s", status, body)
+	}
+	// A restarted instance without the last owner policy shares the same cache.
+	// It must still recognize a stored private job before cached 202 is released.
+	removed := reports.New(rootPool, clock.NewFixed(time.Date(2026, 10, 21, 3, 0, 0, 0, time.UTC)), reports.Deps{Catalog: []port.CatalogRegistration{catalog}})
+	removedServer := httptest.NewServer(NewRouter(Deps{Log: telemetry.NewLogger("test", io.Discard), Verifier: issuer.Verifier(), Ops: rootPool, Modules: []httpx.Module{removed}}))
+	defer removedServer.Close()
+	requestBaseURL = removedServer.URL
+	status, body, replayed = post("owner-http-cache-01", "private-marker")
+	if status != http.StatusServiceUnavailable || replayed {
+		t.Fatalf("removed policy returned cached job: %d %s", status, body)
 	}
 }
