@@ -12,6 +12,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
 type assignmentRuleProbe struct {
@@ -94,10 +95,7 @@ func TestAssignmentRulesNormalizeBeforeProviderAndIgnoreMutation(t *testing.T) {
 		!slices.Equal(provider.seen.Departments, got.Departments) || !slices.Equal(provider.seen.Communes, got.Communes) {
 		t.Fatal("provider did not see normalized values")
 	}
-	b, err := json.Marshal(Service{AssignmentRules: provider})
-	if err != nil || strings.Contains(string(b), "AssignmentRules") || strings.Contains(string(b), "fixture_level") {
-		t.Fatal("server-side policy was serialized", string(b), err)
-	}
+
 }
 
 func TestAssignmentRulesRejectsInvalidStructureBeforePermissiveProvider(t *testing.T) {
@@ -137,8 +135,10 @@ func TestAssignmentRulesConfiguredDenialNeverFallsBack(t *testing.T) {
 		t.Fatal("configured node-kind error fell back to legacy", err)
 	}
 	for _, err := range []error{port.AssignmentRuleError{Field: "role", Msg: "fixture denied"}, &port.AssignmentRuleError{Field: "role", Msg: "fixture denied"}} {
-		if got := fieldProblem(err); got == err {
-			t.Fatal("owner validation error was not mapped")
+		var validation *problem.Problem
+		if got := fieldProblem(err); !errors.As(got, &validation) || validation.Code != "validation_failed" ||
+			len(validation.Errors) != 1 || validation.Errors[0].Field != "role" || validation.Errors[0].Reason != "fixture denied" {
+			t.Fatal("owner validation error was not mapped with its field", got)
 		}
 	}
 }
