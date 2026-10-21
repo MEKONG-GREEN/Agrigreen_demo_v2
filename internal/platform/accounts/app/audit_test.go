@@ -88,17 +88,17 @@ func TestAuditCursorStableMergeBindingsAndReadReceipt(t *testing.T) {
 	}
 	changed := in
 	changed.Action = "locked"
-	if _, err = svc.Audit(ctx, changed); !errors.Is(err, problem.Validation) {
+	if _, err = svc.Audit(ctx, changed); err == nil || problem.From(err).Code != problem.Validation.Code {
 		t.Fatal("cursor allowed different filter", err)
 	}
 	changed = in
 	changed.Limit = 2
-	if _, err = svc.Audit(ctx, changed); !errors.Is(err, problem.Validation) {
+	if _, err = svc.Audit(ctx, changed); err == nil || problem.From(err).Code != problem.Validation.Code {
 		t.Fatal("cursor allowed different limit", err)
 	}
 	other := p
 	other.TenantID = ids.New()
-	if _, err = svc.Audit(authz.WithPrincipal(context.Background(), other), in); !errors.Is(err, problem.Validation) {
+	if _, err = svc.Audit(authz.WithPrincipal(context.Background(), other), in); err == nil || problem.From(err).Code != problem.Validation.Code {
 		t.Fatal("cursor crossed tenant", err)
 	}
 	data, _ := base64.RawURLEncoding.DecodeString(in.Cursor)
@@ -108,7 +108,7 @@ func TestAuditCursorStableMergeBindingsAndReadReceipt(t *testing.T) {
 	data, _ = json.Marshal(cur)
 	changed = in
 	changed.Cursor = base64.RawURLEncoding.EncodeToString(data)
-	if _, err = svc.Audit(ctx, changed); !errors.Is(err, problem.Validation) {
+	if _, err = svc.Audit(ctx, changed); err == nil || problem.From(err).Code != problem.Validation.Code {
 		t.Fatal("unknown cursor source accepted", err)
 	}
 }
@@ -169,7 +169,7 @@ func TestAuditAuthorizationRecorderAndSourceFailClosed(t *testing.T) {
 	}
 	invalid := in
 	invalid.To = invalid.From.Add(MaxAuditWindow + time.Second)
-	if _, err := svc.Audit(ctx, invalid); !errors.Is(err, problem.Validation) {
+	if _, err := svc.Audit(ctx, invalid); err == nil || problem.From(err).Code != problem.Validation.Code {
 		t.Fatal("unbounded window", err)
 	}
 }
