@@ -95,6 +95,9 @@ func (s *Service) buildRegisteredSource(ctx context.Context, j domain.Job, sc au
 	}
 	data, err := builder(ctx, query)
 	if err != nil {
+		if _, enabled := s.Builders.jobPolicy(j.Def.Source); enabled {
+			return built{}, ErrDependency
+		}
 		return built{}, err
 	}
 	return sourceBuilt(data), nil

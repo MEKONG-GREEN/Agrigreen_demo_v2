@@ -62,7 +62,7 @@ func (s *Service) freezeSourceArgs(ctx context.Context, j *domain.Job, raw json.
 		return ErrDependency
 	}
 	j.SourceArgs = &domain.FrozenSourceArgs{Source: j.Def.Source, Version: policy.Version,
-		JobID: j.ID, TenantID: j.TenantID, RequestedBy: j.RequestedBy, RequestedAt: j.RequestedAt, Args: slices.Clone(canonical)}
+		JobID: j.ID, TenantID: j.TenantID, RequestedBy: j.RequestedBy, RequestedAt: j.RequestedAt, TemplateKey: j.TemplateKey, TemplateVersion: j.TemplateVersion, Format: j.Format, Args: slices.Clone(canonical)}
 	return nil
 }
 func (s *Service) authorizeSourceJob(ctx context.Context, j domain.Job, actor uuid.UUID, op port.SourceJobOperation) (bool, error) {
@@ -86,7 +86,7 @@ func (s *Service) authorizeSourceJob(ctx context.Context, j domain.Job, actor uu
 	}
 	if op != port.SourceJobBuild {
 		p, err := authz.Require(ctx, s.readerRoles()...)
-		if err != nil || actor == uuid.Nil || p.ActorRef != actor || p.TenantID != j.TenantID {
+		if err != nil || actor == uuid.Nil || p.ActorRef != actor || p.TenantID != j.TenantID || !hasAny(p, s.sourceRoles(j.Def.Source)) {
 			return true, problem.Forbidden
 		}
 	}

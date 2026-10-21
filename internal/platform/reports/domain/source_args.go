@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -17,13 +18,16 @@ var ErrSourceArgs = errors.New("reports: invalid private source arguments")
 // FrozenSourceArgs is stored with the job, never serialized in any public Job DTO.
 // Binding prevents moving a valid owner's snapshot to another job or tenant.
 type FrozenSourceArgs struct {
-	Source      string          `json:"source"`
-	Version     int             `json:"version"`
-	JobID       uuid.UUID       `json:"job_id"`
-	TenantID    uuid.UUID       `json:"tenant_id"`
-	RequestedBy uuid.UUID       `json:"requested_by"`
-	RequestedAt time.Time       `json:"requested_at"`
-	Args        json.RawMessage `json:"args"`
+	TemplateKey     string          `json:"template_key"`
+	TemplateVersion int             `json:"template_version"`
+	Format          string          `json:"format"`
+	Source          string          `json:"source"`
+	Version         int             `json:"version"`
+	JobID           uuid.UUID       `json:"job_id"`
+	TenantID        uuid.UUID       `json:"tenant_id"`
+	RequestedBy     uuid.UUID       `json:"requested_by"`
+	RequestedAt     time.Time       `json:"requested_at"`
+	Args            json.RawMessage `json:"args"`
 }
 
 func (j Job) ValidateSourceArgs() error {
@@ -33,7 +37,7 @@ func (j Job) ValidateSourceArgs() error {
 	}
 	if f.Source == "" || f.Source != j.Def.Source || f.Version < 1 || f.JobID == uuid.Nil || f.JobID != j.ID ||
 		f.TenantID == uuid.Nil || f.TenantID != j.TenantID || f.RequestedBy == uuid.Nil || f.RequestedBy != j.RequestedBy ||
-		f.RequestedAt.IsZero() || !f.RequestedAt.Equal(j.RequestedAt) {
+		f.RequestedAt.IsZero() || !f.RequestedAt.Equal(j.RequestedAt) || f.TemplateKey != j.TemplateKey || f.TemplateVersion != j.TemplateVersion || f.Format != j.Format {
 		return ErrSourceArgs
 	}
 	_, err := CanonicalSourceArgs(f.Args)
@@ -46,7 +50,7 @@ func CanonicalSourceArgs(raw json.RawMessage) (json.RawMessage, error) {
 	return canonicalObject(raw, MaxSourceArgsBytes, false)
 }
 func canonicalObject(raw []byte, limit int, allowReserved bool) (json.RawMessage, error) {
-	if len(raw) == 0 || len(raw) > limit {
+	if len(raw) == 0 || len(raw) > limit || !utf8.Valid(raw) {
 		return nil, ErrSourceArgs
 	}
 	d := json.NewDecoder(bytes.NewReader(raw))
