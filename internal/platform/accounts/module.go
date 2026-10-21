@@ -131,6 +131,9 @@ func (m *Module) Assignments() port.Assignments { return m.svc }
 // báo của consumer worker (tenant tường minh).
 func (m *Module) RoleHolders() port.RoleHolders { return m.svc }
 
+// ScopedDutyHolders provides a read-only recipient query restricted to one issuer node.
+func (m *Module) ScopedDutyHolders() port.ScopedDutyHolders { return app.ScopedDutyReader{Svc: m.svc} }
+
 // XaScopes (W11.46) cho lịch trực KSGM BM-03 của pf/extension: cán bộ Cấp Xã của phòng ban kèm xã phụ trách, giới hạn
 // cơ sở/hộ (tenant tường minh).
 func (m *Module) XaScopes() port.XaScopes { return m.svc }
