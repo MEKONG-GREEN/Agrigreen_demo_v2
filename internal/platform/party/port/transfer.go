@@ -200,6 +200,10 @@ type TransferImporter func(context.Context, TransferApplyRequest) (TransferRecei
 type TransferReceiptReader func(context.Context, TransferApplyRequest) (TransferReceipt, error)
 type TransferVerifier func(context.Context, TransferApplyRequest, TransferReceipt) error
 
+// Recovery-only read of the immutable original apply receipt/provenance; it must
+// not require the old normal approval or assert that the target row is still active.
+type TransferRecoveryReceiptReader func(context.Context, TransferRecoveryRequest, TransferApplyRequest) (TransferReceipt, error)
+
 type TransferRecoveryRequest struct {
 	Scope                  TransferScope
 	OperationID, ReasonRef uuid.UUID
@@ -232,25 +236,26 @@ type TransferAdapter struct {
 	Module, Namespace, Version string
 	DependsOn                  []string
 	MaxBatch                   int
-	Authority                  TransferAuthority            `json:"-"`
-	RecoveryAuthority          TransferAuthority            `json:"-"`
-	ReleaseSourceFence         TransferFenceReleaser        `json:"-"`
-	ReadSourceFenceRelease     TransferFenceReleaseReader   `json:"-"`
-	ReleaseTargetFence         TransferFenceReleaser        `json:"-"`
-	ReadTargetFenceRelease     TransferFenceReleaseReader   `json:"-"`
-	FenceSource                TransferFenceWriter          `json:"-"`
-	FenceTarget                TransferFenceWriter          `json:"-"`
-	CheckSourceFence           TransferFenceChecker         `json:"-"`
-	CheckTargetFence           TransferFenceChecker         `json:"-"`
-	Scan                       TransferScanner              `json:"-"`
-	Export                     TransferExporter             `json:"-"`
-	ReadExport                 TransferExportReader         `json:"-"`
-	Apply                      TransferImporter             `json:"-"`
-	ReadReceipt                TransferReceiptReader        `json:"-"`
-	Verify                     TransferVerifier             `json:"-"`
-	Compensate                 TransferCompensator          `json:"-"`
-	ReadCompensation           TransferCompensationReader   `json:"-"`
-	VerifyCompensation         TransferCompensationVerifier `json:"-"`
+	Authority                  TransferAuthority             `json:"-"`
+	ReadAppliedForRecovery     TransferRecoveryReceiptReader `json:"-"`
+	RecoveryAuthority          TransferAuthority             `json:"-"`
+	ReleaseSourceFence         TransferFenceReleaser         `json:"-"`
+	ReadSourceFenceRelease     TransferFenceReleaseReader    `json:"-"`
+	ReleaseTargetFence         TransferFenceReleaser         `json:"-"`
+	ReadTargetFenceRelease     TransferFenceReleaseReader    `json:"-"`
+	FenceSource                TransferFenceWriter           `json:"-"`
+	FenceTarget                TransferFenceWriter           `json:"-"`
+	CheckSourceFence           TransferFenceChecker          `json:"-"`
+	CheckTargetFence           TransferFenceChecker          `json:"-"`
+	Scan                       TransferScanner               `json:"-"`
+	Export                     TransferExporter              `json:"-"`
+	ReadExport                 TransferExportReader          `json:"-"`
+	Apply                      TransferImporter              `json:"-"`
+	ReadReceipt                TransferReceiptReader         `json:"-"`
+	Verify                     TransferVerifier              `json:"-"`
+	Compensate                 TransferCompensator           `json:"-"`
+	ReadCompensation           TransferCompensationReader    `json:"-"`
+	VerifyCompensation         TransferCompensationVerifier  `json:"-"`
 }
 
 type TransferIntentInput struct {

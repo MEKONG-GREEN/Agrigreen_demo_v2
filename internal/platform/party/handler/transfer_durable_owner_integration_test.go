@@ -819,6 +819,9 @@ func (o *durableOwner) adapter(namespace string) port.TransferAdapter {
 	a.Scan, a.Export, a.ReadExport = o.scan, o.export, o.readExport
 	a.Apply, a.ReadReceipt, a.Verify = o.apply, o.readReceipt, o.verify
 	a.Compensate, a.ReadCompensation, a.VerifyCompensation = o.compensate, o.readCompensation, o.verifyCompensation
+	a.ReadAppliedForRecovery = func(ctx context.Context, recovery port.TransferRecoveryRequest, req port.TransferApplyRequest) (port.TransferReceipt, error) {
+		return o.readReceipt(ctx, req)
+	}
 	// Fence release is deliberately unavailable: these tests do not claim cutover.
 	a.ReleaseSourceFence = func(context.Context, port.TransferRecoveryRequest, port.TransferFenceRequest, port.TransferFence) (port.TransferFenceRelease, error) {
 		return port.TransferFenceRelease{}, port.ErrTransferNotReady

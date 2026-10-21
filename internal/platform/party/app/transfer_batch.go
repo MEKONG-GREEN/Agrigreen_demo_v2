@@ -253,6 +253,21 @@ func (t *Transfers) batch(p port.TransferParticipants, ref port.TransferBatchRef
 	if err := validateTransferBatchMaps(*req); err != nil {
 		return nil, nil, port.TransferAdapter{}, port.TransferBatchRequest{}, err
 	}
+	err = t.local(p.Target(), func(tx pgx.Tx) error {
+		for _, m := range append(slices.Clone(req.Mappings), req.DependencyMappings...) {
+			actual, err := store.TransferMappingOf(p.Target(), tx, req.Scope, m.Key)
+			if err != nil {
+				return err
+			}
+			if actual == nil || *actual != m {
+				return port.ErrTransferConflict
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, port.TransferAdapter{}, port.TransferBatchRequest{}, err
+	}
 	// The stored batch must be an exact subset of the sealed local source headers.
 	sealed, err := t.headers(p.Source(), ref.PlanID)
 	if err != nil {
@@ -320,6 +335,24 @@ func validateTransferArtifact(req port.TransferBatchRequest, a port.TransferArti
 	}
 	return nil
 }
+func transferDecodeArtifact(proof *store.TransferProof, req port.TransferBatchRequest, version string) (port.TransferArtifact, error) {
+	var artifact port.TransferArtifact
+	if proof == nil {
+		return artifact, port.ErrTransferNotReady
+	}
+	if err := json.Unmarshal(proof.Document, &artifact); err != nil {
+		return artifact, port.ErrTransferConflict
+	}
+	hash, err := transferDigest(artifact)
+	if err != nil || hash != proof.Hash || artifact.ExportReceiptRef != proof.Ref {
+		return artifact, port.ErrTransferConflict
+	}
+	if err := validateTransferArtifact(req, artifact, version); err != nil {
+		return artifact, err
+	}
+	return artifact, nil
+}
+
 func validateTransferReceipt(req port.TransferBatchRequest, r port.TransferReceipt, compensation bool) error {
 	if r.Ref == uuid.Nil || r.PlanID != req.Scope.PlanID || r.BatchID != req.BatchID || r.TargetTenant != req.Scope.TargetTenant || r.TargetScopeRef != req.Scope.TargetScopeRef || r.BindingHash != req.Scope.BindingHash || r.ManifestHash != req.ManifestHash || r.MapHash != req.MapHash || !port.ValidTransferDigest(r.ArtifactHash) || !port.ValidTransferDigest(r.LogicalRoot) || len(r.Items) != len(req.Headers) {
 		return port.ErrTransferConflict
@@ -359,37 +392,37 @@ func transferCanonicalReceipt(r port.TransferReceipt) (port.TransferReceipt, err
 	slices.SortFunc(out.Items, func(a, b port.TransferAppliedRef) int { return compareTransferKeys(a.Key, b.Key) })
 	return out, nil
 }
-func (t *Transfers) ownerReceipt(p port.TransferParticipants, a port.TransferAdapter, req port.TransferApplyRequest) (port.TransferReceipt, error) {
+func (t *Transfers) ownerReceipt(p port.TransferParticipants, a port.TransferAdapter, req port.TransferApplyRequest) (port.TransferReceipt, bool, error) {
 	copyReq, err := transferClone(req)
 	if err != nil {
-		return port.TransferReceipt{}, err
+		return port.TransferReceipt{}, false, err
 	}
 	receipt, err := a.ReadReceipt(p.Target(), copyReq)
 	if err != nil {
-		return port.TransferReceipt{}, transferOwnerError(err)
+		return port.TransferReceipt{}, false, transferOwnerError(err)
 	}
 	receipt, err = transferCanonicalReceipt(receipt)
 	if err != nil {
-		return port.TransferReceipt{}, err
+		return port.TransferReceipt{}, true, err
 	}
 	if receipt.OwnerVersion != a.Version || receipt.ArtifactHash != req.Artifact.Hash {
-		return port.TransferReceipt{}, port.ErrTransferConflict
+		return port.TransferReceipt{}, true, port.ErrTransferConflict
 	}
 	if err := validateTransferReceipt(req.TransferBatchRequest, receipt, false); err != nil {
-		return port.TransferReceipt{}, err
+		return port.TransferReceipt{}, true, err
 	}
 	copyReq, err = transferClone(req)
 	if err != nil {
-		return port.TransferReceipt{}, err
+		return port.TransferReceipt{}, true, err
 	}
 	copyReceipt, err := transferClone(receipt)
 	if err != nil {
-		return port.TransferReceipt{}, err
+		return port.TransferReceipt{}, true, err
 	}
 	if err := a.Verify(p.Target(), copyReq, copyReceipt); err != nil {
-		return port.TransferReceipt{}, transferOwnerError(err)
+		return port.TransferReceipt{}, true, transferOwnerError(err)
 	}
-	return receipt, nil
+	return receipt, true, nil
 }
 func (t *Transfers) dependencies(p port.TransferParticipants, req port.TransferBatchRequest) error {
 	if len(req.DependencyMappings) == 0 {
@@ -436,11 +469,11 @@ func (t *Transfers) dependencies(p port.TransferParticipants, req port.TransferB
 		if artifactProof == nil {
 			return port.ErrTransferNotReady
 		}
-		var artifact port.TransferArtifact
-		if err := json.Unmarshal(artifactProof.Document, &artifact); err != nil {
-			return port.ErrTransferConflict
+		artifact, err := transferDecodeArtifact(artifactProof, previous, adapter.Version)
+		if err != nil {
+			return err
 		}
-		actual, err := t.ownerReceipt(p, adapter, port.TransferApplyRequest{TransferBatchRequest: previous, Artifact: artifact})
+		actual, _, err := t.ownerReceipt(p, adapter, port.TransferApplyRequest{TransferBatchRequest: previous, Artifact: artifact})
 		if err != nil {
 			return err
 		}
@@ -543,11 +576,8 @@ func (t *Transfers) ApplyBatch(p port.TransferParticipants, ref port.TransferBat
 	if proof == nil {
 		return port.TransferReceipt{}, port.ErrTransferNotReady
 	}
-	var artifact port.TransferArtifact
-	if err := json.Unmarshal(proof.Document, &artifact); err != nil {
-		return port.TransferReceipt{}, port.ErrTransferConflict
-	}
-	if err := validateTransferArtifact(req, artifact, a.Version); err != nil {
+	artifact, err := transferDecodeArtifact(proof, req, a.Version)
+	if err != nil {
 		return port.TransferReceipt{}, err
 	}
 	copyReq, err := transferClone(req)
@@ -562,8 +592,8 @@ func (t *Transfers) ApplyBatch(p port.TransferParticipants, ref port.TransferBat
 		return port.TransferReceipt{}, port.ErrTransferConflict
 	}
 	apply := port.TransferApplyRequest{TransferBatchRequest: req, Artifact: artifact}
-	receipt, err := t.ownerReceipt(p, a, apply)
-	if errors.Is(err, port.ErrTransferNotReady) {
+	receipt, found, err := t.ownerReceipt(p, a, apply)
+	if !found && errors.Is(err, port.ErrTransferNotReady) {
 		if target.Plan.Status != "importing" {
 			return port.TransferReceipt{}, port.ErrTransferNotReady
 		}
@@ -579,7 +609,7 @@ func (t *Transfers) ApplyBatch(p port.TransferParticipants, ref port.TransferBat
 		if e != nil {
 			return port.TransferReceipt{}, e
 		}
-		receipt, err = t.ownerReceipt(p, a, apply)
+		receipt, _, err = t.ownerReceipt(p, a, apply)
 		if err != nil {
 			return port.TransferReceipt{}, err
 		}
@@ -647,11 +677,11 @@ func (t *Transfers) Verify(p port.TransferParticipants, ref port.TransferRef) (p
 		if artifactProof == nil {
 			return port.TransferReport{}, port.ErrTransferNotReady
 		}
-		var artifact port.TransferArtifact
-		if err := json.Unmarshal(artifactProof.Document, &artifact); err != nil {
-			return port.TransferReport{}, port.ErrTransferConflict
+		artifact, err := transferDecodeArtifact(artifactProof, req, a.Version)
+		if err != nil {
+			return port.TransferReport{}, err
 		}
-		receipt, err := t.ownerReceipt(p, a, port.TransferApplyRequest{TransferBatchRequest: req, Artifact: artifact})
+		receipt, _, err := t.ownerReceipt(p, a, port.TransferApplyRequest{TransferBatchRequest: req, Artifact: artifact})
 		if err != nil {
 			return port.TransferReport{}, err
 		}
