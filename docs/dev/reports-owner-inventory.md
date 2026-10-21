@@ -40,3 +40,20 @@ Trên nguồn đối chiếu, `tools/knboundary/baseline.yaml` không có mục 
 #64 AUDIT-LOG chưa hoàn tất bởi kiểm kê này. Export audit cần bộ lọc riêng đóng băng vào job, kiểm quyền owner khi yêu cầu/replay/lịch sử/tải, reader worker được cấp quyền và biên nhận đọc bền vững. `domain.Params` hiện là bộ lọc native và được chiếu ra HTTP; không nhét payload riêng vào đó rồi làm lộ qua DTO. Nếu triển khai, mở rộng contribution builder hiện hữu với snapshot riêng/callback kiểm quyền và giữ nguyên checkpoint DLP, không dựng registry hay sổ audit thứ hai. Nguồn audit tùy biến/lập lịch cho nó chưa được cung cấp bởi #54.
 
 Gói không chứng nhận toàn bộ KNSPLIT/G1, tenant migration, retention audit, Google Sheet production hay thay đổi M1–M7. Không migration, OpenAPI, web, dữ liệu hay hành vi runtime nào được sửa.
+
+## Kết quả lượt xác minh trên commit tài liệu 0fb3fad9
+
+Go thực tế là `go1.26.9 windows/amd64`; toàn bộ source/runtime, tests, cấu hình và 35 tệp golden giữ nguyên so với nguồn `a6d9db28`. Không sinh lại fixture. Các runner đã kết thúc trước khi ghi phần kết quả này.
+
+| Kiểm | Kết quả thực |
+|---|---|
+| Build/vet/modgen/migratecheck/archlint/contractcheck/docscheck/knboundary | Tất cả exit 0; boundary 314 đúng baseline. Gofmt chỉ báo hai tệp testdata archlint đã có từ trước. |
+| Global golangci-lint (chạy có khóa tuần tự) | Exit 0, `0 issues.`; đã nhả lượt lint. |
+| Reports nội bộ, `tests/reports`, `tests/reportforms`, `tests/platformdata`, assembly | Lệnh tổng exit 1: 109 test cấp cao PASS, một FAIL, không SKIP/INFRA. `tests/reports` PASS 155.177s, reportforms PASS 4.143s, assembly PASS 151.644s. |
+| KN77 owner HTTP và báo cáo đóng băng (bảy test được chọn) | Exit 0, bảy PASS, 183.285s, không SKIP/INFRA. |
+| Owner `TestReportSessionPolicyRolesAndDepartments` | Exit 0, PASS 2.000s; có kiểm phiên chỉ đọc không được ghi dispatch. |
+| PostgreSQL riêng | Port 52642, thư mục tạm `agrigreen-pg-ephemeral-b11b0821ac92`; đã dừng và xóa sau runner. PostgreSQL chung không được dùng. |
+
+FAIL duy nhất: `TestKNReportSessionWithPublishedOrganizations` tại `tests/platformdata/kn_consumers_test.go:115` nhận `accounts.context_required`. Fixture của test chỉ gắn `Principal.KN` cũ, chưa gắn `SelectedSession` do owner tạo; cả resolver native và published cùng từ chối đúng hợp đồng hiện tại, rồi assertion positive cũ thất bại. Các case platformdata khác, gồm builder dùng metadata published, đều PASS. Đây không phải bằng chứng cho phép thêm fallback runtime. Child owner #81 chịu trách nhiệm cập nhật fixture và giữ matrix 180 quyết định/negative case; Codex không sửa phần ngoài làn. Giữ nguyên log và exit 1 của lượt đầu; chỉ chạy lại phần cần thiết sau commit owner đã review.
+
+Gói #54 chưa ready/gộp: còn chờ #81, xác minh lại case lỗi và bình luận Claude `Review OK`. Kết quả trên không phải chứng nhận tất cả checks đã đạt. Log cục bộ nằm tại `%LOCALAPPDATA%\Temp\agrigreen-codex-ticket54-*`; ticket là nguồn trạng thái và lưu bằng chứng tương ứng. Extension cho custom audit export được tách riêng thành #82 và owner #83 dưới #64, chưa được thực hiện bởi gói kiểm kê này.
