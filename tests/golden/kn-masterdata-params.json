@@ -143,6 +143,24 @@
       "Min": "0",
       "Max": "100",
       "Dimensional": true
+    },
+    {
+      "Key": "cnts.diary_edit_days",
+      "Name": "Nhật ký: số ngày được sửa lần ghi đã gửi chưa xác thực",
+      "Unit": "ngày",
+      "Kind": "decimal",
+      "Min": "0",
+      "Max": "60",
+      "Dimensional": false
+    },
+    {
+      "Key": "cnts.diary_fix_retention_days",
+      "Name": "Nhật ký: hạn lưu tọa độ GPS lúc ghi",
+      "Unit": "ngày",
+      "Kind": "decimal",
+      "Min": "1",
+      "Max": "3650",
+      "Dimensional": false
     }
   ],
   "Seeds": [
@@ -236,6 +254,20 @@
       "unit": "mg/l",
       "effective_from": "2026-01-01",
       "source_doc": "BRD CNTS v3.7 Mục III.5 / UR-TINH-13 — ngưỡng mặc định (W11.41), Cấp Tỉnh sửa qua quy trình tham số"
+    },
+    {
+      "key": "cnts.diary_edit_days",
+      "value": "7",
+      "unit": "ngày",
+      "effective_from": "2026-01-01",
+      "source_doc": "BRD CNTS v3.7 Mục III.5 \"Lần ghi nhật ký — chưa xác thực: sửa trong 7 ngày\" (W11.48)"
+    },
+    {
+      "key": "cnts.diary_fix_retention_days",
+      "value": "365",
+      "unit": "ngày",
+      "effective_from": "2026-01-01",
+      "source_doc": "W11.48 — hạn lưu tọa độ GPS lúc ghi nhật ký (QĐ-8, bảng cnts_diary_fix) — TẠM, chờ DPIA Q-005 và pháp chế xác nhận thời hạn"
     }
   ]
 }
