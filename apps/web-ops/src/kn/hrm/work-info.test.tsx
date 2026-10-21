@@ -26,7 +26,7 @@ import { HrmWorkInfoDetailScreen, HrmWorkInfoScreen } from "./WorkInfoScreens";
 
 const params: { id: string } = { id: "" };
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/kn/nhan-su/thong-tin-lam-viec",
+  usePathname: () => "/kn/nhan-su/ho-so/thong-tin-lam-viec",
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useParams: () => params,
 }));

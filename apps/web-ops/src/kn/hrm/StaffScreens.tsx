@@ -51,8 +51,8 @@ import {
 
 const PAGE = 20;
 const DETAIL = "/kn/nhan-su/ho-so";
-/** FN-08 Thông tin làm việc (W11.29) — chưa có mục menu riêng (menu do `internal/kn/hrm/menus` sinh), mở từ Hồ sơ nhân sự. */
-const WORK_ROUTE = "/kn/nhan-su/thong-tin-lam-viec";
+/** FN-08 Thông tin làm việc (W11.29) — đặt dưới tiền tố menu "Hồ sơ nhân sự" (`/kn/nhan-su/ho-so`) nên không cần mục menu mới (menu sinh từ `internal/kn/hrm/menus`). */
+const WORK_ROUTE = "/kn/nhan-su/ho-so/thong-tin-lam-viec";
 
 export function useStaffApi(): StaffApi {
   const { api } = useAuth();

@@ -34,7 +34,7 @@ import {
 } from "./work-info";
 
 const PAGE = 20;
-export const WORK_ROUTE = "/kn/nhan-su/thong-tin-lam-viec";
+export const WORK_ROUTE = "/kn/nhan-su/ho-so/thong-tin-lam-viec";
 const PROFILE_ROUTE = "/kn/nhan-su/ho-so";
 
 function WorkStatus({ s }: { s: string }) {

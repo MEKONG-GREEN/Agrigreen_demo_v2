@@ -5,7 +5,7 @@ import type { DashboardAlert } from "@/components/patterns/dashboard";
 import type { PromotionList } from "./promotion-api";
 
 export const PROMO_ROUTE = "/kn/nhan-su/nang-bac";
-export const WORK_ROUTE = "/kn/nhan-su/thong-tin-lam-viec";
+export const WORK_ROUTE = "/kn/nhan-su/ho-so/thong-tin-lam-viec";
 
 export function hrmDashboardAlerts(
   promo: PromotionList | null,

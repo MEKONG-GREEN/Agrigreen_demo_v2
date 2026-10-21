@@ -85,3 +85,21 @@ Nguồn: [giả định W11.25](../kn/gia-dinh/W11.25.md) (Q-069, Q-070, Q-075 d
 | Màn Danh sách nâng bậc, Sổ quyết định theo bố cục prototype HCTH; menu HCTH | Vitest `promotion.test.tsx`, `kn-menu.contract.test.ts`; `TestWebMenuFixture` | Giả lập API |
 
 Giới hạn nghiệm thu: quy chế nâng bậc, chỉ tiêu, bố cục Mẫu số 1/2/4 chính thức chờ Phòng HCTH (Q-070); xuất Word thuộc W10.17; thông báo đẩy cho HCTH chờ loại thông báo ở pf/notify.
+
+## W11.29 — web-ops HCTH theo prototype (D3 H9)
+
+Nguồn: [giả định + bảng kiểm kê màn W11.29](../kn/gia-dinh/W11.29.md), prototype `Khuyen_nong_so_HCTH.html`, BRD FN-06/07/08/13.
+Chỉ web (giả lập API theo hợp đồng có sẵn), không đổi backend.
+
+| Tiêu chí | Bằng chứng | Phạm vi kiểm tra |
+|---|---|---|
+| Kiểm kê mọi màn prototype HCTH → trang web-ops → API → trạng thái (Xong/Một phần/Chặn API W11.26/W11.27) | `docs/kn/gia-dinh/W11.29.md` | Tài liệu |
+| FN-08 Thông tin làm việc: 3 thẻ bấm lọc nhanh, lọc đơn vị/trạng thái/tháng/biến động; cập nhật ngày nghỉ việc + lý do → "Đã nghỉ việc", thẻ "Đang làm việc" giảm | Vitest `src/kn/hrm/work-info.test.tsx`; Playwright `tests/e2e/hc-nhan-su.spec.ts` (hc-hs-tl) | Giả lập API, trình duyệt thật |
+| Sửa/bỏ ngày đã ghi là `replace`/`void` có lý do 10–500 ký tự (sổ chỉ ghi thêm); ngày nghỉ trước ngày vào làm bị chặn | Vitest `work-info.test.tsx` (planWork, validateWork) | Logic màn |
+| Chi tiết: "Ảnh hưởng đến báo cáo" NS02 tháng nghỉ, NS01 không còn từ tháng sau; mở hồ sơ nhân viên | Vitest `work-info.test.tsx`; Playwright hc-hs-tl | — |
+| Hồ sơ nhân sự: lọc Chức vụ, Ngạch/CDNN; cột Trình độ cao nhất, SĐT che | Playwright hc-hs-tl; Vitest `staff.test.tsx` (hồi quy) | — |
+| Dashboard: thẻ chỉ số mở danh sách người; Cảnh báo nâng bậc 3 tháng (HCTH/Admin), biến động tháng | Vitest `work-info.test.tsx` (hrmDashboardAlerts); Playwright `hc-nhan-su.spec.ts` (hc-dash) | — |
+| Contact cho mọi vai: Cấp Xã chỉ Họ tên/Năm sinh/SĐT, Cấp Tỉnh đủ cột (cùng TW/Admin ở `kn-contact.spec.ts`) | Playwright `tests/e2e/hc-contact.spec.ts` | Giả lập `kn-contact.ts` |
+
+Giới hạn nghiệm thu: nhóm màn Đánh giá (W11.26) và Kế hoạch nhân lực (W11.27) chưa có API; xuất Excel danh sách, xuất
+Contact, lọc giới tính/tuổi/trình độ/chuyên ngành, chỉ số Đảng viên/DTTS chờ API (liệt kê ở giả định W11.29).
