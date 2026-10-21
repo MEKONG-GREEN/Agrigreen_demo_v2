@@ -18,4 +18,12 @@ Lượt source đầu lỗi biên dịch fixture p91; lượt handler kế bị 
 
 ## Điều chỉnh alias 22/10/2026
 
-Đối chiếu tĩnh fixture HCTH phát hiện hai key khác nhau cùng trỏ dashboard nhân sự. Bản sửa bỏ giới hạn trùng route ở cây trình bày, giữ nguyên kiểm pattern/ownership và key; bổ sung unit regression cho alias giữa nhóm/lồng nhau, bản sao output và các trường hợp ownership/key không hợp lệ. Ca HTTP registry hiện có cũng kiểm cả hai liên kết được giữ, cùng landing với ContextNavigation và cùng bị bỏ khi module bị tắt. Fixture/golden không thay đổi; kết quả kiểm mới được ghi sau khi chạy thật.
+Đối chiếu tĩnh fixture HCTH phát hiện hai key khác nhau cùng trỏ dashboard nhân sự. Bản sửa bỏ giới hạn trùng route ở cây trình bày, giữ nguyên kiểm pattern/ownership và key; bổ sung unit regression cho alias giữa nhóm/lồng nhau, bản sao output và các trường hợp ownership/key không hợp lệ. Ca HTTP registry hiện có cũng kiểm cả hai liên kết được giữ, alias đầu không khả dụng nhưng alias sau vẫn thành landing cùng ContextNavigation, và cả hai cùng bị bỏ khi module bị tắt. Fixture/golden không thay đổi.
+
+Nguồn `fc1cdda94a66dd7d68af57259ac78d1ba3a8d5b2` đã kiểm thật với Go 1.26.9:
+
+- Unit port/app: exit 0, 10 test cấp đầu PASS, port 0.465s và app 1.368s. Alias, bản sao output, key và ownership negatives đều đạt.
+- PostgreSQL riêng: `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/party/... ./cmd/api-platform/assembly` exit 0; 85 test cấp đầu PASS, không FAIL/SKIP/INFRA kể cả subtest. App 1.993s, domain 0.547s, handler 115.722s, port 0.736s và API assembly 106.553s. `TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog` PASS 0.22s; `TestWebMenuFixture` PASS 0.00s, không bật cập nhật fixture. Cụm tạm 62092 đã dừng và dọn.
+- Build, vet, modgen-check, migratecheck, archlint, contractcheck, docscheck, knboundary và lint đều exit 0; boundary 314, lint 0 issues. Gofmt chỉ còn hai fixture archlint cũ, không đổi từ trước bản sửa. Raw logs và proof ở `%TEMP%/agrigreen-ticket75-alias-{pure,pg,static}-proof.json` cùng log từng bước. Không lặp accounts HTTP/KN77 đã đạt trước đó vì sửa lần này chỉ đổi validation cây trình bày đã cấu hình; default/nil và nguồn các consumer đó giữ nguyên.
+
+Owner #76 và assembly vẫn cần thực hiện theo hợp đồng, rồi kiểm byte parity trên cấu hình chạy thật trước khi gỡ bridge trong #53. Gói shared cần Claude Review OK trước khi gộp.
