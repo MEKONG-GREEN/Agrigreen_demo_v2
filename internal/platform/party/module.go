@@ -28,6 +28,7 @@ const DBRole = "party_app"
 // Deps là port của module khác mà party cần.
 type Deps struct {
 	NavigationPolicy port.NavigationPolicy
+	Menus            *port.Menus // instance-owned menu presentation; nil keeps compatibility
 	// AdminUnits: đơn vị hành chính có hiệu lực theo thời gian (pf/masterdata) —
 	// kiểm mã đơn vị khi tạo/di chuyển tổ chức và tính phạm vi TTKN tỉnh.
 	AdminUnits port.AdminUnits
@@ -55,7 +56,7 @@ func New(db tenant.Beginner, clk clock.Clock, deps ...Deps) *Module {
 		d = deps[0]
 	}
 	reg := &app.Registry{DB: db, Clock: clk, Units: d.AdminUnits, Vault: d.Vault}
-	kn := &app.KN{DB: db, Clock: clk, Reg: reg, NavigationPolicy: d.NavigationPolicy}
+	kn := &app.KN{DB: db, Clock: clk, Reg: reg, NavigationPolicy: d.NavigationPolicy, Menus: d.Menus}
 	mods := &app.Modules{DB: db, Clock: clk, Names: func() port.ActorNames { return kn.Names }}
 	kn.Modules = mods
 	return &Module{

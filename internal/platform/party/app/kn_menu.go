@@ -124,6 +124,9 @@ func (k *KN) Menu(ctx context.Context, q MenuQuery) (MenuView, error) {
 	if err := k.resolveAudience(ctx, p, &q); err != nil {
 		return MenuView{}, err
 	}
+	if err := k.checkMenuUnit(ctx, p, q.UnitRef); err != nil {
+		return MenuView{}, err
+	}
 	var depts []port.Department
 	err = tenant.WithTenantTx(ctx, k.DB, p.TenantID, func(tx pgx.Tx) error {
 		if q.UnitRef == uuid.Nil {
@@ -151,11 +154,20 @@ func (k *KN) Menu(ctx context.Context, q MenuQuery) (MenuView, error) {
 		return MenuView{}, err
 	}
 	if q.Audience == port.AudienceAdmin {
+		if k.Menus != nil {
+			request := menuRequest(ctx, q.Audience, q.UnitRef, port.Department{})
+			request.Mode = port.MenuAdmin
+			request.Departments = depts
+			return k.registeredMenu(ctx, p.TenantID, request)
+		}
 		return k.withModules(ctx, p.TenantID, AdminMenu(q.UnitRef, depts))
 	}
 	d, err := pickDepartment(depts, q.Department)
 	if err != nil {
 		return MenuView{}, err
+	}
+	if k.Menus != nil {
+		return k.registeredMenu(ctx, p.TenantID, menuRequest(ctx, q.Audience, q.UnitRef, d))
 	}
 	view, err := DepartmentMenu(ctx, k.Forms, d, q.Audience)
 	view.UnitRef = q.UnitRef
@@ -236,6 +248,9 @@ func (k *KN) DepartmentModules(ctx context.Context, code string, q MenuQuery) (M
 	if q.Audience != port.AudienceAdmin {
 		return k.Menu(ctx, q)
 	}
+	if err := k.checkMenuUnit(ctx, p, q.UnitRef); err != nil {
+		return MenuView{}, err
+	}
 	var d *port.Department
 	err = tenant.WithTenantTx(ctx, k.DB, p.TenantID, func(tx pgx.Tx) error {
 		if q.UnitRef == uuid.Nil {
@@ -254,6 +269,12 @@ func (k *KN) DepartmentModules(ctx context.Context, code string, q MenuQuery) (M
 	}
 	if d == nil {
 		return MenuView{}, ErrDepartmentNotFound
+	}
+	if k.Menus != nil {
+		request := menuRequest(ctx, q.Audience, q.UnitRef, *d)
+		request.Mode = port.MenuDepartmentModules
+		request.Departments = []port.Department{*d}
+		return k.registeredMenu(ctx, p.TenantID, request)
 	}
 	item := adminDeptItem(*d)
 	return k.withModules(ctx, p.TenantID, MenuView{Version: domain.MenuVersion, Audience: q.Audience, UnitRef: q.UnitRef, Department: d,

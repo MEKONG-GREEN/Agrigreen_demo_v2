@@ -61,6 +61,7 @@ type KN struct {
 	Forms            port.FormAvailability  // P3: menu "Báo cáo đột xuất"
 	Session          port.SessionContext    // P1: ngữ cảnh phiên
 	NavigationPolicy port.NavigationPolicy  // trusted application registration
+	Menus            *port.Menus            // optional registered presentation
 	Names            port.ActorNames        // tên người thao tác cho Log
 	Modules          port.ModuleEnablement  // W1.4: menu bỏ mục của module đã tắt (nil = không lọc)
 }

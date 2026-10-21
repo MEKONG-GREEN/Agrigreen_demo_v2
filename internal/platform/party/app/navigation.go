@@ -18,13 +18,19 @@ import (
 // ApplyNavigation chooses an enabled leaf after all menu filters. Application
 // preferences never grant access to a route absent from the resolved menu.
 func ApplyNavigation(view MenuView, policy port.NavigationPolicy) (MenuView, error) {
+	return applyNavigation(view, policy, true)
+}
+
+func applyNavigation(view MenuView, policy port.NavigationPolicy, legacyProfile bool) (MenuView, error) {
 	if policy == nil {
 		return view, nil
 	}
 	request := port.NavigationRequest{Audience: view.Audience, UnitRef: view.UnitRef}
 	if view.Department != nil {
 		request.Department = *view.Department
-		request.Department.MenuProfile = domain.EffectiveMenuProfile(request.Department.MenuProfile, request.Department.Code)
+		if legacyProfile {
+			request.Department.MenuProfile = domain.EffectiveMenuProfile(request.Department.MenuProfile, request.Department.Code)
+		}
 	}
 	preferred, err := policy(request)
 	if err != nil {
@@ -70,6 +76,9 @@ func (k *KN) ContextNavigation(ctx context.Context, in port.NavigationRequest) (
 	p, ok := authz.FromContext(ctx)
 	if !ok {
 		return "", problem.Unauthenticated
+	}
+	if k.Menus != nil {
+		return k.registeredContextNavigation(ctx, p, in)
 	}
 	var view MenuView
 	if in.Audience == port.AudienceAdmin {
