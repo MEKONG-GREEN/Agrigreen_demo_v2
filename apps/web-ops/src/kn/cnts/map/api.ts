@@ -4,9 +4,10 @@
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
 import { newIdempotencyKey } from "@/api/idempotency";
-import { haversineM, type LngLat } from "@/gis/geometry";
 
 type S = components["schemas"];
+/** [kinh độ, vĩ độ] WGS84. */
+export type LngLat = [number, number];
 export type Zone = S["CNTSMapZone"];
 export type ZoneDetail = S["CNTSMapZoneDetail"];
 export type ZoneSave = S["CNTSMapZoneSave"];
@@ -89,7 +90,12 @@ export function centerOf(g: Geometry): LngLat {
   return [body.reduce((s, p) => s + p[0], 0) / body.length, body.reduce((s, p) => s + p[1], 0) / body.length];
 }
 
-export const distanceM = haversineM;
+/** Khoảng cách Haversine giữa hai điểm (m) — bán kính Trái Đất trung bình như PostGIS sphere. */
+export function distanceM(a: LngLat, b: LngLat): number {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const h = Math.sin(rad(b[1] - a[1]) / 2) ** 2 + Math.cos(rad(a[1])) * Math.cos(rad(b[1])) * Math.sin(rad(b[0] - a[0]) / 2) ** 2;
+  return 2 * 6_371_008.8 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
 
 /** Kiểm biểu vẽ vùng phía máy khách (máy chủ kiểm lại, kể cả ST_IsValid). */
 export function zoneErrors(z: Partial<ZoneSave>, draftCount: number): Record<string, string> {

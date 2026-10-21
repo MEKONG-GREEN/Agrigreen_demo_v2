@@ -12,7 +12,6 @@ import { useMemo, useState, type ChangeEvent } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { LayerMap, type AnyFeatureCollection } from "@/components/LayerMap";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
-import type { LngLat } from "@/gis/geometry";
 import { LoadState, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
 import {
   DEFAULT_RADII,
@@ -32,6 +31,7 @@ import {
   zoneErrors,
   zonesGeoJSON,
   type CntsMapApi,
+  type LngLat,
   type MapLayers,
   type Zone,
   type ZoneKind,
