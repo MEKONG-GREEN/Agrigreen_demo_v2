@@ -1,0 +1,1 @@
+- [ ] FORMS-TEMPLATE-SCOPE (#74, con #49): filter biểu do owner cấp và kiểm ACL hiện hành trước offline replay; giữ snapshot bytes/hash, nil compatibility. Owner grant/handoff #71 riêng; chờ kiểm thật và Claude Review OK.

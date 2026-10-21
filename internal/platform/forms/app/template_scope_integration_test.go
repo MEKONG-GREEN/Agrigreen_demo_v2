@@ -96,7 +96,7 @@ func TestTemplateScopeReadsWritesAndSync(t *testing.T) {
 	_, err = f.svc.Publish(boundedPub, PublishInput{Profile: "fx", TemplateID: tpls[1].ID, Label: "blocked", DueAt: to, Units: []string{"U1"}}, "")
 	f.want(err, port.ErrTemplateNotFound.Code, "blocked publish")
 	_, err = (Publisher{Svc: f.svc}).PublishBatch(boundedPub, port.BatchInput{Profile: "fx", TemplateID: tpls[1].ID,
-		Units: []string{"U1"}, Periods: []port.BatchPeriod{{Kind: "week", Key: "new", From: from, To: to, DueAt: to, Label: "blocked"}}}, "")
+		Units: []string{"U1"}, Periods: []port.PeriodDef{{Kind: "week", Key: "new", From: from, To: to, DueAt: to, Label: "blocked"}}}, "")
 	f.want(err, port.ErrTemplateNotFound.Code, "blocked batch")
 	_, err = f.svc.Close(boundedPub, "fx", b.Period.ID, "")
 	f.want(err, port.ErrPeriodNotFound.Code, "blocked close")
@@ -110,6 +110,11 @@ func TestTemplateScopeReadsWritesAndSync(t *testing.T) {
 	_, err = f.svc.DefineTemplate(templateScopeCtx(f, ids.New(), "admin", node, authz.Scope{All: true}, allowA, nil),
 		TemplateInput{Profile: "fx", Code: "FX-02", Title: "blocked", Fields: tpls[1].Fields}, "")
 	f.want(err, "forbidden", "blocked definition")
+	allowedFigures, err := (Figures{Svc: f.svc}).Figures(boundedPub, port.FiguresQuery{Profile: "fx", TemplateCode: "FX-01", From: from, To: to})
+	f.must(err, "allowed figures")
+	if len(allowedFigures) != 1 {
+		t.Fatalf("allowed figures disappeared: %d", len(allowedFigures))
+	}
 
 	empty := templateScopeCtx(f, actorRef, "xa", ids.New(), authz.Scope{All: true}, func(string) bool { return false }, nil)
 	if xs, err := f.svc.Templates(empty, "fx"); err != nil || len(xs) != 0 {
