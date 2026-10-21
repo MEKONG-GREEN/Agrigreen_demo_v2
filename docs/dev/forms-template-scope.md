@@ -14,3 +14,6 @@ Gói không đổi HTTP/schema/DDL/ACL. Lỗi dùng mã hiện có. KN adapter/c
 
 
 Review phạm vi target: Close/Cancel/ChangeDue phải được phép trên mọi đơn vị bị tác động; Reopen chỉ kiểm tập đơn vị chọn, rỗng nghĩa là toàn kỳ. Response có callback target tường minh lọc đồng bộ Period.Units, Spec.UnitParents, unit views, sự kiện mở lại và Figures.Parents. Sự kiện mở lại chỉ tác động target ẩn bị bỏ khỏi phép chiếu trả về, tránh biến danh sách rỗng thành “mở toàn kỳ”; sổ và snapshot nguyên trạng. Nil callback giữ hành vi legacy. Kiểm thử PostgreSQL bao gồm actor scope All và actor cùng node chủ, deny không tạo sự kiện, reopen subset được phép và các metadata không chứa mã target bị cấm.
+
+
+Xác minh commit production ed825555: full forms/... + tests/kn77 + API assembly exit 0, không FAIL/SKIP/INFRA. Forms app333.892s/domain1.157s/handler139.848s, KN77321.040s, assembly99.848s. Ca target lifecycle+metadata2.05s (global0.94/owner1.09), template/replay/snapshot0.94/1.02/0.34s PASS. Build/vet/modgen/migration/arch/contract/docs/boundary/lint đều0; baseline314, lint0issues, gofmt chỉ2testdata cũ. PostgreSQL tạm52392/5b8f8685abce đã dọn; 35 golden KHTC không đổi. Chờ Claude Review OK trước ticket merge; chưa nghiệm thu owner grants/handoff #71.
