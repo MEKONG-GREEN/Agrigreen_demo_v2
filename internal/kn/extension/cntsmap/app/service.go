@@ -94,7 +94,6 @@ type caller struct {
 
 func (c caller) admin() bool    { return c.k.Role == knport.SessionRoleAdmin }
 func (c caller) province() bool { return c.k.Role == knport.SessionRoleProvince }
-func (c caller) me() uuid.UUID  { return c.p.ActorRef }
 
 // sees: dữ liệu của đơn vị code thuộc phạm vi.
 func (c caller) sees(code string) bool { return c.admin() || c.k.Scope.Allows(code) }
