@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -45,5 +46,22 @@ func TestTransferBatchDependencyMappingsMustMatchExactReferences(t *testing.T) {
 				t.Fatal("unproven dependency mapping accepted", err)
 			}
 		})
+	}
+}
+
+func TestTransferProofReplayComparesInstantsAcrossJSONAndZones(t *testing.T) {
+	proof := port.TransferCutoverProof{IdentityReceipt: ids.New(), RehearsalReceipt: ids.New(), BindingHash: port.TransferDigest(strings.Repeat("a", 64)), ManifestHash: port.TransferDigest(strings.Repeat("b", 64)), LogicalRoot: port.TransferDigest(strings.Repeat("c", 64)), ValidUntil: time.Now().Add(time.Hour)}
+	stored, err := transferClone(proof)
+	if err != nil {
+		t.Fatal(err)
+	}
+	same := proof
+	same.ValidUntil = proof.ValidUntil.In(time.FixedZone("other", 7*60*60))
+	if !sameTransferCutoverProof(stored, same) {
+		t.Fatal("same proof instant was rejected after JSON/zone conversion")
+	}
+	same.ValidUntil = same.ValidUntil.Add(time.Nanosecond)
+	if sameTransferCutoverProof(stored, same) {
+		t.Fatal("different expiry accepted")
 	}
 }

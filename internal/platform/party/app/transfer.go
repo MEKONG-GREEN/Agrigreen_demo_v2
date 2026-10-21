@@ -228,6 +228,9 @@ func (t *Transfers) pair(p port.TransferParticipants, ref port.TransferRef, acti
 	if target.Plan.ID != uuid.Nil && target.Plan.ID != source.Plan.ID {
 		return nil, nil, nil, port.ErrTransferConflict
 	}
+	if !recovery && action != "status" && target.Plan.ID != uuid.Nil && !transferNormalState(target) {
+		return nil, nil, nil, port.ErrTransferConflict
+	}
 	adapters, err := t.adapters(source.Plan.Adapters)
 	if err != nil {
 		return nil, nil, nil, err
@@ -357,6 +360,9 @@ func (t *Transfers) Propose(p port.TransferParticipants, ref port.TransferRef) (
 	if target.Intent.ID != ref.ID {
 		return port.TransferPlan{}, port.ErrTransferConflict
 	}
+	if target.Plan.ID != uuid.Nil && !transferNormalState(target) {
+		return port.TransferPlan{}, port.ErrTransferConflict
+	}
 	adapters, err := t.adapters(target.Intent.Adapters)
 	if err != nil {
 		return port.TransferPlan{}, err
@@ -409,6 +415,9 @@ func (t *Transfers) FreezeTarget(p port.TransferParticipants, ref port.TransferR
 		return port.TransferIntent{}, err
 	}
 	if target.Intent.ID != ref.ID {
+		return port.TransferIntent{}, port.ErrTransferConflict
+	}
+	if target.Plan.ID != uuid.Nil && !transferNormalState(target) {
 		return port.TransferIntent{}, port.ErrTransferConflict
 	}
 	adapters, err := t.adapters(target.Intent.Adapters)
@@ -680,10 +689,7 @@ func (t *Transfers) DryRun(p port.TransferParticipants, ref port.TransferRef) (p
 	return port.TransferReport{PlanID: ref.ID, Count: len(all), Root: root, Provisional: true}, err
 }
 
-// Recovery stages stay unavailable until their durable compensation/release implementation exists.
-func (t *Transfers) Compensate(port.TransferParticipants, port.TransferBatchRef, uuid.UUID) (port.TransferReceipt, error) {
-	return port.TransferReceipt{}, port.ErrTransferNotReady
-}
+// Release/abort stay unavailable until all reserved batches are probed under recovery rights.
 func (t *Transfers) Abort(port.TransferParticipants, port.TransferRef, uuid.UUID) (port.TransferPlan, error) {
 	return port.TransferPlan{}, port.ErrTransferNotReady
 }

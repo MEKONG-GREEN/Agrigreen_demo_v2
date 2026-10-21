@@ -3,7 +3,9 @@ package handler_test
 // Test-only owner protocol evidence. These tables live only in pgtest's private
 // database. This is not a production KN importer, producer fence, or cutover rehearsal.
 // Stage-two contract dependencies: TransferLogicalRoot, VerifyCompensation and
-// receipt OperationID/ReasonRef/CompensatesRef/SourceLogicalRoot.
+// receipt OperationID/ReasonRef/CompensatesRef/SourceLogicalRoot and the separate
+// ReadAppliedForRecovery contract. Normal and recovery authority have distinct
+// persisted approvals; recovery never reuses normal source export authority.
 import (
 	"context"
 	"crypto/sha256"
@@ -83,6 +85,8 @@ CREATE TABLE pf_forms.transfer55_fixture_authority (
  tenant_id uuid NOT NULL, scope_ref uuid NOT NULL, namespace text NOT NULL,
  actor_ref uuid NOT NULL, approval_ref uuid NOT NULL, epoch text NOT NULL,
  valid_until timestamptz NOT NULL, enabled boolean NOT NULL,
+ recovery_ref uuid NOT NULL, recovery_epoch text NOT NULL,
+ recovery_valid_until timestamptz NOT NULL, recovery_enabled boolean NOT NULL,
  PRIMARY KEY(tenant_id,scope_ref,namespace)
 );
 CREATE TABLE pf_forms.transfer55_fixture_fence (
@@ -117,8 +121,13 @@ type durableOwnerExportRow struct {
 	Value  durableOwnerValue
 }
 type durableOwner struct {
-	pool *pgxpool.Pool
-	pair port.TransferParticipants
+	missingExportRead       bool
+	missingApplyRead        bool
+	missingCompensationRead bool
+	exportCalls             int
+	compensationCalls       int
+	pool                    *pgxpool.Pool
+	pair                    port.TransferParticipants
 	// These are fault controls only. All authority, fences, source values, exports,
 	// target values, provenance and receipts are durable PostgreSQL rows.
 	beforeApply       func() error
@@ -126,6 +135,8 @@ type durableOwner struct {
 	failAfterCommit   bool
 	malformedRead     bool
 	crashCompensation bool
+	verifyNotReady    bool
+	applyCalls        int // Invocation spy only; never used as a receipt or authorization.
 }
 
 func durableHash(value any) (port.TransferDigest, error) {
@@ -197,6 +208,34 @@ func (o *durableOwner) authority(ctx context.Context, req port.TransferAuthority
 	var a port.TransferApproval
 	err := o.tx(ctx, func(tx pgx.Tx) error { var err error; a, err = o.authorityTx(ctx, tx, req.Namespace); return err })
 	return a, err
+}
+func (o *durableOwner) recoveryAuthorityTx(ctx context.Context, tx pgx.Tx, namespace string) (port.TransferApproval, error) {
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return port.TransferApproval{}, port.ErrTransferAuthority
+	}
+	var a port.TransferApproval
+	var enabled bool
+	err := tx.QueryRow(ctx, `SELECT recovery_ref,actor_ref,recovery_epoch,recovery_valid_until,recovery_enabled FROM pf_forms.transfer55_fixture_authority WHERE scope_ref=$1 AND namespace=$2 FOR SHARE`, p.OrgRef, namespace).Scan(&a.Ref, &a.ActorRef, &a.Epoch, &a.ValidUntil, &enabled)
+	if err != nil {
+		return a, err
+	}
+	if !enabled || a.ActorRef != p.ActorRef || !a.ValidUntil.After(time.Now()) {
+		return a, port.ErrTransferAuthority
+	}
+	return a, nil
+}
+func (o *durableOwner) recoveryAuthority(ctx context.Context, req port.TransferAuthorityRequest) (port.TransferApproval, error) {
+	if _, _, _, err := durableSide(ctx, req.Scope, req.Side); err != nil {
+		return port.TransferApproval{}, err
+	}
+	var out port.TransferApproval
+	err := o.tx(ctx, func(tx pgx.Tx) error {
+		var err error
+		out, err = o.recoveryAuthorityTx(ctx, tx, req.Namespace)
+		return err
+	})
+	return out, err
 }
 func (o *durableOwner) headersTx(ctx context.Context, tx pgx.Tx, namespace string) ([]port.TransferHeader, error) {
 	p, _ := authz.FromContext(ctx)
@@ -322,6 +361,9 @@ func durableCheckMap(req port.TransferBatchRequest) error {
 	return nil
 }
 func (o *durableOwner) readExport(ctx context.Context, req port.TransferBatchRequest) (port.TransferArtifact, error) {
+	if o.missingExportRead {
+		return port.TransferArtifact{}, port.ErrTransferNotReady
+	}
 	var out port.TransferArtifact
 	want, err := durableHash(req)
 	if err != nil {
@@ -351,6 +393,7 @@ func (o *durableOwner) readExport(ctx context.Context, req port.TransferBatchReq
 	return out, err
 }
 func (o *durableOwner) export(ctx context.Context, req port.TransferBatchRequest) (port.TransferArtifact, error) {
+	o.exportCalls++
 	if old, err := o.readExport(ctx, req); !errors.Is(err, port.ErrTransferNotReady) {
 		return old, err
 	}
@@ -439,12 +482,6 @@ func (o *durableOwner) payload(req port.TransferApplyRequest) ([]durableOwnerExp
 	}
 	var out []durableOwnerExportRow
 	err = o.tx(o.pair.Source(), func(tx pgx.Tx) error {
-		if _, err := o.authorityTx(o.pair.Source(), tx, req.Namespace); err != nil {
-			return err
-		}
-		if _, err := o.fenceTx(o.pair.Source(), tx, port.TransferFenceRequest{Scope: req.Scope, Namespace: req.Namespace, Side: port.TransferSource}, &req.SourceFence); err != nil {
-			return err
-		}
 		var raw []byte
 		if err := tx.QueryRow(o.pair.Source(), `SELECT payload FROM pf_forms.transfer55_fixture_artifact WHERE plan_id=$1 AND batch_id=$2`, req.Scope.PlanID, req.BatchID).Scan(&raw); err != nil {
 			return err
@@ -478,6 +515,9 @@ func (o *durableOwner) receiptTx(ctx context.Context, tx pgx.Tx, req port.Transf
 	return out, err
 }
 func (o *durableOwner) readReceipt(ctx context.Context, req port.TransferApplyRequest) (port.TransferReceipt, error) {
+	if o.missingApplyRead {
+		return port.TransferReceipt{}, port.ErrTransferNotReady
+	}
 	want, err := durableHash(req)
 	if err != nil {
 		return port.TransferReceipt{}, err
@@ -537,6 +577,7 @@ func (o *durableOwner) appendEvent(ctx context.Context, tx pgx.Tx, req port.Tran
 	return port.TransferAppliedRef{Key: row.Header.Key, TargetRef: *target, TargetRowHash: port.TransferDigest(rowHash), LogicalHash: logical}, nil
 }
 func (o *durableOwner) apply(ctx context.Context, req port.TransferApplyRequest) (port.TransferReceipt, error) {
+	o.applyCalls++
 	if o.beforeApply != nil {
 		hook := o.beforeApply
 		o.beforeApply = nil
@@ -620,6 +661,9 @@ func (o *durableOwner) apply(ctx context.Context, req port.TransferApplyRequest)
 // Independent verification reconstructs source-key logical values from the
 // actual target row plus predecessor provenance. It does not trust receipt hashes.
 func (o *durableOwner) verifyRows(ctx context.Context, tx pgx.Tx, req port.TransferApplyRequest, out port.TransferReceipt, action string, operation uuid.UUID) error {
+	return o.verifyRowsAt(ctx, tx, req, out, action, operation, true)
+}
+func (o *durableOwner) verifyRowsAt(ctx context.Context, tx pgx.Tx, req port.TransferApplyRequest, out port.TransferReceipt, action string, operation uuid.UUID, current bool) error {
 	if len(out.Items) != len(req.Headers) || len(out.Items) != len(req.Mappings) {
 		return port.ErrTransferConflict
 	}
@@ -641,7 +685,11 @@ func (o *durableOwner) verifyRows(ctx context.Context, tx pgx.Tx, req port.Trans
 		var parent *uuid.UUID
 		var source uuid.UUID
 		var sourceSeq int64
-		err := tx.QueryRow(ctx, `SELECT e.value,e.parent_namespace,e.parent_ref,encode(e.row_hash,'hex'),p.source_tenant,p.source_row_hash,p.source_seq FROM pf_forms.transfer55_fixture_event e JOIN pf_forms.transfer55_fixture_provenance p ON p.tenant_id=e.tenant_id AND p.event_ref=e.id WHERE p.plan_id=$1 AND p.batch_id=$2 AND p.operation_id=$3 AND p.namespace=$4 AND p.source_ref=$5 AND p.target_ref=$6 AND e.action=$7 AND e.seq=(SELECT max(current_event.seq) FROM pf_forms.transfer55_fixture_event current_event WHERE current_event.tenant_id=e.tenant_id AND current_event.entity_ref=e.entity_ref AND current_event.namespace=e.namespace)`, req.Scope.PlanID, req.BatchID, operation, item.Key.Namespace, item.Key.Ref, item.TargetRef, action).Scan(&value, &parentNS, &parent, &rowHash, &source, &sourceHash, &sourceSeq)
+		latest := ""
+		if current {
+			latest = ` AND e.seq=(SELECT max(current_event.seq) FROM pf_forms.transfer55_fixture_event current_event WHERE current_event.tenant_id=e.tenant_id AND current_event.entity_ref=e.entity_ref AND current_event.namespace=e.namespace)`
+		}
+		err := tx.QueryRow(ctx, `SELECT e.value,e.parent_namespace,e.parent_ref,encode(e.row_hash,'hex'),p.source_tenant,p.source_row_hash,p.source_seq FROM pf_forms.transfer55_fixture_event e JOIN pf_forms.transfer55_fixture_provenance p ON p.tenant_id=e.tenant_id AND p.event_ref=e.id WHERE p.plan_id=$1 AND p.batch_id=$2 AND p.operation_id=$3 AND p.namespace=$4 AND p.source_ref=$5 AND p.target_ref=$6 AND e.action=$7`+latest, req.Scope.PlanID, req.BatchID, operation, item.Key.Namespace, item.Key.Ref, item.TargetRef, action).Scan(&value, &parentNS, &parent, &rowHash, &source, &sourceHash, &sourceSeq)
 		if err != nil {
 			return err
 		}
@@ -682,7 +730,7 @@ func (o *durableOwner) verify(ctx context.Context, req port.TransferApplyRequest
 	if err != nil {
 		return err
 	}
-	return o.tx(ctx, func(tx pgx.Tx) error {
+	err = o.tx(ctx, func(tx pgx.Tx) error {
 		if _, err := o.authorityTx(ctx, tx, req.Namespace); err != nil {
 			return err
 		}
@@ -698,15 +746,73 @@ func (o *durableOwner) verify(ctx context.Context, req port.TransferApplyRequest
 		}
 		return o.verifyRows(ctx, tx, req, out, "imported", uuid.Nil)
 	})
+	if err == nil && o.verifyNotReady {
+		return port.ErrTransferNotReady
+	}
+	return err
 }
-func (o *durableOwner) readCompensation(ctx context.Context, req port.TransferCompensationRequest) (port.TransferReceipt, error) {
+func (o *durableOwner) readAppliedForRecovery(ctx context.Context, recovery port.TransferRecoveryRequest, req port.TransferApplyRequest) (port.TransferReceipt, error) {
+	if recovery.Scope != req.Scope {
+		return port.TransferReceipt{}, port.ErrTransferConflict
+	}
 	want, err := durableHash(req)
 	if err != nil {
 		return port.TransferReceipt{}, err
 	}
 	var out port.TransferReceipt
 	err = o.tx(ctx, func(tx pgx.Tx) error {
-		if _, err := o.authorityTx(ctx, tx, req.Namespace); err != nil {
+		if _, err := o.recoveryAuthorityTx(ctx, tx, req.Namespace); err != nil {
+			return err
+		}
+		if _, err := o.fenceTx(ctx, tx, port.TransferFenceRequest{Scope: req.Scope, Namespace: req.Namespace, Side: port.TransferTarget}, &req.TargetFence); err != nil {
+			return err
+		}
+		var err error
+		out, err = o.receiptTx(ctx, tx, req, "apply", uuid.Nil, want)
+		if err != nil {
+			return err
+		}
+		// The original apply row remains valid evidence after compensation. It is
+		// deliberately not required to be the latest active business state here.
+		return o.verifyRowsAt(ctx, tx, req, out, "imported", uuid.Nil, false)
+	})
+	return out, err
+}
+
+// Recovery reconstructs its typed payload from the immutable imported target
+// ledger and provenance, under current recovery rights in the same owner tx.
+// It does not call normal source readExport/payload or require normal authority.
+func (o *durableOwner) recoveryPayloadTx(ctx context.Context, tx pgx.Tx, req port.TransferApplyRequest) ([]durableOwnerExportRow, error) {
+	out := []durableOwnerExportRow{}
+	for _, h := range req.Headers {
+		var value, parentNS string
+		var parent *uuid.UUID
+		if err := tx.QueryRow(ctx, `SELECT e.value,e.parent_namespace,e.parent_ref FROM pf_forms.transfer55_fixture_event e JOIN pf_forms.transfer55_fixture_provenance p ON p.tenant_id=e.tenant_id AND p.event_ref=e.id WHERE p.plan_id=$1 AND p.batch_id=$2 AND p.namespace=$3 AND p.source_ref=$4 AND p.operation_id=$5 AND e.action='imported'`, req.Scope.PlanID, req.BatchID, h.Key.Namespace, h.Key.Ref, uuid.Nil).Scan(&value, &parentNS, &parent); err != nil {
+			return nil, err
+		}
+		v := durableOwnerValue{Value: value, Active: true}
+		if parent != nil {
+			key := port.TransferKey{Namespace: parentNS}
+			if err := tx.QueryRow(ctx, `SELECT source_ref FROM pf_forms.transfer55_fixture_provenance WHERE target_ref=$1 AND namespace=$2 AND source_tenant=$3 AND operation_id=$4`, *parent, parentNS, req.Scope.SourceTenant, uuid.Nil).Scan(&key.Ref); err != nil {
+				return nil, err
+			}
+			v.Parent = &key
+		}
+		out = append(out, durableOwnerExportRow{Header: h, Value: v})
+	}
+	return out, nil
+}
+func (o *durableOwner) readCompensation(ctx context.Context, req port.TransferCompensationRequest) (port.TransferReceipt, error) {
+	if o.missingCompensationRead {
+		return port.TransferReceipt{}, port.ErrTransferNotReady
+	}
+	want, err := durableHash(req)
+	if err != nil {
+		return port.TransferReceipt{}, err
+	}
+	var out port.TransferReceipt
+	err = o.tx(ctx, func(tx pgx.Tx) error {
+		if _, err := o.recoveryAuthorityTx(ctx, tx, req.Namespace); err != nil {
 			return err
 		}
 		if _, err := o.fenceTx(ctx, tx, port.TransferFenceRequest{Scope: req.Scope, Namespace: req.Namespace, Side: port.TransferTarget}, &req.TargetFence); err != nil {
@@ -719,17 +825,14 @@ func (o *durableOwner) readCompensation(ctx context.Context, req port.TransferCo
 	return out, err
 }
 func (o *durableOwner) compensate(ctx context.Context, req port.TransferCompensationRequest) (port.TransferReceipt, error) {
+	o.compensationCalls++
 	want, err := durableHash(req)
-	if err != nil {
-		return port.TransferReceipt{}, err
-	}
-	payload, err := o.payload(req.TransferApplyRequest)
 	if err != nil {
 		return port.TransferReceipt{}, err
 	}
 	var out port.TransferReceipt
 	err = o.tx(ctx, func(tx pgx.Tx) error {
-		if _, err := o.authorityTx(ctx, tx, req.Namespace); err != nil {
+		if _, err := o.recoveryAuthorityTx(ctx, tx, req.Namespace); err != nil {
 			return err
 		}
 		if _, err := o.fenceTx(ctx, tx, port.TransferFenceRequest{Scope: req.Scope, Namespace: req.Namespace, Side: port.TransferTarget}, &req.TargetFence); err != nil {
@@ -744,6 +847,10 @@ func (o *durableOwner) compensate(ctx context.Context, req port.TransferCompensa
 			return err
 		}
 		if err := o.verifyRows(ctx, tx, req.TransferApplyRequest, req.Applied, "imported", uuid.Nil); err != nil {
+			return err
+		}
+		payload, err := o.recoveryPayloadTx(ctx, tx, req.TransferApplyRequest)
+		if err != nil {
 			return err
 		}
 		out, err = durableReceipt(req.TransferApplyRequest)
@@ -792,7 +899,7 @@ func (o *durableOwner) verifyCompensation(ctx context.Context, req port.Transfer
 		return err
 	}
 	return o.tx(ctx, func(tx pgx.Tx) error {
-		if _, err := o.authorityTx(ctx, tx, req.Namespace); err != nil {
+		if _, err := o.recoveryAuthorityTx(ctx, tx, req.Namespace); err != nil {
 			return err
 		}
 		if _, err := o.fenceTx(ctx, tx, port.TransferFenceRequest{Scope: req.Scope, Namespace: req.Namespace, Side: port.TransferTarget}, &req.TargetFence); err != nil {
@@ -813,15 +920,13 @@ func (o *durableOwner) adapter(namespace string) port.TransferAdapter {
 	if namespace == durableChildNS {
 		a.DependsOn = []string{durableParentNS}
 	}
-	a.Authority, a.RecoveryAuthority = o.authority, o.authority
+	a.Authority, a.RecoveryAuthority = o.authority, o.recoveryAuthority
+	a.ReadAppliedForRecovery = o.readAppliedForRecovery
 	a.FenceSource, a.FenceTarget = o.fence, o.fence
 	a.CheckSourceFence, a.CheckTargetFence = o.checkFence, o.checkFence
 	a.Scan, a.Export, a.ReadExport = o.scan, o.export, o.readExport
 	a.Apply, a.ReadReceipt, a.Verify = o.apply, o.readReceipt, o.verify
 	a.Compensate, a.ReadCompensation, a.VerifyCompensation = o.compensate, o.readCompensation, o.verifyCompensation
-	a.ReadAppliedForRecovery = func(ctx context.Context, recovery port.TransferRecoveryRequest, req port.TransferApplyRequest) (port.TransferReceipt, error) {
-		return o.readReceipt(ctx, req)
-	}
 	// Fence release is deliberately unavailable: these tests do not claim cutover.
 	a.ReleaseSourceFence = func(context.Context, port.TransferRecoveryRequest, port.TransferFenceRequest, port.TransferFence) (port.TransferFenceRelease, error) {
 		return port.TransferFenceRelease{}, port.ErrTransferNotReady
@@ -851,7 +956,7 @@ func newDurableOwner(t *testing.T) (*durableOwner, *authztest.FakeIssuer) {
 		durableRequire(t, o.tx(ctx, func(tx pgx.Tx) error {
 			p, _ := authz.FromContext(ctx)
 			for _, ns := range []string{durableParentNS, durableChildNS} {
-				if _, err := tx.Exec(ctx, `INSERT INTO pf_forms.transfer55_fixture_authority(tenant_id,scope_ref,namespace,actor_ref,approval_ref,epoch,valid_until,enabled)VALUES($1,$2,$3,$4,$5,'fixture-current-1',$6,true)`, p.TenantID, p.OrgRef, ns, p.ActorRef, ids.New(), time.Now().Add(time.Hour)); err != nil {
+				if _, err := tx.Exec(ctx, `INSERT INTO pf_forms.transfer55_fixture_authority(tenant_id,scope_ref,namespace,actor_ref,approval_ref,epoch,valid_until,enabled,recovery_ref,recovery_epoch,recovery_valid_until,recovery_enabled)VALUES($1,$2,$3,$4,$5,'fixture-current-1',$6,true,$7,'fixture-recovery-1',$6,true)`, p.TenantID, p.OrgRef, ns, p.ActorRef, ids.New(), time.Now().Add(time.Hour), ids.New()); err != nil {
 					return err
 				}
 			}
@@ -1107,4 +1212,129 @@ func TestTenantTransferDurableOwnerCompensationCommitCrashResumesSameOperation(t
 	if events != 1 || receipts != 1 || operations != 1 {
 		t.Fatal("compensation replay duplicated ledger/provenance/operation receipt")
 	}
+}
+
+func TestTenantTransferDurableOwnerRecoveryAfterNormalAuthorityRevoked(t *testing.T) {
+	o, issuer := newDurableOwner(t)
+	svc, plan := durableAcceptedPlan(t, o, issuer)
+	batch := durableReserveExport(t, o, svc, plan)
+	ref := port.TransferBatchRef{PlanID: plan.ID, BatchID: batch.ID}
+	applied, err := svc.ApplyBatch(o.pair, ref)
+	durableRequire(t, err)
+	for _, ctx := range []context.Context{o.pair.Source(), o.pair.Target()} {
+		durableRequire(t, o.tx(ctx, func(tx pgx.Tx) error {
+			// Fresh, separate recovery approval persists after normal transfer
+			// authority is revoked. No old approval is relabeled as recovery.
+			_, err := tx.Exec(ctx, `UPDATE pf_forms.transfer55_fixture_authority SET enabled=false,recovery_ref=$1,recovery_epoch='fresh-recovery-2',recovery_valid_until=$2`, ids.New(), time.Now().Add(time.Hour))
+			return err
+		}))
+	}
+	beforeCalls := o.applyCalls
+	if _, err := svc.ApplyBatch(o.pair, ref); err == nil {
+		t.Fatal("forward apply replay survived revoked normal authority")
+	}
+	if o.applyCalls != beforeCalls {
+		t.Fatal("revoked forward replay called the owner writer")
+	}
+	reason := ids.New()
+	compensated, err := svc.Compensate(o.pair, ref, reason)
+	durableRequire(t, err)
+	if compensated.CompensatesRef != applied.Ref || compensated.SourceLogicalRoot != applied.LogicalRoot || compensated.LogicalRoot == applied.LogicalRoot {
+		t.Fatal("fresh recovery did not compensate actual imported state")
+	}
+	// Recovery reads the original immutable apply receipt after the latest row
+	// is already inactive; normal Verify must not be used for this read.
+	restarted := &durableOwner{pool: o.pool, pair: o.pair}
+	again, err := restarted.facade(t, issuer).Compensate(o.pair, ref, reason)
+	durableRequire(t, err)
+	if !reflect.DeepEqual(compensated, again) {
+		t.Fatal("recovery replay changed its durable operation")
+	}
+	durableAssertCount(t, o, "imported", 1)
+	durableAssertCount(t, o, "compensated", 1)
+	for _, ctx := range []context.Context{o.pair.Source(), o.pair.Target()} {
+		durableRequire(t, o.tx(ctx, func(tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, `UPDATE pf_forms.transfer55_fixture_authority SET recovery_enabled=false`)
+			return err
+		}))
+	}
+	if _, err := restarted.facade(t, issuer).Compensate(o.pair, ref, reason); err == nil {
+		t.Fatal("recovery replay ignored revoked recovery authority")
+	}
+	durableAssertCount(t, o, "compensated", 1)
+}
+
+func TestTenantTransferDurableOwnerVerifyNotReadyNeverReapplies(t *testing.T) {
+	o, issuer := newDurableOwner(t)
+	svc, plan := durableAcceptedPlan(t, o, issuer)
+	batch := durableReserveExport(t, o, svc, plan)
+	ref := port.TransferBatchRef{PlanID: plan.ID, BatchID: batch.ID}
+	o.failAfterCommit = true
+	if _, err := svc.ApplyBatch(o.pair, ref); err == nil {
+		t.Fatal("injected post-commit interruption was ignored")
+	}
+	if o.applyCalls != 1 {
+		t.Fatal("fixture did not perform exactly one owner write")
+	}
+	durableAssertCoreReceiptCount(t, o, batch, "apply", 0)
+	// ReadReceipt now succeeds with a valid durable receipt. Verify deliberately
+	// returns ErrNotReady only after checking that receipt and actual target rows.
+	// This is not a missing receipt and must never enter the Apply path again.
+	o.verifyNotReady = true
+	if _, err := o.facade(t, issuer).ApplyBatch(o.pair, ref); err == nil {
+		t.Fatal("owner Verify ErrNotReady was ignored")
+	}
+	if o.applyCalls != 1 {
+		t.Fatal("valid receipt plus Verify ErrNotReady called Apply again")
+	}
+	durableAssertCount(t, o, "imported", 1)
+	durableAssertCoreReceiptCount(t, o, batch, "apply", 0)
+	o.verifyNotReady = false
+	_, err := o.facade(t, issuer).ApplyBatch(o.pair, ref)
+	durableRequire(t, err)
+	if o.applyCalls != 1 {
+		t.Fatal("receipt recovery retried the owner writer")
+	}
+	durableAssertCount(t, o, "imported", 1)
+	durableAssertCoreReceiptCount(t, o, batch, "apply", 1)
+}
+
+func TestTenantTransferDurableOwnerMissingWitnessNeverRepeatsWriter(t *testing.T) {
+	o, issuer := newDurableOwner(t)
+	svc, plan := durableAcceptedPlan(t, o, issuer)
+	batch := durableReserveExport(t, o, svc, plan)
+	ref := port.TransferBatchRef{PlanID: plan.ID, BatchID: batch.ID}
+	exportCalls := o.exportCalls
+	o.missingExportRead = true
+	if _, err := svc.ExportBatch(o.pair, ref); !errors.Is(err, port.ErrTransferNotReady) {
+		t.Fatal("missing owner export after checkpoint was not denied", err)
+	}
+	if o.exportCalls != exportCalls {
+		t.Fatal("missing export evidence invoked writer again")
+	}
+	o.missingExportRead = false
+	_, err := svc.ApplyBatch(o.pair, ref)
+	durableRequire(t, err)
+	applyCalls := o.applyCalls
+	o.missingApplyRead = true
+	if _, err := svc.ApplyBatch(o.pair, ref); !errors.Is(err, port.ErrTransferNotReady) {
+		t.Fatal("missing apply witness after checkpoint was not denied", err)
+	}
+	if o.applyCalls != applyCalls {
+		t.Fatal("missing apply evidence invoked writer again")
+	}
+	o.missingApplyRead = false
+	reason := ids.New()
+	_, err = svc.Compensate(o.pair, ref, reason)
+	durableRequire(t, err)
+	compensationCalls := o.compensationCalls
+	o.missingCompensationRead = true
+	if _, err := svc.Compensate(o.pair, ref, reason); !errors.Is(err, port.ErrTransferNotReady) {
+		t.Fatal("missing compensation evidence after checkpoint was not denied", err)
+	}
+	if o.compensationCalls != compensationCalls {
+		t.Fatal("missing compensation evidence invoked writer again")
+	}
+	durableAssertCount(t, o, "imported", 1)
+	durableAssertCount(t, o, "compensated", 1)
 }

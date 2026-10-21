@@ -22,16 +22,22 @@ type TransferScanState struct {
 
 // TransferState is an immutable ledger snapshot, never an authorization cache.
 // Sequence is DB-derived and excluded from the hashed document to avoid recursion.
+type TransferOperationWitness struct {
+	ID   uuid.UUID
+	Hash port.TransferDigest
+}
+
 type TransferState struct {
-	VerifiedRoot    port.TransferDigest              `json:"verified_root"`
-	CutoverProof    *port.TransferCutoverProof       `json:"cutover_proof,omitempty"`
-	Intent          port.TransferIntent              `json:"intent"`
-	Plan            port.TransferPlan                `json:"plan"`
-	SourceApprovals map[string]port.TransferApproval `json:"source_approvals"`
-	TargetApprovals map[string]port.TransferApproval `json:"target_approvals"`
-	SourceFences    map[string]port.TransferFence    `json:"source_fences"`
-	Scans           map[string]TransferScanState     `json:"scans"`
-	Sequence        int64                            `json:"-"`
+	RecoveryOperations map[string]TransferOperationWitness `json:"recovery_operations"`
+	VerifiedRoot       port.TransferDigest                 `json:"verified_root"`
+	CutoverProof       *port.TransferCutoverProof          `json:"cutover_proof,omitempty"`
+	Intent             port.TransferIntent                 `json:"intent"`
+	Plan               port.TransferPlan                   `json:"plan"`
+	SourceApprovals    map[string]port.TransferApproval    `json:"source_approvals"`
+	TargetApprovals    map[string]port.TransferApproval    `json:"target_approvals"`
+	SourceFences       map[string]port.TransferFence       `json:"source_fences"`
+	Scans              map[string]TransferScanState        `json:"scans"`
+	Sequence           int64                               `json:"-"`
 }
 
 func LockTransfer(ctx context.Context, tx pgx.Tx, tid, entity uuid.UUID) error {

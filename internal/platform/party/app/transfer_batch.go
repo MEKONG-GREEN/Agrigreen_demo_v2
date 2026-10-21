@@ -525,6 +525,17 @@ func (t *Transfers) ExportBatch(p port.TransferParticipants, ref port.TransferBa
 	if err := t.dependencies(p, req); err != nil {
 		return port.TransferArtifact{}, err
 	}
+	oldProof, err := t.proof(p, ref.PlanID, ref.BatchID, "export", req.Namespace)
+	if err != nil {
+		return port.TransferArtifact{}, err
+	}
+	var expectedArtifact port.TransferArtifact
+	if oldProof != nil {
+		expectedArtifact, err = transferDecodeArtifact(oldProof, req, a.Version)
+		if err != nil {
+			return port.TransferArtifact{}, err
+		}
+	}
 	copyReq, err := transferClone(req)
 	if err != nil {
 		return port.TransferArtifact{}, err
@@ -532,6 +543,9 @@ func (t *Transfers) ExportBatch(p port.TransferParticipants, ref port.TransferBa
 	artifact, err := a.ReadExport(p.Source(), copyReq)
 	err = transferOwnerError(err)
 	if errors.Is(err, port.ErrTransferNotReady) {
+		if oldProof != nil {
+			return port.TransferArtifact{}, port.ErrTransferNotReady
+		}
 		copyReq, e := transferClone(req)
 		if e != nil {
 			return port.TransferArtifact{}, e
@@ -541,6 +555,9 @@ func (t *Transfers) ExportBatch(p port.TransferParticipants, ref port.TransferBa
 	}
 	if err != nil {
 		return port.TransferArtifact{}, err
+	}
+	if oldProof != nil && artifact != expectedArtifact {
+		return port.TransferArtifact{}, port.ErrTransferConflict
 	}
 	if err := validateTransferArtifact(req, artifact, a.Version); err != nil {
 		return port.TransferArtifact{}, err
@@ -592,8 +609,27 @@ func (t *Transfers) ApplyBatch(p port.TransferParticipants, ref port.TransferBat
 		return port.TransferReceipt{}, port.ErrTransferConflict
 	}
 	apply := port.TransferApplyRequest{TransferBatchRequest: req, Artifact: artifact}
+	oldProof, err := t.proof(p, ref.PlanID, ref.BatchID, "apply", req.Namespace)
+	if err != nil {
+		return port.TransferReceipt{}, err
+	}
+	if oldProof != nil {
+		old, err := transferDecodeReceipt(oldProof)
+		if err != nil {
+			return port.TransferReceipt{}, err
+		}
+		if err := validateTransferReceipt(req, old, false); err != nil {
+			return port.TransferReceipt{}, err
+		}
+		if old.OwnerVersion != a.Version || old.ArtifactHash != artifact.Hash {
+			return port.TransferReceipt{}, port.ErrTransferConflict
+		}
+	}
 	receipt, found, err := t.ownerReceipt(p, a, apply)
 	if !found && errors.Is(err, port.ErrTransferNotReady) {
+		if oldProof != nil {
+			return port.TransferReceipt{}, port.ErrTransferNotReady
+		}
 		if target.Plan.Status != "importing" {
 			return port.TransferReceipt{}, port.ErrTransferNotReady
 		}
@@ -740,6 +776,7 @@ func (t *Transfers) PrepareCutover(p port.TransferParticipants, ref port.Transfe
 	if err != nil {
 		return port.TransferPlan{}, transferOwnerError(err)
 	}
+	proof.ValidUntil = proof.ValidUntil.UTC().Round(0)
 	if proof.IdentityReceipt == uuid.Nil || proof.RehearsalReceipt == uuid.Nil || proof.BindingHash != source.Plan.Scope.BindingHash || proof.ManifestHash != source.Plan.ManifestHash || proof.LogicalRoot != report.Root || !proof.ValidUntil.After(t.now()) {
 		return port.TransferPlan{}, port.ErrTransferNotReady
 	}
@@ -747,7 +784,7 @@ func (t *Transfers) PrepareCutover(p port.TransferParticipants, ref port.Transfe
 		return port.TransferPlan{}, err
 	}
 	if target.Plan.Status == "cutover_prepared" {
-		if target.CutoverProof == nil || *target.CutoverProof != proof {
+		if target.CutoverProof == nil || !sameTransferCutoverProof(*target.CutoverProof, proof) {
 			return port.TransferPlan{}, port.ErrTransferConflict
 		}
 		return target.Plan, nil
@@ -755,4 +792,8 @@ func (t *Transfers) PrepareCutover(p port.TransferParticipants, ref port.Transfe
 	target.CutoverProof = &proof
 	target.Plan.Status = "cutover_prepared"
 	return target.Plan, t.write(p.Target(), target.Intent.ID, target.Plan.Scope.TargetScopeRef, "cutover_prepared", target)
+}
+
+func sameTransferCutoverProof(a, b port.TransferCutoverProof) bool {
+	return a.IdentityReceipt == b.IdentityReceipt && a.RehearsalReceipt == b.RehearsalReceipt && a.BindingHash == b.BindingHash && a.ManifestHash == b.ManifestHash && a.LogicalRoot == b.LogicalRoot && a.ValidUntil.Equal(b.ValidUntil)
 }

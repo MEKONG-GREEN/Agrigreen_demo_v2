@@ -131,3 +131,15 @@ func InsertTransferProof(ctx context.Context, tx pgx.Tx, s port.TransferScope, a
 	_, err = tx.Exec(ctx, `INSERT INTO pf_party.transfer_receipt(tenant_id,scope_ref,plan_id,batch_id,operation,namespace,owner_receipt_ref,document_hash,document,actor_ref,created_at)VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, s.TargetTenant, s.TargetScopeRef, s.PlanID, batch, operation, namespace, ref, hash, string(raw), actor, now)
 	return transferConstraint(err)
 }
+
+func TransferOperationOf(ctx context.Context, tx pgx.Tx, entity uuid.UUID, kind, key string) (*TransferOperation, error) {
+	var op TransferOperation
+	err := tx.QueryRow(ctx, `SELECT operation_id,input_hash,document FROM pf_party.transfer_operation WHERE entity_id=$1 AND kind=$2 AND semantic_key=$3`, entity, kind, key).Scan(&op.ID, &op.Hash, &op.Document)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &op, nil
+}
