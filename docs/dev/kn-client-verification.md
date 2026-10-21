@@ -18,6 +18,8 @@ Nguồn: `deploy/compose/keycloak/agrigreen-realm.json`, `cmd/api-platform/realm
 
 ## Hai điểm owner cần xử lý
 
+Đã bàn giao cả hai điểm ở [owner KN #86](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/86). Gói shared giữ việc kiểm chứng mở, không sửa frontend/deploy hoặc tự thay policy scope.
+
 Web đang gửi scope `openid profile`, nhưng JSON realm không khai báo profile và kn-web không gán profile vào default/optional scopes. Đây cũng là hiện trạng client web cũ. [TokenManager Keycloak 26.3.5](https://github.com/keycloak/keycloak/blob/26.3.5/services/src/main/java/org/keycloak/protocol/oidc/TokenManager.java#L616-L669) loại openid rồi kiểm các scope còn lại thuộc client; [AuthorizationEndpoint](https://github.com/keycloak/keycloak/blob/26.3.5/services/src/main/java/org/keycloak/protocol/oidc/endpoints/AuthorizationEndpoint.java#L168-L175) thực hiện kiểm scope trước PKCE. Suy luận từ cấu hình: request profile chưa được cấp sẽ không hợp lệ; chưa có tái hiện trên realm chạy thật. Giao owner KN đối chiếu request scope với scope đã gán, giữ các mapper claim/audience/MFA cần thiết, thêm test hợp đồng và kiểm authorize thực tế; không tự thêm profile/PII vào token để bỏ qua lỗi.
 
 Compose đặt issuer `http://localhost:8180/realms/agrigreen`, cổng 8180→Keycloak8080. Nhưng `apps/web-ops/src/config.ts` fallback và `.env.example` còn 8081; Compose dùng 8081 cho API nội bộ MKG. Bản web phải đặt issuer đúng khi build. Sửa ví dụ/default frontend thuộc owner KN, không sửa tại gói shared này.
@@ -34,4 +36,4 @@ GET chỉ đọc `http://localhost:8180/realms/agrigreen/.well-known/openid-conf
 
 Live OIDC/PKCE/MFA/refresh/logout/tenant-routing **chưa chạy**. Realm đã nhập không tự cập nhật khi thay JSON; người vận hành cần thực hiện runbook trên môi trường được duyệt rồi lưu bằng chứng không chứa bí mật. Chỉ GET discovery thành công cũng chưa chứng minh PKCE, OTP hoặc tenant isolation.
 
-Các bài thử cấu hình thuần và kiểm bộ xác minh token hiện có sẽ được ghi sau khi kết thúc. Không có SQL/Go/frontend/deploy thay đổi; không lấy kiểm cấu hình làm bằng chứng PG hoặc live Keycloak. #59 và G1 còn mở tới khi owner xử lý hợp đồng web và có chứng cứ vận hành/phần #56.
+Go1.26.9: các test cấu hình realm được chọn trong cmd/api-platform đạt exit 0 (7 test cấp đầu); các test verifier/MFA/session thuần trong internal/shared/authz đạt exit 0 (7 test cấp đầu). Không FAIL/SKIP/INFRA. Đây là test đọc JSON và token tổng hợp offline, không chạy DB hoặc Keycloak. TestMain của cmd/api-platform chỉ bootstrap khi có AG_TEST_PG_ADMIN_URL; lượt này lọc đúng các test không cần DB và không đặt biến đó, không báo PASS PG. Prefix bằng chứng: %TEMP%/agrigreen-codex-ticket59-pure-tests.*. Không có SQL/Go/frontend/deploy thay đổi; #59 và G1 còn mở tới khi owner xử lý hợp đồng web và có chứng cứ vận hành/phần #56.
