@@ -9456,6 +9456,214 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/diary-cycles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lứa nuôi trong phạm vi (W11.48, NC-02/NC-15) — kèm lợi nhuận trung bình/hộ của lứa đã hạch toán */
+        get: operations["extensionCntsDiaryCycleList"];
+        put?: never;
+        /** Mở lứa nuôi cho hộ mô hình — cán bộ theo dõi điểm / người ghi nhật ký (Cấp Xã), Admin */
+        post: operations["extensionCntsDiaryCycleCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/diary-cycles/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết lứa: gợi ý hạch toán, lịch sử phiên bản */
+        get: operations["extensionCntsDiaryCycleGet"];
+        put?: never;
+        /** Sửa lứa đang nuôi (base_version) */
+        post: operations["extensionCntsDiaryCycleUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/diary-cycles/{ref}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Kết thúc lứa kèm hạch toán kinh tế NC-15 (tổng thu bắt buộc) */
+        post: operations["extensionCntsDiaryCycleClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/diary-cycles/{ref}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở lại lứa đã kết thúc — lý do bắt buộc (người ghi hoặc chủ nhiệm) */
+        post: operations["extensionCntsDiaryCycleReopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/diary-entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lần ghi nhật ký trong phạm vi; review=true: hàng chờ rà soát của chủ nhiệm/lãnh đạo phòng (UR-TINH-12) */
+        get: operations["extensionCntsDiaryEntryList"];
+        put?: never;
+        /** Ghi lần ghi (nháp hoặc gửi luôn) — mã UUIDv7, thời điểm và vị trí thiết bị cho bản ngoại tuyến (AC-03); quy tắc chặn khi gửi */
+        post: operations["extensionCntsDiaryEntryCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/diary-entries/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết lần ghi: lịch sử, vị trí so với điểm, ảnh, lần ghi trước, biểu đồ tăng trọng */
+        get: operations["extensionCntsDiaryEntryGet"];
+        put?: never;
+        /** Sửa lần ghi chưa xác thực (trong cnts.diary_edit_days ngày); submit=true gửi luôn. Mã, lứa, thời điểm, vị trí lúc ghi không sửa */
+        post: operations["extensionCntsDiaryEntryUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/diary-entries/{ref}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gửi lần ghi (nháp, yêu cầu bổ sung) */
+        post: operations["extensionCntsDiaryEntrySubmit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/diary-entries/{ref}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xác thực — chủ nhiệm dự án / lãnh đạo phòng; người xác thực khác người ghi */
+        post: operations["extensionCntsDiaryEntryVerify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/diary-entries/{ref}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Yêu cầu bổ sung (lý do bắt buộc) */
+        post: operations["extensionCntsDiaryEntryReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/diary-entries/{ref}/correct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Điều chỉnh lần ghi đã xác thực — bản mới có lý do, chờ xác thực lại */
+        post: operations["extensionCntsDiaryEntryCorrect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/diary-photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tải ảnh nhật ký (≤ 500 KB) — máy chủ mã hóa phong bì bằng khóa chủ hộ, lưu qua pf/evidence */
+        post: operations["extensionCntsDiaryPhotoUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/diary-photos/{ref}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xem ảnh nhật ký — người ghi được, người rà soát được, Admin (mục đích extension.diary) */
+        get: operations["extensionCntsDiaryPhotoContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -20028,6 +20236,451 @@ export interface components {
         };
         CNTSGrantCandidateList: {
             items: components["schemas"]["CNTSGrantCandidate"][];
+        };
+        CNTSDiarySupply: {
+            /** Format: date */
+            date: string;
+            kind: string;
+            quantity: string;
+            unit: string;
+            note?: string;
+        };
+        CNTSDiaryAccounting: {
+            cost_seed: string | null;
+            cost_feed: string | null;
+            cost_depreciation: string | null;
+            cost_transport: string | null;
+            cost_vet: string | null;
+            cost_probiotic: string | null;
+            revenue_heads: number | null;
+            revenue_output_kg: string | null;
+            revenue_price: string | null;
+            revenue_amount: string | null;
+            total_cost: string;
+            profit: string | null;
+            unit_cost: string | null;
+        };
+        CNTSDiarySuggest: {
+            feed_cost: string;
+            sold_heads: number;
+            sold_kg: string;
+            sales_amount: string;
+            current_heads: number | null;
+            /** Format: date */
+            last_entry_date: string | null;
+            counts: {
+                [key: string]: number;
+            };
+        };
+        CNTSDiaryCycleVersion: {
+            /** @enum {string} */
+            event: "created" | "updated" | "closed" | "reopened";
+            status_reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            updated_by_display: string | null;
+        };
+        CNTSDiaryCycle: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "closed" | "reopened";
+            /** @enum {string} */
+            status: "open" | "closed";
+            /** Format: uuid */
+            household_ref: string;
+            /** Format: uuid */
+            site_ref: string;
+            /** Format: uuid */
+            project_ref: string;
+            commune_code: string;
+            /** @enum {string} */
+            form: "BM-08" | "BM-09" | "BM-19";
+            breed: string;
+            /** Format: date */
+            received_date: string;
+            initial_count: number;
+            initial_weight_g: string | null;
+            age_days: number | null;
+            supplies: components["schemas"]["CNTSDiarySupply"][];
+            /** Format: uuid */
+            vaccination_batch_ref: string | null;
+            note: string | null;
+            status_reason: string | null;
+            site_name: string;
+            project_code: string;
+            owner_label: string | null;
+            can_edit: boolean;
+            accounting: components["schemas"]["CNTSDiaryAccounting"];
+            suggest: components["schemas"]["CNTSDiarySuggest"];
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            updated_by_display: string | null;
+        };
+        CNTSDiaryCycleDetail: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "closed" | "reopened";
+            /** @enum {string} */
+            status: "open" | "closed";
+            /** Format: uuid */
+            household_ref: string;
+            /** Format: uuid */
+            site_ref: string;
+            /** Format: uuid */
+            project_ref: string;
+            commune_code: string;
+            /** @enum {string} */
+            form: "BM-08" | "BM-09" | "BM-19";
+            breed: string;
+            /** Format: date */
+            received_date: string;
+            initial_count: number;
+            initial_weight_g: string | null;
+            age_days: number | null;
+            supplies: components["schemas"]["CNTSDiarySupply"][];
+            /** Format: uuid */
+            vaccination_batch_ref: string | null;
+            note: string | null;
+            status_reason: string | null;
+            site_name: string;
+            project_code: string;
+            owner_label: string | null;
+            can_edit: boolean;
+            accounting: components["schemas"]["CNTSDiaryAccounting"];
+            suggest: components["schemas"]["CNTSDiarySuggest"];
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            updated_by_display: string | null;
+            versions: components["schemas"]["CNTSDiaryCycleVersion"][];
+        };
+        CNTSDiaryCycleList: {
+            items: components["schemas"]["CNTSDiaryCycle"][];
+            closed_count: number;
+            avg_profit: string | null;
+            can_create: boolean;
+        };
+        CNTSDiaryCycleSave: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            household_ref?: string;
+            base_version?: number;
+            /** @enum {string} */
+            form?: "BM-08" | "BM-09" | "BM-19";
+            breed: string;
+            /** Format: date */
+            received_date: string;
+            initial_count: number;
+            initial_weight_g?: string | null;
+            age_days?: number | null;
+            supplies?: components["schemas"]["CNTSDiarySupply"][];
+            /** Format: uuid */
+            vaccination_batch_ref?: string | null;
+            note?: string;
+        };
+        CNTSDiaryCycleClose: {
+            base_version: number;
+            cost_seed?: string | null;
+            cost_feed?: string | null;
+            cost_depreciation?: string | null;
+            cost_transport?: string | null;
+            cost_vet?: string | null;
+            cost_probiotic?: string | null;
+            revenue_heads?: number | null;
+            revenue_output_kg?: string | null;
+            revenue_price?: string | null;
+            revenue_amount: string;
+        };
+        CNTSDiaryCheck: {
+            code: string;
+            /** @enum {string} */
+            level: "block" | "warn" | "info";
+            field?: string;
+            message: string;
+            /** @enum {string} */
+            alert?: "water_quality" | "low_growth" | "mortality" | "log_location";
+            value?: string;
+            compare?: string;
+        };
+        CNTSDiaryLocation: {
+            has_fix: boolean;
+            accuracy_m: string | null;
+            distance_m: string | null;
+            no_target_point: boolean;
+            far: boolean;
+            weak_accuracy: boolean;
+            mock_location: boolean;
+            mock_suspected: boolean;
+            fix_stored: boolean;
+        };
+        CNTSDiaryFeedPurchase: {
+            /** Format: date */
+            date: string;
+            name: string;
+            quantity_kg: string;
+            unit_price: string;
+            note?: string;
+        };
+        CNTSDiaryTreatment: {
+            /** Format: date */
+            date: string;
+            condition?: string;
+            symptoms?: string;
+            drug: string;
+            dosage?: string;
+            treater?: string;
+            withdrawal_days: number;
+            result?: string;
+        };
+        CNTSDiaryVaccination: {
+            vaccine: string;
+            shot: number;
+            /** Format: date */
+            date: string;
+            dosage?: string;
+            method?: string;
+            mfg_date?: string;
+        };
+        CNTSDiarySale: {
+            /** Format: date */
+            date: string;
+            kind?: string;
+            heads: number;
+            weight_kg: string;
+            unit_price: string;
+        };
+        CNTSDiaryOfficerNote: {
+            /** Format: date */
+            date: string;
+            content: string;
+            farmer_opinion?: string;
+        };
+        CNTSDiaryTables: {
+            feed_purchases?: components["schemas"]["CNTSDiaryFeedPurchase"][];
+            treatments?: components["schemas"]["CNTSDiaryTreatment"][];
+            vaccinations?: components["schemas"]["CNTSDiaryVaccination"][];
+            sales?: components["schemas"]["CNTSDiarySale"][];
+            officer_notes?: components["schemas"]["CNTSDiaryOfficerNote"][];
+        };
+        CNTSDiaryEntryVersion: {
+            /** @enum {string} */
+            event: "created" | "updated" | "submitted" | "returned" | "verified" | "corrected";
+            /** @enum {string} */
+            status: "draft" | "submitted" | "returned" | "verified";
+            status_reason: string | null;
+            /** @description Chỉ số theo mẫu (NC-05…NC-12, NT-04…NT-12) — giá trị dạng chuỗi */
+            metrics: {
+                [key: string]: string;
+            };
+            checks: components["schemas"]["CNTSDiaryCheck"][];
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            updated_by_display: string | null;
+        };
+        CNTSDiaryPhoto: {
+            /** Format: uuid */
+            file_ref: string;
+            /** Format: uuid */
+            household_ref: string;
+            /** @enum {string} */
+            kind: "weighing" | "test_kit" | "flock" | "other";
+            /** @enum {string} */
+            content_type: "image/jpeg" | "image/png" | "image/webp";
+            size_bytes: number;
+            /** Format: date-time */
+            captured_at: string | null;
+            /** Format: uuid */
+            uploaded_by: string;
+            /** Format: date-time */
+            uploaded_at: string;
+        };
+        CNTSDiaryEntry: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "submitted" | "returned" | "verified" | "corrected";
+            /** @enum {string} */
+            status: "draft" | "submitted" | "returned" | "verified";
+            /** Format: uuid */
+            cycle_ref: string;
+            /** Format: uuid */
+            household_ref: string;
+            /** Format: uuid */
+            site_ref: string;
+            /** Format: uuid */
+            project_ref: string;
+            commune_code: string;
+            /** @enum {string} */
+            form: "BM-08" | "BM-09" | "BM-19";
+            /** @enum {string} */
+            entry_kind: "daily" | "growth_env" | "env" | "harvest";
+            /** Format: date */
+            entry_date: string;
+            /** Format: date-time */
+            captured_at: string;
+            /** @description Chỉ số theo mẫu (NC-05…NC-12, NT-04…NT-12) — giá trị dạng chuỗi */
+            metrics: {
+                [key: string]: string;
+            };
+            tables: components["schemas"]["CNTSDiaryTables"];
+            photo_refs: string[];
+            checks: components["schemas"]["CNTSDiaryCheck"][];
+            location: components["schemas"]["CNTSDiaryLocation"];
+            /** Format: uuid */
+            author_ref: string;
+            author_display: string | null;
+            /** Format: uuid */
+            reviewer_ref: string | null;
+            reviewer_display: string | null;
+            status_reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            updated_by_display: string | null;
+            site_name: string;
+            project_code: string;
+            breed: string | null;
+            owner_label: string | null;
+            /** Format: date */
+            editable_until: string;
+            can_edit: boolean;
+            can_submit: boolean;
+            can_review: boolean;
+            can_correct: boolean;
+        };
+        CNTSDiaryEntryDetail: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            event: "created" | "updated" | "submitted" | "returned" | "verified" | "corrected";
+            /** @enum {string} */
+            status: "draft" | "submitted" | "returned" | "verified";
+            /** Format: uuid */
+            cycle_ref: string;
+            /** Format: uuid */
+            household_ref: string;
+            /** Format: uuid */
+            site_ref: string;
+            /** Format: uuid */
+            project_ref: string;
+            commune_code: string;
+            /** @enum {string} */
+            form: "BM-08" | "BM-09" | "BM-19";
+            /** @enum {string} */
+            entry_kind: "daily" | "growth_env" | "env" | "harvest";
+            /** Format: date */
+            entry_date: string;
+            /** Format: date-time */
+            captured_at: string;
+            /** @description Chỉ số theo mẫu (NC-05…NC-12, NT-04…NT-12) — giá trị dạng chuỗi */
+            metrics: {
+                [key: string]: string;
+            };
+            tables: components["schemas"]["CNTSDiaryTables"];
+            photo_refs: string[];
+            checks: components["schemas"]["CNTSDiaryCheck"][];
+            location: components["schemas"]["CNTSDiaryLocation"];
+            /** Format: uuid */
+            author_ref: string;
+            author_display: string | null;
+            /** Format: uuid */
+            reviewer_ref: string | null;
+            reviewer_display: string | null;
+            status_reason: string | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            updated_by_display: string | null;
+            site_name: string;
+            project_code: string;
+            breed: string | null;
+            owner_label: string | null;
+            /** Format: date */
+            editable_until: string;
+            can_edit: boolean;
+            can_submit: boolean;
+            can_review: boolean;
+            can_correct: boolean;
+            versions: components["schemas"]["CNTSDiaryEntryVersion"][];
+            /** @description Tọa độ lúc ghi — chỉ người ghi được, người rà soát được, Admin; null khi đã xóa theo hạn lưu */
+            fix: {
+                lat: number;
+                lng: number;
+                accuracy_m: string | null;
+                /** Format: date-time */
+                captured_at: string;
+            } | null;
+            target: {
+                lat: number;
+                lng: number;
+            } | null;
+            photos: components["schemas"]["CNTSDiaryPhoto"][];
+            previous: {
+                /** Format: uuid */
+                ref: string;
+                /** Format: date */
+                entry_date: string;
+                /** @description Chỉ số theo mẫu (NC-05…NC-12, NT-04…NT-12) — giá trị dạng chuỗi */
+                metrics: {
+                    [key: string]: string;
+                };
+            } | null;
+            weights: {
+                /** Format: date */
+                date: string;
+                weight_avg_g: string;
+            }[];
+        };
+        CNTSDiaryEntryList: {
+            items: components["schemas"]["CNTSDiaryEntry"][];
+        };
+        CNTSDiaryEntrySave: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            cycle_ref?: string;
+            base_version?: number;
+            submit?: boolean;
+            /** Format: date-time */
+            captured_at?: string;
+            /** Format: date */
+            entry_date?: string;
+            /** @enum {string} */
+            entry_kind: "daily" | "growth_env" | "env" | "harvest";
+            /** @description Chỉ số theo mẫu (NC-05…NC-12, NT-04…NT-12) — giá trị dạng chuỗi */
+            metrics: {
+                [key: string]: string;
+            };
+            tables?: components["schemas"]["CNTSDiaryTables"];
+            photo_refs?: string[];
+            location?: {
+                lat: number;
+                lng: number;
+                accuracy_m?: string | null;
+                mock_location?: boolean;
+            };
+            reason?: string;
+        };
+        CNTSDiaryBase: {
+            base_version: number;
         };
     };
     responses: {
@@ -40034,6 +40687,627 @@ export interface operations {
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryCycleList: {
+        parameters: {
+            query?: {
+                household_ref?: string;
+                site_ref?: string;
+                project_ref?: string;
+                status?: "open" | "closed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryCycleList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryCycleCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSDiaryCycleSave"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp (Idempotency-Key) — trả bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryCycleDetail"];
+                };
+            };
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryCycleDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryCycleGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryCycleDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryCycleUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSDiaryCycleSave"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryCycleDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryCycleClose: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSDiaryCycleClose"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryCycleDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryCycleReopen: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusChange"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryCycleDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_cycle_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryEntryList: {
+        parameters: {
+            query?: {
+                cycle_ref?: string;
+                household_ref?: string;
+                project_ref?: string;
+                status?: "draft" | "submitted" | "returned" | "verified";
+                review?: boolean;
+                flagged?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryEntryList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.cnts_diary_self_verify | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryEntryCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSDiaryEntrySave"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp (Idempotency-Key) — trả bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryEntryDetail"];
+                };
+            };
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryEntryDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.cnts_diary_self_verify | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryEntryGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryEntryDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.cnts_diary_self_verify | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryEntryUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSDiaryEntrySave"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryEntryDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.cnts_diary_self_verify | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryEntrySubmit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSDiaryBase"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryEntryDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.cnts_diary_self_verify | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryEntryVerify: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSDiaryBase"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryEntryDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.cnts_diary_self_verify | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryEntryReturn: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusChange"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryEntryDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.cnts_diary_self_verify | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryEntryCorrect: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSDiaryEntrySave"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryEntryDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.cnts_diary_self_verify | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryPhotoUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    /** Format: uuid */
+                    household_ref: string;
+                    /** @enum {string} */
+                    kind: "weighing" | "test_kit" | "flock" | "other";
+                    /** Format: date-time */
+                    captured_at?: string;
+                    /** Format: uuid */
+                    id?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDiaryPhoto"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description not_found | extension.cnts_diary_photo_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_photo_no_key */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_photo_invalid */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsDiaryPhotoContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nội dung ảnh (Cache-Control no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            /** @description not_found | extension.cnts_diary_photo_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_photo_no_key */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_diary_photo_invalid */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
             503: components["responses"]["Problem"];
         };
     };
