@@ -4,6 +4,7 @@ package handler
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -179,9 +180,10 @@ func (h Handler) retire(c *gin.Context) {
 // ---------------------------------------------------------------------------
 
 type exportReq struct {
-	TemplateKey string        `json:"template_key"`
-	Format      string        `json:"format"`
-	Params      domain.Params `json:"params"`
+	SourceArgs  json.RawMessage `json:"source_args,omitempty"`
+	TemplateKey string          `json:"template_key"`
+	Format      string          `json:"format"`
+	Params      domain.Params   `json:"params"`
 }
 
 type exportDTO struct {
@@ -224,7 +226,7 @@ func (h Handler) requestExport(c *gin.Context) {
 		return
 	}
 	j, _, err := h.Svc.RequestExport(c.Request.Context(), app.ExportInput{
-		TemplateKey: req.TemplateKey, Format: req.Format, Params: req.Params, IdemKey: idem(c),
+		TemplateKey: req.TemplateKey, Format: req.Format, Params: req.Params, IdemKey: idem(c), SourceArgs: req.SourceArgs,
 	})
 	if err != nil {
 		httpx.Fail(c, err)

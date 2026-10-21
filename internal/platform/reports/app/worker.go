@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -47,6 +48,13 @@ func (s *Service) HandleExportRequested(ctx context.Context, tx pgx.Tx, env outb
 	}
 	if j == nil || j.Status != domain.JobQueued {
 		return nil
+	}
+	if policy, ok := s.Builders.jobPolicy(j.Def.Source); ok || j.SourceArgs != nil {
+		at, parseErr := time.Parse(time.RFC3339Nano, pl.RequestedAt)
+		if policy.Version < 1 || parseErr != nil || env.TenantID != j.TenantID || pl.RequestedBy != j.RequestedBy.String() ||
+			pl.TemplateKey != j.TemplateKey || pl.Format != j.Format || !at.Equal(j.RequestedAt) {
+			return ErrDependency
+		}
 	}
 	if s.Store == nil {
 		return ErrDependency.WithDetail("chưa cấu hình kho đối tượng")

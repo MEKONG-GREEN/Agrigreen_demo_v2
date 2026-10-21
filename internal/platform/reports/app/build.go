@@ -93,6 +93,9 @@ type built struct {
 // phạm vi và bộ lọc ĐÃ GIẢI lúc yêu cầu. Chạy ở worker (không có token).
 func (s *Service) buildDataset(ctx context.Context, j domain.Job) (domain.Dataset, error) {
 	ctx = tenant.WithID(ctx, j.TenantID)
+	if _, err := s.authorizeSourceJob(ctx, j, uuid.Nil, port.SourceJobBuild); err != nil {
+		return domain.Dataset{}, err
+	}
 	sc := authz.Scope{All: j.ScopeAll, Units: j.ScopeUnits}
 	n := &names{s: s, cache: map[string]string{}}
 	src, registered := s.sourceSpecs()[j.Def.Source]

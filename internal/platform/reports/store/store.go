@@ -105,7 +105,7 @@ func scanJob(row pgx.Row) (domain.Job, error) {
 	if err := json.Unmarshal([]byte(def), &j.Def); err != nil {
 		return j, err
 	}
-	return j, json.Unmarshal([]byte(params), &j.Params)
+	return j, domain.UnmarshalJobParams([]byte(params), &j)
 }
 
 func oneJob(ctx context.Context, tx pgx.Tx, where string, args ...any) (*domain.Job, error) {
@@ -162,7 +162,7 @@ func InsertJob(ctx context.Context, tx pgx.Tx, j *domain.Job) error {
 	if err != nil {
 		return err
 	}
-	params, err := json.Marshal(j.Params)
+	params, err := domain.MarshalJobParams(*j)
 	if err != nil {
 		return err
 	}
