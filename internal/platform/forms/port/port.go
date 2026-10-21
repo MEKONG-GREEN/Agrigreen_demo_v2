@@ -27,6 +27,8 @@ type ResolvedActor struct {
 	Scope        authz.Scope
 	Node         uuid.UUID
 	AllowsTarget func(unitKind string, ref uuid.UUID) bool
+	// AllowsTemplate is a server-owned code filter. Nil preserves the legacy profile.
+	AllowsTemplate func(code string) bool
 }
 
 // ActorResolver returns handled=false only when no application session applies.

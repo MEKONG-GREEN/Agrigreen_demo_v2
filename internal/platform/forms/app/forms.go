@@ -52,6 +52,9 @@ func (s *Service) DefineTemplate(ctx context.Context, in TemplateInput, idem str
 		}
 		return store.Template{}, port.ErrInvalidTemplate.WithDetail(err.Error())
 	}
+	if !a.allowsTemplate(in.Code) {
+		return store.Template{}, problem.Forbidden.WithDetail("biểu ngoài phạm vi")
+	}
 	t := store.Template{ID: ids.New(), Profile: in.Profile, Code: in.Code, Title: in.Title, Fields: in.Fields, Fixture: in.Fixture,
 		ActorRef: a.ref, EventTime: s.Clock.Now().UTC()}
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
@@ -85,6 +88,7 @@ func (s *Service) Templates(ctx context.Context, profile string) ([]store.Templa
 		out, e = store.LatestTemplates(ctx, tx, profile)
 		return e
 	})
+	out = slices.DeleteFunc(out, func(t store.Template) bool { return !a.allowsTemplate(t.Code) })
 	return out, err
 }
 
@@ -103,7 +107,7 @@ func (s *Service) Template(ctx context.Context, profile string, id uuid.UUID) (s
 	if err != nil {
 		return store.Template{}, err
 	}
-	if t == nil || t.Profile != profile {
+	if t == nil || t.Profile != profile || !a.allowsTemplate(t.Code) {
 		return store.Template{}, port.ErrTemplateNotFound
 	}
 	return *t, nil
@@ -198,7 +202,7 @@ func (s *Service) Publish(ctx context.Context, in PublishInput, idem string) (Pe
 		if err != nil {
 			return err
 		}
-		if t == nil || t.Profile != in.Profile {
+		if t == nil || t.Profile != in.Profile || !a.allowsTemplate(t.Code) {
 			return port.ErrTemplateNotFound
 		}
 		if t.Fixture && !prof.AllowFixtures {
@@ -255,6 +259,9 @@ func (a actor) owns(p store.Period) bool {
 
 // canSee: phạm vi toàn quốc, Nút chủ của kỳ, hoặc có ít nhất một đơn vị nhận trong phạm vi (theo loại đơn vị lá).
 func (a actor) canSee(p store.Period, spec domain.Spec) bool {
+	if !a.allowsTemplate(p.TemplateCode) {
+		return false
+	}
 	if a.scope.All || a.owns(p) {
 		return true
 	}
@@ -263,10 +270,22 @@ func (a actor) canSee(p store.Period, spec domain.Spec) bool {
 
 // canClose: cấp close_by và (toàn quốc hoặc Nút chủ của kỳ).
 func (a actor) canClose(prof string, p store.Period) bool {
-	return a.level == prof && (a.scope.All || a.owns(p))
+	return a.allowsTemplate(p.TemplateCode) && a.level == prof && (a.scope.All || a.owns(p))
 }
 
-// load đọc kỳ + sự kiện + bài nộp cuối + rà soát + ảnh chụp trong tx; now dùng chiếu "Trễ hạn".
+// canReadWholeSnapshot checks all bounded units before returning immutable bytes.
+// Filtering a snapshot body would invalidate its stored hash.
+func (a actor) canReadWholeSnapshot(p store.Period, spec domain.Spec) bool {
+	if !a.canSee(p, spec) {
+		return false
+	}
+	if a.templateFilter != nil || a.targetFilter != nil {
+		return !slices.ContainsFunc(p.Units, func(u string) bool { return !a.allowsUnit(spec, p.Units, u) })
+	}
+	return true
+}
+
+// load reads the native period and projections in the current tenant transaction.
 func load(ctx context.Context, tx pgx.Tx, id uuid.UUID, now time.Time) (*PeriodView, error) {
 	p, err := store.PeriodByID(ctx, tx, id)
 	if err != nil || p == nil {
@@ -345,7 +364,7 @@ func (s *Service) Period(ctx context.Context, profile string, id uuid.UUID) (Per
 	if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
 		return PeriodView{}, port.ErrPeriodNotFound
 	}
-	if !a.scope.All && !a.owns(v.Period) {
+	if (!a.scope.All && !a.owns(v.Period)) || a.targetFilter != nil {
 		v.Units = slices.DeleteFunc(v.Units, func(u UnitView) bool { return !a.allowsUnit(v.Spec, v.Period.Units, u.Unit) })
 	}
 	return *v, nil
@@ -465,16 +484,11 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 		if err := store.Lock(ctx, tx, periodID); err != nil {
 			return err
 		}
-		if in.ID != nil {
-			if done, err := s.replayed(ctx, tx, *in.ID, a.ref, &out); err != nil || done {
-				return err
-			}
-		}
 		v, err := load(ctx, tx, periodID, now)
 		if err != nil {
 			return err
 		}
-		if v == nil || v.Period.Profile != profile {
+		if v == nil || v.Period.Profile != profile || !a.allowsTemplate(v.Period.TemplateCode) {
 			return port.ErrPeriodNotFound
 		}
 		if !a.allowsUnit(v.Spec, v.Period.Units, unit) {
@@ -482,6 +496,11 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 		}
 		if !slices.Contains(v.Period.Units, unit) {
 			return port.ErrUnitNotInPeriod
+		}
+		if in.ID != nil {
+			if done, err := s.replayed(ctx, tx, *in.ID, a.ref, periodID, unit, &out); err != nil || done {
+				return err
+			}
 		}
 		if v.State.Status == domain.PeriodCancelled {
 			return port.ErrPeriodCancelled
@@ -592,12 +611,12 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 }
 
 // replayed: mã phiên bản id đã ghi (bài nộp hoặc bài giữ) → out = bản đã ghi, done.
-func (s *Service) replayed(ctx context.Context, tx pgx.Tx, id, actorRef uuid.UUID, out *SubmissionView) (bool, error) {
+func (s *Service) replayed(ctx context.Context, tx pgx.Tx, id, actorRef, periodRef uuid.UUID, unit string, out *SubmissionView) (bool, error) {
 	sb, err := store.SubmissionByID(ctx, tx, id)
 	if err != nil {
 		return false, err
 	}
-	if sb != nil && sb.Submitter != actorRef {
+	if sb != nil && (sb.Submitter != actorRef || sb.PeriodID != periodRef || sb.Unit != unit) {
 		return false, problem.Conflict.WithDetail("mã phiên bản bài nộp đã dùng")
 	}
 	if sb != nil {
@@ -608,7 +627,7 @@ func (s *Service) replayed(ctx context.Context, tx pgx.Tx, id, actorRef uuid.UUI
 	if err != nil || h == nil {
 		return false, err
 	}
-	if h.Submitter != actorRef {
+	if h.Submitter != actorRef || h.PeriodID != periodRef || h.Unit != unit {
 		return false, problem.Conflict.WithDetail("mã phiên bản bài nộp đã dùng")
 	}
 	*out = SubmissionView{Submission: store.Submission{ID: h.ID, PeriodID: h.PeriodID, Unit: h.Unit, Values: h.Values, Submitter: h.Submitter,
@@ -659,7 +678,7 @@ func (s *Service) Submissions(ctx context.Context, profile string, periodID uuid
 		if err != nil {
 			return err
 		}
-		if p == nil || p.Profile != profile {
+		if p == nil || p.Profile != profile || !a.allowsTemplate(p.TemplateCode) {
 			return port.ErrPeriodNotFound
 		}
 		spec, err := store.SpecOf(ctx, tx, periodID)
@@ -736,7 +755,7 @@ func (s *Service) Review(ctx context.Context, profile string, submissionID uuid.
 		if err != nil {
 			return err
 		}
-		if v == nil || v.Period.Profile != profile || !a.allowsUnit(v.Spec, v.Period.Units, sb.Unit) {
+		if v == nil || v.Period.Profile != profile || !a.allowsTemplate(v.Period.TemplateCode) || !a.allowsUnit(v.Spec, v.Period.Units, sb.Unit) {
 			return port.ErrSubmissionMissing
 		}
 		if v.State.Status == domain.PeriodCancelled {
@@ -980,12 +999,12 @@ func (s *Service) Snapshot(ctx context.Context, profile string, id uuid.UUID) (s
 			if err != nil {
 				return err
 			}
-			if a.canSee(*p, spec) {
+			if p.Profile == profile && a.canReadWholeSnapshot(*p, spec) {
 				out = snap
 			}
 			return nil
 		}
-		if a.level != "" && a.level != prof.Leaf() {
+		if a.templateFilter == nil && a.targetFilter == nil && a.level != "" && a.level != prof.Leaf() {
 			out = snap
 		}
 		return nil
@@ -1021,7 +1040,7 @@ func (s *Service) Snapshots(ctx context.Context, profile string, periodRef uuid.
 				return port.ErrPeriodNotFound
 			}
 		}
-		if p == nil && (a.level == "" || a.level == prof.Leaf()) {
+		if p == nil && (a.templateFilter != nil || a.targetFilter != nil || a.level == "" || a.level == prof.Leaf()) {
 			return problem.Forbidden.WithDetail("ảnh chụp kỳ ghi song song cần cấp trên cấp lá")
 		}
 		ss, err := store.Snapshots(ctx, tx, periodRef)

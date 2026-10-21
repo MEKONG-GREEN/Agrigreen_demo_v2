@@ -190,6 +190,9 @@ func (src SyncSource) Changes(ctx context.Context, sc authz.Scope, entity string
 			if !ok {
 				continue
 			}
+			if !a.allowsTemplate(v.Period.TemplateCode) {
+				continue
+			}
 			if _, ok := tpls[v.Period.TemplateID]; !ok {
 				if tpls[v.Period.TemplateID], err = store.TemplateByID(ctx, tx, v.Period.TemplateID); err != nil {
 					return err
