@@ -4,25 +4,21 @@ Trạng thái: thiết kế để root/Claude review, chưa có Go/DDL/importer 
 
 ## Chủ module và bất biến
 
-Đặt hợp đồng generic ở party/port, điều phối ở party/app, lưu tại party/store và schema pf_party, wiring ở cmd/*/assembly. Party là kernel quản quan hệ bên tham gia/cấp phép; accounts đã phụ thuộc party nên không tạo cạnh vòng. Không tạo module/schema shared mới. Phạm vi issue55 ghi port/assembly; root cần xác nhận app/store cho phần thực thi generic trước code. Migration pf_party dùng tools/migratecheck -new, chỉ sau chốt thiết kế; modgen sinh lại.
+Đặt hợp đồng generic ở party/port, điều phối ở party/app, lưu tại party/store và schema pf_party, wiring ở cmd/*/assembly. Party là kernel quản quan hệ bên tham gia/cấp phép; accounts đã phụ thuộc party nên không tạo cạnh vòng. Không tạo module/schema shared mới. Root đã duyệt phần thực thi generic party app/store trong lane shared; không mở rộng sang module riêng KN. Migration pf_party dùng tools/migratecheck -new, chỉ sau chốt thiết kế; modgen sinh lại.
 
 Core chỉ giữ metadata được kiểm: cặp tenant/phạm vi, approvals, manifest, hash/provenance, ID map, batch receipts và trạng thái. Không raw payload/PII, SQL/table name từ request, toàn bộ dữ liệu HTX/MRV/MKG hoặc luật phòng ban KN. Assembly đăng ký allowlist rõ từng owner/namespace/version; owner typed exporters lọc đúng dữ liệu riêng KN (kể cả dữ liệu KN nằm trong forms/reports). Không chuyển HTX/Nút cooperative/Neo MST, quyền đồng sở hữu D2 hoặc MRV. Tenant digest recipient map hiện có chỉ tenant→mailbox, không phải map Trung tâm→tenant.
 
 Mỗi binding giữ một SourceScopeRef (Trung tâm nguồn do owner xác nhận) và một TargetTenant/TargetScopeRef. Hai Trung tâm không dùng chung tenant đích; một nguồn lưu ký có thể có nhiều Trung tâm. ID map ghi rõ SourceTenant/namespace/source_ref→TargetTenant/namespace/target_ref, không sửa tenant_id hay hash của dòng nguồn. Mỗi phiên bản ledger mới ở đích có provenance gốc và chuỗi băm đích do shared.fn_chain tính lại.
 
-## Hai ngữ cảnh xác thực thật
+## Hai ngữ cảnh xác thực thật — v1 đã review
 
-Không có một Principal giả dùng cho cả hai tenant. Phía nguồn Propose/Freeze/Seal/Export chạy dưới actual source context; phía đích Intent/Accept/Reserve/Apply/Resume chạy dưới actual target context. Mỗi mutation yêu cầu Principal đúng tenant của pha, actor có thật, platform_admin + MFA và callback owner kiểm quyền hiện hành trên đúng SourceScopeRef hoặc TargetScopeRef. Không callback/không đủ quyền/approval hết hạn hoặc bị thu hồi thì deny trước cache, replay, đọc dữ liệu hoặc gọi importer.
+Mọi operation và replay nhận TransferParticipants giữ HAI context đã được caller xác thực thật. Constructor kiểm hai Principal có tenant khác nhau, actor có thật, platform_admin + MFA; core gọi owner CurrentAuthority cho cả hai phía trên từng operation/replay, đúng source/target scope hiện hành. Không nhận contexts/token qua JSON. Adapter CLI xác thực hai token thật là việc owner sau này; v1 chưa có live CLI/job capability thì không tự bật worker import. Restart phải lấy lại hai authenticated contexts.
 
-H4 share-grant đọc không phải quyền ghi chuyển tenant. Core không truyền tenant.Grant ra owner writers, không dựng Principal/SelectedSession/ScopeAll, không xóa Principal/WithoutNodeScope để vượt p_scope. Đặc biệt db.ContextVarsFrom(ctx) giữ Nút của phiên thực: importer phải dùng context đích thật và kiểm scope đích; không mang Nút nguồn sang target rồi xóa Nút cho qua. V1 chưa có job capability được duyệt thì worker/CLI không có actual target authority phải bị từ chối.
+Core mở hai giao dịch LOCAL riêng: Source luôn dưới source context/tenant, Target luôn dưới target context/tenant. Không cross-tenant query, không MintGrant/WithGrant/Within cho loại permission metadata mới, không secret ký offer. Đọc counterpart approvals/intent/fence/status bằng context thật của counterpart, không suy quyền từ UUID/ref/hash của offer. Không callback/approval hết hạn/thu hồi thì deny trước replay hoặc gọi importer. Không dựng Principal/SelectedSession/ScopeAll, không xóa Principal/WithoutNodeScope để vượt p_scope; importer dùng actual target context với đúng Nút đích.
 
-Handshake không cần key/token mới:
+Handshake: TargetIntent chưa reserve global binding, chỉ lưu ứng viên ở actual target; Propose đọc intent bằng target context rồi ghi source plan bằng source context; FreezeTarget trên intent chạy actual target TRƯỚC source Seal, FreezeSource trên plan chạy actual source. Seal đọc/check cả hai durable fence epochs bằng hai contexts và bind cả hai vào manifest. Target Accept chỉ chốt binding unique sau source offer/current approval và target authority đều thật. Không dùng source context đóng target hoặc đòi Accept trước target fence gây vòng phụ thuộc.
 
-1. Actual target admin tạo TargetIntent, ghi append-only tại tenant đích: source tenant/scope dự định nhận, target scope thật, adapter allowlist, expiry, approval actor/ref/epoch. Trả reference để review, chưa cho ghi dữ liệu owner.
-2. Actual source admin đọc đúng intent dành cho source tenant/scope của mình, kiểm authority của cả hai phía hiện hành, rồi tạo SourcePlan gắn IntentID, binding hash và adapter versions. Target không tự tạo nguồn/Trung tâm giả.
-3. Sau source freeze/seal, actual target admin Accept SourcePlan đã chỉ đúng IntentID/target. Đích lưu bản metadata manifest đã xác minh trong tenant mình và cấp ID map. Chỉ lúc này mới có import batches.
-
-Party chỉ cho phép cross-tenant đọc metadata intent/offer/receipt của đúng cặp: kiểm actual actor/quyền ở phía hiện hành và invitation/binding đã lưu, dùng private read-only transaction + H4 permit, SELECT có điều kiện source/target/plan/intent/hash. Không raw owner data và không expose permit. Cả sau Accept phải đọc lại approvals/fence trạng thái hiện hành, không coi offer cũ là quyền vĩnh viễn. Đây là loại permission metadata riêng của transfer, không tái sử dụng share_grant dữ liệu HTX hay cấp write grant. Root cần review riêng chốt này trước thực thi.
+Offer chỉ là immutable refs/hash để review và đối chiếu, không authority. Mọi lần dùng phải re-read local metadata của hai bên dưới hai actual contexts. Không ngầm biến H4 share-grant đọc thành write grant. Hai local transactions không atomic xuyên tenant/module; saga/receipts xử lý khoảng crash, luôn fail closed trước cutover.
 
 ## API port dự kiến
 
@@ -74,7 +70,40 @@ type TransferReceipt struct {
 
 Registration gồm Module/Namespace/Version, namespace dependencies không vòng, maximum batch (≤500), Authority, FenceSource/FenceTarget/CheckFence, ScanHeaders, ExportBatch, ApplyBatch, ReadReceipt, VerifyBatch, CompensateBatch, ReadCompensationReceipt. Mỗi adapter sở hữu một module đã đăng ký; core không nhận arbitrary module/table lúc gọi. Authority/Fence/Scan/Apply/Receipt/Verify thiếu là deny, không fallback/no-op. Artifact authority và source data transport do owner, không có generic payload field.
 
-Facade party.Module.Transfers() trả TenantTransfers: TargetIntent(ctx,in), Propose(ctx,intentRef), DryRun(ctx,planRef), Freeze(ctx,planRef), Seal(ctx,planRef), Accept(ctx,sourceOfferRef), ReserveBatch(ctx,planRef,limit), ExportBatch(ctxSource,batchRef), ApplyBatch(ctxTarget,batchRef), Verify(ctxTarget,planRef), PrepareCutover(ctx,planRef), Compensate(ctxTarget,batchRef,reasonRef), Status(ctx,planRef). Mỗi phương thức định rõ phase tenant; refs/receipts từ caller chỉ là khóa tra, không được tin kết quả trong body. Approval, fence và durable receipt luôn gọi current server lookup trước replay.
+Facade party.Module.Transfers() dùng Participants trên mọi call; tenant IDs lấy từ hai Principal, không từ input. Các chữ ký exact trước implementation:
+
+```go
+type TransferParticipants struct { source, target context.Context }
+func NewTransferParticipants(source, target context.Context) (TransferParticipants, error)
+func (p TransferParticipants) Source() context.Context
+func (p TransferParticipants) Target() context.Context
+
+type TransferIntentInput struct {
+    OperationID, SourceScopeRef, TargetScopeRef uuid.UUID
+    Namespaces []string
+}
+type TransferRef struct { ID uuid.UUID }
+type TransferBatchRef struct { PlanID, BatchID uuid.UUID }
+type TenantTransfers interface {
+    TargetIntent(TransferParticipants, TransferIntentInput) (TransferIntent, error)
+    Propose(TransferParticipants, TransferRef) (TransferPlan, error)
+    DryRun(TransferParticipants, TransferRef) (TransferReport, error)
+    FreezeTarget(TransferParticipants, TransferRef) (TransferPlan, error)
+    FreezeSource(TransferParticipants, TransferRef) (TransferPlan, error)
+    ScanNext(TransferParticipants, TransferRef) (TransferPlan, error)
+    Seal(TransferParticipants, TransferRef) (TransferPlan, error)
+    Accept(TransferParticipants, TransferRef) (TransferPlan, error)
+    ReserveBatch(TransferParticipants, TransferRef, int) (TransferBatch, error)
+    ExportBatch(TransferParticipants, TransferBatchRef) (TransferArtifact, error)
+    ApplyBatch(TransferParticipants, TransferBatchRef) (TransferReceipt, error)
+    Verify(TransferParticipants, TransferRef) (TransferReport, error)
+    PrepareCutover(TransferParticipants, TransferRef) (TransferPlan, error)
+    Compensate(TransferParticipants, TransferBatchRef, uuid.UUID) (TransferReceipt, error)
+    Status(TransferParticipants, TransferRef) (TransferPlan, error)
+}
+```
+
+FreezeTarget ref là IntentID (chưa cần Accept); FreezeSource/ScanNext/Seal ref là PlanID. Mọi ref chỉ dùng lookup; counterpart đọc bằng actual counterpart context, current authority/fence/receipt phải kiểm trước replay. Source scan pages/resume lấy cursor từ metadata đã ghi, không nhận cursor tự chọn từ CLI.
 
 ApplyBatch nhận BatchID đã reserve, dùng artifact gắn batch đã xuất dưới actual source context. Owner đọc/giải mã artifact có cấp phép vận chuyển, không tự đọc DB nguồn với Principal đích. Nếu artifact thiếu hoặc không còn quyền thì deny/giữ checkpoint. Core không log artifact content, token hay lý do có PII. Chi tiết envelope/typed canonicalizer thuộc owner child trước triển khai.
 
@@ -82,7 +111,8 @@ ApplyBatch nhận BatchID đã reserve, dùng artifact gắn batch đã xuất d
 
 Tất cả metadata được RLS FORCE, tenant_id là tenant thực của participant (source hoặc target), không nhánh share cho writes; r_party SELECT/INSERT, không UPDATE/DELETE trên bản ghi bất biến. Không BYPASSRLS/SECURITY DEFINER và không cấp quyền r_party ghi schema owner. Không đổi shared/db để né scope.
 
-- transfer_binding: target intent + cặp tenant/scope/actor refs/adapter-set hash; unique target tenant cho một Trung tâm và unique source tenant/scope→target binding. Tạo dưới actual target, source acceptance append qua event; không sửa binding đã dùng. Binding mới cần phiên bản/approval mới, không viết đè.
+- transfer_intent: ứng viên target, cặp tenant/scope/actor refs/adapter-set hash; tạo dưới actual target, chưa giữ global source binding. Nhiều intent chưa được source chấp thuận không chiếm khóa Centre.
+- transfer_binding: chỉ append ở Accept sau đủ source/target approval hiện hành; unique source tenant/scope→target và unique target tenant→một Centre. Binding đã dùng không viết đè, thay đổi cần phiên bản/approval và compensation policy rõ ràng.
 - transfer_plan: immutable header, side source/target, IntentID/PlanID, BindingHash, adapter versions. PlanID nguồn được đích Accept cùng giá trị; tenant local khác nhau. Source sealed manifest được target copy đúng metadata/hash và kiểm lại.
 - transfer_event: shared.apply_ledger, stream transfer:<plan>; created/fenced/page_recorded/sealed/accepted/batch_reserved/batch_verified/verified/cutover_prepared/compensation_requested/compensated/aborted. Transition kiểm seq kỳ vọng; authoritative status lấy từ ledger, projection nếu thêm chỉ là cache.
 - transfer_item: immutable source header/provenance và hash, unique tenant/plan/namespace/source_ref. Header không chứa dữ liệu người. Source rows chỉ append, target copies giữ source row hash nguyên như evidence.
@@ -96,7 +126,7 @@ Một transaction party local ghi reservation + idmap + batch + event. Advisory 
 
 DryRun dùng source read-only, trả provisional count/root/exclusions/conflicts, không ghi/import/khóa hoặc xác nhận trạng thái cuối. Dữ liệu có thể đổi sau dry-run.
 
-Trước seal phải có durable fences cho tất cả namespace nguồn và đích đã đăng ký. Owner Fence lấy khóa chung với mọi writer hiện hữu, đợi writer đang chạy kết thúc rồi append fence active; mọi HTTP/CLI/offline sync/job phải kiểm fence trong cùng giao dịch với ghi. Không thể chỉ giữ advisory lock trong coordinator hoặc chặn riêng route mới. Fence không tự mở khi coordinator crash/lease timeout. Thiếu bất kỳ owner producer integration nào thì Freeze/Seal/Apply/Cutover deny.
+Trước seal phải có durable fences cho tất cả namespace nguồn và đích đã đăng ký. FreezeTarget(intent) dùng target context trước Seal, FreezeSource(plan) dùng source context; không đợi target Accept mới fence. Owner Fence lấy khóa chung với mọi writer hiện hữu, đợi writer đang chạy kết thúc rồi append fence active; mọi HTTP/CLI/offline sync/job phải kiểm fence trong cùng giao dịch với ghi. Không thể chỉ giữ advisory lock trong coordinator hoặc chặn riêng route mới. Fence không tự mở khi coordinator crash/lease timeout. Thiếu bất kỳ owner producer integration nào thì Freeze/Seal/Apply/Cutover deny.
 
 Scan source khi fences active, theo watermark recorded_at/ledger seq đã chốt (không chỉ event_time vì nhập muộn). Mỗi page có ordinal/cursor digest/hash và replay key; page khác dữ liệu dưới cùng key thì conflict. Manifest root hash canonical có version: binding, adapter set, source/target fence epochs, sorted namespace+source_ref, source row hash, logical hash và sorted references. Chỉ primitives/length-prefixed encoding hoặc canonical struct versioned, không map tùy ý/float. Seal chỉ ghi khi scan complete, counts/root/chain verification khớp và fences vẫn active/current. Adapter version/authority/fence thay đổi thì dừng, không âm thầm sửa manifest cũ.
 
@@ -130,4 +160,4 @@ Owner child (KN) cần đăng ký typed namespaces/exporter/importer/fence/recei
 - Fence tests: source writer đang chạy phải kết thúc trước fence ack; HTTP/CLI/offline/job write sau fence bị chặn; plan/advisory lock riêng không đủ; source mutation giữa scan/seal/verify buộc mismatch/deny, không lén cập nhật manifest.
 - Actual owner child tests: không có dòng HTX/MRV/MKG trong artifact, references/licensing/chain/provenance đúng, KHTC semantics/goldens giữ; transfer hai Trung tâm với real role/foreign refs. Rehearsal và5 boundary hard PASS thuộc tổng đợt4b, không được mock để đóng55.
 
-Chỉ triển khai sau root review API/module ownership, hai-context metadata permission, artifact transport, source/target fence contract, saga/idmap strategy. Hiện chưa có migration, chưa chạy PG/test production, chưa release/claim ready, chưa cutover hoặc chuyển dữ liệu thật.
+Root đã chốt module party app/store, hai actual contexts và saga/receipts. API chi tiết/owner artifact transport/fence producer integration còn cần kiểm qua implementation và review; không phát hành importer giả hoặc live CLI. Hiện chưa có migration, chưa chạy PG/test production, chưa release/claim ready, chưa cutover hoặc chuyển dữ liệu thật.
