@@ -22,6 +22,8 @@ import (
 	calhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/handler"
 	diaryapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/app"
 	diaryhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/handler"
+	zmapapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/app"
+	zmaphandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/handler"
 	modelapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/app"
 	modelhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/handler"
@@ -98,6 +100,8 @@ type Module struct {
 	model *modelapp.Service
 	// W11.48 (D4 CN8): nhật ký nuôi BM-08/09/19 (extension/cntsdiary, module_cntsdiary.go).
 	diary *diaryapp.Service
+	// W11.52 (D4 CN12): bản đồ vùng nuôi, vùng dịch (extension/cntsmap, module_cntsmap.go).
+	zmap *zmapapp.Service
 }
 
 // New tạo module với pool của vai extension_app.
@@ -117,6 +121,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.diary = &diaryapp.Service{DB: db, Clock: clk, Units: d.Units, Params: d.Params, Alerts: m.alert,
 		Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.zmap = &zmapapp.Service{DB: db, Clock: clk, Units: d.Units, Plots: d.Plots, Names: func() partyport.ActorNames { return m.rc.Names }}
 	return m
 }
 
@@ -153,7 +158,7 @@ func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logge
 // UseCNTSCatalogs nối danh mục CNTS theo ngày của pf/masterdata (W11.41) cho Báo cáo dịch bệnh BM-10 (W11.49: bệnh,
 // vật nuôi). Chưa nối → lập/cập nhật ổ dịch, báo nghi dịch trả 503 extension.dependency_unavailable.
 func (m *Module) UseCNTSCatalogs(c port.CNTSCatalogs) {
-	m.ob.Catalogs, m.cal.Catalogs, m.model.Catalogs = c, c, c
+	m.ob.Catalogs, m.cal.Catalogs, m.model.Catalogs, m.zmap.Catalogs = c, c, c, c
 }
 
 // UseXaScopes (W11.46) nối danh sách cán bộ Cấp Xã CNTS kèm phạm vi (pf/accounts) cho lưới lịch trực KSGM BM-03.
@@ -188,6 +193,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	calhandler.Handler{Svc: m.cal}.RegisterApp(rg)
 	modelhandler.Handler{Svc: m.model}.RegisterApp(rg) // W11.47
 	diaryhandler.Handler{Svc: m.diary}.RegisterApp(rg) // W11.48
+	zmaphandler.Handler{Svc: m.zmap}.RegisterApp(rg)   // W11.52
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham
