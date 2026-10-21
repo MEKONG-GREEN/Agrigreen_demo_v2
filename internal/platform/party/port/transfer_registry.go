@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -30,7 +31,7 @@ type TransferRegistry struct {
 // NewTransferRegistry freezes owner registrations. Missing owner operations never
 // become successful no-ops. Nil cutover keeps PrepareCutover unavailable until owners supply proofs.
 func NewTransferRegistry(adapters []TransferAdapter, verifier TransferTokenVerifier, cutover TransferCutoverCheck) (*TransferRegistry, error) {
-	if verifier == nil || len(adapters) == 0 || len(adapters) > 64 {
+	if transferVerifierMissing(verifier) || len(adapters) == 0 || len(adapters) > 64 {
 		return nil, ErrTransferConfiguration
 	}
 	r := &TransferRegistry{cutover: cutover, verifier: verifier}
@@ -176,7 +177,7 @@ type TransferFenceBinding struct {
 }
 
 func cloneTransferHeader(h TransferHeader) TransferHeader {
-	h.References = slices.Clone(h.References)
+	h.References = append([]TransferReference{}, h.References...)
 	slices.SortFunc(h.References, func(a, b TransferReference) int {
 		if c := compareTransferKey(a.Key, b.Key); c != 0 {
 			return c
@@ -201,50 +202,23 @@ func compareTransferKey(a, b TransferKey) int {
 	return strings.Compare(a.Ref.String(), b.Ref.String())
 }
 
-// TransferManifestDigest validates cross-scope provenance before hashing a
-// canonical typed representation. Payload contents and source chain metadata are never rewritten.
-func TransferManifestDigest(scope TransferScope, adapters []TransferAdapterVersion, fences []TransferFenceBinding, headers []TransferHeader) (TransferDigest, error) {
-	binding, err := TransferBindingDigest(scope)
-	if err != nil || binding != scope.BindingHash || scope.IntentID == uuid.Nil || scope.PlanID == uuid.Nil || len(adapters) == 0 || len(adapters) > 64 || len(headers) > 100000 {
+// TransferHeaderRoot commits the complete frozen inventory of one source scope.
+// It is independent of the manifest and normalizes empty collections. Owner fences
+// must compute this same versioned root only after their durable write fence holds.
+func TransferHeaderRoot(tenantID, scopeRef uuid.UUID, namespace string, headers []TransferHeader) (TransferDigest, error) {
+	if tenantID == uuid.Nil || scopeRef == uuid.Nil || !validTransferName(namespace) || len(headers) > 100000 {
 		return "", ErrTransferConflict
-	}
-	versions := slices.Clone(adapters)
-	slices.SortFunc(versions, func(a, b TransferAdapterVersion) int { return strings.Compare(a.Namespace, b.Namespace) })
-	namespaces := map[string]bool{}
-	for _, a := range versions {
-		if _, ok := modreg.Entry(a.Module); !ok || !validTransferName(a.Namespace) || a.Version == "" || len(a.Version) > 128 || namespaces[a.Namespace] {
-			return "", ErrTransferConflict
-		}
-		namespaces[a.Namespace] = true
-	}
-	fs := slices.Clone(fences)
-	slices.SortFunc(fs, func(a, b TransferFenceBinding) int {
-		if c := strings.Compare(a.Namespace, b.Namespace); c != 0 {
-			return c
-		}
-		return strings.Compare(string(a.Side), string(b.Side))
-	})
-	seenFences := map[string]bool{}
-	for _, f := range fs {
-		key := f.Namespace + ":" + string(f.Side)
-		if !namespaces[f.Namespace] || (f.Side != TransferSource && f.Side != TransferTarget) || seenFences[key] || f.Fence.Ref == uuid.Nil || f.Fence.Epoch == "" || len(f.Fence.Epoch) > 128 || f.Fence.HighWatermark == "" || len(f.Fence.HighWatermark) > 512 || !ValidTransferDigest(f.Fence.HeaderRoot) {
-			return "", ErrTransferConflict
-		}
-		seenFences[key] = true
-	}
-	if len(seenFences) != 2*len(versions) {
-		return "", ErrTransferNotReady
 	}
 	items := make([]TransferHeader, 0, len(headers))
 	seen := map[TransferKey]bool{}
 	for _, h := range headers {
-		if !namespaces[h.Key.Namespace] || h.Key.Ref == uuid.Nil || h.SourceTenant != scope.SourceTenant || h.SourceScopeRef != scope.SourceScopeRef || !ValidTransferDigest(h.SourceRowHash) || !ValidTransferDigest(h.LogicalHash) || h.SourceSeq < 0 || seen[h.Key] || len(h.References) > 128 {
+		if h.Key.Namespace != namespace || h.Key.Ref == uuid.Nil || h.SourceTenant != tenantID || h.SourceScopeRef != scopeRef || !ValidTransferDigest(h.SourceRowHash) || !ValidTransferDigest(h.LogicalHash) || h.SourceSeq < 0 || seen[h.Key] || len(h.References) > 128 {
 			return "", ErrTransferConflict
 		}
 		seen[h.Key] = true
 		h = cloneTransferHeader(h)
 		for i, ref := range h.References {
-			if !validTransferName(ref.Key.Namespace) || ref.Key.Ref == uuid.Nil || (i > 0 && ref == h.References[i-1]) {
+			if !validTransferName(ref.Key.Namespace) || ref.Key.Ref == uuid.Nil || (i > 0 && ref.Key == h.References[i-1].Key) {
 				return "", ErrTransferConflict
 			}
 			if ref.External {
@@ -257,11 +231,153 @@ func TransferManifestDigest(scope TransferScope, adapters []TransferAdapterVersi
 		}
 		items = append(items, h)
 	}
+	slices.SortFunc(items, func(a, b TransferHeader) int { return compareTransferKey(a.Key, b.Key) })
+	return transferHash(struct {
+		Version            string
+		TenantID, ScopeRef uuid.UUID
+		Namespace          string
+		Items              []TransferHeader
+	}{"party.transfer.headers/v1", tenantID, scopeRef, namespace, items})
+}
+
+// TransferManifestDigest validates provenance, declared dependency edges and the
+// complete frozen source inventory before hashing a canonical typed representation.
+// Cyclic aggregates are unavailable in v1 until an owner supplies an atomic-group contract.
+func TransferManifestDigest(scope TransferScope, adapters []TransferAdapterVersion, fences []TransferFenceBinding, headers []TransferHeader) (TransferDigest, error) {
+	binding, err := TransferBindingDigest(scope)
+	if err != nil || binding != scope.BindingHash || scope.IntentID == uuid.Nil || scope.PlanID == uuid.Nil || len(adapters) == 0 || len(adapters) > 64 || len(headers) > 100000 {
+		return "", ErrTransferConflict
+	}
+	versions := slices.Clone(adapters)
+	slices.SortFunc(versions, func(a, b TransferAdapterVersion) int { return strings.Compare(a.Namespace, b.Namespace) })
+	namespaces := map[string]bool{}
+	dependencies := map[string]map[string]bool{}
+	for i, a := range versions {
+		if _, ok := modreg.Entry(a.Module); !ok || !validTransferName(a.Namespace) || a.Version == "" || len(a.Version) > 128 || namespaces[a.Namespace] {
+			return "", ErrTransferConflict
+		}
+		a.DependsOn = append([]string{}, a.DependsOn...)
+		slices.Sort(a.DependsOn)
+		dependencies[a.Namespace] = map[string]bool{}
+		for _, dep := range a.DependsOn {
+			if !validTransferName(dep) || dep == a.Namespace || dependencies[a.Namespace][dep] {
+				return "", ErrTransferConflict
+			}
+			dependencies[a.Namespace][dep] = true
+		}
+		versions[i] = a
+		namespaces[a.Namespace] = true
+	}
+	nsState := map[string]int{}
+	var visitNamespace func(string) error
+	visitNamespace = func(name string) error {
+		if !namespaces[name] || nsState[name] == 1 {
+			return ErrTransferConflict
+		}
+		if nsState[name] == 2 {
+			return nil
+		}
+		nsState[name] = 1
+		for dep := range dependencies[name] {
+			if err := visitNamespace(dep); err != nil {
+				return err
+			}
+		}
+		nsState[name] = 2
+		return nil
+	}
+	for name := range namespaces {
+		if err := visitNamespace(name); err != nil {
+			return "", err
+		}
+	}
+	fs := slices.Clone(fences)
+	slices.SortFunc(fs, func(a, b TransferFenceBinding) int {
+		if c := strings.Compare(a.Namespace, b.Namespace); c != 0 {
+			return c
+		}
+		return strings.Compare(string(a.Side), string(b.Side))
+	})
+	seenFences := map[string]bool{}
+	for _, f := range fs {
+		key := f.Namespace + ":" + string(f.Side)
+		if !namespaces[f.Namespace] || (f.Side != TransferSource && f.Side != TransferTarget) || seenFences[key] || f.Fence.Ref == uuid.Nil || f.Fence.Epoch == "" || len(f.Fence.Epoch) > 128 || f.Fence.HighWatermark == "" || len(f.Fence.HighWatermark) > 512 || !ValidTransferDigest(f.Fence.HeaderRoot) || f.Fence.HeaderCount < 0 || f.Fence.HeaderCount > 100000 {
+			return "", ErrTransferConflict
+		}
+		seenFences[key] = true
+	}
+	if len(seenFences) != 2*len(versions) {
+		return "", ErrTransferNotReady
+	}
+	items := make([]TransferHeader, 0, len(headers))
+	groups := map[string][]TransferHeader{}
+	seen := map[TransferKey]TransferHeader{}
+	for _, h := range headers {
+		if !namespaces[h.Key.Namespace] {
+			return "", ErrTransferConflict
+		}
+		if _, duplicate := seen[h.Key]; duplicate {
+			return "", ErrTransferConflict
+		}
+		h = cloneTransferHeader(h)
+		seen[h.Key] = h
+		groups[h.Key.Namespace] = append(groups[h.Key.Namespace], h)
+		items = append(items, h)
+	}
+	// Validate headers before graph traversal, then prove every internal key exists.
+	for namespace := range namespaces {
+		if _, err := TransferHeaderRoot(scope.SourceTenant, scope.SourceScopeRef, namespace, groups[namespace]); err != nil {
+			return "", err
+		}
+	}
 	for _, h := range items {
 		for _, ref := range h.References {
-			if !ref.External && !seen[ref.Key] {
+			if ref.External {
+				continue
+			}
+			if _, ok := seen[ref.Key]; !ok {
 				return "", ErrTransferNotReady
 			}
+			if ref.Key.Namespace != h.Key.Namespace && !dependencies[h.Key.Namespace][ref.Key.Namespace] {
+				return "", ErrTransferConflict
+			}
+		}
+	}
+	keyState := map[TransferKey]int{}
+	var visitKey func(TransferKey) error
+	visitKey = func(key TransferKey) error {
+		if keyState[key] == 1 {
+			return ErrTransferConflict
+		}
+		if keyState[key] == 2 {
+			return nil
+		}
+		keyState[key] = 1
+		for _, ref := range seen[key].References {
+			if !ref.External {
+				if err := visitKey(ref.Key); err != nil {
+					return err
+				}
+			}
+		}
+		keyState[key] = 2
+		return nil
+	}
+	for key := range seen {
+		if err := visitKey(key); err != nil {
+			return "", err
+		}
+	}
+	for _, f := range fs {
+		if f.Side != TransferSource {
+			continue
+		}
+		root, err := TransferHeaderRoot(scope.SourceTenant, scope.SourceScopeRef, f.Namespace, groups[f.Namespace])
+		if err != nil {
+			return "", err
+		}
+		if root != f.Fence.HeaderRoot || int64(len(groups[f.Namespace])) != f.Fence.HeaderCount {
+			return "", ErrTransferConflict
 		}
 	}
 	slices.SortFunc(items, func(a, b TransferHeader) int { return compareTransferKey(a.Key, b.Key) })
@@ -275,7 +391,7 @@ func TransferManifestDigest(scope TransferScope, adapters []TransferAdapterVersi
 }
 
 func TransferMapDigest(mappings []TransferMapping) (TransferDigest, error) {
-	out := slices.Clone(mappings)
+	out := append([]TransferMapping{}, mappings...)
 	slices.SortFunc(out, func(a, b TransferMapping) int { return compareTransferKey(a.Key, b.Key) })
 	seenTargets := map[uuid.UUID]bool{}
 	for i, m := range out {
@@ -290,10 +406,31 @@ func TransferMapDigest(mappings []TransferMapping) (TransferDigest, error) {
 	}{"party.transfer.idmap/v1", out})
 }
 
+// TransferBatchMapDigest binds primary and dependency maps separately. Dependencies
+// are verified predecessor keys; they cannot also be primary items of this batch.
+func TransferBatchMapDigest(mappings, dependencies []TransferMapping) (TransferDigest, error) {
+	primary, err := TransferMapDigest(mappings)
+	if err != nil {
+		return "", err
+	}
+	deps, err := TransferMapDigest(dependencies)
+	if err != nil {
+		return "", err
+	}
+	all := append(slices.Clone(mappings), dependencies...)
+	if _, err := TransferMapDigest(all); err != nil {
+		return "", err
+	}
+	return transferHash(struct {
+		Version               string
+		Primary, Dependencies TransferDigest
+	}{"party.transfer.batch-map/v1", primary, deps})
+}
+
 // Authenticate rechecks signatures/expiry and native claims for both actual
 // participants on EVERY operation, before owner authority callbacks or replay.
 func (r *TransferRegistry) Authenticate(p TransferParticipants) error {
-	if r == nil || r.verifier == nil || p.Validate() != nil {
+	if r == nil || transferVerifierMissing(r.verifier) || p.Validate() != nil {
 		return ErrTransferAuthority
 	}
 	for _, ctx := range []context.Context{p.Source(), p.Target()} {
@@ -314,4 +451,17 @@ func sameTransferRoles(a, b []string) bool {
 	slices.Sort(ac)
 	slices.Sort(bc)
 	return slices.Equal(slices.Compact(ac), slices.Compact(bc))
+}
+
+func transferVerifierMissing(v TransferTokenVerifier) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return rv.IsNil()
+	default:
+		return false
+	}
 }

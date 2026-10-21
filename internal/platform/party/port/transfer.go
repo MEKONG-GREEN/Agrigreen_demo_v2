@@ -109,6 +109,7 @@ type TransferFence struct {
 	Epoch         string         `json:"epoch"`
 	HighWatermark string         `json:"high_watermark"`
 	HeaderRoot    TransferDigest `json:"header_root"`
+	HeaderCount   int64          `json:"header_count"`
 }
 type TransferFenceRequest struct {
 	Scope     TransferScope
@@ -155,8 +156,11 @@ type TransferBatchRequest struct {
 	MapHash      TransferDigest
 	Headers      []TransferHeader
 	Mappings     []TransferMapping
-	SourceFence  TransferFence
-	TargetFence  TransferFence
+	// DependencyMappings contain only referenced predecessors with verified receipts.
+	// They are not batch members and may never inflate receipt item counts.
+	DependencyMappings []TransferMapping
+	SourceFence        TransferFence
+	TargetFence        TransferFence
 }
 type TransferExporter func(context.Context, TransferBatchRequest) (TransferArtifact, error)
 type TransferExportReader func(context.Context, TransferBatchRequest) (TransferArtifact, error)
@@ -252,9 +256,10 @@ type TransferIntent struct {
 	TargetFences map[string]TransferFence `json:"target_fences"`
 }
 type TransferAdapterVersion struct {
-	Module    string `json:"module"`
-	Namespace string `json:"namespace"`
-	Version   string `json:"version"`
+	Module    string   `json:"module"`
+	Namespace string   `json:"namespace"`
+	Version   string   `json:"version"`
+	DependsOn []string `json:"depends_on"`
 }
 type TransferPlan struct {
 	ID           uuid.UUID                `json:"id"`

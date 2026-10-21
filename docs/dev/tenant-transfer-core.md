@@ -170,3 +170,14 @@ Abort/ReleaseFences cần đường recovery riêng: fresh dual authentication v
 Owner reports checklist: frozen source args gắn JobID/TenantID/RequestedBy/RequestedAt/template/version/format. Khi chuyển phải dùng actual mapped IDs/envelope đích mới và giữ business args/as_of; không copy nguyên JSON private sang tenant khác hoặc UPDATE ledger cũ. ObjectKey, DLP, current actor, source version và queued outbox cần owner rehearsal riêng.
 
 Credential freshness v1: registry nhận TransferTokenVerifier hiện có từ API assembly, reverify authz.RawToken của cả hai actual contexts trên mỗi operation/replay. Fresh Principal phải platform_admin+MFA và khớp ActorRef/TenantID/OrgRef/native realm roles/MFA của context (roles theo canonical set); thiếu raw token/verifier, token hết hạn hoặc mismatch thì deny trước owner callbacks. Không log/persist/cache token, không thêm field Principal hay secret mới. Approval.ValidUntil không thay thế bước verifier này.
+
+
+## Checkpoint port trước runtime (21/10/2026)
+
+Manifest v1 bind normalized DependsOn của từng adapter; mọi internal ref sang namespace khác phải có cạnh dependency khai báo. Chu kỳ internal refs (kể cả cùng namespace) bị từ chối trong v1 vì chưa có owner atomic-group contract. Duplicate Reference.Key luôn bị từ chối dù external/basis khác; nil và empty collections cùng một canonical digest.
+
+TransferHeaderRoot là root versioned độc lập manifest cho toàn namespace/scope nguồn. SourceFence giữ HeaderRoot + HeaderCount; Seal phải so cả hai với full scan đã hoàn tất. Root target mô tả inventory target riêng, không so với source inventory. CheckFence active không thay bằng chứng scan đầy đủ.
+
+TransferBatchRequest có Mappings chỉ dành item của batch và DependencyMappings dành đúng referenced predecessor keys đã có authoritative idmap + verified owner receipts. TransferBatchMapDigest bind hai tập riêng; overlap/duplicate target IDs bị từ chối. Owner không đọc schema party trực tiếp và receipt chỉ được đếm primary items.
+
+Kiểm thử port thực tế: go1.26.9, `go test -count=1 -v ./internal/platform/party/port` đạt (0.980s), gồm raw-token expiry/native claims, registry immutable/dependency closure, cross-scope refs, complete frozen count/root, canonical empty collections, ambiguous key và dependency maps. Lần chạy đầu chỉ lỗi compile fixture (typed callback aliases/FakeIssuer), giữ log initial; sau sửa fixture suite đã chạy lại đạt. Chưa có runtime/DDL/PG; không suy diễn production cutover hoặc rehearsal từ pure tests.
