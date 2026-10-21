@@ -275,11 +275,9 @@ func (t *Transfers) ReleaseFences(p port.TransferParticipants, ref port.Transfer
 			return port.TransferPlan{}, port.ErrTransferConflict
 		}
 		// Once releases start, old active fences/rows may legitimately have changed.
-		// Revalidate identity recovery against the immutable approved inventory,
-		// then replay exact durable release receipts rather than reopening gates.
-		if err := t.refreshReleaseProof(p, source, target, recovery); err != nil {
-			return port.TransferPlan{}, err
-		}
+		// Replay exact historical outcomes without requiring another identity proof.
+		// A still-pending writer refreshes that proof in releaseOne immediately
+		// before its side effect, using only this immutable approved inventory.
 	}
 	// Keep the source closed until every target holder has a durable release.
 	for _, side := range []port.TransferSide{port.TransferTarget, port.TransferSource} {
