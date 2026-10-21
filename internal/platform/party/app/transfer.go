@@ -217,6 +217,9 @@ func (t *Transfers) pair(p port.TransferParticipants, ref port.TransferRef, acti
 	if source.Plan.ID != ref.ID || source.Plan.Scope.SourceTenant != transferTenant(p.Source()) {
 		return nil, nil, nil, port.ErrTransferConflict
 	}
+	if !recovery && action != "status" && source.SourceRecoveryStopped {
+		return nil, nil, nil, port.ErrTransferConflict
+	}
 	target, err := t.read(p.Target(), source.Plan.Scope.IntentID)
 	if err != nil {
 		return nil, nil, nil, err
@@ -384,7 +387,7 @@ func (t *Transfers) Propose(p port.TransferParticipants, ref port.TransferRef) (
 			if err != nil {
 				return err
 			}
-			if state == nil {
+			if state == nil || state.SourceRecoveryStopped {
 				return port.ErrTransferConflict
 			}
 			out = state.Plan
@@ -687,12 +690,4 @@ func (t *Transfers) DryRun(p port.TransferParticipants, ref port.TransferRef) (p
 	}
 	root, err := transferDigest(all)
 	return port.TransferReport{PlanID: ref.ID, Count: len(all), Root: root, Provisional: true}, err
-}
-
-// Release/abort stay unavailable until all reserved batches are probed under recovery rights.
-func (t *Transfers) Abort(port.TransferParticipants, port.TransferRef, uuid.UUID) (port.TransferPlan, error) {
-	return port.TransferPlan{}, port.ErrTransferNotReady
-}
-func (t *Transfers) ReleaseFences(port.TransferParticipants, port.TransferRef, uuid.UUID) (port.TransferPlan, error) {
-	return port.TransferPlan{}, port.ErrTransferNotReady
 }

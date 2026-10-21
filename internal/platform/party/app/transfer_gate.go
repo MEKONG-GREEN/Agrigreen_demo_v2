@@ -137,6 +137,9 @@ func (t *Transfers) gateOperation(p port.TransferParticipants, source, target *s
 	return request, err
 }
 func validateTransferGate(g port.TransferRecoveryGate, recovery port.TransferRecoveryRequest, req port.TransferFenceRequest, f port.TransferFence) error {
+	if f != (port.TransferFence{}) && !validTransferFence(f) {
+		return port.ErrTransferConflict
+	}
 	if g.Ref == uuid.Nil || g.OperationID != recovery.OperationID || g.ReasonRef != recovery.ReasonRef || g.IntentID != req.Scope.IntentID || g.PlanID != req.Scope.PlanID || g.BindingHash != req.Scope.BindingHash || g.Side != req.Side || g.Namespace != req.Namespace || g.Fence != f {
 		return port.ErrTransferConflict
 	}
@@ -157,10 +160,46 @@ func (t *Transfers) ensureRecoveryGates(p port.TransferParticipants, source, tar
 		}
 		for _, a := range adapters {
 			fence, present := fences[a.Namespace]
-			if !present {
-				continue
-			}
 			req := port.TransferFenceRequest{Scope: scope, Namespace: a.Namespace, Side: side}
+			actual, readErr := a.ReadFenceForRecovery(ctx, recovery, req)
+			if errors.Is(readErr, port.ErrTransferNotReady) {
+				if present {
+					return port.ErrTransferConflict
+				}
+				fence = port.TransferFence{}
+			} else if readErr != nil {
+				return transferOwnerError(readErr)
+			} else {
+				if !validTransferFence(actual) {
+					return port.ErrTransferConflict
+				}
+				if present && actual != fence {
+					return port.ErrTransferConflict
+				}
+				if !present {
+					// Persist a discovered owner-committed fence in the correct local tenant.
+					fence = actual
+					if side == port.TransferSource {
+						if source.SourceFences == nil {
+							source.SourceFences = map[string]port.TransferFence{}
+						}
+						source.SourceFences[a.Namespace] = actual
+						fences = source.SourceFences
+						if err := t.write(p.Source(), source.Plan.ID, source.Plan.Scope.SourceScopeRef, "source_fence_recovered", source); err != nil {
+							return err
+						}
+					} else {
+						if target.Intent.TargetFences == nil {
+							target.Intent.TargetFences = map[string]port.TransferFence{}
+						}
+						target.Intent.TargetFences[a.Namespace] = actual
+						fences = target.Intent.TargetFences
+						if err := t.write(p.Target(), target.Intent.ID, target.Intent.Scope.TargetScopeRef, "target_fence_recovered", target); err != nil {
+							return err
+						}
+					}
+				}
+			}
 			operation := "gate_" + string(side)
 			key := a.Namespace + ":" + string(side)
 			old, err := t.proof(p, source.Plan.ID, uuid.Nil, operation, a.Namespace)

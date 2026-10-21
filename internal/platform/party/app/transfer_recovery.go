@@ -24,6 +24,15 @@ func (t *Transfers) beginRecovery(p port.TransferParticipants, source, target *s
 	if reason == uuid.Nil {
 		return port.TransferRecoveryRequest{}, port.ErrTransferConflict
 	}
+	if !source.SourceRecoveryStopped {
+		source.SourceRecoveryStopped = true
+		source.SourceRecoveryReasonRef = reason
+		if err := t.write(p.Source(), source.Plan.ID, source.Plan.Scope.SourceScopeRef, "source_recovery_stopped", source); err != nil {
+			return port.TransferRecoveryRequest{}, err
+		}
+	} else if source.SourceRecoveryReasonRef == uuid.Nil {
+		return port.TransferRecoveryRequest{}, port.ErrTransferConflict
+	}
 	input := transferRecoveryInput{Scope: source.Plan.Scope, ManifestHash: source.Plan.ManifestHash, BatchID: batch, ReasonRef: reason}
 	hash, err := transferDigest(input)
 	if err != nil {
@@ -113,8 +122,14 @@ func (t *Transfers) readAppliedForRecovery(p port.TransferParticipants, a port.T
 	}
 	receipt, err := a.ReadAppliedForRecovery(p.Target(), recovery, copyReq)
 	if err != nil {
-		if expected != nil && errors.Is(err, port.ErrTransferNotReady) {
-			return port.TransferReceipt{}, port.ErrTransferConflict
+		if errors.Is(err, port.ErrTransferNotReady) {
+			compensated, e := t.proof(p, req.Scope.PlanID, req.BatchID, "compensate", req.Namespace)
+			if e != nil {
+				return port.TransferReceipt{}, e
+			}
+			if expected != nil || compensated != nil {
+				return port.TransferReceipt{}, port.ErrTransferConflict
+			}
 		}
 		return port.TransferReceipt{}, transferOwnerError(err)
 	}

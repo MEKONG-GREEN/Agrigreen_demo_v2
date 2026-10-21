@@ -21,6 +21,9 @@ func transferTestAdapter(name string) TransferAdapter {
 		return TransferApproval{}, ErrTransferNotReady
 	}
 	a.RecoveryAuthority = a.Authority
+	a.ReadFenceForRecovery = func(context.Context, TransferRecoveryRequest, TransferFenceRequest) (TransferFence, error) {
+		return TransferFence{}, ErrTransferNotReady
+	}
 	a.EnterRecoveryGate = func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferRecoveryGate, error) {
 		return TransferRecoveryGate{}, ErrTransferNotReady
 	}

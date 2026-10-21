@@ -227,6 +227,8 @@ type TransferRecoveryGate struct {
 	Side                                          TransferSide
 	Namespace                                     string
 }
+type TransferRecoveryFenceReader func(context.Context, TransferRecoveryRequest, TransferFenceRequest) (TransferFence, error)
+
 type TransferRecoveryGateWriter func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferRecoveryGate, error)
 type TransferRecoveryGateReader func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferRecoveryGate, error)
 
@@ -247,8 +249,9 @@ type TransferCompensationVerifier func(context.Context, TransferCompensationRequ
 // TransferAdapter is trusted owner code. No raw data or SQL crosses this port.
 // All source functions receive the actual source context; target functions the target context.
 type TransferAdapter struct {
-	EnterRecoveryGate          TransferRecoveryGateWriter `json:"-"`
-	ReadRecoveryGate           TransferRecoveryGateReader `json:"-"`
+	ReadFenceForRecovery       TransferRecoveryFenceReader `json:"-"`
+	EnterRecoveryGate          TransferRecoveryGateWriter  `json:"-"`
+	ReadRecoveryGate           TransferRecoveryGateReader  `json:"-"`
 	Module, Namespace, Version string
 	DependsOn                  []string
 	MaxBatch                   int
