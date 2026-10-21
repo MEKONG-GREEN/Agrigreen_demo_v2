@@ -20,6 +20,8 @@ import (
 	alerthandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/handler"
 	calapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/app"
 	calhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/handler"
+	diaryapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/app"
+	diaryhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/handler"
 	modelapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/app"
 	modelhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/handler"
@@ -94,6 +96,8 @@ type Module struct {
 	cal *calapp.Service
 	// W11.47 (D4 CN7): CT/DA, điểm trình diễn, hộ mô hình, cấp quyền CNTS (extension/cntsmodel, module_cntsmodel.go).
 	model *modelapp.Service
+	// W11.48 (D4 CN8): nhật ký nuôi BM-08/09/19 (extension/cntsdiary, module_cntsdiary.go).
+	diary *diaryapp.Service
 }
 
 // New tạo module với pool của vai extension_app.
@@ -110,6 +114,8 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.alert = &alertapp.Service{DB: db, Clock: clk, Params: d.Params, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.cal = &calapp.Service{DB: db, Clock: clk, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.model = &modelapp.Service{DB: db, Clock: clk, Units: d.Units, Programs: khtcapp.Ports{Svc: m.khtc},
+		Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.diary = &diaryapp.Service{DB: db, Clock: clk, Units: d.Units, Params: d.Params, Alerts: m.alert,
 		Names: func() partyport.ActorNames { return m.rc.Names }}
 	return m
 }
@@ -181,6 +187,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	alerthandler.Handler{Svc: m.alert}.RegisterApp(rg) // W11.43
 	calhandler.Handler{Svc: m.cal}.RegisterApp(rg)
 	modelhandler.Handler{Svc: m.model}.RegisterApp(rg) // W11.47
+	diaryhandler.Handler{Svc: m.diary}.RegisterApp(rg) // W11.48
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham

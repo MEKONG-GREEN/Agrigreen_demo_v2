@@ -208,7 +208,8 @@ var opPurposes = map[string]map[string]bool{
 	// W11.23: thẻ danh bạ (pf/contact, FN-13) — CHỈ mục đích danh bạ.
 	OpCard: set(PurposeContactDirectory),
 	// Unwrap (mở DEK ảnh): đúng tập mục đích tệp của pf/evidence (domain.Purposes). W11.24: tài liệu nhân sự (hr_records).
-	OpUnwrap: set("mrv.evidence", "extension.field_support", "hr_records"),
+	// W11.48: ảnh nhật ký nuôi khuyến nông (extension.diary, pf/extension).
+	OpUnwrap: set("mrv.evidence", "extension.field_support", "hr_records", "extension.diary"),
 	OpErase:  set("registry.erasure"),
 }
 
