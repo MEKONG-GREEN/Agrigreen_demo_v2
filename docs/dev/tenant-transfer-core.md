@@ -22,7 +22,7 @@ Offer chỉ là immutable refs/hash để review và đối chiếu, không auth
 
 ## API port dự kiến
 
-Các struct dưới đây là hợp đồng review, không có implementation. Ref UUIDv7, Digest SHA-256 hex thường đúng64 ký tự, cursor bounded/opaque; không fields authority do HTTP body tự quyết. Copies sâu và registry immutable theo instance.
+Các struct dưới đây là hợp đồng review, không có implementation. IDs mới do core cấp là UUIDv7; source/actor/tenant/scope/basis refs lịch sử chỉ đòi UUID hợp lệ nonzero. Digest SHA-256 hex thường đúng64 ký tự, cursor bounded/opaque; không fields authority do HTTP body tự quyết. Copies sâu và registry immutable theo instance.
 
 ```go
 type TransferScope struct {
@@ -88,7 +88,7 @@ type TenantTransfers interface {
     TargetIntent(TransferParticipants, TransferIntentInput) (TransferIntent, error)
     Propose(TransferParticipants, TransferRef) (TransferPlan, error)
     DryRun(TransferParticipants, TransferRef) (TransferReport, error)
-    FreezeTarget(TransferParticipants, TransferRef) (TransferPlan, error)
+    FreezeTarget(TransferParticipants, TransferRef) (TransferIntent, error)
     FreezeSource(TransferParticipants, TransferRef) (TransferPlan, error)
     ScanNext(TransferParticipants, TransferRef) (TransferPlan, error)
     Seal(TransferParticipants, TransferRef) (TransferPlan, error)
@@ -161,3 +161,12 @@ Owner child (KN) cần đăng ký typed namespaces/exporter/importer/fence/recei
 - Actual owner child tests: không có dòng HTX/MRV/MKG trong artifact, references/licensing/chain/provenance đúng, KHTC semantics/goldens giữ; transfer hai Trung tâm với real role/foreign refs. Rehearsal và5 boundary hard PASS thuộc tổng đợt4b, không được mock để đóng55.
 
 Root đã chốt module party app/store, hai actual contexts và saga/receipts. API chi tiết/owner artifact transport/fence producer integration còn cần kiểm qua implementation và review; không phát hành importer giả hoặc live CLI. Hiện chưa có migration, chưa chạy PG/test production, chưa release/claim ready, chưa cutover hoặc chuyển dữ liệu thật.
+## Bổ sung sau peer review
+
+Fence owner phải exclusive theo (actual tenant, actual scope, namespace), gắn IntentID/PlanID và BindingHash. Lặp đúng holder trả cùng epoch; intent khác bị từ chối. Release chỉ giải đúng fence holder với receipt lâu dài, không giải fence của plan mới sau retry.
+
+Abort/ReleaseFences cần đường recovery riêng: fresh dual authentication và RecoveryAuthority hiện hành trên cả hai scopes, reason/operation refs; không đòi approval cũ chưa thu hồi để bù. Normal import vẫn deny ngay khi approval cũ không còn hiệu lực. Chưa apply thì Abort có thể chốt không target writes; đã apply phải đối chiếu mọi durable compensation receipt và proof identity rollback #56 trước release. Owner release append receipt trong cùng transaction, retry sau crash không giải fence của holder khác. Không có recovery callbacks thì giữ fence và báo chưa sẵn sàng, không tự mở khi timeout.
+
+Owner reports checklist: frozen source args gắn JobID/TenantID/RequestedBy/RequestedAt/template/version/format. Khi chuyển phải dùng actual mapped IDs/envelope đích mới và giữ business args/as_of; không copy nguyên JSON private sang tenant khác hoặc UPDATE ledger cũ. ObjectKey, DLP, current actor, source version và queued outbox cần owner rehearsal riêng.
+
+Credential freshness v1: registry nhận TransferTokenVerifier hiện có từ API assembly, reverify authz.RawToken của cả hai actual contexts trên mỗi operation/replay. Fresh Principal phải platform_admin+MFA và khớp ActorRef/TenantID/OrgRef/native realm roles/MFA của context (roles theo canonical set); thiếu raw token/verifier, token hết hạn hoặc mismatch thì deny trước owner callbacks. Không log/persist/cache token, không thêm field Principal hay secret mới. Approval.ValidUntil không thay thế bước verifier này.

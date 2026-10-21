@@ -41,6 +41,8 @@ provides:
     - ScopeResolver
     - SeasonActivity
     - SessionContext
+    - TenantTransfers
+    - TransferTokenVerifier
     - ValveGrants
     - grantlookup.CoopLocations
   events:
