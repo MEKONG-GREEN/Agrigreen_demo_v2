@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
@@ -66,7 +67,7 @@ func TestAttributeCatalogHTTPLabelsContextAndLiveGuards(t *testing.T) {
 		t.Fatalf("configured attributes: %d %v", r.status, r.body)
 	}
 	// Existing contexts must re-read the current attribute ledger on every request.
-	if k := f.probeKN(user, before).KN; !k.Manager || !k.ReadOnly() || !k.HasDuty("owner_duty") || k.Can(authz.PowerApprove) || len(k.Powers) != 0 {
+	if k := f.probeKN(user, before).KN; !k.Manager || !k.ReadOnly() || !slices.Contains(k.Duties, "owner_duty") || k.HasDuty("owner_duty") || k.Can(authz.PowerApprove) || len(k.Powers) != 0 {
 		t.Fatalf("live read-only capability: %+v", k)
 	}
 	wantCode(t, f.withCtx(user, http.MethodPost, "/v1/probe/x/write", before, map[string]any{}), http.StatusForbidden, "accounts.context_read_only", "own-department write")

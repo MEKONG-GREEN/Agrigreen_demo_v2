@@ -8,6 +8,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -49,8 +50,12 @@ func TestAttributeCatalogCSVAndReadOnlyProjectionUseSameSnapshot(t *testing.T) {
 	if got := svc.mgmtOf(" CHỨC-DANH RIÊNG "); got != port.MgmtTruongPhong {
 		t.Fatalf("configured CSV label:%q", got)
 	}
-	if got := svc.mgmtOf("Trưởng phòng"); got == port.MgmtTruongPhong {
-		t.Fatal("configured CSV fell back to legacy label")
+	// The unchanged code still normalizes to truong_phong even after its label changes.
+	if got := svc.mgmtOf("Trưởng phòng"); got != port.MgmtTruongPhong {
+		t.Fatal("configured CSV rejected normalized code")
+	}
+	if got := svc.AttributeCatalog().LevelLabel(port.MgmtTruongPhong); got != "Chức danh riêng" {
+		t.Fatalf("configured label fell back: %q", got)
 	}
 	a := port.Assignment{Role: port.KNTinh, MgmtLevel: port.MgmtTruongPhong}
 	k := &authz.KNContext{Role: port.KNTinh}
@@ -71,7 +76,7 @@ func TestAttributeCatalogAssignmentRetainsNativeErrorPrecedence(t *testing.T) {
 		"department_codes": {Role: port.KNTinh, MgmtLevel: "retired_level", Departments: []string{"invalid code"}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			svc := Service{}
+			svc := Service{Clock: clock.System{}}
 			_, err := svc.checkAssignment(context.Background(), nil, in, nil)
 			got := problem.From(err)
 			if got.Code != problem.Validation.Code || len(got.Errors) != 1 || got.Errors[0].Field != name {
