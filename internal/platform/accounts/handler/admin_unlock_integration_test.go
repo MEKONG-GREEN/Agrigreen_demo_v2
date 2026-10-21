@@ -38,7 +38,7 @@ func TestAdminLoginLockLookupFailsClosedAndStaysDetailOnly(t *testing.T) {
 	admin := f.nationalAdmin()
 	id := admin.create(person(f.team30292, "kn_officer"))
 	path := "/v1/accounts/users/" + id.String()
-	f.dir.Fail("BruteForceLocked", errors.New("synthetic attack detection unavailable"))
+	f.dir.Fail("BruteForceLocked", errors.Join(port.ErrUnavailable, errors.New("synthetic attack detection unavailable")))
 	if r := admin.do(http.MethodGet, path, nil); r.status != http.StatusServiceUnavailable || r.body["code"] != "accounts.dependency_unavailable" {
 		t.Fatalf("unknown runtime lock cannot be reported as unlocked: %d %v", r.status, r.body)
 	}
