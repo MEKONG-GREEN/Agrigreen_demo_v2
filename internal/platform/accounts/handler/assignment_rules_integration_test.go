@@ -156,6 +156,8 @@ func TestAssignmentRulesConfiguredDenialsThroughHTTP(t *testing.T) {
 	change := asg(port.KNTinh, f.p91, []string{deptBVTV})
 	change["reason"] = "Điều chỉnh phân công theo thử nghiệm"
 	wantCode(t, f.req(srv, f.root, http.MethodPut, path+"/"+asgIDs(cr)[port.KNTinh], change, nil), http.StatusUnprocessableEntity, "validation_failed", "owner rejected valid legacy node")
+	adminPath := "/v1/accounts/users/" + f.rootID.String() + "/assignments"
+	wantCode(t, f.req(srv, f.root, http.MethodPost, adminPath, asg(port.KNAdmin, f.p91, nil), nil), http.StatusUnprocessableEntity, "validation_failed", "owner node rule also applies to Admin with node")
 	rules.deny(errors.New("fixture owner unavailable"), nil)
 	wantCode(t, f.req(srv, f.root, http.MethodPost, path, asg(port.KNXa, f.p91, []string{deptTT}, "30292"), nil), http.StatusInternalServerError, "", "unavailable owner did not fallback")
 	storedRuleAssignment(t, f, uuid.MustParse(asgIDs(cr)[port.KNTinh]), port.KNTinh, f.p91, []string{deptTT}, nil)
