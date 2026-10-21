@@ -619,7 +619,7 @@
                     "Icon": "journal",
                     "BadgeSource": "",
                     "Requires": null,
-                    "ComingSoon": true,
+                    "ComingSoon": false,
                     "Needs": "",
                     "Children": null
                   },
@@ -1026,22 +1026,22 @@
                   {
                     "Key": "xa.cnts.nhat_ky.thuy_san",
                     "Label": "Thủy sản",
-                    "Route": "/kn/cnts/nhat-ky/thuy-san",
+                    "Route": "/kn/cnts/nhat-ky",
                     "Icon": "water",
                     "BadgeSource": "",
                     "Requires": null,
-                    "ComingSoon": true,
+                    "ComingSoon": false,
                     "Needs": "",
                     "Children": null
                   },
                   {
                     "Key": "xa.cnts.nhat_ky.chan_nuoi",
                     "Label": "Chăn nuôi",
-                    "Route": "/kn/cnts/nhat-ky/chan-nuoi",
+                    "Route": "/kn/cnts/nhat-ky",
                     "Icon": "sprout",
                     "BadgeSource": "",
                     "Requires": null,
-                    "ComingSoon": true,
+                    "ComingSoon": false,
                     "Needs": "",
                     "Children": null
                   }

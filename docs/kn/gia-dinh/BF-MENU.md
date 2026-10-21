@@ -39,7 +39,7 @@ Issue #98, xếp chồng trên #76 (`knsplit2-menu-kn`). Nguồn: PRD `kn-bugfix
 | CNTS xã | Báo cáo | KSGM hằng ngày, Nhập liệu tuần chăn nuôi, Khai thác thủy sản tuần, Báo cáo công việc tuần | `/kn/cnts/bao-cao-ky` (lọc biểu BM-01/04/17/05 trong màn) | Có màn |
 | CNTS xã | Báo cáo | Báo cáo dịch bệnh | `/kn/cnts/dich-benh` | Có màn |
 | CNTS xã | Dữ liệu | Hộ mô hình | `/kn/cnts/ho-mo-hinh` | Có màn |
-| CNTS xã | Dữ liệu | Nhật ký sản xuất › Thủy sản, Chăn nuôi | `/kn/cnts/nhat-ky/thuy-san`, `/kn/cnts/nhat-ky/chan-nuoi` | Sắp có |
+| CNTS xã | Dữ liệu | Nhật ký sản xuất › Thủy sản, Chăn nuôi | `/kn/cnts/nhat-ky` (cả hai mục, chọn lứa/biểu BM-08/09/19 trong màn) | Có màn (W11.48) |
 | CNTS xã | Dữ liệu | Lịch tiêm phòng | `/kn/cnts/lich-tiem` | Có màn |
 | CNTS xã | Dữ liệu | Bản đồ vùng dịch | `/kn/cnts/ban-do-dich` | Sắp có |
 | CNTS xã | Dữ liệu | Điểm trình diễn | `/kn/cnts/ho-mo-hinh` (màn hộ mô hình, điểm trình diễn của xã) | Có màn |
@@ -49,7 +49,7 @@ Issue #98, xếp chồng trên #76 (`knsplit2-menu-kn`). Nguồn: PRD `kn-bugfix
 | CNTS tỉnh | Điều hành | Biểu mẫu › Thiết kế biểu mẫu | `/kn/cnts/thiet-ke-bieu-mau` | Sắp có |
 | CNTS tỉnh | Điều hành | Biểu mẫu › Phát hành, theo dõi nộp | `/kn/cnts/bieu-mau` | Có màn |
 | CNTS tỉnh | Điều hành | Biểu mẫu › Cấu hình nhắc nhở | `/kn/cnts/canh-bao` (tab Cấu hình nhắc nhở) | Có màn |
-| CNTS tỉnh | Điều hành | Biểu mẫu › Rà soát nhật ký | `/kn/cnts/ra-soat-nhat-ky` | Sắp có |
+| CNTS tỉnh | Điều hành | Biểu mẫu › Rà soát nhật ký | `/kn/cnts/ra-soat-nhat-ky` | Có màn (W11.48) |
 | CNTS tỉnh | Điều hành | Biểu mẫu › Cấp quyền | `/kn/cnts/cap-quyen` | Có màn |
 | CNTS tỉnh | Điều hành | Lịch › Lịch trực KSGM; Lịch tiêm phòng | `/kn/cnts/lich-truc`; `/kn/cnts/lich-tiem` | Có màn |
 | CNTS tỉnh | Điều hành | Lịch › Lịch công tác cán bộ xã | `/kn/nhiem-vu/lich-cong-tac` (badge `work_schedules.pending`) | Có màn |

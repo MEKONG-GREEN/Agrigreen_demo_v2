@@ -773,8 +773,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
                 "key": "tinh.cnts.bieu_mau.ra_soat_nhat_ky",
                 "label": "Rà soát nhật ký",
                 "route": "/kn/cnts/ra-soat-nhat-ky",
-                "icon": "journal",
-                "soon": true
+                "icon": "journal"
               },
               {
                 "key": "tinh.cnts.bieu_mau.cap_quyen",
@@ -1024,16 +1023,14 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
               {
                 "key": "xa.cnts.nhat_ky.thuy_san",
                 "label": "Thủy sản",
-                "route": "/kn/cnts/nhat-ky/thuy-san",
-                "icon": "water",
-                "soon": true
+                "route": "/kn/cnts/nhat-ky",
+                "icon": "water"
               },
               {
                 "key": "xa.cnts.nhat_ky.chan_nuoi",
                 "label": "Chăn nuôi",
-                "route": "/kn/cnts/nhat-ky/chan-nuoi",
-                "icon": "sprout",
-                "soon": true
+                "route": "/kn/cnts/nhat-ky",
+                "icon": "sprout"
               }
             ]
           },

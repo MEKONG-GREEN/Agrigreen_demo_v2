@@ -1654,9 +1654,7 @@
           "route": "/kn/cnts/ra-soat-nhat-ky",
           "icon": "journal",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          },
          {
@@ -2124,23 +2122,19 @@
          {
           "key": "xa.cnts.nhat_ky.thuy_san",
           "label": "Thủy sản",
-          "route": "/kn/cnts/nhat-ky/thuy-san",
+          "route": "/kn/cnts/nhat-ky",
           "icon": "water",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          },
          {
           "key": "xa.cnts.nhat_ky.chan_nuoi",
           "label": "Chăn nuôi",
-          "route": "/kn/cnts/nhat-ky/chan-nuoi",
+          "route": "/kn/cnts/nhat-ky",
           "icon": "sprout",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          }
         ]

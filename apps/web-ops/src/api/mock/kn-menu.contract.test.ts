@@ -134,7 +134,7 @@ describe("kn.menu/v6 (BF-MENU #98, R-A6): menu theo Update prototype và hình k
     expect(groupsOf("kn_xa/chan_nuoi_thuy_san")).toEqual({
       "Điều hành": ["Việc cần làm", "Lịch trực KSGM của tôi", "Lịch công tác"],
       "Báo cáo": ["KSGM hằng ngày", "Nhập liệu tuần chăn nuôi", "Khai thác thủy sản tuần", "Báo cáo công việc tuần", "Báo cáo dịch bệnh"],
-      "Dữ liệu": ["Hộ mô hình", ["Nhật ký sản xuất", ["Thủy sản*", "Chăn nuôi*"]], "Lịch tiêm phòng", "Bản đồ vùng dịch*", "Điểm trình diễn", "Quy trình, văn bản*"],
+      "Dữ liệu": ["Hộ mô hình", ["Nhật ký sản xuất", ["Thủy sản", "Chăn nuôi"]], "Lịch tiêm phòng", "Bản đồ vùng dịch*", "Điểm trình diễn", "Quy trình, văn bản*"],
       "Dùng chung": ["Contact"],
     });
     expect(menuOf("kn_xa/chan_nuoi_thuy_san").default_route).toBe("/kn/cnts/bao-cao-ky");
@@ -145,7 +145,7 @@ describe("kn.menu/v6 (BF-MENU #98, R-A6): menu theo Update prototype và hình k
     expect(g["Điều hành"]).toEqual([
       "Trang chủ",
       "Cảnh báo",
-      ["Biểu mẫu", ["Thiết kế biểu mẫu*", "Phát hành, theo dõi nộp", "Cấu hình nhắc nhở", "Rà soát nhật ký*", "Cấp quyền"]],
+      ["Biểu mẫu", ["Thiết kế biểu mẫu*", "Phát hành, theo dõi nộp", "Cấu hình nhắc nhở", "Rà soát nhật ký", "Cấp quyền"]],
       ["Lịch", ["Lịch trực KSGM", "Lịch tiêm phòng", "Lịch công tác cán bộ xã", "Lịch công tác phòng"]],
       ["Chiến dịch điều tra", ["Quản lý chiến dịch*", "Tạo chiến dịch*"]],
     ]);

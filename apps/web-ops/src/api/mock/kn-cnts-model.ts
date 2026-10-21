@@ -421,3 +421,20 @@ export const cntsModelRoutes: Route[] = [
     handler: () => json({ items: [{ ref: OFFICER, display: NAMES[OFFICER] ?? null, commune_codes: AG_COMMUNES.slice(0, 3).map((c) => c.code) }] }),
   },
 ];
+
+/** W11.48: hộ mô hình giả lập (bản hiện hành) cho nhật ký nuôi — null nếu không có hoặc người gọi không thấy. Giả lập nới:
+ * Cấp Xã thấy hộ là người ghi được; Cấp Tỉnh (chủ nhiệm/lãnh đạo phòng/chưa phân nhóm) và Admin rà soát được. */
+export function cntsMockHousehold(ctx: Ctx, ref: string) {
+  seed();
+  const w = who(ctx);
+  const h = last(HOUSEHOLDS, ref);
+  if (!h || !sees(w, h.commune_code)) return null;
+  const site = last(SITES, h.site_ref)!;
+  const project = last(PROJECTS, h.project_ref)!;
+  return {
+    household: householdView(w, h), site, project, actor: w.actor,
+    keeper: !w.readOnly && (w.role === "admin" || w.role === "kn_xa") && h.event !== "withdrawn",
+    reviewer: !w.readOnly && (w.role === "admin" || (w.role === "kn_tinh" && ["", "chu_nhiem", "lanh_dao_phong"].includes(w.group))),
+    point: POINTS.get(h.ref) ?? POINTS.get(site.ref) ?? null,
+  };
+}
