@@ -114,7 +114,7 @@ CREATE TABLE pf_party.transfer_receipt (
   scope_ref uuid NOT NULL,
   plan_id uuid NOT NULL,
   batch_id uuid NOT NULL,
-  operation text NOT NULL CHECK (operation IN ('export', 'apply', 'verify', 'compensate', 'release_source', 'release_target')),
+  operation text NOT NULL CHECK (operation IN ('export', 'apply', 'verify', 'compensate', 'release_source', 'release_target', 'gate_source', 'gate_target')),
   namespace text NOT NULL CHECK (char_length(namespace) BETWEEN 1 AND 96),
   owner_receipt_ref uuid NOT NULL,
   document_hash text NOT NULL CHECK (document_hash ~ '^[a-f0-9]{64}$'),

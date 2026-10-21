@@ -216,6 +216,20 @@ type TransferFenceRelease struct {
 	Side                   TransferSide
 	Namespace              string
 }
+
+// TransferRecoveryGate is a durable owner phase transition. It keeps the original
+// manifest fence unchanged; the owner atomically drains forward writers using the
+// same fence lock and switches their checked mode to recovery before acknowledging.
+type TransferRecoveryGate struct {
+	Ref, OperationID, ReasonRef, IntentID, PlanID uuid.UUID
+	BindingHash                                   TransferDigest
+	Fence                                         TransferFence
+	Side                                          TransferSide
+	Namespace                                     string
+}
+type TransferRecoveryGateWriter func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferRecoveryGate, error)
+type TransferRecoveryGateReader func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferRecoveryGate, error)
+
 type TransferFenceReleaser func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferFenceRelease, error)
 type TransferFenceReleaseReader func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferFenceRelease, error)
 
@@ -233,6 +247,8 @@ type TransferCompensationVerifier func(context.Context, TransferCompensationRequ
 // TransferAdapter is trusted owner code. No raw data or SQL crosses this port.
 // All source functions receive the actual source context; target functions the target context.
 type TransferAdapter struct {
+	EnterRecoveryGate          TransferRecoveryGateWriter `json:"-"`
+	ReadRecoveryGate           TransferRecoveryGateReader `json:"-"`
 	Module, Namespace, Version string
 	DependsOn                  []string
 	MaxBatch                   int

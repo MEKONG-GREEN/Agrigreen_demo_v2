@@ -65,6 +65,10 @@ func (o *transferProtocolOwner) adapter() port.TransferAdapter {
 		return approval, nil
 	}
 	a.RecoveryAuthority = a.Authority
+	a.EnterRecoveryGate = func(context.Context, port.TransferRecoveryRequest, port.TransferFenceRequest, port.TransferFence) (port.TransferRecoveryGate, error) {
+		return port.TransferRecoveryGate{}, port.ErrTransferNotReady
+	}
+	a.ReadRecoveryGate = port.TransferRecoveryGateReader(a.EnterRecoveryGate)
 	a.ReadAppliedForRecovery = func(context.Context, port.TransferRecoveryRequest, port.TransferApplyRequest) (port.TransferReceipt, error) {
 		return port.TransferReceipt{}, port.ErrTransferNotReady
 	}

@@ -55,7 +55,7 @@ func NewTransferRegistry(adapters []TransferAdapter, verifier TransferTokenVerif
 		if !validTransferName(a.Namespace) || a.Version == "" || len(a.Version) > 128 || seen[a.Namespace] || a.MaxBatch < 1 || a.MaxBatch > 500 {
 			return nil, ErrTransferConfiguration
 		}
-		if a.ReadAppliedForRecovery == nil || a.RecoveryAuthority == nil || a.ReleaseSourceFence == nil || a.ReadSourceFenceRelease == nil || a.ReleaseTargetFence == nil || a.ReadTargetFenceRelease == nil || a.Authority == nil || a.FenceSource == nil || a.FenceTarget == nil || a.CheckSourceFence == nil || a.CheckTargetFence == nil || a.Scan == nil || a.Export == nil || a.ReadExport == nil || a.Apply == nil || a.ReadReceipt == nil || a.Verify == nil || a.Compensate == nil || a.ReadCompensation == nil || a.VerifyCompensation == nil {
+		if a.EnterRecoveryGate == nil || a.ReadRecoveryGate == nil || a.ReadAppliedForRecovery == nil || a.RecoveryAuthority == nil || a.ReleaseSourceFence == nil || a.ReadSourceFenceRelease == nil || a.ReleaseTargetFence == nil || a.ReadTargetFenceRelease == nil || a.Authority == nil || a.FenceSource == nil || a.FenceTarget == nil || a.CheckSourceFence == nil || a.CheckTargetFence == nil || a.Scan == nil || a.Export == nil || a.ReadExport == nil || a.Apply == nil || a.ReadReceipt == nil || a.Verify == nil || a.Compensate == nil || a.ReadCompensation == nil || a.VerifyCompensation == nil {
 			return nil, ErrTransferConfiguration
 		}
 		a.DependsOn = slices.Clone(a.DependsOn)
