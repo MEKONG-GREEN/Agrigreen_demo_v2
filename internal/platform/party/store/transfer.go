@@ -78,7 +78,7 @@ func InsertTransferIntent(ctx context.Context, tx pgx.Tx, tid, actor, operation 
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO pf_party.transfer_intent(tenant_id,scope_ref,id,operation_id,input_hash,document,actor_ref,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, tid, intent.Scope.TargetScopeRef, intent.ID, operation, hash, raw, actor, now)
+	_, err = tx.Exec(ctx, `INSERT INTO pf_party.transfer_intent(tenant_id,scope_ref,id,operation_id,input_hash,document,actor_ref,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, tid, intent.Scope.TargetScopeRef, intent.ID, operation, hash, string(raw), actor, now)
 	return transferConstraint(err)
 }
 func InsertTransferPlan(ctx context.Context, tx pgx.Tx, tid, actor uuid.UUID, side port.TransferSide, plan port.TransferPlan, now time.Time) error {
@@ -93,7 +93,7 @@ func InsertTransferPlan(ctx context.Context, tx pgx.Tx, tid, actor uuid.UUID, si
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO pf_party.transfer_plan(tenant_id,scope_ref,id,intent_id,side,document,actor_ref,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, tid, scopeRef, plan.ID, plan.Scope.IntentID, side, raw, actor, now)
+	_, err = tx.Exec(ctx, `INSERT INTO pf_party.transfer_plan(tenant_id,scope_ref,id,intent_id,side,document,actor_ref,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, tid, scopeRef, plan.ID, plan.Scope.IntentID, side, string(raw), actor, now)
 	return transferConstraint(err)
 }
 
@@ -119,7 +119,7 @@ func AppendTransferState(ctx context.Context, tx pgx.Tx, tid, scopeRef, actor, e
 		return err
 	}
 	eventID := ids.New()
-	return tx.QueryRow(ctx, `INSERT INTO pf_party.transfer_event(id,tenant_id,scope_ref,stream_key,entity_id,kind,document,event_time,actor_ref,idem_key,rule_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING seq`, eventID, tid, scopeRef, "transfer:"+entity.String(), entity, kind, raw, now, actor, "transfer:"+eventID.String(), "party.transfer/v1").Scan(&s.Sequence)
+	return tx.QueryRow(ctx, `INSERT INTO pf_party.transfer_event(id,tenant_id,scope_ref,stream_key,entity_id,kind,document,event_time,actor_ref,idem_key,rule_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING seq`, eventID, tid, scopeRef, "transfer:"+entity.String(), entity, kind, string(raw), now, actor, "transfer:"+eventID.String(), "party.transfer/v1").Scan(&s.Sequence)
 }
 func TransferHeaders(ctx context.Context, tx pgx.Tx, plan uuid.UUID) ([]port.TransferHeader, error) {
 	rows, err := tx.Query(ctx, `SELECT document FROM pf_party.transfer_item WHERE plan_id=$1 ORDER BY namespace COLLATE "C",source_ref`, plan)
@@ -147,7 +147,7 @@ func InsertTransferHeaders(ctx context.Context, tx pgx.Tx, tid, scopeRef, plan u
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, `INSERT INTO pf_party.transfer_item(tenant_id,scope_ref,plan_id,namespace,source_ref,document)VALUES($1,$2,$3,$4,$5,$6)`, tid, scopeRef, plan, h.Key.Namespace, h.Key.Ref, raw)
+		_, err = tx.Exec(ctx, `INSERT INTO pf_party.transfer_item(tenant_id,scope_ref,plan_id,namespace,source_ref,document)VALUES($1,$2,$3,$4,$5,$6)`, tid, scopeRef, plan, h.Key.Namespace, h.Key.Ref, string(raw))
 		if err != nil {
 			return transferConstraint(err)
 		}
@@ -200,7 +200,7 @@ func ReserveTransferOperation(ctx context.Context, tx pgx.Tx, tid, scopeRef, ent
 		return TransferOperation{}, err
 	}
 	out := TransferOperation{ID: ids.New(), Hash: hash, Document: raw}
-	_, err = tx.Exec(ctx, `INSERT INTO pf_party.transfer_operation(tenant_id,scope_ref,entity_id,kind,semantic_key,operation_id,input_hash,document)VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, tid, scopeRef, entity, kind, key, out.ID, hash, raw)
+	_, err = tx.Exec(ctx, `INSERT INTO pf_party.transfer_operation(tenant_id,scope_ref,entity_id,kind,semantic_key,operation_id,input_hash,document)VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, tid, scopeRef, entity, kind, key, out.ID, hash, string(raw))
 	return out, transferConstraint(err)
 }
 func transferConstraint(err error) error {
