@@ -43,6 +43,8 @@ type Deps struct {
 	Roles           *port.RoleCatalog
 	Navigation      partyport.Navigation // registered application context landing
 	SessionPolicies port.SessionPolicies // trusted application-owned request projections
+	// AssignmentRules validates normalized values without replacing native scope checks.
+	AssignmentRules port.AssignmentRules `json:"-"`
 	// Sessions contains trusted application-owned projections for selected requests.
 	Sessions *authz.SessionRegistry
 	// Directory: Keycloak Admin REST. Nil → mọi route trả 503 accounts.dependency_unavailable.
@@ -80,7 +82,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		panic("accounts: invalid role catalog configuration")
 	}
 	db = forModule(db)
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs, Navigation: d.Navigation, Roles: d.Roles,
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs, Navigation: d.Navigation, Roles: d.Roles, AssignmentRules: d.AssignmentRules,
 		Households: d.Households, Vault: d.Vault, Params: d.Params, SessionPolicies: d.SessionPolicies, Departments: d.Departments, Units: d.Units, Names: d.Names,
 		Modules: d.Modules, DormantDryRun: d.DormantDryRun}, sessions: d.Sessions}
 }

@@ -65,6 +65,8 @@ type Service struct {
 	Roles           *port.RoleCatalog
 	Navigation      partyport.Navigation // final resolver errors never fall back
 	SessionPolicies port.SessionPolicies // instance configuration; no owner payload decoding here
+	// AssignmentRules is optional trusted owner policy; configured errors never fall back.
+	AssignmentRules port.AssignmentRules `json:"-"`
 	DB              tenant.Beginner      // pool vai accounts_app
 	Clock           clock.Clock
 	Dir             port.Directory          // nil → ErrDependency
@@ -134,6 +136,14 @@ func fieldProblem(err error) error {
 	var fe domain.FieldError
 	if errors.As(err, &fe) {
 		return problem.Validation.WithField(fe.Field, fe.Msg)
+	}
+	var rule port.AssignmentRuleError
+	if errors.As(err, &rule) {
+		return problem.Validation.WithField(rule.Field, rule.Msg)
+	}
+	var rulePtr *port.AssignmentRuleError
+	if errors.As(err, &rulePtr) && rulePtr != nil {
+		return problem.Validation.WithField(rulePtr.Field, rulePtr.Msg)
 	}
 	return err
 }

@@ -96,7 +96,7 @@ type checkedAssignment struct {
 // vi người gọi; phòng ban thuộc đơn vị của Nút (chưa xóa); xã phụ trách ⊂ xã của Nút. targetRealm là vai
 // realm của tài khoản đích (Admin cần platform_admin).
 func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.AssignmentInput, targetRealm []string) (checkedAssignment, error) {
-	in, err := domain.NormalizeAssignment(in, s.now())
+	in, err := s.normalizeAssignment(in, s.now())
 	if err != nil {
 		return checkedAssignment{}, fieldProblem(err)
 	}
@@ -126,7 +126,7 @@ func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.Assig
 		}
 		return checkedAssignment{}, err
 	}
-	if err := domain.KNRoleFitsOrg(in.Role, string(o.Kind)); err != nil {
+	if err := s.validateAssignmentNodeKind(in.Role, string(o.Kind)); err != nil {
 		return checkedAssignment{}, fieldProblem(err)
 	}
 	unit, err := s.Departments.DepartmentUnit(ctx, o.Ref)
