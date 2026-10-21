@@ -243,20 +243,36 @@ type SupportActionInput struct {
 	Status    int
 }
 
-// LogSupportAction ghi một dòng nhật ký hỗ trợ cho request hiện tại (Principal.KN.Support khác nil).
+// LogSupportAction ghi nhật ký bằng ảnh chụp của chủ phiên; actor và tenant vẫn từ xác thực.
 func (s *Service) LogSupportAction(ctx context.Context, in SupportActionInput) error {
 	p, ok := authz.FromContext(ctx)
-	if !ok || p.KN == nil || p.KN.Support == nil {
+	if !ok {
 		return problem.Forbidden
 	}
-	k := p.KN
+	var audit port.SupportAuditContext
+	var err error
+	if s.SessionPolicies.SupportAudit != nil {
+		audit, err = s.SessionPolicies.SupportAudit(ctx)
+	} else {
+		// Temporary compatibility until the KN owner adapter is registered.
+		// Only absent configuration uses legacy data; provider errors never do.
+		if p.KN == nil || p.KN.Support == nil {
+			return problem.Forbidden
+		}
+		k := p.KN
+		audit = port.SupportAuditContext{ContextID: k.ID, SessionID: k.Support.SessionID,
+			OnBehalfOf: k.Support.OnBehalfOf, Audience: k.Role, Department: k.Department, Reason: k.Support.Reason}
+	}
+	if err != nil {
+		return problem.Forbidden.WithCause(err)
+	}
 	content, err := json.Marshal(in.Content)
 	if err != nil {
 		return err
 	}
-	row := store.SupportAction{ID: ids.New(), TenantID: p.TenantID, SessionID: k.Support.SessionID, ContextID: k.ID, RequestID: in.RequestID,
-		Phase: in.Phase, OnBehalfOf: k.Support.OnBehalfOf, ActedRole: k.Role, Department: k.Department, Function: in.Function,
-		Content: content, Reason: k.Support.Reason, TraceID: telemetry.TraceID(ctx), EventTime: s.now(), ActorRef: p.ActorRef}
+	row := store.SupportAction{ID: ids.New(), TenantID: p.TenantID, SessionID: audit.SessionID, ContextID: audit.ContextID, RequestID: in.RequestID,
+		Phase: in.Phase, OnBehalfOf: audit.OnBehalfOf, ActedRole: audit.Audience, Department: audit.Department, Function: in.Function,
+		Content: content, Reason: audit.Reason, TraceID: telemetry.TraceID(ctx), EventTime: s.now(), ActorRef: p.ActorRef}
 	if in.Phase == "completed" {
 		st := in.Status
 		row.Status = &st

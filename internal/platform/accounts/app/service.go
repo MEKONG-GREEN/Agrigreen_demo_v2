@@ -61,12 +61,13 @@ const DefaultActionsLifespan = 72 * time.Hour
 
 // Service là use case của module.
 type Service struct {
-	Navigation partyport.Navigation // final resolver errors never fall back
-	DB         tenant.Beginner      // pool vai accounts_app
-	Clock      clock.Clock
-	Dir        port.Directory          // nil → ErrDependency
-	Scope      partyport.ScopeResolver // nil → ErrDependency
-	Orgs       partyport.Orgs          // nil → ErrDependency
+	Navigation      partyport.Navigation // final resolver errors never fall back
+	SessionPolicies port.SessionPolicies // instance configuration; no owner payload decoding here
+	DB              tenant.Beginner      // pool vai accounts_app
+	Clock           clock.Clock
+	Dir             port.Directory          // nil → ErrDependency
+	Scope           partyport.ScopeResolver // nil → ErrDependency
+	Orgs            partyport.Orgs          // nil → ErrDependency
 	// ActionsLifespan: hạn liên kết kích hoạt; 0 → DefaultActionsLifespan.
 	ActionsLifespan time.Duration
 	// Households, Vault, Params: tài khoản nông dân (G2) — thành viên HTX của nông hộ

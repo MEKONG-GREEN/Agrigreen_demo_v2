@@ -295,8 +295,29 @@ func (s *Service) ListInternalUnits(ctx context.Context, unit uuid.UUID, include
 	if s.Departments == nil {
 		return nil, uuid.Nil, ErrDependency.WithDetail("chưa nối pf/party")
 	}
-	if unit == uuid.Nil && p.KN != nil {
-		unit = p.KN.UnitRef
+	var ownerUnit uuid.UUID
+	var handled bool
+	if s.SessionPolicies.DefaultUnit != nil {
+		var err error
+		ownerUnit, handled, err = s.SessionPolicies.DefaultUnit(ctx)
+		if err != nil {
+			return nil, uuid.Nil, err
+		}
+	}
+	// Temporary compatibility until the KN owner adapter is wired in a separate lane.
+	// A configured resolver is authoritative: it may never fall back to this bridge.
+	if s.SessionPolicies.DefaultUnit == nil && p.KN != nil {
+		ownerUnit, handled = p.KN.UnitRef, true
+	}
+	if p.SelectedSession != nil && !handled {
+		// A bound owner is never native, even if a configured resolver declines it.
+		return nil, uuid.Nil, problem.Forbidden
+	}
+	if unit == uuid.Nil && handled {
+		unit = ownerUnit
+		if unit == uuid.Nil {
+			return nil, uuid.Nil, problem.Validation.WithField("org_ref", "ngữ cảnh phiên không gắn đơn vị")
+		}
 	}
 	if unit == uuid.Nil {
 		if p.OrgRef == uuid.Nil {
