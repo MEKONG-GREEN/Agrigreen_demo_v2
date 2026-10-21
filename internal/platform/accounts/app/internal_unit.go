@@ -306,10 +306,11 @@ func (s *Service) ListInternalUnits(ctx context.Context, unit uuid.UUID, include
 	}
 	// Temporary compatibility until the KN owner adapter is wired in a separate lane.
 	// A configured resolver is authoritative: it may never fall back to this bridge.
-	if s.SessionPolicies.DefaultUnit == nil && p.KN != nil {
-		ownerUnit, handled = p.KN.UnitRef, true
+	legacy := s.SessionPolicies.DefaultUnit == nil && p.KN != nil
+	if legacy && unit == uuid.Nil {
+		unit = p.KN.UnitRef
 	}
-	if p.SelectedSession != nil && !handled {
+	if p.SelectedSession != nil && !handled && !legacy {
 		// A bound owner is never native, even if a configured resolver declines it.
 		return nil, uuid.Nil, problem.Forbidden
 	}

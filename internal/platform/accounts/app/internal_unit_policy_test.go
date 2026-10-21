@@ -142,3 +142,20 @@ func TestSupportPolicyErrorCannotUseLegacyAudit(t *testing.T) {
 		t.Fatalf("err=%v db=%d", err, database.calls)
 	}
 }
+
+func TestUnconfiguredUnitPolicyKeepsEmptyLegacyUnitFallback(t *testing.T) {
+	selected, err := authz.NewSession("synthetic_owner", uuid.New(), authz.SessionScope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	nativeUnit := uuid.New()
+	deps := &unitPolicyDepartments{unit: nativeUnit}
+	dbErr := errors.New("database boundary")
+	database := &unitPolicyDB{err: dbErr}
+	svc := app.Service{DB: database, Departments: deps}
+	p := authz.Principal{ActorRef: uuid.New(), TenantID: uuid.New(), OrgRef: uuid.New(), SelectedSession: &selected, KN: &authz.KNContext{}}
+	_, unit, got := svc.ListInternalUnits(authz.WithPrincipal(context.Background(), p), uuid.Nil, false)
+	if !errors.Is(got, dbErr) || unit != nativeUnit || deps.calls != 1 || database.calls != 1 {
+		t.Fatalf("legacy empty-unit behavior changed: err=%v unit=%s native=%d db=%d", got, unit, deps.calls, database.calls)
+	}
+}

@@ -14,7 +14,7 @@ type SupportAuditContext struct {
 }
 
 // SessionPolicies are instance-scoped owner projections. Nil callbacks select
-// native behavior only; a configured callback error is final, never a fallback.
+// the existing compatibility path during rollout; a configured callback error is final, never a fallback.
 type SessionPolicies struct {
 	SupportAudit func(context.Context) (SupportAuditContext, error) `json:"-"`
 	// DefaultUnit reports handled for every selected owner, including invalid or
