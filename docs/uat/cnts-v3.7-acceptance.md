@@ -80,3 +80,24 @@ Nguồn và giới hạn: [giả định W11.48](../kn/gia-dinh/W11.48.md) (Q-07
 
 Chưa nghiệm thu: ghi ngoại tuyến trên App xã (entity `pf/sync`), nông hộ tự ghi (W11.55), cảnh báo quá hạn ghi (dòng 10),
 NC-11 cập nhật lịch tiêm BM-07, chuẩn kỹ thuật theo mẫu (UR-TINH-07), Mẫu 05 lấy thực tế (W11.53), bản đồ vị trí (W11.52).
+
+## Bản đồ vùng nuôi, vùng dịch W11.52
+
+Nguồn và giới hạn: [giả định W11.52](../kn/gia-dinh/W11.52.md) (bán kính mặc định 500 m/3 km/10 km là giả định; Xã chỉ xem theo BRD).
+
+| Tiêu chí | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| ★ UR-TINH-17 B3–B4: vẽ vùng chăn nuôi/thủy sản/dịch/uy hiếp/đệm (đa giác hoặc bán kính) và hướng di chuyển; hình PostGIS 4326 hợp lệ — đa giác tự cắt, vòng hở, ngoài Việt Nam bị chặn ở ứng dụng và ràng buộc DB | `TestCNTSMap_W1152`, `TestZoneNormalize` | G1 |
+| ★ Khoanh vùng từ ổ dịch BM-10 (W11.49): vùng dịch 500 m, vùng bị uy hiếp 3 km, vùng đệm 10 km (đổi được, tăng dần), gắn ổ dịch và vùng cha; gọi lặp không ghi thêm | `TestCNTSMap_W1152` | G1 |
+| ★ Đối tượng trong vùng đệm: điểm trình diễn, hộ mô hình (W11.47) và ổ dịch nằm trong vùng 3 km/10 km, kèm khoảng cách | `TestCNTSMap_W1152` | G1 |
+| ★ FN-18 BR-01, AC-03: vùng lưu theo ngày áp dụng; chọn ngày cũ thấy phiên bản của ngày đó; sửa là phiên bản mới có lý do và khóa lạc quan; ngưng/khôi phục không xóa dòng nào | `TestCNTSMap_W1152`; Vitest `src/kn/cnts/map/map.test.ts` | G1 |
+| ★ FN-18 AC-01: ổ dịch đã xác nhận hiện ngay trên lớp bản đồ (đọc trực tiếp sổ BM-10 theo ngày) | `TestCNTSMap_W1152` (lớp `outbreaks`) | G1 |
+| ★ FN-18 AC-02: Cấp Xã chỉ thấy vùng, ổ dịch, điểm, hộ của xã mình; không vẽ được | `TestCNTSMap_W1152` | G1 |
+| Ma trận quyền FN-18: viên chức chuyên môn vẽ/sửa; lãnh đạo phòng chỉ xem; ngữ cảnh chỉ xem bị chặn; xã ngoài tỉnh bị chặn | `TestCNTSMap_W1152` | G1 |
+| Cách ly tenant (RLS): tenant khác không thấy vùng, ổ dịch, điểm, hộ | `TestCNTSMap_W1152` | G1 |
+| Lớp HTX chỉ qua công bố (thống kê thửa theo xã), KN không đọc bảng HTX | `go run ./tools/knboundary` (không tăng) | G1 |
+| Màn `/kn/cnts/ban-do-dich`: lớp bật/tắt, thanh trượt ngày, vẽ/sửa/ngưng, khoanh từ ổ dịch, GeoJSON lên/xuống; menu Tỉnh/Xã | Vitest `map.test.ts`; `TestWebMenuFixture`; `kn-menu.contract.test.ts` | G1 |
+
+Chưa nghiệm thu: tải KML, xuất ảnh, lớp cơ sở giết mổ, ranh giới xã, hình thửa/ranh giới HTX (cần công bố có hình học — ticket
+làn shared); cảnh báo "vẽ ngoài ranh giới" chỉ hoạt động khi `pf/geo` có ranh giới xã (chưa có kiểm thử DB với ranh giới thật);
+luồng trình duyệt chưa có Playwright.
