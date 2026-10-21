@@ -47,7 +47,7 @@ func (s *Service) prepare(ctx context.Context, a *actor, in CreateInput) (prepar
 	if err != nil {
 		return prepared{}, fieldProblem(err)
 	}
-	roles, err := domain.NormalizeRoles(in.Roles)
+	roles, err := domain.NormalizeRolesWithCatalog(in.Roles, s.RoleCatalog())
 	if err != nil {
 		return prepared{}, fieldProblem(err)
 	}
@@ -61,7 +61,7 @@ func (s *Service) prepare(ctx context.Context, a *actor, in CreateInput) (prepar
 	if err != nil {
 		return prepared{}, err
 	}
-	if err := domain.RolesFitOrg(roles, string(o.Kind)); err != nil {
+	if err := domain.RolesFitOrgWithCatalog(roles, string(o.Kind), s.RoleCatalog()); err != nil {
 		return prepared{}, fieldProblem(err)
 	}
 	return prepared{prof: prof, roles: roles, org: o.Ref}, nil
@@ -108,7 +108,7 @@ func (s *Service) create(ctx context.Context, a *actor, in CreateInput) (Result,
 	if err := s.checkUnique(ctx, a, pr.prof); err != nil {
 		return Result{}, err
 	}
-	acts := domain.RequiredActions(pr.roles)
+	acts := domain.RequiredActionsWithCatalog(pr.roles, s.RoleCatalog())
 	id, err := s.Dir.CreateUser(ctx, port.NewUser{
 		Username: pr.prof.Username, Email: pr.prof.Email, FirstName: pr.prof.FirstName, LastName: pr.prof.LastName,
 		Phone: pr.prof.Phone, TenantID: a.p.TenantID, OrgRef: pr.org, RequiredActions: acts,
@@ -388,7 +388,7 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (Result, error) {
 	}
 	newRoles := t.roles
 	if in.Roles != nil {
-		if newRoles, err = domain.NormalizeRoles(in.Roles); err != nil {
+		if newRoles, err = domain.NormalizeRolesWithCatalog(in.Roles, s.RoleCatalog()); err != nil {
 			return Result{}, fieldProblem(err)
 		}
 		if err := a.checkGrant(newRoles); err != nil {
@@ -413,7 +413,7 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := domain.RolesFitOrg(newRoles, string(o.Kind)); err != nil {
+	if err := domain.RolesFitOrgWithCatalog(newRoles, string(o.Kind), s.RoleCatalog()); err != nil {
 		return Result{}, fieldProblem(err)
 	}
 	if orgRef != t.user.OrgRef {
@@ -440,7 +440,7 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (Result, error) {
 	}
 	totp := false
 	// D24: cấp thêm vai bắt TOTP lúc đăng nhập (vai [MFA] hoặc cán bộ KN) mà chưa có TOTP → đăng ký ở lần sau.
-	if port.NeedsLoginTOTP(newRoles) && !port.NeedsLoginTOTP(t.roles) {
+	if s.RoleCatalog().NeedsLoginTOTP(newRoles) && !s.RoleCatalog().NeedsLoginTOTP(t.roles) {
 		has, err := s.Dir.HasOTP(ctx, t.user.ID)
 		if err != nil {
 			return Result{}, dirErr(err)

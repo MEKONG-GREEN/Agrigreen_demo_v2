@@ -189,11 +189,16 @@ func (h Handler) grants(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	g := port.Grantable(p.Roles)
+	catalog := h.Svc.RoleCatalog()
+	if !catalog.Valid() {
+		httpx.Fail(c, app.ErrDependency)
+		return
+	}
+	g := catalog.Grantable(p.Roles)
 	if g == nil {
 		g = []string{}
 	}
-	c.JSON(http.StatusOK, gin.H{"grantable": g, "mfa_roles": port.MFARoles, "role_org_kinds": port.RoleOrgKinds})
+	c.JSON(http.StatusOK, gin.H{"grantable": g, "mfa_roles": catalog.MFARoles(), "role_org_kinds": catalog.RoleOrgKinds()})
 }
 
 type createReq struct {

@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-ROLE-CATALOG (#66, con #52): catalog vai realm/MFA bất biến theo instance, đăng ký bổ sung không ghi đè quyền native; consumer HTTP và ghi cùng snapshot. Giữ bridge KN đến khi adapter chủ ứng dụng được kiểm. Chờ kiểm thật và Claude Review OK.

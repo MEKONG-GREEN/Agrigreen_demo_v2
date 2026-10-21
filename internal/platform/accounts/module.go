@@ -39,6 +39,8 @@ const DBRole = "accounts_app"
 
 // Deps là phụ thuộc của module.
 type Deps struct {
+	// Roles is an immutable server-side realm-role catalog; nil retains compatibility.
+	Roles           *port.RoleCatalog
 	Navigation      partyport.Navigation // registered application context landing
 	SessionPolicies port.SessionPolicies // trusted application-owned request projections
 	// Sessions contains trusted application-owned projections for selected requests.
@@ -71,8 +73,14 @@ type Module struct {
 
 // New tạo module với pool của vai accounts_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
+	if d.Roles == nil {
+		d.Roles = port.LegacyRoleCatalog()
+	}
+	if !d.Roles.Valid() {
+		panic("accounts: invalid role catalog configuration")
+	}
 	db = forModule(db)
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs, Navigation: d.Navigation,
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs, Navigation: d.Navigation, Roles: d.Roles,
 		Households: d.Households, Vault: d.Vault, Params: d.Params, SessionPolicies: d.SessionPolicies, Departments: d.Departments, Units: d.Units, Names: d.Names,
 		Modules: d.Modules, DormantDryRun: d.DormantDryRun}, sessions: d.Sessions}
 }

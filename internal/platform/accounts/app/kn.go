@@ -169,15 +169,16 @@ func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.Assig
 
 // knTarget là tài khoản đích của thao tác gán vai trò.
 type knTarget struct {
-	user  port.User
-	realm []string
-	tg    *target
+	catalog *port.RoleCatalog
+	user    port.User
+	realm   []string
+	tg      *target
 }
 
 // state là trạng thái tài khoản ở pf với vai do module quản lý theo realm hiện hành.
 func (t *knTarget) state() domain.Account {
 	acc := t.tg.state()
-	acc.Roles = domain.ManagedOf(t.realm)
+	acc.Roles = domain.ManagedOfWithCatalog(t.realm, t.catalog)
 	return acc
 }
 
@@ -196,7 +197,7 @@ func (s *Service) knTarget(ctx context.Context, a *actor, id uuid.UUID) (*knTarg
 	if t.acc != nil && !t.acc.Enabled {
 		return nil, ErrState.WithDetail("Tài khoản đang bị khóa.")
 	}
-	return &knTarget{user: t.user, realm: realm, tg: t}, nil
+	return &knTarget{user: t.user, realm: realm, tg: t, catalog: s.RoleCatalog()}, nil
 }
 
 // AssignmentResult là kết quả một thao tác gán vai trò.
@@ -641,7 +642,7 @@ func (s *Service) CreateKNUser(ctx context.Context, in KNCreateInput) (KNCreateR
 		return KNCreateResult{}, err
 	}
 	// D24: mọi tài khoản KN (kn_user) đăng ký TOTP ngay trong liên kết kích hoạt.
-	acts := domain.RequiredActions([]string{port.RoleKNUser})
+	acts := domain.RequiredActionsWithCatalog([]string{port.RoleKNUser}, s.RoleCatalog())
 	id, err := s.Dir.CreateUser(ctx, port.NewUser{Username: prof.Username, Email: prof.Email, FirstName: prof.FirstName,
 		LastName: prof.LastName, Phone: prof.Phone, TenantID: a.p.TenantID, RequiredActions: acts})
 	if err != nil {
@@ -675,7 +676,7 @@ func (s *Service) CreateKNUser(ctx context.Context, in KNCreateInput) (KNCreateR
 		if err != nil {
 			return KNCreateResult{}, err
 		}
-		acc.Roles = domain.ManagedOf(realm)
+		acc.Roles = domain.ManagedOfWithCatalog(realm, s.RoleCatalog())
 		vaultGranted = true
 	}
 	res := KNCreateResult{Warnings: warnings}

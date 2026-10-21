@@ -61,6 +61,8 @@ const DefaultActionsLifespan = 72 * time.Hour
 
 // Service là use case của module.
 type Service struct {
+	// Roles is an immutable server-configured realm-role catalog. Nil keeps the legacy bridge.
+	Roles           *port.RoleCatalog
 	Navigation      partyport.Navigation // final resolver errors never fall back
 	SessionPolicies port.SessionPolicies // instance configuration; no owner payload decoding here
 	DB              tenant.Beginner      // pool vai accounts_app
@@ -149,6 +151,9 @@ func (s *Service) caller(ctx context.Context) (*actor, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !s.RoleCatalog().Valid() {
+		return nil, ErrDependency.WithDetail("chưa cấu hình danh mục vai hợp lệ")
+	}
 	if s.Dir == nil {
 		return nil, ErrDependency.WithCause(errNoDirectoryYet)
 	}
@@ -159,7 +164,7 @@ func (s *Service) caller(ctx context.Context) (*actor, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &actor{p: p, sc: sc, grantable: port.Grantable(p.Roles), orgs: map[uuid.UUID]*partyport.Org{}}, nil
+	return &actor{p: p, sc: sc, grantable: s.RoleCatalog().Grantable(p.Roles), orgs: map[uuid.UUID]*partyport.Org{}}, nil
 }
 
 // org tra tổ chức (có đệm); nil nếu không có.
@@ -282,7 +287,7 @@ func (s *Service) target(ctx context.Context, a *actor, id uuid.UUID) (*target, 
 	if slices.Contains(all, authz.RolePlatformAdmin) && !a.p.Has(authz.RolePlatformAdmin) {
 		return nil, ErrNotGrantable.WithDetail("Tài khoản quản trị nền tảng chỉ quản trị nền tảng thao tác.")
 	}
-	managed := domain.ManagedOf(all)
+	managed := domain.ManagedOfWithCatalog(all, s.RoleCatalog())
 	if err := a.checkGrant(managed); err != nil {
 		return nil, err
 	}

@@ -29,7 +29,7 @@ func (s *Service) mfaStatus(ctx context.Context, u port.User, realm []string) (M
 		return MFAStatus{}, dirErr(err)
 	}
 	return MFAStatus{
-		Required:          port.NeedsLoginTOTP(realm),
+		Required:          s.RoleCatalog().NeedsLoginTOTP(realm),
 		Configured:        has,
 		EnrollmentPending: slices.Contains(u.RequiredActions, port.ActionConfigureTOTP),
 	}, nil
@@ -79,7 +79,7 @@ func (s *Service) ResetTOTP(ctx context.Context, in TOTPResetInput) (Result, err
 		return Result{}, dirErr(err)
 	}
 	pending := slices.Contains(t.user.RequiredActions, port.ActionConfigureTOTP)
-	if removed == 0 && !pending && !port.NeedsLoginTOTP(t.roles) {
+	if removed == 0 && !pending && !s.RoleCatalog().NeedsLoginTOTP(t.roles) {
 		return Result{}, ErrState.WithDetail("Tài khoản chưa cấu hình TOTP.")
 	}
 	if !pending {

@@ -170,13 +170,21 @@ func SplitFullName(full string) (first, last string) {
 
 // NormalizeRoles bỏ trùng, sắp xếp và kiểm vai do module quản lý.
 func NormalizeRoles(roles []string) ([]string, error) {
+	return NormalizeRolesWithCatalog(roles, port.LegacyRoleCatalog())
+}
+
+// NormalizeRolesWithCatalog validates realm roles using one instance catalog.
+func NormalizeRolesWithCatalog(roles []string, catalog *port.RoleCatalog) ([]string, error) {
+	if !catalog.Valid() {
+		return nil, FieldError{Field: "roles", Msg: MsgRoleUnknown}
+	}
 	out := make([]string, 0, len(roles))
 	for _, r := range roles {
 		r = strings.TrimSpace(r)
 		if r == "" {
 			continue
 		}
-		if !port.IsManaged(r) {
+		if !catalog.IsManaged(r) {
 			return nil, FieldError{Field: "roles", Msg: MsgRoleUnknown}
 		}
 		if !slices.Contains(out, r) {
@@ -193,8 +201,13 @@ func NormalizeRoles(roles []string) ([]string, error) {
 // RequiredActions trả required action khi tạo tài khoản: xác minh email, tự đặt
 // mật khẩu, và cấu hình TOTP nếu có vai [MFA] hoặc vai cán bộ KN (D24 — port.LoginTOTPRoles).
 func RequiredActions(roles []string) []string {
+	return RequiredActionsWithCatalog(roles, port.LegacyRoleCatalog())
+}
+
+// RequiredActionsWithCatalog applies the same login policy used by MFA status.
+func RequiredActionsWithCatalog(roles []string, catalog *port.RoleCatalog) []string {
 	acts := []string{port.ActionVerifyEmail, port.ActionUpdatePassword}
-	if port.NeedsLoginTOTP(roles) {
+	if !catalog.Valid() || catalog.NeedsLoginTOTP(roles) {
 		acts = append(acts, port.ActionConfigureTOTP)
 	}
 	return acts
@@ -216,9 +229,14 @@ func CheckActions(actions []string) ([]string, error) {
 
 // ManagedOf lọc vai do module quản lý (bỏ offline_access, vai mặc định…).
 func ManagedOf(roles []string) []string {
+	return ManagedOfWithCatalog(roles, port.LegacyRoleCatalog())
+}
+
+// ManagedOfWithCatalog leaves unmanaged realm roles outside accounts writes.
+func ManagedOfWithCatalog(roles []string, catalog *port.RoleCatalog) []string {
 	var out []string
 	for _, r := range roles {
-		if port.IsManaged(r) {
+		if catalog.IsManaged(r) {
 			out = append(out, r)
 		}
 	}
@@ -231,9 +249,17 @@ func ManagedOf(roles []string) []string {
 
 // RolesFitOrg kiểm ràng buộc vai ↔ loại tổ chức (port.RoleOrgKinds).
 func RolesFitOrg(roles []string, orgKind string) error {
+	return RolesFitOrgWithCatalog(roles, orgKind, port.LegacyRoleCatalog())
+}
+
+// RolesFitOrgWithCatalog checks the registered restrictions before directory writes.
+func RolesFitOrgWithCatalog(roles []string, orgKind string, catalog *port.RoleCatalog) error {
+	if !catalog.Valid() {
+		return FieldError{Field: "roles", Msg: MsgRoleUnknown}
+	}
 	for _, r := range roles {
-		kinds, ok := port.RoleOrgKinds[r]
-		if ok && !slices.Contains(kinds, orgKind) {
+		kinds := catalog.OrgKinds(r)
+		if len(kinds) > 0 && !slices.Contains(kinds, orgKind) {
 			msg := "vai " + r + " chỉ gắn cho tổ chức loại " + strings.Join(kinds, ", ")
 			if r == "coop_manager" {
 				msg = MsgCoopRequired
