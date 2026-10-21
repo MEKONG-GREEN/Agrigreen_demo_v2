@@ -220,3 +220,125 @@ func TestSourceJobPolicyPostgresLifecycle(t *testing.T) {
 		}
 	}
 }
+
+func TestSourceArgsNumericPostgresReplay(t *testing.T) {
+	env := pgtest.Get(t)
+	now := time.Date(2026, 10, 21, 3, 0, 0, 0, time.UTC)
+	principal := sourceTestPrincipal()
+	ctx := sourceTestContext(principal)
+	builder := func(context.Context, port.SourceBuildQuery) (port.SourceData, error) { return port.SourceData{}, nil }
+	policy := port.SourceJobPolicy{Version: 1, ScopeMode: port.SourceScopeTenant,
+		Freeze:       func(_ context.Context, q port.SourceFreezeRequest) (json.RawMessage, error) { return q.SourceArgs, nil },
+		AuthorizeJob: func(context.Context, port.SourceJobAccess) error { return nil },
+	}
+	svc := Service{DB: env.Pool(t, migrations.PF, "reports_app"), Clock: clock.NewFixed(now), Catalog: NewCatalogRegistry(testCatalogRegistration()),
+		Builders: NewSourceBuilderRegistry(port.SourceBuilderRegistration{Source: "example.measure", Build: builder, JobPolicy: &policy})}
+	in := ExportInput{TemplateKey: "example.layout", Format: "xlsx", IdemKey: "number-jsonb-01",
+		SourceArgs: json.RawMessage(`{"small":1.230e-5,"zero":-0,"one":1.00,"large":1234567890123456789012345678901234567890}`)}
+	first, replay, err := svc.RequestExport(ctx, in)
+	if err != nil || replay {
+		t.Fatalf("numeric request: %v", err)
+	}
+	// JSONB expands exponent/scale while preserving the numeric value exactly.
+	svc.Clock = clock.NewFixed(now.Add(time.Hour))
+	again, replay, err := svc.RequestExport(ctx, in)
+	if err != nil || !replay || first.ID != again.ID || !bytes.Equal(first.SourceArgs.Args, again.SourceArgs.Args) {
+		t.Fatalf("exact number changed through JSONB: %v", err)
+	}
+	in.SourceArgs = json.RawMessage(`{"small":0.00001230,"zero":0,"one":1,"large":123456789012345678901234567890123456789e1}`)
+	if _, replay, err = svc.RequestExport(ctx, in); err != nil || !replay {
+		t.Fatalf("equivalent decimal spelling changed snapshot: %v", err)
+	}
+}
+
+type sourceDeliverySpyStore struct {
+	objstore.Store
+	calls int
+}
+
+func (s *sourceDeliverySpyStore) PresignGet(context.Context, string, time.Duration) (string, error) {
+	s.calls++
+	return "https://files.test/should-not-send", nil
+}
+
+type sourceDeliverySpyMailer struct{ calls int }
+
+func (m *sourceDeliverySpyMailer) Send(context.Context, port.Message) error { m.calls++; return nil }
+
+type sourceDeliveryDirectory struct{}
+
+func (sourceDeliveryDirectory) EmailOf(context.Context, uuid.UUID, uuid.UUID) (string, error) {
+	return "fixture@example.test", nil
+}
+
+func TestSourcePolicyPendingScheduledDeliveryDenied(t *testing.T) {
+	env := pgtest.Get(t)
+	now := time.Date(2026, 10, 21, 3, 0, 0, 0, time.UTC)
+	for _, withPolicy := range []bool{true, false} {
+		principal := sourceTestPrincipal()
+		ctx := sourceTestContext(principal)
+		svc := ownerPolicyService(now, func(context.Context, port.SourceJobAccess) error { return problem.Forbidden },
+			func(context.Context, port.SourceBuildQuery) (port.SourceData, error) {
+				t.Fatal("delivery called source builder")
+				return port.SourceData{}, nil
+			})
+		if !withPolicy {
+			svc.Builders = nil
+		}
+		svc.DB = env.Pool(t, migrations.PF, "reports_app")
+		spy := &sourceDeliverySpyStore{}
+		mailer := &sourceDeliverySpyMailer{}
+		svc.Store, svc.Mailer, svc.Directory = spy, mailer, sourceDeliveryDirectory{}
+		sid := ids.New()
+		slot := "2026-10"
+		sch := domain.Schedule{ID: sid, TenantID: principal.TenantID, TemplateKey: "example.layout", Format: "xlsx",
+			Params: domain.Params{Level: "province"}, Frequency: domain.FreqMonthly, DayOfMonth: 1, Hour: 10, Recipients: []uuid.UUID{principal.ActorRef},
+			OwnerRef: principal.ActorRef, OwnerRoles: principal.Roles, ScopeAll: true, Active: true, CreatedAt: now, UpdatedAt: now, IdemKey: "pending-schedule"}
+		template, _ := svc.builtinTemplate("example.layout")
+		j := domain.Job{ID: ids.New(), TenantID: principal.TenantID, TemplateKey: template.Key, TemplateVersion: template.Version, Def: template.Def, Format: "xlsx",
+			Params: domain.Params{Level: "province"}, ScopeAll: true, RequestedBy: principal.ActorRef, RequestedAt: now,
+			Trigger: domain.TriggerSchedule, ScheduleID: &sid, ScheduleSlot: &slot, IdemKey: "pending-schedule-job"}
+		if !withPolicy {
+			j.SourceArgs = &domain.FrozenSourceArgs{Source: j.Def.Source, Version: 1, JobID: j.ID, TenantID: j.TenantID, RequestedBy: j.RequestedBy, RequestedAt: j.RequestedAt,
+				TemplateKey: j.TemplateKey, TemplateVersion: j.TemplateVersion, Format: j.Format, Args: json.RawMessage("{}")}
+		}
+		if err := svc.tx(ctx, principal.TenantID, func(tx pgx.Tx) error {
+			if err := store.InsertSchedule(ctx, tx, &sch); err != nil {
+				return err
+			}
+			if err := store.InsertJob(ctx, tx, &j); err != nil {
+				return err
+			}
+			if _, err := store.ClaimRun(ctx, tx, principal.TenantID, store.Run{ScheduleID: sid, SlotKey: slot, SlotAt: now, Status: "queued", JobID: &j.ID, FiredAt: now}); err != nil {
+				return err
+			}
+			return store.CompleteJob(ctx, tx, j.ID, domain.ObjectKey(j.TenantID, j.ID, j.Format), "checksum", 10, 1, false, now)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		scheduleRef := sid.String()
+		payload, _ := json.Marshal(port.ExportCompletedV1{JobID: j.ID.String(), ScheduleID: &scheduleRef})
+		for repeat := 0; repeat < 2; repeat++ {
+			if err := svc.tx(ctx, principal.TenantID, func(tx pgx.Tx) error {
+				return svc.HandleExportCompleted(ctx, tx, outbox.Envelope{TenantID: principal.TenantID, Payload: payload})
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if spy.calls != 0 || mailer.calls != 0 {
+			t.Fatalf("custom pending delivery escaped: presign=%d mail=%d", spy.calls, mailer.calls)
+		}
+		if err := svc.tx(ctx, principal.TenantID, func(tx pgx.Tx) error {
+			run, err := store.RunByJob(ctx, tx, j.ID)
+			if err != nil {
+				return err
+			}
+			if run.DeliveryStatus == nil || *run.DeliveryStatus != DeliverySkipped || run.SentCount == nil || *run.SentCount != 0 {
+				t.Fatal("delivery denial was not durably recorded")
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

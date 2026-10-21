@@ -8,7 +8,7 @@ Dùng SourceBuilderRegistration.JobPolicy cùng builder hiện có; không thêm
 
 ExportInput.SourceArgs và trường HTTP source_args chỉ nhận JSON object tối đa 16 KiB, sâu tối đa 16; cấm khóa trùng, JSON nối tiếp, UTF-8 hỏng và khóa _reports_source. Nguồn không đăng ký policy từ chối SourceArgs thay vì bỏ qua. Owner Freeze phải giải lược đồ đóng, cấm trường identity/tenant/scope do client truyền, kiểm ngày/mã, chuẩn hóa mặc định theo RequestedAt. Freeze nhận JobID/TenantID/RequestedBy/RequestedAt/Source/TemplateKey/Format do server lập; không thể trả lại các trường này.
 
-Snapshot trong Job.SourceArgs mang json:"-". Codec lưu phần riêng _reports_source trong cột params JSONB hiện có, không thêm migration. Snapshot ràng buộc source/version/job/tenant/requester/time/mẫu/phiên bản/định dạng. Native Params không có snapshot giữ byte marshal cũ. Cổng đọc chuẩn hóa lại JSON object sau PostgreSQL JSONB để replay không phụ thuộc thứ tự khóa của DB. Thời điểm truyền cho owner được chuẩn UTC kể cả khi PostgreSQL trả timestamptz theo múi giờ máy. Các trường Params không biết vẫn theo hợp đồng native bị bỏ qua và không thể thay snapshot riêng. Không trả snapshot qua DTO, event, lỗi hoặc log.
+Snapshot trong Job.SourceArgs mang json:"-". Codec lưu phần riêng _reports_source trong cột params JSONB hiện có, không thêm migration. Snapshot ràng buộc source/version/job/tenant/requester/time/mẫu/phiên bản/định dạng. Native Params không có snapshot giữ byte marshal cũ. Cổng đọc chuẩn hóa lại JSON object sau PostgreSQL JSONB để replay không phụ thuộc thứ tự khóa của DB. Thời điểm truyền cho owner được chuẩn UTC kể cả khi PostgreSQL trả timestamptz theo múi giờ máy. Số JSON được chuẩn theo hệ số nguyên và số mũ chính xác, không float64; chặn số mũ gây phình bản in vượt giới hạn trước khi cấp phát. Các trường Params không biết vẫn theo hợp đồng native bị bỏ qua và không thể thay snapshot riêng. Không trả snapshot qua DTO, event, lỗi hoặc log.
 
 SourceBuildQuery bổ sung JobID, RequestedBy, ArgsVersion và SourceArgs được sao chép từ việc xuất thực. Các slice/JSON đều sao chép qua ranh giới callback.
 
@@ -28,7 +28,7 @@ Owner callback/Builder có private args phải không tiết lộ dữ liệu tr
 
 Request vẫn đi DLP và ghi job + outbox nguyên tử. Download kiểm lại quyền trước điểm DLP và trước URL ngắn hạn. Worker kiểm envelope khớp job thực, kiểm owner trước builder rồi dùng render/object store/completion ledger hiện có. Các sự kiện chỉ chứa metadata job, không có args.
 
-Nguồn policy-enabled chưa được lập lịch: tạo mới, replay lịch cũ và fire lịch đều từ chối. Deactivate lịch cũ vẫn được phép theo quyền hiện hành. Cần hợp đồng freeze từng lượt và owner authority của scheduler trước khi bật.
+Nguồn policy-enabled chưa được lập lịch: tạo mới, replay lịch cũ, fire lịch và delivery pending của nguồn mới bật policy đều từ chối. Delivery pending được ghi skipped bền vững trước presign/email, kể cả khi policy bị gỡ nhưng job còn snapshot riêng. Deactivate lịch cũ vẫn được phép theo quyền hiện hành. Cần hợp đồng freeze từng lượt và owner authority của scheduler trước khi bật.
 
 ## Kiểm thử
 

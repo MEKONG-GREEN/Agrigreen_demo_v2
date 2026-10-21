@@ -58,6 +58,11 @@ func (s *Service) HandleExportCompleted(ctx context.Context, tx pgx.Tx, env outb
 	mark := func(status, note string, sent int) error {
 		return store.MarkDelivered(ctx, tx, sch.ID, run.SlotKey, status, note, sent, s.now())
 	}
+	// A source enabled after an old scheduled job completed must not deliver
+	// its pending artifact without the unsupported per-run owner authorization.
+	if _, enabled := s.Builders.jobPolicy(j.Def.Source); enabled || j.SourceArgs != nil {
+		return mark(DeliverySkipped, "nguồn báo cáo chưa hỗ trợ lịch gửi", 0)
+	}
 	switch {
 	case s.Directory == nil:
 		lg.Warn("bỏ gửi email: chưa nối danh bạ email (pf/accounts)", "outcome", "skipped")
