@@ -18,6 +18,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	sessionport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -58,7 +60,7 @@ func newFixture(t *testing.T) *fixture {
 	env := pgtest.Get(t)
 	now := time.Date(2026, 10, 20, 3, 0, 0, 0, time.UTC)
 	mod, err := hrm.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(now),
-		port.Access{Department: "hanh_chinh_tong_hop", ManageBy: []string{"admin"}, ReadBy: []string{"kn_tinh"}})
+		port.Access{Session: extension.HRMSession, Department: "hanh_chinh_tong_hop", ManageBy: []string{"admin"}, ReadBy: []string{"kn_tinh"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,6 +75,9 @@ func newFixture(t *testing.T) *fixture {
 			InternalUnit: "hcth", UnitRef: org}},
 		"vc_tt": {ActorRef: ids.New(), TenantID: f.tid, KN: &authz.KNContext{Role: "kn_tinh", Department: "trong_trot",
 			InternalUnit: "trong_trot", UnitRef: org}},
+	}
+	for as, p := range f.who {
+		f.who[as] = bindSession(t, p)
 	}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -89,6 +94,37 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	return f
+}
+
+// bindSession gắn ngữ cảnh fixture vào phiên chủ KN thật (registry + bộ mã chủ phiên của pf/extension), như middleware
+// pf/accounts ở production dựng từ Bearer + X-AG-Context — mẫu của KNSPLIT-2-CONTEXT-I. Mã ngữ cảnh sinh ở đây chỉ
+// dùng cho kiểm thử; pf/hrm không còn đọc Principal.KN.
+func bindSession(t *testing.T, p authz.Principal) authz.Principal {
+	t.Helper()
+	if p.KN == nil {
+		return p
+	}
+	kc := *p.KN
+	if kc.ID == uuid.Nil {
+		kc.ID = ids.New()
+	}
+	p.KN = &kc
+	registry, err := authz.NewSessionRegistry(authz.SessionRegistration{Profile: "kn", Project: func(_ context.Context, p authz.Principal) (authz.Session, bool, error) {
+		k := p.KN
+		selected, err := sessionport.NewSessionContext(sessionport.SessionContext{ID: k.ID, Role: k.Role, Department: k.Department,
+			OrgRef: k.OrgRef, UnitRef: k.UnitRef, Communes: k.Communes, Scope: k.Scope, Duties: k.Duties, InternalUnit: k.InternalUnit,
+			Manager: k.Manager, ViewOnly: k.ViewOnly})
+		return selected, true, err
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := registry.ResolveSelected(context.Background(), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.SelectedSession = &selected
+	return p
 }
 
 func (f *fixture) cfg(as, report string, commit, skip bool) Config {
