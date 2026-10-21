@@ -16,4 +16,9 @@ Danh mục quyền ủy quyền và KNContext.Can vẫn dùng bridge cũ. Không
 
 ## Kiểm tra
 
-Có ca thuần cho snapshot/clone/hai instance, cấu hình lỗi, xung đột CSV, mã lưu không còn hợp lệ, valid role × level × group × own/other/empty department parity, tổ hợp sai role/group bị từ chối, read-only không phụ thuộc quyền quản lý, chuẩn hóa UUID/giới hạn/khử trùng lặp, thứ tự lỗi native. Ca HTTP PostgreSQL kiểm catalog/nhãn riêng, thay thuộc tính có hiệu lực ngay với context cũ, chỉ xem ở phòng mình/phòng khác, ngừng phòng và thu hồi lần gán. Kết quả thực tế sẽ bổ sung sau khi chạy.
+Có ca thuần cho snapshot/clone/hai instance, cấu hình lỗi, xung đột CSV, mã lưu không còn hợp lệ, valid role × level × group × own/other/empty department parity, tổ hợp sai role/group bị từ chối, read-only không phụ thuộc quyền quản lý, chuẩn hóa UUID/giới hạn/khử trùng lặp, thứ tự lỗi native. Ca HTTP PostgreSQL kiểm catalog/nhãn riêng, thay thuộc tính có hiệu lực ngay với context cũ, chỉ xem ở phòng mình/phòng khác, ngừng phòng và thu hồi lần gán. Kết quả thực tế 21/10/2026 (Go 1.26.9):
+- Lượt đầy đủ accounts/... + api-platform/assembly ban đầu exit 1 chỉ vì ba lỗi fixture mới: assertion CSV coi mã chuẩn hóa là fallback nhãn, thiếu Clock trong test thứ tự lỗi, HasDuty được kỳ vọng true ở context chỉ xem. Log thất bại được giữ nguyên.
+- Sau khi tất cả runner kết thúc, chỉ sửa hai tệp test; production giữ nguyên commit 27190e2d. Full app kiểm lại exit 0/2.023s; ca HTTP PostgreSQL kiểm lại exit 0/92.508s, test 0.46s, không SKIP/INFRA.
+- Production không đổi: các ca handler cũ đã PASS trong lượt 114.997s; domain 1.896s, keycloak 1.213s, port 1.010s, api-platform/assembly 86.707s PASS. Không chạy lại các gói đã đạt.
+- build/vet/modgen-check/migratecheck/archlint/contractcheck/docscheck/knboundary đều exit 0; vet accounts và lint toàn repo sau sửa fixture đều 0 (0 issues). Boundary giữ 314, gofmt chỉ hai testdata archlint có sẵn; 35 golden KHTC không đổi.
+- Hai cụm PG riêng 52913/fcb100e07162 và 56767/b65c73023271 đã dừng và dọn; không chạm PG chung.
