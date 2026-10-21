@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"strings"
 	"testing"
 	"time"
@@ -83,7 +82,7 @@ func TestSourcePolicyBindsRequestReplayAndHidesErrors(t *testing.T) {
 	}
 	svc := ownerPolicyService(now, func(_ context.Context, a port.SourceJobAccess) error {
 		calls++
-		if a.ActorRef != p.ActorRef || a.TenantID != p.TenantID {
+		if (a.Operation != port.SourceJobBuild && a.ActorRef != p.ActorRef) || (a.Operation == port.SourceJobBuild && a.ActorRef != uuid.Nil) || a.TenantID != p.TenantID {
 			t.Fatal("owner identity not verified")
 		}
 		a.SourceArgs[2] = 'X'
@@ -135,5 +134,4 @@ func TestSourcePolicyBindsRequestReplayAndHidesErrors(t *testing.T) {
 	if _, err = native.buildDataset(ctx, domain.Job{Def: tpl.Def, TenantID: p.TenantID}); err == nil || !strings.Contains(err.Error(), "private-marker") {
 		t.Fatal("native builder errors changed")
 	}
-	_ = io.EOF // keep explicit source decoder ownership visible in this test.
 }
