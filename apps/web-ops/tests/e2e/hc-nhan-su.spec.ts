@@ -27,7 +27,8 @@ async function enterHcth(page: Page, label: string): Promise<void> {
   await logout(page);
   await submitLogin(page, "hung.tq@angiang.gov.vn");
   await expect(accountMenu(page)).toContainText("Trần Quốc Hưng");
-  await menuNav(page).getByRole("link", { name: label, exact: true }).click();
+  // "Dashboard nhân sự" có ở cả nhóm lãnh đạo phòng và nhóm HCTH của menu Cấp Tỉnh — cùng một đường dẫn.
+  await menuNav(page).getByRole("link", { name: label, exact: true }).first().click();
 }
 
 test("hc-hs-tl: Hồ sơ nhân viên → Thông tin làm việc, cập nhật ngày nghỉ việc → NS01/NS02 ở chi tiết", async ({ page }) => {
@@ -35,7 +36,7 @@ test("hc-hs-tl: Hồ sơ nhân viên → Thông tin làm việc, cập nhật ng
   await expect(page.getByRole("heading", { level: 1, name: "Hồ sơ nhân sự" })).toBeVisible();
   const staff = page.locator("table.dt").first();
   await expect(staff.getByRole("columnheader", { name: "Trình độ cao nhất" })).toBeVisible();
-  await expect(staff.getByRole("link", { name: "VC-00001" })).toBeVisible();
+  await expect(staff.getByRole("link", { name: "VC-00001", exact: true })).toBeVisible();
   await expect(page.getByLabel("Ngạch/CDNN", { exact: true })).toBeVisible();
 
   await page.getByRole("link", { name: "Thông tin làm việc", exact: true }).click();
