@@ -477,6 +477,9 @@ type UserView struct {
 	Tracked   bool // có trong pf_accounts (tạo hoặc thao tác qua nền tảng)
 	// MFA: trạng thái TOTP (chỉ ở Get — đọc thêm Keycloak; D24).
 	MFA *MFAStatus
+	// LoginLocked is runtime Keycloak lockout, queried only for the authorized detail view.
+	// Nil means not queried (list/create); it is distinct from administratively disabled.
+	LoginLocked *bool
 }
 
 // Get đọc một tài khoản trong phạm vi.
@@ -504,6 +507,11 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (UserView, error) {
 		return UserView{}, err
 	}
 	v.MFA = &m
+	locked, err := s.Dir.BruteForceLocked(ctx, id)
+	if err != nil {
+		return UserView{}, dirErr(err)
+	}
+	v.LoginLocked = &locked
 	return v, nil
 }
 

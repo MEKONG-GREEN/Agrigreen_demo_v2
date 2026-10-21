@@ -72,6 +72,8 @@ type userDTO struct {
 	Tracked         bool     `json:"tracked"`
 	// MFA chỉ có ở GET /v1/accounts/users/{id} (D24).
 	MFA *mfaDTO `json:"mfa,omitempty"`
+	// LoginLocked is present only on account detail; false is a verified unlocked state.
+	LoginLocked *bool `json:"login_locked,omitempty"`
 }
 
 type mfaDTO struct {
@@ -101,6 +103,7 @@ func toUserDTO(v app.UserView) userDTO {
 		ID: u.ID.String(), Username: u.Username, Email: u.Email, FirstName: u.FirstName, LastName: u.LastName,
 		Phone: strPtr(u.Phone), Enabled: u.Enabled, EmailVerified: u.EmailVerified, OrgRef: refPtr(u.OrgRef),
 		Roles: v.Roles, LockCause: strPtr(string(v.LockCause)), RequiredActions: u.RequiredActions, Tracked: v.Tracked,
+		LoginLocked: v.LoginLocked,
 	}
 	if d.RequiredActions == nil {
 		d.RequiredActions = []string{}

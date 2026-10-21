@@ -465,6 +465,9 @@ func (m *Memory) LockByBruteForce(id uuid.UUID) {
 func (m *Memory) BruteForceLocked(_ context.Context, id uuid.UUID) (bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.fail("BruteForceLocked"); err != nil {
+		return false, err
+	}
 	u, err := m.get(id)
 	if err != nil {
 		return false, err
