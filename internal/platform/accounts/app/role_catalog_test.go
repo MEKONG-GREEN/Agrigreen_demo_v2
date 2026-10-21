@@ -9,6 +9,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
 func TestRoleCatalogInvalidConfigurationFailsBeforeDependencies(t *testing.T) {
@@ -16,7 +17,8 @@ func TestRoleCatalogInvalidConfigurationFailsBeforeDependencies(t *testing.T) {
 	ctx := authz.WithPrincipal(context.Background(), authz.Principal{
 		ActorRef: ids.New(), TenantID: ids.New(), Roles: []string{authz.RolePlatformAdmin}, MFA: true,
 	})
-	if _, err := s.caller(ctx); !errors.Is(err, ErrDependency) {
+	var p *problem.Problem
+	if _, err := s.caller(ctx); !errors.As(err, &p) || p.Code != ErrDependency.Code || p.Status != ErrDependency.Status {
 		t.Fatalf("invalid configured catalog did not fail closed: %v", err)
 	}
 	if _, err := s.HandleOrgStatus(context.Background(), nil, outbox.Envelope{}); !errors.Is(err, ErrDependency) {
