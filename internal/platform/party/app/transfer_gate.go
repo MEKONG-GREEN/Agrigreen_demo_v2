@@ -206,6 +206,11 @@ func (t *Transfers) ensureRecoveryGates(p port.TransferParticipants, source, tar
 			if err != nil {
 				return err
 			}
+			if _, recorded := target.RecoveryGates[key]; recorded && old == nil {
+				// The map and witness commit together; retaining only the map is
+				// missing evidence, never permission to enter the owner gate again.
+				return port.ErrTransferConflict
+			}
 			if old != nil {
 				var gate port.TransferRecoveryGate
 				if err := json.Unmarshal(old.Document, &gate); err != nil {

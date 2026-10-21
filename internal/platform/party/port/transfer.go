@@ -217,9 +217,14 @@ type TransferFenceRelease struct {
 	Namespace              string
 }
 
-// TransferRecoveryGate is a durable owner phase transition. It keeps the original
-// manifest fence unchanged; the owner atomically drains forward writers using the
-// same fence lock and switches their checked mode to recovery before acknowledging.
+// TransferRecoveryGate is a durable owner phase transition. Every namespace and
+// side must enter, including a scope whose exact holder never acquired a fence.
+// Fence{} acknowledges durable absence under the SAME stable scope lock used by
+// fence acquisition, Export and Apply. It is an immutable tombstone preventing
+// late acquisition by that holder even after its recovery barrier is released.
+// A fence appearing between ReadFenceForRecovery and zero-fence Enter must cause
+// Conflict, so the core rediscovers the actual fence before retrying. The original
+// fence epoch stays unchanged; gate receipts use their own operation/reason.
 type TransferRecoveryGate struct {
 	Ref, OperationID, ReasonRef, IntentID, PlanID uuid.UUID
 	BindingHash                                   TransferDigest
@@ -227,11 +232,19 @@ type TransferRecoveryGate struct {
 	Side                                          TransferSide
 	Namespace                                     string
 }
+
+// TransferRecoveryFenceReader is read-only under fresh recovery authority.
+// NotReady means this exact holder was never created, not unknown retention or
+// database failure; a known core fence missing at its owner must fail closed.
 type TransferRecoveryFenceReader func(context.Context, TransferRecoveryRequest, TransferFenceRequest) (TransferFence, error)
 
 type TransferRecoveryGateWriter func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferRecoveryGate, error)
 type TransferRecoveryGateReader func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferRecoveryGate, error)
 
+// TransferFenceReleaser checks the recovery gate and exact active holder under
+// the same owner transaction as its durable release receipt. A reader must read
+// the immutable historical receipt before checking any newer active holder; an
+// exact old replay returns its old outcome without opening the newer holder.
 type TransferFenceReleaser func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferFenceRelease, error)
 type TransferFenceReleaseReader func(context.Context, TransferRecoveryRequest, TransferFenceRequest, TransferFence) (TransferFenceRelease, error)
 

@@ -65,3 +65,20 @@ func TestTransferProofReplayComparesInstantsAcrossJSONAndZones(t *testing.T) {
 		t.Fatal("different expiry accepted")
 	}
 }
+
+func TestTransferRecoveryProofReplayComparesInstantsAcrossJSONAndZones(t *testing.T) {
+	proof := port.TransferRecoveryProof{PlanID: ids.New(), OperationID: ids.New(), ReasonRef: ids.New(), IdentityRollbackReceipt: ids.New(), RehearsalReceipt: ids.New(), BindingHash: port.TransferDigest(strings.Repeat("a", 64)), ManifestHash: port.TransferDigest(strings.Repeat("b", 64)), CompensationRoot: port.TransferDigest(strings.Repeat("c", 64)), ValidUntil: time.Now().Add(time.Hour)}
+	stored, err := transferClone(proof)
+	if err != nil {
+		t.Fatal(err)
+	}
+	same := proof
+	same.ValidUntil = proof.ValidUntil.In(time.FixedZone("other", -5*60*60))
+	if !sameTransferRecoveryProof(stored, same) {
+		t.Fatal("same recovery proof instant rejected after JSON/zone conversion")
+	}
+	same.ValidUntil = same.ValidUntil.Add(time.Nanosecond)
+	if sameTransferRecoveryProof(stored, same) {
+		t.Fatal("different recovery expiry accepted")
+	}
+}

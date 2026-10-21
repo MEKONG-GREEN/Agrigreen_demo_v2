@@ -123,6 +123,11 @@ func (t *Transfers) releaseOne(p port.TransferParticipants, source, target *stor
 	if err != nil {
 		return err
 	}
+	if target.Plan.Status == "released" && old == nil {
+		// Terminal state can only be replayed from its committed witnesses.
+		// Missing retained evidence must never reopen the release writer.
+		return port.ErrTransferConflict
+	}
 	if old != nil {
 		var receipt port.TransferFenceRelease
 		if err := json.Unmarshal(old.Document, &receipt); err != nil {
