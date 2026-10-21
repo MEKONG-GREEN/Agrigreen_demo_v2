@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"regexp"
 	"slices"
@@ -185,7 +186,7 @@ func (s *Service) Audit(ctx context.Context, in AuditInput) (AuditPage, error) {
 			return AuditPage{}, auditBad("cursor")
 		}
 		var trailing any
-		if err = dec.Decode(&trailing); err != io.EOF {
+		if err = dec.Decode(&trailing); !errors.Is(err, io.EOF) {
 			return AuditPage{}, auditBad("cursor")
 		}
 		if cur.Version != 1 || cur.FilterHash != hash || cur.AsOf.IsZero() || cur.AsOf.After(asOf) || cur.Before.EventRef == uuid.Nil || !slices.Contains(keys, cur.Before.SourceKey) || cur.Before.RecordedAt.Before(in.From) || !cur.Before.RecordedAt.Before(in.To) || cur.Before.RecordedAt.After(cur.AsOf) {
