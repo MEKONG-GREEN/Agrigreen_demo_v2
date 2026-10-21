@@ -72,14 +72,14 @@ const DeptCNTS = partyport.DeptChanNuoiThuySan
 
 // Tham số (pf/masterdata, masterdata_params.json của module) và mặc định.
 const (
-	ParamDistance  = "cnts.location_distance_m"      // 200 m
-	ParamAccuracy  = "cnts.gps_accuracy_m"           // 50 m
-	ParamPHMin     = "cnts.indicator_min:PH"         // 7,5
-	ParamPHMax     = "cnts.indicator_max:PH"         // 8,5
-	ParamDOMin     = "cnts.indicator_min:DO"         // 4 mg/l
-	ParamMortality = "cnts.mortality_max_pct"        // chưa cấu hình → không cảnh báo
-	ParamEditDays  = "cnts.diary_edit_days"          // 7 ngày
-	ParamRetention = "cnts.diary_fix_retention_days" // 365 ngày
+	ParamDistance  = "cnts.location_distance_m"            // 200 m
+	ParamAccuracy  = "cnts.gps_accuracy_m"                 // 50 m
+	ParamPHMin     = "cnts.indicator_min:PH"               // 7,5
+	ParamPHMax     = "cnts.indicator_max:PH"               // 8,5
+	ParamDOMin     = "cnts.indicator_min:DO"               // 4 mg/l
+	ParamMortality = knport.ParamCNTSMortalityPctPrefix    // + ":<loại mô hình>"; chưa cấu hình → không cảnh báo
+	ParamEditDays  = knport.ParamCNTSDiaryEditDays         // 7 ngày
+	ParamRetention = knport.ParamCNTSDiaryFixRetentionDays // 365 ngày
 	SubjectModule  = "pf/extension"
 	SubjectType    = "cnts_household" // chủ thể tệp ảnh nhật ký ở pf/evidence (R-DB-07)
 	// Purpose là mục đích mở DEK ảnh nhật ký (danh mục OpUnwrap của kho định danh; pf/evidence không kiểm đồng ý của hộ —
@@ -137,9 +137,9 @@ func (s *Service) optParam(ctx context.Context, key string) *decimal.Decimal {
 	return &d
 }
 
-func (s *Service) thresholds(ctx context.Context) domain.Thresholds {
+func (s *Service) thresholds(ctx context.Context, modelType string) domain.Thresholds {
 	phMin, phMax, doMin := s.param(ctx, ParamPHMin, "7.5"), s.param(ctx, ParamPHMax, "8.5"), s.param(ctx, ParamDOMin, "4")
-	return domain.Thresholds{PHMin: &phMin, PHMax: &phMax, DOMin: &doMin, MortalityMaxPct: s.optParam(ctx, ParamMortality)}
+	return domain.Thresholds{PHMin: &phMin, PHMax: &phMax, DOMin: &doMin, MortalityMaxPct: s.optParam(ctx, ParamMortality+":"+modelType)}
 }
 
 func (s *Service) editDays(ctx context.Context) int {
