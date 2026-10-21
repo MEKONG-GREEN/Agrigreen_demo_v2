@@ -9554,7 +9554,7 @@ export interface paths {
         /** Chi tiết lần ghi: lịch sử, vị trí so với điểm, ảnh, lần ghi trước, biểu đồ tăng trọng */
         get: operations["extensionCntsDiaryEntryGet"];
         put?: never;
-        /** Sửa lần ghi chưa xác thực (trong cnts.diary_edit_days ngày); submit=true gửi luôn. Mã, lứa, thời điểm, vị trí lúc ghi không sửa */
+        /** Sửa lần ghi chưa xác thực (trong 7 ngày kể từ ngày ghi); submit=true gửi luôn. Mã, lứa, thời điểm, vị trí lúc ghi không sửa */
         post: operations["extensionCntsDiaryEntryUpdate"];
         delete?: never;
         options?: never;

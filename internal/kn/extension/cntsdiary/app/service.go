@@ -72,14 +72,12 @@ const DeptCNTS = partyport.DeptChanNuoiThuySan
 
 // Tham số (pf/masterdata, masterdata_params.json của module) và mặc định.
 const (
-	ParamDistance  = "cnts.location_distance_m"            // 200 m
-	ParamAccuracy  = "cnts.gps_accuracy_m"                 // 50 m
-	ParamPHMin     = "cnts.indicator_min:PH"               // 7,5
-	ParamPHMax     = "cnts.indicator_max:PH"               // 8,5
-	ParamDOMin     = "cnts.indicator_min:DO"               // 4 mg/l
-	ParamMortality = knport.ParamCNTSMortalityPctPrefix    // + ":<loại mô hình>"; chưa cấu hình → không cảnh báo
-	ParamEditDays  = knport.ParamCNTSDiaryEditDays         // 7 ngày
-	ParamRetention = knport.ParamCNTSDiaryFixRetentionDays // 365 ngày
+	ParamDistance  = "cnts.location_distance_m"         // 200 m
+	ParamAccuracy  = "cnts.gps_accuracy_m"              // 50 m
+	ParamPHMin     = "cnts.indicator_min:PH"            // 7,5
+	ParamPHMax     = "cnts.indicator_max:PH"            // 8,5
+	ParamDOMin     = "cnts.indicator_min:DO"            // 4 mg/l
+	ParamMortality = knport.ParamCNTSMortalityPctPrefix // + ":<loại mô hình>"; chưa cấu hình → không cảnh báo
 	SubjectModule  = "pf/extension"
 	SubjectType    = "cnts_household" // chủ thể tệp ảnh nhật ký ở pf/evidence (R-DB-07)
 	// Purpose là mục đích mở DEK ảnh nhật ký (danh mục OpUnwrap của kho định danh; pf/evidence không kiểm đồng ý của hộ —
@@ -142,9 +140,15 @@ func (s *Service) thresholds(ctx context.Context, modelType string) domain.Thres
 	return domain.Thresholds{PHMin: &phMin, PHMax: &phMax, DOMin: &doMin, MortalityMaxPct: s.optParam(ctx, ParamMortality+":"+modelType)}
 }
 
-func (s *Service) editDays(ctx context.Context) int {
-	return int(s.param(ctx, ParamEditDays, "7").IntPart())
-}
+// EditDays: lần ghi đã gửi chưa xác thực sửa được trong 7 ngày kể từ ngày ghi (Mục III.5). FixRetentionDays: hạn lưu tọa độ
+// GPS lúc ghi (tạm 365 ngày, chờ DPIA Q-005). Hằng số trong mã — kho tham số KN đang đóng băng danh mục (pf/masterdata
+// TestParametersRequireRegistration); tham số hóa cần ticket làn shared (gia-dinh/W11.48).
+const (
+	EditDays         = 7
+	FixRetentionDays = 365
+)
+
+func (s *Service) editDays(context.Context) int { return EditDays }
 
 // caller là người gọi đã giải ngữ cảnh phiên KN.
 type caller struct {

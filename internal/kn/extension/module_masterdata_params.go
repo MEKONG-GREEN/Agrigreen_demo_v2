@@ -34,7 +34,5 @@ func MasterdataParams() mdport.ParamRegistration {
 		{Key: extport.ParamCNTSGPSAccuracyM, Name: "Sai số GPS tối đa của lần ghi", Unit: "m", Kind: mdport.ParamKindDecimal, Min: "0", Max: "1000"},
 		{Key: extport.ParamCNTSLogOverdueDays, Name: "Quá hạn ghi nhật ký: số ngày thêm sau tần suất", Unit: "ngày", Kind: mdport.ParamKindDecimal, Min: "0", Max: "30"},
 		{Key: extport.ParamCNTSMortalityPctPrefix, Name: "Tỷ lệ chết tối đa theo loại mô hình", Unit: "%", Kind: mdport.ParamKindDecimal, Min: "0", Max: "100", Dimensional: true},
-		{Key: extport.ParamCNTSDiaryEditDays, Name: "Nhật ký: số ngày được sửa lần ghi đã gửi chưa xác thực", Unit: "ngày", Kind: mdport.ParamKindDecimal, Min: "0", Max: "60"},
-		{Key: extport.ParamCNTSDiaryFixRetentionDays, Name: "Nhật ký: hạn lưu tọa độ GPS lúc ghi", Unit: "ngày", Kind: mdport.ParamKindDecimal, Min: "1", Max: "3650"},
 	}, Seeds: seeds}
 }

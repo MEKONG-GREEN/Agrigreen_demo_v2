@@ -16,7 +16,7 @@ ghi nhật ký của hộ / không phải chủ nhiệm, lãnh đạo phòng), `
 | 422 | `extension.cnts_diary_entry_blocked` | Gửi/điều chỉnh vi phạm quy tắc chặn: NC-05 số sống ≠ sống lần trước − chết − xuất bán trong ngày; NC-06 > 0 thiếu NC-07; BM-19 cân đo thiếu ảnh cân mẫu (NT-13); có cảnh báo môi trường nước thiếu biện pháp (NT-12). `errors[]` nêu từng quy tắc |
 | 409 | `extension.cnts_diary_entry_version_conflict` | `base_version` khác phiên bản hiện hành |
 | 409 | `extension.cnts_diary_entry_state` | Thao tác không hợp lệ ở trạng thái hiện tại (vd xác thực bản nháp/yêu cầu bổ sung, điều chỉnh bản chưa xác thực) |
-| 409 | `extension.cnts_diary_entry_locked` | Sửa lần ghi đã xác thực (dùng Điều chỉnh) hoặc lần ghi đã gửi quá `cnts.diary_edit_days` ngày |
+| 409 | `extension.cnts_diary_entry_locked` | Sửa lần ghi đã xác thực (dùng Điều chỉnh) hoặc lần ghi đã gửi quá 7 ngày |
 | 409 | `extension.cnts_diary_entry_day_taken` | BM-08/09: lứa đã có lần ghi của ngày ghi |
 | 403 | `extension.cnts_diary_self_verify` | Người xác thực là người ghi (hoặc đã tạo/sửa/gửi lần ghi) |
 | 422 | `extension.cnts_diary_photo_invalid` | Ảnh rỗng, > 500 KB, không phải JPEG/PNG/WebP, loại ảnh sai, thời điểm chụp ở tương lai, mã ảnh đã dùng cho hộ khác |

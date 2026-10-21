@@ -1,7 +1,7 @@
 package app
 
 // Lần ghi nhật ký (UR-XA-11, UR-XA-12) và rà soát, xác thực (UR-TINH-12, FN-13). Vòng đời Mục III.5: Lưu nháp → Đã gửi →
-// Đã xác thực; Đã gửi → Yêu cầu bổ sung (lý do) → Đã gửi. Chưa xác thực: sửa trong cnts.diary_edit_days (7) ngày kể từ
+// Đã xác thực; Đã gửi → Yêu cầu bổ sung (lý do) → Đã gửi. Chưa xác thực: sửa trong 7 ngày (EditDays) kể từ
 // ngày ghi; đã xác thực không sửa — điều chỉnh tạo phiên bản 'corrected' có lý do, chờ xác thực lại (AC-04).
 //
 // Vị trí (NT-15, NC-16): tọa độ thiết bị gửi kèm LẦN TẠO, không đổi ở phiên bản sau. Tọa độ vào bảng thường
@@ -330,7 +330,7 @@ func (s *Service) CreateEntry(ctx context.Context, in EntryInput) (EntryView, er
 	}
 	var out store.Entry
 	replayed := false
-	retention := int(s.param(ctx, ParamRetention, "365").IntPart())
+	retention := FixRetentionDays
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.EntryByIdem(ctx, tx, idemEntry(in.IdemKey)); err != nil || prev != nil {
 			if prev != nil {
