@@ -1,0 +1,1 @@
+- [ ] AUDIT-QUERY-PORT (#70, con #64): thêm registry reader audit bất biến, filter/cursor giới hạn và native account_event chỉ đọc; owner Authorize và durable RecordRead bắt buộc trước trả trang. Chưa reader/recorder KN, OpenAPI/web, retention hoặc xuất Excel; chờ kiểm thử và review.

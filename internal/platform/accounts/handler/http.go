@@ -35,6 +35,7 @@ type Handler struct {
 
 // RegisterAdmin gắn route Admin API.
 func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
+	rg.GET("/accounts/audit", h.audit)
 	rg.GET("/accounts/grants", h.grants)
 	rg.GET("/accounts/users", h.list)
 	rg.POST("/accounts/users", h.create)

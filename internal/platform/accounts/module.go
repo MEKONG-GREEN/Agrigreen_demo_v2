@@ -254,3 +254,12 @@ type MemoryDirectory = keycloak.Memory
 
 // NewMemoryDirectory tạo Directory trong bộ nhớ (realm có mọi vai do module quản lý).
 func NewMemoryDirectory() *MemoryDirectory { return keycloak.NewMemory() }
+
+// NativeAuditSource exposes the sanitized native account ledger reader for startup registration.
+func (m *Module) NativeAuditSource() port.AuditSource { return m.svc.NativeAuditSource() }
+
+// UseAudit configures this instance at startup. Both owner authorization and a durable
+// recorder are mandatory; missing callbacks leave the new endpoint unavailable.
+func (m *Module) UseAudit(registry *port.AuditRegistry, access port.AuditAccess) {
+	m.svc.AuditRegistry, m.svc.AuditAccess = registry, access
+}

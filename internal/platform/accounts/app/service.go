@@ -61,6 +61,8 @@ const DefaultActionsLifespan = 72 * time.Hour
 
 // Service là use case của module.
 type Service struct {
+	AuditRegistry *port.AuditRegistry
+	AuditAccess   port.AuditAccess
 	// Roles is an immutable server-configured realm-role catalog. Nil keeps the legacy bridge.
 	Roles           *port.RoleCatalog
 	Navigation      partyport.Navigation // final resolver errors never fall back
