@@ -9474,6 +9474,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/map/layers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lớp bản đồ vùng nuôi, vùng dịch theo ngày: vùng, ổ dịch BM-10, điểm/hộ mô hình có tọa độ, thống kê thửa HTX theo xã (FN-18, W11.52) */
+        get: operations["extensionCntsMapLayers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/diary-cycles/{ref}": {
         parameters: {
             query?: never;
@@ -9486,6 +9503,24 @@ export interface paths {
         put?: never;
         /** Sửa lứa đang nuôi (base_version) */
         post: operations["extensionCntsDiaryCycleUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/map/zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vùng trên bản đồ tại một ngày (phiên bản mới nhất có ngày áp dụng ≤ ngày xem — FN-18 BR-01, AC-03) */
+        get: operations["extensionCntsMapZoneList"];
+        put?: never;
+        /** Vẽ vùng (đa giác, theo bán kính, hướng di chuyển) — cán bộ phụ trách dịch Cấp Tỉnh, Admin */
+        post: operations["extensionCntsMapZoneCreate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9509,6 +9544,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/map/zones/from-outbreak": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khoanh vùng dịch, vùng bị uy hiếp, vùng đệm theo bán kính quanh ổ dịch BM-10 (mặc định 500 m / 3 km / 10 km) */
+        post: operations["extensionCntsMapZoneFromOutbreak"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/diary-cycles/{ref}/reopen": {
         parameters: {
             query?: never;
@@ -9520,6 +9572,24 @@ export interface paths {
         put?: never;
         /** Mở lại lứa đã kết thúc — lý do bắt buộc (người ghi hoặc chủ nhiệm) */
         post: operations["extensionCntsDiaryCycleReopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/map/zones/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vùng hiện hành và lịch sử phiên bản (mới nhất trước) */
+        get: operations["extensionCntsMapZoneGet"];
+        put?: never;
+        /** Sửa vùng — phiên bản mới (base_version, lý do, ngày áp dụng không sớm hơn bản trước) */
+        post: operations["extensionCntsMapZoneUpdate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9544,6 +9614,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/map/zones/{ref}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngưng hiển thị vùng từ ngày áp dụng (phiên bản retired có lý do — không xóa) */
+        post: operations["extensionCntsMapZoneRetire"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/diary-entries/{ref}": {
         parameters: {
             query?: never;
@@ -9562,6 +9649,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/map/zones/{ref}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khôi phục vùng đã ngưng (phiên bản restored có lý do) */
+        post: operations["extensionCntsMapZoneRestore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/diary-entries/{ref}/submit": {
         parameters: {
             query?: never;
@@ -9573,6 +9677,23 @@ export interface paths {
         put?: never;
         /** Gửi lần ghi (nháp, yêu cầu bổ sung) */
         post: operations["extensionCntsDiaryEntrySubmit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/map/zones/{ref}/contents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Điểm trình diễn, hộ mô hình, ổ dịch nằm trong vùng ở ngày xem (vùng đệm 3 km/10 km), kèm khoảng cách tới tâm */
+        get: operations["extensionCntsMapZoneContents"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -20245,6 +20366,10 @@ export interface components {
             unit: string;
             note?: string;
         };
+        CNTSMapLatLng: {
+            lat: number;
+            lng: number;
+        };
         CNTSDiaryAccounting: {
             cost_seed: string | null;
             cost_feed: string | null;
@@ -20260,6 +20385,12 @@ export interface components {
             profit: string | null;
             unit_cost: string | null;
         };
+        /** @description GeoJSON Polygon | MultiPolygon | LineString (WGS84, EPSG:4326) */
+        CNTSMapGeometry: {
+            /** @enum {string} */
+            type: "Polygon" | "MultiPolygon" | "LineString";
+            coordinates: unknown[];
+        };
         CNTSDiarySuggest: {
             feed_cost: string;
             sold_heads: number;
@@ -20272,6 +20403,42 @@ export interface components {
                 [key: string]: number;
             };
         };
+        CNTSMapZoneVersion: {
+            /** Format: uuid */
+            ref: string;
+            version: number;
+            /** @enum {string} */
+            event: "created" | "updated" | "retired" | "restored";
+            /** @enum {string} */
+            status: "active" | "retired";
+            province_code: string;
+            communes: string[];
+            /** @enum {string} */
+            kind: "vung_chan_nuoi" | "vung_thuy_san" | "vung_dich" | "vung_uy_hiep" | "vung_dem" | "huong_di_chuyen";
+            kind_label: string;
+            name: string;
+            /** @enum {string} */
+            draw_mode: "polygon" | "radius" | "line";
+            geometry: components["schemas"]["CNTSMapGeometry"];
+            center: components["schemas"]["CNTSMapLatLng"] | null;
+            radius_m: number | null;
+            area_ha: string | null;
+            /** Format: uuid */
+            outbreak_ref: string | null;
+            /** Format: uuid */
+            parent_zone_ref: string | null;
+            species_code: string | null;
+            disease_code: string | null;
+            /** Format: date */
+            effective_on: string;
+            note: string | null;
+            reason: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            actor_display: string | null;
+        };
         CNTSDiaryCycleVersion: {
             /** @enum {string} */
             event: "created" | "updated" | "closed" | "reopened";
@@ -20282,6 +20449,43 @@ export interface components {
             /** Format: uuid */
             updated_by: string;
             updated_by_display: string | null;
+        };
+        CNTSMapZone: {
+            /** Format: uuid */
+            ref: string;
+            version: number;
+            /** @enum {string} */
+            event: "created" | "updated" | "retired" | "restored";
+            /** @enum {string} */
+            status: "active" | "retired";
+            province_code: string;
+            communes: string[];
+            /** @enum {string} */
+            kind: "vung_chan_nuoi" | "vung_thuy_san" | "vung_dich" | "vung_uy_hiep" | "vung_dem" | "huong_di_chuyen";
+            kind_label: string;
+            name: string;
+            /** @enum {string} */
+            draw_mode: "polygon" | "radius" | "line";
+            geometry: components["schemas"]["CNTSMapGeometry"];
+            center: components["schemas"]["CNTSMapLatLng"] | null;
+            radius_m: number | null;
+            area_ha: string | null;
+            /** Format: uuid */
+            outbreak_ref: string | null;
+            /** Format: uuid */
+            parent_zone_ref: string | null;
+            species_code: string | null;
+            disease_code: string | null;
+            /** Format: date */
+            effective_on: string;
+            note: string | null;
+            reason: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            can_edit: boolean;
+            warnings: "outside_communes"[];
         };
         CNTSDiaryCycle: {
             /** Format: uuid */
@@ -20322,6 +20526,44 @@ export interface components {
             /** Format: uuid */
             updated_by: string;
             updated_by_display: string | null;
+        };
+        CNTSMapZoneDetail: {
+            /** Format: uuid */
+            ref: string;
+            version: number;
+            /** @enum {string} */
+            event: "created" | "updated" | "retired" | "restored";
+            /** @enum {string} */
+            status: "active" | "retired";
+            province_code: string;
+            communes: string[];
+            /** @enum {string} */
+            kind: "vung_chan_nuoi" | "vung_thuy_san" | "vung_dich" | "vung_uy_hiep" | "vung_dem" | "huong_di_chuyen";
+            kind_label: string;
+            name: string;
+            /** @enum {string} */
+            draw_mode: "polygon" | "radius" | "line";
+            geometry: components["schemas"]["CNTSMapGeometry"];
+            center: components["schemas"]["CNTSMapLatLng"] | null;
+            radius_m: number | null;
+            area_ha: string | null;
+            /** Format: uuid */
+            outbreak_ref: string | null;
+            /** Format: uuid */
+            parent_zone_ref: string | null;
+            species_code: string | null;
+            disease_code: string | null;
+            /** Format: date */
+            effective_on: string;
+            note: string | null;
+            reason: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            can_edit: boolean;
+            warnings: "outside_communes"[];
+            versions: components["schemas"]["CNTSMapZoneVersion"][];
         };
         CNTSDiaryCycleDetail: {
             /** Format: uuid */
@@ -20364,11 +20606,40 @@ export interface components {
             updated_by_display: string | null;
             versions: components["schemas"]["CNTSDiaryCycleVersion"][];
         };
+        CNTSMapZoneList: {
+            items: components["schemas"]["CNTSMapZone"][];
+            can_draw: boolean;
+        };
         CNTSDiaryCycleList: {
             items: components["schemas"]["CNTSDiaryCycle"][];
             closed_count: number;
             avg_profit: string | null;
             can_create: boolean;
+        };
+        CNTSMapZoneSave: {
+            /** Format: uuid */
+            id?: string;
+            base_version?: number;
+            reason?: string;
+            province_code?: string | null;
+            /** @enum {string} */
+            kind: "vung_chan_nuoi" | "vung_thuy_san" | "vung_dich" | "vung_uy_hiep" | "vung_dem" | "huong_di_chuyen";
+            name: string;
+            communes: string[];
+            /** @enum {string} */
+            draw_mode: "polygon" | "radius" | "line";
+            geometry?: components["schemas"]["CNTSMapGeometry"] | null;
+            center?: components["schemas"]["CNTSMapLatLng"] | null;
+            radius_m?: number | null;
+            /** Format: uuid */
+            outbreak_ref?: string | null;
+            /** Format: uuid */
+            parent_zone_ref?: string | null;
+            species_code?: string | null;
+            disease_code?: string | null;
+            /** Format: date */
+            effective_on?: string | null;
+            note?: string | null;
         };
         CNTSDiaryCycleSave: {
             /** Format: uuid */
@@ -20389,6 +20660,12 @@ export interface components {
             vaccination_batch_ref?: string | null;
             note?: string;
         };
+        CNTSMapZoneStatus: {
+            base_version: number;
+            reason: string;
+            /** Format: date */
+            effective_on?: string;
+        };
         CNTSDiaryCycleClose: {
             base_version: number;
             cost_seed?: string | null;
@@ -20402,6 +20679,18 @@ export interface components {
             revenue_price?: string | null;
             revenue_amount: string;
         };
+        CNTSMapFromOutbreak: {
+            /** Format: uuid */
+            outbreak_ref: string;
+            radii?: {
+                vung_dich?: number;
+                vung_uy_hiep?: number;
+                vung_dem?: number;
+            };
+            /** Format: date */
+            effective_on?: string;
+            note?: string | null;
+        };
         CNTSDiaryCheck: {
             code: string;
             /** @enum {string} */
@@ -20412,6 +20701,9 @@ export interface components {
             alert?: "water_quality" | "low_growth" | "mortality" | "log_location";
             value?: string;
             compare?: string;
+        };
+        CNTSMapZoneItems: {
+            items: components["schemas"]["CNTSMapZone"][];
         };
         CNTSDiaryLocation: {
             has_fix: boolean;
@@ -20424,6 +20716,25 @@ export interface components {
             mock_suspected: boolean;
             fix_stored: boolean;
         };
+        CNTSMapOutbreak: {
+            /** Format: uuid */
+            ref: string;
+            version: number;
+            /** @enum {string} */
+            status: "reported" | "monitoring" | "closed";
+            commune_code: string;
+            disease_code: string;
+            disease_name: string | null;
+            species_code: string;
+            species_name: string | null;
+            lat: number;
+            lng: number;
+            /** Format: date */
+            as_of: string;
+            herd_size: number;
+            dead: number;
+            distance_m?: number;
+        };
         CNTSDiaryFeedPurchase: {
             /** Format: date */
             date: string;
@@ -20431,6 +20742,26 @@ export interface components {
             quantity_kg: string;
             unit_price: string;
             note?: string;
+        };
+        CNTSMapPlace: {
+            /** @enum {string} */
+            kind: "site" | "household";
+            /** Format: uuid */
+            ref: string;
+            /** Format: uuid */
+            site_ref: string;
+            /** Format: uuid */
+            project_ref: string;
+            project_name: string | null;
+            commune_code: string;
+            name: string;
+            model_type_code: string;
+            model_type_name: string | null;
+            scale: string | null;
+            scale_unit: string | null;
+            lat: number;
+            lng: number;
+            distance_m?: number;
         };
         CNTSDiaryTreatment: {
             /** Format: date */
@@ -20443,6 +20774,11 @@ export interface components {
             withdrawal_days: number;
             result?: string;
         };
+        CNTSMapPlotStat: {
+            commune_code: string;
+            plots: number;
+            area_ha: string;
+        };
         CNTSDiaryVaccination: {
             vaccine: string;
             shot: number;
@@ -20452,6 +20788,16 @@ export interface components {
             method?: string;
             mfg_date?: string;
         };
+        CNTSMapLayers: {
+            /** Format: date */
+            date: string;
+            can_draw: boolean;
+            zones: components["schemas"]["CNTSMapZone"][];
+            outbreaks: components["schemas"]["CNTSMapOutbreak"][];
+            places: components["schemas"]["CNTSMapPlace"][];
+            plot_stats: components["schemas"]["CNTSMapPlotStat"][];
+            plots_ready: boolean;
+        };
         CNTSDiarySale: {
             /** Format: date */
             date: string;
@@ -20459,6 +20805,16 @@ export interface components {
             heads: number;
             weight_kg: string;
             unit_price: string;
+        };
+        CNTSMapZoneContents: {
+            /** Format: date */
+            date: string;
+            zone: components["schemas"]["CNTSMapZone"];
+            places: components["schemas"]["CNTSMapPlace"][];
+            outbreaks: components["schemas"]["CNTSMapOutbreak"][];
+            site_count: number;
+            household_count: number;
+            outbreak_count: number;
         };
         CNTSDiaryOfficerNote: {
             /** Format: date */
@@ -40770,6 +41126,40 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionCntsMapLayers: {
+        parameters: {
+            query?: {
+                /** @description Ngày xem YYYY-MM-DD (mặc định hôm nay, giờ Việt Nam) */
+                date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMapLayers"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_version_conflict | extension.cnts_zone_retired */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionCntsDiaryCycleGet: {
         parameters: {
             query?: never;
@@ -40840,6 +41230,89 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionCntsMapZoneList: {
+        parameters: {
+            query?: {
+                /** @description Ngày xem YYYY-MM-DD (mặc định hôm nay, giờ Việt Nam) */
+                date?: string;
+                kind?: "vung_chan_nuoi" | "vung_thuy_san" | "vung_dich" | "vung_uy_hiep" | "vung_dem" | "huong_di_chuyen";
+                outbreak_ref?: string;
+                with_retired?: "true" | "false";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMapZoneList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_version_conflict | extension.cnts_zone_retired */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsMapZoneCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSMapZoneSave"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp (Idempotency-Key) — trả bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMapZone"];
+                };
+            };
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMapZone"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_version_conflict | extension.cnts_zone_retired */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionCntsDiaryCycleClose: {
         parameters: {
             query?: never;
@@ -40878,6 +41351,52 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionCntsMapZoneFromOutbreak: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSMapFromOutbreak"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp (Idempotency-Key) — trả các vùng đã tạo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMapZoneItems"];
+                };
+            };
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMapZoneItems"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_version_conflict | extension.cnts_zone_retired */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionCntsDiaryCycleReopen: {
         parameters: {
             query?: never;
@@ -40912,6 +41431,78 @@ export interface operations {
             /** @description extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists */
             409: components["responses"]["Problem"];
             /** @description extension.cnts_diary_cycle_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsMapZoneGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMapZoneDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_version_conflict | extension.cnts_zone_retired */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsMapZoneUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSMapZoneSave"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMapZone"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_version_conflict | extension.cnts_zone_retired */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_invalid */
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
@@ -41000,6 +41591,45 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionCntsMapZoneRetire: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSMapZoneStatus"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMapZone"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_version_conflict | extension.cnts_zone_retired */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionCntsDiaryEntryGet: {
         parameters: {
             query?: never;
@@ -41072,6 +41702,45 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionCntsMapZoneRestore: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSMapZoneStatus"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMapZone"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_version_conflict | extension.cnts_zone_retired */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionCntsDiaryEntrySubmit: {
         parameters: {
             query?: never;
@@ -41107,6 +41776,42 @@ export interface operations {
             /** @description extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed */
             409: components["responses"]["Problem"];
             /** @description extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsMapZoneContents: {
+        parameters: {
+            query?: {
+                /** @description Ngày xem YYYY-MM-DD (mặc định hôm nay, giờ Việt Nam) */
+                date?: string;
+            };
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSMapZoneContents"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_version_conflict | extension.cnts_zone_retired */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_zone_invalid */
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };

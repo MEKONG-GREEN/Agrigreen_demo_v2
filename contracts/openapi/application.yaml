@@ -13508,21 +13508,241 @@ paths:
   /v1/extension/cnts/diary-cycles:
     get: {"summary":"Lứa nuôi trong phạm vi (W11.48, NC-02/NC-15) — kèm lợi nhuận trung bình/hộ của lứa đã hạch toán","operationId":"extensionCntsDiaryCycleList","tags":["extension"],"parameters":[{"name":"household_ref","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"site_ref","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"project_ref","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"status","in":"query","required":false,"schema":{"type":"string","enum":["open","closed"]}}],"responses":{"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleList"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_cycle_invalid","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
     post: {"summary":"Mở lứa nuôi cho hộ mô hình — cán bộ theo dõi điểm / người ghi nhật ký (Cấp Xã), Admin","operationId":"extensionCntsDiaryCycleCreate","tags":["extension"],"parameters":[{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleSave"}}}},"responses":{"200":{"description":"Gọi lặp (Idempotency-Key) — trả bản đã ghi","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleDetail"}}}},"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_cycle_invalid","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
+  /v1/extension/cnts/map/layers:
+    get:
+      summary: "Lớp bản đồ vùng nuôi, vùng dịch theo ngày: vùng, ổ dịch BM-10, điểm/hộ mô hình có tọa độ, thống kê thửa HTX theo xã (FN-18, W11.52)"
+      operationId: extensionCntsMapLayers
+      tags: [extension]
+      parameters:
+        - {name: date, in: query, required: false, description: "Ngày xem YYYY-MM-DD (mặc định hôm nay, giờ Việt Nam)", schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapLayers"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/diary-cycles/{ref}:
     get: {"summary":"Chi tiết lứa: gợi ý hạch toán, lịch sử phiên bản","operationId":"extensionCntsDiaryCycleGet","tags":["extension"],"parameters":[{"name":"ref","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_cycle_invalid","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
     post: {"summary":"Sửa lứa đang nuôi (base_version)","operationId":"extensionCntsDiaryCycleUpdate","tags":["extension"],"parameters":[{"name":"ref","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleSave"}}}},"responses":{"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_cycle_invalid","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
+  /v1/extension/cnts/map/zones:
+    get:
+      summary: "Vùng trên bản đồ tại một ngày (phiên bản mới nhất có ngày áp dụng ≤ ngày xem — FN-18 BR-01, AC-03)"
+      operationId: extensionCntsMapZoneList
+      tags: [extension]
+      parameters:
+        - {name: date, in: query, required: false, description: "Ngày xem YYYY-MM-DD (mặc định hôm nay, giờ Việt Nam)", schema: {type: string, format: date}}
+        - {name: kind, in: query, required: false, schema: {type: string, enum: [vung_chan_nuoi, vung_thuy_san, vung_dich, vung_uy_hiep, vung_dem, huong_di_chuyen]}}
+        - {name: outbreak_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: with_retired, in: query, required: false, schema: {type: string, enum: ["true", "false"]}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZoneList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Vẽ vùng (đa giác, theo bán kính, hướng di chuyển) — cán bộ phụ trách dịch Cấp Tỉnh, Admin"
+      operationId: extensionCntsMapZoneCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSMapZoneSave"}
+      responses:
+        "200":
+          description: Gọi lặp (Idempotency-Key) — trả bản đã ghi
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZone"}
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZone"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/diary-cycles/{ref}/close:
     post: {"summary":"Kết thúc lứa kèm hạch toán kinh tế NC-15 (tổng thu bắt buộc)","operationId":"extensionCntsDiaryCycleClose","tags":["extension"],"parameters":[{"name":"ref","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleClose"}}}},"responses":{"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_cycle_invalid","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
+  /v1/extension/cnts/map/zones/from-outbreak:
+    post:
+      summary: "Khoanh vùng dịch, vùng bị uy hiếp, vùng đệm theo bán kính quanh ổ dịch BM-10 (mặc định 500 m / 3 km / 10 km)"
+      operationId: extensionCntsMapZoneFromOutbreak
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSMapFromOutbreak"}
+      responses:
+        "200":
+          description: Gọi lặp (Idempotency-Key) — trả các vùng đã tạo
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZoneItems"}
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZoneItems"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/diary-cycles/{ref}/reopen:
     post: {"summary":"Mở lại lứa đã kết thúc — lý do bắt buộc (người ghi hoặc chủ nhiệm)","operationId":"extensionCntsDiaryCycleReopen","tags":["extension"],"parameters":[{"name":"ref","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSStatusChange"}}}},"responses":{"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_cycle_invalid","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
+  /v1/extension/cnts/map/zones/{ref}:
+    get:
+      summary: "Vùng hiện hành và lịch sử phiên bản (mới nhất trước)"
+      operationId: extensionCntsMapZoneGet
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZoneDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Sửa vùng — phiên bản mới (base_version, lý do, ngày áp dụng không sớm hơn bản trước)"
+      operationId: extensionCntsMapZoneUpdate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSMapZoneSave"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZone"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/diary-entries:
     get: {"summary":"Lần ghi nhật ký trong phạm vi; review=true: hàng chờ rà soát của chủ nhiệm/lãnh đạo phòng (UR-TINH-12)","operationId":"extensionCntsDiaryEntryList","tags":["extension"],"parameters":[{"name":"cycle_ref","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"household_ref","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"project_ref","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"status","in":"query","required":false,"schema":{"type":"string","enum":["draft","submitted","returned","verified"]}},{"name":"review","in":"query","required":false,"schema":{"type":"boolean"}},{"name":"flagged","in":"query","required":false,"schema":{"type":"boolean"}}],"responses":{"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryEntryList"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"description":"forbidden | extension.cnts_diary_self_verify | extension.read_only","$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
     post: {"summary":"Ghi lần ghi (nháp hoặc gửi luôn) — mã UUIDv7, thời điểm và vị trí thiết bị cho bản ngoại tuyến (AC-03); quy tắc chặn khi gửi","operationId":"extensionCntsDiaryEntryCreate","tags":["extension"],"parameters":[{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryEntrySave"}}}},"responses":{"200":{"description":"Gọi lặp (Idempotency-Key) — trả bản đã ghi","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryEntryDetail"}}}},"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryEntryDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"description":"forbidden | extension.cnts_diary_self_verify | extension.read_only","$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
+  /v1/extension/cnts/map/zones/{ref}/retire:
+    post:
+      summary: "Ngưng hiển thị vùng từ ngày áp dụng (phiên bản retired có lý do — không xóa)"
+      operationId: extensionCntsMapZoneRetire
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSMapZoneStatus"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZone"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/diary-entries/{ref}:
     get: {"summary":"Chi tiết lần ghi: lịch sử, vị trí so với điểm, ảnh, lần ghi trước, biểu đồ tăng trọng","operationId":"extensionCntsDiaryEntryGet","tags":["extension"],"parameters":[{"name":"ref","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryEntryDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"description":"forbidden | extension.cnts_diary_self_verify | extension.read_only","$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
     post: {"summary":"Sửa lần ghi chưa xác thực (trong 7 ngày kể từ ngày ghi); submit=true gửi luôn. Mã, lứa, thời điểm, vị trí lúc ghi không sửa","operationId":"extensionCntsDiaryEntryUpdate","tags":["extension"],"parameters":[{"name":"ref","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryEntrySave"}}}},"responses":{"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryEntryDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"description":"forbidden | extension.cnts_diary_self_verify | extension.read_only","$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
+  /v1/extension/cnts/map/zones/{ref}/restore:
+    post:
+      summary: "Khôi phục vùng đã ngưng (phiên bản restored có lý do)"
+      operationId: extensionCntsMapZoneRestore
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSMapZoneStatus"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZone"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/diary-entries/{ref}/submit:
     post: {"summary":"Gửi lần ghi (nháp, yêu cầu bổ sung)","operationId":"extensionCntsDiaryEntrySubmit","tags":["extension"],"parameters":[{"name":"ref","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryBase"}}}},"responses":{"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryEntryDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"description":"forbidden | extension.cnts_diary_self_verify | extension.read_only","$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
+  /v1/extension/cnts/map/zones/{ref}/contents:
+    get:
+      summary: "Điểm trình diễn, hộ mô hình, ổ dịch nằm trong vùng ở ngày xem (vùng đệm 3 km/10 km), kèm khoảng cách tới tâm"
+      operationId: extensionCntsMapZoneContents
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: date, in: query, required: false, description: "Ngày xem YYYY-MM-DD (mặc định hôm nay, giờ Việt Nam)", schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZoneContents"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/diary-entries/{ref}/verify:
     post: {"summary":"Xác thực — chủ nhiệm dự án / lãnh đạo phòng; người xác thực khác người ghi","operationId":"extensionCntsDiaryEntryVerify","tags":["extension"],"parameters":[{"name":"ref","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryBase"}}}},"responses":{"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryEntryDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"description":"forbidden | extension.cnts_diary_self_verify | extension.read_only","$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_entry_not_found | extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_entry_version_conflict | extension.cnts_diary_entry_state | extension.cnts_diary_entry_locked | extension.cnts_diary_entry_day_taken | extension.cnts_diary_cycle_closed","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_entry_invalid | extension.cnts_diary_entry_blocked","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
   /v1/extension/cnts/diary-entries/{ref}/return:
@@ -22330,20 +22550,35 @@ components:
     CNTSGrantCandidate: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"display":{"type":["string","null"]},"commune_codes":{"type":"array","items":{"type":"string"}}},"required":["ref","display","commune_codes"],"additionalProperties":false}
     CNTSGrantCandidateList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSGrantCandidate"}}},"required":["items"],"additionalProperties":false}
     CNTSDiarySupply: {"type":"object","properties":{"date":{"type":"string","format":"date"},"kind":{"type":"string"},"quantity":{"type":"string"},"unit":{"type":"string"},"note":{"type":"string"}},"required":["date","kind","quantity","unit"],"additionalProperties":false}
+    CNTSMapLatLng: {"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"}},"required":["lat","lng"],"additionalProperties":false}
     CNTSDiaryAccounting: {"type":"object","properties":{"cost_seed":{"type":["string","null"]},"cost_feed":{"type":["string","null"]},"cost_depreciation":{"type":["string","null"]},"cost_transport":{"type":["string","null"]},"cost_vet":{"type":["string","null"]},"cost_probiotic":{"type":["string","null"]},"revenue_heads":{"type":["integer","null"]},"revenue_output_kg":{"type":["string","null"]},"revenue_price":{"type":["string","null"]},"revenue_amount":{"type":["string","null"]},"total_cost":{"type":"string"},"profit":{"type":["string","null"]},"unit_cost":{"type":["string","null"]}},"required":["cost_seed","cost_feed","cost_depreciation","cost_transport","cost_vet","cost_probiotic","revenue_heads","revenue_output_kg","revenue_price","revenue_amount","total_cost","profit","unit_cost"],"additionalProperties":false}
+    CNTSMapGeometry: {"type":"object","description":"GeoJSON Polygon | MultiPolygon | LineString (WGS84, EPSG:4326)","properties":{"type":{"type":"string","enum":["Polygon","MultiPolygon","LineString"]},"coordinates":{"type":"array","items":{}}},"required":["type","coordinates"]}
     CNTSDiarySuggest: {"type":"object","properties":{"feed_cost":{"type":"string"},"sold_heads":{"type":"integer"},"sold_kg":{"type":"string"},"sales_amount":{"type":"string"},"current_heads":{"type":["integer","null"]},"last_entry_date":{"type":["string","null"],"format":"date"},"counts":{"type":"object","additionalProperties":{"type":"integer"}}},"required":["feed_cost","sold_heads","sold_kg","sales_amount","current_heads","last_entry_date","counts"],"additionalProperties":false}
+    CNTSMapZoneVersion: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"version":{"type":"integer"},"event":{"type":"string","enum":["created","updated","retired","restored"]},"status":{"type":"string","enum":["active","retired"]},"province_code":{"type":"string"},"communes":{"type":"array","items":{"type":"string"}},"kind":{"type":"string","enum":["vung_chan_nuoi","vung_thuy_san","vung_dich","vung_uy_hiep","vung_dem","huong_di_chuyen"]},"kind_label":{"type":"string"},"name":{"type":"string"},"draw_mode":{"type":"string","enum":["polygon","radius","line"]},"geometry":{"$ref":"#/components/schemas/CNTSMapGeometry"},"center":{"anyOf":[{"$ref":"#/components/schemas/CNTSMapLatLng"},{"type":"null"}]},"radius_m":{"type":["number","null"]},"area_ha":{"type":["string","null"]},"outbreak_ref":{"type":["string","null"],"format":"uuid"},"parent_zone_ref":{"type":["string","null"],"format":"uuid"},"species_code":{"type":["string","null"]},"disease_code":{"type":["string","null"]},"effective_on":{"type":"string","format":"date"},"note":{"type":["string","null"]},"reason":{"type":["string","null"]},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"actor_display":{"type":["string","null"]}},"required":["ref","version","event","status","province_code","communes","kind","kind_label","name","draw_mode","geometry","center","radius_m","area_ha","outbreak_ref","parent_zone_ref","species_code","disease_code","effective_on","note","reason","updated_at","updated_by","actor_display"],"additionalProperties":false}
     CNTSDiaryCycleVersion: {"type":"object","properties":{"event":{"type":"string","enum":["created","updated","closed","reopened"]},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"updated_by_display":{"type":["string","null"]}},"required":["event","status_reason","version","updated_at","updated_by","updated_by_display"],"additionalProperties":false}
+    CNTSMapZone: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"version":{"type":"integer"},"event":{"type":"string","enum":["created","updated","retired","restored"]},"status":{"type":"string","enum":["active","retired"]},"province_code":{"type":"string"},"communes":{"type":"array","items":{"type":"string"}},"kind":{"type":"string","enum":["vung_chan_nuoi","vung_thuy_san","vung_dich","vung_uy_hiep","vung_dem","huong_di_chuyen"]},"kind_label":{"type":"string"},"name":{"type":"string"},"draw_mode":{"type":"string","enum":["polygon","radius","line"]},"geometry":{"$ref":"#/components/schemas/CNTSMapGeometry"},"center":{"anyOf":[{"$ref":"#/components/schemas/CNTSMapLatLng"},{"type":"null"}]},"radius_m":{"type":["number","null"]},"area_ha":{"type":["string","null"]},"outbreak_ref":{"type":["string","null"],"format":"uuid"},"parent_zone_ref":{"type":["string","null"],"format":"uuid"},"species_code":{"type":["string","null"]},"disease_code":{"type":["string","null"]},"effective_on":{"type":"string","format":"date"},"note":{"type":["string","null"]},"reason":{"type":["string","null"]},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"can_edit":{"type":"boolean"},"warnings":{"type":"array","items":{"type":"string","enum":["outside_communes"]}}},"required":["ref","version","event","status","province_code","communes","kind","kind_label","name","draw_mode","geometry","center","radius_m","area_ha","outbreak_ref","parent_zone_ref","species_code","disease_code","effective_on","note","reason","updated_at","updated_by","can_edit","warnings"],"additionalProperties":false}
     CNTSDiaryCycle: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"status":{"type":"string","enum":["open","closed"]},"household_ref":{"type":"string","format":"uuid"},"site_ref":{"type":"string","format":"uuid"},"project_ref":{"type":"string","format":"uuid"},"commune_code":{"type":"string"},"form":{"type":"string","enum":["BM-08","BM-09","BM-19"]},"breed":{"type":"string"},"received_date":{"type":"string","format":"date"},"initial_count":{"type":"integer"},"initial_weight_g":{"type":["string","null"]},"age_days":{"type":["integer","null"]},"supplies":{"type":"array","items":{"$ref":"#/components/schemas/CNTSDiarySupply"}},"vaccination_batch_ref":{"type":["string","null"],"format":"uuid"},"note":{"type":["string","null"]},"status_reason":{"type":["string","null"]},"site_name":{"type":"string"},"project_code":{"type":"string"},"owner_label":{"type":["string","null"]},"can_edit":{"type":"boolean"},"accounting":{"$ref":"#/components/schemas/CNTSDiaryAccounting"},"suggest":{"$ref":"#/components/schemas/CNTSDiarySuggest"},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"updated_by_display":{"type":["string","null"]}},"required":["ref","event","status","household_ref","site_ref","project_ref","commune_code","form","breed","received_date","initial_count","initial_weight_g","age_days","supplies","vaccination_batch_ref","note","status_reason","site_name","project_code","owner_label","can_edit","accounting","suggest","version","updated_at","updated_by","updated_by_display"],"additionalProperties":false}
+    CNTSMapZoneDetail: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"version":{"type":"integer"},"event":{"type":"string","enum":["created","updated","retired","restored"]},"status":{"type":"string","enum":["active","retired"]},"province_code":{"type":"string"},"communes":{"type":"array","items":{"type":"string"}},"kind":{"type":"string","enum":["vung_chan_nuoi","vung_thuy_san","vung_dich","vung_uy_hiep","vung_dem","huong_di_chuyen"]},"kind_label":{"type":"string"},"name":{"type":"string"},"draw_mode":{"type":"string","enum":["polygon","radius","line"]},"geometry":{"$ref":"#/components/schemas/CNTSMapGeometry"},"center":{"anyOf":[{"$ref":"#/components/schemas/CNTSMapLatLng"},{"type":"null"}]},"radius_m":{"type":["number","null"]},"area_ha":{"type":["string","null"]},"outbreak_ref":{"type":["string","null"],"format":"uuid"},"parent_zone_ref":{"type":["string","null"],"format":"uuid"},"species_code":{"type":["string","null"]},"disease_code":{"type":["string","null"]},"effective_on":{"type":"string","format":"date"},"note":{"type":["string","null"]},"reason":{"type":["string","null"]},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"can_edit":{"type":"boolean"},"warnings":{"type":"array","items":{"type":"string","enum":["outside_communes"]}},"versions":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapZoneVersion"}}},"required":["ref","version","event","status","province_code","communes","kind","kind_label","name","draw_mode","geometry","center","radius_m","area_ha","outbreak_ref","parent_zone_ref","species_code","disease_code","effective_on","note","reason","updated_at","updated_by","can_edit","warnings","versions"],"additionalProperties":false}
     CNTSDiaryCycleDetail: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"status":{"type":"string","enum":["open","closed"]},"household_ref":{"type":"string","format":"uuid"},"site_ref":{"type":"string","format":"uuid"},"project_ref":{"type":"string","format":"uuid"},"commune_code":{"type":"string"},"form":{"type":"string","enum":["BM-08","BM-09","BM-19"]},"breed":{"type":"string"},"received_date":{"type":"string","format":"date"},"initial_count":{"type":"integer"},"initial_weight_g":{"type":["string","null"]},"age_days":{"type":["integer","null"]},"supplies":{"type":"array","items":{"$ref":"#/components/schemas/CNTSDiarySupply"}},"vaccination_batch_ref":{"type":["string","null"],"format":"uuid"},"note":{"type":["string","null"]},"status_reason":{"type":["string","null"]},"site_name":{"type":"string"},"project_code":{"type":"string"},"owner_label":{"type":["string","null"]},"can_edit":{"type":"boolean"},"accounting":{"$ref":"#/components/schemas/CNTSDiaryAccounting"},"suggest":{"$ref":"#/components/schemas/CNTSDiarySuggest"},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"updated_by_display":{"type":["string","null"]},"versions":{"type":"array","items":{"$ref":"#/components/schemas/CNTSDiaryCycleVersion"}}},"required":["ref","event","status","household_ref","site_ref","project_ref","commune_code","form","breed","received_date","initial_count","initial_weight_g","age_days","supplies","vaccination_batch_ref","note","status_reason","site_name","project_code","owner_label","can_edit","accounting","suggest","version","updated_at","updated_by","updated_by_display","versions"],"additionalProperties":false}
+    CNTSMapZoneList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapZone"}},"can_draw":{"type":"boolean"}},"required":["items","can_draw"],"additionalProperties":false}
     CNTSDiaryCycleList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSDiaryCycle"}},"closed_count":{"type":"integer"},"avg_profit":{"type":["string","null"]},"can_create":{"type":"boolean"}},"required":["items","closed_count","avg_profit","can_create"],"additionalProperties":false}
+    CNTSMapZoneSave: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"base_version":{"type":"integer"},"reason":{"type":"string"},"province_code":{"type":["string","null"]},"kind":{"type":"string","enum":["vung_chan_nuoi","vung_thuy_san","vung_dich","vung_uy_hiep","vung_dem","huong_di_chuyen"]},"name":{"type":"string"},"communes":{"type":"array","items":{"type":"string"}},"draw_mode":{"type":"string","enum":["polygon","radius","line"]},"geometry":{"anyOf":[{"$ref":"#/components/schemas/CNTSMapGeometry"},{"type":"null"}]},"center":{"anyOf":[{"$ref":"#/components/schemas/CNTSMapLatLng"},{"type":"null"}]},"radius_m":{"type":["number","null"]},"outbreak_ref":{"type":["string","null"],"format":"uuid"},"parent_zone_ref":{"type":["string","null"],"format":"uuid"},"species_code":{"type":["string","null"]},"disease_code":{"type":["string","null"]},"effective_on":{"type":["string","null"],"format":"date"},"note":{"type":["string","null"]}},"required":["kind","name","communes","draw_mode"],"additionalProperties":false}
     CNTSDiaryCycleSave: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"household_ref":{"type":"string","format":"uuid"},"base_version":{"type":"integer"},"form":{"type":"string","enum":["BM-08","BM-09","BM-19"]},"breed":{"type":"string"},"received_date":{"type":"string","format":"date"},"initial_count":{"type":"integer"},"initial_weight_g":{"type":["string","null"]},"age_days":{"type":["integer","null"]},"supplies":{"type":"array","items":{"$ref":"#/components/schemas/CNTSDiarySupply"}},"vaccination_batch_ref":{"type":["string","null"],"format":"uuid"},"note":{"type":"string"}},"required":["breed","received_date","initial_count"],"additionalProperties":false}
+    CNTSMapZoneStatus: {"type":"object","properties":{"base_version":{"type":"integer"},"reason":{"type":"string"},"effective_on":{"type":"string","format":"date"}},"required":["base_version","reason"],"additionalProperties":false}
     CNTSDiaryCycleClose: {"type":"object","properties":{"base_version":{"type":"integer"},"cost_seed":{"type":["string","null"]},"cost_feed":{"type":["string","null"]},"cost_depreciation":{"type":["string","null"]},"cost_transport":{"type":["string","null"]},"cost_vet":{"type":["string","null"]},"cost_probiotic":{"type":["string","null"]},"revenue_heads":{"type":["integer","null"]},"revenue_output_kg":{"type":["string","null"]},"revenue_price":{"type":["string","null"]},"revenue_amount":{"type":"string"}},"required":["base_version","revenue_amount"],"additionalProperties":false}
+    CNTSMapFromOutbreak: {"type":"object","properties":{"outbreak_ref":{"type":"string","format":"uuid"},"radii":{"type":"object","properties":{"vung_dich":{"type":"number"},"vung_uy_hiep":{"type":"number"},"vung_dem":{"type":"number"}},"additionalProperties":false},"effective_on":{"type":"string","format":"date"},"note":{"type":["string","null"]}},"required":["outbreak_ref"],"additionalProperties":false}
     CNTSDiaryCheck: {"type":"object","properties":{"code":{"type":"string"},"level":{"type":"string","enum":["block","warn","info"]},"field":{"type":"string"},"message":{"type":"string"},"alert":{"type":"string","enum":["water_quality","low_growth","mortality","log_location"]},"value":{"type":"string"},"compare":{"type":"string"}},"required":["code","level","message"],"additionalProperties":false}
+    CNTSMapZoneItems: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapZone"}}},"required":["items"],"additionalProperties":false}
     CNTSDiaryLocation: {"type":"object","properties":{"has_fix":{"type":"boolean"},"accuracy_m":{"type":["string","null"]},"distance_m":{"type":["string","null"]},"no_target_point":{"type":"boolean"},"far":{"type":"boolean"},"weak_accuracy":{"type":"boolean"},"mock_location":{"type":"boolean"},"mock_suspected":{"type":"boolean"},"fix_stored":{"type":"boolean"}},"required":["has_fix","accuracy_m","distance_m","no_target_point","far","weak_accuracy","mock_location","mock_suspected","fix_stored"],"additionalProperties":false}
+    CNTSMapOutbreak: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"version":{"type":"integer"},"status":{"type":"string","enum":["reported","monitoring","closed"]},"commune_code":{"type":"string"},"disease_code":{"type":"string"},"disease_name":{"type":["string","null"]},"species_code":{"type":"string"},"species_name":{"type":["string","null"]},"lat":{"type":"number"},"lng":{"type":"number"},"as_of":{"type":"string","format":"date"},"herd_size":{"type":"integer"},"dead":{"type":"integer"},"distance_m":{"type":"number"}},"required":["ref","version","status","commune_code","disease_code","disease_name","species_code","species_name","lat","lng","as_of","herd_size","dead"],"additionalProperties":false}
     CNTSDiaryFeedPurchase: {"type":"object","properties":{"date":{"type":"string","format":"date"},"name":{"type":"string"},"quantity_kg":{"type":"string"},"unit_price":{"type":"string"},"note":{"type":"string"}},"required":["date","name","quantity_kg","unit_price"],"additionalProperties":false}
+    CNTSMapPlace: {"type":"object","properties":{"kind":{"type":"string","enum":["site","household"]},"ref":{"type":"string","format":"uuid"},"site_ref":{"type":"string","format":"uuid"},"project_ref":{"type":"string","format":"uuid"},"project_name":{"type":["string","null"]},"commune_code":{"type":"string"},"name":{"type":"string"},"model_type_code":{"type":"string"},"model_type_name":{"type":["string","null"]},"scale":{"type":["string","null"]},"scale_unit":{"type":["string","null"]},"lat":{"type":"number"},"lng":{"type":"number"},"distance_m":{"type":"number"}},"required":["kind","ref","site_ref","project_ref","project_name","commune_code","name","model_type_code","model_type_name","scale","scale_unit","lat","lng"],"additionalProperties":false}
     CNTSDiaryTreatment: {"type":"object","properties":{"date":{"type":"string","format":"date"},"condition":{"type":"string"},"symptoms":{"type":"string"},"drug":{"type":"string"},"dosage":{"type":"string"},"treater":{"type":"string"},"withdrawal_days":{"type":"integer"},"result":{"type":"string"}},"required":["date","drug","withdrawal_days"],"additionalProperties":false}
+    CNTSMapPlotStat: {"type":"object","properties":{"commune_code":{"type":"string"},"plots":{"type":"integer"},"area_ha":{"type":"string"}},"required":["commune_code","plots","area_ha"],"additionalProperties":false}
     CNTSDiaryVaccination: {"type":"object","properties":{"vaccine":{"type":"string"},"shot":{"type":"integer"},"date":{"type":"string","format":"date"},"dosage":{"type":"string"},"method":{"type":"string"},"mfg_date":{"type":"string"}},"required":["vaccine","shot","date"],"additionalProperties":false}
+    CNTSMapLayers: {"type":"object","properties":{"date":{"type":"string","format":"date"},"can_draw":{"type":"boolean"},"zones":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapZone"}},"outbreaks":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapOutbreak"}},"places":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapPlace"}},"plot_stats":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapPlotStat"}},"plots_ready":{"type":"boolean"}},"required":["date","can_draw","zones","outbreaks","places","plot_stats","plots_ready"],"additionalProperties":false}
     CNTSDiarySale: {"type":"object","properties":{"date":{"type":"string","format":"date"},"kind":{"type":"string"},"heads":{"type":"integer"},"weight_kg":{"type":"string"},"unit_price":{"type":"string"}},"required":["date","heads","weight_kg","unit_price"],"additionalProperties":false}
+    CNTSMapZoneContents: {"type":"object","properties":{"date":{"type":"string","format":"date"},"zone":{"$ref":"#/components/schemas/CNTSMapZone"},"places":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapPlace"}},"outbreaks":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapOutbreak"}},"site_count":{"type":"integer"},"household_count":{"type":"integer"},"outbreak_count":{"type":"integer"}},"required":["date","zone","places","outbreaks","site_count","household_count","outbreak_count"],"additionalProperties":false}
     CNTSDiaryOfficerNote: {"type":"object","properties":{"date":{"type":"string","format":"date"},"content":{"type":"string"},"farmer_opinion":{"type":"string"}},"required":["date","content"],"additionalProperties":false}
     CNTSDiaryTables: {"type":"object","properties":{"feed_purchases":{"type":"array","items":{"$ref":"#/components/schemas/CNTSDiaryFeedPurchase"}},"treatments":{"type":"array","items":{"$ref":"#/components/schemas/CNTSDiaryTreatment"}},"vaccinations":{"type":"array","items":{"$ref":"#/components/schemas/CNTSDiaryVaccination"}},"sales":{"type":"array","items":{"$ref":"#/components/schemas/CNTSDiarySale"}},"officer_notes":{"type":"array","items":{"$ref":"#/components/schemas/CNTSDiaryOfficerNote"}}},"required":[],"additionalProperties":false}
     CNTSDiaryEntryVersion: {"type":"object","properties":{"event":{"type":"string","enum":["created","updated","submitted","returned","verified","corrected"]},"status":{"type":"string","enum":["draft","submitted","returned","verified"]},"status_reason":{"type":["string","null"]},"metrics":{"type":"object","additionalProperties":{"type":"string"},"description":"Chỉ số theo mẫu (NC-05…NC-12, NT-04…NT-12) — giá trị dạng chuỗi"},"checks":{"type":"array","items":{"$ref":"#/components/schemas/CNTSDiaryCheck"}},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"updated_by_display":{"type":["string","null"]}},"required":["event","status","status_reason","metrics","checks","version","updated_at","updated_by","updated_by_display"],"additionalProperties":false}
