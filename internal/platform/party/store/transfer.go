@@ -28,16 +28,18 @@ type TransferOperationWitness struct {
 }
 
 type TransferState struct {
-	RecoveryOperations map[string]TransferOperationWitness `json:"recovery_operations"`
-	VerifiedRoot       port.TransferDigest                 `json:"verified_root"`
-	CutoverProof       *port.TransferCutoverProof          `json:"cutover_proof,omitempty"`
-	Intent             port.TransferIntent                 `json:"intent"`
-	Plan               port.TransferPlan                   `json:"plan"`
-	SourceApprovals    map[string]port.TransferApproval    `json:"source_approvals"`
-	TargetApprovals    map[string]port.TransferApproval    `json:"target_approvals"`
-	SourceFences       map[string]port.TransferFence       `json:"source_fences"`
-	Scans              map[string]TransferScanState        `json:"scans"`
-	Sequence           int64                               `json:"-"`
+	RecoveryGateRequest *port.TransferRecoveryRequest        `json:"recovery_gate_request,omitempty"`
+	RecoveryGates       map[string]port.TransferRecoveryGate `json:"recovery_gates"`
+	RecoveryOperations  map[string]TransferOperationWitness  `json:"recovery_operations"`
+	VerifiedRoot        port.TransferDigest                  `json:"verified_root"`
+	CutoverProof        *port.TransferCutoverProof           `json:"cutover_proof,omitempty"`
+	Intent              port.TransferIntent                  `json:"intent"`
+	Plan                port.TransferPlan                    `json:"plan"`
+	SourceApprovals     map[string]port.TransferApproval     `json:"source_approvals"`
+	TargetApprovals     map[string]port.TransferApproval     `json:"target_approvals"`
+	SourceFences        map[string]port.TransferFence        `json:"source_fences"`
+	Scans               map[string]TransferScanState         `json:"scans"`
+	Sequence            int64                                `json:"-"`
 }
 
 func LockTransfer(ctx context.Context, tx pgx.Tx, tid, entity uuid.UUID) error {

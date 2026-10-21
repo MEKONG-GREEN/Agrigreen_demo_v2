@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -93,12 +94,28 @@ func (t *Transfers) recoveryApplyRequest(p port.TransferParticipants, adapter po
 	return apply, err
 }
 func (t *Transfers) readAppliedForRecovery(p port.TransferParticipants, a port.TransferAdapter, recovery port.TransferRecoveryRequest, req port.TransferApplyRequest) (port.TransferReceipt, error) {
+	expected, err := t.proof(p, req.Scope.PlanID, req.BatchID, "apply", req.Namespace)
+	if err != nil {
+		return port.TransferReceipt{}, err
+	}
+	if expected != nil {
+		old, err := transferDecodeReceipt(expected)
+		if err != nil {
+			return port.TransferReceipt{}, err
+		}
+		if err := validateTransferReceipt(req.TransferBatchRequest, old, false); err != nil {
+			return port.TransferReceipt{}, err
+		}
+	}
 	copyReq, err := transferClone(req)
 	if err != nil {
 		return port.TransferReceipt{}, err
 	}
 	receipt, err := a.ReadAppliedForRecovery(p.Target(), recovery, copyReq)
 	if err != nil {
+		if expected != nil && errors.Is(err, port.ErrTransferNotReady) {
+			return port.TransferReceipt{}, port.ErrTransferConflict
+		}
 		return port.TransferReceipt{}, transferOwnerError(err)
 	}
 	receipt, err = transferCanonicalReceipt(receipt)
@@ -172,6 +189,16 @@ func (t *Transfers) Compensate(p port.TransferParticipants, ref port.TransferBat
 	if err != nil {
 		return port.TransferReceipt{}, err
 	}
+	adapters, err := t.adapters(source.Plan.Adapters)
+	if err != nil {
+		return port.TransferReceipt{}, err
+	}
+	if err := t.ensureRecoveryGates(p, source, target, adapters, reason); err != nil {
+		return port.TransferReceipt{}, err
+	}
+	if err := t.reverseCompensationDependencies(p, source, target, batch, recovery); err != nil {
+		return port.TransferReceipt{}, err
+	}
 	apply, err := t.recoveryApplyRequest(p, a, batch)
 	if err != nil {
 		return port.TransferReceipt{}, err
@@ -231,4 +258,115 @@ func (t *Transfers) Compensate(p port.TransferParticipants, ref port.TransferBat
 		return port.TransferReceipt{}, err
 	}
 	return receipt, t.checkpoint(p, target, batch, "compensate", receipt.Ref, receipt)
+}
+
+// compensationWitness requires a completed core witness AND a current durable
+// owner compensation receipt. Pending owner commits are resumed through Compensate,
+// never counted as completed by a predecessor or release operation.
+func (t *Transfers) compensationWitness(p port.TransferParticipants, source, target *store.TransferState, a port.TransferAdapter, b port.TransferBatchRequest, applied port.TransferReceipt) (port.TransferReceipt, error) {
+	var op *store.TransferOperation
+	err := t.local(p.Target(), func(tx pgx.Tx) error {
+		var err error
+		op, err = store.TransferOperationOf(p.Target(), tx, target.Intent.ID, "compensate", b.BatchID.String())
+		return err
+	})
+	if err != nil {
+		return port.TransferReceipt{}, err
+	}
+	if op == nil {
+		return port.TransferReceipt{}, port.ErrTransferNotReady
+	}
+	var input transferRecoveryInput
+	if err := json.Unmarshal(op.Document, &input); err != nil {
+		return port.TransferReceipt{}, port.ErrTransferConflict
+	}
+	hash, err := transferDigest(input)
+	witness, ok := target.RecoveryOperations["compensate:"+b.BatchID.String()]
+	if err != nil || hash != op.Hash || input.Scope != source.Plan.Scope || input.ManifestHash != source.Plan.ManifestHash || input.BatchID != b.BatchID || input.ReasonRef == uuid.Nil || !ok || witness.ID != op.ID || witness.Hash != op.Hash {
+		return port.TransferReceipt{}, port.ErrTransferConflict
+	}
+	core, err := t.proof(p, b.Scope.PlanID, b.BatchID, "compensate", b.Namespace)
+	if err != nil {
+		return port.TransferReceipt{}, err
+	}
+	if core == nil {
+		return port.TransferReceipt{}, port.ErrTransferNotReady
+	}
+	if _, err := transferDecodeReceipt(core); err != nil {
+		return port.TransferReceipt{}, err
+	}
+	apply, err := t.recoveryApplyRequest(p, a, b)
+	if err != nil {
+		return port.TransferReceipt{}, err
+	}
+	req := port.TransferCompensationRequest{TransferApplyRequest: apply, OperationID: op.ID, ReasonRef: input.ReasonRef, Applied: applied}
+	receipt, _, err := t.ownerCompensation(p, a, req)
+	if err != nil {
+		return port.TransferReceipt{}, err
+	}
+	actual, err := transferDigest(receipt)
+	if err != nil || actual != core.Hash || receipt.Ref != core.Ref {
+		return port.TransferReceipt{}, port.ErrTransferConflict
+	}
+	return receipt, nil
+}
+func (t *Transfers) reverseCompensationDependencies(p port.TransferParticipants, source, target *store.TransferState, batch port.TransferBatchRequest, recovery port.TransferRecoveryRequest) error {
+	adapters, err := t.adapters(source.Plan.Adapters)
+	if err != nil {
+		return err
+	}
+	dependencies := map[string][]string{}
+	for _, a := range adapters {
+		dependencies[a.Namespace] = a.DependsOn
+	}
+	var depends func(string, string) bool
+	depends = func(child, parent string) bool {
+		for _, dep := range dependencies[child] {
+			if dep == parent || depends(dep, parent) {
+				return true
+			}
+		}
+		return false
+	}
+	members := map[port.TransferKey]bool{}
+	for _, m := range batch.Mappings {
+		members[m.Key] = true
+	}
+	batches, err := t.batches(p, source.Plan.ID)
+	if err != nil {
+		return err
+	}
+	for _, candidate := range batches {
+		if candidate.BatchID == batch.BatchID {
+			continue
+		}
+		dependent := candidate.Namespace != batch.Namespace && depends(candidate.Namespace, batch.Namespace)
+		for _, m := range candidate.DependencyMappings {
+			if members[m.Key] {
+				dependent = true
+			}
+		}
+		if !dependent {
+			continue
+		}
+		_, _, a, req, err := t.batch(p, port.TransferBatchRef{PlanID: source.Plan.ID, BatchID: candidate.BatchID}, "compensation_dependency", true)
+		if err != nil {
+			return err
+		}
+		apply, err := t.recoveryApplyRequest(p, a, req)
+		if err != nil {
+			return err
+		}
+		applied, err := t.readAppliedForRecovery(p, a, recovery, apply)
+		if errors.Is(err, port.ErrTransferNotReady) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := t.compensationWitness(p, source, target, a, req, applied); err != nil {
+			return err
+		}
+	}
+	return nil
 }
