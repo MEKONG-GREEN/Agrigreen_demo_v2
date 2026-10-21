@@ -230,6 +230,9 @@ func (c *AttributeCatalog) Capabilities(role, level, group string) (AttributeCap
 	}
 	var g AttributeGroup
 	if group != "" {
+		if !r.GroupAndDuties {
+			return AttributeCapabilities{}, AttributeCodeError{Field: "province_group"}
+		}
 		found := false
 		for _, candidate := range c.groups {
 			if candidate.Code == group {
@@ -243,7 +246,7 @@ func (c *AttributeCatalog) Capabilities(role, level, group string) (AttributeCap
 	}
 	return AttributeCapabilities{Manager: r.ManagementPermissions && (l.Manager || g.Manager),
 		ReadsAllDepartments: r.ManagementPermissions && (l.ReadsAllDepartments || g.ReadsAllDepartments),
-		ForceReadOnly:       r.ManagementPermissions && g.ReadOnly, ScopedTargets: r.ScopedTargets}, nil
+		ForceReadOnly:       g.ReadOnly, ScopedTargets: r.ScopedTargets}, nil
 }
 
 // LegacyAttributeCatalog is the temporary bridge until the owner adapter is

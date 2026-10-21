@@ -100,6 +100,10 @@ const (
 )
 
 func newKNFixture(t *testing.T, registries ...*authz.SessionRegistry) *knFix {
+	return newKNFixtureWithCatalog(t, nil, registries...)
+}
+
+func newKNFixtureWithCatalog(t *testing.T, catalog *port.AttributeCatalog, registries ...*authz.SessionRegistry) *knFix {
 	sessions := fixtureSessionRegistry(t)
 	if len(registries) > 1 {
 		t.Fatal("one registry override expected")
@@ -119,7 +123,7 @@ func newKNFixture(t *testing.T, registries ...*authz.SessionRegistry) *knFix {
 	f.depts.depts[f.national] = []partyport.Department{mk(f.national, deptTT, "Phòng Trồng trọt", partyport.DeptActive)}
 
 	ops := f.env.Pool(t, migrations.PF, "platform_api")
-	f.kmod = accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Departments: f.depts, Sessions: sessions, SessionPolicies: fixtureSessionPolicies()})
+	f.kmod = accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Departments: f.depts, Sessions: sessions, SessionPolicies: fixtureSessionPolicies(), Attributes: catalog})
 	log := telemetry.NewLogger("test", io.Discard)
 	app := httpx.NewEngine(log, 1<<20)
 	ag := app.Group("/v1", httpx.Authenticate(f.iss.Verifier()), f.kmod.Middleware(), idempotency.Middleware(ops))

@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-ATTRIBUTE-CATALOG (#78): snapshot thuộc tính theo instance cho catalog/nhãn/CSV/quyền context đồng bộ; giữ native guards và bridge ủy quyền. Chờ kiểm thật, Claude Review OK và owner #79 nối cùng #68/#72; chưa hoàn thành #52.

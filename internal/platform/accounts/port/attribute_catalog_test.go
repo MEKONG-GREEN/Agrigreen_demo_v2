@@ -48,7 +48,7 @@ func TestAttributeCatalogImmutableInstancesAndExplicitFlags(t *testing.T) {
 	if err != nil || !ro.ForceReadOnly || !ro.ReadsAllDepartments {
 		t.Fatalf("read-only flags lost: %+v %v", ro, err)
 	}
-	collector, err := first.Capabilities("collector", "head", "readers")
+	collector, err := first.Capabilities("collector", "head", "")
 	if err != nil || collector.Manager || collector.ReadsAllDepartments || collector.ForceReadOnly || !collector.ScopedTargets {
 		t.Fatalf("role flags unioned: %+v %v", collector, err)
 	}
@@ -101,5 +101,21 @@ func TestAttributeCatalogZeroAndUnknownCodesNeverFallBack(t *testing.T) {
 	}
 	if _, ok := c.ManagementCode("Trưởng phòng"); ok {
 		t.Fatal("CSV used legacy label")
+	}
+}
+
+func TestAttributeCatalogReadOnlyRestrictionDoesNotRequireManagementPermission(t *testing.T) {
+	spec := attributeSpec()
+	spec.Roles = append(spec.Roles, port.AttributeRole{Role: "reviewer", GroupAndDuties: true})
+	c, err := port.NewAttributeCatalog(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caps, err := c.Capabilities("reviewer", "head", "readers")
+	if err != nil || !caps.ForceReadOnly || caps.Manager || caps.ReadsAllDepartments {
+		t.Fatalf("read-only restriction lost without management permission: %+v %v", caps, err)
+	}
+	if caps, err := c.Capabilities("collector", "head", "readers"); err == nil || caps != (port.AttributeCapabilities{}) {
+		t.Fatalf("group enabled outside role: %+v %v", caps, err)
 	}
 }

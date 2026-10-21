@@ -103,6 +103,12 @@ func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.Assig
 	if err != nil {
 		return checkedAssignment{}, fieldProblem(err)
 	}
+	// Assignment write-policy ownership remains with #68/#72; this check only
+	// prevents writing a management code absent from this instance's readers.
+	// Preserve native normalization and error order before this restriction.
+	if in.MgmtLevel != "" && s.AttributeCatalog().LevelLabel(in.MgmtLevel) == "" {
+		return checkedAssignment{}, fieldProblem(domain.FieldError{Field: "mgmt_level", Msg: domain.MsgKNMgmtLevel})
+	}
 	out := checkedAssignment{in: in}
 	if in.Role == port.KNAdmin {
 		// This native scope invariant is not delegated to an owner provider.
