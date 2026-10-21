@@ -27,7 +27,8 @@ type MenuBuildRequest struct {
 }
 
 // MenuItem is resolved owner presentation. Module is mandatory on routed leaves;
-// Enabled includes owner availability/traits. Shared module gating can only hide it.
+// distinct presentation nodes may link to the same owned route. Enabled includes
+// owner availability/traits. Shared module gating can only hide it.
 type MenuItem struct {
 	Key, Label, Route, Module, Icon, BadgeSource string
 	Enabled                                      bool
@@ -152,7 +153,6 @@ func (m *Menus) Build(ctx context.Context, request MenuBuildRequest) (MenuDefini
 	}
 	out := MenuDefinition{Version: value.Version, DefaultRoute: value.DefaultRoute, Groups: make([]MenuGroup, 0, len(value.Groups))}
 	count := 0
-	seenRoutes := map[string]bool{}
 	var cloneItems func([]MenuItem, int) ([]MenuItem, error)
 	cloneItems = func(items []MenuItem, depth int) ([]MenuItem, error) {
 		if depth > 12 {
@@ -171,10 +171,9 @@ func (m *Menus) Build(ctx context.Context, request MenuBuildRequest) (MenuDefini
 					return nil, ErrMenuDefinition
 				}
 			} else {
-				if !validMenuPath(item.Route, false) || m.owner(item.Route) != item.Module || item.Module == "" || seenRoutes[item.Route] {
+				if !validMenuPath(item.Route, false) || m.owner(item.Route) != item.Module || item.Module == "" {
 					return nil, ErrMenuDefinition
 				}
-				seenRoutes[item.Route] = true
 			}
 			var err error
 			item.Children, err = cloneItems(item.Children, depth+1)

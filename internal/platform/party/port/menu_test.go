@@ -3,6 +3,7 @@ package port
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 )
 
@@ -51,6 +52,34 @@ func TestMenusCopiesInputsOutputsAndInstances(t *testing.T) {
 		t.Fatal("owner error hidden", err)
 	}
 }
+
+func TestMenusPreserveRepeatedRoutePresentationAliases(t *testing.T) {
+	leaf := MenuItem{Key: "reports.main", Label: "Reports", Route: "/workspace/reports", Module: "pf/reports", Enabled: true, Children: []MenuItem{}}
+	shortcut := leaf
+	shortcut.Key, shortcut.Label, shortcut.Icon = "reports.shortcut", "Quick reports", "shortcut"
+	shared := leaf
+	shared.Key, shared.Label, shared.Enabled = "reports.shared", "Shared reports", false
+	want := MenuDefinition{Version: "aliases/v1", DefaultRoute: leaf.Route, Groups: []MenuGroup{
+		{Key: "work", Label: "Work", Items: []MenuItem{leaf, {Key: "shortcuts", Label: "Shortcuts", Enabled: true, Children: []MenuItem{shortcut}}}},
+		{Key: "shared", Label: "Shared", Items: []MenuItem{shared}},
+	}}
+	reg, err := NewMenus(func(context.Context, MenuBuildRequest) (MenuDefinition, error) { return want, nil }, MenuRoute{Pattern: leaf.Route, Module: leaf.Module})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := MenuBuildRequest{Mode: MenuDepartment}
+	got, err := reg.Build(context.Background(), request)
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatal("registered aliases were rejected, reordered, or deduplicated", got, err)
+	}
+	got.Groups[0].Items[1].Children[0].Label = "mutated"
+	got.Groups[1].Items[0].Route = "/mutated"
+	again, err := reg.Build(context.Background(), request)
+	if err != nil || !reflect.DeepEqual(again, want) {
+		t.Fatal("alias output mutated the owner's presentation", again, err)
+	}
+}
+
 func TestMenusRejectAmbiguousRegistrationAndMalformedDefinitions(t *testing.T) {
 	builder := func(context.Context, MenuBuildRequest) (MenuDefinition, error) { return menuExample(), nil }
 	for i, routes := range [][]MenuRoute{
@@ -73,7 +102,14 @@ func TestMenusRejectAmbiguousRegistrationAndMalformedDefinitions(t *testing.T) {
 		func(d *MenuDefinition) { d.Groups[0].Items[0].Route = "/workspace/reports?tenant=else" },
 		func(d *MenuDefinition) {
 			d.Groups[0].Items = append(d.Groups[0].Items, d.Groups[0].Items[0])
-			d.Groups[0].Items[1].Key = "another"
+		},
+		func(d *MenuDefinition) {
+			alias := d.Groups[0].Items[0]
+			alias.Key, alias.Module = "another", "pf/party"
+			d.Groups[0].Items = append(d.Groups[0].Items, alias)
+		},
+		func(d *MenuDefinition) {
+			d.Groups = append(d.Groups, d.Groups[0])
 		},
 		func(d *MenuDefinition) {
 			d.Groups[0].Items[0].Children = []MenuItem{{Key: "child", Label: "Child", Route: "/workspace/reports", Module: "pf/reports"}}

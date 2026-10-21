@@ -57,11 +57,18 @@ func TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog(t *testing.T) {
 		} else if len(in.Departments) == 0 || in.Departments[0].OrgRef != tr.p89 {
 			t.Fatal("admin metadata missing")
 		}
-		def := port.MenuDefinition{Version: "registered/v1", DefaultRoute: "/registered/reports", Groups: []port.MenuGroup{{Key: "work", Label: "Work", Items: []port.MenuItem{
-			{Key: "report", Label: "Reports", Route: "/registered/reports", Module: "pf/reports", Enabled: true},
-			{Key: "unavailable", Label: "Unavailable", Route: "/registered/unavailable", Module: "pf/party", Enabled: false},
-			{Key: "overview", Label: "Overview", Route: "/registered/overview", Module: "pf/party", Enabled: true},
-		}}}}
+		// A disabled first presentation must not mask an enabled shortcut to the
+		// same registered route when navigation selects its landing page.
+		def := port.MenuDefinition{Version: "registered/v1", DefaultRoute: "/registered/reports", Groups: []port.MenuGroup{
+			{Key: "work", Label: "Work", Items: []port.MenuItem{
+				{Key: "report", Label: "Reports", Route: "/registered/reports", Module: "pf/reports", Enabled: false},
+				{Key: "unavailable", Label: "Unavailable", Route: "/registered/unavailable", Module: "pf/party", Enabled: false},
+				{Key: "overview", Label: "Overview", Route: "/registered/overview", Module: "pf/party", Enabled: true},
+			}},
+			{Key: "shared", Label: "Shared", Items: []port.MenuItem{{Key: "shortcuts", Label: "Shortcuts", Enabled: true, Children: []port.MenuItem{
+				{Key: "report.shortcut", Label: "Quick reports", Route: "/registered/reports", Module: "pf/reports", Enabled: true},
+			}}}},
+		}}
 		if invalidOwner {
 			def.DefaultRoute = "/not-registered"
 		}
@@ -89,6 +96,9 @@ func TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog(t *testing.T) {
 	if str(r.body, "default_route") != "/registered/reports" || str(r.body, "menu_version") != "registered/v1" {
 		t.Fatal("legacy catalog used", r.body)
 	}
+	if keys := menuKeys(r); !slices.Contains(keys, "report") || !slices.Contains(keys, "report.shortcut") {
+		t.Fatal("registered route alias was removed", r.body)
+	}
 	principal := authz.Principal{ActorRef: user.actor, TenantID: f.tenant, OrgRef: tr.p89, Roles: []string{port.RoleKNProvinceAdmin}, MFA: true}
 	ctx := authz.WithPrincipal(tenant.WithID(context.Background(), f.tenant), principal)
 	request := port.NavigationRequest{Audience: port.AudienceTinh, UnitRef: tr.p89, Department: port.Department{OrgRef: tr.p89, Code: "trong_trot", MenuProfile: "stale", Status: port.DeptNotOpen}}
@@ -105,7 +115,7 @@ func TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog(t *testing.T) {
 	wantStatus(t, rr, http.StatusCreated, "disable registered module")
 	r = get(user, "/v1/menu")
 	wantStatus(t, r, http.StatusOK, "filtered menu")
-	if str(r.body, "default_route") != "/registered/overview" || slices.Contains(menuKeys(r), "report") {
+	if str(r.body, "default_route") != "/registered/overview" || slices.Contains(menuKeys(r), "report") || slices.Contains(menuKeys(r), "report.shortcut") {
 		t.Fatal("disabled route became landing", r.body)
 	}
 	landing, err = mod.ContextNavigation()(ctx, request)
