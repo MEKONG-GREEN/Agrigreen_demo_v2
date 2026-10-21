@@ -1,6 +1,6 @@
 package domain
 
-// W11.25 (pf 20261020161259) — NÂNG BẬC LƯƠNG (BRD HCTH v3.0 FN-09 danh sách nâng bậc NL01–NL04, FN-10 sổ quyết định).
+// W11.25 (pf 20261021122821) — NÂNG BẬC LƯƠNG (BRD HCTH v3.0 FN-09 danh sách nâng bậc NL01–NL04, FN-10 sổ quyết định).
 //
 // Tính THUẦN (không DB): từ phép chiếu hồ sơ tại ngày xét (ngạch, bậc, mốc xếp bậc = step_since — Q-069), bảng hệ số có
 // hiệu lực (số bậc, thời gian giữ bậc), xếp loại năm, kỷ luật (cờ nhập tay — Q-075), khen thưởng + bảng quy đổi thành

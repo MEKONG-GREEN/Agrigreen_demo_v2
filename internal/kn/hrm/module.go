@@ -22,7 +22,7 @@
 // cho docs.view/docs.manage), tệp qua pf/evidence (mục đích hr_records, khóa của chủ thể "kho tài liệu" ở kho định danh),
 // xóa = ẩn, nhật ký xem trước/tải xuống. Bật bằng UseDocs; tài liệu gắn nhân viên theo cờ AG_HRM_RECORDS.
 //
-// W11.25 (pf 20261020161259) — NÂNG BẬC LƯƠNG (FN-09, FN-10): kỳ NLTX/TNVK/NLTH tính từ mốc xếp bậc + bảng hệ số + tham
+// W11.25 (pf 20261021122821) — NÂNG BẬC LƯƠNG (FN-09, FN-10): kỳ NLTX/TNVK/NLTH tính từ mốc xếp bậc + bảng hệ số + tham
 // số, xếp loại năm, trạng thái xử lý, xuất Mẫu số 1/2/4 (Excel, dựng lại + SHA-256), sổ quyết định (áp bậc cùng giao dịch,
 // hủy = sự kiện bù), job hrm_promotion_scan (module_promotion.go).
 //

@@ -1,6 +1,6 @@
 package store
 
-// W11.25 (pf 20261020161259): xếp loại năm, trạng thái xử lý kỳ nâng bậc, lần xuất Mẫu số 1/2/4, sổ quyết định, kết quả
+// W11.25 (pf 20261021122821): xếp loại năm, trạng thái xử lý kỳ nâng bậc, lần xuất Mẫu số 1/2/4, sổ quyết định, kết quả
 // job tính mốc. Mọi bảng là sổ chỉ ghi thêm — không UPDATE/DELETE.
 
 import (

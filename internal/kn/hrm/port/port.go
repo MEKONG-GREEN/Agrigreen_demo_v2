@@ -148,7 +148,7 @@ var (
 	ErrExportNotFound = problem.New(http.StatusNotFound, "hrm.export_not_found", "Không có lần xuất báo cáo này")
 )
 
-// --- W11.25 (pf 20261020161259): nâng bậc lương (FN-09, FN-10). ---
+// --- W11.25 (pf 20261021122821): nâng bậc lương (FN-09, FN-10). ---
 
 // Lỗi nâng bậc (docs/errors/pf-hrm-promotion.md).
 var (

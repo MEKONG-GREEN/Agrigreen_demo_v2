@@ -1,6 +1,6 @@
 package app
 
-// W11.25 (pf 20261020161259) — NÂNG BẬC LƯƠNG (BRD HCTH v3.0 FN-09, FN-10). Xem domain/promotion.go cho cách tính.
+// W11.25 (pf 20261021122821) — NÂNG BẬC LƯƠNG (BRD HCTH v3.0 FN-09, FN-10). Xem domain/promotion.go cho cách tính.
 //
 // Quyền: Cấp Tỉnh – HCTH, Admin — phạm vi "toàn Trung tâm" của nhóm quyền export (xem/xuất danh sách) và profile.edit
 // (đưa vào danh sách, quyết định) của ma trận FN-20. Ngữ cảnh chỉ xem không ghi.
