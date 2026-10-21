@@ -5,13 +5,14 @@ import { createApiClient, type ApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsDiary } from "@/api/mock/kn-cnts-diary";
 import { resetCntsModel } from "@/api/mock/kn-cnts-model";
+import type * as Common from "@/kn/cycle/common";
 import { DiaryScreen } from "./DiaryScreen";
 import { ReviewScreen } from "./ReviewScreen";
 
 const auth: { api: ApiClient | null } = { api: null };
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ api: auth.api, kn: { context: { role: "admin" } } }) }));
 vi.mock("next/navigation", () => ({ usePathname: () => "/kn/cnts/nhat-ky", useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
-vi.mock("@/kn/cycle/common", async (orig) => ({ ...(await orig<typeof import("@/kn/cycle/common")>()), useCommuneNames: () => (c: string) => c }));
+vi.mock("@/kn/cycle/common", async (orig) => ({ ...(await orig<typeof Common>()), useCommuneNames: () => (c: string) => c }));
 
 beforeEach(() => {
   resetCntsModel();
