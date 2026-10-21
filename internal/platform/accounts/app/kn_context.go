@@ -56,11 +56,12 @@ type CommuneView struct {
 // AssignmentView là lần gán đã tra tên (GET /v1/me/contexts, màn Detail tài khoản).
 type AssignmentView struct {
 	port.Assignment
-	OrgName        string
-	MgmtLevelLabel string
-	CommuneViews   []CommuneView
-	DepartmentRefs []DepartmentView
-	Attrs          port.AssignmentAttrs // W11.07
+	OrgName         string
+	MgmtLevelLabel  string
+	CommuneViews    []CommuneView
+	DepartmentRefs  []DepartmentView
+	Attrs           port.AssignmentAttrs // W11.07
+	AttrsGroupLabel string
 }
 
 // ContextView là ngữ cảnh đã chọn (POST /v1/me/context).
@@ -126,6 +127,9 @@ func (s *Service) communeViews(ctx context.Context, codes []string) []CommuneVie
 // (W11.07, Q-059): thêm mọi phòng ban khác của đơn vị, đánh dấu chỉ xem.
 func (s *Service) deptViews(ctx context.Context, a port.Assignment, group string) ([]DepartmentView, error) {
 	out := []DepartmentView{}
+	if _, err := s.attributeCapabilities(a, port.AssignmentAttrs{ProvinceGroup: group}); err != nil {
+		return nil, err
+	}
 	if a.Role == port.KNAdmin || len(a.Departments) == 0 {
 		return out, nil
 	}
@@ -137,7 +141,11 @@ func (s *Service) deptViews(ctx context.Context, a port.Assignment, group string
 		if d.Retired {
 			continue
 		}
-		if ro, ok := domain.ViewOnlyDepartment(a, group, d.Code); ok {
+		ro, ok, err := domain.ViewOnlyDepartmentWithCatalog(a, group, d.Code, s.AttributeCatalog())
+		if err != nil {
+			return nil, ErrContextRevoked
+		}
+		if ok {
 			out = append(out, DepartmentView{Code: d.Code, Name: d.Name, Description: d.Description, Status: d.Status, ReadOnly: ro})
 		}
 	}
@@ -145,6 +153,9 @@ func (s *Service) deptViews(ctx context.Context, a port.Assignment, group string
 }
 
 func (s *Service) viewOf(ctx context.Context, a port.Assignment, attrs port.AssignmentAttrs) (AssignmentView, error) {
+	if _, err := s.attributeCapabilities(a, attrs); err != nil {
+		return AssignmentView{}, err
+	}
 	d, err := s.deptViews(ctx, a, attrs.ProvinceGroup)
 	if err != nil {
 		return AssignmentView{}, err
@@ -152,7 +163,7 @@ func (s *Service) viewOf(ctx context.Context, a port.Assignment, attrs port.Assi
 	if attrs.AssignmentID == uuid.Nil {
 		attrs = port.AssignmentAttrs{AssignmentID: a.ID, Duties: []string{}, Facilities: []uuid.UUID{}, Households: []uuid.UUID{}}
 	}
-	return AssignmentView{Assignment: a, OrgName: s.orgName(ctx, a.OrgRef), MgmtLevelLabel: port.MgmtLevelLabel(a.MgmtLevel),
+	return AssignmentView{Assignment: a, OrgName: s.orgName(ctx, a.OrgRef), MgmtLevelLabel: s.AttributeCatalog().LevelLabel(a.MgmtLevel), AttrsGroupLabel: s.AttributeCatalog().GroupLabel(attrs.ProvinceGroup),
 		CommuneViews: s.communeViews(ctx, a.Communes), DepartmentRefs: d, Attrs: attrs}, nil
 }
 
@@ -182,6 +193,9 @@ func (s *Service) knSelf(ctx context.Context) (authz.Principal, error) {
 	p, ok := authz.FromContext(ctx)
 	if !ok {
 		return authz.Principal{}, problem.Unauthenticated
+	}
+	if !s.AttributeCatalog().Valid() {
+		return p, ErrDependency.WithDetail("danh mục thuộc tính chưa sẵn sàng")
 	}
 	if s.Departments == nil || s.Scope == nil {
 		return p, ErrDependency.WithDetail("chưa nối pf/party")
@@ -280,7 +294,14 @@ func (s *Service) SelectContext(ctx context.Context, assignment uuid.UUID, dept 
 			if err != nil {
 				return ContextView{}, err
 			}
-			if _, ok := domain.ViewOnlyDepartment(asg, attrs[asg.ID].ProvinceGroup, dept); dept == "" || !ok {
+			if _, err := s.attributeCapabilities(asg, attrs[asg.ID]); err != nil {
+				return ContextView{}, err
+			}
+			_, ok, err := domain.ViewOnlyDepartmentWithCatalog(asg, attrs[asg.ID].ProvinceGroup, dept, s.AttributeCatalog())
+			if err != nil {
+				return ContextView{}, ErrContextRevoked
+			}
+			if dept == "" || !ok {
 				return ContextView{}, ErrDepartmentRequired
 			}
 			d, err := s.Departments.DepartmentByCode(ctx, asg.UnitRef, dept)
@@ -311,8 +332,13 @@ func (s *Service) SelectContext(ctx context.Context, assignment uuid.UUID, dept 
 			return ContextView{}, aerr
 		}
 		selected = &authz.KNContext{Role: asg.Role}
-		ro, _ := domain.ViewOnlyDepartment(asg, attrs[asg.ID].ProvinceGroup, row.Department)
-		applyAttrs(selected, asg, attrs[asg.ID], ro, nil)
+		ro, _, aerr := domain.ViewOnlyDepartmentWithCatalog(asg, attrs[asg.ID].ProvinceGroup, row.Department, s.AttributeCatalog())
+		if aerr != nil {
+			return ContextView{}, ErrContextRevoked
+		}
+		if aerr = s.applyAttrs(selected, asg, attrs[asg.ID], ro, nil); aerr != nil {
+			return ContextView{}, aerr
+		}
 	}
 	v, err := s.contextView(ctx, row, asg.Communes, selected)
 	v.Replayed = replayed
@@ -452,12 +478,20 @@ func (s *Service) ResolveContext(ctx context.Context, id uuid.UUID) (*authz.KNCo
 		if row.Role == port.KNAdmin && !p.MFA {
 			return nil, problem.MFARequired
 		}
-		viewOnly, allowed := domain.ViewOnlyDepartment(*asg, attrs.ProvinceGroup, row.Department)
+		if _, err := s.attributeCapabilities(*asg, attrs); err != nil {
+			return nil, err
+		}
+		viewOnly, allowed, err := domain.ViewOnlyDepartmentWithCatalog(*asg, attrs.ProvinceGroup, row.Department, s.AttributeCatalog())
+		if err != nil {
+			return nil, ErrContextRevoked
+		}
 		if row.Role != port.KNAdmin && !allowed {
 			return nil, ErrContextRevoked
 		}
 		communes, k.OrgRef, k.UnitRef = asg.Communes, asg.OrgRef, asg.UnitRef
-		applyAttrs(k, *asg, attrs, viewOnly, powers)
+		if err := s.applyAttrs(k, *asg, attrs, viewOnly, powers); err != nil {
+			return nil, err
+		}
 	}
 	var navigationDepartment partyport.Department
 	if row.Role != port.KNAdmin {
@@ -602,15 +636,21 @@ func (s *Service) DisplayNames(ctx context.Context, refs []uuid.UUID) (map[uuid.
 }
 
 // applyAttrs đưa thuộc tính vai (W11.07) vào ngữ cảnh đã giải. Ngữ cảnh chỉ xem không nhận quyền ủy quyền.
-func applyAttrs(k *authz.KNContext, a port.Assignment, attrs port.AssignmentAttrs, viewOnly bool, powers []string) {
+func (s *Service) applyAttrs(k *authz.KNContext, a port.Assignment, attrs port.AssignmentAttrs, viewOnly bool, powers []string) error {
+	caps, err := s.attributeCapabilities(a, attrs)
+	if err != nil {
+		return err
+	}
 	k.MgmtLevel, k.ProvinceGroup, k.InternalUnit = a.MgmtLevel, attrs.ProvinceGroup, attrs.InternalUnit
-	k.Manager = a.Role == port.KNTinh && port.IsManager(a.MgmtLevel, attrs.ProvinceGroup)
+	k.Manager = caps.Manager
 	k.Duties = slices.Clone(attrs.Duties)
-	if a.Role == port.KNXa {
+	if caps.ScopedTargets {
 		k.Facilities, k.Households = slices.Clone(attrs.Facilities), slices.Clone(attrs.Households)
 	}
-	k.ViewOnly = viewOnly
-	if !viewOnly {
+	k.ViewOnly = viewOnly || caps.ForceReadOnly
+	k.Powers = nil
+	if !k.ViewOnly {
 		k.Powers = slices.Clone(powers)
 	}
+	return nil
 }

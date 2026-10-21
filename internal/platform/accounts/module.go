@@ -39,6 +39,7 @@ const DBRole = "accounts_app"
 
 // Deps là phụ thuộc của module.
 type Deps struct {
+	Attributes *port.AttributeCatalog `json:"-"` // nil selects a private legacy snapshot
 	// Roles is an immutable server-side realm-role catalog; nil retains compatibility.
 	Roles           *port.RoleCatalog
 	Navigation      partyport.Navigation // registered application context landing
@@ -75,6 +76,14 @@ type Module struct {
 
 // New tạo module với pool của vai accounts_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
+	catalog := d.Attributes
+	if catalog == nil {
+		catalog = port.LegacyAttributeCatalog()
+	}
+	if !catalog.Valid() {
+		panic("accounts: invalid attribute catalog configuration")
+	}
+	catalog = catalog.Clone()
 	if d.Roles == nil {
 		d.Roles = port.LegacyRoleCatalog()
 	}
@@ -82,7 +91,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		panic("accounts: invalid role catalog configuration")
 	}
 	db = forModule(db)
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs, Navigation: d.Navigation, Roles: d.Roles, AssignmentRules: d.AssignmentRules,
+	return &Module{svc: &app.Service{Attributes: catalog, DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs, Navigation: d.Navigation, Roles: d.Roles, AssignmentRules: d.AssignmentRules,
 		Households: d.Households, Vault: d.Vault, Params: d.Params, SessionPolicies: d.SessionPolicies, Departments: d.Departments, Units: d.Units, Names: d.Names,
 		Modules: d.Modules, DormantDryRun: d.DormantDryRun}, sessions: d.Sessions}
 }

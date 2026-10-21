@@ -63,6 +63,9 @@ const DefaultActionsLifespan = 72 * time.Hour
 type Service struct {
 	AuditRegistry *port.AuditRegistry
 	AuditAccess   port.AuditAccess
+	// Attributes is trusted immutable application-owned catalog data. Nil is the
+	// temporary legacy bridge; a nonnil invalid snapshot never falls back.
+	Attributes *port.AttributeCatalog `json:"-"`
 	// Roles is an immutable server-configured realm-role catalog. Nil keeps the legacy bridge.
 	Roles           *port.RoleCatalog
 	Navigation      partyport.Navigation // final resolver errors never fall back

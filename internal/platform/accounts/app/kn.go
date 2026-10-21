@@ -57,6 +57,9 @@ func (s *Service) knCaller(ctx context.Context) (*actor, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !s.AttributeCatalog().Valid() {
+		return nil, ErrDependency.WithDetail("danh mục thuộc tính chưa sẵn sàng")
+	}
 	if s.Departments == nil {
 		return nil, ErrDependency.WithDetail("chưa nối phòng ban của pf/party")
 	}
