@@ -1,0 +1,1 @@
+- [ ] ADMIN-UNLOCK: GET chi tiết tài khoản trả trạng thái khóa đăng nhập Keycloak độc lập enabled; backend PG/static/lint đạt, phần OpenAPI/giao diện ở #61 chưa tích hợp nên chưa hoàn tất.
