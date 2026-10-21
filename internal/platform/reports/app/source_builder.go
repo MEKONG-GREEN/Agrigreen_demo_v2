@@ -46,6 +46,7 @@ func sourceBuildQuery(j domain.Job, scope authz.Scope) (port.SourceBuildQuery, e
 		return q, ErrDependency
 	}
 	if j.SourceArgs != nil {
+		q.At = j.RequestedAt.UTC()
 		q.ArgsVersion = j.SourceArgs.Version
 		q.SourceArgs = slices.Clone(j.SourceArgs.Args)
 	}

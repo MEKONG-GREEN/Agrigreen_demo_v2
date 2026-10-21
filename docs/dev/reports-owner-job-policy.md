@@ -8,7 +8,7 @@ Dùng SourceBuilderRegistration.JobPolicy cùng builder hiện có; không thêm
 
 ExportInput.SourceArgs và trường HTTP source_args chỉ nhận JSON object tối đa 16 KiB, sâu tối đa 16; cấm khóa trùng, JSON nối tiếp, UTF-8 hỏng và khóa _reports_source. Nguồn không đăng ký policy từ chối SourceArgs thay vì bỏ qua. Owner Freeze phải giải lược đồ đóng, cấm trường identity/tenant/scope do client truyền, kiểm ngày/mã, chuẩn hóa mặc định theo RequestedAt. Freeze nhận JobID/TenantID/RequestedBy/RequestedAt/Source/TemplateKey/Format do server lập; không thể trả lại các trường này.
 
-Snapshot trong Job.SourceArgs mang json:"-". Codec lưu phần riêng _reports_source trong cột params JSONB hiện có, không thêm migration. Snapshot ràng buộc source/version/job/tenant/requester/time/mẫu/phiên bản/định dạng. Native Params không có snapshot giữ byte marshal cũ. Cổng đọc chuẩn hóa lại JSON object sau PostgreSQL JSONB để replay không phụ thuộc thứ tự khóa của DB. Không trả snapshot qua DTO, event, lỗi hoặc log.
+Snapshot trong Job.SourceArgs mang json:"-". Codec lưu phần riêng _reports_source trong cột params JSONB hiện có, không thêm migration. Snapshot ràng buộc source/version/job/tenant/requester/time/mẫu/phiên bản/định dạng. Native Params không có snapshot giữ byte marshal cũ. Cổng đọc chuẩn hóa lại JSON object sau PostgreSQL JSONB để replay không phụ thuộc thứ tự khóa của DB. Thời điểm truyền cho owner được chuẩn UTC kể cả khi PostgreSQL trả timestamptz theo múi giờ máy. Các trường Params không biết vẫn theo hợp đồng native bị bỏ qua và không thể thay snapshot riêng. Không trả snapshot qua DTO, event, lỗi hoặc log.
 
 SourceBuildQuery bổ sung JobID, RequestedBy, ArgsVersion và SourceArgs được sao chép từ việc xuất thực. Các slice/JSON đều sao chép qua ranh giới callback.
 
@@ -16,7 +16,7 @@ SourceBuildQuery bổ sung JobID, RequestedBy, ArgsVersion và SourceArgs đư�
 
 AuthorizeJob chạy ở request, replay (gồm nhánh tranh unique-key), list, detail, download và worker build. RequestedBy không cho phép bỏ qua owner authorization. SourceJobAccess mang operation, Now, actual ActorRef của HTTP, metadata bất biến và Scope/SourceArgs sao chép. Worker ActorRef là UUID Nil; owner phải tra quyền hiện tại của RequestedBy trong tenant từ nguồn đáng tin cậy. Không dựng Principal từ vai đã lưu. Owner phải kiểm MFA/session/Admin, thu hồi, hạn, readonly và phạm vi của toàn snapshot; lỗi dependency từ chối.
 
-Replay dùng JobID/RequestedAt gốc để Freeze cùng as_of; vẫn kiểm quyền tại Now. Actor/mẫu/format/Params/phạm vi/canonical args thay đổi bị từ chối. Version snapshot không khớp registry, snapshot thiếu hoặc sai metadata đều dừng, không fallback. Bỏ policy khỏi registry cũng không làm snapshot cũ trở thành nguồn native.
+Replay dùng JobID/RequestedAt gốc chuẩn UTC để Freeze cùng as_of; vẫn kiểm quyền tại Now. Actor/mẫu/format/Params/phạm vi/canonical args thay đổi bị từ chối. Version snapshot không khớp registry, snapshot thiếu hoặc sai metadata đều dừng, không fallback. Bỏ policy khỏi registry cũng không làm snapshot cũ trở thành nguồn native.
 
 reports.Module.Middleware() là RequestMiddleware đã được gốc lắp ráp đặt sau xác thực/middleware accounts và trước common idempotency cache. Nó kiểm quyền owner và nội dung replay trước khi cached 202 có thể được trả. Khi lắp module thủ công phải đặt middleware này ở cùng vị trí. Cache scope hash không thay thế live authorization.
 

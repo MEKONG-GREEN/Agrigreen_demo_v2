@@ -52,7 +52,7 @@ func (s *Service) freezeSourceArgs(ctx context.Context, j *domain.Job, raw json.
 	}
 	frozen, err := policy.Freeze(ctx, port.SourceFreezeRequest{
 		Source: j.Def.Source, TemplateKey: j.TemplateKey, Format: j.Format, TenantID: j.TenantID,
-		JobID: j.ID, RequestedBy: j.RequestedBy, RequestedAt: j.RequestedAt, SourceArgs: slices.Clone(input),
+		JobID: j.ID, RequestedBy: j.RequestedBy, RequestedAt: j.RequestedAt.UTC(), SourceArgs: slices.Clone(input),
 	})
 	if err != nil {
 		return sourcePolicyError(err, true)
@@ -92,7 +92,7 @@ func (s *Service) authorizeSourceJob(ctx context.Context, j domain.Job, actor uu
 	}
 	err = policy.AuthorizeJob(ctx, port.SourceJobAccess{
 		Operation: op, Now: s.now(), ActorRef: actor, Source: j.Def.Source, TemplateKey: j.TemplateKey, Format: j.Format,
-		TenantID: j.TenantID, JobID: j.ID, RequestedBy: j.RequestedBy, RequestedAt: j.RequestedAt,
+		TenantID: j.TenantID, JobID: j.ID, RequestedBy: j.RequestedBy, RequestedAt: j.RequestedAt.UTC(),
 		ArgsVersion: j.SourceArgs.Version, Scope: authz.Scope{All: j.ScopeAll, Units: slices.Clone(j.ScopeUnits)}, SourceArgs: slices.Clone(j.SourceArgs.Args),
 	})
 	return true, sourcePolicyError(err, false)
@@ -108,10 +108,10 @@ func (s *Service) sourceRequestJob(ctx context.Context, p authz.Principal, t dom
 	now := s.now()
 	id := ids.New()
 	if enabled {
-		now = now.Truncate(time.Microsecond)
+		now = now.UTC().Truncate(time.Microsecond)
 	}
 	if original != nil {
-		id, now = original.ID, original.RequestedAt
+		id, now = original.ID, original.RequestedAt.UTC()
 	}
 	var scope authz.Scope
 	var err error

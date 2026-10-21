@@ -73,8 +73,8 @@ func TestReportsOwnerAuthorizationPrecedesHTTPIdempotencyCache(t *testing.T) {
 	server := httptest.NewServer(router)
 	defer server.Close()
 	token := issuer.Sign(t, authztest.Token{Subject: actor, TenantID: tid, Roles: []string{authz.RolePlatformAdmin}, MFA: true})
-	post := func(key, filter string) (int, string, bool) {
-		req, e := http.NewRequest(http.MethodPost, server.URL+"/v1/reports/exports", strings.NewReader(`{"template_key":"example.audit_layout","format":"xlsx","params":{"level":"province"},"source_args":{"filter":"`+filter+`"}}`))
+	postRaw := func(key, raw string) (int, string, bool) {
+		req, e := http.NewRequest(http.MethodPost, server.URL+"/v1/reports/exports", strings.NewReader(raw))
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -85,12 +85,19 @@ func TestReportsOwnerAuthorizationPrecedesHTTPIdempotencyCache(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		defer response.Body.Close()
+		defer func() {
+			if e := response.Body.Close(); e != nil {
+				t.Errorf("close response: %v", e)
+			}
+		}()
 		body, _ := io.ReadAll(response.Body)
 		if bytes.Contains(body, []byte("private-marker")) || bytes.Contains(body, []byte("source_args")) || bytes.Contains(body, []byte("_reports_source")) {
 			t.Fatalf("HTTP body leaked filter: %s", body)
 		}
 		return response.StatusCode, string(body), response.Header.Get(idempotency.ReplayedHeader) == "true"
+	}
+	post := func(key, filter string) (int, string, bool) {
+		return postRaw(key, `{"template_key":"example.audit_layout","format":"xlsx","params":{"level":"province"},"source_args":{"filter":"`+filter+`"}}`)
 	}
 	status, first, replayed := post("owner-http-cache-01", "private-marker")
 	if status != http.StatusAccepted || replayed {
@@ -108,6 +115,27 @@ func TestReportsOwnerAuthorizationPrecedesHTTPIdempotencyCache(t *testing.T) {
 		t.Fatalf("revoked owner received cached 202: %d %s", status, body)
 	}
 	active.Store(true)
+	status, body, _ = postRaw("owner-http-private-02", `{"template_key":"example.audit_layout","format":"xlsx","params":{"level":"province"},"source_args":{"filter":"private-marker","_reports_source":{"job_id":"forged"}}}`)
+	if status != http.StatusUnprocessableEntity {
+		t.Fatalf("private envelope injection accepted: %d %s", status, body)
+	}
+	status, body, _ = postRaw("owner-http-params-03", `{"template_key":"example.audit_layout","format":"xlsx","params":{"level":"province","_reports_source":{"source":"forged","job_id":"forged"}},"source_args":{"filter":"private-marker"}}`)
+	if status != http.StatusAccepted {
+		t.Fatalf("legacy unknown Params fields changed behavior: %d %s", status, body)
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(body), &created); err != nil {
+		t.Fatal(err)
+	}
+	var source, storedID string
+	if err := env.AdminPool(t, migrations.PF).QueryRow(context.Background(), "SELECT params->'_reports_source'->>'source',params->'_reports_source'->>'job_id' FROM pf_reports.export_job WHERE tenant_id=$1 AND id=$2::uuid", tid, created.ID).Scan(&source, &storedID); err != nil {
+		t.Fatal(err)
+	}
+	if source != "example.audit" || storedID != created.ID {
+		t.Fatal("unknown Params fields replaced trusted private envelope")
+	}
 	status, body, _ = post("owner-http-cache-01", "different")
 	if status != http.StatusUnprocessableEntity {
 		t.Fatalf("changed filter was replayed: %d %s", status, body)

@@ -101,7 +101,14 @@ func TestSourcePolicyBindsRequestReplayAndHidesErrors(t *testing.T) {
 	if err = svc.checkSourceReplay(ctx, p, in, j); err != nil {
 		t.Fatal(err)
 	}
-	if calls != 2 {
+	// PostgreSQL may scan timestamptz with the machine's +07 location.
+	// Freeze defaults must still receive canonical UTC server metadata.
+	localJob := j
+	localJob.RequestedAt = j.RequestedAt.In(time.FixedZone("VN", 7*60*60))
+	if err = svc.checkSourceReplay(ctx, p, in, localJob); err != nil {
+		t.Fatalf("same instant localzone changed snapshot: %v", err)
+	}
+	if calls != 3 {
 		t.Fatalf("replay skipped current authorization: %d", calls)
 	}
 	changed := in
@@ -121,9 +128,19 @@ func TestSourcePolicyBindsRequestReplayAndHidesErrors(t *testing.T) {
 	if _, err = svc.authorizeSourceJob(tenant.WithID(ctx, uuid.New()), j, p.ActorRef, port.SourceJobDetail); err == nil {
 		t.Fatal("tenant mismatch accepted")
 	}
+	versioned := j
+	frozen := *j.SourceArgs
+	frozen.Version = 99
+	versioned.SourceArgs = &frozen
+	if _, err = svc.authorizeSourceJob(ctx, versioned, p.ActorRef, port.SourceJobDetail); err == nil {
+		t.Fatal("unknown version accepted")
+	}
 	// Native callers cannot supply an ignored filter extension.
 	native := *svc
 	native.Builders = NewSourceBuilderRegistry(port.SourceBuilderRegistration{Source: "example.measure", Build: build})
+	if _, err = native.authorizeSourceJob(ctx, j, p.ActorRef, port.SourceJobDetail); err == nil {
+		t.Fatal("removed policy fell back to native")
+	}
 	if _, err = native.sourceRequestJob(ctx, p, tpl, in, nil); err == nil {
 		t.Fatal("native dropped custom args")
 	}
