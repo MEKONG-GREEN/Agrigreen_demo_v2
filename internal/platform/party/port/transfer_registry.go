@@ -22,19 +22,31 @@ type TransferCutoverProof struct {
 }
 type TransferCutoverCheck func(TransferParticipants, TransferScope, TransferReport) (TransferCutoverProof, error)
 
+type TransferRecoveryProof struct {
+	PlanID, OperationID, ReasonRef              uuid.UUID
+	IdentityRollbackReceipt, RehearsalReceipt   uuid.UUID
+	BindingHash, ManifestHash, CompensationRoot TransferDigest
+	ValidUntil                                  time.Time
+}
+type TransferRecoveryCheck func(TransferParticipants, TransferRecoveryRequest, TransferReport) (TransferRecoveryProof, error)
+
 type TransferRegistry struct {
 	verifier TransferTokenVerifier
 	adapters []TransferAdapter
 	cutover  TransferCutoverCheck
+	recovery TransferRecoveryCheck
 }
 
 // NewTransferRegistry freezes owner registrations. Missing owner operations never
 // become successful no-ops. Nil cutover keeps PrepareCutover unavailable until owners supply proofs.
-func NewTransferRegistry(adapters []TransferAdapter, verifier TransferTokenVerifier, cutover TransferCutoverCheck) (*TransferRegistry, error) {
-	if transferVerifierMissing(verifier) || len(adapters) == 0 || len(adapters) > 64 {
+func NewTransferRegistry(adapters []TransferAdapter, verifier TransferTokenVerifier, cutover TransferCutoverCheck, recovery ...TransferRecoveryCheck) (*TransferRegistry, error) {
+	if len(recovery) > 1 || transferVerifierMissing(verifier) || len(adapters) == 0 || len(adapters) > 64 {
 		return nil, ErrTransferConfiguration
 	}
 	r := &TransferRegistry{cutover: cutover, verifier: verifier}
+	if len(recovery) == 1 {
+		r.recovery = recovery[0]
+	}
 	seen := map[string]bool{}
 	for _, a := range adapters {
 		if _, ok := modreg.Entry(a.Module); !ok {
@@ -493,4 +505,11 @@ func TransferLogicalRoot(headers []TransferHeader) (TransferDigest, error) {
 		Version string
 		Items   []item
 	}{"party.transfer.logical/v1", out})
+}
+
+func (r *TransferRegistry) Recovery() TransferRecoveryCheck {
+	if r == nil {
+		return nil
+	}
+	return r.recovery
 }

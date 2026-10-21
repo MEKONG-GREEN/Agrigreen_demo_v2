@@ -28,13 +28,16 @@ import (
 )
 
 type transferProtocolOwner struct {
-	mu        sync.Mutex
-	headers   map[uuid.UUID][]port.TransferHeader
-	approvals map[string]port.TransferApproval
-	holders   map[string]uuid.UUID
-	fences    map[string]port.TransferFence
-	revoked   bool
-	omitLast  bool
+	mu         sync.Mutex
+	headers    map[uuid.UUID][]port.TransferHeader
+	approvals  map[string]port.TransferApproval
+	holders    map[string]uuid.UUID
+	fences     map[string]port.TransferFence
+	revoked    bool
+	omitLast   bool
+	scanError  error
+	emptyPages bool
+	scanCalls  int
 }
 
 func newTransferProtocolOwner() *transferProtocolOwner {
@@ -103,6 +106,13 @@ func (o *transferProtocolOwner) adapter() port.TransferAdapter {
 	a.Scan = func(ctx context.Context, req port.TransferScanRequest) (port.TransferPage, error) {
 		o.mu.Lock()
 		defer o.mu.Unlock()
+		o.scanCalls++
+		if o.scanError != nil {
+			return port.TransferPage{}, o.scanError
+		}
+		if o.emptyPages {
+			return port.TransferPage{Next: strconv.Itoa(o.scanCalls)}, nil
+		}
 		start := 0
 		if req.Cursor != "" {
 			var err error
@@ -328,5 +338,43 @@ func TestTenantTransferProtocolMissingInventoryCannotSeal(t *testing.T) {
 	}
 	if _, err := svc.Seal(p, ref); !errors.Is(err, port.ErrTransferConflict) {
 		t.Fatal("complete cursor with omitted header sealed", err)
+	}
+}
+
+func TestTenantTransferProtocolOwnerErrorsAreOpaqueAndDryRunTerminates(t *testing.T) {
+	pgtest.Get(t)
+	iss := authztest.New(t)
+	owner := newTransferProtocolOwner()
+	st, ss, tt, ts := ids.New(), ids.New(), ids.New(), ids.New()
+	p := transferProtocolPair(t, iss, st, ss, tt, ts)
+	svc := transferProtocolService(t, owner, iss)
+	_, plan := transferProtocolPlan(t, svc, p, ss, ts)
+	ref := port.TransferRef{ID: plan.ID}
+	owner.mu.Lock()
+	owner.emptyPages = true
+	owner.mu.Unlock()
+	if _, err := svc.DryRun(p, ref); !errors.Is(err, port.ErrTransferConflict) {
+		t.Fatal("empty advancing scanner was not rejected", err)
+	}
+	owner.mu.Lock()
+	calls := owner.scanCalls
+	owner.emptyPages = false
+	owner.mu.Unlock()
+	if calls != 1 {
+		t.Fatal("empty scanner consumed unbounded callbacks", calls)
+	}
+	if _, err := svc.FreezeSource(p, ref); err != nil {
+		t.Fatal(err)
+	}
+	marker := "private-owner-payload-do-not-echo"
+	owner.mu.Lock()
+	owner.scanError = errors.New(marker)
+	owner.mu.Unlock()
+	if _, err := svc.ScanNext(p, ref); !errors.Is(err, port.ErrTransferDependency) || strings.Contains(err.Error(), marker) {
+		t.Fatal("owner error leaked or became absent receipt", err)
+	}
+	status, err := svc.Status(p, ref)
+	if err != nil || status.Count != 0 || status.Status != "frozen" {
+		t.Fatal("failed owner read advanced checkpoint", status, err)
 	}
 }

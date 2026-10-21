@@ -14,6 +14,7 @@ var (
 	ErrTransferAuthority     = errors.New("party: transfer authority required")
 	ErrTransferConflict      = errors.New("party: transfer evidence conflict")
 	ErrTransferNotReady      = errors.New("party: transfer evidence is not ready")
+	ErrTransferDependency    = errors.New("party: transfer owner unavailable")
 )
 
 // TransferTokenVerifier is the real API verifier, not an owner boolean.

@@ -23,6 +23,8 @@ type TransferScanState struct {
 // TransferState is an immutable ledger snapshot, never an authorization cache.
 // Sequence is DB-derived and excluded from the hashed document to avoid recursion.
 type TransferState struct {
+	VerifiedRoot    port.TransferDigest              `json:"verified_root"`
+	CutoverProof    *port.TransferCutoverProof       `json:"cutover_proof,omitempty"`
 	Intent          port.TransferIntent              `json:"intent"`
 	Plan            port.TransferPlan                `json:"plan"`
 	SourceApprovals map[string]port.TransferApproval `json:"source_approvals"`

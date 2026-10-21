@@ -117,6 +117,7 @@ CREATE TABLE pf_party.transfer_receipt (
   operation text NOT NULL CHECK (operation IN ('export', 'apply', 'verify', 'compensate', 'release_source', 'release_target')),
   namespace text NOT NULL CHECK (char_length(namespace) BETWEEN 1 AND 96),
   owner_receipt_ref uuid NOT NULL,
+  document_hash text NOT NULL CHECK (document_hash ~ '^[a-f0-9]{64}$'),
   document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
   actor_ref uuid NOT NULL,
   created_at timestamptz NOT NULL,

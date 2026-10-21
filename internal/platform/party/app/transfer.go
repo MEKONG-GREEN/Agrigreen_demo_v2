@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"slices"
 	"time"
 
@@ -51,6 +52,20 @@ func (t *Transfers) authenticate(p port.TransferParticipants) error {
 }
 func (t *Transfers) local(ctx context.Context, fn func(pgx.Tx) error) error {
 	return db.WithContextTx(ctx, t.database, transferModule, fn)
+}
+
+// Unknown owner errors must not leak SQL/private artifact details or be mistaken
+// for an absent receipt (which could otherwise trigger a new owner write).
+func transferOwnerError(err error) error {
+	if err == nil {
+		return nil
+	}
+	for _, safe := range []error{port.ErrTransferConfiguration, port.ErrTransferAuthority, port.ErrTransferConflict, port.ErrTransferNotReady, port.ErrTransferDependency} {
+		if errors.Is(err, safe) {
+			return safe
+		}
+	}
+	return port.ErrTransferDependency
 }
 func transferActor(ctx context.Context) uuid.UUID  { p, _ := authz.FromContext(ctx); return p.ActorRef }
 func transferTenant(ctx context.Context) uuid.UUID { p, _ := authz.FromContext(ctx); return p.TenantID }
@@ -413,6 +428,7 @@ func (t *Transfers) FreezeTarget(p port.TransferParticipants, ref port.TransferR
 		}
 		f, err := a.FenceTarget(p.Target(), req)
 		if err != nil {
+			err = transferOwnerError(err)
 			return port.TransferIntent{}, err
 		}
 		if !validTransferFence(f) {
@@ -451,6 +467,7 @@ func (t *Transfers) FreezeSource(p port.TransferParticipants, ref port.TransferR
 		}
 		f, err := a.FenceSource(p.Source(), req)
 		if err != nil {
+			err = transferOwnerError(err)
 			return port.TransferPlan{}, err
 		}
 		if !validTransferFence(f) {
@@ -482,7 +499,7 @@ func (t *Transfers) ScanNext(p port.TransferParticipants, ref port.TransferRef) 
 		}
 		page, err := a.Scan(p.Source(), port.TransferScanRequest{Scope: source.Plan.Scope, Namespace: a.Namespace, Fence: source.SourceFences[a.Namespace], Cursor: scan.Cursor, Limit: a.MaxBatch})
 		if err != nil {
-			return port.TransferPlan{}, err
+			return port.TransferPlan{}, transferOwnerError(err)
 		}
 		page, err = transferClone(page)
 		if err != nil {
@@ -627,16 +644,19 @@ func (t *Transfers) DryRun(p port.TransferParticipants, ref port.TransferRef) (p
 	for _, a := range adapters {
 		cursor := ""
 		seen := map[string]bool{}
-		for {
+		for pageNumber := 0; ; pageNumber++ {
+			if pageNumber >= 100001 || p.Source().Err() != nil || p.Target().Err() != nil {
+				return port.TransferReport{}, port.ErrTransferNotReady
+			}
 			page, err := a.Scan(p.Source(), port.TransferScanRequest{Scope: source.Plan.Scope, Namespace: a.Namespace, Cursor: cursor, Limit: a.MaxBatch, DryRun: true})
 			if err != nil {
-				return port.TransferReport{}, err
+				return port.TransferReport{}, transferOwnerError(err)
 			}
 			page, err = transferClone(page)
 			if err != nil {
 				return port.TransferReport{}, err
 			}
-			if len(page.Items) > a.MaxBatch || len(all)+len(page.Items) > 100000 || len(page.Next) > 512 {
+			if (!page.Complete && len(page.Items) == 0) || len(page.Items) > a.MaxBatch || len(all)+len(page.Items) > 100000 || len(page.Next) > 512 {
 				return port.TransferReport{}, port.ErrTransferConflict
 			}
 			if _, err := port.TransferHeaderRoot(source.Plan.Scope.SourceTenant, source.Plan.Scope.SourceScopeRef, a.Namespace, page.Items); err != nil {
@@ -660,22 +680,7 @@ func (t *Transfers) DryRun(p port.TransferParticipants, ref port.TransferRef) (p
 	return port.TransferReport{PlanID: ref.ID, Count: len(all), Root: root, Provisional: true}, err
 }
 
-// Later stages stay unavailable until their durable receipt/recovery implementation exists.
-func (t *Transfers) ReserveBatch(port.TransferParticipants, port.TransferRef, int) (port.TransferBatch, error) {
-	return port.TransferBatch{}, port.ErrTransferNotReady
-}
-func (t *Transfers) ExportBatch(port.TransferParticipants, port.TransferBatchRef) (port.TransferArtifact, error) {
-	return port.TransferArtifact{}, port.ErrTransferNotReady
-}
-func (t *Transfers) ApplyBatch(port.TransferParticipants, port.TransferBatchRef) (port.TransferReceipt, error) {
-	return port.TransferReceipt{}, port.ErrTransferNotReady
-}
-func (t *Transfers) Verify(port.TransferParticipants, port.TransferRef) (port.TransferReport, error) {
-	return port.TransferReport{}, port.ErrTransferNotReady
-}
-func (t *Transfers) PrepareCutover(port.TransferParticipants, port.TransferRef) (port.TransferPlan, error) {
-	return port.TransferPlan{}, port.ErrTransferNotReady
-}
+// Recovery stages stay unavailable until their durable compensation/release implementation exists.
 func (t *Transfers) Compensate(port.TransferParticipants, port.TransferBatchRef, uuid.UUID) (port.TransferReceipt, error) {
 	return port.TransferReceipt{}, port.ErrTransferNotReady
 }
