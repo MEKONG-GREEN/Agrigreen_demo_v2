@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-REPORTS-OWNER (#54): kiểm kê sáu điểm đăng ký/lắp ráp đã có; không thêm port hoặc đổi runtime. Đang xác minh reports/scheduler/owner HTTP trên PostgreSQL riêng, static và 35 golden giữ nguyên; chờ bằng chứng thực, Claude Review OK và gộp qua ticket. Custom audit export thuộc #64, chưa hoàn tất ở đây.
