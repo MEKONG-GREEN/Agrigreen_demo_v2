@@ -17,7 +17,7 @@ riêng, không thay thế diễn tập worker và gửi email trên môi trườ
 | Sự kiện nộp biểu và đọc nguồn theo tenant | `TestFormsSubmissionFeed_W1143` | G1 |
 | Người nhận không trùng; thông báo chủ đề khi thiếu người nhận; kênh email cho cảnh báo Khẩn/nhắc được cấu hình | `TestCNTSNotifications_W1143` | G1 |
 | Danh sách và thao tác cảnh báo, cấu hình nhắc; menu tỉnh/xã | Vitest `src/kn/cnts/alert/alert.test.ts`; `TestWebMenuFixture`; `kn-menu.contract.test.ts` | G1 |
-| Cảnh báo chất lượng nước, tăng trưởng, tỷ lệ chết, vị trí, nhật ký trễ, lịch tiêm trễ (dòng 6–11) | `TestLogRules` chỉ kiểm hàm đánh giá | Chờ nguồn W11.48/CN6 sau G1 |
+| Cảnh báo chất lượng nước, tăng trưởng, tỷ lệ chết, vị trí (dòng 6–9) từ lần ghi nhật ký; nhật ký trễ, lịch tiêm trễ (dòng 10–11) | `TestCNTSDiary_W1148` (dòng 6, 9 trên PostgreSQL thật), `TestLogRules`, `TestEvaluatePoultry` | Dòng 6–9: G1 (W11.48); dòng 10–11: chờ job |
 
 Chưa nghiệm thu: widget “Việc cần làm” cấp Xã, người phụ trách riêng theo đợt
 phát hành, bản đồ/biểu đồ cảnh báo và nút báo nghi dịch từ tỷ lệ chết.
@@ -62,3 +62,21 @@ Nguồn và giới hạn: [giả định W11.47](../kn/gia-dinh/W11.47.md) (Q-02
 
 Chưa nghiệm thu: FN-14 AC-01/AC-03 (quyền KN vào phạm vi phiên `pf/accounts`, phạm vi KSGM BM-01 — ticket làn shared),
 mẫu biểu dự án BM-12…BM-16 (W11.53), nạp Excel điểm/hộ, chọn tọa độ trên bản đồ (W11.52), nông hộ tự nhập (GĐ2).
+
+## Nhật ký nuôi BM-08/09/19 W11.48
+
+Nguồn và giới hạn: [giả định W11.48](../kn/gia-dinh/W11.48.md) (Q-077 mẫu BM-19, Q-005 hạn lưu GPS/cơ sở mở ảnh là giả định tạm).
+
+| Tiêu chí | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| ★ UR-XA-11 (NC-02…NC-15): lứa nuôi gắn hộ mô hình KN (mẫu theo điểm, một lứa đang nuôi); lần ghi hằng ngày; NC-05 lệch số sống − chết − xuất bán → chặn; NC-06 > 0 thiếu NC-07 → chặn; xuất bán trong thời gian ngưng thuốc → cảnh báo; sổ vịt xiêm không có điều trị, xuất bán; một lần ghi mỗi ngày | `TestCNTSDiary_W1148`, `TestEntryNormalize`, `TestEvaluatePoultry`; Vitest `src/kn/cnts/diary/diary.test.ts`, `DiaryScreens.test.tsx` | G1 |
+| ★ UR-XA-12 (NT-02…NT-15, Q-077 giả định): cân đo thiếu ảnh cân mẫu → chặn; pH 8,7 → cảnh báo môi trường nước tới chủ nhiệm và cán bộ theo dõi ngay khi gửi (FN-10 AC-02), thiếu biện pháp NT-12 → chặn | `TestCNTSDiary_W1148`, `TestEvaluateAquaticAndLocation` | G1 |
+| ★ NT-15: vị trí lúc ghi không sửa được; khoảng cách tới tọa độ hộ, > 200 m đánh dấu và cảnh báo dòng 9; nghi giả lập (cờ thiết bị, sai số 0, trùng tọa độ); sổ không có tọa độ, tọa độ ở bảng thường không UPDATE, dọn theo hạn lưu giữ khoảng cách trong sổ (QĐ-8) | `TestCNTSDiary_W1148`, `TestEvaluateAquaticAndLocation` | G1 (cờ giả lập từ thiết bị: chưa) |
+| ★ Ảnh: ≤ 500 KB, đúng kiểu; bản mã ở `pf/evidence`, mã hóa bằng khóa chủ hộ; chỉ người ghi được/chủ nhiệm/Admin xem; xóa định danh chủ hộ → ảnh không đọc được | `TestCNTSDiary_W1148` (kho tệp giả gọi Resolver/FileAuthorizer thật) | G1 |
+| ★ UR-TINH-12, FN-13: chủ nhiệm chỉ rà soát chương trình mình; xác thực / yêu cầu bổ sung có lý do; người xác thực khác người ghi (ứng dụng + CHECK sổ); đã xác thực không có nút Sửa (AC-04), điều chỉnh tạo bản mới có lý do và chờ xác thực lại; sửa bản đã gửi quá 7 ngày bị chặn | `TestCNTSDiary_W1148`, `TestTransitionAndAccounting`; Vitest `DiaryScreens.test.tsx` | G1 |
+| ★ FN-10 AC-03 (một phần): mã lần ghi máy khách, thời điểm thiết bị, gửi lại cùng khóa trả bản đã ghi | `TestCNTSDiary_W1148` | G1 (hàng đợi ngoại tuyến App xã: chưa) |
+| NC-15: hạch toán cuối lứa (tổng thu bắt buộc), gợi ý chi thức ăn/thu từ nhật ký, lợi nhuận, giá thành, lợi nhuận trung bình/hộ theo điểm; mở lại lứa có lý do | `TestCNTSDiary_W1148`, `TestTransitionAndAccounting`; Vitest | G1 |
+| Menu Tỉnh "Rà soát nhật ký", Xã "Nhật ký sản xuất" | `TestWebMenuFixture`; `kn-menu.contract.test.ts` | G1 |
+
+Chưa nghiệm thu: ghi ngoại tuyến trên App xã (entity `pf/sync`), nông hộ tự ghi (W11.55), cảnh báo quá hạn ghi (dòng 10),
+NC-11 cập nhật lịch tiêm BM-07, chuẩn kỹ thuật theo mẫu (UR-TINH-07), Mẫu 05 lấy thực tế (W11.53), bản đồ vị trí (W11.52).
