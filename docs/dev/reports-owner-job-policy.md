@@ -35,3 +35,18 @@ Nguồn policy-enabled chưa được lập lịch: tạo mới, replay lịch c
 Các test domain kiểm byte native, private codec, metadata binding, unknown/duplicate/depth/size/UTF-8. Test app kiểm callback snapshot/clone, request/replay authority và lỗi không lộ filter. PostgreSQL kiểm roundtrip JSONB, replay as_of, worker dựng artifact, revoke/readonly/dependency ở mọi lối, tenant khác, DLP/outbox và lịch cũ. Test assembly HTTP kiểm cùng token/body/key sau khi thu hồi quyền không nhận cached 202.
 
 Kết quả kiểm thực tế được ghi trên issue #82 sau khi runner kết thúc. Không được coi preflight hoặc DB SKIP là bằng chứng PostgreSQL đạt. 35 golden KHTC không thay đổi.
+
+## Bằng chứng kiểm cuối
+
+Production 19bd68f4; cây mã đóng băng suốt Go/test/lint. Lệnh Go 1.26.9 trên cụm PostgreSQL riêng: go test -v -count=1 -p 1 -timeout 55m ./internal/platform/reports/... ./tests/reports ./cmd/api-platform/assembly — actual exit 0, 95 test cấp đầu PASS, không FAIL/SKIP/INFRA.
+
+- reports/app 95.962s; lifecycle PG mới 0.17s, exact numeric JSONB 0.00s, pending scheduled delivery 0.01s.
+- tests/reports 76.175s: native export, scope, quota/anomaly, lịch/delivery, history đều PASS.
+- assembly 105.071s; HTTP owner cache 0.19s, gồm revoke cùng token/key/body, source_args reserved injection, Params không ghi đè snapshot và gỡ policy cuối cùng.
+- domain 0.704s, dispatch 0.753s, formula 0.947s, mail 0.743s, render 0.945s; typed int100/1000, UTC cùng instant +07, số rất lớn/nhỏ và guard phạm vi native đều PASS.
+- build/vet/modgen/migration/archlint/contractcheck/docscheck/knboundary đều 0. Lint toàn repo 0 issues. Boundary 314. Gofmt chỉ còn hai tệp archlint testdata có sẵn.
+- Cụm tạm 127.0.0.1:52734, thư mục 9fd439af75c5 đã dừng và dọn. tests/golden có 35 tệp, tree 06a780646532b38221d14cea61d636b1f78c5033 giữ nguyên byte; thư mục con KHTC cũng không thay.
+
+Giữ nguyên lịch sử thất bại trước sửa: source đầu exit1 (UTC replay qua timestamptz làm khác as_of), lint đầu exit1 (test Close response chưa kiểm lỗi). Lượt revised source exit1 chỉ vì assertion của HTTP test nhầm tên trường problem.errors.field là rò payload. Các lỗi đã sửa, vòng full cuối ở trên đạt; không đổi thất bại cũ thành PASS.
+
+Chờ Claude Review OK và tích hợp qua ticket.ps1. Owner #83 còn phải đăng ký nguồn thật, quyền Admin/MFA hiện hành, trusted reader + durable read receipt, schema/generated/mock/web và retention. Chưa hoàn thành AUDIT-LOG #64.
