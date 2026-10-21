@@ -1,0 +1,1 @@
+- [ ] REPORTS-OWNER-JOB-POLICY (#82): shared snapshot args riêng có version + live owner authorization trên pipeline exports/cache/worker; đang kiểm PostgreSQL, chờ owner KN #83 và Claude Review OK. Chưa hoàn thành AUDIT-LOG #64.

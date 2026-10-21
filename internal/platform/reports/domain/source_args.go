@@ -170,9 +170,11 @@ func UnmarshalJobParams(raw []byte, j *Job) error {
 		if err := d.Decode(&f); err != nil {
 			return ErrSourceArgs
 		}
-		if _, err := CanonicalSourceArgs(f.Args); err != nil {
+		canonical, err := CanonicalSourceArgs(f.Args)
+		if err != nil {
 			return err
 		}
+		f.Args = canonical
 		j.SourceArgs = &f
 		return j.ValidateSourceArgs()
 	}

@@ -14,7 +14,7 @@ func frozenJob() Job {
 	j := Job{ID: uuid.New(), TenantID: uuid.New(), RequestedBy: uuid.New(), RequestedAt: time.Date(2026, 10, 21, 3, 0, 0, 0, time.UTC),
 		TemplateKey: "example.layout", Format: "xlsx", Params: Params{Level: "province"}, Def: Definition{Source: "example.measure"}}
 	j.SourceArgs = &FrozenSourceArgs{Source: j.Def.Source, Version: 1, JobID: j.ID, TenantID: j.TenantID, RequestedBy: j.RequestedBy,
-		RequestedAt: j.RequestedAt, TemplateKey: j.TemplateKey, TemplateVersion: j.TemplateVersion, Format: j.Format, Args: json.RawMessage(`{"filter":"private-marker","as_of":"2026-10-21T03:00:00Z"}`)}
+		RequestedAt: j.RequestedAt, TemplateKey: j.TemplateKey, TemplateVersion: j.TemplateVersion, Format: j.Format, Args: json.RawMessage(`{"as_of":"2026-10-21T03:00:00Z","filter":"private-marker"}`)}
 	return j
 }
 func TestSourceArgsCodecNativeAndPrivate(t *testing.T) {
