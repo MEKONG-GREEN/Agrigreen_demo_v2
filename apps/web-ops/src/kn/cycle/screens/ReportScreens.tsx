@@ -9,7 +9,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { DetailLayout, LogPanel } from "@/components/patterns/detail";
 import { AlertList, HotMetric, ProgressList, SectionTitle, type DashboardAlert } from "@/components/patterns/dashboard";
-import { FilterBar, FilterChip, PageHeader, StatusPill } from "@/components/patterns/list";
+import { DataTable, FilterBar, FilterChip, PageHeader, StatusPill } from "@/components/patterns/list";
 import { formLayout } from "@/kn/forms/api";
 import type { FormDefinition } from "@/kn/forms/types";
 import { FormGrid, allCommuneRows, computedCells, type GridCommune } from "@/kn/grid";
@@ -198,36 +198,28 @@ export function ConsolidationScreen({ title = "Báo cáo tổng hợp các xã",
           </button>
         </div>
         {tab === "runs" ? (
-          <table className="dt" aria-label="Các lần cập nhật">
-            <thead>
-              <tr>
-                <th scope="col">Lần cập nhật</th>
-                <th scope="col">Người bấm</th>
-                <th scope="col">Số xã có dữ liệu</th>
-                <th scope="col">Số xã thay đổi</th>
-                <th scope="col">Số ô thay đổi</th>
-                <th scope="col" />
-              </tr>
-            </thead>
-            <tbody>
-              {(runs.data?.items ?? []).map((r) => (
-                <tr key={r.id} className={r.id === selRun ? "hl" : undefined}>
-                  <td>{dt(r.at)}</td>
-                  <td>{r.trigger === "system" ? "Hệ thống (tự động)" : (r as { actor_display?: string }).actor_display}</td>
-                  <td>
-                    {r.communes_with_data} / {r.communes_total}
-                  </td>
-                  <td>{r.communes_changed}</td>
-                  <td>{r.cells_changed}</td>
-                  <td>
-                    <button type="button" className="btn btn-o btn-sm" onClick={() => setRunSel(r.id)}>
-                      Xem chi tiết
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            caption="Các lần cập nhật"
+            rows={runs.data?.items ?? []}
+            rowKey={(r) => r.id}
+            empty="Chưa có lần cập nhật nào."
+            columns={[
+              { key: "at", header: "Lần cập nhật", cell: (r) => (r.id === selRun ? <b>{dt(r.at)}</b> : dt(r.at)) },
+              { key: "by", header: "Người bấm", cell: (r) => (r.trigger === "system" ? "Hệ thống (tự động)" : (r as { actor_display?: string }).actor_display) },
+              { key: "with", header: "Số xã có dữ liệu", cell: (r) => `${r.communes_with_data} / ${r.communes_total}` },
+              { key: "changed", header: "Số xã thay đổi", cell: (r) => r.communes_changed, className: "num" },
+              { key: "cells", header: "Số ô thay đổi", cell: (r) => r.cells_changed, className: "num" },
+              {
+                key: "act",
+                header: "Thao tác",
+                cell: (r) => (
+                  <button type="button" className="btn btn-o btn-sm" aria-pressed={r.id === selRun} onClick={() => setRunSel(r.id)}>
+                    Xem chi tiết
+                  </button>
+                ),
+              },
+            ]}
+          />
         ) : (
           <ul className="list-plain">
             {((view.data?.v.pending.items ?? []) as unknown as PendingItem[]).map((p) => (
@@ -241,43 +233,28 @@ export function ConsolidationScreen({ title = "Báo cáo tổng hợp các xã",
         {changes.data ? (
           <>
             <h3 style={{ marginTop: 12 }}>Chi tiết lần cập nhật {dt(changes.data.run.at)}</h3>
-            <table className="dt" aria-label="Chi tiết lần cập nhật">
-              <thead>
-                <tr>
-                  <th scope="col">Thời điểm xã gửi</th>
-                  <th scope="col">Xã/phường</th>
-                  <th scope="col">Biểu · cột</th>
-                  <th scope="col">Giá trị cũ → mới</th>
-                  <th scope="col">Người sửa</th>
-                  <th scope="col">Loại thay đổi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {changes.data.items.map((c) => (
-                  <tr key={c.id}>
-                    <td>{ddmm(c.submitted_at)}</td>
-                    <td>{name(c.commune_code)}</td>
-                    <td>
-                      {changes.data!.run.form_code} · {c.letter}
-                    </td>
-                    <td>
+            <DataTable
+              caption="Chi tiết lần cập nhật"
+              rows={changes.data.items}
+              rowKey={(c) => c.id}
+              empty="Lần này không có ô thay đổi."
+              columns={[
+                { key: "at", header: "Thời điểm xã gửi", cell: (c) => ddmm(c.submitted_at) },
+                { key: "commune", header: "Xã/phường", cell: (c) => name(c.commune_code) },
+                { key: "col", header: "Biểu · cột", cell: (c) => `${changes.data!.run.form_code} · ${c.letter}` },
+                {
+                  key: "val",
+                  header: "Giá trị cũ → mới",
+                  cell: (c) => (
+                    <>
                       {num(c.old)} → <b>{num(c.new)}</b>
-                    </td>
-                    <td>{c.kind === "computed" ? "(công thức)" : c.changed_by_display}</td>
-                    <td>
-                      <StatusPill tone={KIND_TONE[c.kind]}>{KIND_LABEL[c.kind]}</StatusPill>
-                    </td>
-                  </tr>
-                ))}
-                {!changes.data.items.length ? (
-                  <tr>
-                    <td colSpan={6} className="empty">
-                      Lần này không có ô thay đổi.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                    </>
+                  ),
+                },
+                { key: "by", header: "Người sửa", cell: (c) => (c.kind === "computed" ? "(công thức)" : c.changed_by_display) },
+                { key: "kind", header: "Loại thay đổi", cell: (c) => <StatusPill tone={KIND_TONE[c.kind]}>{KIND_LABEL[c.kind]}</StatusPill> },
+              ]}
+            />
           </>
         ) : null}
       </section>

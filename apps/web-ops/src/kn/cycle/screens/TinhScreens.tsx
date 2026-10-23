@@ -3,10 +3,11 @@
 // Cấp Tỉnh (BRD §4.3): Phát hành biểu mẫu FN-TI-02.02, Trạng thái nộp FN-TI-02.03, Rà soát & chốt kỳ FN-TI-02.04.
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { Dialog } from "@/components/Dialog";
+import { NumberField, TextField, parseNumberInput, validateForm } from "@/components/form";
 import { ActionBar, BackLink, DetailLayout, LabelValueBlock, LogPanel } from "@/components/patterns/detail";
 import { DataTable, FilterBar, FilterChip, PageHeader, StatusPill, type Column } from "@/components/patterns/list";
 import { formLayout } from "@/kn/forms/api";
@@ -67,6 +68,27 @@ const PERIOD_CHOICES: Record<PublishReportType, { value: PeriodChoice; label: st
   ],
 };
 
+/** Ô ngày bắt buộc có dấu * và lỗi theo trường (UI-KIT chưa có ô ngày riêng; dùng cùng khung `.field`). */
+function DateInput({ label, value, onChange, error }: { label: string; value: string; onChange: (v: string) => void; error?: string }) {
+  const id = useId();
+  return (
+    <div className="field">
+      <label htmlFor={id}>
+        {label}
+        <span className="req" aria-hidden="true">
+          {" "}*
+        </span>
+      </label>
+      <input id={id} className="input" type="date" aria-required value={value} aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-err` : undefined} onChange={(e) => onChange(e.target.value)} />
+      {error ? (
+        <span className="err" id={`${id}-err`} role="alert">
+          {error}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 /** FN-TI-02.02 Phát hành biểu mẫu báo cáo (Hình 7). */
 export function PublishScreen() {
   const { cycleApi, kn } = useAuth();
@@ -82,7 +104,9 @@ export function PublishScreen() {
   const [to, setTo] = useState(ymdLocal(new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 27)));
   const [season, setSeason] = useState("Thu Đông 2026");
   const [deadline, setDeadline] = useState("");
-  const [closeAfter, setCloseAfter] = useState(1);
+  const [closeAfter, setCloseAfter] = useState("1");
+  const [errors, setErrors] = useState<Partial<Record<"from" | "to" | "season" | "closeAfter", string>>>({});
+  const [pvErr, setPvErr] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
   const [pv, setPv] = useState<Record<string, Record<string, Record<string, string>>>>({});
   const [pvSource, setPvSource] = useState<"manual" | "excel">("manual");
@@ -92,7 +116,35 @@ export function PublishScreen() {
   const act = useAction();
   const forms = useLoad(() => cycleApi.reportForms(rt, from), [rt, from]);
   const batches = useLoad(() => cycleApi.batches(), [preview]);
-  const body = (): RcBatchInput => {
+  /**
+   * R-A1/R-A4 (BF-SWEEP-TT): kiểm form trước Xem trước / Phát hành — không gọi API khi còn lỗi.
+   * Trả thân yêu cầu với số đã chuẩn hóa; null khi có lỗi (đã hiện dưới từng trường).
+   * TODO(#106): làm lại thành 5 bước (TT-14) — gói #106.
+   */
+  const check = (): RcBatchInput | null => {
+    const v = validateForm(
+      { from, to, season, closeAfter },
+      { from: { kind: "text", required: true }, to: { kind: "text", required: true }, season: { kind: "text", required: true, maxLength: 120 }, closeAfter: { kind: "number", required: true, integer: true, max: 60 } },
+    );
+    const errs = { ...v.errors };
+    if (!errs.to && !errs.from && to < from) errs.to = "Đến ngày phải sau hoặc bằng Từ ngày.";
+    const pe: Record<string, string> = {};
+    const norm: typeof pv = {};
+    for (const [tpl, byCommune] of Object.entries(pv)) {
+      for (const [cm, cells] of Object.entries(byCommune)) {
+        for (const [letter, raw] of Object.entries(cells)) {
+          const p = parseNumberInput(raw);
+          if (!p.ok) pe[`${tpl}|${cm}|${letter}`] = p.error;
+          else if (p.value !== "") ((norm[tpl] ??= {})[cm] ??= {})[letter] = p.value;
+        }
+      }
+    }
+    setErrors(errs);
+    setPvErr(pe);
+    if (Object.keys(errs).length || Object.keys(pe).length) return null;
+    return body(norm, Number(v.values.closeAfter));
+  };
+  const body = (provincial: typeof pv, closeAfterDays: number): RcBatchInput => {
     const [offset, time] = deadline.split("|");
     return {
       report_type: rt,
@@ -103,14 +155,16 @@ export function PublishScreen() {
       to_date: to,
       season_label: season,
       ...(deadline ? { deadline: { offset_days: Number(offset), time: time! } } : {}),
-      close_after_days: closeAfter,
+      close_after_days: closeAfterDays,
       ...(note ? { note } : {}),
-      provincial_values: pv,
+      provincial_values: provincial,
       provincial_source: pvSource,
     };
   };
   const doPreview = async () => {
-    const r = await act.run(() => cycleApi.preview(body()));
+    const b = check();
+    if (!b) return;
+    const r = await act.run(() => cycleApi.preview(b));
     if (r) {
       setPreview(r);
     }
@@ -146,6 +200,62 @@ export function PublishScreen() {
       return next;
     });
   };
+  const formCols: Column<RcFormItem>[] = [
+    {
+      key: "pick",
+      header: "Chọn",
+      cell: (f) => (
+        <input
+          type="checkbox"
+          aria-label={`Chọn ${f.code}`}
+          checked={picked.includes(f.template_id)}
+          onChange={(e) => setPicked((p) => (e.target.checked ? [...p, f.template_id] : p.filter((x) => x !== f.template_id)))}
+        />
+      ),
+    },
+    { key: "code", header: "Mã", cell: (f) => <b>{f.code}</b> },
+    { key: "name", header: "Tên biểu", cell: (f) => f.name },
+    { key: "ver", header: "Mẫu", cell: (f) => <StatusPill tone="info">v{f.version}</StatusPill> },
+  ];
+  // Ô "Tỉnh giao" là chỉ tiêu (≥ 0): kiểm khi rời ô và trước khi gửi (R-A1).
+  type PreviewCommune = (typeof previewCommunes)[number];
+  const pvCols: Column<PreviewCommune>[] = [
+    { key: "commune", header: "Xã/phường", cell: (cm) => `${name(cm.commune_code)} · ${cm.region_name}` },
+    ...provCols.map(({ f, c }) => ({
+      key: `${f.code}${c.letter}`,
+      header: `${f.code} · cột ${c.letter} “${c.title}” ${c.unit ? `(${c.unit})` : ""}`,
+      cell: (cm: PreviewCommune) => {
+        const k = `${f.template_id}|${cm.commune_code}|${c.letter}`;
+        const raw = pv[f.template_id]?.[cm.commune_code]?.[c.letter] ?? "";
+        return (
+          <>
+            <input
+              className="input"
+              inputMode="decimal"
+              aria-label={`${f.code} ${c.letter} ${cm.commune_code}`}
+              aria-invalid={pvErr[k] ? true : undefined}
+              value={raw}
+              onChange={(e) => setPv((x) => ({ ...x, [f.template_id]: { ...(x[f.template_id] ?? {}), [cm.commune_code]: { ...(x[f.template_id]?.[cm.commune_code] ?? {}), [c.letter]: e.target.value } } }))}
+              onBlur={() => {
+                const p = parseNumberInput(raw);
+                setPvErr((x) => {
+                  const next = { ...x };
+                  if (p.ok) delete next[k];
+                  else next[k] = p.error;
+                  return next;
+                });
+              }}
+            />
+            {pvErr[k] ? (
+              <span className="err" role="alert">
+                {pvErr[k]}
+              </span>
+            ) : null}
+          </>
+        );
+      },
+    })),
+  ];
   const inPreview = new Set(previewCommunes.map((c) => c.commune_code));
   const outsideImport = pvImport ? pvImport.rows.filter((x) => x.status === "accepted" && previewCommunes.length > 0 && !inPreview.has(x.commune_code)) : [];
   return (
@@ -165,7 +275,9 @@ export function PublishScreen() {
               className="btn btn-p"
               disabled={!picked.length || act.busy}
               onClick={async () => {
-                const r = await act.run(() => cycleApi.issue(body()), (x) => `Đã phát hành ${x.batch.task_count.toLocaleString("vi-VN")} công việc cho ${x.batch.communes.length} xã, ${x.periods.length} kỳ.`);
+                const b = check();
+                if (!b) return;
+                const r = await act.run(() => cycleApi.issue(b), (x) => `Đã phát hành ${x.batch.task_count.toLocaleString("vi-VN")} công việc cho ${x.batch.communes.length} xã, ${x.periods.length} kỳ.`);
                 if (r) {
                   setPreview(null);
                   batches.reload();
@@ -184,44 +296,7 @@ export function PublishScreen() {
             <h2>Bước 1 · Chọn biểu mẫu (cùng loại kỳ)</h2>
             <LoadState s={forms}>
               {(d) => (
-                <table className="dt">
-                  <thead>
-                    <tr>
-                      <th scope="col">Chọn</th>
-                      <th scope="col">Mã</th>
-                      <th scope="col">Tên biểu</th>
-                      <th scope="col">Mẫu</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {d.items.map((f: RcFormItem) => (
-                      <tr key={f.template_id}>
-                        <td>
-                          <input
-                            type="checkbox"
-                            aria-label={`Chọn ${f.code}`}
-                            checked={picked.includes(f.template_id)}
-                            onChange={(e) => setPicked((p) => (e.target.checked ? [...p, f.template_id] : p.filter((x) => x !== f.template_id)))}
-                          />
-                        </td>
-                        <td>
-                          <b>{f.code}</b>
-                        </td>
-                        <td>{f.name}</td>
-                        <td>
-                          <StatusPill tone="info">v{f.version}</StatusPill>
-                        </td>
-                      </tr>
-                    ))}
-                    {!d.items.length ? (
-                      <tr>
-                        <td colSpan={4} className="empty">
-                          Chưa có mẫu đã phát hành gán cho loại báo cáo này (FN-AD-04.06).
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
+                <DataTable caption="Biểu mẫu" columns={formCols} rows={d.items} rowKey={(f) => f.template_id} empty="Chưa có mẫu đã phát hành gán cho loại báo cáo này (FN-AD-04.06)." />
               )}
             </LoadState>
           </section>
@@ -273,40 +348,7 @@ export function PublishScreen() {
               <h2>Bước 4 · Giá trị cột &quot;Tỉnh giao&quot; của biểu</h2>
               {!previewCommunes.length ? <p className="mute">Bấm “Xem trước” để có danh sách xã nhận.</p> : null}
               {previewCommunes.length ? (
-                <table className="dt">
-                  <thead>
-                    <tr>
-                      <th scope="col">Xã/phường</th>
-                      {provCols.map(({ f, c }) => (
-                        <th key={`${f.code}${c.letter}`} scope="col">
-                          {f.code} · cột {c.letter} “{c.title}” {c.unit ? `(${c.unit})` : ""}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {previewCommunes.map((cm) => (
-                      <tr key={cm.commune_code}>
-                        <td>
-                          {name(cm.commune_code)} · {cm.region_name}
-                        </td>
-                        {provCols.map(({ f, c }) => (
-                          <td key={`${f.code}${c.letter}`}>
-                            <input
-                              className="input"
-                              inputMode="decimal"
-                              aria-label={`${f.code} ${c.letter} ${cm.commune_code}`}
-                              value={pv[f.template_id]?.[cm.commune_code]?.[c.letter] ?? ""}
-                              onChange={(e) =>
-                                setPv((x) => ({ ...x, [f.template_id]: { ...(x[f.template_id] ?? {}), [cm.commune_code]: { ...(x[f.template_id]?.[cm.commune_code] ?? {}), [c.letter]: e.target.value } } }))
-                              }
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable caption="Giá trị Tỉnh giao theo xã" columns={pvCols} rows={previewCommunes} rowKey={(cm) => cm.commune_code} />
               ) : null}
               <div className="row" style={{ gap: 8, marginTop: 10 }} aria-label="Nạp Tỉnh giao từ Excel">
                 <button type="button" className="btn btn-o btn-sm" disabled={!previewCommunes.length} onClick={downloadPvTemplate}>
@@ -381,18 +423,9 @@ export function PublishScreen() {
                 Kỳ ngày / tuần KSGM / quý theo lịch kỳ hệ thống mới — đợt phải bắt đầu từ {REPORT_RULE_V2_FROM.split("-").reverse().join("/")}.
               </p>
             ) : null}
-            <label className="field">
-              <span>Từ ngày*</span>
-              <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Đến ngày*</span>
-              <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Tên vụ / đợt*</span>
-              <input className="input" value={season} onChange={(e) => setSeason(e.target.value)} />
-            </label>
+            <DateInput label="Từ ngày" value={from} onChange={setFrom} error={errors.from} />
+            <DateInput label="Đến ngày" value={to} onChange={setTo} error={errors.to} />
+            <TextField label="Tên vụ / đợt" required value={season} onChange={setSeason} error={errors.season} maxLength={120} />
             <label className="field">
               <span>Hạn nộp mỗi kỳ</span>
               <select className="input" value={deadline} onChange={(e) => setDeadline(e.target.value)}>
@@ -403,10 +436,7 @@ export function PublishScreen() {
                 ))}
               </select>
             </label>
-            <label className="field">
-              <span>Chốt kỳ sau hạn (ngày)</span>
-              <input className="input" type="number" min={0} max={60} value={closeAfter} onChange={(e) => setCloseAfter(Number(e.target.value))} />
-            </label>
+            <NumberField label="Chốt kỳ sau hạn" unit="ngày" required value={closeAfter} onChange={setCloseAfter} rule={{ integer: true, max: 60 }} error={errors.closeAfter} onBlurError={(e) => setErrors((x) => ({ ...x, closeAfter: e }))} />
             <label className="field">
               <span>Ghi chú giao việc</span>
               <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -671,7 +701,9 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
   const router = useRouter();
   const act = useAction();
   const [reason, setReason] = useState("");
+  const [reasonErr, setReasonErr] = useState<string | undefined>();
   const [reopen, setReopen] = useState(false);
+  const [reopenErr, setReopenErr] = useState<Partial<Record<"reason" | "until", string>>>({});
   const [reopenReason, setReopenReason] = useState("");
   const [reopenUntil, setReopenUntil] = useState(() => ymdLocal(new Date(Date.now() + 2 * 86_400_000)));
   const s = useLoad(async () => {
@@ -702,7 +734,12 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
               <PageHeader title={`${name(d.task.commune_code)} · ${d.task.form_code} · ${d.period.label}`} />
               {readOnly ? null : (
                 <ActionBar>
-                  <button type="button" className="btn btn-p btn-sm" disabled={act.busy || !sub} onClick={() => void act.run(() => cycleApi.requestAdjustment(id, reason), "Đã gửi yêu cầu điều chỉnh tới Cán bộ xã.")}>
+                  <button type="button" className="btn btn-p btn-sm" disabled={act.busy || !sub} onClick={() => {
+                      const err = reason.trim() ? undefined : "Bắt buộc nhập.";
+                      setReasonErr(err);
+                      if (!err) void act.run(() => cycleApi.requestAdjustment(id, reason.trim()), "Đã gửi yêu cầu điều chỉnh tới Cán bộ xã.");
+                    }}
+                  >
                     <Icon name="edit" size={15} /> Yêu cầu điều chỉnh
                   </button>
                   <button type="button" className="btn btn-o btn-sm" disabled={act.busy || !sub} onClick={() => void act.run(() => cycleApi.confirm(id), "Đã xác nhận báo cáo.")}>
@@ -756,11 +793,9 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
                       <ul>{(sub?.issues ?? []).map((i, k) => <li key={k}>{i.letter ? `Cột ${i.letter}: ` : ""}{i.message}</li>)}</ul>
                     )}
                     {readOnly ? null : (
-                      <label className="field" style={{ marginTop: 10 }}>
-                        <span>Lý do yêu cầu điều chỉnh*</span>
-                        <textarea className="textarea" value={reason} onChange={(e) => setReason(e.target.value)} />
-                        <PiiHint text={reason} />
-                      </label>
+                      <div style={{ marginTop: 10 }}>
+                        <TextField label="Lý do yêu cầu điều chỉnh" required multiline value={reason} onChange={setReason} error={reasonErr} hint={<PiiHint text={reason} />} />
+                      </div>
                     )}
                   </>
                 }
@@ -799,6 +834,9 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
                       type="button"
                       className="btn btn-p"
                       onClick={async () => {
+                        const v = validateForm({ reason: reopenReason, until: reopenUntil }, { reason: { kind: "text", required: true }, until: { kind: "text", required: true } });
+                        setReopenErr(v.errors);
+                        if (!v.valid) return;
                         const r = await act.run(
                           () => cycleApi.reopen(d.period.id, { communes: [d.task.commune_code], template_ids: [d.task.template_id], reason: reopenReason, until: new Date(`${reopenUntil}T17:00:00`).toISOString() }),
                           (x) => `Đã mở lại kỳ cho ${x.task_ids.length} công việc đến ${reopenUntil}.${x.dispatch_changed ? " Cảnh báo: kỳ đã gửi Chi cục — số liệu đã thay đổi." : ""}`,
@@ -810,15 +848,8 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
                     </button>
                   }
                 >
-                  <label className="field">
-                    <span>Lý do mở lại*</span>
-                    <textarea className="textarea" value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} />
-                    <PiiHint text={reopenReason} />
-                  </label>
-                  <label className="field">
-                    <span>Mở đến ngày* (17:00)</span>
-                    <input className="input" type="date" value={reopenUntil} onChange={(e) => setReopenUntil(e.target.value)} />
-                  </label>
+                  <TextField label="Lý do mở lại" required multiline value={reopenReason} onChange={setReopenReason} error={reopenErr.reason} hint={<PiiHint text={reopenReason} />} />
+                  <DateInput label="Mở đến ngày (17:00)" value={reopenUntil} onChange={setReopenUntil} error={reopenErr.until} />
                 </Dialog>
               ) : null}
             </>
