@@ -922,7 +922,10 @@ class _WorkScheduleItemScreenState extends State<WorkScheduleItemScreen> {
             DropdownButtonFormField<String?>(
               key: const ValueKey('ws-f-commune'),
               initialValue: _commune,
-              decoration: const InputDecoration(labelText: 'Xã/phường'),
+              decoration: InputDecoration(
+                labelText: 'Xã/phường *',
+                errorText: _err('commune_code'),
+              ),
               items: [
                 const DropdownMenuItem<String?>(child: Text('—')),
                 for (final c in communes)
@@ -938,7 +941,7 @@ class _WorkScheduleItemScreenState extends State<WorkScheduleItemScreen> {
             readOnly: ro,
             maxLength: 200,
             decoration: InputDecoration(
-              labelText: 'Địa điểm (ấp, cánh đồng, HTX…)',
+              labelText: 'Địa điểm * (ấp, cánh đồng, HTX…)',
               errorText: _err('location'),
             ),
           ),

@@ -128,6 +128,18 @@ void main() {
     );
     await tester.enterText(find.byKey(const ValueKey('ws-f-start')), '07:30');
     await tester.enterText(find.byKey(const ValueKey('ws-f-end')), '11:00');
+    // Log bug TT-05/CN-04: Địa điểm bắt buộc.
+    await tester.ensureVisible(find.byKey(const ValueKey('ws-f-save')));
+    await tester.tap(find.byKey(const ValueKey('ws-f-save')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Địa điểm bắt buộc — nhập địa điểm hoặc chọn vị trí.'),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('ws-f-location')),
+      'Cánh đồng ấp 1',
+    );
     await tester.enterText(
       find.byKey(const ValueKey('ws-f-participants')),
       'Cán bộ HTX 0912345678',
@@ -164,6 +176,10 @@ void main() {
       'Họp tổ khuyến nông',
     );
     await tester.enterText(find.byKey(const ValueKey('ws-f-start')), '10:00');
+    await tester.enterText(
+      find.byKey(const ValueKey('ws-f-location')),
+      'Trụ sở UBND xã',
+    );
     await tester.ensureVisible(find.byKey(const ValueKey('ws-f-save')));
     await tester.tap(find.byKey(const ValueKey('ws-f-save')));
     await tester.pumpAndSettle();
