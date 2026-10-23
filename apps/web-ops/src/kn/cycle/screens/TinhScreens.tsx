@@ -8,7 +8,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { Dialog } from "@/components/Dialog";
 import { NumberField, TextField, parseNumberInput, validateForm } from "@/components/form";
-import { ActionBar, BackLink, DetailLayout, LabelValueBlock, LogPanel } from "@/components/patterns/detail";
+import { ActionBar, BackLink, DetailLayout, DetailPage, LabelValueBlock, LogPanel } from "@/components/patterns/detail";
 import { DataTable, FilterBar, FilterChip, PageHeader, StatusPill, type Column } from "@/components/patterns/list";
 import { formLayout } from "@/kn/forms/api";
 import type { FormDefinition } from "@/kn/forms/types";
@@ -92,7 +92,6 @@ function DateInput({ label, value, onChange, error }: { label: string; value: st
 /** FN-TI-02.02 Phát hành biểu mẫu báo cáo (Hình 7). */
 export function PublishScreen() {
   const { cycleApi, kn } = useAuth();
-  const router = useRouter();
   const ws = weekStartLocal(new Date(), reportWeekStart(new Date(), kn.context?.department_code)); // D8: lịch tuần của phòng
   const [rt, setRt] = useState<PublishReportType>("weekly");
   const [pt, setPt] = useState<PeriodChoice>("");
@@ -112,7 +111,6 @@ export function PublishScreen() {
   const [pvSource, setPvSource] = useState<"manual" | "excel">("manual");
   const [pvImport, setPvImport] = useState<RcProvincialImport | null>(null);
   const [preview, setPreview] = useState<RcPreview | null>(null);
-  const [showBatches, setShowBatches] = useState(false);
   const act = useAction();
   const forms = useLoad(() => cycleApi.reportForms(rt, from), [rt, from]);
   const batches = useLoad(() => cycleApi.batches(), [preview]);
@@ -264,9 +262,9 @@ export function PublishScreen() {
         title="Phát hành biểu mẫu báo cáo"
         actions={
           <>
-            <button type="button" className="btn btn-o" onClick={() => setShowBatches(true)}>
+            <Link className="btn btn-o" href="/kn/nhiem-vu/phat-hanh/dot-da-phat-hanh">
               Đợt đã phát hành ({batches.data?.items.length ?? 0})
-            </button>
+            </Link>
             <button type="button" className="btn btn-o" disabled={!picked.length || act.busy} onClick={() => void doPreview()}>
               <Icon name="eye" size={15} /> Xem trước
             </button>
@@ -480,33 +478,72 @@ export function PublishScreen() {
           </section>
         </div>
       </div>
-      {showBatches ? (
-        <Dialog title="Đợt đã phát hành" onClose={() => setShowBatches(false)}>
-          <ul className="list-plain">
-            {(batches.data?.items ?? []).map((b) => (
-              <li key={b.id} style={{ marginBottom: 8 }}>
-                <b>{b.season_label}</b> · {b.forms.map((f) => f.code).join(", ")} · {b.communes.length} xã · {b.period_count} kỳ · {b.status === "withdrawn" ? "Đã thu hồi" : "Đang áp dụng"}{" "}
-                <button type="button" className="btn btn-o btn-sm" onClick={() => router.push(`/kn/nhiem-vu/trang-thai-nop?dot=${b.id}`)}>
-                  Trạng thái nộp
-                </button>
-                {b.status === "issued" ? (
-                  <button
-                    type="button"
-                    className="btn btn-o btn-sm"
-                    onClick={async () => {
-                      const r = window.prompt("Lý do thu hồi đợt (≥ 10 ký tự):");
-                      if (r) await act.run(() => cycleApi.withdraw(b.id, r), "Đã thu hồi đợt.").then(() => batches.reload());
-                    }}
-                  >
-                    Thu hồi
-                  </button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+
+    </>
+  );
+}
+
+/** FN-TI-02.02 Đợt đã phát hành — trang riêng (R-A2, thay pop-up cũ): xem trạng thái nộp, thu hồi đợt (lý do trong pop-up ngắn). */
+export function BatchesScreen() {
+  const { cycleApi } = useAuth();
+  const readOnly = useCycleReadOnly();
+  const act = useAction();
+  const s = useLoad(() => cycleApi.batches(), [act.note]);
+  const [withdraw, setWithdraw] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [reasonErr, setReasonErr] = useState<string | undefined>();
+  type Batch = NonNullable<typeof s.data>["items"][number];
+  const columns: Column<Batch>[] = [
+    { key: "season", header: "Vụ / đợt", cell: (b) => <b>{b.season_label}</b> },
+    { key: "forms", header: "Biểu", cell: (b) => b.forms.map((f) => f.code).join(", ") },
+    { key: "communes", header: "Số xã", cell: (b) => b.communes.length, className: "num" },
+    { key: "periods", header: "Số kỳ", cell: (b) => b.period_count, className: "num" },
+    { key: "st", header: "Trạng thái", cell: (b) => <StatusPill tone={b.status === "withdrawn" ? "neutral" : "ok"}>{b.status === "withdrawn" ? "Đã thu hồi" : "Đang áp dụng"}</StatusPill> },
+    {
+      key: "act",
+      header: "Thao tác",
+      cell: (b) => (
+        <span className="row" style={{ gap: 6 }}>
+          <Link className="btn btn-o btn-sm" href={`/kn/nhiem-vu/trang-thai-nop?dot=${b.id}`}>
+            Trạng thái nộp
+          </Link>
+          {b.status === "issued" && !readOnly ? (
+            <button type="button" className="btn btn-o btn-sm" onClick={() => (setReason(""), setReasonErr(undefined), setWithdraw(b.id))}>
+              Thu hồi
+            </button>
+          ) : null}
+        </span>
+      ),
+    },
+  ];
+  return (
+    <DetailPage back={{ href: "/kn/nhiem-vu/phat-hanh", label: "Phát hành biểu mẫu" }} title="Đợt đã phát hành">
+      {act.view}
+      <LoadState s={s}>{(d) => <DataTable caption="Đợt đã phát hành" columns={columns} rows={d.items} rowKey={(b) => b.id} empty="Chưa phát hành đợt nào." />}</LoadState>
+      {withdraw ? (
+        <Dialog
+          title="Thu hồi đợt"
+          onClose={() => setWithdraw(null)}
+          actions={
+            <button
+              type="button"
+              className="btn btn-p"
+              disabled={act.busy}
+              onClick={async () => {
+                const e = reason.trim() === "" ? "Bắt buộc nhập." : reason.trim().length < 10 ? "Tối thiểu 10 ký tự." : undefined;
+                setReasonErr(e);
+                if (e) return;
+                if (await act.run(() => cycleApi.withdraw(withdraw, reason.trim()), "Đã thu hồi đợt.")) setWithdraw(null);
+              }}
+            >
+              Thu hồi
+            </button>
+          }
+        >
+          <TextField label="Lý do thu hồi (≥ 10 ký tự)" required multiline value={reason} onChange={setReason} error={reasonErr} hint={<PiiHint text={reason} />} />
         </Dialog>
       ) : null}
-    </>
+    </DetailPage>
   );
 }
 
