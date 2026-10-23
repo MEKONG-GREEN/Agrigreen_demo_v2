@@ -6,6 +6,11 @@ import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { ADMIN_UNITS, CATALOGS } from "./data";
 import { json, problem, validation, type Ctx, type Route } from "./http";
+
+// Như máy chủ (cntsmodel/domain): kinh phí số nguyên không âm; quy mô số dương (BF-SWEEP-CNTS: web chặn trước, mock chặn lại).
+const budgetBad = (v: string | null | undefined) => !!v && !/^\d{1,15}$/.test(v);
+const scaleBad = (b: { scale?: string | null; scale_unit?: string | null }) =>
+  (!!b.scale !== !!b.scale_unit && "nhập cả quy mô và đơn vị") || (!!b.scale && !(/^\d{1,12}(\.\d+)?$/.test(b.scale) && Number(b.scale) > 0) && "phải dương") || null;
 import { knContext, personaForContext } from "./kn";
 import { AG_COMMUNES } from "./kn-reports/store";
 
@@ -165,7 +170,8 @@ export const cntsModelRoutes: Route[] = [
       if (!canCreate(w)) return problem(403, "forbidden", "chỉ chủ nhiệm, lãnh đạo phòng Cấp Tỉnh (hoặc Admin) tạo chương trình, dự án");
       const b = (ctx.body ?? {}) as S["CNTSProjectSave"];
       const errs = [!b.code?.trim() && { field: "code", reason: "bắt buộc" }, !b.name?.trim() && { field: "name", reason: "bắt buộc" },
-        !b.start_date && { field: "start_date", reason: "bắt buộc" }, b.end_date && b.start_date && b.end_date < b.start_date && { field: "end_date", reason: "không trước ngày bắt đầu" }]
+        !b.start_date && { field: "start_date", reason: "bắt buộc" }, b.end_date && b.start_date && b.end_date < b.start_date && { field: "end_date", reason: "không trước ngày bắt đầu" },
+        budgetBad(b.budget) && { field: "budget", reason: "số đồng nguyên, không âm" }]
         .filter(Boolean) as { field: string; reason: string }[];
       if (errs.length) return validation(errs);
       const code = b.code.trim().toUpperCase();
@@ -199,6 +205,7 @@ export const cntsModelRoutes: Route[] = [
         push(PROJECTS, cur.ref, { ...cur, event: action === "close" ? "closed" : "reopened", status_reason: b.reason!, ...meta(w, cur.version + 1) });
       } else {
         if (cur.event === "closed") return problem(409, "extension.cnts_project_closed", "Dự án đã kết thúc — mở lại trước khi sửa");
+        if (budgetBad(b.budget)) return validation([{ field: "budget", reason: "số đồng nguyên, không âm" }]);
         push(PROJECTS, cur.ref, { ...cur, event: "updated", code: b.code.trim().toUpperCase(), name: b.name, kind: b.kind, basis: b.basis ?? null,
           scale_note: b.scale_note ?? null, start_date: b.start_date, end_date: b.end_date ?? null, budget: b.budget ?? null,
           manager_ref: b.manager_ref ?? cur.manager_ref, program_ref: b.program_ref ?? null, training_note: b.training_note ?? null,
@@ -232,6 +239,7 @@ export const cntsModelRoutes: Route[] = [
       if (!COMMUNE_OK(b.commune_code)) return problem(403, "extension.out_of_scope", "Ngoài phạm vi phụ trách");
       const bad = parsePoint(b);
       if (bad || !b.name?.trim()) return validation([{ field: bad ? "location" : "name", reason: bad ?? "bắt buộc" }]);
+      if (scaleBad(b)) return validation([{ field: "scale", reason: scaleBad(b)! }]);
       const ref = b.id ?? uuidv7();
       SITES.set(ref, [{ ref, event: "created", project_ref: p.ref, commune_code: b.commune_code, name: b.name.trim(), model_type_code: b.model_type_code,
         scale: b.scale ?? null, scale_unit: b.scale_unit ?? null, officer_ref: b.officer_ref ?? null, diary_form: b.diary_form ?? null,
@@ -262,6 +270,7 @@ export const cntsModelRoutes: Route[] = [
         push(SITES, cur.ref, { ...cur, event: ctx.params[1] === "close" ? "closed" : "reopened", status_reason: b.reason!, ...meta(w, cur.version + 1) });
       } else {
         if (cur.event === "closed") return problem(409, "extension.cnts_site_closed", "Điểm trình diễn đã đóng");
+        if (scaleBad(b)) return validation([{ field: "scale", reason: scaleBad(b)! }]);
         push(SITES, cur.ref, { ...cur, event: "updated", commune_code: b.commune_code, name: b.name, model_type_code: b.model_type_code, scale: b.scale ?? null,
           scale_unit: b.scale_unit ?? null, officer_ref: b.officer_ref ?? null, diary_form: b.diary_form ?? null, cooperative_ref: b.cooperative_ref ?? null,
           note: b.note ?? null, status_reason: null, ...meta(w, cur.version + 1) });
@@ -295,6 +304,7 @@ export const cntsModelRoutes: Route[] = [
       if (!siteView(w, s).can_add_households) return problem(403, "forbidden", "chỉ người quản lý dự án hoặc cán bộ theo dõi điểm thêm hộ mô hình");
       if (!b.person_ref && !b.owner_name?.trim()) return validation([{ field: "owner_name", reason: "nhập họ tên chủ hộ (lưu ở kho định danh)" }]);
       if (b.keeper_kind !== "self" && !b.keeper_ref) return validation([{ field: "keeper_ref", reason: "chọn cán bộ ghi nhật ký (hoặc chọn hộ tự ghi)" }]);
+      if (scaleBad(b)) return validation([{ field: "scale", reason: scaleBad(b)! }]);
       const bad = parsePoint(b);
       if (bad) return validation([{ field: "location", reason: bad }]);
       const person = b.person_ref ?? uuidv7();
@@ -328,6 +338,7 @@ export const cntsModelRoutes: Route[] = [
         if (ctx.params[1] === "withdraw") POINTS.delete(cur.ref);
       } else {
         if (cur.event === "withdrawn") return problem(409, "extension.cnts_household_withdrawn", "Hộ đã rút khỏi mô hình");
+        if (scaleBad(b)) return validation([{ field: "scale", reason: scaleBad(b)! }]);
         push(HOUSEHOLDS, cur.ref, { ...cur, event: "updated", scale: b.scale ?? null, scale_unit: b.scale_unit ?? null, keeper_kind: b.keeper_kind ?? cur.keeper_kind,
           keeper_ref: b.keeper_kind === "self" ? null : b.keeper_ref ?? cur.keeper_ref, self_entry: !!b.self_entry, joined_on: b.joined_on ?? cur.joined_on,
           note: b.note ?? null, status_reason: null, ...meta(w, cur.version + 1) });

@@ -51,6 +51,8 @@ describe("giả lập CT/DA, điểm, hộ, quyền", () => {
     const p = await mapi.createProject({ code: "da-x", name: "Dự án X", kind: "tinh", start_date: "2027-03-01" });
     expect(p.code).toBe("DA-X");
     await expect(mapi.createProject({ code: "DA-X", name: "Trùng", kind: "tinh", start_date: "2027-03-01" })).rejects.toThrow();
+    await expect(mapi.createProject({ code: "DA-AM", name: "Kinh phí âm", kind: "tinh", start_date: "2027-03-01", budget: "-5" })).rejects.toThrow(); // BF-SWEEP-CNTS
+    await expect(mapi.createSite({ project_ref: p.ref, commune_code: "91301", name: "Quy mô 0", model_type_code: "GA_THUONG_PHAM", scale: "0", scale_unit: "con" })).rejects.toThrow();
     const s = await mapi.createSite({ project_ref: p.ref, commune_code: "91301", name: "Điểm 1", model_type_code: "GA_THUONG_PHAM", location: { lat: 10.4, lng: 105.4, source: "map" } });
     expect(s.location).toEqual({ lat: 10.4, lng: 105.4, source: "map" });
     const h = await mapi.createHousehold({ site_ref: s.ref, owner_name: "Nguyễn Văn Bình", owner_phone: "0912345678", keeper_kind: "self", self_entry: true });

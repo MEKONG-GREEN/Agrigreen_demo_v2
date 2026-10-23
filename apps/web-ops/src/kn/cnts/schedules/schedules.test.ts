@@ -101,6 +101,8 @@ describe("giả lập lịch trực, lịch tiêm", () => {
     expect(saved.notified_officer_refs).toEqual([officer]);
     await expect(capi.saveRoster("2027-10", { province_code: "91", base_version: 0, cells: [] })).rejects.toThrow();
 
+    await expect(capi.createBatch({ commune_code: "30292", model_type_code: "GA_THUONG_PHAM", locality: "Ấp 1", received_date: "2027-10-01", age_at_receipt: -1 })).rejects.toThrow(); // BF-SWEEP-CNTS
+    await expect(capi.createBatch({ commune_code: "30292", model_type_code: "GA_THUONG_PHAM", locality: "Ấp 1", received_date: "2027-10-01", age_at_receipt: 1, head_count: 0 })).rejects.toThrow();
     const b = await capi.createBatch({ commune_code: "30292", model_type_code: "GA_THUONG_PHAM", locality: "Ấp 1", received_date: "2027-10-01", age_at_receipt: 1 });
     expect(b.doses.map((d) => d.expected_date)).toEqual(["2027-10-03", "2027-10-17", "2027-11-09"]);
     const u = await capi.updateDoses(b.ref, { base_version: 1, doses: [{ vaccine_code: "VX_ND_F", shot: 1, actual_date: "2027-10-03" }] });

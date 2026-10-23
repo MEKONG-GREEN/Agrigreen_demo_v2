@@ -811,7 +811,7 @@ function ImportPanel({ tab, onDone }: { tab: CatalogTab; onDone: () => void }) {
   };
   return (
     <div className="panel stack" style={{ gap: 8, marginBottom: 12 }} aria-label="Nạp danh mục từ tệp">
-      <b>Nạp {tab.label.toLowerCase()} từ Excel/CSV (tối đa 500 dòng)</b>
+      <h3>Nạp {tab.label.toLowerCase()} từ Excel/CSV (tối đa 500 dòng)</h3>
       <span className="small mute">
         Cột catalog ({tab.id}), code, name, valid_from (YYYY-MM-DD, trống = hôm nay) và các cột thuộc tính. Mục đã có cùng nội dung được bỏ qua.
       </span>
