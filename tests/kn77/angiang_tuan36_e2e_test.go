@@ -630,8 +630,8 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 		t.Fatalf("mặc định tuần kế tiếp: %s", mine.raw)
 	}
 	ws := s.want(xa1.post("/v1/extension/work-schedules", map[string]any{"week_start": week, "action": "submit", "items": []any{
-		map[string]any{"day": "2026-09-07", "session": "morning", "start_time": "08:00", "end_time": "10:00", "content": "Kiểm tra đồng ruộng xã " + agC1},
-		map[string]any{"day": "2026-09-09", "session": "afternoon", "content": "Tập huấn IPM tại HTX"}}}), http.StatusCreated, "gửi duyệt lịch")
+		map[string]any{"day": "2026-09-07", "session": "morning", "start_time": "08:00", "end_time": "10:00", "content": "Kiểm tra đồng ruộng xã " + agC1, "commune_code": agC1, "location": "Cánh đồng ấp 1"},
+		map[string]any{"day": "2026-09-09", "session": "afternoon", "content": "Tập huấn IPM tại HTX", "commune_code": agC1, "location": "Hội trường HTX"}}}), http.StatusCreated, "gửi duyệt lịch")
 	wid := str(obj(ws.body, "schedule"), "id")
 	if l := s.want(tinh.get("/v1/extension/work-schedules?week_start="+week+"&status=pending"), http.StatusOK, "chờ duyệt"); len(arr(l.body, "items")) != 1 {
 		t.Fatalf("lịch hiện ngay ở Chờ duyệt: %s", l.raw)

@@ -34,6 +34,7 @@ Map<String, Object?> _item(
 Map<String, Object?> _mine({
   required String status,
   List<Object?> checkins = const [],
+  int? approvedVersion,
 }) => {
   'week_start': '2026-10-12',
   'submit_due_at': '2026-10-09T10:00:00Z',
@@ -47,6 +48,7 @@ Map<String, Object?> _mine({
       'id': _sid,
       'status': status,
       'version': 2,
+      'approved_version': approvedVersion,
       'commune_codes': ['30001'],
     },
     'items': [
@@ -71,14 +73,19 @@ void main() {
   late Harness h;
   late ActionQueue actions;
   late WorkScheduleService svc;
-  var status = 'pending';
+  var status = 'approved';
   var checkins = <Object?>[];
+  int? approvedVersion;
 
   setUp(() async {
     h = await Harness.create(now: _now);
     h.fake.onGet = (path, q) async =>
         path == '/v1/extension/work-schedules/mine'
-        ? _mine(status: status, checkins: checkins)
+        ? _mine(
+            status: status,
+            checkins: checkins,
+            approvedVersion: approvedVersion,
+          )
         : null;
     actions = ActionQueue(
       db: h.db,
@@ -100,8 +107,27 @@ void main() {
         ),
       ),
     );
-    status = 'pending';
+    status = 'approved';
     checkins = [];
+    approvedVersion = null;
+  });
+
+  test('log bug TT-07/CN-06: chỉ check-in theo lịch đã duyệt; điều chỉnh chờ duyệt còn bản đã duyệt thì vẫn được', () async {
+    status = 'pending';
+    var v = await svc.load(_week, refresh: true);
+    final today = v.items.firstWhere((i) => i.id == 'i-today');
+    expect(
+      v.canCheckin(today, _now),
+      isFalse,
+      reason: 'gửi duyệt nhưng chưa được duyệt',
+    );
+    approvedVersion = 1;
+    v = await svc.load(_week, refresh: true);
+    expect(
+      v.canCheckin(v.items.firstWhere((i) => i.id == 'i-today'), _now),
+      isTrue,
+      reason: 'bản đã duyệt v1 còn hiệu lực trong lúc điều chỉnh chờ duyệt',
+    );
   });
   tearDown(() => h.dispose());
 

@@ -145,7 +145,13 @@ describe("<RegisterSchedule> Cấp Xã (Hình 21)", { timeout: 30_000 }, () => {
     await user.click(screen.getByRole("button", { name: `Thêm mục ${dayColumnLabel(addDays(next, 1))} Sáng` }));
     const form = screen.getByRole("region", { name: "Mục công tác" });
     await user.type(within(form).getByLabelText("Nội dung công việc"), "Kiểm tra rầy nâu");
+    // Log bug TT-05/CN-04: Xã/phường và Địa điểm bắt buộc.
+    await user.click(within(form).getByRole("button", { name: /Lưu mục/ }));
+    expect(within(form).getByRole("alert")).toHaveTextContent("Xã/phường bắt buộc.");
     await user.selectOptions(within(form).getByLabelText("Địa điểm: xã/phường"), "91302");
+    await user.click(within(form).getByRole("button", { name: /Lưu mục/ }));
+    expect(within(form).getByRole("alert")).toHaveTextContent("Địa điểm bắt buộc");
+    await user.type(within(form).getByLabelText("Địa điểm cụ thể"), "Cánh đồng ấp 2");
     await within(form).findByRole("option", { name: "HTX Bình Đức" });
     await user.selectOptions(within(form).getByLabelText("Địa điểm: HTX"), "HTX Bình Đức");
     await user.type(within(form).getByLabelText("Thành phần phối hợp"), "0912345678");

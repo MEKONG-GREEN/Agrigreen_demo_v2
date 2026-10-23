@@ -2539,7 +2539,7 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/ExtWorkScheduleCheckinResult"}
         "404": {description: "extension.schedule_not_found | extension.schedule_item_not_found", $ref: "#/components/responses/Problem"}
-        "409": {description: "extension.checkin_exists | extension.checkin_disabled | extension.checkin_not_registered", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.checkin_exists | extension.checkin_disabled | extension.checkin_not_registered | extension.checkin_not_approved", $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   # Số liệu cân đối/báo cáo/dashboard đọc KẾT QUẢ ĐÃ LƯU theo vụ (FN-10 BR-04), không tính lại.
 

@@ -43,6 +43,15 @@ func (c caller) saveSched(week, action string, base any, items ...map[string]any
 	if items == nil {
 		items = []map[string]any{}
 	}
+	// Log bug TT-05/CN-04: Xã/phường (cán bộ xã) và Địa điểm bắt buộc — mục mẫu không ghi thì lấy mặc định.
+	for _, it := range items {
+		if _, ok := it["commune_code"]; !ok {
+			it["commune_code"] = "30001"
+		}
+		if _, ok := it["location"]; !ok && it["place"] == nil {
+			it["location"] = "Trụ sở UBND xã"
+		}
+	}
 	return c.post("/v1/extension/work-schedules", map[string]any{"week_start": week, "action": action, "base_version": base, "items": items})
 }
 
