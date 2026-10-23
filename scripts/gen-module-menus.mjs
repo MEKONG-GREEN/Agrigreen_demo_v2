@@ -41,7 +41,7 @@ function merge(target, source, location) {
 }
 export function compileMenus(documents) {
   const tables = {}, ids = new Set();
-  const names = new Set(["trongTrotMenus", "genericMenus", "adminDeptItems", "AdminOverview", "AdminSystem", "defaultRoutes", "contextDefaultRoutes", "MenuProfiles", "khtcReportProfiles", "KHTCReportItem", "KHTCReportAdminItem", "SharedGroup", "sharedByAudience", "deptBusiness", "adminDeptBusiness", "deptProfileByCode", "menuModules", "menuDeptModules"]);
+  const names = new Set(["trongTrotMenus", "genericMenus", "adminDeptItems", "AdminOverview", "AdminSystem", "defaultRoutes", "contextDefaultRoutes", "MenuProfiles", "khtcReportProfiles", "KHTCReportItem", "KHTCReportAdminItem", "SharedGroup", "sharedByAudience", "deptBusiness", "deptMenus", "adminDeptBusiness", "deptProfileByCode", "menuModules", "menuDeptModules"]);
   for (const doc of [...documents].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id, "en"))) {
     if (!doc.id || ids.has(doc.id) || !Number.isInteger(doc.order)) throw Error("menu registration needs a unique id and integer order");
     ids.add(doc.id);
@@ -61,7 +61,7 @@ export function compileMenus(documents) {
     }
   }
   for (const profile of tables.MenuProfiles ?? []) {
-    if (!["trong_trot", "generic"].includes(profile) && !tables.deptBusiness?.[profile]) throw Error(`profile has no registered business menu: ${profile}`);
+    if (!["trong_trot", "generic"].includes(profile) && !tables.deptBusiness?.[profile] && !tables.deptMenus?.[profile]) throw Error(`profile has no registered business menu: ${profile}`);
   }
   for (const [profile, roles] of Object.entries(tables.contextDefaultRoutes ?? {})) {
     if (!tables.MenuProfiles?.includes(profile)) throw Error(`navigation profile is not registered: ${profile}`);
@@ -82,7 +82,7 @@ export function readyItems(tables) {
     }
     for (const child of Object.values(value)) visit(child);
   }
-  for (const key of ["deptBusiness", "adminDeptBusiness", "KHTCReportItem", "KHTCReportAdminItem"]) visit(tables[key]);
+  for (const key of ["deptBusiness", "deptMenus", "adminDeptBusiness", "KHTCReportItem", "KHTCReportAdminItem"]) visit(tables[key]);
   return entries;
 }
 export function validatePages(root, items) {
@@ -117,6 +117,7 @@ function webMenu(tables) {
     ["SHARED", "Group", group(tables.SharedGroup)],
     ["SHARED_BY_AUDIENCE", "Partial<Record<KnRole, Item[]>>", map(tables.sharedByAudience, list)],
     ["BUSINESS", 'Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "admin">, Item[]>>>>', map(tables.deptBusiness, (value) => map(value, list))],
+    ["DEPT_MENUS", 'Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "admin">, Group[]>>>>', map(tables.deptMenus ?? {}, (value) => map(value, (groups) => groups.map(group)))],
     ["ADMIN_BUSINESS", "Partial<Record<KnMenuProfile, Item[]>>", map(tables.adminDeptBusiness, list)],
     ["ADMIN_DEPT_BASE", "Record<string, Item[]>", map(tables.adminDeptItems, list)],
     ["KHTC_REPORT", "Item", item(tables.KHTCReportItem)],

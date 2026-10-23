@@ -20,7 +20,7 @@ import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v5";
+export const MENU_VERSION = "kn.menu/v6";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -134,8 +134,107 @@ const TRONG_TROT: Record<Exclude<KnRole, "admin">, Group[]> = {
         {
           "key": "tinh.bao_cao.tong_hop",
           "label": "Báo cáo tổng hợp các xã",
-          "route": "/kn/bao-cao/tong-hop",
-          "icon": "layers"
+          "icon": "layers",
+          "children": [
+            {
+              "key": "tinh.bao_cao.tong_hop.tuan",
+              "label": "Báo cáo tuần",
+              "icon": "file",
+              "children": [
+                {
+                  "key": "tinh.bao_cao.tong_hop.tuan.t01",
+                  "label": "T01 · Tiến độ XG",
+                  "route": "/kn/bao-cao/tong-hop",
+                  "icon": "file"
+                },
+                {
+                  "key": "tinh.bao_cao.tong_hop.tuan.t03",
+                  "label": "T03 · Phân trà",
+                  "route": "/kn/bao-cao/tong-hop",
+                  "icon": "file"
+                },
+                {
+                  "key": "tinh.bao_cao.tong_hop.tuan.t04",
+                  "label": "T04 · Rau màu",
+                  "route": "/kn/bao-cao/tong-hop",
+                  "icon": "file"
+                },
+                {
+                  "key": "tinh.bao_cao.tong_hop.tuan.t05",
+                  "label": "T05 · Sâu bệnh lúa",
+                  "route": "/kn/bao-cao/tong-hop",
+                  "icon": "file"
+                },
+                {
+                  "key": "tinh.bao_cao.tong_hop.tuan.t06",
+                  "label": "T06 · Sâu bệnh khác",
+                  "route": "/kn/bao-cao/tong-hop",
+                  "icon": "file"
+                },
+                {
+                  "key": "tinh.bao_cao.tong_hop.tuan.t07",
+                  "label": "T07 · Thu hoạch",
+                  "route": "/kn/bao-cao/tong-hop",
+                  "icon": "file"
+                }
+              ]
+            },
+            {
+              "key": "tinh.bao_cao.tong_hop.thang",
+              "label": "Báo cáo tháng",
+              "route": "/kn/bao-cao/tong-hop",
+              "icon": "calendar"
+            },
+            {
+              "key": "tinh.bao_cao.tong_hop.hang_vu",
+              "label": "Báo cáo hàng vụ",
+              "icon": "sprout",
+              "children": [
+                {
+                  "key": "tinh.bao_cao.tong_hop.hang_vu.v01",
+                  "label": "V01 · 3G3T",
+                  "route": "/kn/bao-cao/tong-hop",
+                  "icon": "file"
+                },
+                {
+                  "key": "tinh.bao_cao.tong_hop.hang_vu.v02",
+                  "label": "V02 · 1P5G",
+                  "route": "/kn/bao-cao/tong-hop",
+                  "icon": "file"
+                },
+                {
+                  "key": "tinh.bao_cao.tong_hop.hang_vu.v03",
+                  "label": "V03 · CGH",
+                  "route": "/kn/bao-cao/tong-hop",
+                  "icon": "file"
+                },
+                {
+                  "key": "tinh.bao_cao.tong_hop.hang_vu.v04",
+                  "label": "V04 · CCG",
+                  "route": "/kn/bao-cao/tong-hop",
+                  "icon": "file"
+                },
+                {
+                  "key": "tinh.bao_cao.tong_hop.hang_vu.v05",
+                  "label": "V05 · Lượng giống",
+                  "route": "/kn/bao-cao/tong-hop",
+                  "icon": "file"
+                },
+                {
+                  "key": "tinh.bao_cao.tong_hop.hang_vu.v06",
+                  "label": "V06 · Mô hình",
+                  "route": "/kn/bao-cao/tong-hop",
+                  "icon": "file"
+                }
+              ]
+            },
+            {
+              "key": "tinh.bao_cao.tong_hop.nam",
+              "label": "Báo cáo năm",
+              "route": "/kn/bao-cao/tong-hop",
+              "icon": "chart"
+            }
+          ]
         },
         {
           "key": "tinh.bao_cao.chi_cuc",
@@ -150,6 +249,43 @@ const TRONG_TROT: Record<Exclude<KnRole, "admin">, Group[]> = {
           "icon": "zap",
           "badge": "extension.report_status.ad_hoc_pending",
           "adHoc": true
+        }
+      ]
+    },
+    {
+      "key": "du_lieu",
+      "label": "Dữ liệu",
+      "items": [
+        {
+          "key": "tinh.thu_thap",
+          "label": "Thu thập dữ liệu",
+          "icon": "database",
+          "children": [
+            {
+              "key": "tinh.thu_thap.htx",
+              "label": "Danh sách HTX",
+              "route": "/kn/du-lieu/htx",
+              "icon": "coop"
+            },
+            {
+              "key": "tinh.thu_thap.may_moc",
+              "label": "Máy móc HTX",
+              "route": "/kn/du-lieu/may-moc",
+              "icon": "tractor"
+            },
+            {
+              "key": "tinh.thu_thap.thua",
+              "label": "Thửa ruộng",
+              "route": "/kn/du-lieu/ve-thua",
+              "icon": "map"
+            },
+            {
+              "key": "tinh.thu_thap.vat_tu",
+              "label": "Vật tư",
+              "route": "/kn/du-lieu/vat-tu",
+              "icon": "package"
+            }
+          ]
         }
       ]
     }
@@ -232,8 +368,51 @@ const TRONG_TROT: Record<Exclude<KnRole, "admin">, Group[]> = {
         {
           "key": "xa.bao_cao.tuan",
           "label": "Báo cáo tuần",
-          "route": "/kn/bao-cao/tuan",
-          "icon": "file"
+          "icon": "file",
+          "children": [
+            {
+              "key": "xa.bao_cao.tuan.t01",
+              "label": "T01 · Tiến độ XG",
+              "route": "/kn/bao-cao/tuan",
+              "icon": "file"
+            },
+            {
+              "key": "xa.bao_cao.tuan.t02",
+              "label": "T02 · Lúa mùa",
+              "route": "/kn/bao-cao/tuan",
+              "icon": "file"
+            },
+            {
+              "key": "xa.bao_cao.tuan.t03",
+              "label": "T03 · Phân trà",
+              "route": "/kn/bao-cao/tuan",
+              "icon": "file"
+            },
+            {
+              "key": "xa.bao_cao.tuan.t04",
+              "label": "T04 · Rau màu",
+              "route": "/kn/bao-cao/tuan",
+              "icon": "file"
+            },
+            {
+              "key": "xa.bao_cao.tuan.t05",
+              "label": "T05 · Sâu bệnh lúa",
+              "route": "/kn/bao-cao/tuan",
+              "icon": "file"
+            },
+            {
+              "key": "xa.bao_cao.tuan.t06",
+              "label": "T06 · Sâu bệnh khác",
+              "route": "/kn/bao-cao/tuan",
+              "icon": "file"
+            },
+            {
+              "key": "xa.bao_cao.tuan.t07",
+              "label": "T07 · Thu hoạch",
+              "route": "/kn/bao-cao/tuan",
+              "icon": "file"
+            }
+          ]
         },
         {
           "key": "xa.bao_cao.thang",
@@ -244,8 +423,45 @@ const TRONG_TROT: Record<Exclude<KnRole, "admin">, Group[]> = {
         {
           "key": "xa.bao_cao.hang_vu",
           "label": "Báo cáo hàng vụ",
-          "route": "/kn/bao-cao/vu",
-          "icon": "sprout"
+          "icon": "sprout",
+          "children": [
+            {
+              "key": "xa.bao_cao.hang_vu.v01",
+              "label": "V01 · 3G3T",
+              "route": "/kn/bao-cao/vu",
+              "icon": "file"
+            },
+            {
+              "key": "xa.bao_cao.hang_vu.v02",
+              "label": "V02 · 1P5G",
+              "route": "/kn/bao-cao/vu",
+              "icon": "file"
+            },
+            {
+              "key": "xa.bao_cao.hang_vu.v03",
+              "label": "V03 · CGH",
+              "route": "/kn/bao-cao/vu",
+              "icon": "file"
+            },
+            {
+              "key": "xa.bao_cao.hang_vu.v04",
+              "label": "V04 · CCG",
+              "route": "/kn/bao-cao/vu",
+              "icon": "file"
+            },
+            {
+              "key": "xa.bao_cao.hang_vu.v05",
+              "label": "V05 · Lượng giống",
+              "route": "/kn/bao-cao/vu",
+              "icon": "file"
+            },
+            {
+              "key": "xa.bao_cao.hang_vu.v06",
+              "label": "V06 · Mô hình",
+              "route": "/kn/bao-cao/vu",
+              "icon": "file"
+            }
+          ]
         },
         {
           "key": "xa.bao_cao.cua_xa",
@@ -507,426 +723,1041 @@ const SHARED_BY_AUDIENCE: Partial<Record<KnRole, Item[]>> = {
   ]
 };
 
-const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "admin">, Item[]>>>> = {
+const BUSINESS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "admin">, Item[]>>>> = {};
+
+const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "admin">, Group[]>>>> = {
   "chan_nuoi_thuy_san": {
     "kn_tinh": [
       {
-        "key": "tinh.cnts.canh_bao",
-        "label": "Cảnh báo",
-        "route": "/kn/cnts/canh-bao",
-        "icon": "zap"
+        "key": "dieu_hanh",
+        "label": "Điều hành",
+        "items": [
+          {
+            "key": "tinh.cnts.trang_chu",
+            "label": "Trang chủ",
+            "route": "/kn/dashboard",
+            "icon": "dashboard"
+          },
+          {
+            "key": "tinh.cnts.canh_bao",
+            "label": "Cảnh báo",
+            "route": "/kn/cnts/canh-bao",
+            "icon": "zap"
+          },
+          {
+            "key": "tinh.cnts.bieu_mau",
+            "label": "Biểu mẫu",
+            "icon": "table",
+            "children": [
+              {
+                "key": "tinh.cnts.bieu_mau.thiet_ke",
+                "label": "Thiết kế biểu mẫu",
+                "route": "/kn/cnts/thiet-ke-bieu-mau",
+                "icon": "table",
+                "soon": true
+              },
+              {
+                "key": "tinh.cnts.bieu_mau.phat_hanh",
+                "label": "Phát hành, theo dõi nộp",
+                "route": "/kn/cnts/bieu-mau",
+                "icon": "send"
+              },
+              {
+                "key": "tinh.cnts.bieu_mau.nhac_nho",
+                "label": "Cấu hình nhắc nhở",
+                "route": "/kn/cnts/canh-bao",
+                "icon": "bell"
+              },
+              {
+                "key": "tinh.cnts.bieu_mau.ra_soat_nhat_ky",
+                "label": "Rà soát nhật ký",
+                "route": "/kn/cnts/ra-soat-nhat-ky",
+                "icon": "journal",
+                "soon": true
+              },
+              {
+                "key": "tinh.cnts.bieu_mau.cap_quyen",
+                "label": "Cấp quyền",
+                "route": "/kn/cnts/cap-quyen",
+                "icon": "key"
+              }
+            ]
+          },
+          {
+            "key": "tinh.cnts.lich",
+            "label": "Lịch",
+            "icon": "calendar",
+            "children": [
+              {
+                "key": "tinh.cnts.lich.truc",
+                "label": "Lịch trực KSGM",
+                "route": "/kn/cnts/lich-truc",
+                "icon": "calendar"
+              },
+              {
+                "key": "tinh.cnts.lich.tiem",
+                "label": "Lịch tiêm phòng",
+                "route": "/kn/cnts/lich-tiem",
+                "icon": "check"
+              },
+              {
+                "key": "tinh.cnts.lich.cong_tac_xa",
+                "label": "Lịch công tác cán bộ xã",
+                "route": "/kn/nhiem-vu/lich-cong-tac",
+                "icon": "calendar",
+                "badge": "extension.work_schedules.pending"
+              },
+              {
+                "key": "tinh.cnts.lich.cong_tac_phong",
+                "label": "Lịch công tác phòng",
+                "route": "/kn/nhiem-vu/lich-cong-tac",
+                "icon": "calendar"
+              }
+            ]
+          },
+          {
+            "key": "tinh.cnts.chien_dich",
+            "label": "Chiến dịch điều tra",
+            "icon": "megaphone",
+            "children": [
+              {
+                "key": "tinh.cnts.chien_dich.quan_ly",
+                "label": "Quản lý chiến dịch",
+                "route": "/kn/cnts/chien-dich",
+                "icon": "megaphone",
+                "soon": true
+              },
+              {
+                "key": "tinh.cnts.chien_dich.tao",
+                "label": "Tạo chiến dịch",
+                "route": "/kn/cnts/chien-dich/tao",
+                "icon": "megaphone",
+                "soon": true
+              }
+            ]
+          }
+        ]
       },
       {
-        "key": "tinh.cnts.duyet_bao_cao",
-        "label": "Duyệt báo cáo",
-        "route": "/kn/cnts/duyet-bao-cao",
-        "icon": "approve",
-        "soon": true
+        "key": "bao_cao",
+        "label": "Báo cáo",
+        "items": [
+          {
+            "key": "tinh.cnts.bao_cao_dinh_ky",
+            "label": "Báo cáo định kỳ",
+            "route": "/kn/cnts/bao-cao-dinh-ky",
+            "icon": "report",
+            "soon": true
+          },
+          {
+            "key": "tinh.cnts.ksgm",
+            "label": "KSGM tuần, tháng",
+            "route": "/kn/cnts/ksgm",
+            "icon": "chart"
+          },
+          {
+            "key": "tinh.cnts.phu_luc_2",
+            "label": "Thủy sản (Phụ lục 2)",
+            "route": "/kn/cnts/phu-luc-2",
+            "icon": "report"
+          },
+          {
+            "key": "tinh.cnts.dich_benh",
+            "label": "Báo cáo dịch bệnh",
+            "route": "/kn/cnts/dich-benh",
+            "icon": "shield"
+          }
+        ]
       },
       {
-        "key": "tinh.cnts.bieu_mau",
-        "label": "Biểu mẫu & cấp quyền",
-        "route": "/kn/cnts/bieu-mau",
-        "icon": "table"
-      },
-      {
-        "key": "tinh.cnts.dich_benh",
-        "label": "Báo cáo dịch bệnh",
-        "route": "/kn/cnts/dich-benh",
-        "icon": "shield"
-      },
-      {
-        "key": "tinh.cnts.ksgm",
-        "label": "KSGM tuần, tháng",
-        "route": "/kn/cnts/ksgm",
-        "icon": "chart"
-      },
-      {
-        "key": "tinh.cnts.phu_luc_2",
-        "label": "Thủy sản (Phụ lục 2)",
-        "route": "/kn/cnts/phu-luc-2",
-        "icon": "report"
-      },
-      {
-        "key": "tinh.cnts.lich",
-        "label": "Lịch trực KSGM",
-        "route": "/kn/cnts/lich-truc",
-        "icon": "calendar"
-      },
-      {
-        "key": "tinh.cnts.lich_tiem",
-        "label": "Lịch tiêm phòng",
-        "route": "/kn/cnts/lich-tiem",
-        "icon": "check"
-      },
-      {
-        "key": "tinh.cnts.lich_cong_tac",
-        "label": "Lịch công tác",
-        "route": "/kn/nhiem-vu/lich-cong-tac",
-        "icon": "calendar",
-        "badge": "extension.work_schedules.pending"
-      },
-      {
-        "key": "tinh.cnts.chien_dich",
-        "label": "Chiến dịch điều tra",
-        "route": "/kn/cnts/chien-dich",
-        "icon": "megaphone",
-        "soon": true
-      },
-      {
-        "key": "tinh.cnts.ban_do_dich",
-        "label": "Bản đồ vùng dịch",
-        "route": "/kn/cnts/ban-do-dich",
-        "icon": "map",
-        "soon": true
-      },
-      {
-        "key": "tinh.cnts.du_an_knqg",
-        "label": "Chương trình, dự án",
-        "route": "/kn/cnts/du-an",
-        "icon": "report"
-      },
-      {
-        "key": "tinh.cnts.quy_trinh",
-        "label": "Quy trình, văn bản",
-        "route": "/kn/cnts/quy-trinh",
-        "icon": "sop",
-        "soon": true
-      },
-      {
-        "key": "tinh.cnts.danh_muc",
-        "label": "Danh mục CNTS",
-        "route": "/kn/cnts/danh-muc",
-        "icon": "catalog"
-      },
-      {
-        "key": "tinh.cnts.ho_mo_hinh",
-        "label": "Hộ mô hình",
-        "route": "/kn/cnts/ho-mo-hinh",
-        "icon": "sprout"
-      },
-      {
-        "key": "tinh.cnts.cap_quyen",
-        "label": "Cấp quyền xã, nông hộ",
-        "route": "/kn/cnts/cap-quyen",
-        "icon": "key"
-      }
-    ],
-    "kn_tw": [
-      {
-        "key": "tw.cnts.du_an_knqg",
-        "label": "Dự án KNQG",
-        "route": "/kn/cnts/du-an",
-        "icon": "report"
+        "key": "du_lieu",
+        "label": "Dữ liệu",
+        "items": [
+          {
+            "key": "tinh.cnts.so_lieu_xa",
+            "label": "Số liệu cấp xã",
+            "icon": "database",
+            "children": [
+              {
+                "key": "tinh.cnts.so_lieu_xa.nhap_lieu_tuan",
+                "label": "Nhập liệu tuần",
+                "route": "/kn/cnts/so-lieu-xa/nhap-lieu-tuan",
+                "icon": "table",
+                "soon": true
+              },
+              {
+                "key": "tinh.cnts.so_lieu_xa.khai_thac_thuy_san",
+                "label": "Khai thác thủy sản",
+                "route": "/kn/cnts/so-lieu-xa/khai-thac-thuy-san",
+                "icon": "water",
+                "soon": true
+              },
+              {
+                "key": "tinh.cnts.so_lieu_xa.nhat_ky",
+                "label": "Nhật ký sản xuất",
+                "route": "/kn/cnts/so-lieu-xa/nhat-ky",
+                "icon": "journal",
+                "soon": true
+              },
+              {
+                "key": "tinh.cnts.so_lieu_xa.lich_tiem",
+                "label": "Lịch tiêm (thực tế)",
+                "route": "/kn/cnts/lich-tiem",
+                "icon": "check"
+              }
+            ]
+          },
+          {
+            "key": "tinh.cnts.ban_do_dich",
+            "label": "Bản đồ vùng dịch",
+            "route": "/kn/cnts/ban-do-dich",
+            "icon": "map",
+            "soon": true
+          },
+          {
+            "key": "tinh.cnts.du_an_knqg",
+            "label": "Dự án KNQG",
+            "icon": "report",
+            "children": [
+              {
+                "key": "tinh.cnts.du_an_knqg.du_an",
+                "label": "Dự án, điểm trình diễn",
+                "route": "/kn/cnts/du-an",
+                "icon": "report"
+              },
+              {
+                "key": "tinh.cnts.du_an_knqg.mau_bieu",
+                "label": "Mẫu biểu dự án",
+                "route": "/kn/cnts/du-an-mau-bieu",
+                "icon": "table",
+                "soon": true
+              }
+            ]
+          },
+          {
+            "key": "tinh.cnts.quy_trinh",
+            "label": "Quy trình, văn bản",
+            "route": "/kn/cnts/quy-trinh",
+            "icon": "sop",
+            "soon": true
+          }
+        ]
       }
     ],
     "kn_xa": [
       {
-        "key": "xa.cnts.bao_cao_ky",
-        "label": "Báo cáo kỳ CNTS",
-        "route": "/kn/cnts/bao-cao-ky",
-        "icon": "task"
+        "key": "dieu_hanh",
+        "label": "Điều hành",
+        "items": [
+          {
+            "key": "xa.cnts.viec_can_lam",
+            "label": "Việc cần làm",
+            "route": "/kn/cnts/bao-cao-ky",
+            "icon": "bell"
+          },
+          {
+            "key": "xa.cnts.lich",
+            "label": "Lịch trực KSGM của tôi",
+            "route": "/kn/cnts/lich-truc",
+            "icon": "calendar"
+          },
+          {
+            "key": "xa.cnts.lich_cong_tac",
+            "label": "Lịch công tác",
+            "route": "/kn/nhiem-vu/lich-cong-tac",
+            "icon": "calendar"
+          }
+        ]
       },
       {
-        "key": "xa.cnts.dich_benh",
-        "label": "Báo cáo dịch bệnh",
-        "route": "/kn/cnts/dich-benh",
-        "icon": "shield"
+        "key": "bao_cao",
+        "label": "Báo cáo",
+        "items": [
+          {
+            "key": "xa.cnts.ksgm_ngay",
+            "label": "KSGM hằng ngày",
+            "route": "/kn/cnts/bao-cao-ky",
+            "icon": "chart"
+          },
+          {
+            "key": "xa.cnts.nhap_lieu_tuan",
+            "label": "Nhập liệu tuần chăn nuôi",
+            "route": "/kn/cnts/bao-cao-ky",
+            "icon": "table"
+          },
+          {
+            "key": "xa.cnts.khai_thac_thuy_san",
+            "label": "Khai thác thủy sản tuần",
+            "route": "/kn/cnts/bao-cao-ky",
+            "icon": "water"
+          },
+          {
+            "key": "xa.cnts.cong_viec_tuan",
+            "label": "Báo cáo công việc tuần",
+            "route": "/kn/cnts/bao-cao-ky",
+            "icon": "check"
+          },
+          {
+            "key": "xa.cnts.dich_benh",
+            "label": "Báo cáo dịch bệnh",
+            "route": "/kn/cnts/dich-benh",
+            "icon": "shield"
+          }
+        ]
       },
       {
-        "key": "xa.cnts.canh_bao",
-        "label": "Cảnh báo",
-        "route": "/kn/cnts/canh-bao",
-        "icon": "zap"
+        "key": "du_lieu",
+        "label": "Dữ liệu",
+        "items": [
+          {
+            "key": "xa.cnts.ho_mo_hinh",
+            "label": "Hộ mô hình",
+            "route": "/kn/cnts/ho-mo-hinh",
+            "icon": "users"
+          },
+          {
+            "key": "xa.cnts.nhat_ky",
+            "label": "Nhật ký sản xuất",
+            "icon": "journal",
+            "children": [
+              {
+                "key": "xa.cnts.nhat_ky.thuy_san",
+                "label": "Thủy sản",
+                "route": "/kn/cnts/nhat-ky/thuy-san",
+                "icon": "water",
+                "soon": true
+              },
+              {
+                "key": "xa.cnts.nhat_ky.chan_nuoi",
+                "label": "Chăn nuôi",
+                "route": "/kn/cnts/nhat-ky/chan-nuoi",
+                "icon": "sprout",
+                "soon": true
+              }
+            ]
+          },
+          {
+            "key": "xa.cnts.lich_tiem",
+            "label": "Lịch tiêm phòng",
+            "route": "/kn/cnts/lich-tiem",
+            "icon": "check"
+          },
+          {
+            "key": "xa.cnts.ban_do_dich",
+            "label": "Bản đồ vùng dịch",
+            "route": "/kn/cnts/ban-do-dich",
+            "icon": "map",
+            "soon": true
+          },
+          {
+            "key": "xa.cnts.diem_trinh_dien",
+            "label": "Điểm trình diễn",
+            "route": "/kn/cnts/ho-mo-hinh",
+            "icon": "report"
+          },
+          {
+            "key": "xa.cnts.quy_trinh",
+            "label": "Quy trình, văn bản",
+            "route": "/kn/cnts/quy-trinh",
+            "icon": "sop",
+            "soon": true
+          }
+        ]
+      }
+    ],
+    "kn_tw": [
+      {
+        "key": "dieu_hanh",
+        "label": "Điều hành",
+        "items": [
+          {
+            "key": "tw.dashboard",
+            "label": "Dashboard",
+            "route": "/kn/dashboard",
+            "icon": "dashboard"
+          }
+        ]
       },
       {
-        "key": "xa.cnts.lich",
-        "label": "Lịch trực của tôi",
-        "route": "/kn/cnts/lich-truc",
-        "icon": "calendar"
+        "key": "bao_cao",
+        "label": "Báo cáo",
+        "items": [
+          {
+            "key": "tw.bao_cao.tuan",
+            "label": "Báo cáo tuần",
+            "route": "/kn/bao-cao/tuan",
+            "icon": "file"
+          },
+          {
+            "key": "tw.bao_cao.thang",
+            "label": "Báo cáo tháng",
+            "route": "/kn/bao-cao/thang",
+            "icon": "calendar"
+          },
+          {
+            "key": "tw.bao_cao.hang_vu",
+            "label": "Báo cáo hàng vụ",
+            "route": "/kn/bao-cao/vu",
+            "icon": "sprout"
+          },
+          {
+            "key": "tw.bao_cao.nam",
+            "label": "Báo cáo năm",
+            "route": "/kn/bao-cao/nam",
+            "icon": "chart"
+          }
+        ]
       },
       {
-        "key": "xa.cnts.lich_tiem",
-        "label": "Lịch tiêm",
-        "route": "/kn/cnts/lich-tiem",
-        "icon": "check"
-      },
-      {
-        "key": "xa.cnts.lich_cong_tac",
-        "label": "Lịch công tác",
-        "route": "/kn/nhiem-vu/lich-cong-tac",
-        "icon": "calendar"
-      },
-      {
-        "key": "xa.cnts.nhat_ky",
-        "label": "Hộ mô hình & nhật ký",
-        "route": "/kn/cnts/nhat-ky",
-        "icon": "journal",
-        "soon": true
-      },
-      {
-        "key": "xa.cnts.ban_do_dich",
-        "label": "Bản đồ vùng dịch",
-        "route": "/kn/cnts/ban-do-dich",
-        "icon": "map",
-        "soon": true
-      },
-      {
-        "key": "xa.cnts.diem_trinh_dien",
-        "label": "Điểm trình diễn, hộ mô hình",
-        "route": "/kn/cnts/ho-mo-hinh",
-        "icon": "report"
-      },
-      {
-        "key": "xa.cnts.quy_trinh",
-        "label": "Quy trình, văn bản",
-        "route": "/kn/cnts/quy-trinh",
-        "icon": "sop",
-        "soon": true
-      },
-      {
-        "key": "xa.cnts.quyen_cua_toi",
-        "label": "Quyền của tôi",
-        "route": "/kn/cnts/cap-quyen",
-        "icon": "key"
+        "key": "du_lieu",
+        "label": "Dữ liệu",
+        "items": [
+          {
+            "key": "tw.cnts.du_an_knqg",
+            "label": "Dự án KNQG",
+            "route": "/kn/cnts/du-an",
+            "icon": "report"
+          }
+        ]
       }
     ]
   },
   "ke_hoach_tai_chinh": {
     "kn_tinh": [
       {
-        "key": "tinh.khtc.ky_bao_cao",
-        "label": "Kỳ báo cáo & phiếu các phòng",
-        "route": "/kn/khtc/ky-bao-cao",
-        "icon": "task"
+        "key": "dieu_hanh",
+        "label": "Điều hành",
+        "items": [
+          {
+            "key": "tinh.dashboard",
+            "label": "Dashboard",
+            "route": "/kn/dashboard",
+            "icon": "dashboard"
+          },
+          {
+            "key": "tinh.nhiem_vu",
+            "label": "Nhiệm vụ",
+            "icon": "task",
+            "children": [
+              {
+                "key": "tinh.nhiem_vu.phat_hanh",
+                "label": "Phát hành biểu mẫu",
+                "route": "/kn/nhiem-vu/phat-hanh",
+                "icon": "send"
+              },
+              {
+                "key": "tinh.nhiem_vu.trang_thai_nop",
+                "label": "Trạng thái nộp",
+                "route": "/kn/nhiem-vu/trang-thai-nop",
+                "icon": "bell",
+                "badge": "extension.report_status.not_submitted"
+              },
+              {
+                "key": "tinh.nhiem_vu.ra_soat",
+                "label": "Rà soát & chốt kỳ",
+                "route": "/kn/nhiem-vu/ra-soat",
+                "icon": "check",
+                "badge": "extension.submissions.pending_review"
+              }
+            ]
+          },
+          {
+            "key": "tinh.khtc.ky_bao_cao",
+            "label": "Kỳ báo cáo & phiếu các phòng",
+            "route": "/kn/khtc/ky-bao-cao",
+            "icon": "task"
+          },
+          {
+            "key": "tinh.khtc.ke_hoach_nam",
+            "label": "Kế hoạch năm",
+            "route": "/kn/khtc/ke-hoach-nam",
+            "icon": "calendar"
+          }
+        ]
       },
       {
-        "key": "tinh.khtc.ke_hoach_nam",
-        "label": "Kế hoạch năm",
-        "route": "/kn/khtc/ke-hoach-nam",
-        "icon": "calendar"
+        "key": "bao_cao",
+        "label": "Báo cáo",
+        "items": [
+          {
+            "key": "tinh.bao_cao.tong_hop",
+            "label": "Báo cáo tổng hợp các xã",
+            "route": "/kn/bao-cao/tong-hop",
+            "icon": "layers"
+          },
+          {
+            "key": "tinh.bao_cao.dot_xuat",
+            "label": "Báo cáo đột xuất",
+            "route": "/kn/bao-cao/dot-xuat",
+            "icon": "zap",
+            "badge": "extension.report_status.ad_hoc_pending",
+            "adHoc": true
+          },
+          {
+            "key": "tinh.khtc.bao_cao",
+            "label": "Soạn báo cáo (Mẫu 1–5)",
+            "route": "/kn/khtc/bao-cao",
+            "icon": "report"
+          },
+          {
+            "key": "tinh.khtc.tien_do",
+            "label": "Tiến độ các chương trình",
+            "route": "/kn/khtc/tien-do",
+            "icon": "chart"
+          },
+          {
+            "key": "tinh.khtc.da_xuat",
+            "label": "Báo cáo đã xuất",
+            "route": "/kn/khtc/bao-cao-da-xuat",
+            "icon": "report"
+          },
+          {
+            "key": "tinh.khtc.mau_bao_cao",
+            "label": "Mẫu báo cáo KHTC",
+            "route": "/kn/khtc/mau-bao-cao",
+            "icon": "table",
+            "soon": true
+          }
+        ]
       },
       {
-        "key": "tinh.khtc.so_lieu_ngoai",
-        "label": "Số liệu nguồn ngoài",
-        "route": "/kn/khtc/so-lieu-ngoai",
-        "icon": "database",
-        "soon": true
-      },
-      {
-        "key": "tinh.khtc.mau_bao_cao",
-        "label": "Mẫu báo cáo KHTC",
-        "route": "/kn/khtc/mau-bao-cao",
-        "icon": "table",
-        "soon": true
-      },
-      {
-        "key": "tinh.khtc.tien_do",
-        "label": "Tiến độ các chương trình",
-        "route": "/kn/khtc/tien-do",
-        "icon": "chart"
-      },
-      {
-        "key": "tinh.khtc.da_xuat",
-        "label": "Báo cáo đã xuất",
-        "route": "/kn/khtc/bao-cao-da-xuat",
-        "icon": "report"
-      },
-      {
-        "key": "tinh.khtc.bao_cao",
-        "label": "Soạn báo cáo (Mẫu 1–5)",
-        "route": "/kn/khtc/bao-cao",
-        "icon": "report"
+        "key": "du_lieu",
+        "label": "Dữ liệu",
+        "items": [
+          {
+            "key": "tinh.khtc.so_lieu_ngoai",
+            "label": "Số liệu nguồn ngoài",
+            "route": "/kn/khtc/so-lieu-ngoai",
+            "icon": "database",
+            "soon": true
+          }
+        ]
       }
     ],
     "kn_tw": [
       {
-        "key": "tw.khtc.bao_cao_tinh",
-        "label": "Báo cáo Tỉnh (KHTC)",
-        "route": "/kn/khtc/bao-cao-da-xuat",
-        "icon": "report",
-        "soon": true
+        "key": "dieu_hanh",
+        "label": "Điều hành",
+        "items": [
+          {
+            "key": "tw.dashboard",
+            "label": "Dashboard",
+            "route": "/kn/dashboard",
+            "icon": "dashboard"
+          }
+        ]
+      },
+      {
+        "key": "bao_cao",
+        "label": "Báo cáo",
+        "items": [
+          {
+            "key": "tw.bao_cao.tuan",
+            "label": "Báo cáo tuần",
+            "route": "/kn/bao-cao/tuan",
+            "icon": "file"
+          },
+          {
+            "key": "tw.bao_cao.thang",
+            "label": "Báo cáo tháng",
+            "route": "/kn/bao-cao/thang",
+            "icon": "calendar"
+          },
+          {
+            "key": "tw.bao_cao.hang_vu",
+            "label": "Báo cáo hàng vụ",
+            "route": "/kn/bao-cao/vu",
+            "icon": "sprout"
+          },
+          {
+            "key": "tw.bao_cao.nam",
+            "label": "Báo cáo năm",
+            "route": "/kn/bao-cao/nam",
+            "icon": "chart"
+          },
+          {
+            "key": "tw.khtc.bao_cao_tinh",
+            "label": "Báo cáo Tỉnh (KHTC)",
+            "route": "/kn/khtc/bao-cao-da-xuat",
+            "icon": "report",
+            "soon": true
+          }
+        ]
       }
     ]
   },
   "thong_tin_truyen_thong": {
     "kn_tinh": [
       {
-        "key": "tinh.bao_gia.tien_do",
-        "label": "Tiến độ nhập giá",
-        "route": "/kn/bao-gia/tien-do",
-        "icon": "bell"
+        "key": "dieu_hanh",
+        "label": "Điều hành",
+        "items": [
+          {
+            "key": "tinh.dashboard",
+            "label": "Dashboard",
+            "route": "/kn/dashboard",
+            "icon": "dashboard"
+          },
+          {
+            "key": "tinh.nhiem_vu",
+            "label": "Nhiệm vụ",
+            "icon": "task",
+            "children": [
+              {
+                "key": "tinh.nhiem_vu.phat_hanh",
+                "label": "Phát hành biểu mẫu",
+                "route": "/kn/nhiem-vu/phat-hanh",
+                "icon": "send"
+              },
+              {
+                "key": "tinh.nhiem_vu.trang_thai_nop",
+                "label": "Trạng thái nộp",
+                "route": "/kn/nhiem-vu/trang-thai-nop",
+                "icon": "bell",
+                "badge": "extension.report_status.not_submitted"
+              },
+              {
+                "key": "tinh.nhiem_vu.ra_soat",
+                "label": "Rà soát & chốt kỳ",
+                "route": "/kn/nhiem-vu/ra-soat",
+                "icon": "check",
+                "badge": "extension.submissions.pending_review"
+              }
+            ]
+          },
+          {
+            "key": "tinh.bao_gia.tien_do",
+            "label": "Tiến độ nhập giá",
+            "route": "/kn/bao-gia/tien-do",
+            "icon": "bell"
+          },
+          {
+            "key": "tinh.bao_gia.kiem_duyet",
+            "label": "Kiểm duyệt & công bố",
+            "route": "/kn/bao-gia/kiem-duyet",
+            "icon": "approve"
+          },
+          {
+            "key": "tinh.bao_gia.cau_hinh",
+            "label": "Cấu hình báo giá",
+            "route": "/kn/bao-gia/cau-hinh",
+            "icon": "param"
+          }
+        ]
       },
       {
-        "key": "tinh.bao_gia.kiem_duyet",
-        "label": "Kiểm duyệt & công bố",
-        "route": "/kn/bao-gia/kiem-duyet",
-        "icon": "approve"
+        "key": "bao_cao",
+        "label": "Báo cáo",
+        "items": [
+          {
+            "key": "tinh.bao_cao.tong_hop",
+            "label": "Báo cáo tổng hợp các xã",
+            "route": "/kn/bao-cao/tong-hop",
+            "icon": "layers"
+          },
+          {
+            "key": "tinh.bao_cao.dot_xuat",
+            "label": "Báo cáo đột xuất",
+            "route": "/kn/bao-cao/dot-xuat",
+            "icon": "zap",
+            "badge": "extension.report_status.ad_hoc_pending",
+            "adHoc": true
+          },
+          {
+            "key": "tinh.bao_gia.bang_gia",
+            "label": "Bảng giá tổng hợp",
+            "route": "/kn/bao-gia/bang-gia",
+            "icon": "chart"
+          },
+          {
+            "key": "tinh.bao_gia.bien_dong",
+            "label": "Báo cáo biến động giá",
+            "route": "/kn/bao-gia/bien-dong",
+            "icon": "layers"
+          },
+          {
+            "key": "tinh.bao_gia.dashboard",
+            "label": "Dashboard theo vùng",
+            "route": "/kn/bao-gia/dashboard-vung",
+            "icon": "map"
+          },
+          {
+            "key": "tinh.bao_gia.thong_ke",
+            "label": "Thống kê phiếu báo giá",
+            "route": "/kn/bao-gia/thong-ke",
+            "icon": "table"
+          }
+        ]
       },
       {
-        "key": "tinh.bao_gia.bang_gia",
-        "label": "Bảng giá tổng hợp",
-        "route": "/kn/bao-gia/bang-gia",
-        "icon": "chart"
-      },
-      {
-        "key": "tinh.bao_gia.bien_dong",
-        "label": "Báo cáo biến động giá",
-        "route": "/kn/bao-gia/bien-dong",
-        "icon": "layers"
-      },
-      {
-        "key": "tinh.bao_gia.dashboard",
-        "label": "Dashboard theo vùng",
-        "route": "/kn/bao-gia/dashboard-vung",
-        "icon": "map"
-      },
-      {
-        "key": "tinh.bao_gia.thong_ke",
-        "label": "Thống kê phiếu báo giá",
-        "route": "/kn/bao-gia/thong-ke",
-        "icon": "table"
-      },
-      {
-        "key": "tinh.bao_gia.dieu_tra",
-        "label": "Điều tra giá thành",
-        "route": "/kn/bao-gia/dieu-tra",
-        "icon": "season",
-        "soon": true
-      },
-      {
-        "key": "tinh.bao_gia.mat_hang",
-        "label": "Mặt hàng",
-        "route": "/kn/bao-gia/mat-hang",
-        "icon": "package",
-        "soon": true
-      },
-      {
-        "key": "tinh.bao_gia.cau_hinh",
-        "label": "Cấu hình báo giá",
-        "route": "/kn/bao-gia/cau-hinh",
-        "icon": "param"
+        "key": "du_lieu",
+        "label": "Dữ liệu",
+        "items": [
+          {
+            "key": "tinh.bao_gia.dieu_tra",
+            "label": "Điều tra giá thành",
+            "route": "/kn/bao-gia/dieu-tra",
+            "icon": "season",
+            "soon": true
+          },
+          {
+            "key": "tinh.bao_gia.mat_hang",
+            "label": "Mặt hàng",
+            "route": "/kn/bao-gia/mat-hang",
+            "icon": "package",
+            "soon": true
+          }
+        ]
       }
     ],
     "kn_tw": [
       {
-        "key": "tw.bao_gia.bang_gia",
-        "label": "Bảng giá tổng hợp",
-        "route": "/kn/bao-gia/bang-gia",
-        "icon": "chart"
+        "key": "dieu_hanh",
+        "label": "Điều hành",
+        "items": [
+          {
+            "key": "tw.dashboard",
+            "label": "Dashboard",
+            "route": "/kn/dashboard",
+            "icon": "dashboard"
+          }
+        ]
       },
       {
-        "key": "tw.bao_gia.dashboard",
-        "label": "Dashboard theo vùng",
-        "route": "/kn/bao-gia/dashboard-vung",
-        "icon": "map"
-      },
-      {
-        "key": "tw.bao_gia.bien_dong",
-        "label": "Báo cáo biến động giá",
-        "route": "/kn/bao-gia/bien-dong",
-        "icon": "layers"
-      },
-      {
-        "key": "tw.bao_gia.gia_thanh",
-        "label": "Giá thành sản xuất",
-        "route": "/kn/bao-gia/gia-thanh",
-        "icon": "report",
-        "soon": true
+        "key": "bao_cao",
+        "label": "Báo cáo",
+        "items": [
+          {
+            "key": "tw.bao_cao.tuan",
+            "label": "Báo cáo tuần",
+            "route": "/kn/bao-cao/tuan",
+            "icon": "file"
+          },
+          {
+            "key": "tw.bao_cao.thang",
+            "label": "Báo cáo tháng",
+            "route": "/kn/bao-cao/thang",
+            "icon": "calendar"
+          },
+          {
+            "key": "tw.bao_cao.hang_vu",
+            "label": "Báo cáo hàng vụ",
+            "route": "/kn/bao-cao/vu",
+            "icon": "sprout"
+          },
+          {
+            "key": "tw.bao_cao.nam",
+            "label": "Báo cáo năm",
+            "route": "/kn/bao-cao/nam",
+            "icon": "chart"
+          },
+          {
+            "key": "tw.bao_gia.bang_gia",
+            "label": "Bảng giá tổng hợp",
+            "route": "/kn/bao-gia/bang-gia",
+            "icon": "chart"
+          },
+          {
+            "key": "tw.bao_gia.dashboard",
+            "label": "Dashboard theo vùng",
+            "route": "/kn/bao-gia/dashboard-vung",
+            "icon": "map"
+          },
+          {
+            "key": "tw.bao_gia.bien_dong",
+            "label": "Báo cáo biến động giá",
+            "route": "/kn/bao-gia/bien-dong",
+            "icon": "layers"
+          },
+          {
+            "key": "tw.bao_gia.gia_thanh",
+            "label": "Giá thành sản xuất",
+            "route": "/kn/bao-gia/gia-thanh",
+            "icon": "report",
+            "soon": true
+          }
+        ]
       }
     ],
     "kn_xa": [
       {
-        "key": "xa.bao_gia.nhap",
-        "label": "Nhập báo giá",
-        "route": "/kn/bao-gia/nhap",
-        "icon": "upload"
+        "key": "dieu_hanh",
+        "label": "Điều hành",
+        "items": [
+          {
+            "key": "xa.nhiem_vu",
+            "label": "Nhiệm vụ",
+            "icon": "task",
+            "children": [
+              {
+                "key": "xa.nhiem_vu.cong_viec",
+                "label": "Công việc cần làm",
+                "route": "/kn/nhiem-vu/cong-viec",
+                "icon": "bell",
+                "badge": "extension.report_tasks.todo"
+              }
+            ]
+          },
+          {
+            "key": "xa.bao_gia.nhap",
+            "label": "Nhập báo giá",
+            "route": "/kn/bao-gia/nhap",
+            "icon": "upload"
+          },
+          {
+            "key": "xa.bao_gia.xac_minh",
+            "label": "Yêu cầu xác minh",
+            "route": "/kn/bao-gia/xac-minh",
+            "icon": "check"
+          }
+        ]
       },
       {
-        "key": "xa.bao_gia.xac_minh",
-        "label": "Yêu cầu xác minh",
-        "route": "/kn/bao-gia/xac-minh",
-        "icon": "check"
+        "key": "bao_cao",
+        "label": "Báo cáo",
+        "items": [
+          {
+            "key": "xa.bao_cao.tuan",
+            "label": "Báo cáo tuần",
+            "route": "/kn/bao-cao/tuan",
+            "icon": "file"
+          },
+          {
+            "key": "xa.bao_cao.thang",
+            "label": "Báo cáo tháng",
+            "route": "/kn/bao-cao/thang",
+            "icon": "calendar"
+          },
+          {
+            "key": "xa.bao_cao.hang_vu",
+            "label": "Báo cáo hàng vụ",
+            "route": "/kn/bao-cao/vu",
+            "icon": "sprout"
+          },
+          {
+            "key": "xa.bao_cao.cua_xa",
+            "label": "Báo cáo của xã",
+            "route": "/kn/bao-cao/cua-xa",
+            "icon": "chart"
+          },
+          {
+            "key": "xa.bao_cao.dot_xuat",
+            "label": "Báo cáo đột xuất",
+            "route": "/kn/bao-cao/dot-xuat",
+            "icon": "zap",
+            "badge": "extension.report_tasks.ad_hoc_todo",
+            "adHoc": true
+          },
+          {
+            "key": "xa.bao_gia.bang_gia",
+            "label": "Bảng giá tổng hợp",
+            "route": "/kn/bao-gia/bang-gia",
+            "icon": "chart"
+          },
+          {
+            "key": "xa.bao_gia.bien_dong",
+            "label": "Báo cáo biến động giá",
+            "route": "/kn/bao-gia/bien-dong",
+            "icon": "layers"
+          }
+        ]
       },
       {
-        "key": "xa.bao_gia.lich_su",
-        "label": "Lịch sử báo giá",
-        "route": "/kn/bao-gia/lich-su",
-        "icon": "journal"
-      },
-      {
-        "key": "xa.bao_gia.bang_gia",
-        "label": "Bảng giá tổng hợp",
-        "route": "/kn/bao-gia/bang-gia",
-        "icon": "chart"
-      },
-      {
-        "key": "xa.bao_gia.bien_dong",
-        "label": "Báo cáo biến động giá",
-        "route": "/kn/bao-gia/bien-dong",
-        "icon": "layers"
+        "key": "du_lieu",
+        "label": "Dữ liệu",
+        "items": [
+          {
+            "key": "xa.bao_gia.lich_su",
+            "label": "Lịch sử báo giá",
+            "route": "/kn/bao-gia/lich-su",
+            "icon": "journal"
+          }
+        ]
       }
     ]
   },
   "hanh_chinh_tong_hop": {
     "kn_tinh": [
       {
-        "key": "tinh.hcth.dashboard",
-        "label": "Dashboard nhân sự",
-        "route": "/kn/nhan-su/dashboard",
-        "icon": "chart"
+        "key": "dieu_hanh",
+        "label": "Điều hành",
+        "items": [
+          {
+            "key": "tinh.dashboard",
+            "label": "Dashboard",
+            "route": "/kn/dashboard",
+            "icon": "dashboard"
+          },
+          {
+            "key": "tinh.nhiem_vu",
+            "label": "Nhiệm vụ",
+            "icon": "task",
+            "children": [
+              {
+                "key": "tinh.nhiem_vu.phat_hanh",
+                "label": "Phát hành biểu mẫu",
+                "route": "/kn/nhiem-vu/phat-hanh",
+                "icon": "send"
+              },
+              {
+                "key": "tinh.nhiem_vu.trang_thai_nop",
+                "label": "Trạng thái nộp",
+                "route": "/kn/nhiem-vu/trang-thai-nop",
+                "icon": "bell",
+                "badge": "extension.report_status.not_submitted"
+              },
+              {
+                "key": "tinh.nhiem_vu.ra_soat",
+                "label": "Rà soát & chốt kỳ",
+                "route": "/kn/nhiem-vu/ra-soat",
+                "icon": "check",
+                "badge": "extension.submissions.pending_review"
+              }
+            ]
+          },
+          {
+            "key": "tinh.hcth.dashboard",
+            "label": "Dashboard nhân sự",
+            "route": "/kn/nhan-su/dashboard",
+            "icon": "chart"
+          },
+          {
+            "key": "tinh.hcth.nang_bac",
+            "label": "Danh sách nâng bậc",
+            "route": "/kn/nhan-su/nang-bac",
+            "icon": "chart"
+          },
+          {
+            "key": "tinh.hcth.quyet_dinh_nang_bac",
+            "label": "Quyết định nâng bậc",
+            "route": "/kn/nhan-su/quyet-dinh-nang-bac",
+            "icon": "journal"
+          },
+          {
+            "key": "tinh.hcth.danh_gia",
+            "label": "Đánh giá",
+            "route": "/kn/nhan-su/danh-gia",
+            "icon": "approve",
+            "soon": true
+          }
+        ]
       },
       {
-        "key": "tinh.hcth.ho_so",
-        "label": "Hồ sơ nhân sự",
-        "route": "/kn/nhan-su/ho-so",
-        "icon": "users"
+        "key": "bao_cao",
+        "label": "Báo cáo",
+        "items": [
+          {
+            "key": "tinh.bao_cao.tong_hop",
+            "label": "Báo cáo tổng hợp các xã",
+            "route": "/kn/bao-cao/tong-hop",
+            "icon": "layers"
+          },
+          {
+            "key": "tinh.bao_cao.dot_xuat",
+            "label": "Báo cáo đột xuất",
+            "route": "/kn/bao-cao/dot-xuat",
+            "icon": "zap",
+            "badge": "extension.report_status.ad_hoc_pending",
+            "adHoc": true
+          },
+          {
+            "key": "tinh.hcth.bao_cao_so",
+            "label": "Biểu mẫu báo cáo Sở",
+            "route": "/kn/nhan-su/bao-cao-so",
+            "icon": "report"
+          }
+        ]
       },
       {
-        "key": "tinh.hcth.bao_cao_so",
-        "label": "Biểu mẫu báo cáo Sở",
-        "route": "/kn/nhan-su/bao-cao-so",
-        "icon": "report"
-      },
-      {
-        "key": "tinh.hcth.nang_bac",
-        "label": "Danh sách nâng bậc",
-        "route": "/kn/nhan-su/nang-bac",
-        "icon": "chart"
-      },
-      {
-        "key": "tinh.hcth.quyet_dinh_nang_bac",
-        "label": "Quyết định nâng bậc",
-        "route": "/kn/nhan-su/quyet-dinh-nang-bac",
-        "icon": "journal"
-      },
-      {
-        "key": "tinh.hcth.kho_tai_lieu",
-        "label": "Hồ sơ dữ liệu",
-        "route": "/kn/nhan-su/kho-tai-lieu",
-        "icon": "library"
-      },
-      {
-        "key": "tinh.hcth.danh_gia",
-        "label": "Đánh giá",
-        "route": "/kn/nhan-su/danh-gia",
-        "icon": "approve",
-        "soon": true
-      },
-      {
-        "key": "tinh.hcth.danh_muc",
-        "label": "Danh mục nhân sự",
-        "route": "/kn/nhan-su/danh-muc",
-        "icon": "catalog"
+        "key": "du_lieu",
+        "label": "Dữ liệu",
+        "items": [
+          {
+            "key": "tinh.hcth.ho_so",
+            "label": "Hồ sơ nhân sự",
+            "route": "/kn/nhan-su/ho-so",
+            "icon": "users"
+          },
+          {
+            "key": "tinh.hcth.kho_tai_lieu",
+            "label": "Hồ sơ dữ liệu",
+            "route": "/kn/nhan-su/kho-tai-lieu",
+            "icon": "library"
+          },
+          {
+            "key": "tinh.hcth.danh_muc",
+            "label": "Danh mục nhân sự",
+            "route": "/kn/nhan-su/danh-muc",
+            "icon": "catalog"
+          }
+        ]
       }
     ],
     "kn_xa": [
       {
-        "key": "xa.hcth.danh_gia",
-        "label": "Đánh giá của tôi",
-        "route": "/kn/nhan-su/danh-gia-cua-toi",
-        "icon": "approve",
-        "soon": true
+        "key": "dieu_hanh",
+        "label": "Điều hành",
+        "items": [
+          {
+            "key": "xa.nhiem_vu",
+            "label": "Nhiệm vụ",
+            "icon": "task",
+            "children": [
+              {
+                "key": "xa.nhiem_vu.cong_viec",
+                "label": "Công việc cần làm",
+                "route": "/kn/nhiem-vu/cong-viec",
+                "icon": "bell",
+                "badge": "extension.report_tasks.todo"
+              }
+            ]
+          },
+          {
+            "key": "xa.hcth.danh_gia",
+            "label": "Đánh giá của tôi",
+            "route": "/kn/nhan-su/danh-gia-cua-toi",
+            "icon": "approve",
+            "soon": true
+          }
+        ]
+      },
+      {
+        "key": "bao_cao",
+        "label": "Báo cáo",
+        "items": [
+          {
+            "key": "xa.bao_cao.tuan",
+            "label": "Báo cáo tuần",
+            "route": "/kn/bao-cao/tuan",
+            "icon": "file"
+          },
+          {
+            "key": "xa.bao_cao.thang",
+            "label": "Báo cáo tháng",
+            "route": "/kn/bao-cao/thang",
+            "icon": "calendar"
+          },
+          {
+            "key": "xa.bao_cao.hang_vu",
+            "label": "Báo cáo hàng vụ",
+            "route": "/kn/bao-cao/vu",
+            "icon": "sprout"
+          },
+          {
+            "key": "xa.bao_cao.cua_xa",
+            "label": "Báo cáo của xã",
+            "route": "/kn/bao-cao/cua-xa",
+            "icon": "chart"
+          },
+          {
+            "key": "xa.bao_cao.dot_xuat",
+            "label": "Báo cáo đột xuất",
+            "route": "/kn/bao-cao/dot-xuat",
+            "icon": "zap",
+            "badge": "extension.report_tasks.ad_hoc_todo",
+            "adHoc": true
+          }
+        ]
       }
     ]
   }
@@ -1274,7 +2105,8 @@ function profileGroups(profile: KnMenuProfile, audience: Exclude<KnRole, "admin"
   const groups =
     profile === "trong_trot"
       ? TRONG_TROT[audience]
-      : GENERIC[audience].flatMap((g) => (g.key === "dieu_hanh" && biz.length ? [g, { key: "nghiep_vu", label: "Nghiệp vụ", items: biz }] : [g]));
+      : (DEPT_MENUS[profile]?.[audience] ??
+        GENERIC[audience].flatMap((g) => (g.key === "dieu_hanh" && biz.length ? [g, { key: "nghiep_vu", label: "Nghiệp vụ", items: biz }] : [g])));
   if (audience !== "kn_tinh" || !KHTC_REPORT_PROFILES.has(profile)) return groups;
   return groups.map((g) => (g.key === "bao_cao" ? { ...g, items: [...g.items, KHTC_REPORT] } : g));
 }

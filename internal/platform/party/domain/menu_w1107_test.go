@@ -32,12 +32,13 @@ func TestW1107_MenuNeeds(t *testing.T) {
 	if !hasMenuKey(qtnv, "tinh.bao_gia.cau_hinh") || hasMenuKey(qtnv, "tinh.chung.nhan_su_phong") {
 		t.Fatal("QTNV")
 	}
+	// BF-MENU (#98): menu CNTS Cấp Tỉnh theo hình khách gửi 23/10 không còn "Duyệt báo cáo".
 	cn := domain.DepartmentMenu(port.MenuProfileChanNuoiThuySan, port.AudienceTinh, port.DeptChanNuoiThuySan)
-	if lead := domain.FilterNeeds(cn, domain.MenuTraits{Manager: true}); !hasMenuKey(lead, "tinh.cnts.duyet_bao_cao") || !hasMenuKey(lead, "tinh.chung.nhan_su_phong") {
+	if lead := domain.FilterNeeds(cn, domain.MenuTraits{Manager: true}); hasMenuKey(lead, "tinh.cnts.duyet_bao_cao") || !hasMenuKey(lead, "tinh.chung.nhan_su_phong") {
 		t.Fatal("lãnh đạo")
 	}
-	if hasMenuKey(domain.FilterNeeds(cn, domain.MenuTraits{}), "tinh.cnts.duyet_bao_cao") {
-		t.Fatal("chuyên viên không thấy Duyệt báo cáo")
+	if hasMenuKey(domain.FilterNeeds(cn, domain.MenuTraits{}), "tinh.chung.nhan_su_phong") {
+		t.Fatal("chuyên viên không thấy Nhân sự của phòng")
 	}
 	if hasMenuKey(domain.DepartmentMenu(port.MenuProfileTrongTrot, port.AudienceXa, port.DeptTrongTrot), "tinh.chung.nhan_su_phong") {
 		t.Fatal("Cấp Xã không có Nhân sự của phòng")

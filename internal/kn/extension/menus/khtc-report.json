@@ -2,23 +2,6 @@
   "id": "extension-khtc-reports",
   "order": 100,
   "tables": {
-    "deptBusiness": {
-      "ke_hoach_tai_chinh": {
-        "kn_tinh": [
-          {
-            "Key": "tinh.khtc.bao_cao",
-            "Label": "Soạn báo cáo (Mẫu 1–5)",
-            "Route": "/kn/khtc/bao-cao",
-            "Icon": "report",
-            "BadgeSource": "",
-            "Requires": null,
-            "ComingSoon": false,
-            "Needs": "",
-            "Children": null
-          }
-        ]
-      }
-    },
     "adminDeptBusiness": {
       "ke_hoach_tai_chinh": [
         {
@@ -34,67 +17,5 @@
         }
       ]
     }
-  },
-  "replacements": [
-    {
-      "path": [
-        "deptBusiness",
-        "ke_hoach_tai_chinh",
-        "kn_tinh",
-        4
-      ],
-      "before": {
-        "Key": "tinh.khtc.tien_do",
-        "Label": "Tiến độ các chương trình",
-        "Route": "/kn/khtc/tien-do",
-        "Icon": "chart",
-        "BadgeSource": "",
-        "Requires": null,
-        "ComingSoon": true,
-        "Needs": "",
-        "Children": null
-      },
-      "after": {
-        "Key": "tinh.khtc.tien_do",
-        "Label": "Tiến độ các chương trình",
-        "Route": "/kn/khtc/tien-do",
-        "Icon": "chart",
-        "BadgeSource": "",
-        "Requires": null,
-        "ComingSoon": false,
-        "Needs": "",
-        "Children": null
-      }
-    },
-    {
-      "path": [
-        "deptBusiness",
-        "ke_hoach_tai_chinh",
-        "kn_tinh",
-        5
-      ],
-      "before": {
-        "Key": "tinh.khtc.da_xuat",
-        "Label": "Báo cáo đã xuất",
-        "Route": "/kn/khtc/bao-cao-da-xuat",
-        "Icon": "report",
-        "BadgeSource": "",
-        "Requires": null,
-        "ComingSoon": true,
-        "Needs": "",
-        "Children": null
-      },
-      "after": {
-        "Key": "tinh.khtc.da_xuat",
-        "Label": "Báo cáo đã xuất",
-        "Route": "/kn/khtc/bao-cao-da-xuat",
-        "Icon": "report",
-        "BadgeSource": "",
-        "Requires": null,
-        "ComingSoon": false,
-        "Needs": "",
-        "Children": null
-      }
-    }
-  ]
+  }
 }

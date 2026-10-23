@@ -19,12 +19,12 @@ import (
 
 // Version là phiên bản bảng menu (client lưu đệm theo phiên bản). Đổi menu = đổi nguồn JSON VÀ tăng
 // phiên bản ở đây cùng bản compatibility (party domain.MenuVersion) cho tới khi #53 gỡ cầu nối.
-const Version = "kn.menu/v5"
+const Version = "kn.menu/v6"
 
 // tableNames là các bảng mà bộ sinh chấp nhận (scripts/gen-module-menus.mjs compileMenus).
 var tableNames = []string{"trongTrotMenus", "genericMenus", "adminDeptItems", "AdminOverview", "AdminSystem", "defaultRoutes",
 	"contextDefaultRoutes", "MenuProfiles", "khtcReportProfiles", "KHTCReportItem", "KHTCReportAdminItem", "SharedGroup",
-	"sharedByAudience", "deptBusiness", "adminDeptBusiness", "deptProfileByCode", "menuModules", "menuDeptModules"}
+	"sharedByAudience", "deptBusiness", "deptMenus", "adminDeptBusiness", "deptProfileByCode", "menuModules", "menuDeptModules"}
 
 var navigationRoute = regexp.MustCompile(`^/[^/\\?#\r\n][^\\?#\r\n]*$|^/$`)
 
@@ -256,11 +256,12 @@ func replace(tables map[string]any, path []any, before, after any) error {
 func validate(tables map[string]any) error {
 	profiles, _ := tables["MenuProfiles"].([]any)
 	business, _ := tables["deptBusiness"].(map[string]any)
+	full, _ := tables["deptMenus"].(map[string]any)
 	known := map[string]bool{}
 	for _, p := range profiles {
 		name, _ := p.(string)
 		known[name] = true
-		if name != "trong_trot" && name != "generic" && business[name] == nil {
+		if name != "trong_trot" && name != "generic" && business[name] == nil && full[name] == nil {
 			return fmt.Errorf("%w: profile has no registered business menu: %s", ErrSource, name)
 		}
 	}

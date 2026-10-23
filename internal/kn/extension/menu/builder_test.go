@@ -109,7 +109,8 @@ func TestDefaultRouteSelection(t *testing.T) {
 		{partyport.AudienceTinh, "trong_trot", partyport.MenuProfileTrongTrot, nil, "/kn/bao-cao-khtc"},
 		{partyport.AudienceTinh, "phong_moi", partyport.MenuProfileGeneric, nil, "/kn/dashboard"},
 		{partyport.AudienceTW, "ke_hoach_tai_chinh", partyport.MenuProfileKeHoachTaiChinh, nil, "/kn/dashboard"},
-		{partyport.AudienceXa, "chan_nuoi_thuy_san", partyport.MenuProfileGeneric, nil, "/kn/nhiem-vu/cong-viec"},
+		// BF-MENU (#98): menu CNTS Cấp Xã không có "Công việc cần làm" của Trồng trọt → mục bật đầu tiên "Việc cần làm".
+		{partyport.AudienceXa, "chan_nuoi_thuy_san", partyport.MenuProfileGeneric, nil, "/kn/cnts/bao-cao-ky"},
 		{partyport.AudienceTinh, "thong_tin_truyen_thong", partyport.MenuProfileThongTinTuyenTruyen, map[string]bool{"pf/extension": true}, "/kn/bao-gia/tien-do"},
 	} {
 		request := partyport.MenuBuildRequest{NavigationRequest: partyport.NavigationRequest{Audience: tc.audience, UnitRef: unit,
@@ -237,19 +238,19 @@ func TestRouteOwnership(t *testing.T) {
 		owner[r.Pattern] = r.Module
 	}
 	for pattern, want := range map[string]string{
-		"/kn/dashboard":                           "pf/extension",
-		"/kn/khtc/ky-bao-cao":                     "pf/extension",
-		"/kn/nhan-su/dashboard":                   "pf/hrm",
-		"/kn/bao-gia/nhap":                        "pf/price",
-		"/kn/cnts/danh-muc":                       "pf/masterdata",
-		"/kn/du-lieu/may-moc":                     "pf/mechanization",
-		"/kn/phong-ban/{department}/mau-bao-cao":  "pf/reports",
-		"/kn/phong-ban/{department}/bao-gia-lich": "pf/price",
-		"/kn/phong-ban/{department}/ke-hoach-nam": "pf/party",
-		"/kn/dung-chung/contact":                  "pf/contact",
-		"/kn/du-lieu/htx":                         "pf/party",
-		"/kn/tong-quan":                           "pf/party",
-		"/dong-bo":                                "pf/sync",
+		"/kn/dashboard":                            "pf/extension",
+		"/kn/khtc/ky-bao-cao":                      "pf/extension",
+		"/kn/nhan-su/dashboard":                    "pf/hrm",
+		"/kn/bao-gia/nhap":                         "pf/price",
+		"/kn/phong-ban/{department}/danh-muc-cnts": "pf/masterdata",
+		"/kn/du-lieu/may-moc":                      "pf/mechanization",
+		"/kn/phong-ban/{department}/mau-bao-cao":   "pf/reports",
+		"/kn/phong-ban/{department}/bao-gia-lich":  "pf/price",
+		"/kn/phong-ban/{department}/ke-hoach-nam":  "pf/party",
+		"/kn/dung-chung/contact":                   "pf/contact",
+		"/kn/du-lieu/htx":                          "pf/party",
+		"/kn/tong-quan":                            "pf/party",
+		"/dong-bo":                                 "pf/sync",
 	} {
 		if owner[pattern] != want {
 			t.Errorf("%s owned by %q, want %q", pattern, owner[pattern], want)

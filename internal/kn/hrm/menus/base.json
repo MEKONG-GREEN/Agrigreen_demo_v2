@@ -39,109 +39,301 @@
         }
       ]
     },
-    "deptBusiness": {
+    "deptMenus": {
       "hanh_chinh_tong_hop": {
         "kn_tinh": [
           {
-            "Key": "tinh.hcth.dashboard",
-            "Label": "Dashboard nhân sự",
-            "Route": "/kn/nhan-su/dashboard",
-            "Icon": "chart",
-            "BadgeSource": "",
-            "Requires": null,
-            "ComingSoon": false,
-            "Needs": "",
-            "Children": null
+            "Key": "dieu_hanh",
+            "Label": "Điều hành",
+            "Items": [
+              {
+                "Key": "tinh.dashboard",
+                "Label": "Dashboard",
+                "Route": "/kn/dashboard",
+                "Icon": "dashboard",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "tinh.nhiem_vu",
+                "Label": "Nhiệm vụ",
+                "Route": "",
+                "Icon": "task",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": [
+                  {
+                    "Key": "tinh.nhiem_vu.phat_hanh",
+                    "Label": "Phát hành biểu mẫu",
+                    "Route": "/kn/nhiem-vu/phat-hanh",
+                    "Icon": "send",
+                    "BadgeSource": "",
+                    "Requires": null,
+                    "ComingSoon": false,
+                    "Needs": "",
+                    "Children": null
+                  },
+                  {
+                    "Key": "tinh.nhiem_vu.trang_thai_nop",
+                    "Label": "Trạng thái nộp",
+                    "Route": "/kn/nhiem-vu/trang-thai-nop",
+                    "Icon": "bell",
+                    "BadgeSource": "extension.report_status.not_submitted",
+                    "Requires": null,
+                    "ComingSoon": false,
+                    "Needs": "",
+                    "Children": null
+                  },
+                  {
+                    "Key": "tinh.nhiem_vu.ra_soat",
+                    "Label": "Rà soát & chốt kỳ",
+                    "Route": "/kn/nhiem-vu/ra-soat",
+                    "Icon": "check",
+                    "BadgeSource": "extension.submissions.pending_review",
+                    "Requires": null,
+                    "ComingSoon": false,
+                    "Needs": "",
+                    "Children": null
+                  }
+                ]
+              },
+              {
+                "Key": "tinh.hcth.dashboard",
+                "Label": "Dashboard nhân sự",
+                "Route": "/kn/nhan-su/dashboard",
+                "Icon": "chart",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "tinh.hcth.nang_bac",
+                "Label": "Danh sách nâng bậc",
+                "Route": "/kn/nhan-su/nang-bac",
+                "Icon": "chart",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "tinh.hcth.quyet_dinh_nang_bac",
+                "Label": "Quyết định nâng bậc",
+                "Route": "/kn/nhan-su/quyet-dinh-nang-bac",
+                "Icon": "journal",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "tinh.hcth.danh_gia",
+                "Label": "Đánh giá",
+                "Route": "/kn/nhan-su/danh-gia",
+                "Icon": "approve",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": true,
+                "Needs": "",
+                "Children": null
+              }
+            ]
           },
           {
-            "Key": "tinh.hcth.ho_so",
-            "Label": "Hồ sơ nhân sự",
-            "Route": "/kn/nhan-su/ho-so",
-            "Icon": "users",
-            "BadgeSource": "",
-            "Requires": null,
-            "ComingSoon": false,
-            "Needs": "",
-            "Children": null
+            "Key": "bao_cao",
+            "Label": "Báo cáo",
+            "Items": [
+              {
+                "Key": "tinh.bao_cao.tong_hop",
+                "Label": "Báo cáo tổng hợp các xã",
+                "Route": "/kn/bao-cao/tong-hop",
+                "Icon": "layers",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "tinh.bao_cao.dot_xuat",
+                "Label": "Báo cáo đột xuất",
+                "Route": "/kn/bao-cao/dot-xuat",
+                "Icon": "zap",
+                "BadgeSource": "extension.report_status.ad_hoc_pending",
+                "Requires": {
+                  "ReportType": "dot_xuat",
+                  "Level": "province"
+                },
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "tinh.hcth.bao_cao_so",
+                "Label": "Biểu mẫu báo cáo Sở",
+                "Route": "/kn/nhan-su/bao-cao-so",
+                "Icon": "report",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              }
+            ]
           },
           {
-            "Key": "tinh.hcth.bao_cao_so",
-            "Label": "Biểu mẫu báo cáo Sở",
-            "Route": "/kn/nhan-su/bao-cao-so",
-            "Icon": "report",
-            "BadgeSource": "",
-            "Requires": null,
-            "ComingSoon": false,
-            "Needs": "",
-            "Children": null
-          },
-          {
-            "Key": "tinh.hcth.nang_bac",
-            "Label": "Danh sách nâng bậc",
-            "Route": "/kn/nhan-su/nang-bac",
-            "Icon": "chart",
-            "BadgeSource": "",
-            "Requires": null,
-            "ComingSoon": false,
-            "Needs": "",
-            "Children": null
-          },
-          {
-            "Key": "tinh.hcth.quyet_dinh_nang_bac",
-            "Label": "Quyết định nâng bậc",
-            "Route": "/kn/nhan-su/quyet-dinh-nang-bac",
-            "Icon": "journal",
-            "BadgeSource": "",
-            "Requires": null,
-            "ComingSoon": false,
-            "Needs": "",
-            "Children": null
-          },
-          {
-            "Key": "tinh.hcth.kho_tai_lieu",
-            "Label": "Hồ sơ dữ liệu",
-            "Route": "/kn/nhan-su/kho-tai-lieu",
-            "Icon": "library",
-            "BadgeSource": "",
-            "Requires": null,
-            "ComingSoon": false,
-            "Needs": "",
-            "Children": null
-          },
-          {
-            "Key": "tinh.hcth.danh_gia",
-            "Label": "Đánh giá",
-            "Route": "/kn/nhan-su/danh-gia",
-            "Icon": "approve",
-            "BadgeSource": "",
-            "Requires": null,
-            "ComingSoon": true,
-            "Needs": "",
-            "Children": null
-          },
-          {
-            "Key": "tinh.hcth.danh_muc",
-            "Label": "Danh mục nhân sự",
-            "Route": "/kn/nhan-su/danh-muc",
-            "Icon": "catalog",
-            "BadgeSource": "",
-            "Requires": null,
-            "ComingSoon": false,
-            "Needs": "",
-            "Children": null
+            "Key": "du_lieu",
+            "Label": "Dữ liệu",
+            "Items": [
+              {
+                "Key": "tinh.hcth.ho_so",
+                "Label": "Hồ sơ nhân sự",
+                "Route": "/kn/nhan-su/ho-so",
+                "Icon": "users",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "tinh.hcth.kho_tai_lieu",
+                "Label": "Hồ sơ dữ liệu",
+                "Route": "/kn/nhan-su/kho-tai-lieu",
+                "Icon": "library",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "tinh.hcth.danh_muc",
+                "Label": "Danh mục nhân sự",
+                "Route": "/kn/nhan-su/danh-muc",
+                "Icon": "catalog",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              }
+            ]
           }
         ],
         "kn_xa": [
           {
-            "Key": "xa.hcth.danh_gia",
-            "Label": "Đánh giá của tôi",
-            "Route": "/kn/nhan-su/danh-gia-cua-toi",
-            "Icon": "approve",
-            "BadgeSource": "",
-            "Requires": null,
-            "ComingSoon": true,
-            "Needs": "",
-            "Children": null
+            "Key": "dieu_hanh",
+            "Label": "Điều hành",
+            "Items": [
+              {
+                "Key": "xa.nhiem_vu",
+                "Label": "Nhiệm vụ",
+                "Route": "",
+                "Icon": "task",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": [
+                  {
+                    "Key": "xa.nhiem_vu.cong_viec",
+                    "Label": "Công việc cần làm",
+                    "Route": "/kn/nhiem-vu/cong-viec",
+                    "Icon": "bell",
+                    "BadgeSource": "extension.report_tasks.todo",
+                    "Requires": null,
+                    "ComingSoon": false,
+                    "Needs": "",
+                    "Children": null
+                  }
+                ]
+              },
+              {
+                "Key": "xa.hcth.danh_gia",
+                "Label": "Đánh giá của tôi",
+                "Route": "/kn/nhan-su/danh-gia-cua-toi",
+                "Icon": "approve",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": true,
+                "Needs": "",
+                "Children": null
+              }
+            ]
+          },
+          {
+            "Key": "bao_cao",
+            "Label": "Báo cáo",
+            "Items": [
+              {
+                "Key": "xa.bao_cao.tuan",
+                "Label": "Báo cáo tuần",
+                "Route": "/kn/bao-cao/tuan",
+                "Icon": "file",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "xa.bao_cao.thang",
+                "Label": "Báo cáo tháng",
+                "Route": "/kn/bao-cao/thang",
+                "Icon": "calendar",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "xa.bao_cao.hang_vu",
+                "Label": "Báo cáo hàng vụ",
+                "Route": "/kn/bao-cao/vu",
+                "Icon": "sprout",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "xa.bao_cao.cua_xa",
+                "Label": "Báo cáo của xã",
+                "Route": "/kn/bao-cao/cua-xa",
+                "Icon": "chart",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "xa.bao_cao.dot_xuat",
+                "Label": "Báo cáo đột xuất",
+                "Route": "/kn/bao-cao/dot-xuat",
+                "Icon": "zap",
+                "BadgeSource": "extension.report_tasks.ad_hoc_todo",
+                "Requires": {
+                  "ReportType": "dot_xuat",
+                  "Level": "commune"
+                },
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              }
+            ]
           }
         ]
       }

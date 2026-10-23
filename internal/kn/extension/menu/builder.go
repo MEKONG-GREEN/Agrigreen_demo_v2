@@ -65,24 +65,25 @@ type group struct {
 }
 
 type tables struct {
-	TrongTrot            map[string][]group           `json:"trongTrotMenus"`
-	Generic              map[string][]group           `json:"genericMenus"`
-	AdminDeptItems       map[string][]item            `json:"adminDeptItems"`
-	AdminOverview        group                        `json:"AdminOverview"`
-	AdminSystem          group                        `json:"AdminSystem"`
-	DefaultRoutes        map[string]string            `json:"defaultRoutes"`
-	ContextDefaultRoutes map[string]map[string]string `json:"contextDefaultRoutes"`
-	MenuProfiles         []string                     `json:"MenuProfiles"`
-	KHTCReportProfiles   map[string]bool              `json:"khtcReportProfiles"`
-	KHTCReportItem       item                         `json:"KHTCReportItem"`
-	KHTCReportAdminItem  item                         `json:"KHTCReportAdminItem"`
-	SharedGroup          group                        `json:"SharedGroup"`
-	SharedByAudience     map[string][]item            `json:"sharedByAudience"`
-	DeptBusiness         map[string]map[string][]item `json:"deptBusiness"`
-	AdminDeptBusiness    map[string][]item            `json:"adminDeptBusiness"`
-	DeptProfileByCode    map[string]string            `json:"deptProfileByCode"`
-	MenuModules          map[string]string            `json:"menuModules"`
-	MenuDeptModules      map[string]string            `json:"menuDeptModules"`
+	TrongTrot            map[string][]group            `json:"trongTrotMenus"`
+	Generic              map[string][]group            `json:"genericMenus"`
+	AdminDeptItems       map[string][]item             `json:"adminDeptItems"`
+	AdminOverview        group                         `json:"AdminOverview"`
+	AdminSystem          group                         `json:"AdminSystem"`
+	DefaultRoutes        map[string]string             `json:"defaultRoutes"`
+	ContextDefaultRoutes map[string]map[string]string  `json:"contextDefaultRoutes"`
+	MenuProfiles         []string                      `json:"MenuProfiles"`
+	KHTCReportProfiles   map[string]bool               `json:"khtcReportProfiles"`
+	KHTCReportItem       item                          `json:"KHTCReportItem"`
+	KHTCReportAdminItem  item                          `json:"KHTCReportAdminItem"`
+	SharedGroup          group                         `json:"SharedGroup"`
+	SharedByAudience     map[string][]item             `json:"sharedByAudience"`
+	DeptBusiness         map[string]map[string][]item  `json:"deptBusiness"`
+	DeptMenus            map[string]map[string][]group `json:"deptMenus"`
+	AdminDeptBusiness    map[string][]item             `json:"adminDeptBusiness"`
+	DeptProfileByCode    map[string]string             `json:"deptProfileByCode"`
+	MenuModules          map[string]string             `json:"menuModules"`
+	MenuDeptModules      map[string]string             `json:"menuDeptModules"`
 }
 
 // Catalog là cây menu KN đã biên dịch (bất biến) + nguồn FormAvailability nối muộn ở gốc lắp ráp.
@@ -358,9 +359,14 @@ func (c *Catalog) departmentGroups(profile, audience, code string) []group {
 	return append(out, shared)
 }
 
+// withBusiness: cây deptMenus của đối tượng nếu có (kn.menu/v6, #98), không thì khung chung + nhóm "Nghiệp vụ".
 func (c *Catalog) withBusiness(profile string) map[string][]group {
 	out := map[string][]group{}
 	for audience, groups := range c.t.Generic {
+		if full, ok := c.t.DeptMenus[profile][audience]; ok {
+			out[audience] = full
+			continue
+		}
 		business := c.t.DeptBusiness[profile][audience]
 		composed := make([]group, 0, len(groups)+1)
 		for _, g := range groups {
@@ -607,6 +613,13 @@ func (c *Catalog) ownership() ([]partyport.MenuRoute, error) {
 	for _, byAudience := range c.t.DeptBusiness {
 		for _, items := range byAudience {
 			lists = append(lists, items)
+		}
+	}
+	for _, byAudience := range c.t.DeptMenus {
+		for _, groups := range byAudience {
+			for _, g := range groups {
+				lists = append(lists, g.Items)
+			}
 		}
 	}
 	for _, items := range lists {

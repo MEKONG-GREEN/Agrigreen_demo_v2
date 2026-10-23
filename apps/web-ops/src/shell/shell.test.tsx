@@ -25,7 +25,8 @@ const labels = (t: MenuTree) => menuLinks(t).map((l) => l.node.label);
 describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
   it("nhóm Điều hành / Báo cáo / Dữ liệu + Dùng chung (kn.menu/v3); Admin: Điều hành / Phòng ban / Quản trị hệ thống / Dùng chung", () => {
     expect(xa.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dữ liệu", "Dùng chung"]);
-    expect(tinh.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dùng chung"]);
+    // BF-MENU (#98, UP-02): Cấp Tỉnh Trồng trọt có nhóm Dữ liệu (Thu thập dữ liệu).
+    expect(tinh.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dữ liệu", "Dùng chung"]);
     expect(tw.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dùng chung"]);
     expect(admin.groups.map((g) => g.label)).toEqual(["Điều hành", "Phòng ban", "Quản trị hệ thống", "Dùng chung"]);
   });
@@ -37,7 +38,7 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
     expect(labels(tw)).toEqual(["Dashboard", "Báo cáo tuần", "Báo cáo tháng", "Báo cáo hàng vụ", "Báo cáo năm", "Contact"]);
     expect(labels(xa)).toContain("Contact");
     expect(labels(tinh)).toEqual(
-      expect.arrayContaining(["Dashboard", "Phát hành biểu mẫu", "Trạng thái nộp", "Rà soát & chốt kỳ", "Báo cáo tổng hợp các xã", "Báo cáo Chi cục"]),
+      expect.arrayContaining(["Dashboard", "Phát hành biểu mẫu", "Trạng thái nộp", "Rà soát & chốt kỳ", "Lịch công tác", "Báo cáo tháng", "Báo cáo năm", "Báo cáo Chi cục", "Thửa ruộng"]),
     );
   });
 
@@ -103,9 +104,9 @@ describe("<Sidebar> (Design Sample)", () => {
   it("thu gọn: chỉ icon, tên vẫn đọc được; mục cha mở flyout chứa menu con", async () => {
     const user = userEvent.setup();
     const onToggle = vi.fn();
-    render(<Sidebar menu={xa} pathname="/kn/bao-cao/tuan" collapsed onToggleCollapse={onToggle} />);
+    render(<Sidebar menu={xa} pathname="/kn/bao-cao/thang" collapsed onToggleCollapse={onToggle} />);
     expect(screen.getByRole("complementary", { name: "Điều hướng chính" })).toHaveAttribute("data-collapsed", "true");
-    expect(screen.getByRole("link", { name: "Báo cáo tuần" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Báo cáo tháng" })).toHaveAttribute("aria-current", "page");
     const parent = screen.getByRole("button", { name: /Thu thập dữ liệu/ });
     const flyEl = document.getElementById(parent.getAttribute("aria-controls")!);
     expect(flyEl).toHaveAttribute("hidden");
