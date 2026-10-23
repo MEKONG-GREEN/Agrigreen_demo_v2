@@ -49,11 +49,14 @@ func (s *Service) HandleExportRequested(ctx context.Context, tx pgx.Tx, env outb
 	if j == nil || j.Status != domain.JobQueued {
 		return nil
 	}
+	if _, _, policyErr := s.sourceJobPolicyState(*j); policyErr != nil {
+		return store.FailJob(ctx, tx, j.ID, sourceJobInvalidCode, s.now())
+	}
 	if policy, ok := s.Builders.jobPolicy(j.Def.Source); ok || j.SourceArgs != nil {
 		at, parseErr := time.Parse(time.RFC3339Nano, pl.RequestedAt)
 		if policy.Version < 1 || parseErr != nil || env.TenantID != j.TenantID || pl.RequestedBy != j.RequestedBy.String() ||
 			pl.TemplateKey != j.TemplateKey || pl.Format != j.Format || !at.Equal(j.RequestedAt) {
-			return ErrDependency
+			return store.FailJob(ctx, tx, j.ID, sourceJobInvalidCode, s.now())
 		}
 	}
 	if s.Store == nil {

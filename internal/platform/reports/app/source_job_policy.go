@@ -65,20 +65,40 @@ func (s *Service) freezeSourceArgs(ctx context.Context, j *domain.Job, raw json.
 		JobID: j.ID, TenantID: j.TenantID, RequestedBy: j.RequestedBy, RequestedAt: j.RequestedAt, TemplateKey: j.TemplateKey, TemplateVersion: j.TemplateVersion, Format: j.Format, Args: slices.Clone(canonical)}
 	return nil
 }
-func (s *Service) authorizeSourceJob(ctx context.Context, j domain.Job, actor uuid.UUID, op port.SourceJobOperation) (bool, error) {
+
+const sourceJobInvalidCode = "reports.source_job_invalid"
+
+var errSourceJobInvalid = errors.New("reports: incompatible source job snapshot or policy")
+
+// sourceJobPolicyState distinguishes an immutable, incompatible job envelope
+// from a transient owner outage. Neither case permits a fallback to native data.
+func (s *Service) sourceJobPolicyState(j domain.Job) (port.SourceJobPolicy, bool, error) {
 	policy, enabled := s.Builders.jobPolicy(j.Def.Source)
 	if !enabled {
 		if j.SourceArgs != nil {
-			return true, ErrDependency
+			return policy, true, errSourceJobInvalid
 		}
-		return false, nil
+		return policy, false, nil
 	}
 	if j.SourceArgs == nil || j.SourceArgs.Version != policy.Version || j.ValidateSourceArgs() != nil ||
 		j.Trigger != domain.TriggerAPI || j.ScheduleID != nil || j.ScheduleSlot != nil {
-		return true, ErrDependency
+		return policy, true, errSourceJobInvalid
 	}
 	if policy.ScopeMode == port.SourceScopeTenant && (j.ScopeAll || len(j.ScopeUnits) > 0) {
-		return true, ErrDependency
+		return policy, true, errSourceJobInvalid
+	}
+	return policy, true, nil
+}
+
+func (s *Service) authorizeSourceJob(ctx context.Context, j domain.Job, actor uuid.UUID, op port.SourceJobOperation) (bool, error) {
+	policy, enabled, err := s.sourceJobPolicyState(j)
+	if err != nil {
+		// Preserve the HTTP replay/detail/download dependency contract (503).
+		// List and worker classify immutable envelopes separately below it.
+		return enabled, ErrDependency
+	}
+	if !enabled {
+		return false, nil
 	}
 	tid, err := tenant.FromContext(ctx)
 	if err != nil || tid != j.TenantID {

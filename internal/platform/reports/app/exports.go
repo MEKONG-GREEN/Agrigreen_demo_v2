@@ -304,18 +304,42 @@ func (s *Service) MyExports(ctx context.Context, before uuid.UUID, limit int) (E
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	var jobs []domain.Job
-	if err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
-		var e error
-		jobs, e = store.JobsOf(ctx, tx, p.ActorRef, before, limit+1)
-		return e
-	}); err != nil {
-		return ExportPage{}, err
-	}
-	for _, job := range jobs {
-		if err := s.readSourceJob(ctx, p, job, port.SourceJobList); err != nil {
+	// Page on the visible set. Revoked/private legacy jobs cannot suppress
+	// unrelated history, while an unavailable owner still fails the whole read.
+	jobs := []domain.Job{}
+	cursor := before
+	const scanSize = 200
+	for len(jobs) <= limit {
+		var batch []domain.Job
+		if err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+			var e error
+			batch, e = store.JobsOf(ctx, tx, p.ActorRef, cursor, scanSize)
+			return e
+		}); err != nil {
 			return ExportPage{}, err
 		}
+		for _, job := range batch {
+			if _, _, stateErr := s.sourceJobPolicyState(job); stateErr != nil {
+				// An immutable legacy/mismatched envelope has no readable owner
+				// snapshot. Hide it; a live owner's 5xx still fails below.
+				continue
+			}
+			if err := s.readSourceJob(ctx, p, job, port.SourceJobList); err != nil {
+				var denied *problem.Problem
+				if errors.As(err, &denied) && denied.Status >= 400 && denied.Status < 500 {
+					continue
+				}
+				return ExportPage{}, err
+			}
+			jobs = append(jobs, job)
+			if len(jobs) > limit {
+				break
+			}
+		}
+		if len(batch) < scanSize || len(jobs) > limit {
+			break
+		}
+		cursor = batch[len(batch)-1].ID
 	}
 	var pg ExportPage
 	if len(jobs) > limit {

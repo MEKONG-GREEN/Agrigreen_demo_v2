@@ -342,6 +342,11 @@ func (s *Service) fire(ctx context.Context, id, tid uuid.UUID, slotAt time.Time,
 // became policy-enabled. No old snapshot may be reused for a new scheduled run.
 func (s *Service) denySourceSchedule(ctx context.Context, tx pgx.Tx, key string) error {
 	t, err := s.resolveTemplate(ctx, tx, strings.TrimSpace(key))
+	if errors.Is(err, ErrTemplateNotFound) {
+		// A legacy native replay must return its stored schedule even if a
+		// referenced template no longer exists. No new run is created here.
+		return nil
+	}
 	if err != nil {
 		return err
 	}

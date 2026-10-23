@@ -149,7 +149,6 @@ func TestSourceJobPolicyPostgresLifecycle(t *testing.T) {
 			func() error { _, _, e := svc.RequestExport(ctx, input); return e },
 			func() error { return svc.CheckExportReplay(ctx, input) },
 			func() error { _, e := svc.GetExport(ctx, j.ID); return e },
-			func() error { _, e := svc.MyExports(ctx, uuid.Nil, 10); return e },
 			func() error { _, e := svc.Download(ctx, j.ID); return e },
 			func() error {
 				_, e := svc.buildDataset(tenant.WithID(context.Background(), principal.TenantID), j)
@@ -160,6 +159,14 @@ func TestSourceJobPolicyPostgresLifecycle(t *testing.T) {
 			if e := check(); e == nil || strings.Contains(e.Error(), "private-marker") {
 				t.Fatalf("%s returned job/private error: %v", mode, e)
 			}
+		}
+		page, listErr := svc.MyExports(ctx, uuid.Nil, 10)
+		if mode == "dependency" {
+			if listErr == nil || strings.Contains(listErr.Error(), "private-marker") {
+				t.Fatal("owner outage did not fail the list closed")
+			}
+		} else if listErr != nil || len(page.Items) != 0 || page.Next != nil {
+			t.Fatal("revoked/read-only job was not omitted safely", listErr)
 		}
 	}
 	active, readonly, ownerDown = true, false, false
@@ -340,5 +347,160 @@ func TestSourcePolicyPendingScheduledDeliveryDenied(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestSourceJobPolicyHistoryFiltersBeforePagination(t *testing.T) {
+	env := pgtest.Get(t)
+	now := time.Date(2026, 10, 23, 2, 0, 0, 0, time.UTC)
+	principal := sourceTestPrincipal()
+	ctx := sourceTestContext(principal)
+	revoked := map[uuid.UUID]bool{}
+	ownerDown := false
+	svc := ownerPolicyService(now, func(_ context.Context, access port.SourceJobAccess) error {
+		if ownerDown {
+			return errors.New("private-marker outage")
+		}
+		if revoked[access.JobID] {
+			return problem.Forbidden
+		}
+		return nil
+	}, func(context.Context, port.SourceBuildQuery) (port.SourceData, error) { return port.SourceData{}, nil })
+	svc.DB = env.Pool(t, migrations.PF, "reports_app")
+	template, _ := svc.builtinTemplate("example.layout")
+	var all []domain.Job
+	add := func(kind string) domain.Job {
+		svc.Clock = clock.NewFixed(now.Add(time.Duration(len(all)) * time.Second))
+		job, err := svc.sourceRequestJob(ctx, principal, template, ExportInput{TemplateKey: template.Key, Format: "xlsx", IdemKey: ids.New().String(), SourceArgs: json.RawMessage(`{"filter":"private-marker"}`)}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch kind {
+		case "native":
+			job.SourceArgs = nil
+			job.Def.Source = "native.fixture"
+		case "legacy":
+			job.SourceArgs = nil // The source has since enabled a JobPolicy.
+		}
+		all = append(all, job)
+		return job
+	}
+	oldNative := add("native")
+	allowedPrivate := add("private")
+	for range 205 { // Force a second raw scan before the next visible job.
+		add("legacy")
+	}
+	denied := add("private")
+	newNative := add("native")
+	revoked[denied.ID] = true
+	if err := svc.tx(ctx, principal.TenantID, func(tx pgx.Tx) error {
+		for i := range all {
+			if err := store.InsertJob(ctx, tx, &all[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cursor := uuid.Nil
+	for i, expected := range []uuid.UUID{newNative.ID, allowedPrivate.ID, oldNative.ID} {
+		page, err := svc.MyExports(ctx, cursor, 1)
+		if err != nil || len(page.Items) != 1 || page.Items[0].ID != expected {
+			t.Fatalf("visible page %d: items=%d err=%v", i, len(page.Items), err)
+		}
+		if i < 2 {
+			if page.Next == nil || *page.Next != expected {
+				t.Fatal("cursor did not follow the visible set")
+			}
+			cursor = *page.Next
+		} else if page.Next != nil {
+			t.Fatal("last visible page invented a next cursor")
+		}
+		encoded, _ := json.Marshal(page.Items)
+		if bytes.Contains(encoded, []byte("private-marker")) {
+			t.Fatal("history exposed private filters")
+		}
+	}
+	ownerDown = true
+	if _, err := svc.MyExports(ctx, uuid.Nil, 1); !errors.Is(err, ErrDependency) || strings.Contains(err.Error(), "private-marker") {
+		t.Fatalf("owner failure did not fail the entire list closed: %v", err)
+	}
+}
+
+func TestSourceJobPolicyIncompatibleQueuedJobsFailPermanently(t *testing.T) {
+	env := pgtest.Get(t)
+	for _, mode := range []string{"legacy-policy-enabled", "private-policy-removed", "invalid-envelope"} {
+		t.Run(mode, func(t *testing.T) {
+			now := time.Date(2026, 10, 23, 3, 0, 0, 0, time.UTC)
+			principal := sourceTestPrincipal()
+			ctx := sourceTestContext(principal)
+			buildCalls := 0
+			svc := ownerPolicyService(now, func(context.Context, port.SourceJobAccess) error { return nil }, func(context.Context, port.SourceBuildQuery) (port.SourceData, error) {
+				buildCalls++
+				return port.SourceData{}, nil
+			})
+			svc.DB = env.Pool(t, migrations.PF, "reports_app")
+			template, _ := svc.builtinTemplate("example.layout")
+			job, err := svc.sourceRequestJob(ctx, principal, template, ExportInput{TemplateKey: template.Key, Format: "xlsx", IdemKey: ids.New().String(), SourceArgs: json.RawMessage(`{"filter":"private-marker"}`)}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "legacy-policy-enabled" {
+				job.SourceArgs = nil
+			}
+			if err := svc.tx(ctx, principal.TenantID, func(tx pgx.Tx) error { return store.InsertJob(ctx, tx, &job) }); err != nil {
+				t.Fatal(err)
+			}
+			if mode == "private-policy-removed" {
+				svc.Builders = NewSourceBuilderRegistry()
+			}
+			payload := port.ExportRequestedV1{JobID: job.ID.String(), TemplateKey: job.TemplateKey, Format: job.Format, RequestedBy: job.RequestedBy.String(), RequestedAt: ts(job.RequestedAt)}
+			if mode == "invalid-envelope" {
+				payload.RequestedBy = ids.New().String()
+			}
+			raw, _ := json.Marshal(payload)
+			workerCtx := tenant.WithID(context.Background(), principal.TenantID)
+			for range 2 {
+				if err := svc.tx(workerCtx, principal.TenantID, func(tx pgx.Tx) error {
+					return svc.HandleExportRequested(workerCtx, tx, outbox.Envelope{TenantID: principal.TenantID, EventType: port.EventExportRequested, EventID: ids.New(), Payload: raw})
+				}); err != nil {
+					t.Fatalf("permanent mismatch was retried instead of failed: %v", err)
+				}
+			}
+			var saved *domain.Job
+			if err := svc.tx(ctx, principal.TenantID, func(tx pgx.Tx) error { var err error; saved, err = store.JobByID(ctx, tx, job.ID, false); return err }); err != nil {
+				t.Fatal(err)
+			}
+			if saved == nil || saved.Status != domain.JobFailed || saved.ErrorCode == nil || *saved.ErrorCode != sourceJobInvalidCode || buildCalls != 0 || saved.ObjectKey != nil {
+				t.Fatal("incompatible job was not durably failed before builder/object access")
+			}
+		})
+	}
+}
+
+func TestSourceJobPolicyNativeScheduleReplayAfterTemplateRemoval(t *testing.T) {
+	env := pgtest.Get(t)
+	now := time.Date(2026, 10, 23, 3, 0, 0, 0, time.UTC)
+	principal := sourceTestPrincipal()
+	ctx := sourceTestContext(principal)
+	svc := &Service{DB: env.Pool(t, migrations.PF, "reports_app"), Clock: clock.NewFixed(now)}
+	sch := domain.Schedule{ID: ids.New(), TenantID: principal.TenantID, TemplateKey: "removed.native", Format: "xlsx",
+		Params: domain.Params{Level: "province"}, Frequency: domain.FreqMonthly, DayOfMonth: 1, Hour: 10, Recipients: []uuid.UUID{principal.ActorRef},
+		OwnerRef: principal.ActorRef, OwnerRoles: principal.Roles, ScopeAll: true, Active: true, CreatedAt: now, UpdatedAt: now, IdemKey: "native-removed-template-replay"}
+	if err := svc.tx(ctx, principal.TenantID, func(tx pgx.Tx) error { return store.InsertSchedule(ctx, tx, &sch) }); err != nil {
+		t.Fatal(err)
+	}
+	input := sch
+	input.TemplateKey = "also.missing"
+	replayed, replay, err := svc.CreateSchedule(ctx, ScheduleInput{Schedule: input, IdemKey: sch.IdemKey})
+	if err != nil || !replay || replayed.ID != sch.ID || replayed.TemplateKey != sch.TemplateKey {
+		t.Fatal("native replay did not return the immutable stored schedule", err)
+	}
+	var count int
+	if err := svc.tx(ctx, principal.TenantID, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT count(*) FROM pf_reports.schedule WHERE id=$1`, sch.ID).Scan(&count)
+	}); err != nil || count != 1 {
+		t.Fatal("replay created or removed a schedule", err)
 	}
 }

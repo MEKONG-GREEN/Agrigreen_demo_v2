@@ -50,3 +50,9 @@ Production 19bd68f4; cây mã đóng băng suốt Go/test/lint. Lệnh Go 1.26.9
 Giữ nguyên lịch sử thất bại trước sửa: source đầu exit1 (UTC replay qua timestamptz làm khác as_of), lint đầu exit1 (test Close response chưa kiểm lỗi). Lượt revised source exit1 chỉ vì assertion của HTTP test nhầm tên trường problem.errors.field là rò payload. Các lỗi đã sửa, vòng full cuối ở trên đạt; không đổi thất bại cũ thành PASS.
 
 Chờ Claude Review OK và tích hợp qua ticket.ps1. Owner #83 còn phải đăng ký nguồn thật, quyền Admin/MFA hiện hành, trusted reader + durable read receipt, schema/generated/mock/web và retention. Chưa hoàn thành AUDIT-LOG #64.
+
+## Review 23/10: lịch sử và worker
+
+MyExports quét từng lô 200 job theo cursor, kiểm quyền hiện hành rồi phân trang trên tập còn được xem. Job bị owner từ chối 4xx hoặc snapshot/policy không tương thích được bỏ khỏi lịch sử; lỗi owner 5xx vẫn chặn cả trang, không trả một phần. Snapshot cũ không được chuyển ngầm sang đường native. Phân loại nội bộ snapshot/policy không tương thích để ẩn khỏi lịch sử; worker ghi error_code reports.source_job_invalid và chốt failed trong transaction inbox thay vì retry/dead-letter, trước builder/kho đối tượng. Endpoint request/replay/detail/download giữ lỗi dependency 503 như hợp đồng cũ; owner tạm không hoạt động vẫn 503 để retry. Regression assembly giữ nguyên assertion 503 sau khi gỡ policy, không đổi test để hợp thức hóa 409.
+
+Assembly giữ pf/accounts trước pf/reports để phiên hiện hành được giải trước kiểm replay; có regression bảo vệ thứ tự. Middleware giới hạn body 1MiB và JSON sai trả 400 như handler; mỗi POST có Idempotency-Key đọc job hiện có trong tenant transaction trước cache để không giữ quyền đã thu hồi. Replay lịch native trả lịch đã lưu khi template đã mất; template còn resolve được vẫn kiểm cấm custom schedule. Không cấp URL tải hay nới DLP khi lọc lịch sử.
