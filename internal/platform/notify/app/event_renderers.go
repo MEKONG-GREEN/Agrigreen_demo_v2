@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"slices"
 	"time"
@@ -60,12 +61,13 @@ func (r eventRendererRegistry) render(event string, payload json.RawMessage, at 
 	if err != nil {
 		return nil, true, err
 	}
-	return notificationsFromDrafts(drafts), true, nil
+	ns, err := notificationsFromDrafts(drafts)
+	return ns, true, err
 }
 
-func notificationsFromDrafts(drafts []port.NotificationDraft) []domain.Notification {
+func notificationsFromDrafts(drafts []port.NotificationDraft) ([]domain.Notification, error) {
 	if drafts == nil {
-		return nil
+		return nil, nil
 	}
 	notifications := make([]domain.Notification, len(drafts))
 	for i, d := range drafts {
@@ -76,6 +78,18 @@ func notificationsFromDrafts(drafts []port.NotificationDraft) []domain.Notificat
 			Kind: d.Kind, Severity: d.Severity, Title: d.Title, Body: d.Body, DeepLink: d.DeepLink,
 			SubjectRef: copyRendererRef(d.SubjectRef), CreatedAt: d.CreatedAt, Email: d.Email,
 		}
+		if channels := d.Channels; channels != nil {
+			if !channels.InApp && !channels.Push && !channels.Email {
+				return nil, fmt.Errorf("notify: draft %d has no delivery channel", i)
+			}
+			if channels.Email && (d.RecipientRef == nil || *d.RecipientRef == uuid.Nil) {
+				return nil, fmt.Errorf("notify: draft %d email requires a concrete recipient", i)
+			}
+			notifications[i].SuppressInApp = !channels.InApp
+			notifications[i].SuppressPush = !channels.Push
+			notifications[i].Email = channels.Email
+			notifications[i].RequireEmail = channels.Email
+		}
 	}
-	return notifications
+	return notifications, nil
 }

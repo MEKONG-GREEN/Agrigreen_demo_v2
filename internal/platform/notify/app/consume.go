@@ -347,6 +347,9 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, env outbox.Envelope, n
 		if !n.Normalize() {
 			return fmt.Errorf("notify: thông báo %s dựng từ %s không hợp lệ", n.Kind, env.EventType)
 		}
+		if n.RequireEmail && !s.emailEnabled() {
+			return fmt.Errorf("notify: %w: explicit email channel is not configured", ErrDependency)
+		}
 		ok, err := store.InsertNotification(ctx, tx, env.TenantID, n)
 		if err != nil {
 			return err
@@ -355,25 +358,29 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, env outbox.Envelope, n
 			continue // đã có từ lần giao trước
 		}
 		kind = n.Kind
-		if err := outbox.Enqueue(ctx, tx, outbox.Event{
-			ID: ids.New(), TenantID: env.TenantID, Type: port.EventNotificationCreated, SchemaVersion: 1,
-			OccurredAt: now, TraceID: env.TraceID, Producer: port.EventProducerName,
-			Payload: port.NotificationCreatedV1{NotificationID: n.ID, Kind: n.Kind, Severity: n.Severity, RecipientRef: n.RecipientRef,
-				Topic: n.Topic(), SubjectRef: n.SubjectRef, SourceEventID: env.EventID, CreatedAt: n.CreatedAt.Format(time.RFC3339)},
-		}); err != nil {
-			return err
+		if !n.SuppressInApp {
+			if err := outbox.Enqueue(ctx, tx, outbox.Event{
+				ID: ids.New(), TenantID: env.TenantID, Type: port.EventNotificationCreated, SchemaVersion: 1,
+				OccurredAt: now, TraceID: env.TraceID, Producer: port.EventProducerName,
+				Payload: port.NotificationCreatedV1{NotificationID: n.ID, Kind: n.Kind, Severity: n.Severity, RecipientRef: n.RecipientRef,
+					Topic: n.Topic(), SubjectRef: n.SubjectRef, SourceEventID: env.EventID, CreatedAt: n.CreatedAt.Format(time.RFC3339)},
+			}); err != nil {
+				return err
+			}
 		}
-		var toks []domain.PushToken
-		if n.Topic() {
-			toks, err = store.ActiveTokensForAudience(ctx, tx, n.Audience)
-		} else {
-			toks, err = store.ActiveTokensForActors(ctx, tx, []uuid.UUID{*n.RecipientRef})
+		if !n.SuppressPush {
+			var toks []domain.PushToken
+			if n.Topic() {
+				toks, err = store.ActiveTokensForAudience(ctx, tx, n.Audience)
+			} else {
+				toks, err = store.ActiveTokensForActors(ctx, tx, []uuid.UUID{*n.RecipientRef})
+			}
+			if err != nil {
+				return err
+			}
+			id := n.ID
+			specs = append(specs, sendSpec{tokens: toks, notificationID: &id, urgent: n.Urgent()})
 		}
-		if err != nil {
-			return err
-		}
-		id := n.ID
-		specs = append(specs, sendSpec{tokens: toks, notificationID: &id, urgent: n.Urgent()})
 		if err := s.queueEmail(ctx, tx, env.TenantID, &mail, n, now); err != nil {
 			return err
 		}

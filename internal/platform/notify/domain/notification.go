@@ -75,6 +75,11 @@ type Notification struct {
 	// Email: gửi thêm email tới người nhận (chỉ thông báo có RecipientRef; không lưu trong bảng notification — lần gửi
 	// xếp ở pf_notify.email_delivery, gói NOTIF).
 	Email bool
+	// Source-selected transport settings. Legacy/native notifications retain
+	// zero-value behavior. SuppressInApp is persisted for every inbox read path.
+	SuppressInApp bool
+	SuppressPush  bool
+	RequireEmail  bool
 }
 
 // Topic cho biết thông báo theo chủ đề.
