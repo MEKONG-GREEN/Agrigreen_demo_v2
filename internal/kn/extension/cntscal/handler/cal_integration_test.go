@@ -131,6 +131,14 @@ func (x *xaScopes) XaScopes(context.Context, uuid.UUID, string) ([]accport.XaSco
 }
 
 // knResolver: ngữ cảnh KN của lịch công tác lấy từ Principal.KN (middleware giả).
+// provinceOrgs: cây tổ chức giả — mọi nút của phiên thuộc TTKN tỉnh "89" (cùng tỉnh knResolver trả).
+// Sau đổi phiên KN (owner session), lịch công tác tìm tỉnh từ nút của phiên qua Deps.Orgs; thiếu → 503.
+type provinceOrgs struct{}
+
+func (provinceOrgs) Get(_ context.Context, ref uuid.UUID) (partyport.Org, error) {
+	return partyport.Org{Ref: ref, Kind: partyport.OrgTTKNProvince, AdminUnitCode: "89", Active: true}, nil
+}
+
 type knResolver struct{}
 
 func (knResolver) KNContext(ctx context.Context) (accport.KNContext, bool, error) {
@@ -157,7 +165,7 @@ func newFix(t *testing.T, multi ...bool) *fix {
 	env := pgtest.Get(t)
 	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}}
 	f.pool = env.AdminPool(t, migrations.PF)
-	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), extension.Deps{Units: units{}})
+	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), extension.Deps{Units: units{}, Orgs: provinceOrgs{}})
 	mod.UseCNTSCatalogs(catalogs{multiProvince: len(multi) > 0 && multi[0]})
 	if len(multi) < 2 || multi[1] {
 		mod.UseXaScopes(f.xa)
