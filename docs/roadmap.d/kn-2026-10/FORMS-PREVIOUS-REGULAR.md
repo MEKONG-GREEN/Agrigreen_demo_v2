@@ -1,0 +1,1 @@
+- [ ] FORMS-PREVIOUS-REGULAR (#123): bỏ adhoc trước LIMIT của Previous khi kỳ hiện tại định kỳ; giữ legacy/adhoc, tenant/quyền và mẫu nạp sẵn; PostgreSQL app/handler đạt, còn chờ review chéo/gộp dev. Xem docs/dev/forms-previous-regular.md.

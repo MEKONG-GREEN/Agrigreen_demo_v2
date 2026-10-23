@@ -114,10 +114,11 @@ type PreviousCandidate struct {
 }
 
 // PreviousSubmission tìm kỳ GẦN NHẤT trước kỳ periodID của cùng profile và mã biểu mà đơn vị unit đã nộp (sắp theo
-// ngày đầu kỳ của đặc tả, rồi theo mã kỳ UUIDv7 — thời điểm phát hành). Trả nil nếu không có.
+// ngày đầu kỳ của đặc tả, rồi theo mã kỳ UUIDv7 — thời điểm phát hành). Kỳ định kỳ bỏ qua kỳ đột xuất;
+// kỳ đột xuất hoặc không có loại kỳ giữ cách chọn cũ. Trả nil nếu không có.
 func PreviousSubmission(ctx context.Context, tx pgx.Tx, periodID uuid.UUID, unit string) (*PreviousCandidate, error) {
 	rows, err := tx.Query(ctx, `WITH cur AS (
-	      SELECT p.profile, p.template_code, p.id, s.period_from FROM pf_forms.period p
+	      SELECT p.profile, p.template_code, p.id, s.period_from, s.period_kind FROM pf_forms.period p
 	        LEFT JOIN pf_forms.period_spec s ON s.tenant_id = p.tenant_id AND s.period_id = p.id
 	       WHERE p.id = $1)
 	    SELECT p.id, p.label, sub.id FROM pf_forms.period p
@@ -126,6 +127,7 @@ func PreviousSubmission(ctx context.Context, tx pgx.Tx, periodID uuid.UUID, unit
 	      JOIN LATERAL (SELECT x.id FROM pf_forms.submission x WHERE x.tenant_id = p.tenant_id AND x.period_id = p.id AND x.unit_code = $2
 	                     ORDER BY x.seq DESC LIMIT 1) sub ON true
 	     WHERE p.id <> cur.id AND $2 = ANY (p.units)
+	       AND (coalesce(cur.period_kind, '') IN ('', 'adhoc') OR coalesce(s.period_kind, '') <> 'adhoc')
 	       AND (CASE WHEN cur.period_from IS NOT NULL AND s.period_from IS NOT NULL THEN s.period_from < cur.period_from ELSE p.id < cur.id END)
 	     ORDER BY s.period_from DESC NULLS LAST, p.id DESC LIMIT 1`, periodID, unit)
 	if err != nil {
