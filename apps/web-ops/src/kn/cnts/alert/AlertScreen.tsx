@@ -5,9 +5,12 @@
 //   tab "Cấu hình nhắc nhở" (theo biểu: trước hạn, khi trễ, nhắc lặp, trễ liên tiếp, kênh, nội dung) và "Ngưỡng & xử lý"
 //   (hạn xử lý theo loại, mức Khẩn của môi trường nước; ngưỡng cnts.* sửa qua quy trình tham số).
 // - Cấp Xã: cảnh báo của các xã phụ trách; nhận xử lý và đóng cảnh báo được giao.
+// BF-SWEEP-CNTS (#101): bảng có STT (DataTable); ô giờ/kỳ dùng NumberField (số nguyên, không âm, hạn xử lý > 0) và báo lỗi
+// theo trường trước khi gọi API. Nhắc theo từng biểu đầy đủ (leo thang, mẫu theo kênh) — TODO(#108).
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { PageHeader, StatusPill } from "@/components/patterns/list";
+import { NumberField, TextField, parseNumberInput, type NumberRule } from "@/components/form";
+import { DataTable, PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
 import {
   ACTION_LABEL,
@@ -28,6 +31,11 @@ import {
 } from "./api";
 
 type Tab = "alerts" | "reminders" | "settings";
+
+/** Nhắc trước hạn: số nguyên 0–168 giờ; trễ liên tiếp: 0–12 kỳ; hạn xử lý: 1–720 giờ (như máy chủ). */
+const BEFORE_RULE: NumberRule = { required: true, integer: true, max: 168 };
+const STREAK_RULE: NumberRule = { required: true, integer: true, max: 12 };
+export const SLA_RULE: NumberRule = { required: true, integer: true, positive: true, max: 720 };
 
 export function AlertScreen() {
   const { api, kn } = useAuth();
@@ -105,57 +113,49 @@ function AlertList({ aapi, tinh }: { aapi: AlertApi; tinh: boolean }) {
         </div>
         <LoadState s={list}>
           {(d) => (
-            <table className="dt" aria-label="Bảng cảnh báo">
-              <thead>
-                <tr>
-                  <th>Mức</th>
-                  <th>Loại</th>
-                  <th>Nội dung</th>
-                  <th>Xã</th>
-                  <th>Thời điểm</th>
-                  <th>Người xử lý</th>
-                  <th>Hạn xử lý</th>
-                  <th>Trạng thái</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {d.items.map((a) => (
-                  <tr key={a.alert_ref}>
-                    <td>
-                      <StatusPill tone={a.level === "urgent" ? "bad" : "warn"}>{LEVEL_LABEL[a.level]}</StatusPill>
-                    </td>
-                    <td>{a.kind_no ? `${a.kind_no}. ` : ""}{a.kind_label}</td>
-                    <td>
+            <DataTable
+              caption="Bảng cảnh báo"
+              rows={d.items}
+              rowKey={(a) => a.alert_ref}
+              empty="Không có cảnh báo."
+              columns={[
+                { key: "level", header: "Mức", cell: (a) => <StatusPill tone={a.level === "urgent" ? "bad" : "warn"}>{LEVEL_LABEL[a.level]}</StatusPill> },
+                { key: "kind", header: "Loại", cell: (a) => `${a.kind_no ? `${a.kind_no}. ` : ""}${a.kind_label}` },
+                {
+                  key: "title",
+                  header: "Nội dung",
+                  cell: (a) => (
+                    <>
                       {a.title}
                       {reasonOf(a) ? <div className="mute small">{reasonOf(a)}</div> : null}
-                    </td>
-                    <td>{a.commune_code ? communeName(a.commune_code) : "—"}</td>
-                    <td>{dt(a.raised_at)}</td>
-                    <td>{a.assignee?.display ?? (a.assignee ? "Đã giao" : "—")}</td>
-                    <td>
+                    </>
+                  ),
+                },
+                { key: "commune", header: "Xã", cell: (a) => (a.commune_code ? communeName(a.commune_code) : "—") },
+                { key: "at", header: "Thời điểm", cell: (a) => dt(a.raised_at) },
+                { key: "who", header: "Người xử lý", cell: (a) => a.assignee?.display ?? (a.assignee ? "Đã giao" : "—") },
+                {
+                  key: "due",
+                  header: "Hạn xử lý",
+                  cell: (a) => (
+                    <>
                       {dt(a.due_at)}
                       {a.overdue ? <StatusPill tone="bad"> Quá hạn</StatusPill> : null}
-                    </td>
-                    <td>
-                      <StatusPill tone={STATUS_TONE[a.status]}>{a.auto_closed ? "Tự đóng" : STATUS_LABEL[a.status]}</StatusPill>
-                    </td>
-                    <td>
-                      <button className="btn btn-sm" onClick={() => setOpen(a.alert_ref)}>
-                        Xem
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {d.items.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="mute">
-                      Không có cảnh báo.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                    </>
+                  ),
+                },
+                { key: "st", header: "Trạng thái", cell: (a) => <StatusPill tone={STATUS_TONE[a.status]}>{a.auto_closed ? "Tự đóng" : STATUS_LABEL[a.status]}</StatusPill> },
+                {
+                  key: "act",
+                  header: "",
+                  cell: (a) => (
+                    <button className="btn btn-sm" onClick={() => setOpen(a.alert_ref)}>
+                      Xem
+                    </button>
+                  ),
+                },
+              ]}
+            />
           )}
         </LoadState>
       </section>
@@ -189,6 +189,7 @@ function AlertDetailView({
   const [due, setDue] = useState("");
   const [note, setNote] = useState("");
   const [result, setResult] = useState("");
+  const [resultErr, setResultErr] = useState<string | undefined>();
   const done = (ok: unknown) => {
     if (ok) {
       detail.reload();
@@ -230,28 +231,18 @@ function AlertDetailView({
                 ) : null}
               </dl>
               {fs.length ? (
-                <table className="dt" aria-label="Vi phạm">
-                  <thead>
-                    <tr>
-                      <th>Chỉ tiêu</th>
-                      <th>Kỳ này</th>
-                      <th>So sánh</th>
-                      <th>Biến động</th>
-                      <th>Lý do</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fs.map((f) => (
-                      <tr key={f.field}>
-                        <td>{f.label}</td>
-                        <td>{f.current ?? "—"}</td>
-                        <td>{f.compare ?? "—"}</td>
-                        <td>{f.new_entry ? "Phát sinh mới" : f.change_pct ? `${f.change_pct}%` : "—"}</td>
-                        <td>{f.reason}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                  caption="Vi phạm"
+                  rows={fs}
+                  rowKey={(f) => f.field}
+                  columns={[
+                    { key: "label", header: "Chỉ tiêu", cell: (f) => f.label },
+                    { key: "cur", header: "Kỳ này", cell: (f) => f.current ?? "—" },
+                    { key: "cmp", header: "So sánh", cell: (f) => f.compare ?? "—" },
+                    { key: "chg", header: "Biến động", cell: (f) => (f.new_entry ? "Phát sinh mới" : f.change_pct ? `${f.change_pct}%` : "—") },
+                    { key: "reason", header: "Lý do", cell: (f) => f.reason },
+                  ]}
+                />
               ) : reasonOf(a) ? (
                 <p>{reasonOf(a)}</p>
               ) : null}
@@ -283,10 +274,14 @@ function AlertDetailView({
               ) : null}
               {a.can_close ? (
                 <div className="row" aria-label="Đóng cảnh báo">
-                  <input className="input" aria-label="Kết quả xử lý" placeholder="Kết quả xử lý (bắt buộc, ≥ 10 ký tự)" value={result}
-                    onChange={(e) => setResult(e.target.value)} />
-                  <button className="btn btn-sm" disabled={[...result.trim()].length < 10 || act.busy}
-                    onClick={async () => done(await act.run(() => aapi.close(a.alert_ref, a.seq, result.trim()), "Đã đóng cảnh báo."))}>
+                  <TextField label="Kết quả xử lý" required value={result} onChange={setResult} maxLength={1000} error={resultErr} hint="Tối thiểu 10 ký tự" />
+                  <button className="btn btn-sm" disabled={act.busy}
+                    onClick={async () => {
+                      const n = [...result.trim()].length;
+                      const e = n === 0 ? "Bắt buộc nhập." : n < 10 ? "Tối thiểu 10 ký tự." : undefined;
+                      setResultErr(e);
+                      if (!e) done(await act.run(() => aapi.close(a.alert_ref, a.seq, result.trim()), "Đã đóng cảnh báo."));
+                    }}>
                     Đóng cảnh báo
                   </button>
                 </div>
@@ -315,10 +310,27 @@ function AlertDetailView({
 
 function ReminderConfig({ aapi, canEdit }: { aapi: AlertApi; canEdit: boolean }) {
   const cfg = useLoad(() => aapi.config(), [aapi]);
-  const [edit, setEdit] = useState<{ code: string; r: FormReminder } | null>(null);
+  // Hai ô số giữ chuỗi người gõ (before, streak); chỉ đổi sang số khi Lưu, sau khi kiểm bằng parseNumberInput.
+  const [edit, setEdit] = useState<{ code: string; r: FormReminder; before: string; streak: string } | null>(null);
+  const [errs, setErrs] = useState<Record<string, string | undefined>>({});
   const act = useAction();
-  const errs = edit ? reminderErrors(edit.r) : {};
   const set = (patch: Partial<FormReminder>) => setEdit((e) => (e ? { ...e, r: { ...e.r, ...patch } } : e));
+  const save = async () => {
+    if (!edit) return;
+    const b = parseNumberInput(edit.before, BEFORE_RULE);
+    const l = parseNumberInput(edit.streak, STREAK_RULE);
+    const r: FormReminder = { ...edit.r, before_due_hours: b.ok ? Number(b.value) : edit.r.before_due_hours, late_streak: l.ok ? Number(l.value) : edit.r.late_streak };
+    const e: Record<string, string | undefined> = { ...reminderErrors(r) };
+    if (!b.ok) e.before_due_hours = b.error;
+    if (!l.ok) e.late_streak = l.error;
+    setErrs(e);
+    if (Object.values(e).some(Boolean)) return;
+    const ok = await act.run(() => aapi.putForm(edit.code, r), "Đã lưu cấu hình nhắc nhở.");
+    if (ok) {
+      setEdit(null);
+      cfg.reload();
+    }
+  };
   return (
     <section className="card sec" aria-label="Cấu hình nhắc nhở">
       <h2>Cấu hình nhắc nhở theo biểu</h2>
@@ -329,67 +341,58 @@ function ReminderConfig({ aapi, canEdit }: { aapi: AlertApi; canEdit: boolean })
       {act.view}
       <LoadState s={cfg}>
         {(c: AlertConfig) => (
-          <table className="dt" aria-label="Nhắc nhở theo biểu">
-            <thead>
-              <tr>
-                <th>Biểu</th>
-                <th>Trước hạn</th>
-                <th>Khi trễ</th>
-                <th>Nhắc lặp</th>
-                <th>Trễ liên tiếp</th>
-                <th>Kênh</th>
-                <th>Đã nhắc hôm nay</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {c.forms.map((f) => (
-                <tr key={f.code}>
-                  <td>
+          <DataTable
+            caption="Nhắc nhở theo biểu"
+            rows={c.forms}
+            rowKey={(f) => f.code}
+            columns={[
+              {
+                key: "form",
+                header: "Biểu",
+                cell: (f) => (
+                  <>
                     {f.label}
                     {f.custom ? <span className="mute small"> · phiên bản {f.version}</span> : <span className="mute small"> · mặc định</span>}
-                  </td>
-                  <td>{f.reminder.before_due_hours ? `${f.reminder.before_due_hours} giờ` : "Không"}</td>
-                  <td>{f.reminder.on_overdue ? "Có" : "Không"}</td>
-                  <td>{f.reminder.repeat_daily ? `Mỗi ngày ${f.reminder.repeat_at}` : "Không"}</td>
-                  <td>{f.reminder.late_streak ? `${f.reminder.late_streak} kỳ` : "Tắt"}</td>
-                  <td>{f.reminder.channels.map((ch) => CHANNEL_LABEL[ch]).join(", ")}</td>
-                  <td>{f.sent_today}</td>
-                  <td>
-                    {canEdit ? (
-                      <button className="btn btn-sm" onClick={() => setEdit({ code: f.code, r: { ...f.reminder } })}>
-                        Sửa
-                      </button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </>
+                ),
+              },
+              { key: "before", header: "Trước hạn", cell: (f) => (f.reminder.before_due_hours ? `${f.reminder.before_due_hours} giờ` : "Không") },
+              { key: "over", header: "Khi trễ", cell: (f) => (f.reminder.on_overdue ? "Có" : "Không") },
+              { key: "rep", header: "Nhắc lặp", cell: (f) => (f.reminder.repeat_daily ? `Mỗi ngày ${f.reminder.repeat_at}` : "Không") },
+              { key: "streak", header: "Trễ liên tiếp", cell: (f) => (f.reminder.late_streak ? `${f.reminder.late_streak} kỳ` : "Tắt") },
+              { key: "ch", header: "Kênh", cell: (f) => f.reminder.channels.map((ch) => CHANNEL_LABEL[ch]).join(", ") },
+              { key: "sent", header: "Đã nhắc hôm nay", cell: (f) => f.sent_today },
+              {
+                key: "act",
+                header: "",
+                cell: (f) =>
+                  canEdit ? (
+                    <button className="btn btn-sm" onClick={() => setEdit({ code: f.code, r: { ...f.reminder }, before: String(f.reminder.before_due_hours), streak: String(f.reminder.late_streak) })}>
+                      Sửa
+                    </button>
+                  ) : null,
+              },
+            ]}
+          />
         )}
       </LoadState>
       {edit ? (
         <div className="card sec" aria-label="Sửa cấu hình nhắc">
           <h3>Sửa nhắc nhở — {edit.code}</h3>
           <div className="row">
-            <label className="row small">
-              Nhắc trước hạn (giờ){" "}
-              <input className="input" type="number" min={0} max={168} aria-label="Nhắc trước hạn (giờ)" value={edit.r.before_due_hours}
-                onChange={(e) => set({ before_due_hours: Number(e.target.value) })} />
-            </label>
+            <NumberField label="Nhắc trước hạn" unit="giờ" rule={BEFORE_RULE} value={edit.before} onChange={(v) => setEdit({ ...edit, before: v })}
+              onBlurError={(m) => setErrs((x) => ({ ...x, before_due_hours: m }))} error={errs.before_due_hours} hint="0–168; 0 = không nhắc" />
             <label className="row small">
               <input type="checkbox" checked={edit.r.on_overdue} onChange={(e) => set({ on_overdue: e.target.checked })} /> Nhắc khi trễ hạn
             </label>
             <label className="row small">
-              <input type="checkbox" checked={edit.r.repeat_daily} onChange={(e) => set({ repeat_daily: e.target.checked })} /> Nhắc lặp mỗi ngày lúc
-              <input className="input" aria-label="Giờ nhắc lặp" value={edit.r.repeat_at} onChange={(e) => set({ repeat_at: e.target.value })} />
+              <input type="checkbox" checked={edit.r.repeat_daily} onChange={(e) => set({ repeat_daily: e.target.checked })} /> Nhắc lặp mỗi ngày
             </label>
-            <label className="row small">
-              Trễ liên tiếp từ{" "}
-              <input className="input" type="number" min={0} max={12} aria-label="Số kỳ trễ liên tiếp" value={edit.r.late_streak}
-                onChange={(e) => set({ late_streak: Number(e.target.value) })} />{" "}
-              kỳ
-            </label>
+            {edit.r.repeat_daily ? (
+              <TextField label="Giờ nhắc lặp" required placeholder="HH:MM" value={edit.r.repeat_at} onChange={(v) => set({ repeat_at: v })} error={errs.repeat_at} />
+            ) : null}
+            <NumberField label="Trễ liên tiếp từ" unit="kỳ" rule={STREAK_RULE} value={edit.streak} onChange={(v) => setEdit({ ...edit, streak: v })}
+              onBlurError={(m) => setErrs((x) => ({ ...x, late_streak: m }))} error={errs.late_streak} hint="0–12; 0 = tắt" />
           </div>
           <div className="row">
             {(["in_app", "push", "email"] as const).map((ch) => (
@@ -400,27 +403,13 @@ function ReminderConfig({ aapi, canEdit }: { aapi: AlertApi; canEdit: boolean })
               </label>
             ))}
           </div>
-          <label className="small">
-            Nội dung mẫu ({"{bieu}"}, {"{ky}"}, {"{han}"})
-            <textarea className="input" aria-label="Nội dung mẫu" value={edit.r.message} onChange={(e) => set({ message: e.target.value })} />
-          </label>
-          {Object.entries(errs).map(([k, v]) => (
-            <p key={k} className="err small">
-              {k}: {v}
-            </p>
-          ))}
+          <TextField label={"Nội dung mẫu ({bieu}, {ky}, {han})"} multiline maxLength={500} value={edit.r.message} onChange={(v) => set({ message: v })} error={errs.message} />
           <div className="row">
-            <button className="btn btn-primary btn-sm" disabled={Object.keys(errs).length > 0 || act.busy}
-              onClick={async () => {
-                const r = await act.run(() => aapi.putForm(edit.code, edit.r), "Đã lưu cấu hình nhắc nhở.");
-                if (r) {
-                  setEdit(null);
-                  cfg.reload();
-                }
-              }}>
+            <button className="btn btn-primary btn-sm" disabled={act.busy}
+              onClick={() => void save()}>
               Lưu
             </button>
-            <button className="btn btn-sm" onClick={() => setEdit(null)}>
+            <button className="btn btn-sm" onClick={() => (setEdit(null), setErrs({}))}>
               Hủy
             </button>
           </div>
@@ -434,6 +423,7 @@ function KindSettings({ aapi, canEdit }: { aapi: AlertApi; canEdit: boolean }) {
   const cfg = useLoad(() => aapi.config(), [aapi]);
   const act = useAction();
   const [sla, setSla] = useState<Record<string, string>>({});
+  const [slaErr, setSlaErr] = useState<Record<string, string | undefined>>({});
   return (
     <>
       <section className="card sec" aria-label="Xử lý theo loại cảnh báo">
@@ -441,58 +431,67 @@ function KindSettings({ aapi, canEdit }: { aapi: AlertApi; canEdit: boolean }) {
         {act.view}
         <LoadState s={cfg}>
           {(c) => (
-            <table className="dt" aria-label="Loại cảnh báo">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Loại</th>
-                  <th>Mức</th>
-                  <th>Gửi tới</th>
-                  <th>Nguồn</th>
-                  <th>Hạn xử lý (giờ)</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {c.kinds.map((k) => (
-                  <tr key={k.kind.code}>
-                    <td>{k.kind.no || "—"}</td>
-                    <td>{k.kind.label}</td>
-                    <td>
-                      {k.kind.level_configurable && canEdit ? (
-                        <label className="row small">
-                          <input type="checkbox" checked={k.urgent}
-                            onChange={async (e) => {
-                              const r = await act.run(() => aapi.putKind(k.kind.code, { sla_hours: k.sla_hours, urgent: e.target.checked }), "Đã lưu mức cảnh báo.");
-                              if (r) cfg.reload();
-                            }} />{" "}
-                          Khẩn
-                        </label>
-                      ) : (
-                        LEVEL_LABEL[k.level]
-                      )}
-                    </td>
-                    <td>{k.kind.recipients.map((r) => RECIPIENT_LABEL[r] ?? r).join(", ")}</td>
-                    <td className="small mute">{k.kind.source === "log" || k.kind.source === "schedule" ? "Chờ nhật ký / lịch tiêm" : "Đang chạy"}</td>
-                    <td>
-                      <input className="input" type="number" min={1} max={720} aria-label={`Hạn xử lý ${k.kind.label}`} disabled={!canEdit}
-                        value={sla[k.kind.code] ?? String(k.sla_hours)} onChange={(e) => setSla({ ...sla, [k.kind.code]: e.target.value })} />
-                    </td>
-                    <td>
-                      {canEdit && sla[k.kind.code] !== undefined && sla[k.kind.code] !== String(k.sla_hours) ? (
-                        <button className="btn btn-sm" disabled={act.busy}
-                          onClick={async () => {
-                            const r = await act.run(() => aapi.putKind(k.kind.code, { sla_hours: Number(sla[k.kind.code]), urgent: k.urgent }), "Đã lưu hạn xử lý.");
+            <DataTable
+              caption="Loại cảnh báo"
+              rows={c.kinds}
+              rowKey={(k) => k.kind.code}
+              columns={[
+                { key: "no", header: "Số", cell: (k) => k.kind.no || "—" },
+                { key: "label", header: "Loại", cell: (k) => k.kind.label },
+                {
+                  key: "level",
+                  header: "Mức",
+                  cell: (k) =>
+                    k.kind.level_configurable && canEdit ? (
+                      <label className="row small">
+                        <input type="checkbox" checked={k.urgent}
+                          onChange={async (e) => {
+                            const r = await act.run(() => aapi.putKind(k.kind.code, { sla_hours: k.sla_hours, urgent: e.target.checked }), "Đã lưu mức cảnh báo.");
                             if (r) cfg.reload();
-                          }}>
-                          Lưu
-                        </button>
+                          }} />{" "}
+                        Khẩn
+                      </label>
+                    ) : (
+                      LEVEL_LABEL[k.level]
+                    ),
+                },
+                { key: "to", header: "Gửi tới", cell: (k) => k.kind.recipients.map((r) => RECIPIENT_LABEL[r] ?? r).join(", ") },
+                { key: "src", header: "Nguồn", cell: (k) => <span className="small mute">{k.kind.source === "log" || k.kind.source === "schedule" ? "Chờ nhật ký / lịch tiêm" : "Đang chạy"}</span> },
+                {
+                  key: "sla",
+                  header: "Hạn xử lý (giờ)",
+                  cell: (k) => (
+                    <>
+                      <input className="input" inputMode="numeric" aria-label={`Hạn xử lý ${k.kind.label}`} disabled={!canEdit}
+                        aria-invalid={slaErr[k.kind.code] ? true : undefined}
+                        value={sla[k.kind.code] ?? String(k.sla_hours)} onChange={(e) => setSla({ ...sla, [k.kind.code]: e.target.value })} />
+                      {slaErr[k.kind.code] ? (
+                        <span className="err" role="alert">
+                          {slaErr[k.kind.code]}
+                        </span>
                       ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </>
+                  ),
+                },
+                {
+                  key: "act",
+                  header: "",
+                  cell: (k) =>
+                    canEdit && sla[k.kind.code] !== undefined && sla[k.kind.code] !== String(k.sla_hours) ? (
+                      <button className="btn btn-sm" disabled={act.busy}
+                        onClick={async () => {
+                          const p = parseNumberInput(sla[k.kind.code]!, SLA_RULE);
+                          setSlaErr((x) => ({ ...x, [k.kind.code]: p.ok ? undefined : p.error }));
+                          if (!p.ok) return;
+                          const r = await act.run(() => aapi.putKind(k.kind.code, { sla_hours: Number(p.value), urgent: k.urgent }), "Đã lưu hạn xử lý.");
+                          if (r) cfg.reload();
+                        }}>
+                        Lưu
+                      </button>
+                    ) : null,
+                },
+              ]}
+            />
           )}
         </LoadState>
       </section>
@@ -501,26 +500,24 @@ function KindSettings({ aapi, canEdit }: { aapi: AlertApi; canEdit: boolean }) {
         <p className="mute small">Ngưỡng là tham số có phiên bản (người đặt ≠ người duyệt) — sửa ở mục Tham số; ngưỡng mới áp dụng cho số liệu nhập sau thời điểm hiệu lực.</p>
         <LoadState s={cfg}>
           {(c) => (
-            <table className="dt" aria-label="Bảng ngưỡng">
-              <thead>
-                <tr>
-                  <th>Ngưỡng</th>
-                  <th>Giá trị</th>
-                  <th>Hiệu lực từ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {c.thresholds.map((t) => (
-                  <tr key={t.key}>
-                    <td>
+            <DataTable
+              caption="Bảng ngưỡng"
+              rows={c.thresholds}
+              rowKey={(t) => t.key}
+              columns={[
+                {
+                  key: "label",
+                  header: "Ngưỡng",
+                  cell: (t) => (
+                    <>
                       {t.label} <span className="mute small">({t.key})</span>
-                    </td>
-                    <td>{t.value === null ? "Chưa đặt" : `${t.value.replace(".", ",")} ${t.unit}`}</td>
-                    <td>{t.effective_from ? t.effective_from.split("-").reverse().join("/") : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </>
+                  ),
+                },
+                { key: "value", header: "Giá trị", cell: (t) => (t.value === null ? "Chưa đặt" : `${t.value.replace(".", ",")} ${t.unit}`) },
+                { key: "from", header: "Hiệu lực từ", cell: (t) => (t.effective_from ? t.effective_from.split("-").reverse().join("/") : "—") },
+              ]}
+            />
           )}
         </LoadState>
       </section>

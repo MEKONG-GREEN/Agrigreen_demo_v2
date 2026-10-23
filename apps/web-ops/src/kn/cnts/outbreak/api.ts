@@ -4,6 +4,8 @@
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
 import { newIdempotencyKey } from "@/api/idempotency";
+import { parseNumberInput, type NumberRule } from "@/components/form";
+import { compareDecimal } from "@/lib/decimal";
 
 type S = components["schemas"];
 export type Outbreak = S["CNTSOutbreak"];
@@ -81,8 +83,24 @@ export function formOf(o: Outbreak): OutbreakForm {
   };
 }
 
-const INT = /^\d{1,9}$/;
-const DEC3 = /^\d{1,11}(\.\d{1,3})?$/;
+/** Ô số của BM-10 (R-A1, như máy chủ): quy mô đàn nguyên > 0; số con chết, tiêu hủy, ngày tuổi nguyên ≥ 0; kg, lít, sai số ≥ 0, ≤ 3 số lẻ. */
+export const OUTBREAK_RULES = {
+  herd_size: { required: true, integer: true, positive: true, max: 999_999_999 },
+  dead: { required: true, integer: true, max: 999_999_999 },
+  culled_head: { integer: true, max: 999_999_999 },
+  herd_age_days: { integer: true, max: 999_999_999 },
+  culled_kg: { maxDecimals: 3 },
+  chemical_liters: { maxDecimals: 3 },
+  accuracy_m: { maxDecimals: 3 },
+} satisfies Record<string, NumberRule>;
+type NumKey = keyof typeof OUTBREAK_RULES;
+
+/** Số đã chuẩn hóa ("1.234,5" → "1234.5"); rỗng hoặc sai → "" (đã chặn bởi `formErrors`). */
+export function numValue(k: NumKey, v: string): string {
+  const p = parseNumberInput(v, OUTBREAK_RULES[k]);
+  return p.ok ? p.value : "";
+}
+
 const COORD = /^-?\d{1,3}(\.\d{1,7})?$/;
 
 /** Lỗi phía máy khách trước khi gửi (máy chủ kiểm lại) — quy tắc chặn UR-XA-10. Khóa trường API → lý do. */
@@ -100,21 +118,21 @@ export function formErrors(f: OutbreakForm): Record<string, string> {
     const lat = Number(f.lat), lon = Number(f.lon);
     if (!(lat >= 8 && lat <= 24 && lon >= 102 && lon <= 118)) e.location = "Tọa độ ngoài lãnh thổ Việt Nam";
   }
-  if (!INT.test(f.herd_size.trim()) || Number(f.herd_size) < 1) e.herd_size = "Số con ≥ 1 (DB-06)";
-  if (!INT.test(f.dead.trim())) e.dead = "Số nguyên ≥ 0";
-  else if (!e.herd_size && Number(f.dead) > Number(f.herd_size)) e.dead = "Số con chết lớn hơn quy mô đàn (DB-07 > DB-06)";
-  if (f.culled_head.trim()) {
-    if (!INT.test(f.culled_head.trim())) e.culled_head = "Số nguyên ≥ 0";
-    else if (!e.herd_size && Number(f.culled_head) > Number(f.herd_size)) e.culled_head = "Số con tiêu hủy lớn hơn quy mô đàn (DB-10 > DB-06)";
+  for (const k of Object.keys(OUTBREAK_RULES) as NumKey[]) {
+    const p = parseNumberInput(f[k], OUTBREAK_RULES[k]);
+    if (!p.ok) e[k] = p.error;
   }
-  if (f.herd_age_days.trim() && !INT.test(f.herd_age_days.trim())) e.herd_age_days = "Số ngày tuổi";
-  for (const k of ["culled_kg", "chemical_liters", "accuracy_m"] as const) if (f[k].trim() && !DEC3.test(f[k].trim())) e[k] = "Số ≥ 0, tối đa 3 số lẻ (dấu chấm)";
+  const herd = numValue("herd_size", f.herd_size);
+  if (!e.herd_size && !e.dead && herd && compareDecimal(numValue("dead", f.dead), herd) > 0) e.dead = "Số con chết lớn hơn quy mô đàn (DB-07 > DB-06).";
+  const culled = numValue("culled_head", f.culled_head);
+  if (!e.herd_size && !e.culled_head && herd && culled && compareDecimal(culled, herd) > 0) e.culled_head = "Số con tiêu hủy lớn hơn quy mô đàn (DB-10 > DB-06).";
   if (!f.symptoms.trim()) e.symptoms = "Bắt buộc (DB-08)";
   return e;
 }
 
 const opt = (s: string) => (s.trim() === "" ? undefined : s.trim());
-const optInt = (s: string) => (s.trim() === "" ? null : Number(s));
+const optNum = (k: NumKey, s: string) => numValue(k, s) || null;
+const optInt = (k: NumKey, s: string) => (numValue(k, s) === "" ? null : Number(numValue(k, s)));
 
 /** Thân request từ biểu nhập. */
 export function payload(f: OutbreakForm, baseVersion?: number): OutbreakInput {
@@ -126,17 +144,17 @@ export function payload(f: OutbreakForm, baseVersion?: number): OutbreakInput {
     received_at: new Date(f.received_at).toISOString(),
     source: f.source || undefined,
     locality: f.locality.trim(),
-    location: f.lat.trim() && f.lon.trim() ? { lat: f.lat.trim(), lon: f.lon.trim(), accuracy_m: opt(f.accuracy_m) ?? null, source: f.location_source } : null,
-    herd_size: Number(f.herd_size),
-    herd_age_days: optInt(f.herd_age_days),
-    dead: Number(f.dead || "0"),
+    location: f.lat.trim() && f.lon.trim() ? { lat: f.lat.trim(), lon: f.lon.trim(), accuracy_m: optNum("accuracy_m", f.accuracy_m), source: f.location_source } : null,
+    herd_size: Number(numValue("herd_size", f.herd_size)),
+    herd_age_days: optInt("herd_age_days", f.herd_age_days),
+    dead: Number(numValue("dead", f.dead) || "0"),
     symptoms: f.symptoms.trim(),
     sample_date: opt(f.sample_date),
     lab_name: opt(f.lab_name),
     lab_result: opt(f.lab_result),
-    culled_head: optInt(f.culled_head),
-    culled_kg: opt(f.culled_kg) ?? null,
-    chemical_liters: opt(f.chemical_liters) ?? null,
+    culled_head: optInt("culled_head", f.culled_head),
+    culled_kg: optNum("culled_kg", f.culled_kg),
+    chemical_liters: optNum("chemical_liters", f.chemical_liters),
     buffer_note: opt(f.buffer_note),
     prevention_note: opt(f.prevention_note),
     as_of: opt(f.as_of),

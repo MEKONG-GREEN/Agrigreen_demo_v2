@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsModel } from "@/api/mock/kn-cnts-model";
-import { createCntsModelApi, grantErrors, money, parseLatLng, projectErrors, scaleError, toggle } from "./api";
+import { SCALE_RULE, createCntsModelApi, decimalValue, grantErrors, money, parseLatLng, projectErrors, scaleError, scaleErrors, toggle } from "./api";
 
 const A = "0190f1c4-7d3e-7000-8000-0000000000a1";
 
@@ -10,18 +10,22 @@ describe("CT/DA, hộ mô hình, cấp quyền CNTS — quy tắc biểu (W11.47
   it("dự án: mã, tên, ngày, kinh phí số nguyên", () => {
     expect(projectErrors({ code: "DA 1", name: "", kind: "knqg", start_date: "2027-03-01", end_date: "2027-01-01", budget: "1,5" })).toEqual({
       code: expect.any(String),
-      name: "Nhập tên",
-      end_date: "Không trước ngày bắt đầu",
-      budget: "Số đồng nguyên",
+      name: "Bắt buộc nhập.",
+      end_date: "Không trước ngày bắt đầu.",
+      budget: "Chỉ nhập số nguyên.",
     });
+    expect(projectErrors({ code: "DA-01", name: "Dự án", kind: "tinh", start_date: "2027-03-01", budget: "-5" }).budget).toBe("Không được nhập số âm.");
     expect(projectErrors({ code: "DA-01", name: "Dự án", kind: "tinh", start_date: "2027-03-01" })).toEqual({});
     expect(money("450000000")).toBe("450.000.000 đ");
   });
 
   it("quy mô có đơn vị; tọa độ trong Việt Nam", () => {
     expect(scaleError("", "")).toBeNull();
-    expect(scaleError("10", "")).toBe("Nhập cả quy mô và đơn vị");
-    expect(scaleError("-1", "con")).not.toBeNull();
+    expect(scaleError("10", "")).toBe("Nhập cả quy mô và đơn vị.");
+    expect(scaleError("-1", "con")).toBe("Không được nhập số âm.");
+    expect(scaleErrors("0", "con")).toEqual({ scale: "Phải lớn hơn 0." });
+    expect(scaleErrors("12,5", "")).toEqual({ scale_unit: "Nhập cả quy mô và đơn vị." });
+    expect(decimalValue("1.234,5", SCALE_RULE)).toBe("1234.5");
     expect(parseLatLng("10.38, 105.43")).toEqual({ lat: 10.38, lng: 105.43 });
     expect(parseLatLng("")).toBeNull();
     expect(parseLatLng("48.8, 2.3")).toBe("invalid");

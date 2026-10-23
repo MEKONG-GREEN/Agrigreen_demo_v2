@@ -3,13 +3,19 @@
 // Chương trình, dự án, điểm trình diễn (W11.47 — BRD CNTS v3.7 UR-TINH-19, FN-19 phần CT/DA; bố cục prototype A
 // "r-projects"): danh sách dự án, tạo/sửa (chủ nhiệm sửa dự án mình — FN-19 BR-01), chi tiết dự án với điểm trình diễn và
 // hộ tham gia, kết thúc/mở lại. Mẫu biểu dự án BM-12…BM-16 là gói W11.53 (GĐ2).
+// BF-SWEEP-CNTS (#101): kinh phí dùng NumberField (số nguyên, không âm), trường bắt buộc báo lỗi theo trường khi bấm Lưu,
+// bảng có STT. Mẫu KNQG 01/03/04/05/07 và bước xác nhận của TW — TODO(#29).
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { PageHeader, StatusPill } from "@/components/patterns/list";
+import { fieldErrorMap } from "@/api/problem";
+import { NumberField, SelectField, TextField } from "@/components/form";
+import { DataTable, PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
 import {
+  BUDGET_RULE,
   KIND_LABEL,
   createCntsModelApi,
+  decimalValue,
   dmy,
   money,
   projectErrors,
@@ -68,50 +74,30 @@ export function ProjectsScreen() {
       </div>
       <LoadState s={list}>
         {(d) => (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Mã dự án</th>
-                <th>Tên dự án</th>
-                <th>Loại</th>
-                <th>Thời gian</th>
-                <th>Kinh phí</th>
-                <th>Chủ nhiệm</th>
-                <th>Điểm / hộ</th>
-                <th>Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.items.length ? (
-                d.items.map((p) => (
-                  <tr key={p.ref} className={open === p.ref ? "selected" : undefined}>
-                    <td>
-                      <button className="link" onClick={() => setOpen(open === p.ref ? null : p.ref)}>
-                        {p.code}
-                      </button>
-                    </td>
-                    <td>{p.name}</td>
-                    <td>{KIND_LABEL[p.kind]}</td>
-                    <td>
-                      {dmy(p.start_date)} – {dmy(p.end_date)}
-                    </td>
-                    <td>{money(p.budget)}</td>
-                    <td>{p.manager_display ?? "—"}</td>
-                    <td>
-                      {p.site_count} / {p.household_count}
-                    </td>
-                    <td>{p.status === "closed" ? <StatusPill tone="neutral">Đã kết thúc</StatusPill> : <StatusPill tone="ok">Đang thực hiện</StatusPill>}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={8} className="empty">
-                    Chưa có dự án.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <DataTable
+            caption="Chương trình, dự án"
+            rows={d.items}
+            rowKey={(p) => p.ref}
+            empty="Chưa có dự án."
+            columns={[
+              {
+                key: "code",
+                header: "Mã dự án",
+                cell: (p) => (
+                  <button className="link" aria-expanded={open === p.ref} onClick={() => setOpen(open === p.ref ? null : p.ref)}>
+                    {p.code}
+                  </button>
+                ),
+              },
+              { key: "name", header: "Tên dự án", cell: (p) => p.name },
+              { key: "kind", header: "Loại", cell: (p) => KIND_LABEL[p.kind] },
+              { key: "time", header: "Thời gian", cell: (p) => `${dmy(p.start_date)} – ${dmy(p.end_date)}` },
+              { key: "budget", header: "Kinh phí", cell: (p) => money(p.budget) },
+              { key: "mgr", header: "Chủ nhiệm", cell: (p) => p.manager_display ?? "—" },
+              { key: "sites", header: "Điểm / hộ", cell: (p) => `${p.site_count} / ${p.household_count}` },
+              { key: "st", header: "Trạng thái", cell: (p) => (p.status === "closed" ? <StatusPill tone="neutral">Đã kết thúc</StatusPill> : <StatusPill tone="ok">Đang thực hiện</StatusPill>) },
+            ]}
+          />
         )}
       </LoadState>
       {open ? <ProjectPanel key={open} mapi={mapi} projectRef={open} officers={officers.data ?? []} onChanged={list.reload} /> : null}
@@ -134,8 +120,11 @@ function ProjectForm({ mapi, project, onDone }: { mapi: CntsModelApi; project?: 
     training_note: project?.training_note ?? "",
     supplies_note: project?.supplies_note ?? "",
   });
+  const [errs, setErrs] = useState<Record<string, string | undefined>>({});
   const act = useAction();
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  const server = act.problem ? fieldErrorMap(act.problem) : {};
+  const err = (k: string) => errs[k] ?? server[k];
+  const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
   const body: ProjectSave = {
     ...(project ? { base_version: project.version, manager_ref: project.manager_ref } : {}),
     code: f.code.trim(),
@@ -145,86 +134,44 @@ function ProjectForm({ mapi, project, onDone }: { mapi: CntsModelApi; project?: 
     scale_note: f.scale_note.trim() || null,
     start_date: f.start_date,
     end_date: f.end_date || null,
-    budget: f.budget.trim() || null,
+    budget: decimalValue(f.budget, BUDGET_RULE),
     program_ref: f.program_ref || null,
     training_note: f.training_note.trim() || null,
     supplies_note: f.supplies_note.trim() || null,
     attachment_refs: project?.attachment_refs ?? [],
   };
-  const errs = projectErrors(body);
+  const save = async () => {
+    const e = projectErrors({ ...body, budget: f.budget.trim() || null });
+    setErrs(e);
+    if (Object.keys(e).length) return;
+    const r = await act.run(() => (project ? mapi.updateProject(project.ref, body) : mapi.createProject(body)));
+    if (r) onDone(r.ref);
+  };
   return (
     <section className="card sec" aria-label={project ? "Sửa dự án" : "Tạo dự án"}>
       <h2>{project ? `Sửa dự án ${project.code}` : "Tạo chương trình, dự án"}</h2>
       {act.view}
       <div className="form-grid">
-        <label>
-          Mã dự án
-          <input value={f.code} onChange={set("code")} maxLength={40} />
-        </label>
-        <label>
-          Tên dự án
-          <input value={f.name} onChange={set("name")} maxLength={300} />
-        </label>
-        <label>
-          Loại
-          <select value={f.kind} onChange={set("kind")}>
-            {Object.entries(KIND_LABEL).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          CT/DA của KHTC
-          <select value={f.program_ref} onChange={set("program_ref")}>
-            <option value="">— Không gắn —</option>
-            {(programs.data ?? []).map((p) => (
-              <option key={p.ref} value={p.ref}>
-                {p.code} · {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Căn cứ
-          <input value={f.basis} onChange={set("basis")} maxLength={1000} />
-        </label>
-        <label>
-          Quy mô
-          <input value={f.scale_note} onChange={set("scale_note")} maxLength={1000} />
-        </label>
-        <label>
-          Bắt đầu
-          <input type="date" value={f.start_date} onChange={set("start_date")} />
-        </label>
-        <label>
-          Kết thúc
-          <input type="date" value={f.end_date} onChange={set("end_date")} />
-        </label>
-        <label>
-          Kinh phí (đồng)
-          <input inputMode="numeric" value={f.budget} onChange={set("budget")} />
-        </label>
-        <label>
-          Tập huấn
-          <input value={f.training_note} onChange={set("training_note")} maxLength={2000} />
-        </label>
-        <label>
-          Giống, vật tư
-          <input value={f.supplies_note} onChange={set("supplies_note")} maxLength={2000} />
-        </label>
+        <TextField label="Mã dự án" required value={f.code} onChange={set("code")} error={err("code")} maxLength={40} />
+        <TextField label="Tên dự án" required value={f.name} onChange={set("name")} error={err("name")} maxLength={300} />
+        <SelectField label="Loại" required value={f.kind} onChange={set("kind")} error={err("kind")} options={Object.entries(KIND_LABEL).map(([k, v]) => ({ value: k, label: v }))} />
+        <SelectField
+          label="CT/DA của KHTC"
+          value={f.program_ref}
+          onChange={set("program_ref")}
+          placeholder="— Không gắn —"
+          options={(programs.data ?? []).map((p) => ({ value: p.ref, label: `${p.code} · ${p.name}` }))}
+        />
+        <TextField label="Căn cứ" value={f.basis} onChange={set("basis")} maxLength={1000} />
+        <TextField label="Quy mô" value={f.scale_note} onChange={set("scale_note")} maxLength={1000} />
+        <DateInput label="Bắt đầu" required value={f.start_date} onChange={set("start_date")} error={err("start_date")} />
+        <DateInput label="Kết thúc" value={f.end_date} onChange={set("end_date")} error={err("end_date")} />
+        <NumberField label="Kinh phí" unit="đồng" rule={BUDGET_RULE} value={f.budget} onChange={set("budget")} error={err("budget")} onBlurError={(m) => setErrs((x) => ({ ...x, budget: m }))} />
+        <TextField label="Tập huấn" value={f.training_note} onChange={set("training_note")} maxLength={2000} />
+        <TextField label="Giống, vật tư" value={f.supplies_note} onChange={set("supplies_note")} maxLength={2000} />
       </div>
-      {Object.keys(errs).length ? <p className="mute">{Object.values(errs).join(" · ")}</p> : null}
       <div className="row">
-        <button
-          className="btn btn-primary"
-          disabled={act.busy || Object.keys(errs).length > 0}
-          onClick={async () => {
-            const r = await act.run(() => (project ? mapi.updateProject(project.ref, body) : mapi.createProject(body)));
-            if (r) onDone(r.ref);
-          }}
-        >
+        <button className="btn btn-primary" disabled={act.busy} onClick={() => void save()}>
           Lưu
         </button>
         <button className="btn" onClick={() => onDone()}>
@@ -302,51 +249,41 @@ function ProjectBody({ mapi, p, officers, reload }: { mapi: CntsModelApi; p: Pro
       {mode === "site" ? <SiteForm mapi={mapi} projectRef={p.ref} officers={officers} communes={communes} onDone={(ref) => (setMode(null), ref && (reload(), setSite(ref)))} /> : null}
       {editing ? <SiteForm key={editing.ref} mapi={mapi} projectRef={p.ref} site={editing} officers={officers} communes={communes} onDone={(ref) => (setEditSite(null), ref && reload())} /> : null}
       <h3>Điểm trình diễn</h3>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Điểm</th>
-            <th>Xã</th>
-            <th>Loại mô hình</th>
-            <th>Quy mô</th>
-            <th>Cán bộ theo dõi</th>
-            <th>Số hộ</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {p.sites.length ? (
-            p.sites.map((x) => (
-              <tr key={x.ref}>
-                <td>
-                  <button className="link" onClick={() => setSite(site === x.ref ? null : x.ref)}>
-                    {x.name}
-                  </button>{" "}
-                  {x.status === "closed" ? <StatusPill tone="neutral">Đã đóng</StatusPill> : null}
-                </td>
-                <td>{communeName(x.commune_code)}</td>
-                <td>{x.model_type_name ?? x.model_type_code}</td>
-                <td>{x.scale ? `${x.scale} ${x.scale_unit ?? ""}` : "—"}</td>
-                <td>{x.officer_display ?? "—"}</td>
-                <td>{x.household_count}</td>
-                <td>
-                  {x.can_edit && x.status === "active" ? (
-                    <button className="btn btn-sm" onClick={() => setEditSite(x.ref)}>
-                      Sửa
-                    </button>
-                  ) : null}
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={7} className="empty">
-                Chưa có điểm trình diễn.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      <DataTable
+        caption="Điểm trình diễn của dự án"
+        rows={p.sites}
+        rowKey={(x) => x.ref}
+        empty="Chưa có điểm trình diễn."
+        columns={[
+          {
+            key: "name",
+            header: "Điểm",
+            cell: (x) => (
+              <>
+                <button className="link" aria-expanded={site === x.ref} onClick={() => setSite(site === x.ref ? null : x.ref)}>
+                  {x.name}
+                </button>{" "}
+                {x.status === "closed" ? <StatusPill tone="neutral">Đã đóng</StatusPill> : null}
+              </>
+            ),
+          },
+          { key: "commune", header: "Xã", cell: (x) => communeName(x.commune_code) },
+          { key: "model", header: "Loại mô hình", cell: (x) => x.model_type_name ?? x.model_type_code },
+          { key: "scale", header: "Quy mô", cell: (x) => (x.scale ? `${x.scale} ${x.scale_unit ?? ""}` : "—") },
+          { key: "officer", header: "Cán bộ theo dõi", cell: (x) => x.officer_display ?? "—" },
+          { key: "hh", header: "Số hộ", cell: (x) => x.household_count },
+          {
+            key: "act",
+            header: "",
+            cell: (x) =>
+              x.can_edit && x.status === "active" ? (
+                <button className="btn btn-sm" onClick={() => setEditSite(x.ref)}>
+                  Sửa
+                </button>
+              ) : null,
+          },
+        ]}
+      />
       {site ? <SitePanel key={site} mapi={mapi} siteRef={site} officers={officers} communeName={communeName} onChanged={reload} /> : null}
       <details>
         <summary>Lịch sử phiên bản ({p.versions.length})</summary>
@@ -360,5 +297,27 @@ function ProjectBody({ mapi, p, officers, reload }: { mapi: CntsModelApi; p: Pro
         </ul>
       </details>
     </section>
+  );
+}
+
+/** Ô ngày có nhãn, dấu * và lỗi theo trường như UI-KIT (ô `type="date"` gốc). */
+function DateInput({ label, value, onChange, error, required }: { label: string; value: string; onChange: (v: string) => void; error?: string; required?: boolean }) {
+  return (
+    <div className="field">
+      <label>
+        {label}
+        {required ? (
+          <span className="req" aria-hidden="true">
+            {" "}*
+          </span>
+        ) : null}
+        <input className="input" type="date" aria-required={required || undefined} aria-invalid={error ? true : undefined} value={value} onChange={(e) => onChange(e.target.value)} />
+      </label>
+      {error ? (
+        <span className="err" role="alert">
+          {error}
+        </span>
+      ) : null}
+    </div>
   );
 }

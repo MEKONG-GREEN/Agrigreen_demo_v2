@@ -8,12 +8,18 @@ import { useMemo, useState } from "react";
 import { unwrap } from "@/api/client";
 import type { CatalogItem } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
-import { PageHeader, StatusPill } from "@/components/patterns/list";
+import { fieldErrorMap } from "@/api/problem";
+import { NumberField, SelectField, TextField } from "@/components/form";
+import { DataTable, PageHeader, StatusPill } from "@/components/patterns/list";
+import { ReasonDialog } from "../ReasonDialog";
 import { LoadState, dt, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
 import {
   BATCH_STATUS_LABEL,
+  AGE_RULE,
   BATCH_STATUS_TONE,
+  HEAD_RULE,
   batchErrors,
+  intValue,
   createCntsCalApi,
   type BatchCreate,
   type BatchStatus,
@@ -77,41 +83,37 @@ export function VaccinationScreen() {
             items.length === 0 ? (
               <p className="mute">Chưa có lịch tiêm.</p>
             ) : (
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Xã</th>
-                    <th>Hộ / địa bàn</th>
-                    <th>Mô hình</th>
-                    <th>Ngày nhận giống</th>
-                    <th>Mũi kế tiếp</th>
-                    <th>Trạng thái</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((b) => (
-                    <tr key={b.ref}>
-                      <td>{communeName(b.commune_code)}</td>
-                      <td>{b.locality ?? (b.household_ref ? `Hộ ${b.household_ref.slice(0, 8)}` : "—")}</td>
-                      <td>{b.model_type_name ?? b.model_type_code}</td>
-                      <td>{dmy(b.received_date)}</td>
-                      <td>{b.next_dose ? `${b.next_dose.vaccine_name ?? b.next_dose.vaccine_code} L${b.next_dose.shot} · ${dmy(b.next_dose.expected_date)}` : "—"}</td>
-                      <td>
-                        <StatusPill tone={BATCH_STATUS_TONE[b.status]}>
-                          {BATCH_STATUS_LABEL[b.status]}
-                          {b.overdue_count ? ` (${b.overdue_count})` : ""}
-                        </StatusPill>
-                      </td>
-                      <td>
-                        <button className="btn btn-sm" onClick={() => setOpen(open === b.ref ? null : b.ref)}>
-                          {open === b.ref ? "Đóng" : "Xem"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                caption="Các lứa"
+                rows={items}
+                rowKey={(b) => b.ref}
+                columns={[
+                  { key: "commune", header: "Xã", cell: (b) => communeName(b.commune_code) },
+                  { key: "loc", header: "Hộ / địa bàn", cell: (b) => b.locality ?? (b.household_ref ? `Hộ ${b.household_ref.slice(0, 8)}` : "—") },
+                  { key: "model", header: "Mô hình", cell: (b) => b.model_type_name ?? b.model_type_code },
+                  { key: "recv", header: "Ngày nhận giống", cell: (b) => dmy(b.received_date) },
+                  { key: "next", header: "Mũi kế tiếp", cell: (b) => (b.next_dose ? `${b.next_dose.vaccine_name ?? b.next_dose.vaccine_code} L${b.next_dose.shot} · ${dmy(b.next_dose.expected_date)}` : "—") },
+                  {
+                    key: "st",
+                    header: "Trạng thái",
+                    cell: (b) => (
+                      <StatusPill tone={BATCH_STATUS_TONE[b.status]}>
+                        {BATCH_STATUS_LABEL[b.status]}
+                        {b.overdue_count ? ` (${b.overdue_count})` : ""}
+                      </StatusPill>
+                    ),
+                  },
+                  {
+                    key: "act",
+                    header: "",
+                    cell: (b) => (
+                      <button className="btn btn-sm" onClick={() => setOpen(open === b.ref ? null : b.ref)}>
+                        {open === b.ref ? "Đóng" : "Xem"}
+                      </button>
+                    ),
+                  },
+                ]}
+              />
             )
           }
         </LoadState>
@@ -128,69 +130,71 @@ function CreateBatch({ capi, communes, onDone }: { capi: CntsCalApi; communes: s
     [api],
   );
   const [f, setF] = useState({ commune_code: communes[0] ?? "", model_type_code: "", locality: "", received_date: "", age_at_receipt: "1", head_count: "", note: "" });
+  const [errs, setErrs] = useState<Record<string, string | undefined>>({});
   const act = useAction();
-  const body: Partial<BatchCreate> = {
-    commune_code: f.commune_code.trim(),
-    model_type_code: f.model_type_code,
-    locality: f.locality.trim() || null,
-    received_date: f.received_date,
-    age_at_receipt: Number(f.age_at_receipt),
-    head_count: f.head_count.trim() ? Number(f.head_count) : null,
-    note: f.note.trim() || null,
+  const server = act.problem ? fieldErrorMap(act.problem) : {};
+  const err = (k: string) => errs[k] ?? server[k];
+  const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
+  const save = async () => {
+    const age = intValue(f.age_at_receipt, AGE_RULE);
+    const head = intValue(f.head_count, HEAD_RULE);
+    const body: Partial<BatchCreate> = {
+      commune_code: f.commune_code.trim(),
+      model_type_code: f.model_type_code,
+      locality: f.locality.trim() || null,
+      received_date: f.received_date,
+      age_at_receipt: age.ok ? (age.value ?? undefined) : undefined,
+      head_count: head.ok ? head.value : null,
+      note: f.note.trim() || null,
+    };
+    const e: Record<string, string | undefined> = batchErrors(body);
+    if (!age.ok) e.age_at_receipt = age.error;
+    if (!head.ok) e.head_count = head.error;
+    setErrs(e);
+    if (Object.values(e).some(Boolean)) return;
+    const r = await act.run(() => capi.createBatch(body as BatchCreate));
+    if (r) onDone(r.ref);
   };
-  const errs = batchErrors(body);
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
   return (
     <section className="card sec" aria-label="Tạo lịch tiêm">
       <h2>Tạo lịch theo quy trình của mô hình</h2>
       {act.view}
       <div className="form-grid">
-        <label>
-          Mã xã
-          <input value={f.commune_code} onChange={set("commune_code")} />
-        </label>
-        <label>
-          Loại mô hình
-          <select value={f.model_type_code} onChange={set("model_type_code")}>
-            <option value="">— Chọn —</option>
-            {(models.data ?? []).map((m) => (
-              <option key={m.code} value={m.code}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Địa bàn (ấp, khu vực)
-          <input value={f.locality} onChange={set("locality")} placeholder="Không ghi họ tên, số điện thoại" maxLength={300} />
-        </label>
-        <label>
-          Ngày nhận giống
-          <input type="date" value={f.received_date} onChange={set("received_date")} />
-        </label>
-        <label>
-          Tuổi lúc nhận (ngày)
-          <input inputMode="numeric" value={f.age_at_receipt} onChange={set("age_at_receipt")} />
-        </label>
-        <label>
-          Số con
-          <input inputMode="numeric" value={f.head_count} onChange={set("head_count")} />
-        </label>
-        <label>
-          Ghi chú
-          <input value={f.note} onChange={set("note")} maxLength={1000} />
-        </label>
+        {communes.length ? (
+          <SelectField label="Xã/phường" required value={f.commune_code} onChange={set("commune_code")} error={err("commune_code")} options={communes.map((c) => ({ value: c, label: c }))} />
+        ) : (
+          <TextField label="Mã xã/phường" required value={f.commune_code} onChange={set("commune_code")} error={err("commune_code")} maxLength={10} />
+        )}
+        <SelectField
+          label="Loại mô hình"
+          required
+          value={f.model_type_code}
+          onChange={set("model_type_code")}
+          error={err("model_type_code")}
+          placeholder="— Chọn —"
+          options={(models.data ?? []).map((m) => ({ value: m.code, label: m.name }))}
+        />
+        <TextField label="Địa bàn (ấp, khu vực)" required value={f.locality} onChange={set("locality")} error={err("locality")} placeholder="Không ghi họ tên, số điện thoại" maxLength={300} />
+        <div className="field">
+          <label>
+            Ngày nhận giống
+            <span className="req" aria-hidden="true">
+              {" "}*
+            </span>
+            <input className="input" type="date" aria-required aria-invalid={err("received_date") ? true : undefined} value={f.received_date} onChange={(e) => set("received_date")(e.target.value)} />
+          </label>
+          {err("received_date") ? (
+            <span className="err" role="alert">
+              {err("received_date")}
+            </span>
+          ) : null}
+        </div>
+        <NumberField label="Tuổi lúc nhận" unit="ngày" rule={AGE_RULE} value={f.age_at_receipt} onChange={set("age_at_receipt")} error={err("age_at_receipt")} onBlurError={(m) => setErrs((x) => ({ ...x, age_at_receipt: m }))} />
+        <NumberField label="Số con" rule={HEAD_RULE} value={f.head_count} onChange={set("head_count")} error={err("head_count")} onBlurError={(m) => setErrs((x) => ({ ...x, head_count: m }))} />
+        <TextField label="Ghi chú" value={f.note} onChange={set("note")} maxLength={1000} />
       </div>
-      {Object.values(errs).length ? <p className="mute">{Object.values(errs).join(" · ")}</p> : null}
       <div className="row">
-        <button
-          className="btn btn-primary"
-          disabled={act.busy || Object.keys(errs).length > 0}
-          onClick={async () => {
-            const r = await act.run(() => capi.createBatch(body as BatchCreate));
-            if (r) onDone(r.ref);
-          }}
-        >
+        <button className="btn btn-primary" disabled={act.busy} onClick={() => void save()}>
           Tạo lịch
         </button>
         <button className="btn" onClick={() => onDone()}>
@@ -209,7 +213,7 @@ function BatchDetail({ capi, ref_, onChanged }: { capi: CntsCalApi; ref_: string
 function BatchEditor({ capi, b, onSaved }: { capi: CntsCalApi; b: VaccinationBatchDetail; onSaved: () => void }) {
   const act = useAction();
   const [edit, setEdit] = useState<Record<string, { expected: string; actual: string }>>({});
-  const [reason, setReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
   const key = (v: string, shot: number) => `${v}/${shot}`;
   const changes = b.doses.flatMap((d) => {
     const e = edit[key(d.vaccine_code, d.shot)];
@@ -225,45 +229,47 @@ function BatchEditor({ capi, b, onSaved }: { capi: CntsCalApi; b: VaccinationBat
         {b.model_type_name ?? b.model_type_code} · nhận giống {dmy(b.received_date)} ({b.age_at_receipt} ngày tuổi) · {b.schedule_name ?? b.schedule_code}
       </h2>
       {act.view}
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Vaccine</th>
-            <th>Lần</th>
-            <th>Ngày tuổi</th>
-            <th>Ngày dự kiến</th>
-            <th>Ngày tiêm thực tế</th>
-          </tr>
-        </thead>
-        <tbody>
-          {b.doses.map((d) => {
-            const k = key(d.vaccine_code, d.shot);
-            const e = edit[k] ?? { expected: d.expected_date, actual: d.actual_date ?? "" };
-            return (
-              <tr key={k}>
-                <td>{d.vaccine_name ?? d.vaccine_code}</td>
-                <td>{d.shot}</td>
-                <td>{d.age_days}</td>
-                <td>
+      <DataTable
+        caption="Mũi tiêm của lứa"
+        rows={b.doses}
+        rowKey={(d) => key(d.vaccine_code, d.shot)}
+        columns={[
+          { key: "vx", header: "Vaccine", cell: (d) => d.vaccine_name ?? d.vaccine_code },
+          { key: "shot", header: "Lần", cell: (d) => d.shot },
+          { key: "age", header: "Ngày tuổi", cell: (d) => d.age_days },
+          {
+            key: "exp",
+            header: "Ngày dự kiến",
+            cell: (d) => {
+              const k = key(d.vaccine_code, d.shot);
+              const e = edit[k] ?? { expected: d.expected_date, actual: d.actual_date ?? "" };
+              return (
+                <>
                   {b.can_plan ? (
                     <input type="date" aria-label={`Ngày dự kiến ${k}`} value={e.expected} onChange={(x) => setEdit({ ...edit, [k]: { ...e, expected: x.target.value } })} />
                   ) : (
                     dmy(d.expected_date)
                   )}{" "}
                   {d.overdue ? <StatusPill tone="bad">Quá hạn</StatusPill> : null}
-                </td>
-                <td>
-                  {b.can_record ? (
-                    <input type="date" aria-label={`Ngày tiêm thực tế ${k}`} value={e.actual} onChange={(x) => setEdit({ ...edit, [k]: { ...e, actual: x.target.value } })} />
-                  ) : (
-                    dmy(d.actual_date)
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                </>
+              );
+            },
+          },
+          {
+            key: "act",
+            header: "Ngày tiêm thực tế",
+            cell: (d) => {
+              const k = key(d.vaccine_code, d.shot);
+              const e = edit[k] ?? { expected: d.expected_date, actual: d.actual_date ?? "" };
+              return b.can_record ? (
+                <input type="date" aria-label={`Ngày tiêm thực tế ${k}`} value={e.actual} onChange={(x) => setEdit({ ...edit, [k]: { ...e, actual: x.target.value } })} />
+              ) : (
+                dmy(d.actual_date)
+              );
+            },
+          },
+        ]}
+      />
       <div className="row">
         {b.can_record ? (
           <button
@@ -281,21 +287,29 @@ function BatchEditor({ capi, b, onSaved }: { capi: CntsCalApi; b: VaccinationBat
           </button>
         ) : null}
         {b.can_plan ? (
-          <>
-            <input aria-label="Lý do hủy" placeholder="Lý do hủy lịch" value={reason} onChange={(e) => setReason(e.target.value)} />
-            <button
-              className="btn"
-              disabled={act.busy || reason.trim().length < 5}
-              onClick={async () => {
-                const r = await act.run(() => capi.cancelBatch(b.ref, b.version, reason.trim()), "Đã hủy lịch tiêm của lứa.");
-                if (r) onSaved();
-              }}
-            >
-              Hủy lịch
-            </button>
-          </>
+          <button className="btn" disabled={act.busy} onClick={() => setCancelling(true)}>
+            Hủy lịch
+          </button>
         ) : null}
       </div>
+      {cancelling ? (
+        <ReasonDialog
+          title="Hủy lịch tiêm của lứa"
+          label="Lý do hủy lịch"
+          confirmLabel="Hủy lịch"
+          min={5}
+          max={1000}
+          busy={act.busy}
+          onClose={() => setCancelling(false)}
+          onConfirm={async (reason) => {
+            const r = await act.run(() => capi.cancelBatch(b.ref, b.version, reason), "Đã hủy lịch tiêm của lứa.");
+            if (r) {
+              setCancelling(false);
+              onSaved();
+            }
+          }}
+        />
+      ) : null}
       <h3>Lịch sử</h3>
       <ul>
         {b.versions.map((v) => (

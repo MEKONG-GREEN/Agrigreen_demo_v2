@@ -4,6 +4,7 @@
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
 import { newIdempotencyKey } from "@/api/idempotency";
+import { parseNumberInput, type NumberRule } from "@/components/form";
 
 type S = components["schemas"];
 export type Project = S["CNTSProject"];
@@ -45,23 +46,46 @@ export function money(v: string | null | undefined): string {
 /** Ngày YYYY-MM-DD → DD/MM/YYYY. */
 export const dmy = (d: string | null | undefined) => (d ? d.split("-").reverse().join("/") : "—");
 
+/** Kinh phí (đồng): số nguyên không âm (R-A1, như máy chủ). */
+export const BUDGET_RULE: NumberRule = { integer: true };
+/** Quy mô điểm/hộ: số dương, tối đa 2 số lẻ (máy chủ làm tròn 2 số lẻ, < 10^12). */
+export const SCALE_RULE: NumberRule = { positive: true, maxDecimals: 2 };
+
 /** Lỗi phía máy khách của biểu CT/DA. */
 export function projectErrors(p: Partial<ProjectSave>): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!p.code?.trim() || !/^[A-Za-z0-9._/-]{1,40}$/.test(p.code.trim())) e.code = "Mã 1–40 ký tự chữ, số, . _ / -";
-  if (!p.name?.trim()) e.name = "Nhập tên";
-  if (!p.kind) e.kind = "Chọn loại";
-  if (!p.start_date) e.start_date = "Nhập ngày bắt đầu";
-  if (p.end_date && p.start_date && p.end_date < p.start_date) e.end_date = "Không trước ngày bắt đầu";
-  if (p.budget && !/^\d+$/.test(p.budget)) e.budget = "Số đồng nguyên";
+  if (!p.code?.trim()) e.code = "Bắt buộc nhập.";
+  else if (!/^[A-Za-z0-9._/-]{1,40}$/.test(p.code.trim())) e.code = "Mã 1–40 ký tự chữ, số, . _ / -";
+  if (!p.name?.trim()) e.name = "Bắt buộc nhập.";
+  if (!p.kind) e.kind = "Bắt buộc nhập.";
+  if (!p.start_date) e.start_date = "Bắt buộc nhập.";
+  if (p.end_date && p.start_date && p.end_date < p.start_date) e.end_date = "Không trước ngày bắt đầu.";
+  if (p.budget) {
+    const b = parseNumberInput(p.budget, BUDGET_RULE);
+    if (!b.ok) e.budget = b.error;
+  }
   return e;
 }
 
-/** Lỗi phía máy khách của quy mô (cả hai hoặc không). */
+/** Lỗi quy mô theo trường: nhập cả quy mô và đơn vị (hoặc bỏ trống cả hai); quy mô là số dương. */
+export function scaleErrors(scale: string, unit: string): { scale?: string; scale_unit?: string } {
+  if (!scale.trim() && !unit) return {};
+  if (!scale.trim()) return { scale: "Nhập cả quy mô và đơn vị." };
+  const p = parseNumberInput(scale, SCALE_RULE);
+  if (!p.ok) return { scale: p.error };
+  return unit ? {} : { scale_unit: "Nhập cả quy mô và đơn vị." };
+}
+
+/** Lỗi phía máy khách của quy mô (cả hai hoặc không) — một thông báo. */
 export function scaleError(scale: string, unit: string): string | null {
-  if (!scale && !unit) return null;
-  if (!scale || !unit) return "Nhập cả quy mô và đơn vị";
-  return /^\d+(\.\d{1,2})?$/.test(scale) && Number(scale) > 0 ? null : "Quy mô là số dương";
+  const e = scaleErrors(scale, unit);
+  return e.scale ?? e.scale_unit ?? null;
+}
+
+/** Số đã chuẩn hóa để gửi ("1.234,5" → "1234.5"); rỗng / sai → null (đã chặn bởi kiểm lỗi trước đó). */
+export function decimalValue(v: string, rule: NumberRule): string | null {
+  const p = parseNumberInput(v, rule);
+  return p.ok && p.value !== "" ? p.value : null;
 }
 
 /** Tọa độ nhập tay "vĩ độ, kinh độ" → điểm (null nếu trống; lỗi nếu sai). */
