@@ -116,6 +116,47 @@ describe("<Sidebar> (Design Sample)", () => {
     expect(onToggle).toHaveBeenCalled();
   });
 
+  it("menu 3 cấp (TT tỉnh, UP-02): mọi mục cha của mục active tự mở; breadcrumb đủ chuỗi; flyout có tiêu đề cấp giữa", async () => {
+    const deep: MenuTree = {
+      version: "t",
+      role: "kn_tinh",
+      department_code: "trong_trot",
+      groups: [
+        {
+          key: "bao_cao",
+          label: "Báo cáo",
+          items: [
+            {
+              key: "tong_hop",
+              label: "Báo cáo tổng hợp các xã",
+              icon: "report",
+              children: [
+                { key: "tuan", label: "Báo cáo tuần", icon: "report", children: [{ key: "t01", label: "T01 · Tiến độ XG", icon: "file", href: "/kn/bc/t01" }] },
+                { key: "thang", label: "Báo cáo tháng", icon: "report", href: "/kn/bc/thang" },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(menuLinks(deep).map((l) => [l.node.label, l.ancestors.map((a) => a.key).join(">")])).toEqual([
+      ["T01 · Tiến độ XG", "tong_hop>tuan"],
+      ["Báo cáo tháng", "tong_hop"],
+    ]);
+    expect(crumbsFor(deep, "/kn/bc/t01")).toEqual(["Báo cáo tổng hợp các xã", "Báo cáo tuần", "T01 · Tiến độ XG"]);
+    const { unmount } = render(<Sidebar menu={deep} pathname="/kn/bc/t01" />);
+    expect(screen.getByRole("button", { name: /Báo cáo tổng hợp/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /Báo cáo tuần/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("link", { name: "T01 · Tiến độ XG" })).toHaveAttribute("aria-current", "page");
+    unmount();
+    const user = userEvent.setup();
+    render(<Sidebar menu={deep} pathname="/kn/bc/thang" collapsed />);
+    await user.hover(screen.getByRole("button", { name: /Báo cáo tổng hợp/ }).closest("li")!);
+    const fly = screen.getByRole("group", { name: "Báo cáo tổng hợp các xã" });
+    expect(within(fly).getByText("Báo cáo tuần")).toBeVisible();
+    expect(within(fly).getByRole("link", { name: "T01 · Tiến độ XG" })).toBeVisible();
+  });
+
   it("Admin: phòng ban chưa mở không bấm được, nhãn Chưa mở", () => {
     render(<Sidebar menu={admin} pathname="/kn/tong-quan" />);
     const closed = screen.getByText("Chăn nuôi - TS").closest(".nav-item")!;

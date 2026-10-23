@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Icon } from "@/components/Icon";
 import type { MenuBadges, MenuNode, MenuTree } from "@/kn/contract";
 import { BrandMark } from "./BrandMark";
@@ -75,7 +75,8 @@ export function Sidebar({ menu, pathname, badges, collapsed = false, onToggleCol
   const base = useId();
   const active = findActive(menu, pathname);
   const activeHref = active?.node.href;
-  const activeParent = active?.parent?.key;
+  // Mọi mục cha của mục active (menu có thể 3 cấp) tự mở và đậm chữ.
+  const activeAncestors = new Set((active?.ancestors ?? []).map((n) => n.key));
   // Người dùng mở/đóng tay, ghi kèm trang lúc thao tác: đổi sang trang khác thì mục cha của mục active
   // tự mở lại ("mục cha tự mở khi con active"), các mục khác giữ trạng thái tay.
   const [manual, setManual] = useState<Record<string, { open: boolean; at: string | undefined }>>({});
@@ -84,8 +85,84 @@ export function Sidebar({ menu, pathname, badges, collapsed = false, onToggleCol
   const isOpen = (key: string): boolean => {
     const m = manual[key];
     if (m && m.at === activeHref) return m.open;
-    if (key === activeParent) return true;
+    if (activeAncestors.has(key)) return true;
     return m?.open ?? false;
+  };
+
+  // Lá trong flyout (menu thu gọn): mục cấp sâu hơn hiện kèm tiêu đề mục cha của nó.
+  const flyoutItems = (items: readonly MenuNode[], close: () => void): ReactNode =>
+    items.map((c) =>
+      c.children?.length ? (
+        <li key={c.key}>
+          <div className="flyout-sub-title">{c.label}</div>
+          <ul>{flyoutItems(c.children, close)}</ul>
+        </li>
+      ) : (
+        <li key={c.key}>
+          <Leaf
+            node={c}
+            active={c.href === activeHref}
+            badges={badges}
+            collapsed={false}
+            onNavigate={() => {
+              close();
+              onNavigate?.();
+            }}
+          />
+        </li>
+      ),
+    );
+
+  // Mục có con, mọi cấp (khi mở rộng). Mục cấp 1 khi thu gọn dùng flyout.
+  const branch = (item: MenuNode, depth: number): ReactNode => {
+    const expanded = isOpen(item.key);
+    const hasActive = activeAncestors.has(item.key);
+    const subId = `${base}-sub-${item.key}`;
+    const fly = collapsed && depth === 0;
+    const showFly = fly && flyout === item.key;
+    const disabled = item.status === "not_open" || item.status === "coming_soon";
+    return (
+      <li
+        key={item.key}
+        className={`nav-parent${hasActive ? " has-active" : ""}`}
+        onMouseEnter={fly && !disabled ? () => setFlyout(item.key) : undefined}
+        onMouseLeave={fly ? () => setFlyout((f) => (f === item.key ? null : f)) : undefined}
+      >
+        <button
+          type="button"
+          className={`nav-item${disabled ? " is-disabled" : ""}${depth > 0 ? " nav-sub-item" : ""}`}
+          aria-expanded={fly ? showFly : expanded}
+          aria-controls={subId}
+          onClick={() => toggle(item.key, fly)}
+          title={fly ? item.label : undefined}
+          disabled={disabled}
+        >
+          <Icon name={item.icon} />
+          <span className="nav-text">{item.label}</span>
+          <span className="nav-chev" aria-hidden="true">
+            <Icon name={fly ? "chevronRight" : expanded ? "chevronDown" : "chevronRight"} size={16} />
+          </span>
+        </button>
+        {fly ? (
+          <div id={subId} className="flyout" role="group" aria-label={item.label} hidden={!showFly}>
+            <div className="flyout-title">{item.label}</div>
+            <ul>{flyoutItems(item.children ?? [], () => setFlyout(null))}</ul>
+          </div>
+        ) : (
+          <ul id={subId} className="nav-sub" hidden={!expanded}>
+            {(item.children ?? []).map((c) =>
+              c.children?.length ? (
+                branch(c, depth + 1)
+              ) : (
+                <li key={c.key}>
+                  <Leaf node={c} active={c.href === activeHref} badges={badges} collapsed={false} onNavigate={onNavigate} sub />
+                </li>
+              ),
+            )}
+          </ul>
+        )}
+      </li>
+    );
   };
 
   useEffect(() => {
@@ -97,8 +174,8 @@ export function Sidebar({ menu, pathname, badges, collapsed = false, onToggleCol
     return () => document.removeEventListener("mousedown", onDoc);
   }, [flyout]);
 
-  const toggle = (key: string) => {
-    if (collapsed) {
+  const toggle = (key: string, fly: boolean) => {
+    if (fly) {
       setFlyout((f) => (f === key ? null : key));
       return;
     }
@@ -124,73 +201,15 @@ export function Sidebar({ menu, pathname, badges, collapsed = false, onToggleCol
               {g.label}
             </div>
             <ul className="nav-list">
-              {g.items.map((item) => {
-                if (!item.children?.length) {
-                  return (
-                    <li key={item.key}>
-                      <Leaf node={item} active={item.href === activeHref} badges={badges} collapsed={collapsed} onNavigate={onNavigate} />
-                    </li>
-                  );
-                }
-                const expanded = isOpen(item.key);
-                const hasActive = activeParent === item.key;
-                const subId = `${base}-sub-${item.key}`;
-                const showFly = collapsed && flyout === item.key;
-                const disabled = item.status === "not_open" || item.status === "coming_soon";
-                return (
-                  <li
-                    key={item.key}
-                    className={`nav-parent${hasActive ? " has-active" : ""}`}
-                    onMouseEnter={collapsed && !disabled ? () => setFlyout(item.key) : undefined}
-                    onMouseLeave={collapsed ? () => setFlyout((f) => (f === item.key ? null : f)) : undefined}
-                  >
-                    <button
-                      type="button"
-                      className={`nav-item${disabled ? " is-disabled" : ""}`}
-                      aria-expanded={collapsed ? showFly : expanded}
-                      aria-controls={subId}
-                      onClick={() => toggle(item.key)}
-                      title={collapsed ? item.label : undefined}
-                      disabled={disabled}
-                    >
-                      <Icon name={item.icon} />
-                      <span className="nav-text">{item.label}</span>
-                      <span className="nav-chev" aria-hidden="true">
-                        <Icon name={collapsed ? "chevronRight" : expanded ? "chevronDown" : "chevronRight"} size={16} />
-                      </span>
-                    </button>
-                    {collapsed ? (
-                      <div id={subId} className="flyout" role="group" aria-label={item.label} hidden={!showFly}>
-                        <div className="flyout-title">{item.label}</div>
-                        <ul>
-                          {item.children.map((c) => (
-                            <li key={c.key}>
-                              <Leaf
-                                node={c}
-                                active={c.href === activeHref}
-                                badges={badges}
-                                collapsed={false}
-                                onNavigate={() => {
-                                  setFlyout(null);
-                                  onNavigate?.();
-                                }}
-                              />
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : (
-                      <ul id={subId} className="nav-sub" hidden={!expanded}>
-                        {item.children.map((c) => (
-                          <li key={c.key}>
-                            <Leaf node={c} active={c.href === activeHref} badges={badges} collapsed={false} onNavigate={onNavigate} sub />
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+              {g.items.map((item) =>
+                item.children?.length ? (
+                  branch(item, 0)
+                ) : (
+                  <li key={item.key}>
+                    <Leaf node={item} active={item.href === activeHref} badges={badges} collapsed={collapsed} onNavigate={onNavigate} />
                   </li>
-                );
-              })}
+                ),
+              )}
             </ul>
           </div>
         ))}
