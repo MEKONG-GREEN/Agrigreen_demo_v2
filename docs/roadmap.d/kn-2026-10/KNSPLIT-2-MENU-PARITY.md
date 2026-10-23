@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-MENU-PARITY (#122): chuẩn bị giữ nhóm owner rỗng; chờ76 sửa khóa Admin nhiều đơn vị, review và gộp rồi nối assembly/kiểm HTTP parity. Xem docs/dev/kn-menu-parity.md.

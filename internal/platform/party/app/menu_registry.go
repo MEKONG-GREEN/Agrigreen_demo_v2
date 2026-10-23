@@ -53,7 +53,9 @@ func (k *KN) registeredMenu(ctx context.Context, tid uuid.UUID, request port.Men
 	}
 	for _, group := range def.Groups {
 		items := convert(group.Items)
-		if len(items) > 0 {
+		// An explicitly empty owner category is presentation, not authority. A
+		// category emptied by module filtering stays hidden.
+		if len(items) > 0 || len(group.Items) == 0 {
 			view.Groups = append(view.Groups, MenuGroupView{Key: group.Key, Label: group.Label, Items: items})
 		}
 	}
