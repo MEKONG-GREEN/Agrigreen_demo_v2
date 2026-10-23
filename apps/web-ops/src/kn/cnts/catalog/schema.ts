@@ -269,7 +269,7 @@ export function validateAttrs(tab: CatalogTab, attrs: Record<string, string>): R
 /** Ô số nguyên của danh mục (thứ tự cột…): 0–999, không âm (R-A1; máy chủ kiểm `^\d{1,3}$`). */
 export const INT_RULE: NumberRule = { integer: true, max: 999 };
 
-/** Chuẩn hóa ô số người gõ ("1.000" kiểu vi-VN → "1000") trước khi gửi; ô khác giữ nguyên. Gọi sau `validateAttrs`. */
+/** Chuẩn hóa ô số người gõ (bỏ khoảng trắng, dấu phẩy thập phân kiểu vi-VN) trước khi gửi; ô khác giữ nguyên. Gọi sau `validateAttrs`. */
 export function normalizeAttrs(tab: CatalogTab, attrs: Record<string, string>): Record<string, string> {
   const out = { ...attrs };
   for (const f of tab.fields) {

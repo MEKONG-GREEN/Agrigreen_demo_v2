@@ -4,6 +4,8 @@
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
 import { newIdempotencyKey } from "@/api/idempotency";
+import { parseNumberInput, type NumberRule } from "@/components/form";
+import { normalizeNumberInput } from "@/kn/grid/decimal";
 
 type S = components["schemas"];
 export type CntsForm = S["CNTSPeriodForm"];
@@ -54,32 +56,43 @@ export function groupFields(fields: FormsField[]): { group: string; fields: Form
 
 const isNumeric = (f: FormsField) => f.type === "integer" || f.type === "decimal";
 
+/** Quy tắc ô số của biểu (R-A1, UI-KIT): không âm (mọi trường số CNTS đều `non_negative`), nguyên/thập phân ≤ 6 số lẻ. */
+export function numberRule(f: FormsField): NumberRule {
+  return { required: !!f.required, integer: f.type === "integer", maxDecimals: f.type === "decimal" ? 6 : undefined };
+}
+
 /** Lỗi phía máy khách trước khi gửi (máy chủ kiểm lại): bắt buộc, kiểu số, không âm. Khóa trường → lý do. */
 export function fieldErrors(fields: FormsField[], values: Record<string, string>, nilReport: boolean): Record<string, string> {
   const errs: Record<string, string> = {};
   for (const f of fields) {
     const v = (values[f.key] ?? "").trim();
     if (nilReport && isNumeric(f)) {
-      if (v !== "" && Number(v) !== 0) errs[f.key] = "Báo không phát sinh: phải bằng 0";
+      if (v !== "" && Number(normalizeNumberInput(v)) !== 0) errs[f.key] = "Báo không phát sinh: phải bằng 0.";
+      continue;
+    }
+    if (isNumeric(f)) {
+      const p = parseNumberInput(v, numberRule(f));
+      if (!p.ok) errs[f.key] = p.error;
       continue;
     }
     if (!v) {
-      if (f.required) errs[f.key] = "Bắt buộc";
+      if (f.required) errs[f.key] = "Bắt buộc nhập.";
       continue;
     }
-    if (f.type === "integer" && !/^-?\d{1,18}$/.test(v)) errs[f.key] = "Số nguyên";
-    else if (f.type === "decimal" && !/^-?\d{1,18}(\.\d{1,6})?$/.test(v)) errs[f.key] = "Số thập phân (dấu chấm)";
-    else if (f.non_negative && isNumeric(f) && v.startsWith("-")) errs[f.key] = "Không được âm";
-    else if (f.type === "choice" && !(f.options ?? []).includes(v)) errs[f.key] = "Chọn trong danh sách";
+    if (f.type === "choice" && !(f.options ?? []).includes(v)) errs[f.key] = "Chọn trong danh sách.";
   }
   return errs;
 }
 
-/** Giá trị gửi đi: bỏ ô trống; báo không phát sinh → mọi ô số = 0. */
+/** Giá trị gửi đi: bỏ ô trống; ô số chuẩn hóa ("1.234,5" → "1234.5"); báo không phát sinh → mọi ô số = 0. */
 export function payloadValues(fields: FormsField[], values: Record<string, string>, nilReport: boolean): Record<string, string> {
   const out: Record<string, string> = {};
   for (const f of fields) {
-    const v = nilReport && isNumeric(f) ? "0" : (values[f.key] ?? "").trim();
+    let v = nilReport && isNumeric(f) ? "0" : (values[f.key] ?? "").trim();
+    if (v !== "" && isNumeric(f)) {
+      const p = parseNumberInput(v, numberRule(f));
+      if (p.ok) v = p.value;
+    }
     if (v !== "") out[f.key] = v;
   }
   return out;

@@ -4,12 +4,15 @@
 // (Thứ Ba – Thứ Hai, D8) — cột Tuần trước liền kề, Trong kỳ, Lũy kế từ đầu quý, Lũy kế từ đầu năm (theo ngày cuối tuần).
 // Khai thác tự cộng từ BM-17 của các xã (không sửa tay, gom Khu vực); nuôi trồng nhập theo đối tượng; tổng sản lượng =
 // khai thác + nuôi trồng. Chốt / mở lại tuần (số công bố cho KHTC), phiên bản tệp chia sẻ (sheet TỔNG + 4 sheet khai thác).
+// BF-SWEEP-CNTS (#101): các bảng ở đây là biểu báo cáo (dòng nhóm, dòng khu vực) nên giữ bố cục biểu; ô nuôi trồng kiểm bằng
+// parseNumberInput (không âm, ≤ 4 số lẻ) và gửi số đã chuẩn hóa; lý do mở lại nhập trong pop-up ngắn thay `window.prompt`.
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, num, useAction, useLoad } from "@/kn/cycle/common";
 import { saveBlob } from "@/lib/files";
-import { AGG_STATE, aquaValueError, createCntsAggApi, type Basis, type CntsBM18, type CntsCols } from "./api";
+import { ReasonDialog } from "../ReasonDialog";
+import { AGG_STATE, aquaValue, aquaValueError, createCntsAggApi, type Basis, type CntsBM18, type CntsCols } from "./api";
 import { ShareSection } from "./CntsKsgmScreen";
 
 function ColsCells({ c, d = 3 }: { c: CntsCols; d?: number }) {
@@ -73,6 +76,7 @@ function Pl2Body({ v, writer, act, capi, reload }: {
     Object.fromEntries(v.aqua.map((a) => [a.code, { area: a.entered_area ?? "", output: a.entered_output ?? "" }])),
   );
   const [errs, setErrs] = useState<Record<string, string>>({});
+  const [reopening, setReopening] = useState(false);
   const st = AGG_STATE[v.aggregate.state];
   const groupLabel = Object.fromEntries(v.aqua_groups.map((g) => [g.key, g.label]));
   const saveAqua = async () => {
@@ -83,8 +87,10 @@ function Pl2Body({ v, writer, act, capi, reload }: {
       const eo = aquaValueError(x.output);
       if (ea) e[a.code + ".area"] = ea;
       if (eo) e[a.code + ".output"] = eo;
-      const changed = (x.area || null) !== (a.entered_area ?? null) || (x.output || null) !== (a.entered_output ?? null);
-      return changed ? [{ object: a.code, area: x.area.trim() || null, output: x.output.trim() || null }] : [];
+      const area = ea ? null : aquaValue(x.area);
+      const output = eo ? null : aquaValue(x.output);
+      const changed = area !== (a.entered_area ?? null) || output !== (a.entered_output ?? null);
+      return changed ? [{ object: a.code, area, output }] : [];
     });
     setErrs(e);
     if (Object.keys(e).length || entries.length === 0) return;
@@ -108,13 +114,24 @@ function Pl2Body({ v, writer, act, capi, reload }: {
           </button>
         ) : null}
         {writer && closed ? (
-          <button className="btn btn-o" disabled={act.busy}
-            onClick={async () => {
-              const r = window.prompt("Lý do mở lại (10–500 ký tự)");
-              if (r && r.trim().length >= 10 && (await act.run(() => capi.reopen("CNTS-BM18", v.week.key, r.trim()), "Đã mở lại tuần."))) reload();
-            }}>
+          <button className="btn btn-o" disabled={act.busy} onClick={() => setReopening(true)}>
             Mở lại
           </button>
+        ) : null}
+        {reopening ? (
+          <ReasonDialog
+            title={`Mở lại Phụ lục 2 — ${v.week.label}`}
+            label="Lý do mở lại"
+            confirmLabel="Mở lại"
+            busy={act.busy}
+            onClose={() => setReopening(false)}
+            onConfirm={async (r) => {
+              if (await act.run(() => capi.reopen("CNTS-BM18", v.week.key, r), "Đã mở lại tuần.")) {
+                setReopening(false);
+                reload();
+              }
+            }}
+          />
         ) : null}
       </section>
 
@@ -157,17 +174,17 @@ function Pl2Body({ v, writer, act, capi, reload }: {
                   <td>{a.group ? "  " : ""}{a.label}</td>
                   <td>
                     {writer && !closed ? (
-                      <input className="input input-sm" inputMode="decimal" aria-label={`Diện tích ${a.label} (${a.area_unit})`} value={x.area}
+                      <input className="input input-sm" inputMode="decimal" aria-label={`Diện tích ${a.label} (${a.area_unit})`} aria-invalid={errs[a.code + ".area"] ? true : undefined} value={x.area}
                         onChange={(e) => setEdit({ ...edit, [a.code]: { ...x, area: e.target.value } })} />
                     ) : num(a.area.cur, 3)}{" "}{a.area_unit}
-                    {errs[a.code + ".area"] ? <span className="err">{errs[a.code + ".area"]}</span> : null}
+                    {errs[a.code + ".area"] ? <span className="err" role="alert">{errs[a.code + ".area"]}</span> : null}
                   </td>
                   <td>
                     {writer && !closed ? (
-                      <input className="input input-sm" inputMode="decimal" aria-label={`Sản lượng ${a.label} (${a.output_unit})`} value={x.output}
+                      <input className="input input-sm" inputMode="decimal" aria-label={`Sản lượng ${a.label} (${a.output_unit})`} aria-invalid={errs[a.code + ".output"] ? true : undefined} value={x.output}
                         onChange={(e) => setEdit({ ...edit, [a.code]: { ...x, output: e.target.value } })} />
                     ) : num(a.output.cur, 3)}{" "}{a.output_unit}
-                    {errs[a.code + ".output"] ? <span className="err">{errs[a.code + ".output"]}</span> : null}
+                    {errs[a.code + ".output"] ? <span className="err" role="alert">{errs[a.code + ".output"]}</span> : null}
                   </td>
                   <td className="num">{num(a.output.cur, 3)}</td>
                   <td className="num">{num(a.output.qtd, 3)}</td>

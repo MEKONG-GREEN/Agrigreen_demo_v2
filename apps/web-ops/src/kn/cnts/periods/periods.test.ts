@@ -33,9 +33,12 @@ describe("biểu kỳ CNTS — hàm phía máy khách", () => {
     { key: "ghi_chu", label: "Ghi chú", type: "text", required: false },
   ];
   it("kiểm ô, báo không phát sinh, nhóm trường", () => {
-    expect(fieldErrors(fs, { heo: "-1", ca: "1,5" }, false)).toEqual({ heo: "Không được âm", ca: "Số thập phân (dấu chấm)" });
-    expect(fieldErrors(fs, {}, false)).toEqual({ heo: "Bắt buộc", ca: "Bắt buộc" });
-    expect(fieldErrors(fs, { heo: "3" }, true)).toEqual({ heo: "Báo không phát sinh: phải bằng 0" });
+    expect(fieldErrors(fs, { heo: "-1", ca: "abc" }, false)).toEqual({ heo: "Không được nhập số âm.", ca: "Không phải số hợp lệ." });
+    expect(fieldErrors(fs, { heo: "1,5", ca: "-0,5" }, false)).toEqual({ heo: "Chỉ nhập số nguyên.", ca: "Không được nhập số âm." });
+    expect(fieldErrors(fs, { heo: "12", ca: "1,5" }, false)).toEqual({});
+    expect(fieldErrors(fs, {}, false)).toEqual({ heo: "Bắt buộc nhập.", ca: "Bắt buộc nhập." });
+    expect(fieldErrors(fs, { heo: "3" }, true)).toEqual({ heo: "Báo không phát sinh: phải bằng 0." });
+    expect(payloadValues(fs, { heo: " 1200 ", ca: "1.234,5" }, false)).toEqual({ heo: "1200", ca: "1234.5" });
     expect(payloadValues(fs, { heo: "", ghi_chu: " x " }, true)).toEqual({ heo: "0", ca: "0", ghi_chu: "x" });
     expect(groupFields(fs).map((g) => g.group)).toEqual(["A", "B", ""]);
   });

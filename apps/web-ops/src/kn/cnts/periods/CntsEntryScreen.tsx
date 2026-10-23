@@ -9,9 +9,10 @@ import { unwrap } from "@/api/client";
 import { ApiProblem } from "@/api/problem";
 import type { CatalogItem } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
-import { PageHeader, StatusPill } from "@/components/patterns/list";
+import { NumberField, SelectField, TextField } from "@/components/form";
+import { DataTable, PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
-import { STATUS_LABEL, STATUS_TONE, createCntsPeriodApi, fieldErrors, groupFields, isLate, payloadValues, type FormsTask } from "./api";
+import { STATUS_LABEL, STATUS_TONE, createCntsPeriodApi, fieldErrors, groupFields, isLate, numberRule, payloadValues, type FormsTask } from "./api";
 
 interface Draft {
   values: Record<string, string>;
@@ -79,47 +80,46 @@ export function CntsEntryScreen() {
         </select>
         <LoadState s={tasks}>
           {(ts: FormsTask[]) => (
-            <table className="dt" aria-label="Công việc">
-              <thead>
-                <tr>
-                  <th>Biểu</th>
-                  <th>Kỳ</th>
-                  <th>Đơn vị</th>
-                  <th>Hạn nộp</th>
-                  <th>Trạng thái</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {ts.map((t) => (
-                  <tr key={t.id}>
-                    <td>{t.template_title}</td>
-                    <td>{t.label}</td>
-                    <td>
+            <DataTable
+              caption="Công việc"
+              rows={ts}
+              rowKey={(t) => t.id}
+              empty="Không có công việc."
+              columns={[
+                { key: "form", header: "Biểu", cell: (t) => t.template_title },
+                { key: "label", header: "Kỳ", cell: (t) => t.label },
+                {
+                  key: "unit",
+                  header: "Đơn vị",
+                  cell: (t) => (
+                    <>
                       {unitName(t)}
                       {t.unit_kind === "facility" ? <span className="mute"> · xã {communeName(t.parent)}</span> : null}
-                    </td>
-                    <td>{dt(t.due_at)}</td>
-                    <td>
+                    </>
+                  ),
+                },
+                { key: "due", header: "Hạn nộp", cell: (t) => dt(t.due_at) },
+                {
+                  key: "st",
+                  header: "Trạng thái",
+                  cell: (t) => (
+                    <>
                       <StatusPill tone={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</StatusPill>
                       {t.late ? <span className="mute"> · Nộp trễ</span> : null}
-                    </td>
-                    <td>
-                      <button className="btn btn-sm" onClick={() => setOpen(t)}>
-                        {!t.open ? "Xem" : t.version > 0 ? "Sửa" : "Nhập"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {ts.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="mute">
-                      Không có công việc.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                    </>
+                  ),
+                },
+                {
+                  key: "act",
+                  header: "",
+                  cell: (t) => (
+                    <button className="btn btn-sm" onClick={() => setOpen(t)}>
+                      {!t.open ? "Xem" : t.version > 0 ? "Sửa" : "Nhập"}
+                    </button>
+                  ),
+                },
+              ]}
+            />
           )}
         </LoadState>
       </section>
@@ -172,7 +172,7 @@ function Entry({
 
   const submit = async () => {
     const fe = fieldErrors(task.fields, d.values, d.nil);
-    if (late && !d.explanation.trim()) fe.explanation = "Gửi sau hạn: bắt buộc ghi lý do trễ";
+    if (late && !d.explanation.trim()) fe.explanation = "Gửi sau hạn: bắt buộc ghi lý do trễ.";
     setErrs(fe);
     if (Object.keys(fe).length) return;
     try {
@@ -257,46 +257,51 @@ function Entry({
               const numeric = f.type === "integer" || f.type === "decimal";
               const locked = readOnly || (d.nil && numeric);
               const v = d.nil && numeric ? "0" : (d.values[f.key] ?? "");
-              return (
-                <label key={f.key} className="field">
-                  <span>
-                    {f.label}
-                    {f.unit ? ` (${f.unit})` : ""}
-                    {f.required ? <span className="req"> *</span> : null}
-                  </span>
-                  {f.type === "choice" ? (
-                    <select className="select" aria-label={f.label + " " + (g.group ?? "")} disabled={locked} value={v} onChange={(e) => update({ values: { ...d.values, [f.key]: e.target.value } })}>
-                      <option value="">—</option>
-                      {(f.options ?? []).map((o) => (
-                        <option key={o}>{o}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      className="input"
-                      aria-label={f.label + " " + (g.group ?? "")}
-                      inputMode={numeric ? "decimal" : undefined}
-                      disabled={locked}
-                      value={v}
-                      onChange={(e) => update({ values: { ...d.values, [f.key]: e.target.value } })}
-                    />
-                  )}
-                  {errs[f.key] ? <span className="err">{errs[f.key]}</span> : null}
-                </label>
-              );
+              const set = (x: string) => update({ values: { ...d.values, [f.key]: x } });
+              if (numeric)
+                return (
+                  <NumberField
+                    key={f.key}
+                    label={f.label}
+                    unit={f.unit ?? undefined}
+                    rule={numberRule(f)}
+                    disabled={locked}
+                    value={v}
+                    onChange={set}
+                    error={errs[f.key]}
+                    onBlurError={(e) => setErrs((x) => ({ ...x, [f.key]: e ?? "" }))}
+                  />
+                );
+              if (f.type === "choice")
+                return (
+                  <SelectField
+                    key={f.key}
+                    label={f.label}
+                    required={!!f.required}
+                    disabled={locked}
+                    value={v}
+                    onChange={set}
+                    error={errs[f.key]}
+                    placeholder="—"
+                    options={(f.options ?? []).map((o) => ({ value: o, label: o }))}
+                  />
+                );
+              return <TextField key={f.key} label={f.unit ? `${f.label} (${f.unit})` : f.label} required={!!f.required} disabled={locked} value={v} onChange={set} error={errs[f.key]} />;
             })}
           </div>
         </fieldset>
       ))}
-      <label className="field">
-        <span>H08 Ghi chú chung</span>
-        <textarea className="input" aria-label="Ghi chú chung" maxLength={1000} disabled={readOnly} value={d.note} onChange={(e) => update({ note: e.target.value })} />
-      </label>
-      <label className="field">
-        <span>H09 Giải trình / lý do trễ{late ? <span className="req"> *</span> : null}</span>
-        <textarea className="input" aria-label="Giải trình" maxLength={1000} disabled={readOnly} value={d.explanation} onChange={(e) => update({ explanation: e.target.value })} />
-        {errs.explanation ? <span className="err">{errs.explanation}</span> : null}
-      </label>
+      <TextField label="H08 Ghi chú chung" multiline maxLength={1000} disabled={readOnly} value={d.note} onChange={(x) => update({ note: x })} />
+      <TextField
+        label="H09 Giải trình / lý do trễ"
+        required={late}
+        multiline
+        maxLength={1000}
+        disabled={readOnly}
+        value={d.explanation}
+        onChange={(x) => update({ explanation: x })}
+        error={errs.explanation}
+      />
       <div className="row">
         {!readOnly ? (
           <button className="btn btn-primary" disabled={act.busy} onClick={submit}>
