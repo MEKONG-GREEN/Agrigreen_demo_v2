@@ -1,15 +1,19 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminApiClient, createApiClient } from "@/api/client";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsVersions } from "@/api/mock/kn-cnts-catalogs";
-import { CntsCatalogScreen } from "./CntsCatalogScreen";
+import { CntsCatalogItemFormScreen, CntsCatalogItemScreen, CntsCatalogScreen, catalogBase } from "./CntsCatalogScreen";
 import { CNTS_TABS, cleanAttrs, expectedDate, formatDoses, parseDoses, tabOf, templateRows, validateAttrs } from "./schema";
 
+const nav = { path: "/kn/phong-ban/chan_nuoi_thuy_san/danh-muc-cnts", params: {} as Record<string, string>, search: "" };
+const push = vi.fn();
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/kn/phong-ban/chan_nuoi_thuy_san/danh-muc-cnts",
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => nav.path,
+  useRouter: () => ({ replace: vi.fn(), push }),
+  useParams: () => nav.params,
+  useSearchParams: () => new URLSearchParams(nav.search),
 }));
 
 const auth = { roles: ["masterdata_admin"] as string[], persona: "setter" };
@@ -43,7 +47,7 @@ describe("danh mục CNTS — trường thuộc tính (W11.41)", () => {
 
   it("cơ sở giết mổ: bắt buộc xã + loại, mã không trùng GS/GC, không gửi facility_ref", () => {
     const tab = tabOf("cnts_slaughter_facility");
-    expect(validateAttrs(tab, {})).toMatchObject({ commune_code: "Bắt buộc", facility_kind: "Bắt buộc" });
+    expect(validateAttrs(tab, {})).toMatchObject({ commune_code: "Bắt buộc nhập.", facility_kind: "Bắt buộc nhập." });
     expect(validateAttrs(tab, { commune_code: "30292", facility_kind: "tap_trung", stamp_codes_gs: "91.1, 91.2", stamp_codes_gc: "91.2" }).stamp_codes_gc).toMatch(/91.2/);
     expect(cleanAttrs({ facility_ref: "x", commune_code: " 30292 ", address: " " })).toEqual({ commune_code: "30292" });
   });
@@ -52,27 +56,106 @@ describe("danh mục CNTS — trường thuộc tính (W11.41)", () => {
 describe("màn Danh mục CNTS (mock theo hợp đồng /v1/masterdata/catalogs/cnts_*)", () => {
   beforeEach(() => {
     resetCntsVersions();
+    push.mockReset();
+    nav.path = "/kn/phong-ban/chan_nuoi_thuy_san/danh-muc-cnts";
+    nav.params = {};
+    nav.search = "";
     auth.roles = ["masterdata_admin"];
     auth.persona = "setter";
   });
 
-  it("Admin thêm cơ sở giết mổ có ngày áp dụng; mã mộc dấu trùng → lỗi", async () => {
+  it("danh sách không còn pop-up: Thêm, Xem, Sửa là liên kết tới trang riêng; mở đúng tab theo ?tab=", async () => {
+    nav.search = "tab=cnts_slaughter_facility";
+    render(<CntsCatalogScreen />);
+    expect(await screen.findByText("Cơ sở giết mổ Bình Đức (giả lập)")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Thêm cơ sở giết mổ/ })).toHaveAttribute("href", "/kn/phong-ban/chan_nuoi_thuy_san/danh-muc-cnts/cnts_slaughter_facility/them-moi");
+    const view = screen.getByRole("link", { name: "Xem Cơ sở giết mổ Bình Đức (giả lập)" });
+    expect(view.getAttribute("href")).toMatch(/^\/kn\/phong-ban\/chan_nuoi_thuy_san\/danh-muc-cnts\/cnts_slaughter_facility\/[^/]+$/);
+    expect(screen.getByRole("link", { name: "Sửa Cơ sở giết mổ Bình Đức (giả lập)" }).getAttribute("href")).toBe(`${view.getAttribute("href")}/sua`);
+    expect(screen.getByRole("columnheader", { name: "STT" })).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("Ngừng dùng: pop-up lý do ngắn, lý do < 10 ký tự bị chặn trước khi gọi API", async () => {
     const user = userEvent.setup();
     render(<CntsCatalogScreen />);
-    await user.click(await screen.findByRole("tab", { name: "Cơ sở giết mổ" }));
-    expect(await screen.findByText("Cơ sở giết mổ Bình Đức (giả lập)")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: /Thêm cơ sở giết mổ/ }));
-    await user.type(await screen.findByLabelText("Mã"), "CS_MOI");
-    await user.type(screen.getByLabelText("Tên"), "Cơ sở mới");
-    await user.type(await screen.findByLabelText("Mã xã/phường/đặc khu"), "30292");
-    await user.selectOptions(screen.getByLabelText("Loại cơ sở"), "nho_le");
-    await user.type(screen.getByLabelText("Mã số khắc mộc dấu gia súc (GS)"), "91.589.05.1");
+    await user.click((await screen.findAllByRole("button", { name: "Ngừng dùng" }))[0]!);
+    const dlg = screen.getByRole("dialog");
+    await user.type(within(dlg).getByLabelText(/Lý do/), "ngắn");
+    await user.click(within(dlg).getByRole("button", { name: "Ngừng dùng" }));
+    expect(within(dlg).getByRole("alert")).toHaveTextContent("Tối thiểu 10 ký tự.");
+  });
+
+  it("Thêm cơ sở giết mổ trên trang riêng: thiếu trường → lỗi theo trường; mã mộc dấu trùng → lỗi; hợp lệ → về danh sách", async () => {
+    nav.path = "/kn/cnts/danh-muc/cnts_slaughter_facility/them-moi";
+    nav.params = { type: "cnts_slaughter_facility" };
+    const user = userEvent.setup();
+    render(<CntsCatalogItemFormScreen />);
+    expect(screen.getByRole("heading", { level: 1, name: /Thêm cơ sở giết mổ/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Hủy" })).toHaveAttribute("href", "/kn/cnts/danh-muc?tab=cnts_slaughter_facility");
+    await screen.findByLabelText(/Mã xã\/phường\/đặc khu/);
+    await user.click(screen.getByRole("button", { name: "Lưu" }));
+    expect(screen.getAllByRole("alert").filter((a) => a.textContent === "Bắt buộc nhập.").length).toBeGreaterThanOrEqual(4); // Mã, Tên, Xã, Loại cơ sở
+    expect(push).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText(/^Mã \*$/), "CS_MOI");
+    await user.type(screen.getByLabelText(/^Tên \*$/), "Cơ sở mới");
+    await user.type(screen.getByLabelText(/Mã xã\/phường\/đặc khu/), "30292");
+    await user.selectOptions(screen.getByLabelText(/Loại cơ sở/), "nho_le");
+    await user.type(screen.getByLabelText(/Mã số khắc mộc dấu gia súc \(GS\)/), "91.589.05.1");
     await user.click(screen.getByRole("button", { name: "Lưu" }));
     expect(await screen.findByText(/đã thuộc cơ sở giết mổ khác/)).toBeTruthy();
-    await user.clear(screen.getByLabelText("Mã số khắc mộc dấu gia súc (GS)"));
-    await user.type(screen.getByLabelText("Mã số khắc mộc dấu gia súc (GS)"), "91.600.01");
+    await user.clear(screen.getByLabelText(/Mã số khắc mộc dấu gia súc \(GS\)/));
+    await user.type(screen.getByLabelText(/Mã số khắc mộc dấu gia súc \(GS\)/), "91.600.01");
     await user.click(screen.getByRole("button", { name: "Lưu" }));
-    await waitFor(() => expect(screen.getByText("Cơ sở mới")).toBeTruthy());
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/kn/cnts/danh-muc?tab=cnts_slaughter_facility"));
+  });
+
+  it("Vật nuôi: Thứ tự cột âm / thập phân / quá 999 bị chặn (R-A1), không gọi API", async () => {
+    nav.path = "/kn/cnts/danh-muc/cnts_species/them-moi";
+    nav.params = { type: "cnts_species" };
+    const user = userEvent.setup();
+    render(<CntsCatalogItemFormScreen />);
+    const order = await screen.findByLabelText(/Thứ tự cột/);
+    await user.type(screen.getByLabelText(/^Mã \*$/), "VN_MOI");
+    await user.type(screen.getByLabelText(/^Tên \*$/), "Vật nuôi mới");
+    await user.selectOptions(screen.getByLabelText(/^Nhóm/), "gia_cam");
+    await user.type(screen.getByLabelText(/Đơn vị tính/), "con");
+    for (const [raw, msg] of [
+      ["-1", "Không được nhập số âm."],
+      ["1,5", "Chỉ nhập số nguyên."],
+      ["1000", "Không được lớn hơn 999."],
+    ] as const) {
+      await user.clear(order);
+      await user.type(order, raw);
+      await user.click(screen.getByRole("button", { name: "Lưu" }));
+      expect(screen.getAllByRole("alert").map((a) => a.textContent)).toContain(msg);
+    }
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("Sửa mục: trang riêng có mã cố định, Hủy về trang chi tiết; trang chi tiết có các giá trị theo ngày", async () => {
+    nav.path = "/kn/cnts/danh-muc/cnts_species/TRAU/sua";
+    nav.params = { type: "cnts_species", code: "TRAU" };
+    const user = userEvent.setup();
+    const { unmount } = render(<CntsCatalogItemFormScreen />);
+    const code = await screen.findByLabelText(/^Mã \*$/);
+    expect(code).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Hủy" })).toHaveAttribute("href", "/kn/cnts/danh-muc/cnts_species/TRAU");
+    await user.clear(screen.getByLabelText(/^Tên \*$/));
+    await user.type(screen.getByLabelText(/^Tên \*$/), "Trâu ta");
+    await user.click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/kn/cnts/danh-muc/cnts_species/TRAU"));
+    unmount();
+    nav.path = "/kn/cnts/danh-muc/cnts_species/TRAU";
+    render(<CntsCatalogItemScreen />);
+    expect(await screen.findByRole("heading", { level: 1, name: /Trâu ta/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Sửa" })).toHaveAttribute("href", "/kn/cnts/danh-muc/cnts_species/TRAU/sua");
+    expect(await screen.findByRole("table", { name: "Các giá trị có hiệu lực từ ngày" })).toBeTruthy();
+  });
+
+  it("gốc route danh mục cho cả Phòng CNTS và Admin › Phòng ban", () => {
+    expect(catalogBase("/kn/cnts/danh-muc/cnts_species/them-moi")).toBe("/kn/cnts/danh-muc");
+    expect(catalogBase("/kn/phong-ban/chan_nuoi_thuy_san/danh-muc-cnts/cnts_species/HEO/sua")).toBe("/kn/phong-ban/chan_nuoi_thuy_san/danh-muc-cnts");
   });
 
   it("Cấp Tỉnh chỉ xem: không có nút Thêm, ngưỡng mặc định đọc từ tham số", async () => {

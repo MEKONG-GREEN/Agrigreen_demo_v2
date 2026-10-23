@@ -1,5 +1,6 @@
 // Danh mục Chăn nuôi – Thủy sản (W11.41, BRD CNTS v3.7 FN-06 / UR-ADM-04). Định nghĩa tab + trường thuộc tính của
 // từng danh mục cnts_* — khớp attrSpecs của pf/masterdata (internal/platform/masterdata/domain/cnts.go).
+import { parseNumberInput, type NumberRule } from "@/components/form";
 
 export type CntsCatalog =
   | "cnts_species"
@@ -249,10 +250,13 @@ export function validateAttrs(tab: CatalogTab, attrs: Record<string, string>): R
   const errs: Record<string, string> = {};
   for (const f of tab.fields) {
     const v = (attrs[f.key] ?? "").trim();
-    if ("required" in f && f.required && !v) errs[f.key] = "Bắt buộc";
-    if (f.kind === "int" && v && !/^\d{1,3}$/.test(v)) errs[f.key] = "Số nguyên 0–999";
+    if ("required" in f && f.required && !v) errs[f.key] = "Bắt buộc nhập.";
+    if (f.kind === "int" && v) {
+      const p = parseNumberInput(v, INT_RULE);
+      if (!p.ok) errs[f.key] = p.error;
+    }
   }
-  if (tab.id === "cnts_vaccination_schedule" && !attrs.model_type && !attrs.breed) errs.model_type = "Gắn loại mô hình hoặc giống";
+  if (tab.id === "cnts_vaccination_schedule" && !attrs.model_type && !attrs.breed) errs.model_type = "Gắn loại mô hình hoặc giống.";
   if (tab.id === "cnts_vaccination_schedule" && parseDoses(attrs.doses).length === 0) errs.doses = "Cần ít nhất một mũi";
   if (tab.id === "cnts_slaughter_facility") {
     const gc = codes(attrs.stamp_codes_gc);
@@ -260,6 +264,20 @@ export function validateAttrs(tab: CatalogTab, attrs: Record<string, string>): R
     if (dup) errs.stamp_codes_gc = `Mã ${dup} trùng giữa GS và GC`;
   }
   return errs;
+}
+
+/** Ô số nguyên của danh mục (thứ tự cột…): 0–999, không âm (R-A1; máy chủ kiểm `^\d{1,3}$`). */
+export const INT_RULE: NumberRule = { integer: true, max: 999 };
+
+/** Chuẩn hóa ô số người gõ ("1.000" kiểu vi-VN → "1000") trước khi gửi; ô khác giữ nguyên. Gọi sau `validateAttrs`. */
+export function normalizeAttrs(tab: CatalogTab, attrs: Record<string, string>): Record<string, string> {
+  const out = { ...attrs };
+  for (const f of tab.fields) {
+    if (f.kind !== "int" || !out[f.key]?.trim()) continue;
+    const p = parseNumberInput(out[f.key]!, INT_RULE);
+    if (p.ok) out[f.key] = p.value;
+  }
+  return out;
 }
 
 /** Bỏ thuộc tính rỗng (máy chủ coi thuộc tính vắng = không đặt) và facility_ref (máy chủ cấp, giữ cố định). */
