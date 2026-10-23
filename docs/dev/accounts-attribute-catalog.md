@@ -22,3 +22,5 @@ Có ca thuần cho snapshot/clone/hai instance, cấu hình lỗi, xung đột C
 - Production không đổi: các ca handler cũ đã PASS trong lượt 114.997s; domain 1.896s, keycloak 1.213s, port 1.010s, api-platform/assembly 86.707s PASS. Không chạy lại các gói đã đạt.
 - build/vet/modgen-check/migratecheck/archlint/contractcheck/docscheck/knboundary đều exit 0; vet accounts và lint toàn repo sau sửa fixture đều 0 (0 issues). Boundary giữ 314, gofmt chỉ hai testdata archlint có sẵn; 35 golden KHTC không đổi.
 - Hai cụm PG riêng 52913/fcb100e07162 và 56767/b65c73023271 đã dừng và dọn; không chạm PG chung.
+
+Ghép với #68: kiểm LevelLabel chạy ngay sau normalizeAssignment cả khi có AssignmentRules; provider cho phép mã không thuộc catalog vẫn bị từ chối, còn lỗi provider giữ thứ tự trước kiểm catalog. Rebase giữ đồng thời Roles, SessionPolicies, Navigation, AssignmentRules và Attributes; không rollout owner catalog qua assembly trong gói này.

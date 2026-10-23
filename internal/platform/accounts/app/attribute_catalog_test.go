@@ -85,3 +85,29 @@ func TestAttributeCatalogAssignmentRetainsNativeErrorPrecedence(t *testing.T) {
 		})
 	}
 }
+
+// The owner write-policy and the instance read catalog are separate authorities.
+// A permissive provider must not admit a management code readers cannot resolve;
+// conversely, its earlier denial must retain the native error order.
+func TestAttributeCatalogBoundsConfiguredAssignmentRules(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		denied error
+		field  string
+	}{
+		{name: "permissive owner cannot admit absent level", field: "mgmt_level"},
+		{name: "owner denial remains first", denied: port.AssignmentRuleError{Field: "role", Msg: "fixture denied"}, field: "role"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rules := &assignmentRuleProbe{denied: tc.denied}
+			svc := Service{Clock: clock.System{}, Attributes: port.LegacyAttributeCatalog(), AssignmentRules: rules}
+			_, err := svc.checkAssignment(context.Background(), nil, domain.AssignmentInput{
+				Role: port.KNTinh, OrgRef: ids.New(), Departments: []string{"depta"}, MgmtLevel: "owner_level_absent_from_catalog",
+			}, nil)
+			got := problem.From(err)
+			if rules.calls != 1 || got.Code != problem.Validation.Code || len(got.Errors) != 1 || got.Errors[0].Field != tc.field {
+				t.Fatalf("provider/catalog boundary or error order changed: calls=%d problem=%+v", rules.calls, got)
+			}
+		})
+	}
+}
