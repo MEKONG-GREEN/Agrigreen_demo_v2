@@ -140,3 +140,17 @@ func TestAssignmentRulesConfiguredDenialNeverFallsBack(t *testing.T) {
 		}
 	}
 }
+
+func TestAssignmentRulesTypedNilErrorIsDependencyFailure(t *testing.T) {
+	var missing *port.AssignmentRuleError
+	for _, input := range []error{missing, errors.Join(missing)} {
+		got := fieldProblem(input)
+		var dependency *problem.Problem
+		if !errors.As(got, &dependency) || dependency.Code != ErrDependency.Code || dependency.Status < 500 {
+			t.Fatal("typed nil provider error did not fail closed as configuration")
+		}
+		if got.Error() == "" {
+			t.Fatal("dependency error is not safe to log")
+		}
+	}
+}

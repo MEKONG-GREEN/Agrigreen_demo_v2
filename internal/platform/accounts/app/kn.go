@@ -102,6 +102,10 @@ func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.Assig
 	}
 	out := checkedAssignment{in: in}
 	if in.Role == port.KNAdmin {
+		// This native scope invariant is not delegated to an owner provider.
+		if len(in.Departments) > 0 || len(in.Communes) > 0 {
+			return checkedAssignment{}, fieldProblem(domain.FieldError{Field: "department_codes", Msg: domain.MsgKNAdminScope})
+		}
 		if !a.p.Has(authz.RolePlatformAdmin) || !slices.Contains(targetRealm, authz.RolePlatformAdmin) {
 			return checkedAssignment{}, ErrKNAdminGrant
 		}
@@ -154,18 +158,19 @@ func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.Assig
 		}
 	}
 	out.unit = unit
-	if in.Role == port.KNXa {
-		if len(in.Communes) == 0 {
-			out.warnings = append(out.warnings, warnNoCommunes)
-		} else {
-			sc, err := s.scopeOf(ctx, a.p.TenantID, o.Ref)
-			if err != nil {
-				return checkedAssignment{}, err
-			}
-			for _, c := range in.Communes {
-				if c == o.AdminUnitCode || !sc.Allows(c) {
-					return checkedAssignment{}, ErrCommuneInvalid.With("commune_code", c)
-				}
+	if in.Role == port.KNXa && len(in.Communes) == 0 {
+		out.warnings = append(out.warnings, warnNoCommunes)
+	}
+	// Every assigned commune stays inside the current node, including owner
+	// roles which a configured AssignmentRules provider permits to carry communes.
+	if len(in.Communes) > 0 {
+		sc, err := s.scopeOf(ctx, a.p.TenantID, o.Ref)
+		if err != nil {
+			return checkedAssignment{}, err
+		}
+		for _, c := range in.Communes {
+			if c == o.AdminUnitCode || !sc.Allows(c) {
+				return checkedAssignment{}, ErrCommuneInvalid.With("commune_code", c)
 			}
 		}
 	}

@@ -142,7 +142,12 @@ func fieldProblem(err error) error {
 		return problem.Validation.WithField(rule.Field, rule.Msg)
 	}
 	var rulePtr *port.AssignmentRuleError
-	if errors.As(err, &rulePtr) && rulePtr != nil {
+	if errors.As(err, &rulePtr) {
+		if rulePtr == nil {
+			// A typed nil error is a broken configured provider, not validation.
+			// Do not attach it as a cause: its value-receiver Error method panics.
+			return ErrDependency.WithDetail("cấu hình quy tắc gán không hợp lệ")
+		}
 		return problem.Validation.WithField(rulePtr.Field, rulePtr.Msg)
 	}
 	return err

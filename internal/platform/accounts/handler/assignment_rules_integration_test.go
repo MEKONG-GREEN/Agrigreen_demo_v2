@@ -203,3 +203,52 @@ func TestAssignmentRulesCannotBypassNativeGuardsThroughHTTP(t *testing.T) {
 	wantCode(t, grant(prov, asg(port.KNXa, f.p92, []string{deptTT}, "31120")), http.StatusForbidden, "accounts.out_of_scope", "node outside caller scope")
 	wantCode(t, grant(f.root, asg(port.KNAdmin, uuid.Nil, nil)), http.StatusForbidden, "accounts.kn_admin_grant", "Admin requires target platform_admin")
 }
+
+func TestAssignmentRulesPermissiveProviderCannotExpandCommunesOrAdminScope(t *testing.T) {
+	f := newKNFixture(t)
+	user, _, _ := f.createKN("Kiểm phạm vi lõi", asg(port.KNTinh, f.p91, []string{deptTT}))
+	if err := f.dir.SetOrgRef(context.Background(), user, f.p91); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.dir.AddRealmRoles(context.Background(), user, []string{"platform_admin"}); err != nil {
+		t.Fatal(err)
+	}
+	rules := &assignmentRulesHTTP{}
+	srv := assignmentRulesServer(t, f, rules)
+	path := "/v1/accounts/users/" + user.String() + "/assignments"
+	counts := func() [2]int {
+		var out [2]int
+		err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
+			return tx.QueryRow(context.Background(), `SELECT (SELECT count(*) FROM pf_accounts.role_assignment_current WHERE user_ref=$1),(SELECT count(*) FROM pf_accounts.role_assignment_event WHERE user_ref=$1)`, user).Scan(&out[0], &out[1])
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	before := counts()
+	for _, test := range []struct {
+		name string
+		in   map[string]any
+		code string
+	}{
+		{"province outside commune", asg(port.KNTinh, f.p91, []string{deptTT}, "31120"), "accounts.commune_invalid"},
+		{"national outside commune", asg(port.KNTW, f.p91, []string{deptTT}, "31120"), "accounts.commune_invalid"},
+		{"admin department", asg(port.KNAdmin, uuid.Nil, []string{deptTT}), "validation_failed"},
+		{"admin commune", asg(port.KNAdmin, uuid.Nil, nil, "30292"), "validation_failed"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got := f.req(srv, f.root, http.MethodPost, path, test.in, nil)
+			wantCode(t, got, http.StatusUnprocessableEntity, test.code, test.name)
+			if after := counts(); after != before {
+				t.Fatalf("rejected scope wrote ledger/current: before=%v after=%v", before, after)
+			}
+		})
+	}
+	var missing *port.AssignmentRuleError
+	rules.deny(missing, nil)
+	got := f.req(srv, f.root, http.MethodPost, path, asg(port.KNXa, f.p91, []string{deptTT}, "30292"), nil)
+	if got.status < 500 || got.status >= 600 || counts() != before {
+		t.Fatalf("typed nil provider error did not fail safely: status=%d", got.status)
+	}
+}
