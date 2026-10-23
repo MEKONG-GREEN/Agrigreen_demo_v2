@@ -168,6 +168,8 @@ WsItem _item(
   String content = 'Kiểm tra rầy nâu HTX Mỹ Hòa',
   String? participants,
   String? note,
+  String? commune = '30280',
+  String? location = 'Ấp 1',
 }) => WsItem(
   id: id,
   day: day,
@@ -175,6 +177,8 @@ WsItem _item(
   startTime: start,
   endTime: end,
   content: content,
+  communeCode: commune,
+  location: location,
   participants: participants,
   note: note,
 );
@@ -232,6 +236,33 @@ void main() {
       bad(_item('a', _week, end: '24:00'), 'end_time');
       bad(_item('a', _week, start: '10:00', end: '09:00'), 'end_time');
       bad(_item('a', _week, start: null, end: '09:00'), 'start_time');
+      // Log bug TT-05/CN-04: Địa điểm bắt buộc (chữ hoặc vị trí); cán bộ có xã phụ trách bắt buộc Xã/phường.
+      bad(_item('a', _week, location: ' '), 'location');
+      validateItem(
+        WsItem(
+          id: 'g',
+          day: _week,
+          session: WsSession.morning,
+          content: 'Thăm đồng',
+          place: const WsPlace(lat: 10, lon: 105),
+        ),
+        _week,
+      );
+      expect(
+        () => validateItem(
+          _item('a', _week, commune: null),
+          _week,
+          requireCommune: true,
+        ),
+        throwsA(
+          isA<WorkScheduleError>().having(
+            (e) => e.field,
+            'field',
+            'commune_code',
+          ),
+        ),
+      );
+      validateItem(_item('a', _week, commune: null), _week);
       validateItem(_item('a', _week, start: '09:00', end: '09:00'), _week);
     });
 

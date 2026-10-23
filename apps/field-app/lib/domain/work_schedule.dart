@@ -338,14 +338,29 @@ const maxScheduleItems = 100;
 
 /// Kiểm một mục như máy chủ: nội dung 3..500 ký tự, ngày trong tuần, buổi,
 /// giờ `HH:MM`, giờ kết thúc ≥ giờ bắt đầu, độ dài trường, không ghi SĐT/CCCD
-/// trong thành phần phối hợp, ghi chú (RB-3).
-void validateItem(WsItem it, DateTime weekStart) {
+/// trong thành phần phối hợp, ghi chú (RB-3). Log bug TT-05/CN-04: Địa điểm bắt
+/// buộc (chữ hoặc vị trí trên bản đồ); cán bộ có xã phụ trách ([requireCommune])
+/// bắt buộc Xã/phường.
+void validateItem(
+  WsItem it,
+  DateTime weekStart, {
+  bool requireCommune = false,
+}) {
   final c = it.content.trim();
   if (c.length < 3) {
     throw WorkScheduleError('content', 'Nội dung công việc tối thiểu 3 ký tự.');
   }
   if (c.length > 500) {
     throw WorkScheduleError('content', 'Nội dung công việc tối đa 500 ký tự.');
+  }
+  if (requireCommune && (it.communeCode?.trim().isEmpty ?? true)) {
+    throw WorkScheduleError('commune_code', 'Xã/phường bắt buộc.');
+  }
+  if ((it.location?.trim().isEmpty ?? true) && it.place == null) {
+    throw WorkScheduleError(
+      'location',
+      'Địa điểm bắt buộc — nhập địa điểm hoặc chọn vị trí.',
+    );
   }
   final offset = it.day.difference(weekStart).inDays;
   if (it.day.isBefore(weekStart) || offset > 6) {

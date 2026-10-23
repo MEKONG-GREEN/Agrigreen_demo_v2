@@ -52,12 +52,13 @@ class WeekSchedule {
   /// W11.46: phòng ban dùng check-in GPS (CNTS) — hiện nút "Check-in".
   final bool checkinEnabled;
 
-  /// Mục được check-in lúc [now]: phòng bật, lịch đã gửi, mục ngoài cơ quan của hôm nay, chưa check-in.
+  /// Mục được check-in lúc [now]: phòng bật, lịch ĐÃ DUYỆT (hoặc đang điều chỉnh
+  /// nhưng còn bản đã duyệt hiệu lực — log bug TT-07/CN-06, như máy chủ), mục ngoài
+  /// cơ quan của hôm nay, chưa check-in.
   bool canCheckin(WsItem i, DateTime now) =>
       checkinEnabled &&
       scheduleId != null &&
-      status != null &&
-      status != WsStatus.draft &&
+      (status == WsStatus.approved || (approvedVersion ?? 0) > 0) &&
       i.fieldWork &&
       i.checkin == null &&
       ymd(i.day) == ymd(now);
@@ -573,8 +574,8 @@ class WorkScheduleService {
   /// Thêm hoặc sửa (theo `id`) một mục. Ném [WorkScheduleError] khi sai.
   Future<WeekSchedule> upsertItem(DateTime week, WsItem item) async {
     week = mondayOf(week);
-    validateItem(item, week);
-    final (_, d) = await _editable(week);
+    final (v, d) = await _editable(week);
+    validateItem(item, week, requireCommune: v.communeCodes.isNotEmpty);
     final idx = d.items.indexWhere((i) => i.id == item.id);
     if (idx < 0 && d.items.length >= maxScheduleItems) {
       throw WorkScheduleError(
@@ -711,7 +712,7 @@ class WorkScheduleService {
       );
     }
     for (final i in d.items) {
-      validateItem(i, week);
+      validateItem(i, week, requireCommune: v.communeCodes.isNotEmpty);
     }
     // Lệnh trước chưa gửi → thay bằng lệnh mới (một POST cho trạng thái cuối).
     final prevId = d.actionId;

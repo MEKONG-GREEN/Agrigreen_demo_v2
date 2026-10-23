@@ -551,7 +551,11 @@ export class WorkScheduleStore {
       if (commune_code && c.level === "commune" && !c.communes.includes(commune_code)) errors.push({ field: f("commune_code"), reason: "Xã không thuộc phạm vi phụ trách" });
       const cooperative_ref = cleanStr(x?.cooperative_ref);
       if (cooperative_ref && !UUID_RE.test(cooperative_ref)) errors.push({ field: f("cooperative_ref"), reason: "Mã HTX không hợp lệ" });
+      // Log bug TT-05/CN-04 (như máy chủ): cán bộ xã bắt buộc Xã/phường; Địa điểm bắt buộc (chữ hoặc vị trí).
+      if (!commune_code && c.level === "commune") errors.push({ field: f("commune_code"), reason: "Xã/phường bắt buộc" });
       const location = cleanStr(x?.location);
+      const hasPlace = typeof x?.place === "object" && x.place !== null;
+      if (!location && !hasPlace) errors.push({ field: f("location"), reason: "Địa điểm bắt buộc (nhập địa điểm hoặc chọn vị trí)" });
       if (location && location.length > 200) errors.push({ field: f("location"), reason: "Tối đa 200 ký tự" });
       const participants = cleanStr(x?.participants);
       if (participants && participants.length > 500) errors.push({ field: f("participants"), reason: "Tối đa 500 ký tự" });
@@ -843,7 +847,7 @@ const it = (day: string, session: "morning" | "afternoon", start: string | null,
   content,
   commune_code: null,
   cooperative_ref: null,
-  location: null,
+  location: "Trụ sở UBND xã",
   participants: null,
   note: null,
   ...extra,
@@ -875,7 +879,7 @@ export function seedWorkSchedules(store: WorkScheduleStore): void {
     [
       it(d(prev, 0), "morning", "07:30", "11:00", "Kiểm tra đồng ruộng sau sạ", { commune_code: "91301" }),
       it(d(prev, 2), "afternoon", "13:30", "16:30", "Họp tổ khuyến nông", { commune_code: "91302" }),
-      it(d(prev, 4), "morning", null, null, "Nhập báo cáo tuần"),
+      it(d(prev, 4), "morning", null, null, "Nhập báo cáo tuần", { commune_code: "91301" }),
     ],
     [
       { kind: "submit", hoursAgo: before(80) },
@@ -895,7 +899,7 @@ export function seedWorkSchedules(store: WorkScheduleStore): void {
       it(d(cur, 0), "morning", "07:30", "11:00", "Kiểm tra rầy nâu HTX Mỹ Hòa", { commune_code: "91301", cooperative_ref: coop("HTX Mỹ Hòa") }),
       it(d(cur, 1), "morning", "08:00", "10:30", "Họp tổ khuyến nông", { commune_code: "91301" }),
       it(d(cur, 1), "afternoon", "13:30", "16:30", "Điều tra sâu bệnh ấp 3", { commune_code: "91302", location: "Ấp 3" }),
-      it(d(cur, 2), "afternoon", null, null, "Nhập báo cáo tuần"),
+      it(d(cur, 2), "afternoon", null, null, "Nhập báo cáo tuần", { commune_code: "91301" }),
       it(d(cur, 3), "morning", "07:30", "11:00", "Hướng dẫn 1P5G · Bình Đức", { commune_code: "91302", cooperative_ref: coop("HTX Bình Đức"), participants: "Cán bộ HTX, BVTV" }),
     ],
     [

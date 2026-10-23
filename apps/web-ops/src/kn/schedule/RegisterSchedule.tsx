@@ -205,6 +205,9 @@ export function RegisterSchedule({
     if (!form || !cur) return;
     const draft = { start_time: n(form.start_time), end_time: n(form.end_time) };
     if (form.content.trim().length < 3) return setFormError("Nội dung công việc bắt buộc (ít nhất 3 ký tự).");
+    // Log bug TT-05/CN-04 (máy chủ kiểm cùng quy tắc): cán bộ xã bắt buộc Xã/phường; Địa điểm bắt buộc (chữ hoặc tọa độ).
+    if (level === "commune" && !form.commune_code) return setFormError("Xã/phường bắt buộc.");
+    if (!form.location.trim() && !(form.lat.trim() && form.lon.trim())) return setFormError("Địa điểm bắt buộc — nhập địa điểm cụ thể hoặc tọa độ.");
     const te = timeError(draft);
     if (te) return setFormError(te);
     if (looksLikePersonalNumber(form.participants) || looksLikePersonalNumber(form.note)) return setFormError("Không ghi số điện thoại, số CCCD vào thành phần phối hợp hoặc ghi chú.");
@@ -423,7 +426,7 @@ export function RegisterSchedule({
               {editable ? (
                 <ItemForm
                   form={form}
-                  setForm={setForm}
+                  setForm={(f) => (setForm(f), setFormError(null))}
                   days={days}
                   communes={communes}
                   level={level}
@@ -540,9 +543,11 @@ function ItemForm({
         <PiiHint text={form.content} />
       </div>
       <div className="field">
-        <label htmlFor="ws-commune">Địa điểm: xã/phường</label>
+        <label htmlFor="ws-commune" className={level === "commune" ? "req" : undefined}>
+          Địa điểm: xã/phường
+        </label>
         <select id="ws-commune" className="select" value={form.commune_code} onChange={(e) => set({ commune_code: e.target.value, cooperative_ref: "" })}>
-          <option value="">{level === "commune" ? "— Không chọn —" : "— Không chọn / ngoài danh sách —"}</option>
+          <option value="">{level === "commune" ? "— Chọn xã/phường —" : "— Không chọn / ngoài danh sách —"}</option>
           {communes.map((c) => (
             <option key={c.code} value={c.code}>
               {c.name}
@@ -562,8 +567,11 @@ function ItemForm({
         </select>
       </div>
       <div className="field">
-        <label htmlFor="ws-location">Địa điểm cụ thể</label>
+        <label htmlFor="ws-location" className="req">
+          Địa điểm cụ thể
+        </label>
         <input id="ws-location" className="input" maxLength={200} placeholder="Ấp, cánh đồng, trụ sở…" value={form.location} onChange={(e) => set({ location: e.target.value })} />
+        <span className="hint">Bắt buộc nhập địa điểm hoặc tọa độ bên dưới.</span>
       </div>
       <div className="field">
         <label htmlFor="ws-lat">Tọa độ địa điểm (vĩ độ, kinh độ)</label>
@@ -571,7 +579,7 @@ function ItemForm({
           <input id="ws-lat" className="input" inputMode="decimal" placeholder="10.25341" aria-label="Vĩ độ" value={form.lat} onChange={(e) => set({ lat: e.target.value })} />
           <input id="ws-lon" className="input" inputMode="decimal" placeholder="105.9721" aria-label="Kinh độ" value={form.lon} onChange={(e) => set({ lon: e.target.value })} />
         </div>
-        <span className="hint">Không bắt buộc — dùng để so khoảng cách khi check-in (phòng có check-in).</span>
+        <span className="hint">Dùng để so khoảng cách khi check-in (phòng có check-in). Có tọa độ thì có thể bỏ trống địa điểm cụ thể.</span>
       </div>
       <div className="field">
         <label htmlFor="ws-participants">Thành phần phối hợp</label>

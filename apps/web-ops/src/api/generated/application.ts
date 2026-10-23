@@ -24412,7 +24412,7 @@ export interface operations {
             };
             /** @description extension.schedule_not_found | extension.schedule_item_not_found */
             404: components["responses"]["Problem"];
-            /** @description extension.checkin_exists | extension.checkin_disabled | extension.checkin_not_registered */
+            /** @description extension.checkin_exists | extension.checkin_disabled | extension.checkin_not_registered | extension.checkin_not_approved */
             409: components["responses"]["Problem"];
             /** @description validation_failed */
             422: components["responses"]["Problem"];

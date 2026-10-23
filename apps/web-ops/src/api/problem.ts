@@ -161,6 +161,7 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "extension.checkin_disabled": "Phòng ban này không dùng check-in lịch công tác.",
   "extension.checkin_exists": "Mục công tác đã check-in. Không thể sửa check-in đã gửi.",
   "extension.checkin_not_registered": "Gửi lịch công tác duyệt trước khi check-in.",
+  "extension.checkin_not_approved": "Lịch công tác chưa được duyệt — chỉ check-in theo lịch đã duyệt.",
   "extension.schedule_item_not_found": "Không có mục này trong lịch công tác hiện hành.",
   "extension.cnts_alert_not_found": "Không có cảnh báo này (hoặc ngoài xã được phân công).",
   "extension.cnts_alert_transition": "Cảnh báo đã đóng hoặc chưa được giao — tải lại để xem trạng thái mới.",

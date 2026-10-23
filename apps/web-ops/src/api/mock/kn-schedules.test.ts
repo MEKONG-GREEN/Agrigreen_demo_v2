@@ -34,7 +34,7 @@ function code<T>(r: Result<T>): string {
   return r.ok ? "ok" : r.code;
 }
 
-const item = (day: string, extra: Partial<WsItemInput> = {}): WsItemInput => ({ day, session: "morning", start_time: "07:30", end_time: "10:00", content: "Thăm đồng lúa", ...extra });
+const item = (day: string, extra: Partial<WsItemInput> = {}): WsItemInput => ({ day, session: "morning", start_time: "07:30", end_time: "10:00", content: "Thăm đồng lúa", commune_code: "91301", location: "Ấp 1", ...extra });
 
 let now = T0;
 let store: WorkScheduleStore;
