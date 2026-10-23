@@ -236,6 +236,8 @@ func TestFN_XA_03_04_MachineCountsDeclareTotalsLog(t *testing.T) {
 		t.Fatalf("tổng máy của HTX cho pf/party: %d %v", n, err)
 	}
 
+	// TT-10: số 0 không phải khai báo; bỏ dòng để ghi removed.
+	mcWant(t, xa.put(m.c1, key(), map[string]any{"lines": []any{line("MLD", 0)}}), http.StatusUnprocessableEntity, "mechanization.machine_quantity_invalid", "số không")
 	// Quy tắc số lượng và loại máy.
 	mcWant(t, xa.put(m.c1, key(), map[string]any{"lines": []any{line("MLD", -1)}}), http.StatusUnprocessableEntity, "mechanization.machine_quantity_invalid", "âm")
 	mcWant(t, xa.put(m.c1, key(), map[string]any{"lines": []any{line("MLD", 1.5)}}), http.StatusUnprocessableEntity, "mechanization.machine_quantity_invalid", "không nguyên")

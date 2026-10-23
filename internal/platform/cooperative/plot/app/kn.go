@@ -187,11 +187,11 @@ func (c knCaller) input(attrs store.KNAttrs) *KNInput {
 	return in
 }
 
-// farmerRef ghi tên nông dân vào kho định danh (chủ thể "người") và trả mã tham chiếu; tên rỗng → Nil.
+// farmerRef kiểm tên chủ hộ bắt buộc (TT-11), rồi ghi vào kho định danh và trả mã tham chiếu.
 func (s *Service) farmerRef(ctx context.Context, name, commune string) (uuid.UUID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return uuid.Nil, nil
+		return uuid.Nil, problem.Validation.WithField("farmer_name", "bắt buộc")
 	}
 	if utf8.RuneCountInString(name) > domain.MaxFarmerName {
 		return uuid.Nil, problem.Validation.WithField("farmer_name", "tối đa 200 ký tự")
