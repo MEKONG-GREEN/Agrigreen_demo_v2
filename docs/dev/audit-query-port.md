@@ -31,3 +31,6 @@ Không có Excel endpoint hoặc bypass DLP. SourceBuilder reports hiện chưa 
 Review 23/10: From/To được canonical UTC/microsecond trước validation, filter hash, SQL và kiểm miền sau đọc; khoảng nhỏ hơn một microsecond co về rỗng bị từ chối. Receipt giữ From/To/AsOf, FilterActorRef (người bị tra; ActorRef là người đọc), Department/Module/Action/Limit và PurposeCode. Purpose hiện chỉ có allowlist `audit_view`, do server chọn; HTTP không nhận purpose tự do. Recorder #73 phải lưu các trường này cùng hash/returned refs để tra ngược được ai đã xem gì.
 
 Ghi nhận các lần bị từ chối (thiếu MFA, tenant lệch, owner Authorize từ chối) và index account_event(tenant_id, recorded_at) vẫn là phần việc owner #73; gói này chưa xác nhận các chức năng đó. Không dùng receipt thành công để giả vờ đã ghi nhận denied reads.
+## Kiểm lại sau rebase dev 24/10
+
+Rebase giữ cả RoleCatalog/SessionPolicies/Navigation của dev và AuditRegistry/AuditAccess; không đổi nội dung policy audit đã review. Regression HTTP cấu hình rõ catalog vai và cả hai projection session owner, nhưng KN tỉnh vẫn403; Admin không MFA vẫn403; thiếu registry/recorder vẫn503; owner denial không fallback; recorder failure không trả dữ liệu. Projection owner không được nâng nhãn hỗ trợ thành quyền Admin thực tế.

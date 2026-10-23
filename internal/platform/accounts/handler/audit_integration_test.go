@@ -173,7 +173,22 @@ func TestAuditNativeHTTPFiltersIsolationAndReadOnly(t *testing.T) {
 func TestAuditHTTPMissingDependenciesAdminMFAAndRecorderFailure(t *testing.T) {
 	f := newFixture(t)
 	obs := &auditObserver{Beginner: db.ForModule(f.env.Pool(t, migrations.PF, dbadmin.AppPlatform), accounts.DBModule)}
-	mod := accounts.New(obs, clock.System{}, accounts.Deps{})
+	projectionCalls := 0
+	t.Cleanup(func() {
+		if projectionCalls != 0 {
+			t.Error("native audit consulted session owner projections instead of actual Admin/MFA")
+		}
+	})
+	mod := accounts.New(obs, clock.System{}, accounts.Deps{Roles: port.LegacyRoleCatalog(), SessionPolicies: port.SessionPolicies{
+		SupportAudit: func(context.Context) (port.SupportAuditContext, error) {
+			projectionCalls++
+			return port.SupportAuditContext{Audience: "kn-web", Department: "fixture", Reason: "support label"}, nil
+		},
+		DefaultUnit: func(context.Context) (uuid.UUID, bool, error) {
+			projectionCalls++
+			return f.national, true, nil
+		},
+	}})
 	reg, err := port.NewAuditRegistry(mod.NativeAuditSource())
 	if err != nil {
 		t.Fatal(err)
@@ -195,7 +210,7 @@ func TestAuditHTTPMissingDependenciesAdminMFAAndRecorderFailure(t *testing.T) {
 		return err
 	}, RecordRead: func(context.Context, port.AuditReadReceipt) error { recordCalls++; return nil }}
 	mod.UseAudit(reg, access)
-	officer := f.as(f.tenant, f.team30292, "kn_officer")
+	officer := f.as(f.tenant, f.team30292, "kn_tinh")
 	if r := auditHTTP(t, srv.URL, officer.token, q); r.status != http.StatusForbidden || obs.calls != 0 {
 		t.Fatal("non-Admin read audit")
 	}
