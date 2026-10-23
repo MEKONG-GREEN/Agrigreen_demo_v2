@@ -75,7 +75,7 @@ export function readyItems(tables) {
   const entries = new Map();
   function visit(value) {
     if (!value || typeof value !== "object") return;
-    if (typeof value.Key === "string" && !value.ComingSoon) {
+    if (typeof value.Key === "string" && !value.ComingSoon && !Array.isArray(value.Items)) {
       const previous = entries.get(value.Key);
       if (previous && previous.Route !== value.Route) throw Error(`ambiguous ready menu key ${value.Key}`);
       entries.set(value.Key, value);

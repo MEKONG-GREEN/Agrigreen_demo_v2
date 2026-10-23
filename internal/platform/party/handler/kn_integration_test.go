@@ -331,7 +331,7 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	r = xa.appDo(http.MethodGet, "/v1/menu", nil)
 	wantStatus(t, r, http.StatusOK, "menu Cấp Xã")
 	if str(r.body, "audience") != port.AudienceXa || str(r.body, "department", "code") != "trong_trot" ||
-		str(r.body, "default_route") != "/kn/nhiem-vu/cong-viec" || str(r.body, "menu_version") != "kn.menu/v5" ||
+		str(r.body, "default_route") != "/kn/nhiem-vu/cong-viec" || str(r.body, "menu_version") != "kn.menu/v6" ||
 		!slices.Equal(groupKeys(r), []string{"dieu_hanh", "bao_cao", "du_lieu", "dung_chung"}) || r.hdr.Get("Cache-Control") != "no-store" {
 		t.Fatalf("menu Cấp Xã: %v %v", r.body, r.hdr)
 	}
@@ -394,17 +394,17 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments/"+cn+"/status", map[string]any{"status": "active"}), http.StatusCreated, "bật phòng ban")
 	r = xa.appDo(http.MethodGet, "/v1/menu?department=chan_nuoi_thuy_san", nil)
 	if r.status != http.StatusOK || str(r.body, "department", "menu_profile") != port.MenuProfileChanNuoiThuySan ||
-		str(r.body, "default_route") != "/kn/nhiem-vu/cong-viec" || slices.Contains(groupKeys(r), "du_lieu") ||
-		!slices.Equal(groupKeys(r), []string{"dieu_hanh", "nghiep_vu", "bao_cao", "dung_chung"}) {
-		t.Fatalf("menu phòng ban vừa bật (khuôn CNTS kn.menu/v3): %d %v", r.status, r.body)
+		str(r.body, "default_route") != "/kn/cnts/bao-cao-ky" ||
+		!slices.Equal(groupKeys(r), []string{"dieu_hanh", "bao_cao", "du_lieu", "dung_chung"}) {
+		t.Fatalf("menu phòng ban vừa bật (CNTS Cấp Xã theo UP-03, kn.menu/v6): %d %v", r.status, r.body)
 	}
 	// Mục của module chưa có: "Sắp có", không bấm được.
 	if raw, _ := json.Marshal(r.body); !strings.Contains(string(raw), `"status":"coming_soon","status_label":"Sắp có"`) {
 		t.Fatalf("mục Sắp có: %s", raw)
 	}
-	// W11.42: "Báo cáo kỳ CNTS" của Cấp Xã đã mở.
-	if keys := menuKeys(r); !slices.Contains(keys, "xa.cnts.bao_cao_ky") {
-		t.Fatalf("Cấp Xã CNTS có Báo cáo kỳ: %v", keys)
+	// W11.42 + BF-MENU (#98): "Việc cần làm" (màn Báo cáo kỳ CNTS) của Cấp Xã đã mở.
+	if keys := menuKeys(r); !slices.Contains(keys, "xa.cnts.viec_can_lam") {
+		t.Fatalf("Cấp Xã CNTS có Việc cần làm: %v", keys)
 	}
 	wantStatus(t, xa.appDo(http.MethodGet, "/v1/menu", nil), http.StatusUnprocessableEntity, "hai phòng ban đang áp dụng → phải chọn")
 	if it := adminDeptItem(t, root.appDo(http.MethodGet, "/v1/menu?org_ref="+tr.p89.String(), nil), "chan_nuoi_thuy_san"); it["enabled"] != true {
