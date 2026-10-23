@@ -112,7 +112,7 @@ func New(sources ...[]byte) (*Catalog, error) {
 	}
 	c := &Catalog{}
 	if err := json.Unmarshal(raw, &c.t); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrSource, err)
+		return nil, fmt.Errorf("%w: %w", ErrSource, err)
 	}
 	c.profiles = make(map[string]map[string][]group, len(c.t.MenuProfiles))
 	for _, profile := range c.t.MenuProfiles {

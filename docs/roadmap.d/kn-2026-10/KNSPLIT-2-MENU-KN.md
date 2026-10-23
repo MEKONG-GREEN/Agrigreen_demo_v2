@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-MENU-KN (#76): builder menu KN từ nguồn WH-A (`extension.MenuCatalog` + nguồn hrm/price/contact), đăng ký route ↔ module, alias bộ menu/trình bày và từ chối phiên/bộ menu sai. Parity ca vàng 18 ca và ảnh chụp compatibility 657 ca khớp từng byte; boundary314. [Giả định](../../kn/gia-dinh/KNSPLIT-2-MENU-KN.md). Chưa nối assembly (#53), chưa đổi golden/JSON.

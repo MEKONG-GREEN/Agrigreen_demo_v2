@@ -56,7 +56,7 @@ func Compile(sources ...[]byte) (map[string]any, error) {
 	for _, raw := range sources {
 		var doc document
 		if err := decodeAny(raw, &doc); err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrSource, err)
+			return nil, fmt.Errorf("%w: %w", ErrSource, err)
 		}
 		order, err := strconv.ParseInt(doc.Order.String(), 10, 64)
 		if doc.ID == "" || ids[doc.ID] || err != nil {
@@ -88,7 +88,7 @@ func Compile(sources ...[]byte) (map[string]any, error) {
 			}
 			var value any
 			if err := decodeAny(doc.Tables[key], &value); err != nil {
-				return nil, fmt.Errorf("%w: %v", ErrSource, err)
+				return nil, fmt.Errorf("%w: %w", ErrSource, err)
 			}
 			previous, ok := tables[key]
 			merged, err := merge(previous, ok, value, key)
