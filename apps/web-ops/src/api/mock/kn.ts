@@ -69,7 +69,8 @@ export const CONTEXT_DEFAULT_ROUTES: Partial<Record<KnMenuProfile, Partial<Recor
     "kn_tinh": "/kn/bao-cao-khtc"
   },
   "chan_nuoi_thuy_san": {
-    "kn_tinh": "/kn/bao-cao-khtc"
+    "kn_tinh": "/kn/bao-cao-khtc",
+    "kn_xa": "/kn/cnts/bao-cao-ky"
   },
   "thong_tin_truyen_thong": {
     "kn_tinh": "/kn/bao-cao-khtc"

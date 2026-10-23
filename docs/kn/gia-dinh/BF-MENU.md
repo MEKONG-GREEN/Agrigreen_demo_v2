@@ -12,7 +12,7 @@ Issue #98, xếp chồng trên #76 (`knsplit2-menu-kn`). Nguồn: PRD `kn-bugfix
 | Đường dẫn | Dùng lại route của màn có sẵn. Route menu không cho `?` (`partyport.validMenuPath`) nên không gắn mã biểu bằng query; nhiều mục trỏ cùng một màn (vd T01–T07). Khi màn nhận mã biểu qua đường dẫn thì đổi route từng mục | bảng dưới |
 | Sắp có | Mục chưa có màn dùng `ComingSoon` (hiện "Sắp có", không bấm được), không có liên kết chết | bảng dưới |
 | 3 cấp | Dữ liệu TT tỉnh có 3 cấp (Báo cáo tổng hợp các xã › Báo cáo tuần › T01…). Backend (`partyport.Menus`, độ sâu ≤ 12), `menuAdapter` (đệ quy) nhận. Sidebar và `menuLinks` trên nhánh nền chỉ vẽ 2 cấp: cấp 3 hiện mờ, Báo cáo tháng / năm vẫn bấm được. Chạy đủ khi #97 (`bf-ui-kit`) gộp | `shell.test.tsx` |
-| Trang đích | CNTS xã không còn "Công việc cần làm" của Trồng trọt → trang đích là mục bật đầu tiên `/kn/cnts/bao-cao-ky` (Việc cần làm). CNTS tỉnh giữ chính sách KHTC-DEFAULT-NAV (`/kn/bao-cao-khtc`) | `builder_test.go`, `kn_integration_test.go` |
+| Trang đích | CNTS xã không còn "Công việc cần làm" của Trồng trọt → thêm `contextDefaultRoutes.chan_nuoi_thuy_san.kn_xa = /kn/cnts/bao-cao-ky` (Việc cần làm) trong `navigation.json`. CNTS tỉnh giữ chính sách KHTC-DEFAULT-NAV (`/kn/bao-cao-khtc`). Bộ dựng thử của `kn_integration_test.go` không nối NavigationPolicy nên vẫn trả trang thô `/kn/nhiem-vu/cong-viec`; assembly thật có nối | `builder_test.go`, `kn-menu.json` |
 
 ### Bảng nhãn yêu cầu → route → trạng thái
 

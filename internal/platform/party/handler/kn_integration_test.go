@@ -394,7 +394,9 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments/"+cn+"/status", map[string]any{"status": "active"}), http.StatusCreated, "bật phòng ban")
 	r = xa.appDo(http.MethodGet, "/v1/menu?department=chan_nuoi_thuy_san", nil)
 	if r.status != http.StatusOK || str(r.body, "department", "menu_profile") != port.MenuProfileChanNuoiThuySan ||
-		str(r.body, "default_route") != "/kn/cnts/bao-cao-ky" ||
+		// Bộ dựng thử không nối NavigationPolicy → trang mặc định thô của đối tượng; khi chạy thật (assembly) chính sách
+		// contextDefaultRoutes đưa CNTS Cấp Xã về /kn/cnts/bao-cao-ky (builder_test, kn-menu.json).
+		str(r.body, "default_route") != "/kn/nhiem-vu/cong-viec" ||
 		!slices.Equal(groupKeys(r), []string{"dieu_hanh", "bao_cao", "du_lieu", "dung_chung"}) {
 		t.Fatalf("menu phòng ban vừa bật (CNTS Cấp Xã theo UP-03, kn.menu/v6): %d %v", r.status, r.body)
 	}
