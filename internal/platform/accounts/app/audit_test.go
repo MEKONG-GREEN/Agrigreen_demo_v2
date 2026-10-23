@@ -173,3 +173,39 @@ func TestAuditAuthorizationRecorderAndSourceFailClosed(t *testing.T) {
 		t.Fatal("unbounded window", err)
 	}
 }
+
+func TestAuditMicrosecondFiltersAndReconstructibleReceipt(t *testing.T) {
+	now := time.Date(2026, 10, 23, 9, 0, 0, 0, time.UTC)
+	at := now.Add(-time.Minute)
+	row := auditTestRow(at)
+	row.Department = "fixture_department"
+	p := auditPrincipal()
+	ctx := authz.WithPrincipal(context.Background(), p)
+	var receipts []port.AuditReadReceipt
+	reg, err := port.NewAuditRegistry(port.AuditSource{Key: "example.events", Module: "example", Read: func(_ context.Context, _ uuid.UUID, q port.AuditReadQuery) ([]port.AuditRecord, error) {
+		if !q.From.Equal(at) || q.From.Nanosecond()%1000 != 0 || q.To.Nanosecond()%1000 != 0 || q.ActorRef != row.ActorRef || q.Limit != 6 {
+			t.Fatal("reader did not receive the canonical typed filters")
+		}
+		return []port.AuditRecord{row}, nil
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := Service{Clock: clock.NewFixed(now), AuditRegistry: reg, AuditAccess: port.AuditAccess{
+		Authorize:  func(context.Context) error { return nil },
+		RecordRead: func(_ context.Context, r port.AuditReadReceipt) error { receipts = append(receipts, r); return nil },
+	}}
+	in := AuditInput{From: at.Add(125 * time.Nanosecond), To: now.Add(time.Minute + 875*time.Nanosecond), ActorRef: row.ActorRef, Department: row.Department, Module: "example", Action: row.Action, Limit: 5}
+	page, err := svc.Audit(ctx, in)
+	if err != nil || len(page.Items) != 1 || len(receipts) != 1 {
+		t.Fatal("valid nanosecond filters were rejected", err)
+	}
+	r := receipts[0]
+	if r.ActorRef != p.ActorRef || r.FilterActorRef != row.ActorRef || !r.From.Equal(at) || !r.To.Equal(now.Add(time.Minute)) || !r.AsOf.Equal(now) || r.Department != in.Department || r.Module != in.Module || r.Action != in.Action || r.Limit != 5 || r.PurposeCode != port.AuditPurposeView {
+		t.Fatal("receipt cannot reconstruct the authorized view")
+	}
+	in.From, in.To = r.From, r.To
+	if _, err = svc.Audit(ctx, in); err != nil || receipts[0].FilterHash != receipts[1].FilterHash {
+		t.Fatal("equivalent PostgreSQL precision changed the filter binding", err)
+	}
+}

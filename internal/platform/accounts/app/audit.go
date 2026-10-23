@@ -122,10 +122,13 @@ func (s *Service) Audit(ctx context.Context, in AuditInput) (AuditPage, error) {
 	if err := s.AuditAccess.Authorize(ctx); err != nil {
 		return AuditPage{}, err
 	}
+	// PostgreSQL stores timestamptz at microsecond precision. Canonicalize
+	// before validation/hash/reader checks so accepted nanosecond input cannot
+	// make SQL and the post-read domain guard disagree.
+	in.From, in.To = in.From.UTC().Truncate(time.Microsecond), in.To.UTC().Truncate(time.Microsecond)
 	if in.From.IsZero() || in.To.IsZero() || !in.To.After(in.From) || in.To.Sub(in.From) > MaxAuditWindow {
 		return AuditPage{}, auditBad("from")
 	}
-	in.From, in.To = in.From.UTC(), in.To.UTC()
 	if in.Limit == 0 {
 		in.Limit = 50
 	}
@@ -237,7 +240,7 @@ func (s *Service) Audit(ctx context.Context, in AuditInput) (AuditPage, error) {
 		page.NextCursor = &value
 	}
 	page.Items = items
-	receipt := port.AuditReadReceipt{RequestRef: ids.New(), TenantID: p.TenantID, ActorRef: p.ActorRef, ReadAt: now, FilterHash: hash, Sources: slices.Clone(keys), Returned: []port.AuditPosition{}}
+	receipt := port.AuditReadReceipt{RequestRef: ids.New(), TenantID: p.TenantID, ActorRef: p.ActorRef, ReadAt: now, FilterHash: hash, From: in.From, To: in.To, AsOf: asOf, FilterActorRef: in.ActorRef, Department: in.Department, Module: in.Module, Action: in.Action, Limit: in.Limit, PurposeCode: port.AuditPurposeView, Sources: slices.Clone(keys), Returned: []port.AuditPosition{}}
 	for _, item := range items {
 		receipt.Returned = append(receipt.Returned, auditPosition(item))
 	}

@@ -27,3 +27,7 @@ Native reader dùng giao dịch chỉ đọc r_accounts/RLS và SQL LIMIT trên 
 ## Phần chưa giao trong #70
 
 Không có Excel endpoint hoặc bypass DLP. SourceBuilder reports hiện chưa giữ được custom audit filters trong frozen job params; cần child shared riêng trước khi nối xuất. Không sửa KN, migration, schema OpenAPI, file API gom hoặc web. Không xác nhận retention khi owner recorder/chính sách dọn chưa có bằng chứng.
+
+Review 23/10: From/To được canonical UTC/microsecond trước validation, filter hash, SQL và kiểm miền sau đọc; khoảng nhỏ hơn một microsecond co về rỗng bị từ chối. Receipt giữ From/To/AsOf, FilterActorRef (người bị tra; ActorRef là người đọc), Department/Module/Action/Limit và PurposeCode. Purpose hiện chỉ có allowlist `audit_view`, do server chọn; HTTP không nhận purpose tự do. Recorder #73 phải lưu các trường này cùng hash/returned refs để tra ngược được ai đã xem gì.
+
+Ghi nhận các lần bị từ chối (thiếu MFA, tenant lệch, owner Authorize từ chối) và index account_event(tenant_id, recorded_at) vẫn là phần việc owner #73; gói này chưa xác nhận các chức năng đó. Không dùng receipt thành công để giả vờ đã ghi nhận denied reads.

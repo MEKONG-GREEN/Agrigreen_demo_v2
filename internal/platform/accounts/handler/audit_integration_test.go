@@ -228,3 +228,40 @@ func TestAuditHTTPMissingDependenciesAdminMFAAndRecorderFailure(t *testing.T) {
 		t.Fatal("unbounded read accepted")
 	}
 }
+
+func TestAuditNativeHTTPNanosecondFiltersAndReceipt(t *testing.T) {
+	f := newFixture(t)
+	nat := f.nationalAdmin()
+	user := nat.create(person(f.coop30292, "coop_manager"))
+	var first time.Time
+	var expected int
+	err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
+		return tx.QueryRow(context.Background(), `SELECT min(recorded_at),count(*) FROM pf_accounts.account_event WHERE user_ref=$1 AND actor_ref=$2 AND action='created'`, user, nat.actor).Scan(&first, &expected)
+	})
+	if err != nil || expected == 0 {
+		t.Fatal("missing native audit fixture", err)
+	}
+	mod := accounts.New(f.env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{})
+	registry, err := port.NewAuditRegistry(mod.NativeAuditSource())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var receipt port.AuditReadReceipt
+	mod.UseAudit(registry, port.AuditAccess{
+		Authorize:  func(ctx context.Context) error { _, err := authz.Require(ctx, authz.RolePlatformAdmin); return err },
+		RecordRead: func(_ context.Context, r port.AuditReadReceipt) error { receipt = r; return nil },
+	})
+	eng := httpx.NewEngine(telemetry.NewLogger("audit-nano", io.Discard), 1<<20)
+	mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier())))
+	server := httptest.NewServer(eng)
+	defer server.Close()
+	admin := f.as(f.tenant, f.national, authz.RolePlatformAdmin)
+	q := url.Values{"from": {first.Add(125 * time.Nanosecond).Format(time.RFC3339Nano)}, "to": {first.Add(time.Hour + 875*time.Nanosecond).Format(time.RFC3339Nano)}, "actor_ref": {nat.actor.String()}, "action": {"account.created"}, "module": {"accounts"}, "limit": {"50"}}
+	r := auditHTTP(t, server.URL, admin.token, q)
+	if r.status != http.StatusOK || len(auditRows(t, r)) != expected {
+		t.Fatalf("nanosecond from produced status=%d body=%v", r.status, r.body)
+	}
+	if !receipt.From.Equal(first) || !receipt.To.Equal(first.Add(time.Hour)) || receipt.FilterActorRef != nat.actor || receipt.ActorRef != admin.actor || receipt.Module != "accounts" || receipt.Action != "account.created" || receipt.Limit != 50 || receipt.PurposeCode != port.AuditPurposeView || len(receipt.Returned) != expected {
+		t.Fatal("durable recorder did not receive exact normalized filters/purpose")
+	}
+}

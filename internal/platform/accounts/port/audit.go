@@ -67,6 +67,12 @@ type AuditSource struct {
 	Read        func(context.Context, uuid.UUID, AuditReadQuery) ([]AuditRecord, error)
 }
 
+// AuditPurposeCode is a closed purpose allowlist. The query endpoint emits only
+// AuditPurposeView, chosen by the server; clients cannot submit free-text purpose.
+type AuditPurposeCode string
+
+const AuditPurposeView AuditPurposeCode = "audit_view"
+
 // AuditReadReceipt records the viewing fact, never copies source audit content.
 // RecordRead must durably persist it before any data is released. The application
 // owner supplies that implementation; this port does not imply retention.
@@ -74,8 +80,15 @@ type AuditReadReceipt struct {
 	RequestRef, TenantID, ActorRef uuid.UUID
 	ReadAt                         time.Time
 	FilterHash                     string
-	Sources                        []string
-	Returned                       []AuditPosition
+	// ActorRef above identifies the reader; FilterActorRef is the actor searched.
+	// These normalized ref/code filters make the viewing record reconstructible.
+	From, To, AsOf             time.Time
+	FilterActorRef             uuid.UUID
+	Department, Module, Action string
+	Limit                      int
+	PurposeCode                AuditPurposeCode
+	Sources                    []string
+	Returned                   []AuditPosition
 }
 type AuditAccess struct {
 	// Authorize must validate the actual application Admin session. A realm role
