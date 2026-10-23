@@ -52,7 +52,7 @@ func NewTransferRegistry(adapters []TransferAdapter, verifier TransferTokenVerif
 		if _, ok := modreg.Entry(a.Module); !ok {
 			return nil, ErrTransferConfiguration
 		}
-		if !validTransferName(a.Namespace) || a.Version == "" || len(a.Version) > 128 || seen[a.Namespace] || a.MaxBatch < 1 || a.MaxBatch > 500 {
+		if !validTransferName(a.Namespace) || forbiddenTransferNamespace(a.Namespace) || forbiddenTransferNamespace(a.Module) || a.Version == "" || len(a.Version) > 128 || seen[a.Namespace] || a.MaxBatch < 1 || a.MaxBatch > 500 {
 			return nil, ErrTransferConfiguration
 		}
 		if a.ReadFenceForRecovery == nil || a.EnterRecoveryGate == nil || a.ReadRecoveryGate == nil || a.ReadAppliedForRecovery == nil || a.RecoveryAuthority == nil || a.ReleaseSourceFence == nil || a.ReadSourceFenceRelease == nil || a.ReleaseTargetFence == nil || a.ReadTargetFenceRelease == nil || a.Authority == nil || a.FenceSource == nil || a.FenceTarget == nil || a.CheckSourceFence == nil || a.CheckTargetFence == nil || a.Scan == nil || a.Export == nil || a.ReadExport == nil || a.Apply == nil || a.ReadReceipt == nil || a.Verify == nil || a.Compensate == nil || a.ReadCompensation == nil || a.VerifyCompensation == nil {
@@ -138,6 +138,23 @@ func (r *TransferRegistry) Cutover() TransferCutoverCheck {
 		return nil
 	}
 	return r.cutover
+}
+
+// Reserved HTX/MRV/MKG collections cannot be registered, including under an
+// owner prefix. This invariant also applies when assembly misconfigures its
+// allowlist; trusted KN adapters still have to validate their exact inventory.
+func forbiddenTransferNamespace(name string) bool {
+	parts := strings.FieldsFunc(name, func(c rune) bool {
+		return c == '.' || c == '/' || c == ':' || c == '_' || c == '-'
+	})
+	for _, part := range parts {
+		for _, prefix := range []string{"cooperative", "htx", "mrv", "mkg"} {
+			if strings.HasPrefix(part, prefix) {
+				return true
+			}
+		}
+	}
+	return false
 }
 func validTransferName(s string) bool {
 	if len(s) == 0 || len(s) > 96 || s[0] < 'a' || s[0] > 'z' {

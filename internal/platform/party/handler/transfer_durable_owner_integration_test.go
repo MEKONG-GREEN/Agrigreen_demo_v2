@@ -2312,3 +2312,99 @@ func TestTenantTransferDurableOwnerMissingCoreRecoveryHistoryNeverCallsWriter(t 
 		})
 	}
 }
+
+func TestTenantTransferDurableOwnerConcurrentApplyCommitsOneReceipt(t *testing.T) {
+	o, issuer := newDurableOwner(t)
+	svc, plan := durableAcceptedPlan(t, o, issuer)
+	batch := durableReserveExport(t, o, svc, plan)
+	ref := port.TransferBatchRef{PlanID: plan.ID, BatchID: batch.ID}
+	const workers = 2
+	ready := make(chan struct{}, workers)
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	defer releaseOnce.Do(func() { close(release) })
+	type result struct {
+		receipt port.TransferReceipt
+		err     error
+	}
+	results := make(chan result, workers)
+	owners := make([]*durableOwner, workers)
+	facades := make([]port.TenantTransfers, workers)
+	for i := range workers {
+		// Separate owner/core instances: no process-local mutex or receipt cache
+		// can hide the race between two initially missing durable receipts.
+		owner := &durableOwner{pool: o.pool, pair: o.pair}
+		owners[i] = owner
+		parent, child := owner.adapter(durableParentNS), owner.adapter(durableChildNS)
+		read := parent.ReadReceipt
+		var first sync.Once
+		parent.ReadReceipt = func(ctx context.Context, req port.TransferApplyRequest) (port.TransferReceipt, error) {
+			out, err := read(ctx, req)
+			if errors.Is(err, port.ErrTransferNotReady) {
+				first.Do(func() {
+					ready <- struct{}{}
+					select {
+					case <-release:
+					case <-ctx.Done():
+					}
+				})
+			}
+			return out, err
+		}
+		registry, err := port.NewTransferRegistry([]port.TransferAdapter{parent, child}, issuer.Verifier(), nil)
+		durableRequire(t, err)
+		facades[i] = party.New(o.pool, clock.System{}, party.Deps{Transfers: registry}).Transfers()
+	}
+	for _, facade := range facades {
+		go func() {
+			receipt, err := facade.ApplyBatch(o.pair, ref)
+			results <- result{receipt, err}
+		}()
+	}
+	for range workers {
+		select {
+		case <-ready:
+		case <-time.After(30 * time.Second):
+			t.Fatal("concurrent readers did not both observe the missing receipt")
+		}
+	}
+	releaseOnce.Do(func() { close(release) })
+	var committed port.TransferReceipt
+	for range workers {
+		select {
+		case got := <-results:
+			// A stale core sequence can conflict after the owner commits; replay
+			// must recover that same durable receipt without another ledger row.
+			if got.err != nil && !errors.Is(got.err, port.ErrTransferConflict) {
+				t.Fatalf("concurrent apply: %v", got.err)
+			}
+			if got.err == nil {
+				if committed.Ref != uuid.Nil && !reflect.DeepEqual(committed, got.receipt) {
+					t.Fatal("concurrent apply returned different receipts")
+				}
+				committed = got.receipt
+			}
+		case <-time.After(30 * time.Second):
+			t.Fatal("concurrent apply did not finish")
+		}
+	}
+	if committed.Ref == uuid.Nil {
+		t.Fatal("neither concurrent apply checkpointed its receipt")
+	}
+	for i, facade := range facades {
+		replayed, err := facade.ApplyBatch(o.pair, ref)
+		durableRequire(t, err)
+		if !reflect.DeepEqual(replayed, committed) || owners[i].applyCalls != 1 {
+			t.Fatal("replay changed receipt or called the importer again")
+		}
+	}
+	durableAssertCount(t, o, "imported", 1)
+	durableAssertCoreReceiptCount(t, o, batch, "apply", 1)
+	var receipts, provenance int
+	durableRequire(t, o.tx(o.pair.Target(), func(tx pgx.Tx) error {
+		return tx.QueryRow(o.pair.Target(), `SELECT (SELECT count(*) FROM pf_forms.transfer55_fixture_receipt WHERE plan_id=$1 AND batch_id=$2 AND phase='apply'),(SELECT count(*) FROM pf_forms.transfer55_fixture_provenance WHERE plan_id=$1 AND batch_id=$2)`, plan.ID, batch.ID).Scan(&receipts, &provenance)
+	}))
+	if receipts != 1 || provenance != 1 {
+		t.Fatalf("owner committed receipts=%d provenance=%d, want one of each", receipts, provenance)
+	}
+}

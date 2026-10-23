@@ -1,6 +1,6 @@
-# Đề xuất lõi chuyển tenant (#55)
+# Lõi chuyển tenant (#55)
 
-Trạng thái: thiết kế để root/Claude review, chưa có Go/DDL/importer hoặc thao tác dữ liệu. Nền c6ce02b5. Đọc cùng ADR-0055, ADR-0020, ADR-0030, ADR-0052; quyết định D2 G1 chỉ hồ sơ KN trong ADR-0055 ưu tiên phần KN cũ của ADR-0052. G1 chưa đạt bởi thiết kế này.
+Trạng thái hiện hành (23/10/2026): kernel Go party/port-app-store và migration 20261021160423_pf_party_tenant_transfer đã triển khai, đang sửa theo review Claude. Chưa có production importer/adapter KN (#89), diễn tập/rollback thật (#58) hoặc cutover. Các checkpoint bên dưới ghi lịch sử kiểm thử, không thay trạng thái hiện hành. Nền triển khai c6ce02b5. Đọc cùng ADR-0055, ADR-0020, ADR-0030, ADR-0052; quyết định D2 G1 chỉ hồ sơ KN trong ADR-0055 ưu tiên phần KN cũ của ADR-0052. G1 chưa đạt bởi thiết kế này.
 
 ## Chủ module và bất biến
 
@@ -20,9 +20,9 @@ Handshake: TargetIntent chưa reserve global binding, chỉ lưu ứng viên ở
 
 Offer chỉ là immutable refs/hash để review và đối chiếu, không authority. Mọi lần dùng phải re-read local metadata của hai bên dưới hai actual contexts. Không ngầm biến H4 share-grant đọc thành write grant. Hai local transactions không atomic xuyên tenant/module; saga/receipts xử lý khoảng crash, luôn fail closed trước cutover.
 
-## API port dự kiến
+## Hợp đồng port
 
-Các struct dưới đây là hợp đồng review, không có implementation. IDs mới do core cấp là UUIDv7; source/actor/tenant/scope/basis refs lịch sử chỉ đòi UUID hợp lệ nonzero. Digest SHA-256 hex thường đúng64 ký tự, cursor bounded/opaque; không fields authority do HTTP body tự quyết. Copies sâu và registry immutable theo instance.
+Các đoạn dưới đây mô tả hợp đồng; chữ ký hiện hành và implementation xem internal/platform/party/port/transfer*.go, app/transfer*.go và store/transfer*.go. IDs mới do core cấp là UUIDv7; source/actor/tenant/scope/basis refs lịch sử chỉ đòi UUID hợp lệ nonzero. Digest SHA-256 hex thường đúng64 ký tự, cursor bounded/opaque; không fields authority do HTTP body tự quyết. Copies sâu và registry immutable theo instance.
 
 ```go
 type TransferScope struct {
@@ -70,7 +70,7 @@ type TransferReceipt struct {
 
 Registration gồm Module/Namespace/Version, namespace dependencies không vòng, maximum batch (≤500), Authority, FenceSource/FenceTarget/CheckFence, ScanHeaders, ExportBatch, ApplyBatch, ReadReceipt, VerifyBatch, CompensateBatch, ReadCompensationReceipt. Mỗi adapter sở hữu một module đã đăng ký; core không nhận arbitrary module/table lúc gọi. Authority/Fence/Scan/Apply/Receipt/Verify thiếu là deny, không fallback/no-op. Artifact authority và source data transport do owner, không có generic payload field.
 
-Facade party.Module.Transfers() dùng Participants trên mọi call; tenant IDs lấy từ hai Principal, không từ input. Các chữ ký exact trước implementation:
+Facade party.Module.Transfers() dùng Participants trên mọi call; tenant IDs lấy từ hai Principal, không từ input. Các chữ ký tóm tắt (source Go là chuẩn hiện hành):
 
 ```go
 type TransferParticipants struct { source, target context.Context }
@@ -107,7 +107,7 @@ FreezeTarget ref là IntentID (chưa cần Accept); FreezeSource/ScanNext/Seal r
 
 ApplyBatch nhận BatchID đã reserve, dùng artifact gắn batch đã xuất dưới actual source context. Owner đọc/giải mã artifact có cấp phép vận chuyển, không tự đọc DB nguồn với Principal đích. Nếu artifact thiếu hoặc không còn quyền thì deny/giữ checkpoint. Core không log artifact content, token hay lý do có PII. Chi tiết envelope/typed canonicalizer thuộc owner child trước triển khai.
 
-## Schema/khóa dự kiến
+## Schema và khóa
 
 Tất cả metadata được RLS FORCE, tenant_id là tenant thực của participant (source hoặc target), không nhánh share cho writes; r_party SELECT/INSERT, không UPDATE/DELETE trên bản ghi bất biến. Không BYPASSRLS/SECURITY DEFINER và không cấp quyền r_party ghi schema owner. Không đổi shared/db để né scope.
 
@@ -241,3 +241,11 @@ Final production source b89d2560: affected recovery/release PostgreSQL150.914s e
 Checkpoint bàn giao shared core: production source b89d2560, test-style c3e3d41e. Pure app2.070s/port0.667s, handler compile2.529s, gofmt/docscheck và full golangci-lint lần2 đều exit0 (0 issues); giữ log lint lần1 exit1 và stage3 wrapper exit1. Full native party trên01e7e0c3 có93 top-level PASS, không FAIL/SKIP/INFRA; delta production sau đó chỉ bỏ upfront identity refresh và đã chạy lại affected recovery/release150.914s exit0. Build/vet/modgen/migratecheck/archlint/contractcheck/knboundary314 trên b89d2560 đều exit0. Không còn private PG/Go runner do gói này quản lý.
 
 Đây là generic protocol/metadata core và fixture r_forms/r_party thật trên PG tạm. Runtime mặc định không có registry/importer/cutover routes nên tiếp tục fail-closed. Production typed producers/importers + inventory filters/transport thuộc #89; identity receipts thuộc #56 và rehearsal/compensation thực thuộc #58. Chưa chuyển dữ liệu thật, chưa cutover, chưa xác nhận năm boundary gates và chưa tự ready/merge. Giữ roadmap unchecked đến review/tích hợp và bằng chứng owner tương ứng.
+
+## Bất biến bổ sung từ review 23/10
+
+Kernel từ chối namespace hoặc module owner có thành phần bắt đầu cooperative/htx/mrv/mkg, kể cả sau tiền tố owner hoặc khi namespace dùng alias khác; assembly allowlist không được vô hiệu hóa khóa này. Adapter vẫn phải kiểm inventory đúng dữ liệu KN.
+
+Apply có thể được gọi đồng thời cho cùng (plan_id, batch_id), kể cả hai process hoặc sau crash. Owner bắt buộc unique cặp này trong DB, kiểm request hash, dùng khóa transaction bền vững và ghi ledger + provenance + receipt trong cùng transaction. Không dùng mutex trong RAM làm bằng chứng. Regression PG dùng hai facade/owner độc lập cùng thấy receipt chưa tồn tại trước khi Apply, kiểm chỉ một ledger/provenance/receipt và replay giữ receipt cũ.
+
+Binding hiện là vĩnh viễn: UNIQUE(target_tenant) và UNIQUE(source_tenant, source_scope_ref), chỉ ghi thêm, chưa có binding_supersede. Gắn nhầm phải dừng trước cutover và xử lý có kiểm soát bởi ag_migrator theo runbook #58; không sửa tenant_id, không xóa ledger hay tự dùng API để đổi đích. #58 phải duyệt đối chiếu row-count/checksum, rollback và đúng Trung tâm/tenant trước mọi cutover thật. #89 chịu adapter mẫu/typed inventory và receipt transaction thực. Không lấy fixture này thay diễn tập hay adapter production.

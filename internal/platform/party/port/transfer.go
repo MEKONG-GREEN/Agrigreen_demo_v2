@@ -196,6 +196,13 @@ type TransferReceipt struct {
 	OwnerVersion      string               `json:"owner_version"`
 	Items             []TransferAppliedRef `json:"items"`
 }
+
+// TransferImporter may be called concurrently for the same (plan_id, batch_id),
+// including through independent core instances after a lost checkpoint. The
+// owner MUST enforce that unique pair in its database and commit the receipt,
+// ledger rows and provenance in one transaction. A retry returns the same durable
+// receipt; a different request hash for that pair must fail. An owner lock may
+// serialize the check/write, but an in-memory mutex is not sufficient.
 type TransferImporter func(context.Context, TransferApplyRequest) (TransferReceipt, error)
 type TransferReceiptReader func(context.Context, TransferApplyRequest) (TransferReceipt, error)
 type TransferVerifier func(context.Context, TransferApplyRequest, TransferReceipt) error

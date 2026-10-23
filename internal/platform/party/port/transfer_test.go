@@ -328,3 +328,32 @@ func TestTransferCanonicalReferencesAndCompleteFrozenInventory(t *testing.T) {
 		t.Fatal("primary/dependency overlap accepted", err)
 	}
 }
+
+func TestTransferRegistryRejectsReservedHTXMRVMKGNamespaces(t *testing.T) {
+	issuer := authztest.New(t)
+	for _, name := range []string{"cooperative", "cooperatives.records", "htx", "htx_records", "mrv", "mrv.field", "mkg", "mkg-assets", "kn.cooperative", "forms/mrv_reports", "owner:mkg", "kn-htx"} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := NewTransferRegistry([]TransferAdapter{transferTestAdapter(name)}, issuer.Verifier(), nil); !errors.Is(err, ErrTransferConfiguration) {
+				t.Fatalf("reserved namespace accepted: %s: %v", name, err)
+			}
+		})
+	}
+	for _, name := range []string{"kn.records", "forms.kn_report", "accounts.memberships"} {
+		if _, err := NewTransferRegistry([]TransferAdapter{transferTestAdapter(name)}, issuer.Verifier(), nil); err != nil {
+			t.Fatalf("KN owner namespace rejected: %s: %v", name, err)
+		}
+	}
+}
+
+func TestTransferRegistryRejectsReservedOwnerWithInnocentAlias(t *testing.T) {
+	issuer := authztest.New(t)
+	for _, module := range []string{"pf/cooperative", "pf/mrv"} {
+		t.Run(module, func(t *testing.T) {
+			adapter := transferTestAdapter("kn.records")
+			adapter.Module = module
+			if _, err := NewTransferRegistry([]TransferAdapter{adapter}, issuer.Verifier(), nil); !errors.Is(err, ErrTransferConfiguration) {
+				t.Fatal("reserved owner bypassed the namespace guard with an alias", err)
+			}
+		})
+	}
+}
