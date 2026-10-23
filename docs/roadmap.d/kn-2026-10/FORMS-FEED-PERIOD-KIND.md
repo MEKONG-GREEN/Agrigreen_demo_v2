@@ -1,0 +1,1 @@
+- [ ] FORMS-FEED-PERIOD-KIND (#124): lọc ExcludePeriodKinds trước LIMIT của SubmissionFeed, nil/empty giữ cũ; PG kiểm feed cũ/mới đạt, còn chờ review chéo/gộp và owner #27 nối. Xem docs/dev/forms-feed-period-kind.md.

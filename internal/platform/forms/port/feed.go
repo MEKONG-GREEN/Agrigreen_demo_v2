@@ -62,6 +62,8 @@ type SubmissionQuery struct {
 	Parents      []string
 	From, To     *time.Time
 	Limit        int // 0 = 200
+	// ExcludePeriodKinds loại đúng các giá trị trước LIMIT; nil/rỗng không lọc, "" khớp kỳ không có loại.
+	ExcludePeriodKinds []string
 }
 
 // SubmissionFeed là cổng đọc của hệ thống cho bên dùng có quy tắc liên biểu (W11.43).
