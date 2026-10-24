@@ -7,7 +7,8 @@ import (
 
 // W11.27 — chính sách phiên của profile hrm_plan áp cả khi gọi THẲNG REST cap/forms (/v1/forms) dùng chung: phiên CHỈ XEM
 // (lãnh đạo xem phòng ngoài lần gán, nhóm Ban Giám đốc, Admin chỉ xem) bị từ chối ở mọi thao tác — định nghĩa biểu, phát hành
-// kỳ, nộp, rà soát, chốt — và cả đọc kỳ (FN-11 không cấp quyền xem cho ngữ cảnh chỉ xem); phiên thường vẫn làm được.
+// kỳ, nộp, rà soát, chốt — và cả đọc kỳ (FN-11 không cấp quyền xem cho ngữ cảnh chỉ xem); phiên thường vẫn làm được (nộp bài
+// kế hoạch chỉ qua /v1/hrm/plans — BR-01).
 func TestHRMPlanFormsDirectViewOnly_W1127(t *testing.T) {
 	f, _ := newPlanFixture(t)
 	f.call("admin", http.MethodPost, "/v1/hrm/defaults", nil, http.StatusCreated)
@@ -23,8 +24,11 @@ func TestHRMPlanFormsDirectViewOnly_W1127(t *testing.T) {
 	pub := f.call("hcth", http.MethodPost, "/v1/forms/periods", map[string]any{"profile": "hrm_plan", "template_id": tpl["id"],
 		"label": "Kỳ gọi thẳng", "due_at": "2026-12-31T16:59:59Z", "units": []string{"trong_trot"}, "unit_kind": "department"}, http.StatusCreated)
 	pid2 := pub["period"].(map[string]any)["id"].(string)
-	sub := f.call("ld_tt", http.MethodPost, "/v1/forms/periods/"+pid+"/submissions"+q,
-		map[string]any{"unit": "trong_trot", "values": values, "base_version": 0}, http.StatusCreated)
+	// Nộp thẳng /v1/forms không mang số tự tính từ hồ sơ → 422 (BR-01); lãnh đạo đơn vị nộp qua /v1/hrm/plans.
+	f.call("ld_tt", http.MethodPost, "/v1/forms/periods/"+pid+"/submissions"+q,
+		map[string]any{"unit": "trong_trot", "values": values, "base_version": 0}, http.StatusUnprocessableEntity)
+	sub := f.call("ld_tt", http.MethodPost, "/v1/hrm/plans/2027/units/trong_trot/submit", map[string]any{"leaving": 0, "additional": 1,
+		"base_version": 0}, http.StatusCreated)
 	sid := sub["id"].(string)
 
 	// Phiên chỉ xem — lãnh đạo phòng, lãnh đạo HCTH (Ban Giám đốc), Admin — mọi lời gọi thẳng đều bị từ chối.

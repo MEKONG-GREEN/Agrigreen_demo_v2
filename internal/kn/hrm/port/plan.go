@@ -6,7 +6,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
-// --- W11.27 (pf 20261021112841): kế hoạch nhân lực năm (FN-11) trên cap/forms. ---
+// --- W11.27 (pf 20261024064206): kế hoạch nhân lực năm (FN-11) trên cap/forms. ---
 
 // PlanProfile là tên profile cap/forms của kế hoạch nhân lực năm (D3 H7): TT (Trung tâm — Phòng HCTH, Admin) mở kỳ, rà
 // soát, chốt; DV (đơn vị nội bộ — lãnh đạo đơn vị) lập và gửi.

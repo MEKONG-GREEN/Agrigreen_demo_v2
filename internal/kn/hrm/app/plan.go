@@ -798,7 +798,7 @@ func (s *Service) SubmitPlan(ctx context.Context, year int, unit string, in doma
 	if idem == "" {
 		idem = "hrm-plan-submit:" + ids.New().String()
 	}
-	sb, err := s.Plans.Entry.Submit(uctx, port.PlanProfile, row.PeriodRef, unit, fv, baseVersion, idem)
+	sb, err := s.Plans.Entry.Submit(withPlanFigures(uctx, val.Current, val.Retiring), port.PlanProfile, row.PeriodRef, unit, fv, baseVersion, idem)
 	if err != nil {
 		return PlanSubmission{}, err
 	}

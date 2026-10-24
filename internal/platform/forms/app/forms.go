@@ -903,11 +903,14 @@ type ReopenInput struct {
 	Reason string   // 10–500 ký tự
 }
 
-// Reopen mở lại kỳ đã chốt — sự kiện mới (lý do bắt buộc), ảnh chụp đã chốt không đổi.
+// Reopen mở lại kỳ đã chốt — sự kiện mới (lý do bắt buộc), ảnh chụp đã chốt không đổi. Profile NoReopen → 403.
 func (s *Service) Reopen(ctx context.Context, profile string, periodID uuid.UUID, in ReopenInput, idem string) (PeriodView, error) {
 	prof, a, err := s.resolve(ctx, profile)
 	if err != nil {
 		return PeriodView{}, err
+	}
+	if prof.NoReopen {
+		return PeriodView{}, problem.Forbidden.WithDetail("biểu " + profile + " không mở lại kỳ đã chốt — thay đổi sau chốt qua điều chỉnh của nghiệp vụ")
 	}
 	why, ok := domain.Reason(in.Reason)
 	if !ok {
