@@ -6,13 +6,13 @@ Bối cảnh: hai công cụ AI (Claude Code, Codex) cùng làm trên một repo
 
 ## Giai đoạn chuyển (trước #142)
 
-Áp dụng **tới khi [#142](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142) vào `dev`**. Mục 3–4 dưới đây mô tả quy trình **sau #142**; trước đó:
+Áp dụng **tới khi đủ ba điều kiện**: [#142](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142) đã vào `dev`, CI trên `dev` xanh, và người dùng đã xác nhận bật bảo vệ nhánh. #142 gộp xong **chưa** đủ để chuyển. Mục 3–4 dưới đây mô tả quy trình sau khi chuyển; trước đó:
 
-- `scripts/workflow/` chưa có trong repo (`.\scripts\workflow\ticket.ps1` sẽ báo không tìm thấy tệp). Dùng bản `ticket.ps1` hiện hành do **người điều phối** cung cấp, nằm ngoài repo; hỏi người điều phối vị trí trên máy của mình.
-- Bản hiện hành có các lệnh `list`, `claim`, `ready`, `release`, `merge`, `lock-status` (cùng tham số như mục 3, trừ: chưa có `review`; `merge` không nhận `-Agent`).
+- Trước khi #142 gộp, `scripts/workflow/` chưa có trong repo (`.\scripts\workflow\ticket.ps1` sẽ báo không tìm thấy tệp); sau khi gộp mà chưa chuyển thì vẫn chưa dùng bản trong repo. Dùng bản `ticket.ps1` hiện hành do **người điều phối** cung cấp, nằm ngoài repo; hỏi người điều phối vị trí trên máy của mình.
+- Bản hiện hành có các lệnh `list`, `claim`, `ready`, `release`, `merge`, `lock-status` (cùng tham số như mục 3, kể cả `-Agent`; trừ: chưa có `review`).
 - `merge` của bản hiện hành: giữ khóa `lock/integration`, rebase lên `origin/dev`, chạy cổng cục bộ và test `-Tests`, rồi **chính script** gộp vào `dev`. Nó **chưa** mở PR, **chưa** chờ CI và **không** kiểm bình luận review/SHA. Vì vậy người chạy `merge` phải tự xác nhận trên issue đã có `Review OK — <bên khác chủ gói> (review chéo tại <sha>)` đúng SHA đầu nhánh sẽ gộp, và CI trên `dev` sau khi gộp phải được theo dõi.
 - Không push tay vào `dev`/`main` trong mọi giai đoạn.
-- `dev` chưa bật bảo vệ nhánh; sẽ bật sau #142 và khi CI trên `dev` ổn định.
+- `dev` chưa bật bảo vệ nhánh; chỉ bật khi #142 đã vào `dev`, CI trên `dev` xanh và người dùng xác nhận — cũng là lúc chuyển sang luồng PR.
 
 ## 1. Ticket = GitHub Issue
 
@@ -51,7 +51,7 @@ Script: `scripts/workflow/ticket.ps1` (PowerShell, chạy từ gốc repo) — *
 
 ## 4. Gộp: khóa tích hợp + Pull Request
 
-`ticket.ps1 merge` là đường gộp **duy nhất** (trước #142 là bản hiện hành, xem [giai đoạn chuyển](#giai-đoạn-chuyển-trước-142); các bước 3, 5–7 dưới đây chỉ có sau #142):
+`ticket.ps1 merge` là đường gộp **duy nhất** (trước khi chuyển luồng PR là bản hiện hành, xem [giai đoạn chuyển](#giai-đoạn-chuyển-trước-142); các bước 3, 5–7 dưới đây chỉ có sau khi chuyển luồng PR):
 
 1. Tạo nguyên tử `refs/heads/lock/integration` (cùng cơ chế với claim). Đang có người giữ → exit 3, thử lại sau. Khóa luôn được nhả (kể cả khi lỗi), và chỉ nhả khi còn trỏ đúng commit của mình.
 2. Rebase lên `origin/dev`. Xung đột tài liệu → giữ cả hai phía; tệp sinh → lấy một phía rồi sinh lại; xung đột mã khác → dừng, chủ gói tự giải rồi chạy lại.
@@ -61,7 +61,7 @@ Script: `scripts/workflow/ticket.ps1` (PowerShell, chạy từ gốc repo) — *
 6. Chờ CI fail-closed (mọi check phải `pass`; không có check/check bị bỏ qua/lỗi đọc → dừng), đọc lại cổng review, rồi `gh pr merge --merge --match-head-commit <sha>`.
 7. Thành công → `st:done`, đóng issue, xóa `claim/<PKG>`, ghi SHA dev mới vào issue. Thất bại → `st:review` + đuôi log.
 
-Chi tiết vận hành (sau #142): `scripts/workflow/README.md`.
+Chi tiết vận hành (sau khi chuyển luồng PR): `scripts/workflow/README.md`.
 
 Vì sao PR thay vì `git push <nhánh>:dev` (trước 24/10): để bật **bảo vệ nhánh** `dev`/`main` (bắt buộc PR, CI xanh, cấm push thẳng/force-push, áp cả admin). Vì hai công cụ chung một tài khoản GitHub, GitHub không thể bắt "approval của người khác"; cổng review do script kiểm bằng bình luận theo SHA.
 

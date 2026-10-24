@@ -65,9 +65,9 @@ Ticket = **GitHub Issue**, tiêu đề `[<PKG>] …` (vd `[P0-POOL-KN] …`), t�
 | `size:` | `S`, `M`, `L`, `XL` |
 | khác | `kn`, `g1` (phạm vi/mốc) |
 
-> **Giai đoạn chuyển — tới khi [#142](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142) vào `dev`:** `scripts/workflow/` chưa có trong repo và `dev` chưa bật bảo vệ nhánh. Trong thời gian này dùng bản `ticket.ps1` hiện hành do người điều phối cung cấp (ngoài repo) — xem [two-tool-workflow.md](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142). Các lệnh và luồng PR dưới đây là quy trình **sau #142**.
+> **Giai đoạn chuyển — tới khi chuyển sang luồng PR ([#142](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142) đã vào `dev`, CI trên `dev` xanh, người dùng đã xác nhận bảo vệ nhánh):** `dev` chưa bật bảo vệ nhánh; `scripts/workflow/` dù đã có trong repo cũng chưa dùng. Trong thời gian này dùng bản `ticket.ps1` hiện hành do người điều phối cung cấp (ngoài repo) — xem [two-tool-workflow.md](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142). Các lệnh và luồng PR dưới đây là quy trình **sau khi chuyển luồng PR**.
 
-Lệnh (từ gốc repo, **sau #142**):
+Lệnh (từ gốc repo, **sau khi chuyển luồng PR**):
 
 ```powershell
 .\scripts\workflow\ticket.ps1 list  [-Lane kn|shared]
@@ -94,7 +94,7 @@ Lệnh (từ gốc repo, **sau #142**):
 
 ## 5. Luồng gộp qua Pull Request (phương án (a))
 
-Chốt ngày **24/10/2026** (ticket [#142 WORKFLOW-PR](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142)). **Có hiệu lực khi #142 vào `dev`**; trước đó xem [giai đoạn chuyển](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142) — bản hiện hành gộp dưới khóa nhưng chưa qua PR, chưa chờ CI và không tự kiểm bình luận review. Sau #142, `ticket.ps1 merge`:
+Chốt ngày **24/10/2026** (ticket [#142 WORKFLOW-PR](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142)). **Chỉ có hiệu lực khi đủ ba điều kiện: #142 đã vào `dev`, CI trên `dev` xanh, và người dùng đã xác nhận bật bảo vệ nhánh**; trước đó (kể cả khi #142 đã gộp nhưng chưa đủ hai điều kiện sau) xem [giai đoạn chuyển](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142) — bản hiện hành gộp dưới khóa nhưng chưa qua PR, chưa chờ CI và không tự kiểm bình luận review. Khi luồng PR có hiệu lực, `ticket.ps1 merge`:
 
 1. Giữ khóa gộp `refs/heads/lock/integration` (tạo nguyên tử; luôn nhả khi xong hoặc lỗi).
 2. Rebase nhánh gói lên `origin/dev` (xung đột tài liệu → giữ cả hai; tệp sinh → sinh lại; xung đột mã → dừng, trả về chủ gói).
@@ -104,7 +104,7 @@ Chốt ngày **24/10/2026** (ticket [#142 WORKFLOW-PR](https://github.com/MEKONG
 6. Chờ CI — fail-closed: mọi check (bắt buộc, hoặc mọi check báo về khi chưa bật bảo vệ nhánh) phải `pass`; không có check, check bị bỏ qua hay lỗi đọc → dừng.
 7. Đọc lại cổng review ngay trước khi gộp, rồi gộp bằng `gh pr merge --merge --match-head-commit <sha>` (đầu PR đổi → từ chối).
 
-**Bảo vệ nhánh** `dev` và `main` (sẽ bật sau khi #142 gộp): bắt buộc PR, bắt buộc CI xanh, cấm push thẳng, cấm force-push, áp cả admin. Kể cả trước đó: đừng `git push origin <nhánh>:dev` bằng tay.
+**Bảo vệ nhánh** `dev` và `main` (chỉ bật khi #142 đã vào `dev`, CI trên `dev` xanh và người dùng xác nhận): bắt buộc PR, bắt buộc CI xanh, cấm push thẳng, cấm force-push, áp cả admin. Kể cả trước đó: đừng `git push origin <nhánh>:dev` bằng tay.
 
 Chi tiết và lịch sử quy trình: [docs/process/two-tool-workflow.md](docs/process/two-tool-workflow.md).
 
@@ -189,7 +189,7 @@ Từ 23/10/2026 **mọi gói** phải được bên còn lại (bên khác chủ
    Review CHANGES — <Claude|Codex> (review chéo tại <sha đầy đủ>)
    ```
 
-   Sau #142 dùng `ticket.ps1 review -Pkg <PKG> -Agent <bên review> -Sha <sha> -Ok|-Changes` để đăng đúng mẫu. Có vấn đề → `Review CHANGES …` kèm danh sách cần sửa, không ghi "Review OK". Gặp xung đột mã thật thì không tự viết lại, trả về chủ gói.
+   Sau khi chuyển luồng PR dùng `ticket.ps1 review -Pkg <PKG> -Agent <bên review> -Sha <sha> -Ok|-Changes` để đăng đúng mẫu. Có vấn đề → `Review CHANGES …` kèm danh sách cần sửa, không ghi "Review OK". Gặp xung đột mã thật thì không tự viết lại, trả về chủ gói.
 
 Reviewer đã ghi "Review OK" có thể chạy `ticket.ps1 merge` cho gói đó.
 
