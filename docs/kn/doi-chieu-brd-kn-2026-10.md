@@ -183,7 +183,7 @@ Ký hiệu nguồn: `D1 §2.1#4` = bản D1, mục 2.1, dòng 4. `v4.3 §21.1`, 
 | W11.48 | Nhật ký BM-08/09/19 | Lứa, lần ghi có chỉ số, GPS bất biến + 200 m + phát hiện giả lập, ảnh, offline, xác thực, hạch toán NC-15 | D4 CN8 | W11.47, W11.43 | XL | pf 20261024090937 | Đã làm 21/10/2026 — giả định tạm Q-005, Q-077 ([gia-dinh/W11.48](gia-dinh/W11.48.md)); App xã ngoại tuyến chưa | 3 | |
 | W11.49 | Dịch bệnh BM-10 | Ổ dịch có phiên bản diễn biến + báo nghi dịch | D4 CN9 | W11.41, W11.07 | M | pf 000164 | Mã được | 2 | |
 | W11.50 | Chiến dịch điều tra | Đợt trên kỳ `adhoc`, tách khỏi lũy kế | D4 CN10 | W11.42 | M | pf 000165 | Chờ Q-058 | 2 | |
-| W11.52 | Bản đồ vùng nuôi/dịch (GĐ2) | Vẽ vùng, bán kính, hướng di chuyển, theo ngày | D4 CN12 | W11.49, W11.47 | L | pf 20261021133731 | Đã làm 21/10/2026 (kéo vào G1) — giả định bán kính 500 m/3 km/10 km ([gia-dinh/W11.52](gia-dinh/W11.52.md)) | 4 | |
+| W11.52 | Bản đồ vùng nuôi/dịch (GĐ2) | Vẽ vùng, bán kính, hướng di chuyển, theo ngày | D4 CN12 | W11.49, W11.47 | L | pf 20261024090947 | Đã làm 21/10/2026 (kéo vào G1) — giả định bán kính 500 m/3 km/10 km ([gia-dinh/W11.52](gia-dinh/W11.52.md)) | 4 | |
 | W11.53 | Dự án KNQG Mẫu 01–07 (GĐ2) | Ký scan, TW xác nhận | D4 CN13 | W11.47, W11.48, W10.17 | L | pf 000178 | GĐ2; chờ Q-055, Q-027 | 4 | |
 | W11.54 | Trang chủ phòng + kho văn bản (GĐ2) | `pf/content`, `_pub` | D4 CN14 | W11.44, W11.10 | M | `_pub` | GĐ2 | 4 | |
 | W11.55 | Nông hộ Mobile (GĐ2) | OTP SMS, nhật ký hộ, lịch tiêm + nhắc, báo nghi dịch | D4 CN15 | W11.48, W11.49, W10.06 | L | pf 000179 | GĐ2; Chặn Q-020, Q-080 | 4 | |
