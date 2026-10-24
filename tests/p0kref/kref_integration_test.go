@@ -637,12 +637,17 @@ func p0KRefAdminChange(t *testing.T, f *p0KRefFixture, ctx context.Context, path
 		t.Fatalf("native administrative change HTTP%d: %s", res.StatusCode, data)
 	}
 	var wire struct {
-		Seq int64 `json:"seq"`
+		Event struct {
+			Seq int64 `json:"seq"`
+		} `json:"event"`
 	}
 	if err := json.Unmarshal(data, &wire); err != nil {
 		t.Fatal(err)
 	}
-	return wire.Seq
+	if wire.Event.Seq < 1 {
+		t.Fatal("administrative change response lacks a committed event sequence")
+	}
+	return wire.Event.Seq
 }
 
 func TestP0KRefCreateAfterPendingParentMoveRollsBackThenRetries(t *testing.T) {
