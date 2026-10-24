@@ -3,6 +3,8 @@
 -- Only fields represented by k_ref matter; source-only renames need no rebuild.
 -- ALTER FUNCTION OWNER requires CREATE on the target schema. Only the NOLOGIN
 -- module owner receives DDL; application roles and runtime SELECT stay unchanged.
+SET LOCAL lock_timeout = '5s';
+
 GRANT CREATE ON SCHEMA pf_party TO own_party;
 
 CREATE FUNCTION pf_party.require_created_parent_projection() RETURNS trigger

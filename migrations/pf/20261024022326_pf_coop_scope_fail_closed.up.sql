@@ -6,6 +6,8 @@
 -- still comes from p_share (purpose, grant, owner, node, validity). WITH CHECK
 -- never receives that branch; p_tenant still rejects foreign writes. No source
 -- or append-only ledger is rewritten.
+SET LOCAL lock_timeout = '5s';
+
 DO $$
 DECLARE
   spec constant text[][] := ARRAY[
