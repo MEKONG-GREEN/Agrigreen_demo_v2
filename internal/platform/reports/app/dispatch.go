@@ -676,6 +676,14 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	if err := s.tx(ctx, tid, func(claimTx pgx.Tx) error {
 		var err error
 		claimed, err = store.ClaimDispatch(ctx, claimTx, d.ID, d.Attempts, token, now.Add(lease), now)
+		if err != nil || !claimed {
+			return err
+		}
+		// Đọc lại sau khi nhận: "Gửi lại" tiếp tục lượt có thể vừa đổi người nhận/tiêu đề.
+		fresh, err := store.DispatchByID(ctx, claimTx, id, false)
+		if err == nil && fresh != nil {
+			d = fresh
+		}
 		return err
 	}); err != nil {
 		return err
