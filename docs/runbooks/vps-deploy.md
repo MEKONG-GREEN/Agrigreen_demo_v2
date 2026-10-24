@@ -80,8 +80,8 @@ Mở `https://app.<domain>`.
 Trước khi `up`, đặt trong `.env` trên VPS (hoặc kho bí mật của máy):
 
 - `AG_SMTP_HOST`, `AG_SMTP_PORT` (587), `AG_SMTP_USERNAME`, `AG_SMTP_PASSWORD`, `AG_SMTP_FROM`, `AG_SMTP_TLS=starttls`; `AG_SMTP_DIGEST_TO` là các hộp thư công vụ cần nhận tóm tắt. Notify không cho gửi SMTP bản rõ (`AG_SMTP_ALLOW_PLAIN=false`). Reports dùng STARTTLS hoặc TLS theo `AG_SMTP_TLS`.
-- Keycloak dùng cùng máy chủ thư; `AG_KC_SMTP_STARTTLS=true`, `AG_KC_SMTP_SSL=false`, `AG_KC_SMTP_AUTH=true`. Máy chủ dùng SMTPS 465 thì đặt TLS tương ứng cho cả Reports và Keycloak. Realm đã tồn tại cần cập nhật SMTP trong Realm settings → Email; import khi khởi động chỉ áp cho realm mới.
-- `AG_FCM_PROJECT_ID` và `AG_FCM_CREDENTIALS_FILE=/run/secrets/notify/fcm.json`. Cài tệp tài khoản dịch vụ vào `deploy/compose/.vps/notify/fcm.json`, chủ `65532:65532`, mode `0400`; thư mục cho phép container duyệt. Chỉ API và worker mount thư mục này read-only. Không commit, chép vào image hoặc đưa nội dung tệp vào log. FCM chỉ truyền payload dữ liệu theo ADR-0015; môi trường production cần allowlist non-PII được phê duyệt theo [residency.md](residency.md).
+- Keycloak dùng cùng máy chủ thư; `AG_KC_SMTP_STARTTLS=true`, `AG_KC_SMTP_SSL=false`, `AG_KC_SMTP_AUTH=true`. Mặc định toàn stack dùng 587/STARTTLS; không chuyển riêng sang SMTPS 465 trước khi adapter Notify tương ứng đã được kiểm. Realm đã tồn tại cần cập nhật SMTP trong Realm settings → Email; import khi khởi động chỉ áp cho realm mới.
+- `AG_FCM_PROJECT_ID` và `AG_FCM_CREDENTIALS_FILE=/run/secrets/notify/fcm.json`. Cài tệp tài khoản dịch vụ vào `deploy/compose/.vps/notify/fcm.json`, chủ `65532:65532`, mode `0400`; thư mục cho phép container duyệt. Chỉ API và worker mount thư mục này read-only. Không commit, chép vào image hoặc đưa nội dung tệp vào log. FCM chỉ truyền payload dữ liệu theo ADR-0015. Môi trường production cần `AG_NONPII_ALLOWLIST=fcm.googleapis.com,oauth2.googleapis.com` được phê duyệt theo [residency.md](residency.md); file VPS truyền giá trị được cung cấp, không tự mở ngoại lệ. Máy SMTP trong nước ngoài tên miền của dự án phải được thêm tường minh vào `AG_RESIDENCY_ALLOWLIST` cùng tên miền dự án và `single-label`; không dùng wildcard hoặc danh mục non-PII cho SMTP.
 - `AG_WEB_OPS_URL=https://app.<domain>` và `AG_REPORT_LINK_BASE=https://api.<domain>` được file VPS cấp trực tiếp cho API/worker. Không dùng URL localhost trong email.
 
 S3 I/O tiếp tục qua `seaweedfs:9000`; URL GET được **ký ngay từ đầu** bằng `AG_S3_PUBLIC_ENDPOINT=files.<domain>`, TLS bật và `AG_S3_REGION` mặc định `us-east-1`. Không thay host của URL sau khi ký. Caddy giữ nguyên Host tới SeaweedFS; chỉ cho GET/HEAD, bucket không chuyển sang công khai. Kiểm một URL do API cấp từ máy người dùng, tải được nội dung và URL bị sửa chữ ký phải bị từ chối. Không đưa URL có chữ ký vào issue/log.
@@ -149,6 +149,9 @@ Smoke này không thay nghiệm thu SMTP/FCM công vụ, DNS/TLS công khai, d�
 Bật `docker-compose.backup.yml` (pgBackRest) theo [backup.md](backup.md). Kho S3 đích phải nằm **ngoài VPS này** và ở trong nước, ví dụ kho lưu trữ đối tượng của VNPT hoặc một máy thứ hai. Mỗi quý chạy diễn tập theo [restore-drill.md](restore-drill.md).
 
 ## 7. Cập nhật phiên bản
+
+**Cổng nâng PostgreSQL của P0-SEC-CI (#132):** image mới chuyển từ nền PostGIS 17-3.5/bullseye đã đóng băng sang 17-3.6/trixie. Dù cùng PostgreSQL major 17, thay glibc/PostGIS không cho phép gắn thẳng volume cũ rồi chạy tiếp. Phải logical dump toàn bộ database và globals, dựng **volume PGDATA mới**, restore, dựng lại/kiểm chỉ mục và extensions, đối chiếu số dòng rồi mới chuyển ứng dụng. Giữ volume cũ để quay lại khi chưa chuyển ghi. Hướng dẫn `docs/dev/p0-postgres17-upgrade.md` của #132 là cổng bắt buộc; startup guard của image mới từ chối PGDATA cũ không có marker nền hiện hành. Không xóa volume cũ, không tự thêm marker để vượt guard và không dùng lệnh dưới đây với volume chưa chuyển đổi.
+
 
 ```sh
 GIT_SSH_COMMAND="ssh -i ~/.ssh/agrigreen_deploy" git pull --ff-only

@@ -17,7 +17,8 @@ x-vps-env: &vps-env
   # Bắt buộc với mọi dịch vụ Go (residency.ValidateEnv): thiếu/sai → từ chối khởi động.
   AG_ENV: ${AG_ENV:-staging}
   # Chỉ có hiệu lực khi AG_ENV=production: mọi đích phải thuộc tên miền của mình hoặc dịch vụ nội bộ.
-  AG_RESIDENCY_ALLOWLIST: ${AG_DOMAIN:?chạy deploy/vps/prepare.sh},single-label
+  AG_RESIDENCY_ALLOWLIST: ${AG_RESIDENCY_ALLOWLIST:-${AG_DOMAIN:?chạy deploy/vps/prepare.sh},single-label}
+  AG_NONPII_ALLOWLIST: ${AG_NONPII_ALLOWLIST:-}
   # I/O trong mạng Compose; chữ ký GET ràng buộc host mà trình duyệt truy cập.
   AG_S3_PUBLIC_ENDPOINT: files.${AG_DOMAIN}
   AG_S3_PUBLIC_USE_TLS: "true"
@@ -89,7 +90,11 @@ services:
   kc-db-init:
     mem_limit: 128m
     cpus: "0.50"
-    image: postgis/postgis:17-3.5
+    image: postgres:17-trixie  # client psql only; không mount PGDATA
+    user: "999:999"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
     depends_on:
       postgres: { condition: service_healthy }
     environment:
