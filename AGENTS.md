@@ -65,7 +65,7 @@ Ticket = **GitHub Issue**, tiêu đề `[<PKG>] …` (vd `[P0-POOL-KN] …`), t�
 | `size:` | `S`, `M`, `L`, `XL` |
 | khác | `kn`, `g1` (phạm vi/mốc) |
 
-> **Giai đoạn chuyển — tới khi chuyển sang luồng PR ([#142](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142) đã vào `dev`, CI trên `dev` xanh, người dùng đã xác nhận bảo vệ nhánh):** `dev` chưa bật bảo vệ nhánh; `scripts/workflow/` dù đã có trong repo cũng chưa dùng. Trong thời gian này dùng bản `ticket.ps1` hiện hành do người điều phối cung cấp (ngoài repo) — xem [two-tool-workflow.md](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142). Các lệnh và luồng PR dưới đây là quy trình **sau khi chuyển luồng PR**.
+> **Giai đoạn chuyển — tới khi chuyển sang luồng PR ([#142](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142) đã vào `dev`, CI trên `dev` xanh, người dùng đã xác nhận bảo vệ nhánh gồm check bắt buộc):** gộp #142 thôi **không** chuyển luồng. `dev` chưa bật bảo vệ nhánh; `scripts/workflow/` dù đã có trong repo cũng chưa dùng. Trong thời gian này dùng bản `ticket.ps1` hiện hành do người điều phối cung cấp (ngoài repo) — xem [two-tool-workflow.md](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142). Các lệnh và luồng PR dưới đây là quy trình **sau khi chuyển luồng PR**.
 
 Lệnh (từ gốc repo, **sau khi chuyển luồng PR**):
 
@@ -94,17 +94,17 @@ Lệnh (từ gốc repo, **sau khi chuyển luồng PR**):
 
 ## 5. Luồng gộp qua Pull Request (phương án (a))
 
-Chốt ngày **24/10/2026** (ticket [#142 WORKFLOW-PR](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142)). **Chỉ có hiệu lực khi đủ ba điều kiện: #142 đã vào `dev`, CI trên `dev` xanh, và người dùng đã xác nhận bật bảo vệ nhánh**; trước đó (kể cả khi #142 đã gộp nhưng chưa đủ hai điều kiện sau) xem [giai đoạn chuyển](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142) — bản hiện hành gộp dưới khóa nhưng chưa qua PR, chưa chờ CI và không tự kiểm bình luận review. Khi luồng PR có hiệu lực, `ticket.ps1 merge`:
+Chốt ngày **24/10/2026** (ticket [#142 WORKFLOW-PR](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142)). **Chỉ có hiệu lực khi đủ ba điều kiện: #142 đã vào `dev`, CI trên `dev` xanh, và người dùng đã xác nhận bật bảo vệ nhánh, kể cả danh sách check bắt buộc**. Thiếu check bắt buộc thì mọi `merge` dừng ở cổng CI: các job chỉ chạy trên `main`/push báo `skipping` trên PR, mà `skipping` không phải xanh — fail-closed có chủ ý. Trước khi đủ ba điều kiện (kể cả khi #142 đã gộp nhưng chưa đủ hai điều kiện sau) xem [giai đoạn chuyển](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142) — bản hiện hành gộp dưới khóa nhưng chưa qua PR, chưa chờ CI và không tự kiểm bình luận review. Khi luồng PR có hiệu lực, `ticket.ps1 merge`:
 
 1. Giữ khóa gộp `refs/heads/lock/integration` (tạo nguyên tử; luôn nhả khi xong hoặc lỗi).
 2. Rebase nhánh gói lên `origin/dev` (xung đột tài liệu → giữ cả hai; tệp sinh → sinh lại; xung đột mã → dừng, trả về chủ gói).
 3. Kiểm **cổng review**: phải có bình luận của bên **khác chủ gói** (chủ gói = nhãn `agent:` của issue, không phụ thuộc ai chạy `merge`) dạng `Review OK — <công cụ> (review chéo tại <sha>)` ở đầu dòng, với `<sha>` là SHA đầu PR — hoặc SHA trước rebase khi nội dung các tệp nguồn của gói không đổi. `CHANGES` mới hơn vô hiệu `OK`. Claude và Codex dùng chung một tài khoản GitHub nên GitHub không thể bắt buộc approval; script kiểm bình luận này thay.
-4. Chạy cổng cục bộ (mục 8, đúng toolchain Go của CI) và test DB thật của các gói khai báo trong `-Tests`.
+4. Chạy cổng cục bộ (mục 8) với `GOTOOLCHAIN` đặt theo dòng `toolchain` của `go.mod` ([mục 8 — Toolchain Go](#toolchain-go-đặt-trước-mọi-lệnh-go)) và test DB thật của các gói khai báo trong `-Tests`.
 5. Push nhánh PR, mở **Pull Request vào `dev`** (mô tả theo [mẫu PR](.github/pull_request_template.md)).
 6. Chờ CI — fail-closed: mọi check (bắt buộc, hoặc mọi check báo về khi chưa bật bảo vệ nhánh) phải `pass`; không có check, check bị bỏ qua hay lỗi đọc → dừng.
 7. Đọc lại cổng review ngay trước khi gộp, rồi gộp bằng `gh pr merge --merge --match-head-commit <sha>` (đầu PR đổi → từ chối).
 
-**Bảo vệ nhánh** `dev` và `main` (chỉ bật khi #142 đã vào `dev`, CI trên `dev` xanh và người dùng xác nhận): bắt buộc PR, bắt buộc CI xanh, cấm push thẳng, cấm force-push, áp cả admin. Kể cả trước đó: đừng `git push origin <nhánh>:dev` bằng tay.
+**Bảo vệ nhánh** `dev` và `main` (chỉ bật khi #142 đã vào `dev`, CI trên `dev` xanh và người dùng xác nhận): bắt buộc PR, bắt buộc CI xanh với danh sách check bắt buộc, cấm push thẳng, cấm force-push, áp cả admin. Kể cả trước đó: đừng `git push origin <nhánh>:dev` bằng tay.
 
 Chi tiết và lịch sử quy trình: [docs/process/two-tool-workflow.md](docs/process/two-tool-workflow.md).
 
@@ -131,6 +131,21 @@ Quy ước đăng ký menu/mock/OpenAPI theo module: [docs/dev/module-registrati
 - Một tệp = một schema. Chi tiết: [docs/dev/parallel-packages.md](docs/dev/parallel-packages.md), [docs/dev/package-checklist.md](docs/dev/package-checklist.md).
 
 ## 8. Kiểm thử và cổng
+
+### Toolchain Go: đặt trước mọi lệnh `go`
+
+Trước **mọi** lệnh `go` (test, cổng, sinh lại, gộp), đặt `GOTOOLCHAIN` bằng dòng `toolchain` trong `go.mod` (hiện `go1.26.9`; sẽ đổi khi [#132](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/132) gộp — luôn đọc lại `go.mod`, đừng chép số cố định), rồi kiểm `go version` và ghi dòng đó vào bằng chứng:
+
+```powershell
+$env:GOTOOLCHAIN = (Select-String -Path go.mod -Pattern '^toolchain\s+(\S+)').Matches[0].Groups[1].Value
+go version    # phải in đúng bản trong go.mod
+```
+
+(bash: `export GOTOOLCHAIN=$(awk '/^toolchain/{print $2}' go.mod)`.)
+
+Vì sao: CI dùng `go-version-file: go.mod`, còn máy có thể cài Go mới hơn — với `GOTOOLCHAIN` mặc định (`auto`) Go của máy mới hơn được dùng luôn, không hạ về bản trong `go.mod`. go1.27.1 đổi chữ thông báo lỗi JSON, làm golden/test báo lỗi giả ở [#144](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/144). Sau khi chuyển luồng PR, `ticket.ps1 merge` tự chọn toolchain (`AG_GO_TOOLCHAIN` > `GOTOOLCHAIN=goX.Y.Z` > `toolchain` trong `go.mod`) và dừng nếu sai bản; khi chạy tay vẫn phải tự đặt.
+
+### Cổng
 
 Cổng tĩnh Go (từ gốc repo; `make gates` + `make gates-base` gói phần lớn):
 
@@ -180,7 +195,7 @@ Từ 23/10/2026 **mọi gói** phải được bên còn lại (bên khác chủ
 
 1. Checkout đúng **SHA đầu PR** (`gh pr checkout <n>`; `git rev-parse HEAD`).
 2. Đọc diff toàn bộ, đối chiếu tiêu chí nghiệm thu trong issue và [mục 9](#9-lỗi-bắt-buộc-tránh).
-3. Chạy lại tối thiểu: cổng tĩnh của phần bị đụng (mục 8), test DB của gói với `-v` (thấy `--- PASS`), web/Flutter nếu đụng.
+3. Đặt `GOTOOLCHAIN` theo `go.mod` ([mục 8 — Toolchain Go](#toolchain-go-đặt-trước-mọi-lệnh-go)), rồi chạy lại tối thiểu: cổng tĩnh của phần bị đụng (mục 8), test DB của gói với `-v` (thấy `--- PASS`), web/Flutter nếu đụng.
 4. Kiểm: migration mới xếp sau dev, tệp sinh khớp lệnh sinh, không có bí mật/đường dẫn máy, tài liệu gói (`docs/kn/gia-dinh/<PKG>.md`, `docs/roadmap.d/…/<PKG>.md`).
 5. Bình luận trên PR (hoặc issue) một dòng **ở đầu dòng** (không trong khối code hay trích dẫn — ví dụ trong khối code không được tính):
 
@@ -197,6 +212,6 @@ Reviewer đã ghi "Review OK" có thể chạy `ticket.ps1 merge` cho gói đó.
 
 - **Cài môi trường trên máy sạch chưa kiểm lại** (cả hai cách trong [docs/dev-setup.md](docs/dev-setup.md)). TODO: một người mới chạy từ đầu và ghi lệch.
 - **Tài liệu kiến trúc v4.3 chưa có trong repo** (repo chỉ có [v4.1](docs/kien-truc/AgriGreen-Thiet-ke-kien-truc-he-thong-v4_1.md)). TODO: đưa v4.3 vào `docs/kien-truc/` và cập nhật liên kết ở đây.
-- Script `scripts/workflow/` và bảo vệ nhánh: phụ thuộc [#142](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142); trước khi #142 gộp, lệnh ticket chạy từ bản do người điều phối cung cấp ([giai đoạn chuyển](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142)).
+- Script `scripts/workflow/` và bảo vệ nhánh: phụ thuộc [#142](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142). Tới khi chuyển luồng PR (đủ ba điều kiện: #142 đã vào `dev`, CI trên `dev` xanh, người dùng đã xác nhận bảo vệ nhánh gồm check bắt buộc), lệnh ticket chạy từ bản do người điều phối cung cấp ([giai đoạn chuyển](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142)); gộp #142 thôi chưa chuyển.
 - `docs/kn/ui-kit.md`: phụ thuộc [#97](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/97).
 - Chủ sở hữu CODEOWNERS cho Ecombox/Tech Lead: chưa quyết.

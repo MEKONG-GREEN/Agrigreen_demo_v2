@@ -16,6 +16,7 @@
 
 | Lệnh | Kết quả |
 |---|---|
+| `go version` (sau khi đặt `GOTOOLCHAIN` = `toolchain` trong `go.mod`) | |
 | `gofmt -l` / `go build ./...` / `go vet ./...` | |
 | `go run ./tools/archlint ./...` · `modgen -check` · `contractcheck` · `docscheck` | |
 | `go run ./tools/migratecheck -base origin/dev migrations` | |
@@ -27,6 +28,7 @@
 
 ## Checklist
 
+- [ ] Mọi lệnh `go` (test, cổng, sinh lại) chạy với `GOTOOLCHAIN` = dòng `toolchain` trong `go.mod`, `go version` khớp — Go mới hơn của máy có thể gây lỗi giả (#144) ([AGENTS.md §8](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/blob/dev/AGENTS.md#toolchain-go-đặt-trước-mọi-lệnh-go))
 - [ ] Nhánh từ `origin/dev`, không xếp chồng (nếu có: SHA gốc + `git rebase --onto` đã ghi trong issue)
 - [ ] Commit tiếng Việt `<PKG>: …`; commit AI có `Co-Authored-By`
 - [ ] Không gọi port module khác / I-O ngoài trong DB transaction ([quy ước](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/blob/dev/docs/conventions/transactions-and-io.md))
