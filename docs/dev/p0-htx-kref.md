@@ -123,6 +123,11 @@ chiếu bằng xóa đúng projection tenant test, không tắt trigger hoặc �
 Bộ tổng hợp log đầu dừng nhầm vì hai package `[no test files]`; đã phân loại lại
 từ log nguyên vẹn, chỉ chạy tiếp phần chưa chạy, không gọi test SKIP là PASS.
 
+CI ứng viên 7ed988d7 phát hiện hai QF1008 ở wrapper test (selector Tx thừa).
+Đã đổi `tx.Tx.Begin(ctx)` thành method promoted `tx.Begin(ctx)` trong hai test,
+không đổi production hoặc assertion. Kết quả PG ở f67 giữ nguyên; bản sửa style
+được compile, chạy unit season và golangci-lint trước bàn giao SHA mới.
+
 Kiểm native độc lập, cùng byte production trong cây cuối:
 
 - Member `d7a02c07`/cherry `25a1a973`: 14 ca chính + 4 ca con PASS, 0 FAIL/SKIP;
