@@ -129,9 +129,15 @@ func (src SyncSource) Changes(ctx context.Context, scope authz.Scope, entity str
 		limit = 500
 	}
 	var rows []store.Plot
-	err := tenant.WithTenantTx(ctx, src.Svc.DB, p.TenantID, func(tx pgx.Tx) error {
+	err := src.Svc.inTx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		rows, e = store.ChangesAfter(ctx, tx, a.sc.All, a.sc.Units, after, limit)
+		// Native manager feeds use a single SQL snapshot for current rows and
+		// ownership losses; keep ordinary/KN/selected-session paths unchanged.
+		if a.coopOnly && p.KN == nil && p.SelectedSession == nil {
+			rows, e = store.ManagerChangesAfter(ctx, tx, a.sc.All, a.sc.Units, p.OrgRef, after, limit)
+		} else {
+			rows, e = store.ChangesAfter(ctx, tx, a.sc.All, a.sc.Units, after, limit)
+		}
 		return e
 	})
 	if err != nil {

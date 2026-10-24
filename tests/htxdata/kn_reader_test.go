@@ -3,7 +3,6 @@ package htxdata_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -126,30 +125,12 @@ func TestKNPublishedHTXReadsFailClosed(t *testing.T) {
 	}
 }
 
-// Real node projections force p_scope out of its pre-projection compatibility branch.
+// Synthetic caller roots exercise scoped reads against the source-created HTX projections.
 func TestKNPublishedHTXPrincipalScopesReconcileNative(t *testing.T) {
 	f := newFixture(t)
 	reader := extension.NewPublishedHTXData(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform))
 	for _, tid := range []uuid.UUID{f.tid, f.other} {
-		for _, n := range []int{990, 991, 101, 102, 103, 104, 105} {
-			kind, unit := "cooperative", "89001"
-			if n >= 990 {
-				kind, unit = "ttkn_province", "89"
-			}
-			if n == 103 {
-				unit = "92001"
-			}
-			f.exec(`INSERT INTO k_ref.org(tenant_id,ref,kind,code,admin_unit_code,active,source_seq)
-    VALUES($1,$2,$3,$4,$5,true,1)`, tid, ref(n), kind, fmt.Sprintf("N%d", n), unit)
-			f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$2,0)", tid, ref(n))
-			if n < 990 {
-				root := 990
-				if n >= 103 {
-					root = 991
-				}
-				f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$3,1)", tid, ref(root), ref(n))
-			}
-		}
+		f.seedPrincipalScopeProjection(tid)
 		principals := []authz.Principal{
 			{ActorRef: ref(900), OrgRef: ref(990), Roles: []string{kn.RoleKNOfficer}},
 			{ActorRef: ref(900), OrgRef: ref(101), Roles: []string{kn.RoleCoopManager}},

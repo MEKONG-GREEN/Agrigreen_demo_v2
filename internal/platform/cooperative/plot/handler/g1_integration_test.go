@@ -35,7 +35,7 @@ func TestConflictDetailBothVersions(t *testing.T) {
 	if !ok {
 		t.Fatal("SyncSink phải hiện thực ConflictViewer")
 	}
-	ctx := syncCtx(f, f.orgA)
+	ctx := syncCtx(f, f.orgA, syncport.RoleConflictResolver)
 	sv, err := viewer.ConflictVersions(ctx, authz.Scope{Units: []string{"31117"}}, uuid.MustParse(cid))
 	if err != nil || len(sv) != 2 || sv[0].Role != syncport.VersionRoleRecord {
 		t.Fatalf("ConflictVersions: %v %+v", err, sv)

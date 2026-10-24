@@ -21,8 +21,10 @@ import (
 	port "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	shareddb "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -313,5 +315,56 @@ func (s *Service) eventTime(t time.Time) (time.Time, error) {
 }
 
 func (s *Service) inTx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {
-	return tenant.WithTenantTx(ctx, s.DB, tid, fn)
+	// Native GIS and sync conflict roles use the server-resolved commune scope
+	// as well as their projected node. Resolve it before acquiring this module's connection:
+	// the party resolver may need its own transaction. Do not replace a selected
+	// session/KN scope, a cooperative owner's scope, or a partner/job context.
+	p, authenticated := authz.FromContext(ctx)
+	_, apiClient := authz.APIClientFrom(ctx)
+	native := authenticated && !apiClient && tid != uuid.Nil && p.TenantID == tid && p.ActorRef != uuid.Nil && p.OrgRef != uuid.Nil &&
+		p.KN == nil && p.SelectedSession == nil && !p.Has("kn_user") && !p.Has(port.RoleCoopManager) &&
+		!p.Has(port.RoleFarmer) && !p.Has(partyport.RolePartnerSync) &&
+		(p.Has(port.RolePlotEditor) || p.Has(port.RolePlotViewer) || p.Has(geoport.RoleGeoAdmin) || p.Has(syncport.RoleConflictResolver))
+	// A caller may carry an explicitly granted foreign tenant. Never bind the
+	// principal's native communes into that context, even when a port supplies
+	// the principal tenant as its transaction target.
+	if current, err := tenant.FromContext(ctx); err == nil && current != tid {
+		native = false
+	}
+	var communes string
+	project := false
+	if native {
+		_, joined := shareddb.JoinedTx(ctx)
+		_, directTx := s.DB.(pgx.Tx)
+		if joined || directTx {
+			return ErrDependency.WithDetail("phạm vi native phải được giải trước giao dịch hiện hành")
+		}
+		if s.Scope == nil {
+			return ErrDependency.WithDetail("chưa nối bộ tính phạm vi (pf/party)")
+		}
+		sc, err := s.Scope.Scope(ctx)
+		if err != nil {
+			return err
+		}
+		// An All scope never clears the node or grants tenant-wide DB access.
+		// Keep the existing projected-node restriction in that case.
+		if !sc.All {
+			// An empty SQL xa_ids serializes as NULL, which is also used by
+			// the existing draft policy. Deny before opening a transaction;
+			// an empty server scope must never acquire that draft fallback.
+			if len(sc.Units) == 0 {
+				return ErrOutOfScope
+			}
+			communes = (shareddb.ContextVars{XaIDs: sc.Units}).Settings()[shareddb.VarXaIDs]
+			project = true
+		}
+	}
+	return tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+		if project {
+			if _, err := tx.Exec(ctx, "SELECT set_config('app.xa_ids', $1, true)", communes); err != nil {
+				return err
+			}
+		}
+		return fn(tx)
+	})
 }
