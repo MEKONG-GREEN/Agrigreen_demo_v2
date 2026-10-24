@@ -21,6 +21,7 @@ import (
 	port "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	shareddb "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
@@ -314,8 +315,8 @@ func (s *Service) eventTime(t time.Time) (time.Time, error) {
 }
 
 func (s *Service) inTx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {
-	// Native GIS roles use the server-resolved commune scope as well as their
-	// projected node. Resolve it before acquiring this module's connection:
+	// Native GIS and sync conflict roles use the server-resolved commune scope
+	// as well as their projected node. Resolve it before acquiring this module's connection:
 	// the party resolver may need its own transaction. Do not replace a selected
 	// session/KN scope, a cooperative owner's scope, or a partner/job context.
 	p, authenticated := authz.FromContext(ctx)
@@ -323,7 +324,7 @@ func (s *Service) inTx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error
 	native := authenticated && !apiClient && p.TenantID == tid && p.OrgRef != uuid.Nil &&
 		p.KN == nil && p.SelectedSession == nil && !p.Has(port.RoleCoopManager) &&
 		!p.Has(port.RoleFarmer) && !p.Has(partyport.RolePartnerSync) &&
-		(p.Has(port.RolePlotEditor) || p.Has(port.RolePlotViewer) || p.Has(geoport.RoleGeoAdmin))
+		(p.Has(port.RolePlotEditor) || p.Has(port.RolePlotViewer) || p.Has(geoport.RoleGeoAdmin) || p.Has(syncport.RoleConflictResolver))
 	var communes string
 	project := false
 	if native {
