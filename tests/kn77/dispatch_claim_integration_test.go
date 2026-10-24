@@ -10,7 +10,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -154,7 +153,7 @@ func TestP0WorkerReports_ConcurrentWorkersSendOnce(t *testing.T) {
 }
 
 // TestP0WorkerReports_StaleSendingResumes — #128: worker chết giữa lượt (đã gửi người 1) → lần gửi kẹt "sending" với việc
-// còn hạn: giao lại không gửi song song, "Gửi lại" bị chặn (409); quá hạn (AG_REPORT_DISPATCH_LEASE, mặc định 15 phút) →
+// còn hạn: giao lại không gửi song song, "Gửi lại" bị chặn (409); quá hạn (AG_REPORT_DISPATCH_LEASE, mặc định 15 phút; kiểm thử tiến đồng hồ 16 phút) →
 // "Gửi lại" TIẾP TỤC CÙNG LƯỢT: chỉ gửi người 2, người 1 không nhận lần hai; trạng thái "sent".
 func TestP0WorkerReports_StaleSendingResumes(t *testing.T) {
 	c := setupCycle(t)
@@ -193,7 +192,7 @@ func TestP0WorkerReports_StaleSendingResumes(t *testing.T) {
 		"reports.dispatch_sending", "gửi lại khi còn hạn")
 
 	// Quá hạn → "Gửi lại" tiếp tục cùng lượt.
-	f.setClock(f.clk.Now().Add(dispatch.DefaultSendLease + time.Minute))
+	f.setClock(f.clk.Now().Add(16 * time.Minute))
 	c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusAccepted, "gửi lại sau hạn")
 	evs = f.events(repport.EventDispatchRequested)
 	ev2 := evs[len(evs)-1]

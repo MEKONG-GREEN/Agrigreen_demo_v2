@@ -6,7 +6,9 @@
 --   claim_until  hạn nhận việc; worker gia hạn sau mỗi người nhận. Quá hạn khi còn 'sending' → worker khác (giao lại
 --                sự kiện) hoặc người dùng "Gửi lại" tiếp tục CÙNG lượt gửi: người đã có dấu recipient_mailed không bị gửi lại.
 -- Nhận việc = một câu UPDATE … WHERE status = 'sending' AND attempts = $n AND (claim_until IS NULL OR claim_until <= now)
--- RETURNING — giao dịch riêng, commit trước khi gửi.
+-- (một câu, đếm dòng bị đổi) — giao dịch riêng, commit trước khi gửi.
+
+SET LOCAL lock_timeout = '5s';
 
 ALTER TABLE pf_reports.dispatch
   ADD COLUMN claim_token uuid NULL,
