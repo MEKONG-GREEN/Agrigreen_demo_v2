@@ -1,7 +1,7 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createAdminApiClient, createApiClient } from "@/api/client";
+import { createAdminApiClient, createApiClient, unwrap } from "@/api/client";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsVersions } from "@/api/mock/kn-cnts-catalogs";
 import { CntsCatalogItemFormScreen, CntsCatalogItemScreen, CntsCatalogScreen, catalogBase } from "./CntsCatalogScreen";
@@ -151,6 +151,70 @@ describe("màn Danh mục CNTS (mock theo hợp đồng /v1/masterdata/catalogs/
     expect(await screen.findByRole("heading", { level: 1, name: /Trâu ta/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Sửa" })).toHaveAttribute("href", "/kn/cnts/danh-muc/cnts_species/TRAU/sua");
     expect(await screen.findByRole("table", { name: "Các giá trị có hiệu lực từ ngày" })).toBeTruthy();
+  });
+
+  // Codex review #101: danh sách đọc tại "Xem tại ngày" nhưng liên kết Xem/Sửa mất ngày đó → trang riêng nạp hôm nay.
+  const admin = () => createAdminApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.setter", fetch: mockAdminFetchNoDelay });
+  const followFromList = async (at: string, linkName: string, params: Record<string, string>) => {
+    const { unmount } = render(<CntsCatalogScreen />);
+    fireEvent.change(screen.getByLabelText("Xem tại ngày"), { target: { value: at } });
+    const href = (await screen.findByRole("link", { name: linkName })).getAttribute("href")!;
+    unmount();
+    const [path, search = ""] = href.split("?");
+    nav.path = path!;
+    nav.search = search;
+    nav.params = params;
+    return href;
+  };
+
+  it("mục có hiệu lực tương lai, chọn tại ngày đó: liên kết Sửa/Xem mang ?at= và trang riêng nạp đúng ngày", async () => {
+    nav.path = "/kn/cnts/danh-muc";
+    const today = await unwrap(admin().GET("/v1/masterdata/catalogs/{catalog}/items", { params: { path: { catalog: "cnts_species" }, query: { include_inactive: true } } }));
+    const attrs = today.items.find((x) => x.code === "TRAU")!.attrs;
+    await unwrap(
+      admin().POST("/v1/masterdata/catalogs/{catalog}/items", {
+        params: { path: { catalog: "cnts_species" }, header: { "Idempotency-Key": "review101-future" } },
+        body: { code: "REVIEW_FUTURE_101", name: "Vật nuôi hiệu lực tương lai", attrs, valid_from: "2099-01-01" },
+      }),
+    );
+    const edit = await followFromList("2099-01-01", "Sửa Vật nuôi hiệu lực tương lai", { type: "cnts_species", code: "REVIEW_FUTURE_101" });
+    expect(edit).toBe("/kn/cnts/danh-muc/cnts_species/REVIEW_FUTURE_101/sua?at=2099-01-01");
+    const { unmount } = render(<CntsCatalogItemFormScreen />);
+    expect(await screen.findByRole("heading", { level: 1 })).not.toHaveTextContent("Không có mục");
+    expect(screen.getByLabelText(/^Tên \*$/)).toHaveValue("Vật nuôi hiệu lực tương lai");
+    expect(screen.getByRole("link", { name: "Hủy" })).toHaveAttribute("href", "/kn/cnts/danh-muc/cnts_species/REVIEW_FUTURE_101?at=2099-01-01");
+    unmount();
+    nav.path = "/kn/cnts/danh-muc/cnts_species/REVIEW_FUTURE_101";
+    render(<CntsCatalogItemScreen />);
+    expect(await screen.findByRole("heading", { level: 1, name: /Vật nuôi hiệu lực tương lai/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Sửa" })).toHaveAttribute("href", "/kn/cnts/danh-muc/cnts_species/REVIEW_FUTURE_101/sua?at=2099-01-01");
+    expect(screen.getByRole("link", { name: "Vật nuôi" })).toHaveAttribute("href", "/kn/cnts/danh-muc?tab=cnts_species&at=2099-01-01");
+  });
+
+  it("mục có hai giá trị theo ngày: trang Sửa/Xem hiện giá trị tại ngày đã chọn, ?at= sai → hôm nay", async () => {
+    nav.path = "/kn/cnts/danh-muc";
+    const cur = (await unwrap(admin().GET("/v1/masterdata/catalogs/{catalog}/items", { params: { path: { catalog: "cnts_species" }, query: { include_inactive: true } } }))).items.find(
+      (x) => x.code === "TRAU",
+    )!;
+    await unwrap(
+      admin().PUT("/v1/masterdata/catalogs/{catalog}/items/{code}", {
+        params: { path: { catalog: "cnts_species", code: "TRAU" } },
+        body: { name: "Trâu (từ 2099)", attrs: cur.attrs, valid_from: "2099-01-01" },
+      }),
+    );
+    await followFromList("2099-06-01", "Sửa Trâu (từ 2099)", { type: "cnts_species", code: "TRAU" });
+    let r = render(<CntsCatalogItemFormScreen />);
+    expect(await screen.findByLabelText(/^Tên \*$/)).toHaveValue("Trâu (từ 2099)");
+    r.unmount();
+    nav.path = "/kn/cnts/danh-muc/cnts_species/TRAU";
+    r = render(<CntsCatalogItemScreen />);
+    expect(await screen.findByRole("heading", { level: 1, name: /Trâu \(từ 2099\)/ })).toBeTruthy();
+    r.unmount();
+    nav.search = "at=2099-13-45";
+    render(<CntsCatalogItemScreen />);
+    const h = await screen.findByRole("heading", { level: 1, name: new RegExp(cur.name) });
+    expect(h).not.toHaveTextContent("2099");
+    expect(screen.getByRole("link", { name: "Sửa" })).toHaveAttribute("href", "/kn/cnts/danh-muc/cnts_species/TRAU/sua");
   });
 
   it("gốc route danh mục cho cả Phòng CNTS và Admin › Phòng ban", () => {

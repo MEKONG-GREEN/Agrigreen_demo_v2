@@ -66,6 +66,18 @@ function isCntsCatalog(v: string | null | undefined): v is CntsCatalog {
 
 const itemHref = (base: string, catalog: string, code: string) => `${base}/${catalog}/${encodeURIComponent(code)}`;
 
+/** Ngày tham chiếu từ `?at=YYYY-MM-DD` (ngày "Xem tại ngày" của danh sách); thiếu hoặc sai → hôm nay. */
+export function parseAt(v: string | null | undefined): string {
+  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return vnToday();
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : vnToday();
+}
+
+/** Giữ ngày tham chiếu khi chuyển trang (Codex review #101); hôm nay là mặc định nên không cần ghi vào URL. */
+function withAt(href: string, at: string): string {
+  return at === vnToday() ? href : `${href}${href.includes("?") ? "&" : "?"}at=${at}`;
+}
+
 /** Truy cập danh mục: Admin (masterdata_admin) qua Admin API, người khác chỉ đọc qua Application API. */
 function useCatalogApi() {
   const { api, adminApi, principal } = useAuth();
@@ -157,7 +169,7 @@ export function CntsCatalogScreen() {
     const t = sp?.get("tab");
     return t === "thresholds" || isCntsCatalog(t) ? t : "cnts_species";
   });
-  const [at, setAt] = useState(vnToday());
+  const [at, setAt] = useState(() => parseAt(sp?.get("at")));
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [nonce, setNonce] = useState(0);
@@ -202,8 +214,8 @@ export function CntsCatalogScreen() {
             <span className="row">
               <RowActions
                 label={i.name}
-                viewHref={itemHref(base, i.catalog, i.code)}
-                editHref={ca.canEdit ? `${itemHref(base, i.catalog, i.code)}/sua` : undefined}
+                viewHref={withAt(itemHref(base, i.catalog, i.code), at)}
+                editHref={ca.canEdit ? withAt(`${itemHref(base, i.catalog, i.code)}/sua`, at) : undefined}
               />
               {ca.canEdit ? (
                 i.active ? (
@@ -233,7 +245,7 @@ export function CntsCatalogScreen() {
                 <Icon name="upload" size={15} />
                 Nạp Excel
               </button>
-              <Link className="btn btn-p btn-sm" href={`${base}/${current.id}/them-moi`}>
+              <Link className="btn btn-p btn-sm" href={withAt(`${base}/${current.id}/them-moi`, at)}>
                 Thêm {current.label.toLowerCase()}
               </Link>
             </span>
@@ -298,16 +310,18 @@ export function CntsCatalogScreen() {
   );
 }
 
-/** Đọc loại danh mục + mã mục từ route; mục được tìm trong danh sách hiện hành (Admin: gồm cả mục ngừng dùng). */
+/** Đọc loại danh mục + mã mục từ route; mục được tìm trong danh sách tại ngày tham chiếu `?at=` (mặc định hôm nay; Admin: gồm
+ * cả mục ngừng dùng) — đúng ngày danh sách đang xem, kể cả mục chỉ có hiệu lực từ ngày tương lai. */
 function useRouteItem() {
   const params = useParams<{ type?: string; code?: string }>();
   const type = params?.type;
   const code = params?.code ? decodeURIComponent(params.code) : undefined;
   const base = catalogBase(usePathname());
+  const at = parseAt(useSearchParams()?.get("at"));
   const ca = useCatalogApi();
   const tab = isCntsCatalog(type) ? tabOf(type) : null;
-  const item = useLoad(tab && code ? () => ca.list(tab.id, vnToday()).then((ls) => ({ item: ls.find((i) => i.code === code) ?? null })) : null, [tab?.id, code]);
-  return { tab, code, base, ca, item };
+  const item = useLoad(tab && code ? () => ca.list(tab.id, at).then((ls) => ({ item: ls.find((i) => i.code === code) ?? null })) : null, [tab?.id, code, at]);
+  return { tab, code, base, at, ca, item };
 }
 
 function NotFound({ base, what }: { base: string; what: string }) {
@@ -320,37 +334,40 @@ function NotFound({ base, what }: { base: string; what: string }) {
 
 /** Trang Thêm / Sửa mục danh mục CNTS (dùng chung mọi loại danh mục). */
 export function CntsCatalogItemFormScreen() {
-  const { tab, code, base, ca, item } = useRouteItem();
+  const { tab, code, base, at, ca, item } = useRouteItem();
   if (!tab) return <NotFound base={base} what="Danh mục không tồn tại" />;
+  const listHref = withAt(`${base}?tab=${tab.id}`, at);
   if (!ca.canEdit) {
     return (
-      <DetailPage back={{ href: `${base}?tab=${tab.id}`, label: tab.label }} title={tab.label}>
+      <DetailPage back={{ href: listHref, label: tab.label }} title={tab.label}>
         <ReadOnlyNotice>Chỉ xem — Admin quản trị danh mục CNTS (FN-06).</ReadOnlyNotice>
       </DetailPage>
     );
   }
-  if (!code) return <ItemForm tab={tab} item={null} base={base} />;
+  if (!code) return <ItemForm tab={tab} item={null} base={base} at={at} />;
   return (
     <LoadState s={item}>
-      {(d) => (d.item ? <ItemForm key={d.item.code} tab={tab} item={d.item} base={base} /> : <NotFound base={`${base}?tab=${tab.id}`} what={`Không có mục ${code}`} />)}
+      {(d) => (d.item ? <ItemForm key={`${d.item.code}@${at}`} tab={tab} item={d.item} base={base} at={at} /> : <NotFound base={listHref} what={`Không có mục ${code}`} />)}
     </LoadState>
   );
 }
 
-function ItemForm({ tab, item, base }: { tab: CatalogTab; item: Item | null; base: string }) {
+/** `at`: ngày tham chiếu đã chọn ở danh sách — mục được nạp tại ngày này. Ngày áp dụng mặc định như pop-up cũ (Sửa: hôm nay,
+ * Thêm: ngày đang xem), người dùng vẫn chọn được và gửi nguyên `valid_from` cho API. */
+function ItemForm({ tab, item, base, at }: { tab: CatalogTab; item: Item | null; base: string; at: string }) {
   const ca = useCatalogApi();
   const router = useRouter();
   const [code, setCode] = useState(item?.code ?? "");
   const [name, setName] = useState(item?.name ?? "");
   const [attrs, setAttrs] = useState<Record<string, string>>({ ...(item?.attrs ?? {}) });
-  const [validFrom, setValidFrom] = useState(vnToday());
+  const [validFrom, setValidFrom] = useState(item ? vnToday() : at);
   const [errs, setErrs] = useState<Record<string, string | undefined>>({});
   const [dosesInput, setDosesInput] = useState<string | undefined>();
   const [key] = useState(newIdempotencyKey);
   const act = useAction();
   const server = act.problem ? fieldErrorMap(act.problem) : {};
-  const listHref = `${base}?tab=${tab.id}`;
-  const back = item ? itemHref(base, tab.id, item.code) : listHref;
+  const listHref = withAt(`${base}?tab=${tab.id}`, at);
+  const back = item ? withAt(itemHref(base, tab.id, item.code), at) : listHref;
   const refCatalogs = [...new Set(tab.fields.flatMap((f) => (f.kind === "ref" ? [f.catalog] : f.kind === "doses" ? ["cnts_vaccine" as CntsCatalog] : [])))];
   const opts = useLoad(
     () => Promise.all(refCatalogs.map((c) => ca.list(c, validFrom))).then((ls) => Object.fromEntries(refCatalogs.map((c, i) => [c, ls[i]!])) as Record<CntsCatalog, Item[]>),
@@ -443,25 +460,25 @@ function ItemForm({ tab, item, base }: { tab: CatalogTab; item: Item | null; bas
   );
 }
 
-/** Trang chi tiết mục danh mục: thuộc tính tại hôm nay + các giá trị theo ngày hiệu lực (Admin). */
+/** Trang chi tiết mục danh mục: thuộc tính tại ngày tham chiếu `?at=` (mặc định hôm nay) + các giá trị theo ngày hiệu lực (Admin). */
 export function CntsCatalogItemScreen() {
-  const { tab, code, base, ca, item } = useRouteItem();
-  const names = useRefNames(vnToday());
+  const { tab, code, base, at, ca, item } = useRouteItem();
+  const names = useRefNames(at);
   if (!tab || !code) return <NotFound base={base} what="Danh mục không tồn tại" />;
   return (
     <LoadState s={item}>
       {(d) =>
         d.item ? (
-          <ItemDetail tab={tab} item={d.item} base={base} canEdit={ca.canEdit} names={names.data ?? {}} />
+          <ItemDetail tab={tab} item={d.item} base={base} at={at} canEdit={ca.canEdit} names={names.data ?? {}} />
         ) : (
-          <NotFound base={`${base}?tab=${tab.id}`} what={`Không có mục ${code}`} />
+          <NotFound base={withAt(`${base}?tab=${tab.id}`, at)} what={`Không có mục ${code}`} />
         )
       }
     </LoadState>
   );
 }
 
-function ItemDetail({ tab, item, base, canEdit, names }: { tab: CatalogTab; item: Item; base: string; canEdit: boolean; names: Record<string, string> }) {
+function ItemDetail({ tab, item, base, at, canEdit, names }: { tab: CatalogTab; item: Item; base: string; at: string; canEdit: boolean; names: Record<string, string> }) {
   const ca = useCatalogApi();
   const versions = useLoad(
     canEdit
@@ -477,12 +494,12 @@ function ItemDetail({ tab, item, base, canEdit, names }: { tab: CatalogTab; item
   const href = itemHref(base, tab.id, item.code);
   return (
     <DetailPage
-      back={{ href: `${base}?tab=${tab.id}`, label: tab.label }}
+      back={{ href: withAt(`${base}?tab=${tab.id}`, at), label: tab.label }}
       title={item.name}
       badge={item.active ? <StatusPill tone="ok">Đang dùng</StatusPill> : <StatusPill>Ngừng dùng</StatusPill>}
       actions={
         canEdit ? (
-          <Link className="btn btn-p" href={`${href}/sua`}>
+          <Link className="btn btn-p" href={withAt(`${href}/sua`, at)}>
             Sửa
           </Link>
         ) : null
