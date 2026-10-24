@@ -31,6 +31,21 @@ func ref(n int) uuid.UUID {
 	return uuid.MustParse(fmt.Sprintf("00000000-0000-7000-8000-%012d", n))
 }
 
+// fixtureScope stands in for pf/party's ScopeResolver (production assembly
+// wires pty.ScopeResolver() into cooperative). The synthetic KN roots 990/991
+// exist only in k_ref, so the resolver mirrors their projected admin unit
+// (ttkn_province 89). Unknown callers resolve to an empty scope, which native
+// season reads deny before opening a transaction.
+type fixtureScope struct{}
+
+func (fixtureScope) Scope(ctx context.Context) (authz.Scope, error) {
+	p, _ := authz.FromContext(ctx)
+	if p.OrgRef == ref(990) || p.OrgRef == ref(991) {
+		return authz.Scope{Units: []string{"89", "89001"}}, nil
+	}
+	return authz.Scope{}, nil
+}
+
 type fixture struct {
 	t          *testing.T
 	admin      *pgxpool.Pool
@@ -43,7 +58,7 @@ func newFixture(t *testing.T) *fixture {
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	directory := party.New(pool, clock.System{}).OrgDirectory()
 	f := &fixture{t: t, admin: env.AdminPool(t, migrations.PF), tid: ids.New(), other: ids.New()}
-	f.native = cooperative.New(pool, clock.System{}, cooperative.Deps{Dir: directory})
+	f.native = cooperative.New(pool, clock.System{}, cooperative.Deps{Dir: directory, Scope: fixtureScope{}})
 	f.seed(f.tid, false)
 	f.seed(f.other, true)
 	return f
@@ -85,6 +100,13 @@ func (f *fixture) seedPrincipalScopeProjection(tid uuid.UUID) {
 		}
 		f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$3,1)", tid, ref(root), ref(n))
 	}
+	// KN commune caller 998: a projected node (self edge only, no HTX
+	// descendants), so it reaches HTX rows solely through app.xa_ids. Since
+	// #130 an unprojected caller is denied even on the commune branch; 997
+	// stays unprojected for that negative case.
+	f.exec(`INSERT INTO k_ref.org(tenant_id,ref,kind,code,admin_unit_code,active,source_seq)
+    VALUES($1,$2,'extension_team','N998','89001',true,1)`, tid, ref(998))
+	f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$2,0)", tid, ref(998))
 }
 
 func (f *fixture) seed(tid uuid.UUID, other bool) {

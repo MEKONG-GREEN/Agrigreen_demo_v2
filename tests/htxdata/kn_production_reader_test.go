@@ -141,24 +141,30 @@ func TestKNPublishedProductionPrincipalScopes(t *testing.T) {
 			{ActorRef: ref(900), OrgRef: ref(101), Roles: []string{kn.RoleCoopManager}},
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNXa, OrgRef: ref(990), Department: "trong_trot", Communes: []string{"89001"}, Scope: authz.Scope{Units: []string{"89001"}}}},
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNXa, OrgRef: ref(998), Department: "trong_trot", Communes: []string{"89001"}, Scope: authz.Scope{Units: []string{"89001"}}}},
+			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNXa, OrgRef: ref(997), Department: "trong_trot", Communes: []string{"89001"}, Scope: authz.Scope{Units: []string{"89001"}}}},
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNTinh, OrgRef: ref(990), Department: "trong_trot", Scope: authz.Scope{Units: []string{"89"}}}},
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNAdmin, Scope: authz.Scope{All: true}}},
 		}
 		for _, p := range principals {
 			p.TenantID = tid
 			ctx := authz.WithPrincipal(tenant.WithID(context.Background(), tid), p)
+			unprojected := p.KN != nil && p.KN.OrgRef == ref(997)
 			for _, sc := range []authz.Scope{{All: true}, {Units: []string{"89001"}}, {Units: []string{"92001"}}} {
 				for flags := 0; flags < 8; flags++ {
 					q := cropcyclesrc.ProductionQuery{TenantID: tid, Scope: sc, ByCooperative: flags&1 != 0, BySeason: flags&2 != 0, ByVariety: flags&4 != 0}
 					d := compareProduction(t, f, r, ctx, q)
-					if tid == f.tid && p.KN != nil && p.KN.Role == authz.KNXa && sc.All && d.Totals.Seasons != 2 {
+					// #130 fail-closed: no caller projection, no seasons.
+					if unprojected && (d.Totals.Seasons != 0 || len(d.Rows) != 0) {
+						t.Fatalf("unprojected caller escaped RLS: %+v", d)
+					}
+					if tid == f.tid && p.KN != nil && p.KN.Role == authz.KNXa && !unprojected && sc.All && d.Totals.Seasons != 2 {
 						t.Fatalf("KN commune escaped actual node RLS: %+v", d)
 					}
 				}
 			}
 		}
 	}
-	t.Log("288 reconciliations under real node RLS, including KN context with no node projection")
+	t.Log("336 reconciliations under real node RLS, including a KN caller with no node projection (denied)")
 }
 
 type productionUnavailableDB struct {

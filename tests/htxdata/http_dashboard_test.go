@@ -40,15 +40,22 @@ func (dashboardScope) Scope(ctx context.Context) (authz.Scope, error) {
 func TestKNHTTPDashboardPublishedHTXData(t *testing.T) {
 	f := newFixture(t)
 	// The application ScopeResolver below is deliberately fake. Seed its caller
-	// nodes/self edges so missing caller projection is not the reason for denial;
-	// do not attach HTX organizations to a KN tree or invent a selected session.
+	// nodes, self edges and test-only edges to the source-projected HTX of their
+	// area (as seedPrincipalScopeProjection does with roots 990/991). Since #130
+	// p_scope is fail-closed: a caller node without projection or descendants
+	// no longer falls back to tenant-wide reads. These edges do not define the
+	// target KN/HTX organization model; no selected session is invented.
 	for _, node := range []struct {
 		n          int
 		kind, unit string
-	}{{901, "ttkn_province", "89"}, {902, "ttkn_province", "92"}, {903, "extension_team", "89001"}} {
+		htx        []int
+	}{{901, "ttkn_province", "89", []int{101, 102, 104}}, {902, "ttkn_province", "92", []int{103}}, {903, "extension_team", "89001", []int{101, 102, 104}}} {
 		f.exec(`INSERT INTO k_ref.org(tenant_id,ref,kind,code,admin_unit_code,active,source_seq)
     VALUES($1,$2,$3,$4,$5,true,1)`, f.tid, ref(node.n), node.kind, fmt.Sprintf("N%d", node.n), node.unit)
 		f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$2,0)", f.tid, ref(node.n))
+		for _, h := range node.htx {
+			f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$3,1)", f.tid, ref(node.n), ref(h))
+		}
 	}
 	empty := ids.New()
 	for _, tid := range []uuid.UUID{f.tid, empty} {

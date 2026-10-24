@@ -136,12 +136,14 @@ func TestKNPublishedHTXPrincipalScopesReconcileNative(t *testing.T) {
 			{ActorRef: ref(900), OrgRef: ref(101), Roles: []string{kn.RoleCoopManager}},
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNXa, OrgRef: ref(990), Department: "trong_trot", Communes: []string{"89001"}, Scope: authz.Scope{Units: []string{"89001"}}}},
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNXa, OrgRef: ref(998), Department: "trong_trot", Communes: []string{"89001"}, Scope: authz.Scope{Units: []string{"89001"}}}},
+			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNXa, OrgRef: ref(997), Department: "trong_trot", Communes: []string{"89001"}, Scope: authz.Scope{Units: []string{"89001"}}}},
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNTinh, OrgRef: ref(990), Department: "trong_trot", Scope: authz.Scope{Units: []string{"89"}}}},
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNAdmin, Scope: authz.Scope{All: true}}},
 		}
 		for _, p := range principals {
 			p.TenantID = tid
 			ctx := authz.WithPrincipal(tenant.WithID(context.Background(), tid), p)
+			unprojected := p.KN != nil && p.KN.OrgRef == ref(997)
 			for _, units := range [][]string{nil, {}, {"89001"}, {"92001"}, {"unknown"}} {
 				native, e := f.native.Cooperatives().ByUnit(ctx, units)
 				if e != nil {
@@ -169,7 +171,20 @@ func TestKNPublishedHTXPrincipalScopesReconcileNative(t *testing.T) {
 					t.Fatal(e)
 				}
 				equal(t, gotPlots, wantPlots)
-				if tid == f.tid && p.KN != nil && p.KN.Role == authz.KNXa && units == nil {
+				// #130 fail-closed: a caller node without k_ref projection reads
+				// no pf_coop rows (households, plots), even with communes in its
+				// context. Cooperative counts come from the org directory.
+				if unprojected {
+					for _, v := range got {
+						if v.Households != 0 {
+							t.Fatalf("unprojected caller escaped RLS: %+v", got)
+						}
+					}
+					if len(gotPlots) != 0 {
+						t.Fatalf("unprojected caller escaped RLS: %+v", gotPlots)
+					}
+				}
+				if tid == f.tid && p.KN != nil && p.KN.Role == authz.KNXa && !unprojected && units == nil {
 					if len(gotPlots) != 1 || gotPlots[0].CommuneCode != "89001" || gotPlots[0].Plots != 3 {
 						t.Fatalf("commune RLS escaped: %+v", gotPlots)
 					}
