@@ -62,6 +62,13 @@ snapshot cũ; cửa sổ bảo trì là điều kiện vận hành cho Rebuild h
   rollback nguồn/outbox/closure, 24 yêu cầu đồng thời với 13 hồ sơ thật,
   replay cùng khóa khi kiểm MST chạy đua, RLS đóng, quyền module/cross-tenant,
   cha chờ di chuyển rồi worker đồng bộ và retry, đổi tên nguồn, đường cha thiếu.
+- Fixture drill `b8e1a3c5`: `go test -v -count=1 -p 1 -timeout 20m
+  ./cmd/drill -run ''^TestDrillKRefRebuildMatchesSource_W25$''` trên Go 1.26.10
+  qua PostgreSQL tạm — 1 PASS, 0 FAIL, 0 SKIP; cluster đã dọn. Fixture xóa đúng
+  tenant giả khỏi projection sau INSERT nguồn để mô phỏng dữ liệu cũ chưa chiếu,
+  giữ yêu cầu Before=0/After=6 và lần rebuild lặp không drift. Không sửa mã rebuild
+  hoặc tắt trigger. Lượt trước ở `72a8dfb9` FAIL vì fixture giả định INSERT chưa
+  tự chiếu; không dùng kết quả đó làm PASS.
 - Toàn bộ `party/app` và `party/handler` PASS trên ứng viên `080c174e` có cùng
   byte mã production/migration với nguồn cuối. Lượt ghép đó có hai lỗi fixture
   đọc nhầm `seq` thay vì `event.seq`; e92 sửa đúng fixture và chạy lại đủ 10 ca.
