@@ -15905,6 +15905,8 @@ components:
         previous_week_start: {type: string, format: date}
         previous_available: {type: boolean, description: "Tuần trước có lịch để sao chép"}
         checkin_enabled: {type: boolean, description: "Phòng ban của người gọi dùng check-in GPS (W11.46) — Mobile hiện nút Check-in"}
+        owner_level: {type: string, enum: [commune, province], description: "Cấp đăng ký lịch của người gọi theo phiên KN (commune = cán bộ xã, bắt buộc Xã/phường)"}
+        commune_codes: {type: array, items: {type: string}, description: "Xã phụ trách của người gọi theo phiên KN, có cả khi tuần chưa có lịch (schedule null); rỗng với cán bộ tỉnh"}
     ExtWorkScheduleCounts:
       type: object
       required: [week_start, draft, pending, approved, changes_requested, unregistered, pending_open_weeks]

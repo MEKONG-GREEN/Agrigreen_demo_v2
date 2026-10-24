@@ -68,9 +68,14 @@ class _WsServer {
   final List<Map<String, Object?>> saves = [];
   final List<String?> mineCalls = [];
 
+  /// Phạm vi người gọi theo phiên KN (`owner_level`, `commune_codes` ở cấp
+  /// trên của `mine`) — null: bản máy chủ cũ chưa trả.
+  Map<String, Object?>? scope;
+
   Map<String, Object?> mine(String week) {
     final ws = parseYmd(week)!;
     return {
+      ...?scope,
       'week_start': week,
       'week_end': ymd(ws.add(const Duration(days: 6))),
       'submit_due_at': '2026-10-02T17:00:00+07:00',
@@ -460,6 +465,59 @@ void main() {
       expect(v.offline, isTrue);
       expect(v.fetchedAt, isNotNull);
       expect(v.status, WsStatus.pending);
+    });
+
+    test('R-B1 (review #99): tuần mới (schedule null) — cán bộ xã vẫn có xã phụ trách, Xã/phường bắt buộc', () async {
+      srv.scope = {
+        'owner_level': 'commune',
+        'commune_codes': ['30280', '30281'],
+      };
+      var v = await svc.load(_week);
+      expect(v.scheduleId, isNull, reason: 'tuần chưa đăng ký');
+      expect(v.communeCodes, ['30280', '30281']);
+      expect(v.requireCommune, isTrue);
+      await expectLater(
+        svc.upsertItem(_week, _item(svc.newItemId(), _week, commune: null)),
+        throwsA(
+          isA<WorkScheduleError>().having(
+            (e) => e.field,
+            'field',
+            'commune_code',
+          ),
+        ),
+      );
+      v = await svc.upsertItem(
+        _week,
+        _item(svc.newItemId(), _week, commune: '30281'),
+      );
+      expect(v.items.single.communeCode, '30281');
+      v = await svc.save(_week, submit: true);
+      expect(srv.saves.single['items'], [
+        isA<Map<String, Object?>>().having(
+          (m) => m['commune_code'],
+          'commune_code',
+          '30281',
+        ),
+      ]);
+
+      // Ngoại tuyến, mở tuần khác chưa từng tải: dùng phạm vi đã đệm.
+      srv.offline = true;
+      v = await svc.load(_week.add(const Duration(days: 7)));
+      expect(v.offline, isTrue);
+      expect(v.communeCodes, ['30280', '30281']);
+      expect(v.requireCommune, isTrue);
+    });
+
+    test('R-B1: cán bộ tỉnh (owner_level province) — Xã/phường không bắt buộc (giả định chờ PO)', () async {
+      srv.scope = {'owner_level': 'province', 'commune_codes': <Object?>[]};
+      var v = await svc.load(_week);
+      expect(v.communeCodes, isEmpty);
+      expect(v.requireCommune, isFalse);
+      v = await svc.upsertItem(
+        _week,
+        _item(svc.newItemId(), _week, commune: null),
+      );
+      expect(v.items, hasLength(1));
     });
 
     test(

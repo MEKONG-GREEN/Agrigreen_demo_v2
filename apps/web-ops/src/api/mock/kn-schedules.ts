@@ -443,6 +443,8 @@ export class WorkScheduleStore {
       schedule: r ? this.detail(c, r) : null,
       previous_week_start: prev,
       previous_available: !!prevRec && this.current(prevRec).items.length > 0,
+      owner_level: c.level,
+      commune_codes: c.level === "commune" ? [...c.communes] : [],
     });
   }
 

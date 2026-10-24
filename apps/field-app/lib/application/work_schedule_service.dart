@@ -46,22 +46,62 @@ class WeekSchedule {
     this.fetchedAt,
     this.loadError,
     this.communeCodes = const [],
+    this.ownerLevel,
+    this.checkinItems = const [],
     this.checkinEnabled = false,
   });
 
   /// W11.46: phòng ban dùng check-in GPS (CNTS) — hiện nút "Check-in".
   final bool checkinEnabled;
 
+  /// Mục của bản ĐÃ DUYỆT còn hiệu lực (máy chủ đối chiếu check-in với bản này):
+  /// lịch đã duyệt → mục máy chủ của bản hiện hành; đang điều chỉnh chờ duyệt lại
+  /// → `approved_items`; chưa có bản nào được duyệt → rỗng.
+  final List<WsItem> checkinItems;
+
+  /// Mục đã duyệt tương ứng [i] (cùng `id`), null khi mục chỉ có ở bản điều chỉnh
+  /// hoặc ở nháp trên máy.
+  WsItem? approvedOf(WsItem i) {
+    for (final a in checkinItems) {
+      if (a.id == i.id) return a;
+    }
+    return null;
+  }
+
   /// Mục được check-in lúc [now]: phòng bật, lịch ĐÃ DUYỆT (hoặc đang điều chỉnh
-  /// nhưng còn bản đã duyệt hiệu lực — log bug TT-07/CN-06, như máy chủ), mục ngoài
-  /// cơ quan của hôm nay, chưa check-in.
-  bool canCheckin(WsItem i, DateTime now) =>
-      checkinEnabled &&
-      scheduleId != null &&
-      (status == WsStatus.approved || (approvedVersion ?? 0) > 0) &&
-      i.fieldWork &&
-      i.checkin == null &&
-      ymd(i.day) == ymd(now);
+  /// nhưng còn bản đã duyệt hiệu lực — log bug TT-07/CN-06, như máy chủ), mục có
+  /// trong bản đã duyệt đó, và theo dữ liệu ĐÃ DUYỆT (không theo bản điều chỉnh):
+  /// ngoài cơ quan, của hôm nay; chưa check-in.
+  bool canCheckin(WsItem i, DateTime now) {
+    if (!checkinEnabled || scheduleId == null || i.checkin != null) {
+      return false;
+    }
+    if (status != WsStatus.approved && (approvedVersion ?? 0) <= 0) {
+      return false;
+    }
+    final a = approvedOf(i);
+    return a != null && a.fieldWork && ymd(a.day) == ymd(now);
+  }
+
+  /// Lý do chưa check-in được mục ngoài cơ quan hôm nay (R-B3), null khi không
+  /// cần báo (check-in được, đã check-in, phòng không dùng check-in, mục khác ngày).
+  String? checkinBlockedReason(WsItem i, DateTime now) {
+    if (!checkinEnabled || i.checkin != null || canCheckin(i, now)) return null;
+    final a = approvedOf(i);
+    final today =
+        ymd(i.day) == ymd(now) || (a != null && ymd(a.day) == ymd(now));
+    if (!today || !(i.fieldWork || (a?.fieldWork ?? false))) return null;
+    if (scheduleId == null ||
+        status == null ||
+        status == WsStatus.draft ||
+        (status != WsStatus.approved && (approvedVersion ?? 0) <= 0)) {
+      return 'Chưa check-in được: lịch chưa được duyệt.';
+    }
+    if (a == null) {
+      return 'Chưa check-in được: mục mới trong phần điều chỉnh, chờ duyệt.';
+    }
+    return 'Chưa check-in được: theo bản đã duyệt, mục này không phải hôm nay.';
+  }
 
   final DateTime weekStart;
   final DateTime submitDueAt;
@@ -116,8 +156,18 @@ class WeekSchedule {
   /// Lỗi tải (403…) khi không có bản đệm.
   final String? loadError;
 
-  /// Xã phụ trách (theo lịch máy chủ) — lựa chọn địa điểm.
+  /// Xã phụ trách của người dùng theo phiên KN (`mine.commune_codes`, có cả
+  /// khi tuần chưa có lịch); bản đệm cũ chưa có trường này → xã của lịch.
   final List<String> communeCodes;
+
+  /// Cấp đăng ký lịch (`mine.owner_level`): `commune` | `province`; null khi
+  /// chưa biết (chưa từng tải được từ máy chủ).
+  final String? ownerLevel;
+
+  /// Cán bộ xã bắt buộc chọn Xã/phường (R-B1, như máy chủ). Chưa biết cấp →
+  /// suy từ danh sách xã (cán bộ tỉnh không có xã phụ trách).
+  bool get requireCommune =>
+      ownerLevel == null ? communeCodes.isNotEmpty : ownerLevel == 'commune';
 
   bool get versionConflict =>
       syncError == WorkScheduleService.versionConflictCode;
@@ -287,6 +337,7 @@ class WorkScheduleService {
       week,
       srv,
       draft,
+      scope: srv?['owner_level'] is String ? srv : await _lastScope(),
       offline: offline,
       fetchedAt: cached?.$2,
       loadError: srv == null ? loadError : null,
@@ -357,6 +408,8 @@ class WorkScheduleService {
       fetchedAt: v.fetchedAt,
       loadError: v.loadError,
       communeCodes: v.communeCodes,
+      ownerLevel: v.ownerLevel,
+      checkinItems: v.checkinItems,
       checkinEnabled: enabled,
     );
   }
@@ -371,7 +424,7 @@ class WorkScheduleService {
     if (!v.canCheckin(item, now)) {
       throw WorkScheduleError(
         'checkin',
-        'Chỉ check-in mục công tác ngoài cơ quan của hôm nay, sau khi đã gửi lịch.',
+        v.checkinBlockedReason(item, now) ?? 'Chỉ check-in mục công tác ngoài cơ quan của hôm nay, theo lịch đã duyệt.',
       );
     }
     final src = location;
@@ -428,6 +481,8 @@ class WorkScheduleService {
         if (e is Map) ?WsItem.fromJson(e.cast<String, Object?>()),
   ];
 
+  static List<Object?>? _list(Object? v) => v is List ? v : null;
+
   static int? _int(Object? v) => v is num ? v.toInt() : null;
 
   static DateTime? _time(Object? v) =>
@@ -478,10 +533,31 @@ class WorkScheduleService {
     return d;
   }
 
+  /// Phạm vi (cấp, xã phụ trách) từ bản đệm `mine` gần nhất có trường này —
+  /// dùng khi tuần đang mở chưa tải được (ngoại tuyến, tuần mới).
+  Future<Map<String, Object?>?> _lastScope() async {
+    final rows = await _db.db.query(
+      'catalog_cache',
+      columns: ['json'],
+      where: 'kind = ?',
+      whereArgs: [_srvKind],
+      orderBy: 'fetched_at DESC',
+      limit: 20,
+    );
+    for (final r in rows) {
+      final j = jsonDecode(r['json']! as String);
+      if (j is Map && j['owner_level'] is String) {
+        return j.cast<String, Object?>();
+      }
+    }
+    return null;
+  }
+
   WeekSchedule _view(
     DateTime week,
     Map<String, Object?>? srv,
     _Draft? d, {
+    Map<String, Object?>? scope,
     bool offline = false,
     DateTime? fetchedAt,
     String? loadError,
@@ -540,10 +616,19 @@ class WorkScheduleService {
       fetchedAt: fetchedAt,
       loadError: loadError,
       communeCodes: [
-        if (sched?['commune_codes'] is List)
-          for (final c in sched!['commune_codes']! as List)
-            if (c is String) c,
+        for (final c
+            in _list(scope?['commune_codes']) ??
+                _list(sched?['commune_codes']) ??
+                const [])
+          if (c is String) c,
       ],
+      ownerLevel:
+          scope?['owner_level'] as String? ?? sched?['owner_level'] as String?,
+      checkinItems: switch (WsStatus.tryParse(sched?['status'])) {
+        WsStatus.approved => srvItems,
+        WsStatus.draft || null => const <WsItem>[],
+        _ => _items(detail?['approved_items']),
+      },
     );
   }
 
@@ -575,7 +660,7 @@ class WorkScheduleService {
   Future<WeekSchedule> upsertItem(DateTime week, WsItem item) async {
     week = mondayOf(week);
     final (v, d) = await _editable(week);
-    validateItem(item, week, requireCommune: v.communeCodes.isNotEmpty);
+    validateItem(item, week, requireCommune: v.requireCommune);
     final idx = d.items.indexWhere((i) => i.id == item.id);
     if (idx < 0 && d.items.length >= maxScheduleItems) {
       throw WorkScheduleError(
@@ -712,7 +797,7 @@ class WorkScheduleService {
       );
     }
     for (final i in d.items) {
-      validateItem(i, week, requireCommune: v.communeCodes.isNotEmpty);
+      validateItem(i, week, requireCommune: v.requireCommune);
     }
     // Lệnh trước chưa gửi → thay bằng lệnh mới (một POST cho trạng thái cuối).
     final prevId = d.actionId;

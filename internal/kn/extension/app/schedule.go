@@ -1099,6 +1099,10 @@ type MySchedule struct {
 	PreviousAvailable bool
 	// CheckinEnabled: phòng ban của người gọi dùng check-in GPS (W11.46) — Mobile hiện nút "Check-in".
 	CheckinEnabled bool
+	// OwnerLevel, Communes: cấp và xã phụ trách của người gọi theo phiên KN, không phụ thuộc lịch tuần đã có
+	// (tuần mới chưa đăng ký vẫn biết xã để chọn và bắt buộc Xã/phường với cán bộ xã — BF-SCHED R-B1).
+	OwnerLevel string
+	Communes   []string
 }
 
 // GetMySchedule trả lịch tuần của người gọi (mặc định tuần kế tiếp) kèm hạn đăng ký (FN-XA-03.08 thiết kế:
@@ -1121,7 +1125,11 @@ func (s *Service) GetMySchedule(ctx context.Context, weekRaw string) (MySchedule
 		return MySchedule{}, err
 	}
 	m := MySchedule{Week: week, SubmitDue: st.SubmitDue(week), ReviewDue: st.ReviewDue(week),
-		Locked: domain.WeekLocked(week, now, clock.Zone()), PreviousWeek: week.AddDate(0, 0, -7), CheckinEnabled: st.Checkin}
+		Locked: domain.WeekLocked(week, now, clock.Zone()), PreviousWeek: week.AddDate(0, 0, -7), CheckinEnabled: st.Checkin,
+		OwnerLevel: a.level(), Communes: []string{}}
+	if a.Role == port.KNRoleXa {
+		m.Communes = slices.Clone(a.Communes)
+	}
 	var cur, prev *domain.Schedule
 	err = tenant.WithTenantTx(ctx, s.DB, a.TenantID, func(tx pgx.Tx) error {
 		var e error

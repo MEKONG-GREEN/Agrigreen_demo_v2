@@ -43,16 +43,30 @@ func (c caller) saveSched(week, action string, base any, items ...map[string]any
 	if items == nil {
 		items = []map[string]any{}
 	}
-	// Log bug TT-05/CN-04: Xã/phường (cán bộ xã) và Địa điểm bắt buộc — mục mẫu không ghi thì lấy mặc định.
+	c.fill(items...)
+	return c.post("/v1/extension/work-schedules", map[string]any{"week_start": week, "action": action, "base_version": base, "items": items})
+}
+
+// commune: xã phụ trách của cán bộ xã gọi (theo đơn vị tổ chức của fixture).
+func (c caller) commune() string {
+	if c.org == c.f.org.t30002 {
+		return "30002"
+	}
+	return "30001"
+}
+
+// fill: log bug TT-05/CN-04 — Xã/phường (cán bộ xã) và Địa điểm bắt buộc; mục mẫu không ghi thì lấy xã phụ trách
+// của chính người gọi và địa điểm mặc định. Mục đã ghi sẵn (kể cả xã sai để kiểm 422) giữ nguyên.
+func (c caller) fill(items ...map[string]any) []map[string]any {
 	for _, it := range items {
 		if _, ok := it["commune_code"]; !ok {
-			it["commune_code"] = "30001"
+			it["commune_code"] = c.commune()
 		}
 		if _, ok := it["location"]; !ok && it["place"] == nil {
 			it["location"] = "Trụ sở UBND xã"
 		}
 	}
-	return c.post("/v1/extension/work-schedules", map[string]any{"week_start": week, "action": action, "base_version": base, "items": items})
+	return items
 }
 
 func schedID(r resp) string      { return str(r.body, "schedule", "id") }
@@ -122,16 +136,20 @@ func TestFN_XA_03_08_RegisterSubmitReviewFlow(t *testing.T) {
 	if str(mine.body, "week_start") != nextWeek || mine.body["schedule"] != nil || mine.body["late_now"] != false {
 		t.Fatalf("mặc định tuần kế tiếp, chưa có lịch: %v", mine.body)
 	}
+	// BF-SCHED R-B1: tuần chưa có lịch (schedule null) vẫn trả cấp và xã phụ trách theo phiên KN để app chọn xã.
+	if str(mine.body, "owner_level") != "commune" || joinRefs(mine.body["commune_codes"]) != "30001" {
+		t.Fatalf("mine tuần mới phải có owner_level=commune, commune_codes=[30001]: %v", mine.body)
+	}
 	if !strings.HasPrefix(str(mine.body, "submit_due_at"), "2026-09-18T10:00:00") { // 17:00 VN Thứ Sáu
 		t.Fatalf("hạn đăng ký mặc định 17:00 Thứ Sáu tuần trước: %v", mine.body["submit_due_at"])
 	}
 
 	key := key()
-	body := map[string]any{"week_start": nextWeek, "action": "draft", "items": []map[string]any{
+	body := map[string]any{"week_start": nextWeek, "action": "draft", "items": off.fill(
 		sItem("2026-09-21", "morning", "08:00", "10:00", "Kiểm tra đồng ruộng ấp 1"),
 		sItem("2026-09-21", "morning", "09:00", "11:00", "Họp HTX Tân Phú"),
 		sItem("2026-09-23", "afternoon", "", "", "Tập huấn IPM cho nông dân"),
-	}}
+	)}
 	d := off.must(off.call(http.MethodPost, "/v1/extension/work-schedules", key, body), http.StatusCreated, "lưu nháp")
 	if schedStatus(d) != "draft" || schedVersion(d) != 1 || len(schedItems(d)) != 3 {
 		t.Fatalf("nháp phiên bản 1 với 3 mục: %v", d.body)
@@ -644,9 +662,9 @@ func TestFN_XA_03_08_CopyPreviousAndValidation(t *testing.T) {
 		body map[string]any
 	}{
 		{"không phải Thứ Hai", map[string]any{"week_start": "2026-09-22", "action": "draft", "items": []any{}}},
-		{"ngày ngoài tuần", map[string]any{"week_start": "2026-10-05", "action": "draft", "items": []any{sItem("2026-10-12", "morning", "", "", "Ngoài tuần")}}},
-		{"buổi sai", map[string]any{"week_start": "2026-10-05", "action": "draft", "items": []any{sItem("2026-10-05", "evening", "", "", "Buổi tối")}}},
-		{"giờ kết thúc trước giờ bắt đầu", map[string]any{"week_start": "2026-10-05", "action": "draft", "items": []any{sItem("2026-10-05", "morning", "10:00", "09:00", "Giờ sai")}}},
+		{"ngày ngoài tuần", map[string]any{"week_start": "2026-10-05", "action": "draft", "items": off.fill(sItem("2026-10-12", "morning", "", "", "Ngoài tuần"))}},
+		{"buổi sai", map[string]any{"week_start": "2026-10-05", "action": "draft", "items": off.fill(sItem("2026-10-05", "evening", "", "", "Buổi tối"))}},
+		{"giờ kết thúc trước giờ bắt đầu", map[string]any{"week_start": "2026-10-05", "action": "draft", "items": off.fill(sItem("2026-10-05", "morning", "10:00", "09:00", "Giờ sai"))}},
 		{"gửi lịch rỗng", map[string]any{"week_start": "2026-10-05", "action": "submit", "items": []any{}}},
 		{"quá 8 tuần", map[string]any{"week_start": "2027-01-04", "action": "draft", "items": []any{}}},
 	} {
@@ -657,7 +675,7 @@ func TestFN_XA_03_08_CopyPreviousAndValidation(t *testing.T) {
 	// id do máy sinh (ngoại tuyến) được dùng làm mã lịch; dùng lại cho tuần khác → 409.
 	cid := ids.New().String()
 	r := off.must(off.post("/v1/extension/work-schedules", map[string]any{"id": cid, "week_start": "2026-10-05", "action": "draft",
-		"items": []any{sItem("2026-10-05", "morning", "", "", "Lịch ngoại tuyến")}}), http.StatusCreated, "id máy sinh")
+		"items": off.fill(sItem("2026-10-05", "morning", "", "", "Lịch ngoại tuyến"))}), http.StatusCreated, "id máy sinh")
 	if schedID(r) != cid {
 		t.Fatalf("giữ id máy sinh: %v", schedID(r))
 	}

@@ -222,7 +222,7 @@ func (h Handler) mySchedule(c *gin.Context) {
 		"submit_due_at": m.SubmitDue.UTC().Format(time.RFC3339), "review_due_at": m.ReviewDue.UTC().Format(time.RFC3339),
 		"locked": m.Locked, "late_now": m.LateNow, "schedule": sched,
 		"previous_week_start": m.PreviousWeek.Format(time.DateOnly), "previous_available": m.PreviousAvailable,
-		"checkin_enabled": m.CheckinEnabled,
+		"checkin_enabled": m.CheckinEnabled, "owner_level": m.OwnerLevel, "commune_codes": m.Communes,
 	})
 }
 

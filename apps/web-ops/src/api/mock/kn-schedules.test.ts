@@ -70,6 +70,10 @@ describe("sổ lịch công tác giả lập — trạng thái", () => {
   it("Xã: lưu nháp → gửi duyệt → Tỉnh yêu cầu chỉnh sửa (lý do ≥ 10) → sửa, gửi lại → duyệt; Log đủ sự kiện", () => {
     const mine0 = body(store.mine(an(), null));
     expect(mine0).toMatchObject({ week_start: NEXT, schedule: null, previous_available: true, locked: false, late_now: false });
+    // BF-SCHED R-B1: tuần chưa có lịch vẫn trả cấp và xã phụ trách (app chọn xã cho lịch mới).
+    expect(mine0.owner_level).toBe("commune");
+    expect(mine0.commune_codes).toContain("91301");
+    expect(body(store.mine(binh(), null))).toMatchObject({ owner_level: "province", commune_codes: [] });
 
     const d1 = body(store.save(an(), { week_start: NEXT, action: "draft", base_version: null, items: [item(NEXT, { commune_code: "91301" })] }));
     expect(d1.schedule).toMatchObject({ status: "draft", version: 1, item_count: 1 });

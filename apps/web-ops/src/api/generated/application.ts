@@ -12176,6 +12176,13 @@ export interface components {
             previous_available: boolean;
             /** @description Phòng ban của người gọi dùng check-in GPS (W11.46) — Mobile hiện nút Check-in */
             checkin_enabled?: boolean;
+            /**
+             * @description Cấp đăng ký lịch của người gọi theo phiên KN (commune = cán bộ xã, bắt buộc Xã/phường)
+             * @enum {string}
+             */
+            owner_level?: "commune" | "province";
+            /** @description Xã phụ trách của người gọi theo phiên KN, có cả khi tuần chưa có lịch (schedule null); rỗng với cán bộ tỉnh */
+            commune_codes?: string[];
         };
         ExtWorkScheduleCounts: {
             /** Format: date */
