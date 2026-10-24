@@ -76,3 +76,30 @@ func TestOptionsFromEnvStatementTimeoutDefault(t *testing.T) {
 		t.Fatalf("mặc định: %v, %v", o.StatementTimeout, o.envErr)
 	}
 }
+
+func TestAcquireTimeoutFromEnv(t *testing.T) {
+	cases := []struct {
+		val     string
+		want    time.Duration
+		wantErr bool
+	}{
+		{"", 0, false},
+		{"0", -1, false},
+		{"10s", 10 * time.Second, false},
+		{" 1m ", time.Minute, false},
+		{"10", 0, true},
+		{"-1s", 0, true},
+		{"mười giây", 0, true},
+	}
+	for _, c := range cases {
+		got, err := acquireTimeoutFromEnv(c.val)
+		if (err != nil) != c.wantErr || got != c.want {
+			t.Fatalf("acquireTimeoutFromEnv(%q) = %v, %v; muốn %v, lỗi=%v", c.val, got, err, c.want, c.wantErr)
+		}
+	}
+	t.Setenv("AG_DB_ACQUIRE_TIMEOUT", "mười giây")
+	_, err := Open(context.Background(), "postgres://127.0.0.1:1/x", OptionsFromEnv("test"))
+	if err == nil || !strings.Contains(err.Error(), "AG_DB_ACQUIRE_TIMEOUT") {
+		t.Fatalf("Open với biến sai: lỗi = %v", err)
+	}
+}
