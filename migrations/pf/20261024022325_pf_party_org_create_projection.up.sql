@@ -1,6 +1,10 @@
 -- Validate through the source caller's existing SELECT permissions. A recent
 -- move may still be waiting in outbox: never clone its previous ancestor path.
 -- Only fields represented by k_ref matter; source-only renames need no rebuild.
+-- ALTER FUNCTION OWNER requires CREATE on the target schema. Only the NOLOGIN
+-- module owner receives DDL; application roles and runtime SELECT stay unchanged.
+GRANT CREATE ON SCHEMA pf_party TO own_party;
+
 CREATE FUNCTION pf_party.require_created_parent_projection() RETURNS trigger
 LANGUAGE plpgsql SECURITY INVOKER
 SET search_path = pg_catalog, pg_temp
