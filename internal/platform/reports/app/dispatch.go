@@ -679,7 +679,7 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	lease := s.sendLease()
 	token := ids.New()
 	var claimed bool
-	round := 0
+	round, sentAttempt := 0, 0
 	if err := s.tx(ctx, tid, func(claimTx pgx.Tx) error {
 		var err error
 		claimed, err = store.ClaimDispatch(ctx, claimTx, d.ID, d.Attempts, token, now.Add(lease), now)
@@ -695,7 +695,11 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 			d = fresh
 		}
 		// Vòng gửi = số lần đã "sent" (dòng sent chỉ ghi khi còn giữ việc): dấu người nhận khóa theo vòng (review #128).
-		round, err = store.CountDispatchEvents(ctx, claimTx, d.ID, "sent")
+		if round, err = store.CountDispatchEvents(ctx, claimTx, d.ID, "sent"); err != nil {
+			return err
+		}
+		// Lượt của vòng gần nhất đã "sent": dấu dạng cũ chỉ có giá trị cho các lượt SAU đó (vòng chưa hoàn tất).
+		sentAttempt, err = store.LastSentAttempt(ctx, claimTx, d.ID)
 		return err
 	}); err != nil {
 		return err
@@ -833,8 +837,10 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 			if mailed, err = store.HasDispatchEvent(ctx, rtx, d.ID, key); err != nil || mailed {
 				return err
 			}
-			// Dấu dạng cũ (theo lượt, trước review #128) của lượt đang chạy — lượt dở dang lúc nâng cấp.
-			mailed, err = store.HasDispatchEvent(ctx, rtx, d.ID, legacyMailedKey(d.ID, d.Attempts, x))
+			// Dấu dạng cũ (theo lượt, trước review #128) của MỌI lượt thuộc vòng chưa hoàn tất (sau lượt "sent" gần nhất, tới
+			// lượt đang chạy): lượt lỗi một phần trước nâng cấp rồi "Gửi lại" (lượt mới) vẫn không gửi trùng (review Codex
+			// #128 @59a4ec8f). Dấu của lượt ≤ lượt đã "sent" thuộc vòng cũ — vòng mới chủ động vẫn gửi mọi người.
+			mailed, err = store.HasAnyDispatchEvent(ctx, rtx, d.ID, legacyMailedKeys(d.ID, sentAttempt, d.Attempts, x))
 			return err
 		}); err != nil {
 			return err
@@ -963,6 +969,15 @@ func mailedKey(dispatchID uuid.UUID, round int, recipient uuid.UUID) string {
 // legacyMailedKey là dạng khóa cũ (theo lượt attempts) — chỉ đọc, cho lượt dở dang ghi trước review #128.
 func legacyMailedKey(dispatchID uuid.UUID, attempt int, recipient uuid.UUID) string {
 	return fmt.Sprintf("dispatch-mailed:%s:%d:%s", dispatchID, attempt, recipient)
+}
+
+// legacyMailedKeys: khóa dạng cũ của các lượt (afterAttempt, upTo] — các lượt của vòng gửi chưa hoàn tất.
+func legacyMailedKeys(dispatchID uuid.UUID, afterAttempt, upTo int, recipient uuid.UUID) []string {
+	var keys []string
+	for a := max(afterAttempt+1, 1); a <= upTo; a++ {
+		keys = append(keys, legacyMailedKey(dispatchID, a, recipient))
+	}
+	return keys
 }
 
 // isUniqueViolation: lỗi trùng khóa (23505) — idem sổ đã có dòng.

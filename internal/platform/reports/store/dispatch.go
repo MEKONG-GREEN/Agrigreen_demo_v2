@@ -253,6 +253,25 @@ func CountDispatchEvents(ctx context.Context, tx pgx.Tx, dispatchID uuid.UUID, a
 	return n, err
 }
 
+// LastSentAttempt trả lượt (payload attempt) của dòng 'sent' mới nhất của lần gửi, 0 nếu chưa vòng nào hoàn tất — đọc mới.
+func LastSentAttempt(ctx context.Context, tx pgx.Tx, dispatchID uuid.UUID) (int, error) {
+	var n int
+	err := tx.QueryRow(ctx, `SELECT COALESCE(max((payload->>'attempt')::int), 0) FROM pf_reports.dispatch_event
+	  WHERE dispatch_id = $1::uuid AND action = 'sent'`, dispatchID).Scan(&n)
+	return n, err
+}
+
+// HasAnyDispatchEvent cho biết lần gửi đã có dòng sổ với một trong các idem_key — đọc mới.
+func HasAnyDispatchEvent(ctx context.Context, tx pgx.Tx, dispatchID uuid.UUID, idemKeys []string) (bool, error) {
+	if len(idemKeys) == 0 {
+		return false, nil
+	}
+	var ok bool
+	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pf_reports.dispatch_event WHERE dispatch_id = $1::uuid AND idem_key = ANY($2::text[]))`,
+		dispatchID, idemKeys).Scan(&ok)
+	return ok, err
+}
+
 // SentForPeriod cho biết đã có lần gửi thành công cho kỳ.
 func SentForPeriod(ctx context.Context, tx pgx.Tx, periodID uuid.UUID) (bool, error) {
 	var ok bool
