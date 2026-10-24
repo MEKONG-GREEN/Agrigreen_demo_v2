@@ -25,7 +25,9 @@ bằng quyền SELECT sẵn có của caller, cùng khóa tenant với worker. N
 đợi outbox hoặc đường closure thiếu, giao dịch nguồn rollback trước bước hồ sơ.
 Gọi lại cùng khóa sau khi worker chiếu xong; không để lại Nút thiếu hồ sơ. Guard so
 parent_ref/admin_unit_code/active và tính đầy đủ của đường, không so last_seq: đổi
-tên nguồn không có trong projection vẫn cho tạo bình thường. Không thêm quyền DB.
+tên nguồn không có trong projection vẫn cho tạo bình thường. Không thêm quyền cho
+caller/app. Migration cấp CREATE trên pf_party cho own_party NOLOGIN để chuyển
+quyền sở hữu hàm đúng module; tương tự own_kref, app không được membership vai này.
 
 ## RLS
 
