@@ -5,6 +5,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -176,10 +177,14 @@ func (s *Service) CreateZone(ctx context.Context, in ZoneInput) (ZoneView, error
 	replayed := false
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.ZoneByIdem(ctx, tx, idemZone(in.IdemKey)); err != nil || prev != nil {
-			if prev != nil {
-				out, replayed = *prev, true
+			if err != nil {
+				return err
 			}
-			return err
+			if err := s.replayable(ctx, tx, c, *prev, nil, domain.EventCreated); err != nil {
+				return err
+			}
+			out, replayed = *prev, true
+			return nil
 		}
 		province, err := s.callerProvince(ctx, c, in.Province)
 		if err != nil {
@@ -230,6 +235,29 @@ func (s *Service) lockZone(ctx context.Context, tx pgx.Tx, c caller, ref uuid.UU
 	return cur, nil
 }
 
+// replayable kiểm bản đã ghi với Idempotency-Key trước khi trả lại (phát lại): khóa chỉ dùng lại được cho cùng thao tác
+// (event), cùng người ghi, cùng vùng (ref khác nil — sửa/ngưng/khôi phục), và người gọi theo phiên HIỆN HÀNH vẫn sửa được
+// vùng đó — Cấp Tỉnh: tỉnh của vùng và mọi xã của vùng còn trong phạm vi; sửa/ngưng/khôi phục: kiểm thêm bản hiện hành
+// của vùng (lockZone). Khóa đã dùng ở thao tác/phạm vi khác → idempotency_key_reused (422); vùng hiện hành ngoài phạm vi
+// → 404/403 như yêu cầu mới. Không bao giờ trả vùng ngoài phạm vi (hết cache HTTP, sổ idem còn lâu hơn).
+func (s *Service) replayable(ctx context.Context, tx pgx.Tx, c caller, prev store.Zone, ref *uuid.UUID, event string) error {
+	if prev.Event != event || prev.ActorRef != c.p.ActorRef || (ref != nil && prev.Ref != *ref) || !c.canEditZone(prev) {
+		return problem.IdempotencyConflict
+	}
+	if _, err := s.callerProvince(ctx, c, prev.Province); err != nil {
+		if pb := (*problem.Problem)(nil); errors.As(err, &pb) {
+			return problem.IdempotencyConflict
+		}
+		return err
+	}
+	if ref != nil {
+		if _, err := s.lockZone(ctx, tx, c, *ref); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // UpdateZone ghi phiên bản mới của vùng (hình hoặc thuộc tính) — lý do và base_version bắt buộc.
 func (s *Service) UpdateZone(ctx context.Context, in ZoneInput) (ZoneView, error) {
 	c, err := s.writer(ctx, in.IdemKey)
@@ -249,10 +277,14 @@ func (s *Service) UpdateZone(ctx context.Context, in ZoneInput) (ZoneView, error
 	replayed := false
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.ZoneByIdem(ctx, tx, idemZone(in.IdemKey)); err != nil || prev != nil {
-			if prev != nil {
-				out, replayed = *prev, true
+			if err != nil {
+				return err
 			}
-			return err
+			if err := s.replayable(ctx, tx, c, *prev, in.Ref, domain.EventUpdated); err != nil {
+				return err
+			}
+			out, replayed = *prev, true
+			return nil
 		}
 		cur, err := s.lockZone(ctx, tx, c, *in.Ref)
 		if err != nil {
@@ -302,10 +334,18 @@ func (s *Service) SetZoneStatus(ctx context.Context, ref uuid.UUID, retire bool,
 	replayed := false
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.ZoneByIdem(ctx, tx, idemZone(idem)); err != nil || prev != nil {
-			if prev != nil {
-				out, replayed = *prev, true
+			if err != nil {
+				return err
 			}
-			return err
+			ev := domain.EventRestored
+			if retire {
+				ev = domain.EventRetired
+			}
+			if err := s.replayable(ctx, tx, c, *prev, &ref, ev); err != nil {
+				return err
+			}
+			out, replayed = *prev, true
+			return nil
 		}
 		cur, err := s.lockZone(ctx, tx, c, ref)
 		if err != nil {
@@ -396,9 +436,16 @@ func (s *Service) ZonesFromOutbreak(ctx context.Context, in OutbreakZonesInput) 
 				if err != nil {
 					return err
 				}
-				if z != nil {
-					out = append(out, *z)
+				if z == nil {
+					continue
 				}
+				if z.OutbreakRef == nil || *z.OutbreakRef != in.OutbreakRef {
+					return problem.IdempotencyConflict
+				}
+				if err := s.replayable(ctx, tx, c, *z, nil, domain.EventCreated); err != nil {
+					return err
+				}
+				out = append(out, *z)
 			}
 			return nil
 		}
