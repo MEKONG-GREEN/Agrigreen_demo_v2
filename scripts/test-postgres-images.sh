@@ -5,7 +5,7 @@ set -eu
 variant=${1:?postgres or backup}
 case "$variant" in postgres|backup) ;; *) echo "unknown image variant" >&2; exit 2 ;; esac
 suffix="$(date +%s)-$$"
-image="agrigreen/p0-sec-ci-${variant}:${suffix}"
+image=${P0_IMAGE_TAG:-"agrigreen/p0-sec-ci-${variant}:${suffix}"}
 name="ag-p0132-${variant}-${suffix}"
 data="${name}-data"
 repo="${name}-repo"

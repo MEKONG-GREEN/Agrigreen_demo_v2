@@ -12,6 +12,7 @@ FROM postgis/postgis:17-3.5
 RUN sed -i -E 's#(https?://)apt\.postgresql\.org#\1apt-archive.postgresql.org#g' \
       /etc/apt/sources.list.d/pgdg.list \
  && apt-get update -o Acquire::Check-Valid-Until=false \
+ && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends pgbackrest postgresql-17-pgrouting \
  && rm -rf /var/lib/apt/lists/* \
  && test -f /usr/share/postgresql/17/extension/pgrouting.control \
