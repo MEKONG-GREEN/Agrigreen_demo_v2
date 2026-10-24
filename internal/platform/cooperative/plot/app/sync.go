@@ -129,7 +129,7 @@ func (src SyncSource) Changes(ctx context.Context, scope authz.Scope, entity str
 		limit = 500
 	}
 	var rows []store.Plot
-	err := tenant.WithTenantTx(ctx, src.Svc.DB, p.TenantID, func(tx pgx.Tx) error {
+	err := src.Svc.inTx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		var e error
 		rows, e = store.ChangesAfter(ctx, tx, a.sc.All, a.sc.Units, after, limit)
 		return e
