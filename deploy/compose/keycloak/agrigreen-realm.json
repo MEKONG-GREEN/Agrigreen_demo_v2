@@ -196,7 +196,26 @@
       "authenticationExecutions": [
         { "authenticator": "reset-credentials-choose-user", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10 },
         { "authenticator": "reset-credential-email", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20 },
-        { "authenticator": "reset-password", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 30 }
+        { "flowAlias": "agrigreen recovery role otp", "authenticatorFlow": true, "requirement": "CONDITIONAL", "priority": 30 },
+        { "flowAlias": "agrigreen recovery configured otp", "authenticatorFlow": true, "requirement": "CONDITIONAL", "priority": 40 },
+        { "authenticator": "reset-password", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 50 }
+      ]
+    },
+    {
+      "alias": "agrigreen recovery role otp", "description": "D24: vai bắt MFA phải xác thực OTP trước reset; chưa có OTP thì CONFIGURE_TOTP bắt buộc trước khi hoàn tất phiên",
+      "providerId": "basic-flow", "topLevel": false, "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "conditional-user-role", "authenticatorConfig": "agrigreen-login-totp-role", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10 },
+        { "authenticator": "auth-otp-form", "authenticatorConfig": "agrigreen-amr-otp", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20 }
+      ]
+    },
+    {
+      "alias": "agrigreen recovery configured otp", "description": "Không thuộc vai bắt MFA nhưng đã có OTP: vẫn phải xác thực OTP khi reset, không hỏi hai lần",
+      "providerId": "basic-flow", "topLevel": false, "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "conditional-user-role", "authenticatorConfig": "agrigreen-not-login-totp-role", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10 },
+        { "authenticator": "conditional-user-configured", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20 },
+        { "authenticator": "auth-otp-form", "authenticatorConfig": "agrigreen-amr-otp", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 30 }
       ]
     },
     {

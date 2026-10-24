@@ -4,6 +4,10 @@ set -eu
 [ "${AG_P0_SMOKE_DISPOSABLE:-}" = 1 ] || { echo "requires AG_P0_SMOKE_DISPOSABLE=1" >&2; exit 2; }
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
+# Match this branch's declared SDK rather than the host's default Go version.
+GOTOOLCHAIN=$(awk '$1 == "toolchain" { print $2; exit }' go.mod)
+[ -n "$GOTOOLCHAIN" ] || { echo "go.mod must declare toolchain" >&2; exit 2; }
+export GOTOOLCHAIN
 export COMPOSE_PROJECT_NAME="agrigreen-p0-${GITHUB_RUN_ID:-local}"
 C="-f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.vps.yml -f deploy/compose/docker-compose.vps-smoke.yml"
 dc() { docker compose $C "$@"; }
