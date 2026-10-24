@@ -1,11 +1,14 @@
 package p0kref_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"sync"
 	"testing"
@@ -18,19 +21,20 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/kref"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
-	partyapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/app"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
@@ -44,14 +48,18 @@ type p0KRefFixture struct {
 	mod      *party.Module
 	profiles port.CoopProfiles
 	tenant   uuid.UUID
+	admin    *httptest.Server
+	issuer   *authztest.FakeIssuer
 }
 
 type p0KRefUnits struct{}
 
 func (p0KRefUnits) Get(_ context.Context, code string, _ time.Time) (port.AdminUnit, error) {
 	switch code {
-	case "89":
+	case "89", "91":
 		return port.AdminUnit{Code: code, Name: "Province", Level: port.LevelProvince}, nil
+	case "30003":
+		return port.AdminUnit{Code: code, Name: "Other commune", Level: port.LevelCommune, ParentCode: "91"}, nil
 	case "30001", "30002":
 		return port.AdminUnit{Code: code, Name: "Commune", Level: port.LevelCommune, ParentCode: "89"}, nil
 	default:
@@ -61,6 +69,9 @@ func (p0KRefUnits) Get(_ context.Context, code string, _ time.Time) (port.AdminU
 func (u p0KRefUnits) Descendants(ctx context.Context, code string, at time.Time) ([]string, error) {
 	if _, err := u.Get(ctx, code, at); err != nil {
 		return nil, err
+	}
+	if code == "91" {
+		return []string{"91", "30003"}, nil
 	}
 	if code == "89" {
 		return []string{"89", "30001", "30002"}, nil
@@ -80,7 +91,12 @@ func newP0KRefFixture(t *testing.T) *p0KRefFixture {
 	mod := party.New(pool, clock.System{}, party.Deps{AdminUnits: p0KRefUnits{}})
 	coop := cooperative.New(pool, clock.System{}, cooperative.Deps{})
 	mod.UseCoopProfiles(coop.CoopProfiles())
-	return &p0KRefFixture{env: env, mod: mod, profiles: coop.CoopProfiles(), tenant: ids.New()}
+	issuer := authztest.New(t)
+	eng := httpx.NewEngine(telemetry.NewLogger("p0-kref", io.Discard), 1<<20)
+	mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(issuer.Verifier()), httpx.RequireMFA(), idempotency.Middleware(db.ForModule(pool, db.Ops))))
+	admin := httptest.NewServer(eng)
+	t.Cleanup(admin.Close)
+	return &p0KRefFixture{env: env, mod: mod, profiles: coop.CoopProfiles(), tenant: ids.New(), admin: admin, issuer: issuer}
 }
 
 func key() string { return "p0-" + ids.New().String() }
@@ -93,21 +109,86 @@ func p0KRefContext(tid, node uuid.UUID, roles ...string) context.Context {
 
 func p0KRefParent(t *testing.T, f *p0KRefFixture) uuid.UUID {
 	t.Helper()
-	return p0KRefCreate(t, f, p0KRefContext(f.tenant, uuid.Nil, authz.RolePlatformAdmin), partyapp.CreateOrgInput{
+	return p0KRefCreate(t, f, p0KRefContext(f.tenant, uuid.Nil, authz.RolePlatformAdmin), p0KRefCreateInput{
 		Kind: port.OrgTTKNProvince, Code: "P0-" + ids.New().String()[:8], Name: "P0 province", AdminUnitCode: "89", IdemKey: key(),
 	}).Org.Ref
 }
 
-func p0KRefCreate(t *testing.T, f *p0KRefFixture, ctx context.Context, in partyapp.CreateOrgInput) partyapp.OrgResult {
+type p0KRefCreateInput struct {
+	Kind                               port.OrgKind
+	Code, Name, AdminUnitCode, IdemKey string
+	ParentRef                          uuid.UUID
+}
+type p0KRefResult struct {
+	Org port.Org
+	Seq int64
+}
+
+func p0KRefCreate(t *testing.T, f *p0KRefFixture, ctx context.Context, in p0KRefCreateInput) p0KRefResult {
 	t.Helper()
-	reg := f.mod.Orgs().(interface {
-		CreateOrg(context.Context, partyapp.CreateOrgInput) (partyapp.OrgResult, error)
-	})
-	result, err := reg.CreateOrg(ctx, in)
-	if err != nil {
-		t.Fatalf("native CreateOrg with real cooperative profile: %v", err)
+	var ref uuid.UUID
+	var seq int64
+	if in.Kind == port.OrgCooperative {
+		var err error
+		ref, err = f.mod.CooperativeRegistrar().RegisterCooperative(ctx, port.CooperativeRegistration{
+			Name: in.Name, CommuneCode: in.AdminUnitCode, ParentRef: in.ParentRef, IdemKey: in.IdemKey,
+		})
+		if err != nil {
+			t.Fatalf("native cooperative registration with real profile: %v", err)
+		}
+		if err := db.WithContextTx(ctx, f.env.Pool(t, migrations.PF, dbadmin.AppPlatform), party.DBModule, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `SELECT last_seq FROM pf_party.org WHERE ref=$1`, ref).Scan(&seq)
+		}); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		body := map[string]any{"kind": string(in.Kind), "code": in.Code, "name": in.Name, "admin_unit_code": in.AdminUnitCode}
+		if in.ParentRef != uuid.Nil {
+			body["parent_ref"] = in.ParentRef.String()
+		}
+		raw, err := json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, f.admin.URL+"/v1/orgs", bytes.NewReader(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		p, ok := authz.FromContext(ctx)
+		if !ok {
+			t.Fatal("test administrative request lacks native principal")
+		}
+		req.Header.Set("Authorization", "Bearer "+f.issuer.Sign(t, authztest.Token{Subject: p.ActorRef, TenantID: p.TenantID, Roles: p.Roles, OrgRef: p.OrgRef, MFA: true}))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Idempotency-Key", in.IdemKey)
+		res, err := f.admin.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = res.Body.Close() }()
+		data, err := io.ReadAll(res.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusOK {
+			t.Fatalf("administrative create HTTP%d: %s", res.StatusCode, data)
+		}
+		var wire struct {
+			Org struct {
+				Ref uuid.UUID `json:"ref"`
+			} `json:"org"`
+			Seq int64 `json:"seq"`
+		}
+		if err := json.Unmarshal(data, &wire); err != nil {
+			t.Fatal(err)
+		}
+		ref, seq = wire.Org.Ref, wire.Seq
 	}
-	return result
+	org, err := f.mod.Orgs().Get(ctx, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p0KRefResult{Org: org, Seq: seq}
 }
 
 func p0KRefAssertProjection(t *testing.T, f *p0KRefFixture, ref, parent uuid.UUID) {
@@ -138,7 +219,7 @@ func TestP0KRefCreateVisibleBeforeWorkerAndDelayedEvent(t *testing.T) {
 	p0KRefAssertProjection(t, f, parent, uuid.Nil)
 	// A native principal can be bound to the parent node; no KN write path is used.
 	ctx := p0KRefContext(f.tenant, parent, authz.RolePlatformAdmin, port.RoleRegistryAdmin)
-	created := p0KRefCreate(t, f, ctx, partyapp.CreateOrgInput{
+	created := p0KRefCreate(t, f, ctx, p0KRefCreateInput{
 		Kind: port.OrgCooperative, Name: "P0 synchronous cooperative", AdminUnitCode: "30001", ParentRef: parent, IdemKey: key(),
 	})
 	p0KRefAssertProjection(t, f, created.Org.Ref, parent)
@@ -156,7 +237,7 @@ func TestP0KRefCreateVisibleBeforeWorkerAndDelayedEvent(t *testing.T) {
 	worker := f.env.Pool(t, migrations.PF, dbadmin.AppWorker)
 	mod := kref.New(worker, clock.System{})
 	payload, err := json.Marshal(map[string]any{"org_ref": created.Org.Ref, "kind": "cooperative", "code": "stale-code",
-		"admin_unit_code": "30002", "parent_ref": parent, "active": false, "seq": created.Event.Seq})
+		"admin_unit_code": "30002", "parent_ref": parent, "active": false, "seq": created.Seq})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +253,7 @@ func TestP0KRefCreateVisibleBeforeWorkerAndDelayedEvent(t *testing.T) {
 		if err := tx.QueryRow(ctx, `SELECT code,active,source_seq FROM k_ref.org WHERE ref=$1`, created.Org.Ref).Scan(&code, &active, &seq); err != nil {
 			return err
 		}
-		if code != created.Org.Code || !active || seq != created.Event.Seq {
+		if code != created.Org.Code || !active || seq != created.Seq {
 			return fmt.Errorf("same-seq event overwrote synchronous projection: code=%s active=%v seq=%d", code, active, seq)
 		}
 		return nil
@@ -184,53 +265,52 @@ func TestP0KRefCreateVisibleBeforeWorkerAndDelayedEvent(t *testing.T) {
 
 func TestP0KRefCreateRollbackIsAtomic(t *testing.T) {
 	f := newP0KRefFixture(t)
-	ctx := p0KRefContext(f.tenant, uuid.Nil, authz.RolePlatformAdmin)
-	ref, eventID, outboxID := ids.New(), ids.New(), ids.New()
-	abort := errors.New("intentional source transaction abort")
-	pool := f.env.Pool(t, migrations.PF, dbadmin.AppPlatform)
-	err := db.WithContextTx(ctx, pool, party.DBModule, func(tx pgx.Tx) error {
-		o := port.Org{Ref: ref, Kind: port.OrgMKG, Code: "ROLLBACK-" + ref.String()[:8], Name: "Rollback node", Active: true}
-		ev := domain.OrgEvent{ID: eventID, TenantID: f.tenant, Org: o, Action: domain.ActionCreated,
-			EventTime: time.Now().UTC(), ActorRef: ids.New(), IdemKey: key()}
-		if err := store.InsertOrgEvent(ctx, tx, &ev); err != nil {
-			return err
-		}
-		if err := store.InsertOrg(ctx, tx, f.tenant, o, ev); err != nil {
-			return err
-		}
-		if err := outbox.Enqueue(ctx, tx, outbox.Event{ID: outboxID, TenantID: f.tenant, Type: port.EventOrgCreated,
-			SchemaVersion: 1, OccurredAt: ev.EventTime, Producer: "pf/party", Payload: map[string]any{"org_ref": ref}}); err != nil {
-			return err
-		}
-		var n int
-		if err := tx.QueryRow(ctx, `SELECT count(*) FROM k_ref.node_closure WHERE tenant_id=$1 AND ancestor=$2 AND descendant=$2`, f.tenant, ref).Scan(&n); err != nil {
-			return err
-		}
-		if n != 1 {
-			return fmt.Errorf("source tx cannot see synchronous closure: %d", n)
-		}
-		return abort
-	})
-	if !errors.Is(err, abort) {
-		t.Fatalf("expected intentional abort after observing projection, got %v", err)
-	}
-	if err := db.WithContextTx(ctx, pool, party.DBModule, func(tx pgx.Tx) error {
-		var source, events, projected, closure, queued int
-		if err := tx.QueryRow(ctx, `SELECT
-		 (SELECT count(*) FROM pf_party.org WHERE ref=$1),
-		 (SELECT count(*) FROM pf_party.org_event WHERE id=$2),
-		 (SELECT count(*) FROM k_ref.org WHERE ref=$1),
-		 (SELECT count(*) FROM k_ref.node_closure WHERE ancestor=$1 OR descendant=$1),
-		 (SELECT count(*) FROM shared.outbox WHERE id=$3)`, ref, eventID, outboxID).
-			Scan(&source, &events, &projected, &closure, &queued); err != nil {
-			return err
-		}
-		if source+events+projected+closure+queued != 0 {
-			return fmt.Errorf("rollback leaked source=%d events=%d projection=%d closure=%d outbox=%d", source, events, projected, closure, queued)
-		}
-		return nil
-	}); err != nil {
+	admin := f.env.AdminPool(t, migrations.PF)
+	suffix := ids.New().String()
+	// The names are identifiers derived only from a generated UUID, never input.
+	fn := pgx.Identifier{"shared", "p0_kref_abort_" + suffix}.Sanitize()
+	trig := pgx.Identifier{"p0_kref_abort_" + suffix}.Sanitize()
+	const sentinel = "P0 rollback after visible source projection"
+	sql := fmt.Sprintf(`CREATE FUNCTION %s() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+ SET search_path=pg_catalog,pg_temp AS $body$
+ BEGIN
+  IF NEW.tenant_id='%s'::uuid AND NEW.producer='pf/party' AND NEW.event_type='pf.party.org.created' THEN
+   IF NOT EXISTS(SELECT 1 FROM k_ref.org o JOIN k_ref.node_closure c ON c.tenant_id=o.tenant_id
+     AND c.ancestor=o.ref AND c.descendant=o.ref AND c.depth=0
+     WHERE o.tenant_id=NEW.tenant_id AND o.ref=(NEW.payload->>'org_ref')::uuid) THEN
+    RAISE EXCEPTION 'P0 projection missing before rollback injection' USING ERRCODE='P0002';
+   END IF;
+   RAISE EXCEPTION '%s' USING ERRCODE='P0001';
+  END IF;
+  RETURN NEW;
+ END $body$; CREATE TRIGGER %s AFTER INSERT ON shared.outbox FOR EACH ROW EXECUTE FUNCTION %s()`, fn, f.tenant, sentinel, trig, fn)
+	if _, err := admin.Exec(context.Background(), sql); err != nil {
 		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if _, err := admin.Exec(context.Background(), "DROP TRIGGER "+trig+" ON shared.outbox; DROP FUNCTION "+fn+"()"); err != nil {
+			t.Error(err)
+		}
+	})
+	ctx := p0KRefContext(f.tenant, uuid.Nil, authz.RolePlatformAdmin, port.RoleRegistryAdmin)
+	_, err := f.mod.CooperativeRegistrar().RegisterCooperative(ctx, port.CooperativeRegistration{
+		Name: "P0 transaction rollback", CommuneCode: "30001", IdemKey: key(),
+	})
+	var pg *pgconn.PgError
+	if !errors.As(err, &pg) || pg.Code != "P0001" || pg.Message != sentinel {
+		t.Fatalf("expected abort only after observing projection in source transaction, got %v", err)
+	}
+	var source, events, projected, closure, queued int
+	if err := admin.QueryRow(context.Background(), `SELECT
+ (SELECT count(*) FROM pf_party.org WHERE tenant_id=$1),
+ (SELECT count(*) FROM pf_party.org_event WHERE tenant_id=$1),
+ (SELECT count(*) FROM k_ref.org WHERE tenant_id=$1),
+ (SELECT count(*) FROM k_ref.node_closure WHERE tenant_id=$1),
+ (SELECT count(*) FROM shared.outbox WHERE tenant_id=$1)`, f.tenant).Scan(&source, &events, &projected, &closure, &queued); err != nil {
+		t.Fatal(err)
+	}
+	if source+events+projected+closure+queued != 0 {
+		t.Fatalf("rollback leaked source=%d events=%d projection=%d closure=%d outbox=%d", source, events, projected, closure, queued)
 	}
 }
 
@@ -320,7 +400,7 @@ func TestP0KRefConcurrentCooperativesRealProfiles(t *testing.T) {
 
 func TestP0KRefEmptyProjectionScopedReadWriteFailClosed(t *testing.T) {
 	f := newP0KRefFixture(t)
-	created := p0KRefCreate(t, f, p0KRefContext(f.tenant, uuid.Nil, authz.RolePlatformAdmin), partyapp.CreateOrgInput{
+	created := p0KRefCreate(t, f, p0KRefContext(f.tenant, uuid.Nil, authz.RolePlatformAdmin), p0KRefCreateInput{
 		Kind: port.OrgCooperative, Name: "P0 empty projection cooperative", AdminUnitCode: "30001", IdemKey: key(),
 	})
 	// Fault injection only: emulate a tenant whose projection has not been built.
@@ -371,12 +451,10 @@ func TestP0KRefSourceRollbackWhenParentProjectionMissing(t *testing.T) {
 		}
 	}
 	ctx := p0KRefContext(f.tenant, uuid.Nil, authz.RolePlatformAdmin)
-	reg := f.mod.Orgs().(interface {
-		CreateOrg(context.Context, partyapp.CreateOrgInput) (partyapp.OrgResult, error)
-	})
 	idem := key()
-	_, err := reg.CreateOrg(ctx, partyapp.CreateOrgInput{Kind: port.OrgExtensionTeam, Code: "MISSING-PARENT",
-		Name: "Child must roll back", AdminUnitCode: "30001", ParentRef: parent, IdemKey: idem})
+	_, err := f.mod.CooperativeRegistrar().RegisterCooperative(ctx, port.CooperativeRegistration{
+		Name: "Child must roll back", CommuneCode: "30001", ParentRef: parent, IdemKey: idem,
+	})
 	if err == nil {
 		t.Fatal("source committed child even though parent projection is absent")
 	}
@@ -520,6 +598,171 @@ func TestP0KRefSameKeyReplayWinsTaxCodePrecheckRace(t *testing.T) {
 		}
 		if nodes != 1 || events != 1 {
 			return fmt.Errorf("same-key tax race created extra native node/event: %d/%d", nodes, events)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Change existing source state through the actual administrative HTTP contract.
+func p0KRefAdminChange(t *testing.T, f *p0KRefFixture, ctx context.Context, path string, body any) int64 {
+	t.Helper()
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, f.admin.URL+path, bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	principal, ok := authz.FromContext(ctx)
+	if !ok {
+		t.Fatal("native principal required")
+	}
+	req.Header.Set("Authorization", "Bearer "+f.issuer.Sign(t, authztest.Token{Subject: principal.ActorRef,
+		TenantID: principal.TenantID, OrgRef: principal.OrgRef, Roles: principal.Roles, MFA: true}))
+	req.Header.Set("Idempotency-Key", key())
+	req.Header.Set("Content-Type", "application/json")
+	res, err := f.admin.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated {
+		t.Fatalf("native administrative change HTTP%d: %s", res.StatusCode, data)
+	}
+	var wire struct {
+		Seq int64 `json:"seq"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		t.Fatal(err)
+	}
+	return wire.Seq
+}
+
+func TestP0KRefCreateAfterPendingParentMoveRollsBackThenRetries(t *testing.T) {
+	f := newP0KRefFixture(t)
+	root := p0KRefContext(f.tenant, uuid.Nil, authz.RolePlatformAdmin, port.RoleRegistryAdmin)
+	oldProvince := p0KRefParent(t, f)
+	newProvince := p0KRefCreate(t, f, root, p0KRefCreateInput{Kind: port.OrgTTKNProvince, Code: "OTHER-PROVINCE",
+		Name: "Other province", AdminUnitCode: "91", IdemKey: key()}).Org.Ref
+	team := p0KRefCreate(t, f, root, p0KRefCreateInput{Kind: port.OrgExtensionTeam, Code: "MOVE-TEAM",
+		Name: "Team before move", AdminUnitCode: "30001", ParentRef: oldProvince, IdemKey: key()}).Org.Ref
+	moveSeq := p0KRefAdminChange(t, f, root, "/v1/orgs/"+team.String()+"/move", map[string]any{
+		"new_parent_ref": newProvince, "new_admin_unit_code": "30003", "reason": "Move team for transaction regression"})
+	ctx := p0KRefContext(f.tenant, newProvince, authz.RolePlatformAdmin, port.RoleRegistryAdmin)
+	input := port.CooperativeRegistration{Name: "After pending move", CommuneCode: "30003", ParentRef: team, IdemKey: key()}
+	_, err := f.mod.CooperativeRegistrar().RegisterCooperative(ctx, input)
+	p := problem.From(err)
+	if err == nil || p.Status != http.StatusServiceUnavailable || p.Code != "party.dependency_unavailable" {
+		t.Fatalf("pending parent move must stop before source commit: %v", err)
+	}
+	if err := db.WithContextTx(root, f.env.Pool(t, migrations.PF, dbadmin.AppPlatform), party.DBModule, func(tx pgx.Tx) error {
+		var n int
+		if err := tx.QueryRow(root, `SELECT count(*) FROM pf_party.org_event WHERE idem_key=$1`, input.IdemKey).Scan(&n); err != nil {
+			return err
+		}
+		if n != 0 {
+			return fmt.Errorf("pending parent move left %d committed source event; want rollback", n)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	moved, err := f.mod.Orgs().Get(root, team)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(map[string]any{"org_ref": team, "kind": string(moved.Kind), "code": moved.Code,
+		"admin_unit_code": moved.AdminUnitCode, "parent_ref": newProvince, "active": moved.Active, "seq": moveSeq})
+	if err != nil {
+		t.Fatal(err)
+	}
+	worker := f.env.Pool(t, migrations.PF, dbadmin.AppWorker)
+	projection := kref.New(worker, clock.System{})
+	envelope := outbox.Envelope{EventID: ids.New(), EventType: kref.EventOrgMoved, SchemaVersion: 1, TenantID: f.tenant,
+		OccurredAt: time.Now().UTC(), Producer: "pf/party", Payload: payload}
+	if _, err := inbox.Process(root, db.ForModule(worker, kref.DBModule), kref.Consumer, envelope, projection.Handler()); err != nil {
+		t.Fatal(err)
+	}
+	ref, err := f.mod.CooperativeRegistrar().RegisterCooperative(ctx, input)
+	if err != nil {
+		t.Fatalf("same-key retry after move projection: %v", err)
+	}
+	p0KRefAssertProjection(t, f, ref, team)
+	profiles, err := f.profiles.Profiles(ctx, []uuid.UUID{ref})
+	if err != nil || len(profiles) != 1 {
+		t.Fatalf("retry needs one real profile: count=%d err=%v", len(profiles), err)
+	}
+	if err := db.WithContextTx(root, f.env.Pool(t, migrations.PF, dbadmin.AppPlatform), party.DBModule, func(tx pgx.Tx) error {
+		var oldScope, newScope bool
+		if err := tx.QueryRow(root, `SELECT EXISTS(SELECT 1 FROM k_ref.node_closure WHERE ancestor=$1 AND descendant=$3),
+            EXISTS(SELECT 1 FROM k_ref.node_closure WHERE ancestor=$2 AND descendant=$3)`, oldProvince, newProvince, ref).Scan(&oldScope, &newScope); err != nil {
+			return err
+		}
+		if oldScope || !newScope {
+			return fmt.Errorf("retry copied wrong ancestor path: old=%v new=%v", oldScope, newScope)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestP0KRefSourceOnlyRenameDoesNotBlockCreation(t *testing.T) {
+	f := newP0KRefFixture(t)
+	root := p0KRefContext(f.tenant, uuid.Nil, authz.RolePlatformAdmin, port.RoleRegistryAdmin)
+	parent := p0KRefParent(t, f)
+	renamedSeq := p0KRefAdminChange(t, f, root, "/v1/orgs/"+parent.String()+"/rename", map[string]any{
+		"name": "Renamed source-only parent", "reason": "Rename parent for transaction regression"})
+	if err := db.WithContextTx(root, f.env.Pool(t, migrations.PF, dbadmin.AppPlatform), party.DBModule, func(tx pgx.Tx) error {
+		var projectedSeq int64
+		if err := tx.QueryRow(root, `SELECT source_seq FROM k_ref.org WHERE ref=$1`, parent).Scan(&projectedSeq); err != nil {
+			return err
+		}
+		if projectedSeq >= renamedSeq {
+			return fmt.Errorf("rename fixture did not leave a source-only sequence gap")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ref, err := f.mod.CooperativeRegistrar().RegisterCooperative(p0KRefContext(f.tenant, parent, authz.RolePlatformAdmin, port.RoleRegistryAdmin),
+		port.CooperativeRegistration{Name: "Under renamed parent", CommuneCode: "30001", ParentRef: parent, IdemKey: key()})
+	if err != nil {
+		t.Fatalf("source-only rename must not require a projection sequence update: %v", err)
+	}
+	p0KRefAssertProjection(t, f, ref, parent)
+}
+
+func TestP0KRefCreateRequiresCompleteParentPath(t *testing.T) {
+	f := newP0KRefFixture(t)
+	root := p0KRefContext(f.tenant, uuid.Nil, authz.RolePlatformAdmin, port.RoleRegistryAdmin)
+	province := p0KRefParent(t, f)
+	team := p0KRefCreate(t, f, root, p0KRefCreateInput{Kind: port.OrgExtensionTeam, Code: "PARTIAL-TEAM",
+		Name: "Team with partial path", AdminUnitCode: "30001", ParentRef: province, IdemKey: key()}).Org.Ref
+	if _, err := f.env.AdminPool(t, migrations.PF).Exec(root, `DELETE FROM k_ref.node_closure WHERE tenant_id=$1 AND ancestor=$2 AND descendant=$3`, f.tenant, province, team); err != nil {
+		t.Fatal(err)
+	}
+	idem := key()
+	_, err := f.mod.CooperativeRegistrar().RegisterCooperative(p0KRefContext(f.tenant, team, authz.RolePlatformAdmin, port.RoleRegistryAdmin),
+		port.CooperativeRegistration{Name: "Under incomplete path", CommuneCode: "30001", ParentRef: team, IdemKey: idem})
+	p := problem.From(err)
+	if err == nil || p.Status != http.StatusServiceUnavailable {
+		t.Fatalf("incomplete parent path must stop creation: %v", err)
+	}
+	if err := db.WithContextTx(root, f.env.Pool(t, migrations.PF, dbadmin.AppPlatform), party.DBModule, func(tx pgx.Tx) error {
+		var n int
+		if err := tx.QueryRow(root, `SELECT count(*) FROM pf_party.org_event WHERE idem_key=$1`, idem).Scan(&n); err != nil {
+			return err
+		}
+		if n != 0 {
+			return fmt.Errorf("incomplete parent path left %d source event", n)
 		}
 		return nil
 	}); err != nil {
