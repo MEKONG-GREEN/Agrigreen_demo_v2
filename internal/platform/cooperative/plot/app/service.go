@@ -321,10 +321,16 @@ func (s *Service) inTx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error
 	// session/KN scope, a cooperative owner's scope, or a partner/job context.
 	p, authenticated := authz.FromContext(ctx)
 	_, apiClient := authz.APIClientFrom(ctx)
-	native := authenticated && !apiClient && p.TenantID == tid && p.OrgRef != uuid.Nil &&
-		p.KN == nil && p.SelectedSession == nil && !p.Has(port.RoleCoopManager) &&
+	native := authenticated && !apiClient && tid != uuid.Nil && p.TenantID == tid && p.ActorRef != uuid.Nil && p.OrgRef != uuid.Nil &&
+		p.KN == nil && p.SelectedSession == nil && !p.Has("kn_user") && !p.Has(port.RoleCoopManager) &&
 		!p.Has(port.RoleFarmer) && !p.Has(partyport.RolePartnerSync) &&
 		(p.Has(port.RolePlotEditor) || p.Has(port.RolePlotViewer) || p.Has(geoport.RoleGeoAdmin) || p.Has(syncport.RoleConflictResolver))
+	// A caller may carry an explicitly granted foreign tenant. Never bind the
+	// principal's native communes into that context, even when a port supplies
+	// the principal tenant as its transaction target.
+	if current, err := tenant.FromContext(ctx); err == nil && current != tid {
+		native = false
+	}
 	var communes string
 	project := false
 	if native {
@@ -343,6 +349,12 @@ func (s *Service) inTx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error
 		// An All scope never clears the node or grants tenant-wide DB access.
 		// Keep the existing projected-node restriction in that case.
 		if !sc.All {
+			// An empty SQL xa_ids serializes as NULL, which is also used by
+			// the existing draft policy. Deny before opening a transaction;
+			// an empty server scope must never acquire that draft fallback.
+			if len(sc.Units) == 0 {
+				return ErrOutOfScope
+			}
 			communes = (shareddb.ContextVars{XaIDs: sc.Units}).Settings()[shareddb.VarXaIDs]
 			project = true
 		}

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -211,5 +212,121 @@ func TestNativeGISAllScopeKeepsProjectedNode(t *testing.T) {
 	changes, _, err := g.mod.SyncSource().Changes(ctx, authz.Scope{All: true}, "plot", 0, 100)
 	if err != nil || len(changes) != 0 {
 		t.Fatalf("All scope bypassed independent HTX/node restriction: %v %+v", err, changes)
+	}
+}
+
+func TestNativeGISForeignContextKeepsExistingProjection(t *testing.T) {
+	g := newG2(t)
+	g.national().createPlot("31117", g.coopA, rect(0, 0, 100, 100))
+	scope := &nativeScopeProbe{scope: authz.Scope{Units: []string{"31117"}}}
+	g.mod.svc.Scope = scope
+	ctx := tenant.WithID(syncCtx(g.fixture, g.orgA, syncport.RoleConflictResolver), ids.New())
+	before := shareddb.ContextVarsFrom(ctx)
+	// Changes targets the principal tenant, while PlotStats targets the explicit
+	// context tenant. Neither may add native communes across this mismatch.
+	changes, _, err := g.mod.SyncSource().Changes(ctx, authz.Scope{All: true}, "plot", 0, 100)
+	if err != nil || len(changes) != 0 {
+		t.Fatalf("foreign context gained principal commune scope: %v %+v", err, changes)
+	}
+	stats, err := g.mod.PlotStats().DigitizedByCommune(ctx, []string{"31117"})
+	if err != nil || len(stats) != 0 {
+		t.Fatalf("foreign context commune stats: %v %+v", err, stats)
+	}
+	byCoop, err := g.mod.PlotStats().DigitizedByCooperative(ctx, []uuid.UUID{g.coopA})
+	if err != nil || len(byCoop) != 0 {
+		t.Fatalf("foreign context cooperative stats: %v %+v", err, byCoop)
+	}
+	if scope.calls.Load() != 0 || shareddb.ContextVarsFrom(ctx).NodeID != before.NodeID {
+		t.Fatalf("foreign context replaced projection: calls=%d", scope.calls.Load())
+	}
+}
+
+func TestNativeGISIncompletePrincipalDoesNotResolveScope(t *testing.T) {
+	for _, mode := range []string{"missing_actor", "missing_tenant"} {
+		t.Run(mode, func(t *testing.T) {
+			g := newG2(t)
+			g.national().createPlot("31117", g.coopA, rect(0, 0, 100, 100))
+			scope := &nativeScopeProbe{scope: authz.Scope{Units: []string{"31117"}}}
+			g.mod.svc.Scope = scope
+			p := authz.Principal{ActorRef: ids.New(), TenantID: g.tenant, OrgRef: g.orgA, Roles: []string{syncport.RoleConflictResolver}}
+			if mode == "missing_actor" {
+				p.ActorRef = uuid.Nil
+			} else {
+				p.TenantID = uuid.Nil
+			}
+			ctx := authz.WithPrincipal(hubCtx(g.fixture), p)
+			changes, _, err := g.mod.SyncSource().Changes(ctx, authz.Scope{All: true}, "plot", 0, 100)
+			if mode == "missing_tenant" {
+				if !errors.Is(err, tenant.ErrMissing) {
+					t.Fatalf("missing principal tenant: %v", err)
+				}
+			} else if err != nil || len(changes) != 0 {
+				t.Fatalf("missing actor gained native scope: %v %+v", err, changes)
+			}
+			if scope.calls.Load() != 0 {
+				t.Fatalf("incomplete principal invoked scope port %d times", scope.calls.Load())
+			}
+		})
+	}
+}
+
+func TestNativeGISKNRealmWithoutSessionKeepsExistingProjection(t *testing.T) {
+	g := newG2(t)
+	g.national().createPlot("31117", g.coopA, rect(0, 0, 100, 100))
+	scope := &nativeScopeProbe{scope: authz.Scope{Units: []string{"31117"}}}
+	g.mod.svc.Scope = scope
+	ctx := syncCtx(g.fixture, g.orgA, "kn_user", coopport.RolePlotEditor)
+	before := shareddb.ContextVarsFrom(ctx)
+	changes, _, err := g.mod.SyncSource().Changes(ctx, authz.Scope{All: true}, "plot", 0, 100)
+	if err != nil || len(changes) != 0 {
+		t.Fatalf("KN realm without selected context gained native scope: %v %+v", err, changes)
+	}
+	if scope.calls.Load() != 0 || shareddb.ContextVarsFrom(ctx).NodeID != before.NodeID {
+		t.Fatalf("KN realm replaced its existing projection: calls=%d", scope.calls.Load())
+	}
+}
+
+func TestNativeGISEmptyScopeCannotReadDraft(t *testing.T) {
+	for _, mode := range []string{"nil_units", "empty_units"} {
+		t.Run(mode, func(t *testing.T) {
+			g := newG2(t)
+			_, created := g.national().createPlot("31117", uuid.Nil, rect(0, 0, 100, 100))
+			if got := str(created.body, "plot", "properties", "status"); got != coopport.PlotDraft {
+				t.Fatalf("fixture is not an unassigned draft: %q", got)
+			}
+			scope := &nativeScopeProbe{}
+			if mode == "empty_units" {
+				scope.scope.Units = []string{}
+			}
+			db := &nativeBeginProbe{Beginner: g.mod.svc.DB}
+			g.mod.svc.DB, g.mod.svc.Scope = db, scope
+			ctx := syncCtx(g.fixture, g.orgA, syncport.RoleConflictResolver)
+			denied := func(err error) {
+				t.Helper()
+				var p *problem.Problem
+				if !errors.As(err, &p) || p.Code != "geo.out_of_scope" || p.Status != http.StatusForbidden {
+					t.Fatalf("empty server scope did not fail closed: %v", err)
+				}
+			}
+			// A caller-supplied All scope cannot override the empty server scope.
+			changes, _, err := g.mod.SyncSource().Changes(ctx, authz.Scope{All: true}, "plot", 0, 100)
+			denied(err)
+			if len(changes) != 0 {
+				t.Fatalf("empty scope emitted draft changes: %+v", changes)
+			}
+			stats, err := g.mod.PlotStats().DigitizedByCommune(ctx, nil)
+			denied(err)
+			if len(stats) != 0 {
+				t.Fatalf("empty scope counted draft plots: %+v", stats)
+			}
+			byCoop, err := g.mod.PlotStats().DigitizedByCooperative(ctx, []uuid.UUID{g.coopA})
+			denied(err)
+			if len(byCoop) != 0 {
+				t.Fatalf("empty scope counted cooperative plots: %+v", byCoop)
+			}
+			if db.calls.Load() != 0 || scope.calls.Load() != 3 {
+				t.Fatalf("empty scope did not stop before transaction: begins=%d resolver=%d", db.calls.Load(), scope.calls.Load())
+			}
+		})
 	}
 }
