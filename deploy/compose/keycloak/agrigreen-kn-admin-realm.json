@@ -80,7 +80,8 @@
       "authenticationExecutions": [
         { "authenticator": "reset-credentials-choose-user", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10 },
         { "authenticator": "reset-credential-email", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20 },
-        { "authenticator": "reset-password", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 30 }
+        { "authenticator": "auth-otp-form", "authenticatorConfig": "agrigreen-amr-otp", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 30 },
+        { "authenticator": "reset-password", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 40 }
       ]
     },
     {
