@@ -3,7 +3,9 @@ package handler_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -16,6 +18,7 @@ import (
 	shareddb "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -390,5 +393,122 @@ func TestPlotScopeTombstoneMigrationBackfill(t *testing.T) {
 	var afterWrite int64
 	if err = tx.QueryRow(ctx, `UPDATE pf_coop.plot SET revision=revision+1,sync_seq=nextval('pf_coop.plot_sync_seq') WHERE tenant_id=$1 AND ref=$2 RETURNING sync_seq`, f.tenant, ref).Scan(&afterWrite); err != nil || afterWrite <= newCursor {
 		t.Fatalf("post-deploy writer ordering: %d <= %d: %v", afterWrite, newCursor, err)
+	}
+}
+
+// Inject two committed writers immediately after the first plot result has
+// finished reading, before a second Read Committed query could take a newer
+// snapshot. This reproduces the old current-SELECT / loss-SELECT cursor race.
+type plotReadHookDB struct {
+	base    tenant.Beginner
+	after   func() error
+	fired   bool
+	reads   int
+	hookErr error
+}
+
+func (b *plotReadHookDB) BeginTx(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, error) {
+	tx, err := b.base.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	return plotReadHookTx{Tx: tx, b: b}, nil
+}
+
+type plotReadHookTx struct {
+	pgx.Tx
+	b *plotReadHookDB
+}
+
+func (t plotReadHookTx) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	rows, err := t.Tx.Query(ctx, sql, args...)
+	if err != nil || !strings.Contains(sql, "pf_coop.plot p") {
+		return rows, err
+	}
+	t.b.reads++
+	return plotReadHookRows{Rows: rows, b: t.b}, nil
+}
+
+type plotReadHookRows struct {
+	pgx.Rows
+	b *plotReadHookDB
+}
+
+func (r plotReadHookRows) Close() {
+	r.Rows.Close()
+	if !r.b.fired {
+		r.b.fired = true
+		r.b.hookErr = r.b.after()
+	}
+}
+func (r plotReadHookRows) Next() bool {
+	next := r.Rows.Next()
+	if !next {
+		r.Close()
+	}
+	return next
+}
+func (r plotReadHookRows) Err() error {
+	if err := r.Rows.Err(); err != nil {
+		return err
+	}
+	return r.b.hookErr
+}
+
+func TestPlotScopeTombstoneStatementSnapshot(t *testing.T) {
+	f := newFixture(t)
+	nat := f.national()
+	y, _ := nat.createPlot("31117", f.coopA, rect(0, 0, 100, 100))
+	who := syncCtx(f, f.coopA, coopport.RoleCoopManager)
+	sc := authz.Scope{Units: []string{"31117"}}
+	src := f.mod.SyncSource()
+	_, after, err := src.Changes(who, sc, "plot", 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var x uuid.UUID
+	hook := &plotReadHookDB{base: f.mod.svc.DB}
+	hook.after = func() error {
+		// HTTP handlers use separate pool transactions and normal event/store
+		// writes. X is committed before Y's transfer receives a higher sync_seq.
+		created := nat.appDo(http.MethodPost, "/v1/plots", map[string]any{"commune_code": "31117", "cooperative_ref": f.coopA.String(), "geometry": rect(400, 0, 100, 100)})
+		if created.status != http.StatusCreated {
+			return fmt.Errorf("writer X: HTTP%d %s", created.status, created.raw)
+		}
+		var err error
+		x, err = uuid.Parse(str(created.body, "plot", "id"))
+		if err != nil {
+			return err
+		}
+		transferred := nat.appDo(http.MethodPost, "/v1/plots/"+y.String()+"/assign", map[string]any{"cooperative_ref": f.coopB.String()})
+		if transferred.status != http.StatusOK {
+			return fmt.Errorf("writer Y: HTTP%d %s", transferred.status, transferred.raw)
+		}
+		return nil
+	}
+	svc := *f.mod.svc
+	svc.DB = hook
+	first, cursor, err := (app.SyncSource{Svc: &svc}).Changes(who, sc, "plot", after, 100)
+	if err != nil || !hook.fired {
+		t.Fatalf("snapshot injection: fired=%v err=%v", hook.fired, err)
+	}
+	second, last, err := src.Changes(who, sc, "plot", cursor, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundX, foundLoss := false, false
+	for _, ch := range append(first, second...) {
+		if ch.ID == x && ch.Op == "upsert" {
+			foundX = true
+		}
+		if ch.ID == y && ch.Op == "tombstone" && ch.Data == nil {
+			foundLoss = true
+		}
+	}
+	if !foundX || !foundLoss {
+		t.Fatalf("cursor skipped concurrent X before Y loss: X=%v loss=%v before=%d cursor=%d last=%d first=%+v second=%+v", foundX, foundLoss, after, cursor, last, first, second)
+	}
+	if hook.reads != 1 {
+		t.Fatalf("manager feed used %d statement snapshots, want1", hook.reads)
 	}
 }
