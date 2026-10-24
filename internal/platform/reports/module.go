@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -37,6 +38,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -253,14 +255,51 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 	}}
 }
 
-// SMTPFromEnv dựng bộ gửi email từ AG_SMTP_*; chưa cấu hình → nil (bỏ gửi kèm cảnh báo).
-func SMTPFromEnv(clk clock.Clock) (port.Mailer, error) {
-	cfg, err := mail.ConfigFromEnv()
-	if errors.Is(err, mail.ErrNotConfigured) {
+// SMTPFromEnv dựng bộ gửi email từ AG_MAILER + AG_SMTP_* (SMTPFromEnvWith(os.Getenv, …)).
+func SMTPFromEnv(clk clock.Clock) (port.Mailer, error) { return SMTPFromEnvWith(os.Getenv, clk) }
+
+// SMTPFromEnvWith (P0-NOTIFY-FAILCLOSED): kênh email chưa cấu hình → nil, và app ghi lượt gửi là "Bỏ gửi"/"Gửi lỗi"
+// kèm lý do (không bao giờ "Đã gửi"). AG_MAILER: ""(tự chọn theo AG_SMTP_HOST) | smtp (bắt buộc AG_SMTP_HOST) | log
+// (chỉ máy phát triển; pf/reports không có bộ gửi giả → nil) | disabled (nil). Giá trị khác, hoặc log ngoài máy phát
+// triển → lỗi, worker từ chối dựng module.
+func SMTPFromEnvWith(getenv func(string) string, clk clock.Clock) (port.Mailer, error) {
+	switch m := strings.ToLower(strings.TrimSpace(getenv("AG_MAILER"))); m {
+	case "disabled":
 		return nil, nil
+	case "log":
+		if !residency.LocalDev(getenv) {
+			return nil, errors.New("reports: AG_MAILER=log chỉ dùng trên máy phát triển (AG_ENV=development|dev|local|test)")
+		}
+		return nil, nil
+	case "", "smtp":
+		cfg, err := mail.ConfigFrom(getenv)
+		if errors.Is(err, mail.ErrNotConfigured) {
+			if m == "smtp" {
+				return nil, errors.New("reports: AG_MAILER=smtp nhưng chưa đặt AG_SMTP_HOST")
+			}
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		return &mail.SMTP{Cfg: cfg, Clock: clk}, nil
+	default:
+		return nil, fmt.Errorf("reports: AG_MAILER=%q — chỉ nhận smtp, log, disabled", m)
 	}
+}
+
+// LinkBasesFromEnv đọc URL gốc cho liên kết trong email báo cáo: web = AG_WEB_OPS_URL (dòng "đăng nhập để tải lại"),
+// download = AG_REPORT_LINK_BASE (liên kết tải Chi cục). Ngoài máy phát triển, giá trị thiếu/không tuyệt đối/localhost
+// → "" (fail closed: email lịch bỏ dòng tải lại; gửi Chi cục kiểu liên kết → "Gửi lỗi" nêu AG_REPORT_LINK_BASE) và lỗi
+// trong errs để worker cảnh báo lúc khởi động.
+func LinkBasesFromEnv(getenv func(string) string) (web, download string, errs []error) {
+	web, err := residency.PublicBaseURL(getenv, "AG_WEB_OPS_URL")
 	if err != nil {
-		return nil, err
+		errs = append(errs, err)
 	}
-	return &mail.SMTP{Cfg: cfg, Clock: clk}, nil
+	download, err = residency.PublicBaseURL(getenv, "AG_REPORT_LINK_BASE")
+	if err != nil {
+		errs = append(errs, err)
+	}
+	return web, download, errs
 }

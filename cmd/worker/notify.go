@@ -28,7 +28,8 @@ import (
 // notifyLazy dựng module pf/notify cho worker ở sự kiện đầu tiên: pool notify_app
 // (ghi kết quả gửi đẩy bằng giao dịch riêng), danh bạ cán bộ (extension_app),
 // đơn vị hành chính (masterdata_app) — mỗi module một vai (R-05) — và kênh đẩy từ
-// môi trường (AG_FCM_* → FCM HTTP v1; không đặt → chỉ ghi log).
+// môi trường (notify.ChannelsFromEnv: AG_FCM_* → FCM HTTP v1, AG_SMTP_* → SMTP; thiếu → kênh TẮT, bản gửi ghi
+// "dropped" — P0-NOTIFY-FAILCLOSED).
 type notifyLazy struct {
 	log  *slog.Logger
 	once sync.Once
@@ -69,7 +70,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	md := masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 	knUnits := extension.NewPublishedAdminUnits(extPool)
 	kn := extension.New(extPool, clk, extension.Deps{Units: knUnits, Params: md.Params(), Catalogs: md.Catalogs()})
-	log.Info("kênh thông báo", "event", "startup", "push", ch.Pusher.Name(), "email", ch.Mailer != nil, "outcome", "ok")
+	ch.LogStartup(log)
 	// pf/cooperative (W3.3): nông hộ có thửa theo xã (schema pf_coop, r_cooperative).
 	coop := cooperative.New(coopPool, clk, cooperative.Deps{})
 	// Gói NOTIF: email theo người nhận tra địa chỉ qua pf/accounts (Keycloak, AG_KC_*) lúc gửi; người nhận Cấp Tỉnh của
@@ -85,7 +86,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	d.Builders = assembly.NotificationBuilders(ownedDesk, kn.Staff(), knUnits)
 	d.Consumers, d.Renderers = assembly.NotificationConsumers(), assembly.NotificationRenderers()
 	d.Staff, d.Units, d.Farmers = kn.Staff(), md.AdminUnits(), farmers
-	d.Log, d.LinkBase = log, os.Getenv("AG_WEB_OPS_URL")
+	d.Log, d.LinkBase = log, ch.LinkBase
 	if dir := acc.MailDirectory(); dir != nil {
 		d.Emails = assembly.NotifyEmails{Dir: dir}
 	} else {

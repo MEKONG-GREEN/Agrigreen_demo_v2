@@ -73,6 +73,11 @@ var NudgeRoles = []string{
 	partyport.RoleKNProvinceAdmin, partyport.RoleKNNationalAdmin, syncport.RoleDeviceAdmin, authz.RolePlatformAdmin,
 }
 
+// DeliveryHealthRoles xem tình trạng kênh gửi email/đẩy (GET /v1/notify/delivery-health, P0-NOTIFY-FAILCLOSED).
+var DeliveryHealthRoles = []string{
+	partyport.RoleKNProvinceAdmin, partyport.RoleKNNationalAdmin, authz.KNAdmin, authz.RolePlatformAdmin,
+}
+
 // Sự kiện module phát ra (schema trong contracts/events/).
 const (
 	EventNotificationCreated = "pf.notify.notification.created"

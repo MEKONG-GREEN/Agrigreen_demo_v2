@@ -2,6 +2,7 @@
 //
 //   - Pusher: đẩy thông điệp DỮ LIỆU tới thiết bị (FCM HTTP v1, hoặc ghi log ở Dev).
 //     Chỉ mang notification_id + kind — dịch vụ đẩy nằm ngoài lãnh thổ (RB-7).
+//   - Kênh chưa cấu hình: DisabledMailer/DisabledPusher (disabled.go) — bản gửi ghi "dropped", không "sent".
 //   - Mailer: email tóm tắt chỉ đạo khẩn qua SMTP trong lãnh thổ.
 //   - ZNS: Zalo ZNS — CHƯA bật (cần ADR riêng về dữ liệu SĐT, xem ADR-0015).
 //
@@ -29,7 +30,8 @@ type Pusher interface {
 	Send(ctx context.Context, m domain.PushMessage) error
 }
 
-// LogPusher là kênh đẩy của Local/Dev: chỉ ghi log loại và mã thông báo, không gửi.
+// LogPusher chỉ ghi log loại và mã thông báo, không gửi — CHỈ khi đặt rõ AG_PUSHER=log trên máy phát triển
+// (PusherFromEnvWith). Kênh chưa cấu hình dùng DisabledPusher (P0-NOTIFY-FAILCLOSED).
 type LogPusher struct{ Log *slog.Logger }
 
 // Name thực hiện Pusher.

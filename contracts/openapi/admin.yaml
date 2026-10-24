@@ -2682,6 +2682,22 @@ paths:
   # --- hết pf/mechanization ---
 
   # --- pf/notify ---
+  /v1/notify/delivery-health:
+    get:
+      summary: Tình trạng kênh gửi email/đẩy của tenant (P0-NOTIFY-FAILCLOSED) — kênh chưa cấu hình có cảnh báo
+      description: >-
+        Đếm lần gửi email/đẩy của tenant người gọi trong window_days ngày từ chính bản ghi lần gửi (pf_notify). Kênh chưa
+        cấu hình (thiếu AG_SMTP_*, AG_FCM_*, AG_WEB_OPS_URL) không giả gửi: bản gửi ghi "dropped" với lý do
+        channel_disabled:<lý do>, status = disabled và warning nêu cấu hình còn thiếu. Vai: admin, kn_province_admin,
+        kn_national_admin, platform_admin.
+      operationId: adminNotifyDeliveryHealth
+      responses:
+        "200":
+          description: Tình trạng kênh email và đẩy
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/NotifyDeliveryHealth"}
+        "403": {description: "forbidden | mfa_required", $ref: "#/components/responses/Problem"}
   /v1/sync/nudge:
     post:
       summary: Yêu cầu thiết bị đồng bộ ngay (US-SYNC-02) — như Application API
@@ -7512,6 +7528,32 @@ components:
           maxItems: 30
           items: {type: string, pattern: "^[a-z_]{1,40}$"}
           description: "KN US-SYNC-02: nhóm dữ liệu cần đồng bộ ngay (entity pf/sync); rỗng = tất cả. Thông điệp sync_now mang khóa entities (nối bằng dấu phẩy)."
+    NotifyChannelHealth:
+      type: object
+      required: [status, sent, failed, dropped, pending, disabled, disabled_reason, last_disabled_at, last_sent_at, warning]
+      properties:
+        status:
+          type: string
+          enum: [ok, disabled, failing, idle]
+          description: "disabled: lần bỏ vì kênh tắt mới hơn lần gửi thành công cuối — email/đẩy KHÔNG được gửi"
+        sent: {type: integer, minimum: 0}
+        failed: {type: integer, minimum: 0}
+        dropped: {type: integer, minimum: 0, description: "Gồm cả bản gửi bị bỏ vì kênh tắt"}
+        pending: {type: integer, minimum: 0}
+        disabled: {type: integer, minimum: 0, description: "Bản gửi bị bỏ vì kênh chưa cấu hình (không phải đã gửi)"}
+        disabled_reason:
+          type: [string, "null"]
+          description: "smtp_not_configured | link_base_missing | fcm_not_configured | disabled_by_config"
+        last_disabled_at: {type: [string, "null"], format: date-time}
+        last_sent_at: {type: [string, "null"], format: date-time}
+        warning: {type: [string, "null"], description: "Cảnh báo tiếng Việt cho quản trị"}
+    NotifyDeliveryHealth:
+      type: object
+      required: [window_days, email, push]
+      properties:
+        window_days: {type: integer, minimum: 1}
+        email: {$ref: "#/components/schemas/NotifyChannelHealth"}
+        push: {$ref: "#/components/schemas/NotifyChannelHealth"}
     NudgeResult:
       type: object
       required: [nudge_id, target_kind, target, devices]

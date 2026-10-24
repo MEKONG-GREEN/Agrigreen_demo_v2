@@ -113,12 +113,17 @@ func buildReportsModule(ctx context.Context, log *slog.Logger, pool *pgxpool.Poo
 	if err := reports.ValidateSendLease(lease, inbox.DefaultHandlerTimeout); err != nil {
 		return nil, err
 	}
+	// P0-NOTIFY-FAILCLOSED: URL liên kết trong email thiếu/localhost ngoài máy phát triển → rỗng (không gửi liên kết hỏng).
+	webLink, dlLink, linkErrs := reports.LinkBasesFromEnv(os.Getenv)
+	for _, e := range linkErrs {
+		log.Warn("liên kết trong email báo cáo chưa cấu hình: "+e.Error(), "event", "startup", "outcome", "skipped")
+	}
 	// P0-WORKER-REPORTS (#128): pool THẬT (trước đây nil → panic khi ghi dấu người nhận, giao lại gửi trùng 6 email).
 	return reports.New(pool, clk, reports.Deps{FormSeeds: []repport.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: kn.ReportData(), Orgs: knOrgs, Units: knUnits, Catalogs: md.Catalogs(), Clock: clk}), Catalog: []repport.CatalogRegistration{extension.ReportCatalog()}, Policies: []repport.Policy{extension.ReportPolicy()},
 		ResolveSession: extension.ReportSessionResolver(knOrgs),
 		Scope:          pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
-		Mechanization: mech.ReportData(), CropCycle: coop.ReportData(), Directory: dir, Mailer: mailer, LinkBase: os.Getenv("AG_WEB_OPS_URL"), Log: log,
-		LinkDownloadBase: os.Getenv("AG_REPORT_LINK_BASE"), // A4: liên kết tải Chi cục do api-platform phục vụ
+		Mechanization: mech.ReportData(), CropCycle: coop.ReportData(), Directory: dir, Mailer: mailer, LinkBase: webLink, Log: log,
+		LinkDownloadBase: dlLink, // A4: liên kết tải Chi cục do api-platform phục vụ
 		DispatchLease:    lease,
 	}), nil
 }

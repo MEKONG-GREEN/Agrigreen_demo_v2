@@ -68,10 +68,12 @@ type Deps struct {
 	Log          *slog.Logger
 	// Emails (gói NOTIF): tra email người nhận lúc gửi (pf/accounts); nil → không gửi email theo người nhận.
 	Emails port.EmailDirectory
-	// EmailMailer (gói NOTIF): kênh gửi email theo người nhận (SMTP trong lãnh thổ; Local/Dev: channel.LogMailer). nil →
+	// EmailMailer (gói NOTIF): kênh gửi email theo người nhận (SMTP trong lãnh thổ; kênh tắt → bản gửi "dropped"
+	// channel_disabled:<lý do>; LogMailer chỉ máy phát triển với AG_MAILER=log). nil →
 	// dùng Mailer; cả hai nil → không gửi email theo người nhận.
 	EmailMailer channel.Mailer
-	// LinkBase: gốc URL web-ops cho đường dẫn trong email (AG_WEB_OPS_URL); rỗng → chỉ đường dẫn tương đối.
+	// LinkBase: gốc URL web-ops cho đường dẫn trong email (AG_WEB_OPS_URL); rỗng chỉ ở máy phát triển (ngoài đó
+	// notify.ChannelsFromEnv tắt kênh email theo người nhận — link_base_missing).
 	LinkBase string
 }
 

@@ -27,26 +27,28 @@ type SMTP struct {
 
 // SMTPFromEnv đọc AG_SMTP_HOST, AG_SMTP_PORT (mặc định 587), AG_SMTP_USERNAME,
 // AG_SMTP_PASSWORD, AG_SMTP_FROM, AG_SMTP_ALLOW_PLAIN. Chưa đặt AG_SMTP_HOST → nil
-// (tắt email tóm tắt).
-func SMTPFromEnv() (*SMTP, error) {
-	host := os.Getenv("AG_SMTP_HOST")
+// (bên gọi lắp DisabledMailer — MailerFromEnv).
+func SMTPFromEnv() (*SMTP, error) { return smtpFrom(os.Getenv) }
+
+func smtpFrom(getenv func(string) string) (*SMTP, error) {
+	host := getenv("AG_SMTP_HOST")
 	if host == "" {
 		return nil, nil
 	}
 	port := 587
-	if p := os.Getenv("AG_SMTP_PORT"); p != "" {
+	if p := getenv("AG_SMTP_PORT"); p != "" {
 		n, err := strconv.Atoi(p)
 		if err != nil || n < 1 || n > 65535 {
 			return nil, errors.New("channel: AG_SMTP_PORT không hợp lệ")
 		}
 		port = n
 	}
-	from := os.Getenv("AG_SMTP_FROM")
+	from := getenv("AG_SMTP_FROM")
 	if from == "" {
 		return nil, errors.New("channel: thiếu AG_SMTP_FROM")
 	}
-	return &SMTP{Host: host, Port: port, Username: os.Getenv("AG_SMTP_USERNAME"), Password: os.Getenv("AG_SMTP_PASSWORD"),
-		From: from, AllowPlain: os.Getenv("AG_SMTP_ALLOW_PLAIN") == "true"}, nil
+	return &SMTP{Host: host, Port: port, Username: getenv("AG_SMTP_USERNAME"), Password: getenv("AG_SMTP_PASSWORD"),
+		From: from, AllowPlain: getenv("AG_SMTP_ALLOW_PLAIN") == "true"}, nil
 }
 
 // DigestRecipientsFromEnv đọc AG_SMTP_DIGEST_TO: danh sách hộp thư CÔNG VỤ (vd
@@ -137,7 +139,7 @@ func BuildMessage(from string, to []string, subject, body string) []byte {
 	return []byte(b.String())
 }
 
-// LogMailer ghi log thay vì gửi (Local/Dev).
+// LogMailer ghi log thay vì gửi — CHỈ khi đặt rõ AG_MAILER=log trên máy phát triển (MailerFromEnv).
 type LogMailer struct{ Log *slog.Logger }
 
 // Send thực hiện Mailer — chỉ ghi số người nhận và tiêu đề.
@@ -146,13 +148,4 @@ func (m LogMailer) Send(ctx context.Context, to []string, subject, _ string) err
 		m.Log.InfoContext(ctx, "email (dev, không gửi)", "event", "notify.email", "recipients", len(to), "subject", subject, "outcome", "logged")
 	}
 	return nil
-}
-
-// PusherFromEnv chọn kênh đẩy: có AG_FCM_PROJECT_ID hoặc AG_FCM_CREDENTIALS_FILE →
-// FCM HTTP v1; không → LogPusher (Local/Dev).
-func PusherFromEnv(log *slog.Logger) (Pusher, error) {
-	if os.Getenv("AG_FCM_PROJECT_ID") == "" && os.Getenv("AG_FCM_CREDENTIALS_FILE") == "" {
-		return LogPusher{Log: log}, nil
-	}
-	return FCMFromEnv()
 }
