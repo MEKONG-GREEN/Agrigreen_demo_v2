@@ -75,6 +75,30 @@ curl -s -o /dev/null -w '%{http_code}\n' https://admin.<domain>/healthz         
 
 Mở `https://app.<domain>`.
 
+### 3a. Email và thông báo đẩy (P0-NOTIFY-FAILCLOSED)
+
+Worker **không giả gửi**. Thiếu cấu hình → kênh TẮT: thông báo vẫn hiện trong ứng dụng, nhưng bản gửi email/đẩy được ghi
+là *bị bỏ* (`dropped`, `last_error = channel_disabled:<lý do>`), không bao giờ là *đã gửi*; báo cáo định kỳ ghi "Bỏ gửi",
+gửi Chi cục ghi "Gửi lỗi" kèm lý do. Kiểm tra bằng Admin API (vai admin / quản trị KN / platform_admin):
+
+```sh
+curl -fsS -H "Authorization: Bearer $TOKEN" https://admin.<domain>/v1/notify/delivery-health | jq '.email.status, .email.warning, .push.status'
+docker compose $C logs worker | grep -i "TẮT"      # cảnh báo lúc dựng kênh
+```
+
+Biến đặt trong `deploy/compose/.env` (docker-compose.vps.yml chuyển vào `worker`):
+
+| Biến | Bắt buộc khi | Ghi chú |
+| --- | --- | --- |
+| `AG_SMTP_HOST`, `AG_SMTP_FROM` | muốn gửi email (thông báo theo người nhận, tóm tắt chỉ đạo, báo cáo) | SMTP **trong nước**; thiếu → `smtp_not_configured` |
+| `AG_SMTP_PORT`, `AG_SMTP_USERNAME`, `AG_SMTP_PASSWORD`, `AG_SMTP_TLS` | theo nhà cung cấp | mặc định 587/STARTTLS; không có bản rõ |
+| `AG_FCM_PROJECT_ID`, `AG_FCM_CREDENTIALS_FILE` | muốn gửi đẩy tới app di động | tệp khóa phải mount vào container; thiếu → `fcm_not_configured` |
+| `AG_WEB_OPS_URL` | luôn (VPS đặt sẵn `https://app.<domain>`) | thiếu/localhost → email theo người nhận tắt (`link_base_missing`) |
+| `AG_REPORT_LINK_BASE` | luôn (VPS đặt sẵn `https://api.<domain>`) | thiếu/localhost → gửi Chi cục kiểu liên kết "Gửi lỗi" |
+| `AG_MAILER`, `AG_PUSHER` | không | rỗng = tự chọn; `disabled` = tắt có chủ đích; `log` chỉ máy phát triển (`AG_ENV=local/dev/test`), ở VPS → worker từ chối dựng kênh |
+
+Máy demo (`AG_DEPLOY_ENV=demo`, `AG_ENV=staging`) theo đúng luật trên: không có ngoại lệ "giả gửi".
+
 ## 4. Sao lưu bí mật — làm NGAY sau lần dựng đầu
 
 Chép `deploy/compose/.env` ra kho bí mật ngoài VPS, ví dụ trình quản lý mật khẩu của công ty hoặc USB mã hóa cất két. Trong đó `AG_VAULT_KEK` và `AG_VAULT_BLIND_KEY` là khóa của kho định danh: **mất hai khóa này là mất vĩnh viễn dữ liệu định danh đã mã hóa**, dù còn bản sao lưu DB. Không gửi file này qua chat hay email.
