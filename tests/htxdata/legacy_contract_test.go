@@ -56,6 +56,37 @@ func (f *fixture) exec(sql string, args ...any) {
 	}
 }
 
+// seedPrincipalScopeProjection retains this legacy scope matrix's synthetic
+// roots/edges. HTX rows and self edges already come from the source INSERT
+// trigger: assert their source attributes instead of seeding a second copy.
+// These test-only edges do not define the target KN/HTX organization model.
+func (f *fixture) seedPrincipalScopeProjection(tid uuid.UUID) {
+	f.t.Helper()
+	var projected int
+	err := f.admin.QueryRow(context.Background(), `SELECT count(*) FROM pf_party.org s
+    JOIN k_ref.org p ON p.tenant_id=s.tenant_id AND p.ref=s.ref
+    JOIN k_ref.node_closure c ON c.tenant_id=p.tenant_id AND c.ancestor=p.ref AND c.descendant=p.ref AND c.depth=0
+    WHERE s.tenant_id=$1 AND s.ref=ANY($2::uuid[])
+      AND p.kind=s.kind AND p.code=s.code AND p.admin_unit_code IS NOT DISTINCT FROM s.admin_unit_code
+      AND p.parent_ref IS NOT DISTINCT FROM s.parent_ref AND p.active=s.active AND p.source_seq=s.last_seq`,
+		tid, []uuid.UUID{ref(101), ref(102), ref(103), ref(104), ref(105)}).Scan(&projected)
+	if err != nil || projected != 5 {
+		f.t.Fatalf("source-created organization projections: got %d, want 5: %v", projected, err)
+	}
+	for _, n := range []int{990, 991} {
+		f.exec(`INSERT INTO k_ref.org(tenant_id,ref,kind,code,admin_unit_code,active,source_seq)
+    VALUES($1,$2,'ttkn_province',$3,'89',true,1)`, tid, ref(n), fmt.Sprintf("N%d", n))
+		f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$2,0)", tid, ref(n))
+	}
+	for n := 101; n <= 105; n++ {
+		root := 990
+		if n >= 103 {
+			root = 991
+		}
+		f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$3,1)", tid, ref(root), ref(n))
+	}
+}
+
 func (f *fixture) seed(tid uuid.UUID, other bool) {
 	for n := 101; n <= 105; n++ {
 		unit := "89001"

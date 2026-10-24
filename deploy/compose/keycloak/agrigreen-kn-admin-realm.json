@@ -3,7 +3,13 @@
   "enabled": true,
   "displayName": "AgriGreen KN — Quản trị (realm riêng, Local/Dev)",
   "registrationAllowed": false,
-  "resetPasswordAllowed": false,
+  "resetPasswordAllowed": true,
+  "resetCredentialsFlow": "agrigreen password recovery",
+  "smtpServer": {
+    "host": "${AG_SMTP_HOST:}", "port": "${AG_SMTP_PORT:587}", "from": "${AG_SMTP_FROM:}",
+    "user": "${AG_SMTP_USERNAME:}", "password": "${AG_SMTP_PASSWORD:}",
+    "auth": "${AG_KC_SMTP_AUTH:true}", "starttls": "${AG_KC_SMTP_STARTTLS:true}", "ssl": "${AG_KC_SMTP_SSL:false}"
+  },
   "loginWithEmailAllowed": true,
   "loginTheme": "agrigreen",
   "eventsEnabled": true,
@@ -21,8 +27,8 @@
   "maxFailureWaitSeconds": 900,
   "minimumQuickLoginWaitSeconds": 60,
   "quickLoginCheckMilliSeconds": 1000,
-  "permanentLockout": true,
-  "maxTemporaryLockouts": 3,
+  "permanentLockout": false,
+  "maxTemporaryLockouts": 0,
   "accessTokenLifespan": 300,
   "ssoSessionIdleTimeout": 300,
   "ssoSessionMaxLifespan": 28800,
@@ -48,7 +54,7 @@
       { "name": "account_admin_province", "description": "[MFA] Quản trị tài khoản một tỉnh hệ KN (realm quản trị riêng, D25)" }
     ]
   },
-  "defaultDefaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
+  "defaultDefaultClientScopes": ["basic", "roles", "web-origins", "profile", "agrigreen-claims"],
   "defaultOptionalClientScopes": [],
   "components": {
     "org.keycloak.userprofile.UserProfileProvider": [
@@ -63,7 +69,20 @@
       }
     ]
   },
+  "authenticatorConfig": [
+    { "alias": "agrigreen-amr-pwd", "config": { "default.reference.value": "pwd", "default.reference.maxAge": "86400" } },
+    { "alias": "agrigreen-amr-otp", "config": { "default.reference.value": "otp", "default.reference.maxAge": "86400" } }
+  ],
   "authenticationFlows": [
+    {
+      "alias": "agrigreen password recovery", "description": "Quên mật khẩu qua email; GIỮ nguyên credential TOTP, không tự reset OTP",
+      "providerId": "basic-flow", "topLevel": true, "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "reset-credentials-choose-user", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10 },
+        { "authenticator": "reset-credential-email", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20 },
+        { "authenticator": "reset-password", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 30 }
+      ]
+    },
     {
       "alias": "kn-admin browser",
       "description": "D24/D25: realm quản trị — cookie hoặc mật khẩu + TOTP BẮT BUỘC cho mọi tài khoản (chưa có thì đăng ký ở lần đăng nhập đầu)",
@@ -82,12 +101,20 @@
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
-        { "authenticator": "auth-username-password-form", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
-        { "authenticator": "auth-otp-form", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false }
+        { "authenticator": "auth-username-password-form", "authenticatorConfig": "agrigreen-amr-pwd", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
+        { "authenticator": "auth-otp-form", "authenticatorConfig": "agrigreen-amr-otp", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false }
       ]
     }
   ],
   "clientScopes": [
+    {
+      "name": "profile", "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true", "display.on.consent.screen": "false" },
+      "protocolMappers": [
+        { "name": "username", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": { "user.attribute": "username", "claim.name": "preferred_username", "jsonType.label": "String", "id.token.claim": "true", "access.token.claim": "true", "userinfo.token.claim": "true" } }
+      ]
+    },
     {
       "name": "basic",
       "description": "sub và auth_time",
@@ -146,7 +173,7 @@
       "redirectUris": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
       "webOrigins": ["http://localhost:3000", "http://127.0.0.1:3000"],
       "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:3000/*##http://127.0.0.1:3000/*", "client.session.idle.timeout": "300", "client.session.max.lifespan": "28800" },
-      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"]
+      "defaultClientScopes": ["basic", "roles", "web-origins", "profile", "agrigreen-claims"]
     }
   ]
 }

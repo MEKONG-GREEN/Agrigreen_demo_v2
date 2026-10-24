@@ -22,8 +22,12 @@ import (
 
 // DigitizedByCommune thực hiện cooperativeport.Plots.
 func (s *Service) DigitizedByCommune(ctx context.Context, communes []string) ([]port.PlotStat, error) {
+	tid, err := tenant.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var rows []store.StatRow
-	err := tenant.FromCtxTx(ctx, s.DB, func(tx pgx.Tx) error {
+	err = s.inTx(ctx, tid, func(tx pgx.Tx) error {
 		var e error
 		rows, e = store.StatsByCommune(ctx, tx, communes == nil, communes)
 		return e
@@ -44,8 +48,12 @@ func (s *Service) DigitizedByCooperative(ctx context.Context, coops []uuid.UUID)
 	if len(coops) == 0 {
 		return out, nil
 	}
+	tid, err := tenant.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var rows []store.StatRow
-	err := tenant.FromCtxTx(ctx, s.DB, func(tx pgx.Tx) error {
+	err = s.inTx(ctx, tid, func(tx pgx.Tx) error {
 		var e error
 		rows, e = store.StatsByCooperative(ctx, tx, coops)
 		return e

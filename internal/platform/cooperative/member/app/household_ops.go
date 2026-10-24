@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/member/domain"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/member/store"
 	port "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -154,7 +153,7 @@ func (s *Service) visibleHousehold(ctx context.Context, p authz.Principal, sc au
 	var h *domain.Household
 	if err := tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		h, e = store.HouseholdByRef(ctx, tx, ref)
+		h, e = lookupHousehold(ctx, tx, p, sc, ref)
 		return e
 	}); err != nil {
 		return domain.Household{}, err

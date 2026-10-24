@@ -84,7 +84,7 @@ func (s *Service) ChangeMembership(ctx context.Context, in ChangeMembershipInput
 	}
 	var res MembershipResult
 	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
-		h, err := store.HouseholdByRef(ctx, tx, in.HouseholdRef)
+		h, err := lookupHousehold(ctx, tx, p, sc, in.HouseholdRef)
 		if err != nil {
 			return err
 		}
@@ -154,7 +154,7 @@ func (s *Service) ChangeMembership(ctx context.Context, in ChangeMembershipInput
 		}); err != nil {
 			return err
 		}
-		cur, err := store.HouseholdByRef(ctx, tx, h.Ref)
+		cur, err := lookupHousehold(ctx, tx, p, sc, h.Ref)
 		if err != nil || cur == nil {
 			return err
 		}

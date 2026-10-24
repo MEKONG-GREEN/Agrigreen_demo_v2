@@ -52,6 +52,7 @@ type fixture struct {
 	tenant uuid.UUID
 	// Tổ chức giả: cán bộ xã 31117, cán bộ xã 31120, hai HTX ở xã 31117.
 	orgA, orgB, coopA, coopB uuid.UUID
+	province92               uuid.UUID
 }
 
 func newFixture(t *testing.T, opts ...func(*app.Service)) *fixture {
@@ -67,6 +68,9 @@ func newFixture(t *testing.T, opts ...func(*app.Service)) *fixture {
 	for _, o := range opts {
 		o(svc)
 	}
+	f := &fixture{t: t, iss: iss, pool: pool, db: db, scope: sc, tenant: ids.New(),
+		orgA: ids.New(), orgB: ids.New(), coopA: ids.New(), coopB: ids.New()}
+	f.seedSourceOrgs("HTXA")
 	mod := plotMod{svc: svc}
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 4<<20)
@@ -76,8 +80,7 @@ func newFixture(t *testing.T, opts ...func(*app.Service)) *fixture {
 	appSrv, adminSrv := httptest.NewServer(appEng), httptest.NewServer(adminEng)
 	t.Cleanup(appSrv.Close)
 	t.Cleanup(adminSrv.Close)
-	f := &fixture{t: t, iss: iss, app: appSrv, admin: adminSrv, mod: mod, pool: pool, db: db, scope: sc, tenant: ids.New(),
-		orgA: ids.New(), orgB: ids.New(), coopA: ids.New(), coopB: ids.New()}
+	f.app, f.admin, f.mod = appSrv, adminSrv, mod
 	sc.set(f.orgA, authz.Scope{Units: []string{"31117"}})
 	sc.set(f.orgB, authz.Scope{Units: []string{"31120"}})
 	sc.set(f.coopA, authz.Scope{Units: []string{"31117"}})
