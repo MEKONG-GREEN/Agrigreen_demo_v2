@@ -3,6 +3,7 @@ package htxdata_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -38,6 +39,17 @@ func (dashboardScope) Scope(ctx context.Context) (authz.Scope, error) {
 // SQL fixture writes belong to this composition test, outside the KN source boundary.
 func TestKNHTTPDashboardPublishedHTXData(t *testing.T) {
 	f := newFixture(t)
+	// The application ScopeResolver below is deliberately fake. Seed its caller
+	// nodes/self edges so missing caller projection is not the reason for denial;
+	// do not attach HTX organizations to a KN tree or invent a selected session.
+	for _, node := range []struct {
+		n          int
+		kind, unit string
+	}{{901, "ttkn_province", "89"}, {902, "ttkn_province", "92"}, {903, "extension_team", "89001"}} {
+		f.exec(`INSERT INTO k_ref.org(tenant_id,ref,kind,code,admin_unit_code,active,source_seq)
+    VALUES($1,$2,$3,$4,$5,true,1)`, f.tid, ref(node.n), node.kind, fmt.Sprintf("N%d", node.n), node.unit)
+		f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$2,0)", f.tid, ref(node.n))
+	}
 	empty := ids.New()
 	for _, tid := range []uuid.UUID{f.tid, empty} {
 		for _, u := range []struct{ code, level, parent string }{{"89", "province", ""}, {"92", "province", ""}, {"89001", "commune", "89"}, {"92001", "commune", "92"}} {

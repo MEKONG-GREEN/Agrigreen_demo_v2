@@ -115,6 +115,12 @@ func seedScope(ctx context.Context, t *testing.T, tx pgx.Tx, withKRef bool) scop
 		scopeExec(ctx, t, tx, `INSERT INTO pf_coop.household_membership (tenant_id, id, household_ref, org_ref, since_date)
 		  VALUES ($1, gen_random_uuid(), $2, $3, '2026-01-01')`, s.tid, h.ref, h.coop)
 	}
+	if !withKRef {
+		// New source INSERTs project synchronously. Deliberately model an
+		// unavailable/lost projection after setup, not an unseeded source.
+		scopeExec(ctx, t, tx, `DELETE FROM k_ref.node_closure WHERE tenant_id = $1`, s.tid)
+		scopeExec(ctx, t, tx, `DELETE FROM k_ref.org WHERE tenant_id = $1`, s.tid)
+	}
 	return s
 }
 
@@ -199,10 +205,10 @@ func TestCoopScopeRLS_W34(t *testing.T) {
 		{"cán bộ xã chỉ có xã 10002 (Nút X1): nhánh xã", s.tid, s.x1, `{"10002"}`, []uuid.UUID{s.plot1, s.plot2, s.draft2}, []uuid.UUID{s.hh1, s.hh2}},
 		{"Cấp Tỉnh P: mọi hậu duệ", s.tid, s.p, "", []uuid.UUID{s.plot1, s.plot2, s.draft1, s.draft2}, []uuid.UUID{s.hh1, s.hh2}},
 		{"không Nút (consumer/job/Admin): chỉ lọc tenant", s.tid, uuid.Nil, "", []uuid.UUID{s.plot1, s.plot2, s.draft1, s.draft2}, []uuid.UUID{s.hh1, s.hh2}},
-		{"Nút chưa có trong bản chiếu: đóng (chỉ thửa nháp)", s.tid, ids.New(), "", []uuid.UUID{s.draft1, s.draft2}, nil},
+		{"Nút chưa có trong bản chiếu: đóng cả nhánh nháp", s.tid, ids.New(), "", nil, nil},
 		{"Nút của tenant khác: không thấy gì của tenant này", s.tid, other.p, `{"99999"}`, nil, nil},
-		{"tenant khác, Nút P của tenant này: chỉ dữ liệu tenant khác qua nhánh nháp", other.tid, s.p, "", []uuid.UUID{other.draft1, other.draft2}, nil},
-		{"tenant chưa có k_ref: lùi về p_tenant", bare.tid, bare.c1, "", []uuid.UUID{bare.plot1, bare.plot2, bare.draft1, bare.draft2}, []uuid.UUID{bare.hh1, bare.hh2}},
+		{"tenant khác, Nút P của tenant này: đóng", other.tid, s.p, "", nil, nil},
+		{"tenant chưa có k_ref: đóng", bare.tid, bare.c1, "", nil, nil},
 	}
 	for _, c := range cases {
 		asCoop(ctx, t, tx, c.tid, c.node, c.xa)

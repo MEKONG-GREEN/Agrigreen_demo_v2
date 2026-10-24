@@ -120,3 +120,13 @@ Có ở cụm `pf` và `mkg`. Không cần ở `ts`, `vault` cho đến khi có 
 - Kiến trúc v4.1: §13 (cụm và schema), §17.1 (R-DB-05), §17.2 (`ctx_uuid`), §34 (dựng lại `k_ref` khi phục hồi), §36, Phụ lục B mục 8, Phụ lục D (SAD 6.2 → `k_ref`).
 - Bản đối chiếu: §1.3 mục 3, §2.3, §2.5 (DB-02, DB-05), §3.7.
 - [ADR-0005](0005-rls-mot-policy-moi-bang.md), [ADR-0008](0008-phan-vung-mang.md), [ADR-0020](0020-lien-thong-platform-mkg-khac-tenant.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0030](0030-doc-tai-cho-co-cap-phep.md); ADR-0032, ADR-0033 (gói W0.2).
+
+## P0-HTX-KREF (#130, 24/10/2026)
+
+Gói P0 bổ sung ngoại lệ đồng bộ trong cụm pf: trigger k/ref-owned chiếu dòng tạo
+pf_party.org vào k_ref.org/node_closure trong chính giao dịch nguồn, thay vì chờ
+consumer trước khi tạo hồ sơ HTX. Outbox và cơ chế cụm khác giữ nguyên. Quyền DML
+không cấp cho r_party; hàm trigger SECURITY DEFINER do own_kref NOLOGIN sở hữu,
+không có tham số ngoài NEW và không cho PUBLIC EXECUTE. RLS pf_coop bỏ bootstrap
+fallback, node thiếu chiếu đóng cả nhánh xã/nháp. Tenant cũ phải được Rebuild dưới
+khóa writer vận hành trước khi mở lại; xem [phạm vi và triển khai](../dev/p0-htx-kref.md).

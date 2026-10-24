@@ -57,6 +57,7 @@ func newFixtureOrgs(t *testing.T) *fixture {
 	sc := newFakeScope()
 	tol := decimal.NewFromInt(1)
 	f := &fixture{t: t, iss: iss, pool: pool, db: shareddb.ForModule(pool, coopDB), scope: sc, tenant: ids.New(), orgA: ids.New(), orgB: ids.New(), coopA: ids.New(), coopB: ids.New()}
+	f.seedSourceOrgs("HTX000001")
 	orgs := fakeOrgs{orgs: []partyport.Org{
 		{Ref: f.coopA, Kind: partyport.OrgCooperative, Code: "HTX000001", Name: "HTX A", AdminUnitCode: "31117", Active: true},
 		{Ref: f.orgA, Kind: partyport.OrgExtensionTeam, Code: "TKN-A", Name: "Tổ A", AdminUnitCode: "31117", Active: true},

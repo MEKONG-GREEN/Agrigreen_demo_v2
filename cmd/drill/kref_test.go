@@ -47,6 +47,16 @@ func TestDrillKRefRebuildMatchesSource_W25(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	// P0-HTX-KREF projects source INSERTs synchronously. Explicitly emulate a
+	// restored legacy tenant with a missing projection so this drill still proves
+	// Before=0 -> After=6; never weaken the production trigger or expected drift.
+	admin := env.AdminPool(t, migrations.PF)
+	if _, err := admin.Exec(ctx, `DELETE FROM k_ref.node_closure WHERE tenant_id=$1`, tid); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, `DELETE FROM k_ref.org WHERE tenant_id=$1`, tid); err != nil {
+		t.Fatal(err)
+	}
 	pool := func(role string) (*pgxpool.Pool, error) { return env.Pool(t, migrations.PF, role), nil }
 	cfg := KRefConfig{Pool: pool, Tenants: []uuid.UUID{tid}, Database: "ag_pf"}
 
