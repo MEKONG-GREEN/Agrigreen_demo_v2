@@ -169,6 +169,11 @@ func replayTx(ctx context.Context, tx pgx.Tx, key string) (*OrgResult, error) {
 func (r *Registry) write(ctx context.Context, tid uuid.UUID, key string, fn func(tx pgx.Tx) (OrgResult, error)) (OrgResult, error) {
 	var res OrgResult
 	err := tenant.WithTenantTx(ctx, r.DB, tid, func(tx pgx.Tx) error {
+		// A concurrent retry must observe the winner before name/code allocation.
+		// Keep this lock in the source transaction; no extra pool connection.
+		if err := store.LockOrgIdempotency(ctx, tx, key); err != nil {
+			return err
+		}
 		if prev, err := replayTx(ctx, tx, key); err != nil {
 			return err
 		} else if prev != nil {
@@ -332,7 +337,8 @@ func (r *Registry) createOrg(ctx context.Context, p authz.Principal, in CreateOr
 		if err := store.InsertOrg(ctx, tx, p.TenantID, o, ev); err != nil {
 			return OrgResult{}, err
 		}
-		// W2.5: pf.party.org.created → worker pf.kref (k_ref.org, k_ref.node_closure).
+		// P0-HTX-KREF: the INSERT trigger already projected k_ref in this tx.
+		// Keep the event for remote projections and share-scope rebuilding.
 		if err := enqueueStatusEvent(ctx, tx, ev, 0); err != nil {
 			return OrgResult{}, err
 		}
