@@ -180,7 +180,7 @@ Ký hiệu nguồn: `D1 §2.1#4` = bản D1, mục 2.1, dòng 4. `v4.3 §21.1`, 
 | W11.45 | Báo cáo phòng BM-11 | Soạn tự động + phần viết, LĐ duyệt, gửi theo nơi nhận, phiên bản | D4 CN5 | W11.44, W10.17 | L | pf 000166 | Chặn Q-046 | 3 | |
 | W11.46 | Lịch trực, lịch tiêm, lịch công tác + check-in GPS | BM-03, BM-07, BM-05/06 | D4 CN6 | W11.41, W11.07 | L | pf 000163 | Chờ Q-057 | 2 | |
 | W11.47 | Hộ mô hình, điểm, CT/DA, cấp quyền | ~~`pf_coop` site/batch~~ → bản ghi KN `pf_extension` (CT/DA, điểm, hộ mô hình, quyền CNTS; ADR-0055, Q-KNS-04: không ghi HTX) | D4 CN7 | W10.13, W11.61 | L | pf 20261020161323 | Đã làm 20/10/2026 — giả định tạm Q-023, Q-076, Q-061 ([gia-dinh/W11.47](gia-dinh/W11.47.md)) | 3 | |
-| W11.48 | Nhật ký BM-08/09/19 | Lứa, lần ghi có chỉ số, GPS bất biến + 200 m + phát hiện giả lập, ảnh, offline, xác thực, hạch toán NC-15 | D4 CN8 | W11.47, W11.43 | XL | pf 20261021135709 | Đã làm 21/10/2026 — giả định tạm Q-005, Q-077 ([gia-dinh/W11.48](gia-dinh/W11.48.md)); App xã ngoại tuyến chưa | 3 | |
+| W11.48 | Nhật ký BM-08/09/19 | Lứa, lần ghi có chỉ số, GPS bất biến + 200 m + phát hiện giả lập, ảnh, offline, xác thực, hạch toán NC-15 | D4 CN8 | W11.47, W11.43 | XL | pf 20261024090937 | Đã làm 21/10/2026 — giả định tạm Q-005, Q-077 ([gia-dinh/W11.48](gia-dinh/W11.48.md)); App xã ngoại tuyến chưa | 3 | |
 | W11.49 | Dịch bệnh BM-10 | Ổ dịch có phiên bản diễn biến + báo nghi dịch | D4 CN9 | W11.41, W11.07 | M | pf 000164 | Mã được | 2 | |
 | W11.50 | Chiến dịch điều tra | Đợt trên kỳ `adhoc`, tách khỏi lũy kế | D4 CN10 | W11.42 | M | pf 000165 | Chờ Q-058 | 2 | |
 | W11.52 | Bản đồ vùng nuôi/dịch (GĐ2) | Vẽ vùng, bán kính, hướng di chuyển, theo ngày | D4 CN12 | W11.49, W11.47 | L | pf 000177 | GĐ2 | 4 | |
