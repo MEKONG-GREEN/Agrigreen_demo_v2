@@ -27,6 +27,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -91,8 +92,14 @@ type Service struct {
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
 
+// tx chạy fn trong giao dịch tenant. P0-POOL-KN-2 (#139): ctx mang txdeps (job nhắc nộp, quá hạn xử lý) → đơn vị hành chính
+// và danh bạ người nhận (port module khác) chỉ đọc NGOÀI giao dịch; thiếu thì hủy, nạp, chạy lại fn.
 func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {
-	return tenant.WithTenantTx(ctx, s.DB, tid, fn)
+	err := txdeps.Run(ctx, func(body func(pgx.Tx) error) error { return tenant.WithTenantTx(ctx, s.DB, tid, body) }, fn)
+	if errors.Is(err, txdeps.ErrExhausted) {
+		return ErrDependency.WithDetail("đơn vị hành chính hoặc danh bạ cán bộ thay đổi liên tục — thử lại").WithCause(err)
+	}
+	return err
 }
 
 func dup(err error) bool { return errors.Is(ledger.Classify(err), ledger.ErrDuplicate) }
@@ -212,7 +219,9 @@ func (s *Service) provinceOf(ctx context.Context, commune string, at time.Time) 
 	if s.Units == nil || commune == "" {
 		return ""
 	}
-	u, err := s.Units.Get(ctx, commune, at)
+	u, err := txdeps.Get(ctx, "unit:"+commune+"@"+at.UTC().Format(time.RFC3339Nano), func(ctx context.Context) (partyport.AdminUnit, error) {
+		return s.Units.Get(ctx, commune, at)
+	})
 	if err != nil {
 		return ""
 	}

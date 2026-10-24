@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -185,6 +187,7 @@ type SaveInput struct {
 
 // SaveVersion ghi phiên bản mới của kế hoạch năm (cả cây). Phiên bản cũ giữ nguyên, xem lại được.
 func (s *Service) SaveVersion(ctx context.Context, in SaveInput) (PlanView, bool, error) {
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: ngày chốt kỳ KHTC, dòng đã có số liệu ở phiếu đọc ngoài giao dịch (service.go tx)
 	c, err := s.planWriter(ctx)
 	if err != nil {
 		return PlanView{}, false, err
@@ -283,7 +286,9 @@ func (s *Service) SaveVersion(ctx context.Context, in SaveInput) (PlanView, bool
 			}
 		}
 		if s.ClosedCutoff != nil {
-			cut, err := s.ClosedCutoff(ctx, in.Year)
+			cut, err := txdeps.Get(ctx, "closed_cutoff:"+strconv.Itoa(in.Year), func(ctx context.Context) (*time.Time, error) {
+				return s.ClosedCutoff(ctx, in.Year)
+			})
 			if err != nil {
 				return err
 			}
@@ -365,7 +370,14 @@ func (s *Service) checkRemoved(ctx context.Context, year int, prev, next []domai
 	if len(gone) == 0 {
 		return nil
 	}
-	used, err := s.EntryUsage(ctx, year, gone)
+	keys := make([]string, len(gone))
+	for i, r := range gone {
+		keys[i] = r.String()
+	}
+	slices.Sort(keys)
+	used, err := txdeps.Get(ctx, "entry_usage:"+strconv.Itoa(year)+":"+strings.Join(keys, ","), func(ctx context.Context) (map[uuid.UUID]bool, error) {
+		return s.EntryUsage(ctx, year, gone)
+	})
 	if err != nil {
 		return err
 	}

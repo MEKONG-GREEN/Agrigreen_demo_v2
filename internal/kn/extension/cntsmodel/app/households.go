@@ -15,6 +15,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/store"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
@@ -156,6 +157,7 @@ func (s *Service) person(ctx context.Context, in HouseholdInput, commune string)
 
 // CreateHousehold thêm hộ vào điểm trình diễn.
 func (s *Service) CreateHousehold(ctx context.Context, in HouseholdInput) (HouseholdView, error) {
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: port module khác chỉ đọc ngoài giao dịch (service.go tx)
 	c, err := s.writer(ctx, in.IdemKey)
 	if err != nil {
 		return HouseholdView{}, err
@@ -281,6 +283,7 @@ func (s *Service) lockHousehold(ctx context.Context, tx pgx.Tx, c caller, ref uu
 
 // UpdateHousehold ghi phiên bản mới của hộ (khóa lạc quan). Chủ hộ không đổi (rút hộ, thêm hộ mới).
 func (s *Service) UpdateHousehold(ctx context.Context, in HouseholdInput) (HouseholdView, error) {
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: port module khác chỉ đọc ngoài giao dịch (service.go tx)
 	c, err := s.writer(ctx, in.IdemKey)
 	if err != nil {
 		return HouseholdView{}, err

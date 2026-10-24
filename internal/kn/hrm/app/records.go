@@ -808,11 +808,43 @@ func (s *Service) checkEvents(ctx context.Context, tx pgx.Tx, c rc, t domain.Sta
 }
 
 // unitSet trả tập mã đơn vị nội bộ đang dùng của đơn vị người gọi; nil = không kiểm (chưa nối hoặc Admin không Nút).
+// P0-POOL-KN-2 (#139): unitSet được gọi TRONG giao dịch (checkEvents, checkDocRefs) — dùng bản đã nạp trước giao dịch
+// (preloadUnits) nếu có; danh mục đơn vị nội bộ là port của pf/accounts, mở giao dịch riêng trên CHUNG pool.
 func (s *Service) unitSet(ctx context.Context, c rc) (map[string]bool, error) {
 	if s.Rec.Units == nil || c.unitRef == uuid.Nil {
 		return nil, nil
 	}
-	us, err := s.Rec.Units.InternalUnits(ctx, c.unitRef)
+	if m, ok := ctx.Value(unitsKey{}).(unitsMemo); ok && m.ref == c.unitRef {
+		return m.set, m.err
+	}
+	return s.loadUnitSet(ctx, c.unitRef)
+}
+
+type unitsKey struct{}
+
+// unitsMemo là tập đơn vị nội bộ (và lỗi đọc) đã nạp NGOÀI giao dịch cho đơn vị ref của người gọi.
+type unitsMemo struct {
+	ref uuid.UUID
+	set map[string]bool
+	err error
+}
+
+// preloadUnits (P0-POOL-KN-2) nạp tập đơn vị nội bộ của đơn vị người gọi TRƯỚC giao dịch ghi; lỗi đọc chỉ trả khi thân
+// giao dịch thực sự cần (unitSet) — như trước. Không nối danh mục / không có ngữ cảnh → ctx giữ nguyên.
+func (s *Service) preloadUnits(ctx context.Context) context.Context {
+	if s.Rec == nil || s.Rec.Units == nil {
+		return ctx
+	}
+	k, err := s.recordSession(ctx)
+	if err != nil || k.UnitRef == uuid.Nil {
+		return ctx
+	}
+	set, err := s.loadUnitSet(ctx, k.UnitRef)
+	return context.WithValue(ctx, unitsKey{}, unitsMemo{ref: k.UnitRef, set: set, err: err})
+}
+
+func (s *Service) loadUnitSet(ctx context.Context, unitRef uuid.UUID) (map[string]bool, error) {
+	us, err := s.Rec.Units.InternalUnits(ctx, unitRef)
 	if err != nil {
 		return nil, err
 	}
@@ -840,6 +872,7 @@ func normEvents(t domain.StaffType, in []domain.EventInput) ([]prepared, error) 
 // CreateStaff thêm hồ sơ (FN-07 B2): kiểm mọi thứ trước, rồi tạo chủ thể ở kho (định danh + ngăn), rồi ghi sổ hồ sơ + quá
 // trình ban đầu với mã tự sinh. Trùng SĐT → hrm.duplicate_person (kho chống trùng bằng chỉ mục mù).
 func (s *Service) CreateStaff(ctx context.Context, in CreateInput, idem string) (WriteStaffResult, error) {
+	ctx = s.preloadUnits(ctx) // P0-POOL-KN-2: đơn vị nội bộ đọc ngoài giao dịch
 	c, err := s.recCaller(ctx)
 	if err != nil {
 		return WriteStaffResult{}, err
@@ -1142,6 +1175,7 @@ func (s *Service) VoidEvent(ctx context.Context, id, eventID uuid.UUID, reason, 
 }
 
 func (s *Service) writeEvent(ctx context.Context, id uuid.UUID, in *domain.EventInput, target uuid.UUID, reason, idem string) (EventResult, error) {
+	ctx = s.preloadUnits(ctx) // P0-POOL-KN-2: đơn vị nội bộ đọc ngoài giao dịch
 	c, err := s.recCaller(ctx)
 	if err != nil {
 		return EventResult{}, err

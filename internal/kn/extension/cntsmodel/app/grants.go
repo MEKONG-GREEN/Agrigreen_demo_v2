@@ -19,6 +19,8 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/store"
+	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -82,7 +84,11 @@ func (s *Service) checkGrant(ctx context.Context, tx pgx.Tx, c caller, province 
 		if s.Catalogs == nil {
 			return ErrDependency
 		}
-		fs, err := s.Catalogs.FacilitiesAt(ctx, s.today(), g.Communes)
+		day := s.today()
+		fs, err := txdeps.Get(ctx, "facilities:"+strings.Join(g.Communes, ",")+"@"+day.Format(time.DateOnly),
+			func(ctx context.Context) ([]knport.SlaughterFacility, error) {
+				return s.Catalogs.FacilitiesAt(ctx, day, g.Communes)
+			})
 		if err != nil {
 			return err
 		}
@@ -162,6 +168,7 @@ func activeSameRole(gs []store.Grant, grantee uuid.UUID, role, province string, 
 
 // CreateGrant cấp quyền.
 func (s *Service) CreateGrant(ctx context.Context, in GrantInput) (GrantView, error) {
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: port module khác chỉ đọc ngoài giao dịch (service.go tx)
 	c, err := s.writer(ctx, in.IdemKey)
 	if err != nil {
 		return GrantView{}, err
@@ -247,6 +254,7 @@ func (s *Service) lockGrant(ctx context.Context, tx pgx.Tx, c caller, ref uuid.U
 
 // UpdateGrant sửa phạm vi, biểu mẫu, hiệu lực của quyền (người được cấp, vai không đổi).
 func (s *Service) UpdateGrant(ctx context.Context, in GrantInput) (GrantView, error) {
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: port module khác chỉ đọc ngoài giao dịch (service.go tx)
 	c, err := s.writer(ctx, in.IdemKey)
 	if err != nil {
 		return GrantView{}, err
@@ -299,6 +307,7 @@ type RevokeInput struct {
 
 // RevokeGrant thu hồi quyền; có người nhận → cấp quyền cùng phạm vi cho người nhận trong cùng giao dịch.
 func (s *Service) RevokeGrant(ctx context.Context, in RevokeInput) (GrantView, error) {
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: port module khác chỉ đọc ngoài giao dịch (service.go tx)
 	c, err := s.writer(ctx, in.IdemKey)
 	if err != nil {
 		return GrantView{}, err

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -14,6 +15,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/store"
 	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -100,7 +102,11 @@ func (s *Service) checkSite(ctx context.Context, c caller, p store.Project, in *
 	if err := s.communeIn(ctx, c, ErrSiteInvalid, "commune_code", in.CommuneCode, p.Province); err != nil {
 		return err
 	}
-	it, err := s.Catalogs.ItemAt(ctx, knport.CatalogCNTSModelType, in.ModelType, s.today())
+	day := s.today()
+	it, err := txdeps.Get(ctx, "item:"+knport.CatalogCNTSModelType+":"+in.ModelType+"@"+day.Format(time.DateOnly),
+		func(ctx context.Context) (mdport.CatalogItem, error) {
+			return s.Catalogs.ItemAt(ctx, knport.CatalogCNTSModelType, in.ModelType, day)
+		})
 	switch {
 	case errors.Is(err, mdport.ErrCatalogItemNotFound), errors.Is(err, mdport.ErrNotEffective):
 		return ErrSiteInvalid.WithField("model_type_code", "không có trong danh mục loại mô hình CNTS")
@@ -143,6 +149,7 @@ func (s *Service) writePoint(ctx context.Context, tx pgx.Tx, c caller, kind stri
 
 // CreateSite tạo điểm trình diễn trong dự án.
 func (s *Service) CreateSite(ctx context.Context, in SiteInput) (SiteView, error) {
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: port module khác chỉ đọc ngoài giao dịch (service.go tx)
 	c, err := s.writer(ctx, in.IdemKey)
 	if err != nil {
 		return SiteView{}, err
@@ -206,6 +213,7 @@ func (s *Service) CreateSite(ctx context.Context, in SiteInput) (SiteView, error
 
 // UpdateSite ghi phiên bản mới của điểm (khóa lạc quan).
 func (s *Service) UpdateSite(ctx context.Context, in SiteInput) (SiteView, error) {
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: port module khác chỉ đọc ngoài giao dịch (service.go tx)
 	c, err := s.writer(ctx, in.IdemKey)
 	if err != nil {
 		return SiteView{}, err

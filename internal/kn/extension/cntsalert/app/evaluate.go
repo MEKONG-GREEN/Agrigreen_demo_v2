@@ -16,6 +16,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -83,7 +84,9 @@ func (r *resolver) load(ctx context.Context) {
 		return
 	}
 	r.loaded = true
-	r.officers, _ = r.s.Dir.Officers(ctx, r.tid, r.province)
+	r.officers, _ = txdeps.Get(ctx, "officers:"+r.tid.String()+":"+r.province, func(ctx context.Context) ([]Officer, error) {
+		return r.s.Dir.Officers(ctx, r.tid, r.province)
+	})
 }
 
 func (r *resolver) resolve(ctx context.Context, roles []string, commune string, submitter uuid.UUID) []uuid.UUID {
@@ -94,7 +97,9 @@ func (r *resolver) resolve(ctx context.Context, roles []string, commune string, 
 			out = append(out, submitter)
 		case domain.RecipFormOwner:
 			if r.s.Dir != nil {
-				if refs, err := r.s.Dir.FormOwners(ctx, r.tid); err == nil {
+				if refs, err := txdeps.Get(ctx, "form_owners:"+r.tid.String(), func(ctx context.Context) ([]uuid.UUID, error) {
+					return r.s.Dir.FormOwners(ctx, r.tid)
+				}); err == nil {
 					out = append(out, refs...)
 				}
 			}

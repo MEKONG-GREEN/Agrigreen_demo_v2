@@ -17,6 +17,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -231,7 +232,9 @@ func (s *Service) Remind(ctx context.Context, tid uuid.UUID, now time.Time) (int
 	}
 	loc := clock.Zone()
 	sent, streaks := 0, 0
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: tỉnh của xã, cán bộ nhận nhắc đọc ngoài giao dịch (service.go tx)
 	err = s.tx(ctx, tid, func(tx pgx.Tx) error {
+		sent, streaks = 0, 0 // thân giao dịch có thể chạy lại (txdeps)
 		cs, err := s.configs(ctx, tx)
 		if err != nil {
 			return err

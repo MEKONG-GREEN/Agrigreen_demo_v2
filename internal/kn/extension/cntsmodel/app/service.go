@@ -31,6 +31,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/store"
 	exdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/domain"
 	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -102,8 +103,22 @@ func day(t time.Time) time.Time {
 
 func (s *Service) today() time.Time { return day(s.now()) }
 
+// tx chạy fn trong giao dịch tenant. P0-POOL-KN-2 (#139): ctx mang txdeps (txdeps.With ở đầu thao tác ghi) → port của module
+// khác (đơn vị hành chính, danh mục CNTS, cán bộ Cấp Xã, CT/DA KHTC) chỉ đọc NGOÀI giao dịch; thiếu thì hủy, nạp, chạy lại fn.
 func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {
-	return tenant.WithTenantTx(ctx, s.DB, tid, fn)
+	err := txdeps.Run(ctx, func(body func(pgx.Tx) error) error { return tenant.WithTenantTx(ctx, s.DB, tid, body) }, fn)
+	if errors.Is(err, txdeps.ErrExhausted) {
+		return ErrDependency.WithDetail("danh mục, đơn vị hành chính hoặc danh bạ Cấp Xã thay đổi liên tục — thử lại").WithCause(err)
+	}
+	return err
+}
+
+// unit đọc đơn vị hành chính còn hiệu lực hôm nay (port module khác — qua txdeps).
+func (s *Service) unit(ctx context.Context, code string) (partyport.AdminUnit, error) {
+	day := s.today()
+	return txdeps.Get(ctx, "unit:"+code+"@"+day.Format(time.DateOnly), func(ctx context.Context) (partyport.AdminUnit, error) {
+		return s.Units.Get(ctx, code, day)
+	})
 }
 
 type caller struct {
@@ -207,7 +222,7 @@ func noPII(base *problem.Problem, fields map[string]string) error {
 
 // provinceOf trả mã tỉnh của xã code còn hiệu lực ("" nếu không phải xã).
 func (s *Service) provinceOf(ctx context.Context, code string) (string, error) {
-	u, err := s.Units.Get(ctx, code, s.today())
+	u, err := s.unit(ctx, code)
 	if errors.Is(err, partyport.ErrUnitNotFound) {
 		return "", nil
 	}
@@ -226,7 +241,7 @@ func (s *Service) callerProvince(ctx context.Context, c caller, requested string
 	provinces := map[string]bool{}
 	if !c.admin() {
 		for _, code := range c.k.Scope.Units {
-			u, err := s.Units.Get(ctx, code, s.today())
+			u, err := s.unit(ctx, code)
 			if errors.Is(err, partyport.ErrUnitNotFound) {
 				continue
 			}
@@ -246,7 +261,7 @@ func (s *Service) callerProvince(ctx context.Context, c caller, requested string
 	if requested == "" {
 		return "", problem.Validation.WithField("province_code", "chọn tỉnh")
 	}
-	u, err := s.Units.Get(ctx, requested, s.today())
+	u, err := s.unit(ctx, requested)
 	if errors.Is(err, partyport.ErrUnitNotFound) || (err == nil && u.Level != partyport.LevelProvince) {
 		return "", problem.Validation.WithField("province_code", "phải là tỉnh còn hiệu lực")
 	}
@@ -282,7 +297,9 @@ func (s *Service) officers(ctx context.Context, c caller) (map[uuid.UUID]accport
 	if s.Officers == nil {
 		return nil, ErrDependency
 	}
-	list, err := s.Officers.XaScopes(ctx, c.p.TenantID, DeptCNTS)
+	list, err := txdeps.Get(ctx, "xa_scopes:"+c.p.TenantID.String(), func(ctx context.Context) ([]accport.XaScope, error) {
+		return s.Officers.XaScopes(ctx, c.p.TenantID, DeptCNTS)
+	})
 	if err != nil {
 		return nil, err
 	}

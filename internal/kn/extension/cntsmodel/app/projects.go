@@ -14,6 +14,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/store"
 	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -106,7 +107,10 @@ func (s *Service) checkProject(ctx context.Context, c caller, p *domain.Project,
 		if s.Programs == nil {
 			return ErrDependency
 		}
-		pr, err := s.Programs.Program(ctx, *p.ProgramRef)
+		ref := *p.ProgramRef
+		pr, err := txdeps.Get(ctx, "khtc_program:"+ref.String(), func(ctx context.Context) (knport.KHTCProgram, error) {
+			return s.Programs.Program(ctx, ref)
+		})
 		if errors.Is(err, knport.ErrKHTCProgramNotFound) {
 			return ErrProjectInvalid.WithField("program_ref", "không có trong danh sách CT/DA của KHTC")
 		}
@@ -122,6 +126,7 @@ func (s *Service) checkProject(ctx context.Context, c caller, p *domain.Project,
 
 // CreateProject tạo CT/DA.
 func (s *Service) CreateProject(ctx context.Context, in ProjectInput) (ProjectView, error) {
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: port module khác chỉ đọc ngoài giao dịch (service.go tx)
 	c, err := s.writer(ctx, in.IdemKey)
 	if err != nil {
 		return ProjectView{}, err
@@ -178,6 +183,7 @@ func (s *Service) CreateProject(ctx context.Context, in ProjectInput) (ProjectVi
 
 // UpdateProject ghi phiên bản mới của CT/DA (khóa lạc quan base_version).
 func (s *Service) UpdateProject(ctx context.Context, in ProjectInput) (ProjectView, error) {
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: port module khác chỉ đọc ngoài giao dịch (service.go tx)
 	c, err := s.writer(ctx, in.IdemKey)
 	if err != nil {
 		return ProjectView{}, err

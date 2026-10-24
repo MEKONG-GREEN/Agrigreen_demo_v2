@@ -105,8 +105,8 @@ func TestP0PoolKN2_CNTSAlertJobNoNestedTx(t *testing.T) {
 	tp := poolToucher{pool: shared}
 	d := dir{xa1: ids.New(), tinh: ids.New(), lead: ids.New()}
 	fd := &feed{}
-	// Kỳ W42 hạn 23:00 13/10 (giờ VN, t0 + 20 giờ… trong cửa sổ nhắc trước hạn 24 giờ): xã 30001 chưa gửi. Hai kỳ đã quá hạn
-	// trước đó xã 30001 cũng chưa gửi → trễ liên tiếp (ngưỡng mặc định 2 kỳ).
+	// Kỳ W42 hạn 06:00 14/10 giờ VN (t0 + 20 giờ — nhắc trước hạn 24 giờ), W41, W40 đã quá hạn (nhắc lặp 08:00): xã 30001 chưa
+	// gửi kỳ nào → 3 lượt nhắc, một cảnh báo trễ liên tiếp (ngưỡng mặc định 2 kỳ).
 	due := t0.Add(20 * time.Hour)
 	for i, key := range []string{"2027-W42", "2027-W41", "2027-W40"} {
 		fd.due = append(fd.due, formsport.PeriodProgress{ID: ids.New(), Profile: "kn_cnts", Label: key, TemplateCode: "CNTS-BM04",
@@ -133,7 +133,7 @@ func TestP0PoolKN2_CNTSAlertJobNoNestedTx(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			r, err := mod.CNTSAlertJobRun(ctx, tid, t0)
-			if err != nil || r.Reminders != 1 || r.Streaks != 1 {
+			if err != nil || r.Reminders != 3 || r.Streaks != 1 {
 				mu.Lock()
 				fails = append(fails, fmt.Sprintf("tenant %s: %+v err=%v", tid, r, err))
 				mu.Unlock()
@@ -154,7 +154,7 @@ func TestP0PoolKN2_CNTSAlertJobNoNestedTx(t *testing.T) {
 	// Người nhận nhắc nộp: cán bộ xã 30001 (tra trước giao dịch, như cũ).
 	admin := env.AdminPool(t, migrations.PF)
 	var recips string
-	if err := admin.QueryRow(context.Background(), `SELECT payload->>'recipient_refs' FROM shared.outbox WHERE tenant_id = $1 AND event_type = $2`,
+	if err := admin.QueryRow(context.Background(), `SELECT payload->>'recipient_refs' FROM shared.outbox WHERE tenant_id = $1 AND event_type = $2 LIMIT 1`,
 		tids[0], port.EventCNTSFormReminded).Scan(&recips); err != nil {
 		t.Fatal(err)
 	}

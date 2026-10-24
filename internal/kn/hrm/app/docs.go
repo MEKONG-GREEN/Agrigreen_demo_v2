@@ -757,6 +757,7 @@ func (s *Service) UploadDoc(ctx context.Context, in DocInput, fileName string, c
 	}
 	row := store.DocRow{DocID: ids.New(), FolderID: in.FolderID, FileName: name, ContentType: ct, Size: int64(len(content)),
 		Status: "active", Change: "created"}
+	ctx = s.preloadUnits(ctx) // P0-POOL-KN-2: đơn vị nội bộ đọc ngoài giao dịch (checkDocRefs)
 	var tid uuid.UUID
 	check := func(tx pgx.Tx) (dc, error) {
 		c, err := s.docCaller(ctx, tx)
@@ -868,6 +869,7 @@ func (c dc) visibleDoc(t folderTree, d store.DocRow) (domain.Matrix, error) {
 
 // UpdateDoc sửa phân loại tài liệu (thư mục không đổi — bộ ba chủ thể của tệp gắn thư mục lúc tải lên).
 func (s *Service) UpdateDoc(ctx context.Context, id uuid.UUID, in DocInput, idem string) (DocResult, error) {
+	ctx = s.preloadUnits(ctx) // P0-POOL-KN-2: đơn vị nội bộ đọc ngoài giao dịch (checkDocRefs)
 	res := DocResult{DocID: id}
 	err := s.docTx(ctx, func(tx pgx.Tx) error {
 		c, err := s.docCaller(ctx, tx)
