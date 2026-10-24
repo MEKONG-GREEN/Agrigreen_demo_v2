@@ -276,7 +276,7 @@ Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: t
 | 409 | `reports.dispatch_recipient_duplicate` | pf/reports: địa chỉ hộp thư đã có trong danh bạ đang dùng |
 | 409 | `reports.dispatch_no_data` | pf/reports: kỳ chưa có lần tổng hợp — bấm "Cập nhật" ở Báo cáo tổng hợp các xã trước |
 | 409 | `reports.gsheet_disabled` | pf/reports: tạo link Google Sheet khi bộ chuyển đang TẮT (mặc định; ADR-0026 "Đề xuất", RB-7) |
-| 409 | `reports.dispatch_sending` | pf/reports: đang gửi — chờ kết quả rồi mới gửi lại |
+| 409 | `reports.dispatch_sending` | pf/reports: đang gửi — chờ kết quả rồi mới gửi lại (quá hạn nhận việc `AG_REPORT_DISPATCH_LEASE`, mặc định 15 phút → "Gửi lại" tiếp tục cùng lượt, P0-WORKER-REPORTS) |
 | 422 | `reports.dispatch_no_recipients` | pf/reports: chưa chọn người nhận và chưa có người nhận mặc định |
 | 422 | `reports.gsheet_valve_blocked` | pf/reports: van mặc định chặn — mẫu có cột không phải số/nhãn tổ chức, không được đưa ra ngoài lãnh thổ |
 | 422 | `reports.format_unsupported` | pf/reports: mẫu không hỗ trợ định dạng đã chọn (`xlsx`/`pdf`) |

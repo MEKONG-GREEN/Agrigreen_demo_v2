@@ -83,6 +83,8 @@
 //	AG_WEB_OPS_URL                     (tùy chọn) URL web-ops cho liên kết tải lại trong email
 //	AG_REPORT_LINK_BASE                URL gốc công khai api-platform (vd https://api.<domain>) cho liên kết tải
 //	                                   báo cáo Chi cục 7 ngày (A4); thiếu → email vượt giới hạn đính kèm ghi "Gửi lỗi"
+//	AG_REPORT_DISPATCH_LEASE           (tùy chọn) hạn nhận việc gửi báo cáo Chi cục, mặc định 15m (P0-WORKER-REPORTS):
+//	                                   quá hạn khi còn "Đang gửi" → "Gửi lại" tiếp tục cùng lượt, không gửi lại người đã nhận
 //	AG_RABBITMQ_MGMT_URL               (tùy chọn) management API cho metric độ sâu DLQ
 //	AG_INTEGRATION_CONTRIBUTORS        (W5.3) tenant đóng góp tập tổng hợp của feed cổng tích hợp (job apiclient_feed_build);
 //	AG_INTEGRATION_BUILD_INTERVAL      chu kỳ dựng (mặc định 15m); job apiclient_feed_retention dọn feed quá 30 ngày
@@ -90,6 +92,9 @@
 //	AG_KC_CLIENT_ID, AG_KC_CLIENT_SECRET  pf.accounts.org_status (khóa/mở tài khoản theo trạng thái tổ chức)
 //	AG_OTLP_ENDPOINT, ...              OpenTelemetry (shared/telemetry)
 //	AG_HEALTH_ADDR                     /healthz, /readyz (pool ping + kết nối RabbitMQ) — mặc định :8087, chỉ mạng nội bộ
+//
+// RabbitMQ mất kết nối → worker không thoát: kết nối lại có độ lùi (1s·2^n, trần 30s), khai báo lại hàng đợi và đăng ký
+// lại mọi consumer (amqp_reconnect.go, P0-WORKER-REPORTS #128).
 //
 // `worker -healthcheck <url>`: GET url, thoát 0 khi 200 — healthcheck Docker (distroless).
 package main
