@@ -75,6 +75,11 @@ func (s *Service) nativeScopeTx(ctx context.Context, tid uuid.UUID, fn func(pgx.
 			return err
 		}
 		if !sc.All {
+			// An empty scope must not serialize to a missing xa_ids filter,
+			// which could otherwise leave a node-descendant RLS branch open.
+			if len(sc.Units) == 0 {
+				return ErrOutOfScope
+			}
 			xaIDs = (shareddb.ContextVars{XaIDs: sc.Units}).Settings()[shareddb.VarXaIDs]
 			bind = true
 		}

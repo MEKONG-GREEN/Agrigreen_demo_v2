@@ -57,6 +57,13 @@ func TestNativeSeasonScopeReachesRLSWithoutReplacingSessionScope(t *testing.T) {
 		}
 	}
 	t.Run("native commune positive", func(t *testing.T) { read(t, ctxFor(p), f.p1) })
+	t.Run("empty native scope denies a read port without app filtering", func(t *testing.T) {
+		svc.Scope = nativeSeasonScopeFunc(func(context.Context) (authz.Scope, error) { return authz.Scope{}, nil })
+		defer func() { svc.Scope = original }()
+		if _, err := seasons.HarvestDates(ctxFor(p), []uuid.UUID{f.p1, f.p4}); !errors.Is(err, app.ErrOutOfScope) {
+			t.Fatalf("empty scope read port: %v", err)
+		}
+	})
 	t.Run("unprojected actor stays closed despite unit scope", func(t *testing.T) {
 		missing := p
 		missing.OrgRef = ids.New()
