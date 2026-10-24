@@ -98,7 +98,9 @@ func newG2(t *testing.T) *g2 {
 	f := newFixture(t, func(d *app.Service) {
 		d.Orgs, d.Markers, d.Params = orgs, markers, fakeParams{tolerance: &tol, values: params}
 	})
-	g := &g2{fixture: f, orgs: orgs, markers: markers, params: params, coopC: ids.New(), prov92: ids.New(), prov89: ids.New()}
+	g := &g2{fixture: f, orgs: orgs, markers: markers, params: params, coopC: ids.New(), prov92: f.province92, prov89: ids.New()}
+	seedSourceOrg(t, f.tenant, g.coopC, partyport.OrgCooperative, "HTXC", "31120", uuid.Nil)
+	seedSourceOrg(t, f.tenant, g.prov89, partyport.OrgTTKNProvince, "TTKN89", "89", uuid.Nil)
 	orgs.add(f.coopA, "HTXA", "31117")
 	orgs.add(f.coopB, "HTXB", "31117")
 	orgs.add(g.coopC, "HTXC", "31120")

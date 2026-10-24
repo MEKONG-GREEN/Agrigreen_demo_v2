@@ -21,6 +21,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/plot/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port/farmerid"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -106,7 +107,10 @@ func (f *knFix) user(tid uuid.UUID, role, dept string, units ...string) knUser {
 	switch role {
 	case authz.KNXa:
 		kc.Communes, kc.Scope = units, authz.Scope{Units: units}
-		kc.OrgRef = ids.New() // như P1: lần gán Cấp Xã luôn có Nút (db.ForModule đòi Nút — FD)
+		kc.OrgRef = ids.New() // P1 binds a real commune node; keep its existing KN scope unchanged.
+		if len(units) > 0 {
+			seedSourceOrg(f.t, tid, kc.OrgRef, partyport.OrgExtensionTeam, "KN-"+kc.OrgRef.String()[:30], units[0], uuid.Nil)
+		}
 	case authz.KNTW, authz.KNAdmin:
 		kc.Scope = authz.Scope{All: true}
 	default:
