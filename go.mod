@@ -1,6 +1,6 @@
 module github.com/MEKONG-GREEN/Agrigreen_demo_v2
 
-go 1.26.0
+go 1.26.10
 
 toolchain go1.26.10
 
@@ -16,7 +16,7 @@ require (
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/rabbitmq/amqp091-go v1.15.0
 	github.com/shopspring/decimal v1.4.0
-	github.com/xuri/excelize/v2 v2.11.1-0.20260930021559-01a9ff32fb3c
+	github.com/xuri/excelize/v2 v2.11.1-0.20261020033641-611b222fd8f7
 	go.opentelemetry.io/otel v1.46.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.46.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.46.0
