@@ -150,7 +150,7 @@ Bật `docker-compose.backup.yml` (pgBackRest) theo [backup.md](backup.md). Kho 
 
 ## 7. Cập nhật phiên bản
 
-**Cổng nâng PostgreSQL của P0-SEC-CI (#132):** image mới chuyển từ nền PostGIS 17-3.5/bullseye đã đóng băng sang 17-3.6/trixie. Dù cùng PostgreSQL major 17, thay glibc/PostGIS không cho phép gắn thẳng volume cũ rồi chạy tiếp. Phải logical dump toàn bộ database và globals, dựng **volume PGDATA mới**, restore, dựng lại/kiểm chỉ mục và extensions, đối chiếu số dòng rồi mới chuyển ứng dụng. Giữ volume cũ để quay lại khi chưa chuyển ghi. Hướng dẫn `docs/dev/p0-postgres17-upgrade.md` của #132 là cổng bắt buộc; startup guard của image mới từ chối PGDATA cũ không có marker nền hiện hành. Không xóa volume cũ, không tự thêm marker để vượt guard và không dùng lệnh dưới đây với volume chưa chuyển đổi.
+**Cổng nâng PostgreSQL của P0-SEC-CI (#132):** image mới chuyển từ nền PostGIS 17-3.5/bullseye đã đóng băng sang 17-3.6/trixie. Dù cùng PostgreSQL major 17, thay glibc/PostGIS không cho phép gắn thẳng volume cũ rồi chạy tiếp. Phải logical dump toàn bộ database và globals, dựng **volume PGDATA mới**, restore, dựng lại/kiểm chỉ mục và extensions, đối chiếu số dòng rồi mới chuyển ứng dụng. Giữ volume cũ để quay lại khi chưa chuyển ghi. [Hướng dẫn đổi nền PostgreSQL](../dev/p0-postgres17-upgrade.md) của #132 là cổng bắt buộc; startup guard của image mới từ chối PGDATA cũ không có marker nền hiện hành. Không xóa volume cũ, không tự thêm marker để vượt guard và không dùng lệnh dưới đây với volume chưa chuyển đổi.
 
 
 ```sh
