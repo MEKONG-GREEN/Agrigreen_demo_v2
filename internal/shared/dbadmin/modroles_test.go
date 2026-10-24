@@ -430,7 +430,7 @@ var laterGroups = map[string]string{
 	"pf/price":       "pf/000138_pf_price.up.sql",                     // W11.71 (ADR-0049): khung cap/price
 	"pf/hrm":         "pf/000147_pf_hrm_catalog.up.sql",               // W11.21 (ADR-0050): dom/hrm, danh mục nhân sự
 	"pf/contact":     "pf/20261013230912_pf_contact_directory.up.sql", // W11.23: cap/directory, Contact (FN-13)
-	"pf/export":      "pf/20261020155116_pf_export_docx.up.sql",       // W10.17 (ADR-0051): cap/export, mẫu văn bản + .docx
+	"pf/export":      "pf/20261024090957_pf_export_docx.up.sql",       // W10.17 (ADR-0051): cap/export, mẫu văn bản + .docx
 }
 
 // pf 000092 (W2.5) cấp SELECT k_ref.* cho MỌI r_* của module pf lúc đó (R-DB-05) — danh sách ghi tay khớp
