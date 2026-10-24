@@ -583,3 +583,35 @@ func DistanceM(ctx context.Context, tx pgx.Tx, ref uuid.UUID, lon, lat string) (
 	}
 	return parseDec(s)
 }
+
+// ScopeTombstonesAfter reads only the old owner's ID projection. The current-row
+// subquery remains under its existing FORCE RLS and matches the manager's exact
+// application visibility (commune plus own/draft). A return A→B→A must upsert A,
+// never replay the older loss over a newer visible row.
+func ScopeTombstonesAfter(ctx context.Context, tx pgx.Tx, all bool, communes []string, owner uuid.UUID, after int64, limit int) ([]Plot, error) {
+	rows, err := tx.Query(ctx, `SELECT t.plot_ref, t.commune_code, t.revision, t.sync_seq
+   FROM pf_coop.plot_scope_tombstone t
+   WHERE t.previous_cooperative_ref = $1::uuid
+     AND ($2::boolean OR t.commune_code = ANY($3::text[]))
+     AND t.sync_seq > $4::bigint
+     AND NOT EXISTS (SELECT 1 FROM pf_coop.plot p
+       WHERE p.tenant_id = t.tenant_id AND p.ref = t.plot_ref AND p.sync_seq >= t.sync_seq
+         AND ($2::boolean OR p.commune_code = ANY($3::text[]))
+         AND (p.cooperative_ref = $1::uuid OR p.cooperative_ref IS NULL))
+   ORDER BY t.sync_seq LIMIT $5::int`, owner, all, units(communes), after, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]Plot, 0)
+	for rows.Next() {
+		var p Plot
+		if err := rows.Scan(&p.Ref, &p.CommuneCode, &p.Revision, &p.SyncSeq); err != nil {
+			return nil, err
+		}
+		// Never fabricate name, geometry or the current owner's metadata.
+		p.Status = "retired"
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -132,7 +133,23 @@ func (src SyncSource) Changes(ctx context.Context, scope authz.Scope, entity str
 	err := src.Svc.inTx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		var e error
 		rows, e = store.ChangesAfter(ctx, tx, a.sc.All, a.sc.Units, after, limit)
-		return e
+		if e != nil {
+			return e
+		}
+		// Native managers retain the current-row RLS. A separate ID-only feed
+		// records loss of ownership without granting reads of the new owner.
+		if a.coopOnly && p.KN == nil && p.SelectedSession == nil {
+			lost, err := store.ScopeTombstonesAfter(ctx, tx, a.sc.All, a.sc.Units, p.OrgRef, after, limit)
+			if err != nil {
+				return err
+			}
+			rows = append(rows, lost...)
+			slices.SortFunc(rows, func(a, b store.Plot) int { return cmp.Compare(a.SyncSeq, b.SyncSeq) })
+			if len(rows) > limit {
+				rows = rows[:limit]
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, after, err
