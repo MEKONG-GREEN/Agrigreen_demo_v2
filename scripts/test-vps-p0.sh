@@ -7,8 +7,22 @@ cd "$root"
 export COMPOSE_PROJECT_NAME="agrigreen-p0-${GITHUB_RUN_ID:-local}"
 C="-f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.vps.yml -f deploy/compose/docker-compose.vps-smoke.yml"
 dc() { docker compose $C "$@"; }
-cleanup() { dc down -v --remove-orphans >/dev/null 2>&1 || true; }
-trap cleanup EXIT INT TERM
+cleanup() {
+ status=$?
+ trap - EXIT
+ if [ "$status" -ne 0 ]; then
+  # Only migration jobs; never config/env, API logs, reset links or Keycloak logs.
+  # Missing env/sanitizer failure prints a fixed message, never raw output.
+  dc logs --no-color --no-log-prefix --tail 80 migrate-up migrate-bootstrap 2>&1 |
+   python3 deploy/vps/redact.py --env-file deploy/compose/.env ||
+   printf '%s\n' 'Migration diagnostics unavailable; raw logs suppressed.' >&2
+ fi
+ dc down -v --remove-orphans >/dev/null 2>&1 || true
+ exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 sh deploy/vps/prepare.sh vps.example.test ops@example.test "203.0.113.10/32"
 # Generated test-only service key; values never appear in logs or artifacts.
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out deploy/compose/.vps/notify/fcm.key 2>/dev/null
