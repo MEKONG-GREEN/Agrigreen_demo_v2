@@ -79,7 +79,9 @@ type Notification struct {
 	// zero-value behavior. SuppressInApp is persisted for every inbox read path.
 	SuppressInApp bool
 	SuppressPush  bool
-	RequireEmail  bool
+	// RequireEmail requires queue dependencies, not successful external delivery.
+	// A disabled adapter is still handled/audited by the email consumer (#127).
+	RequireEmail bool
 }
 
 // Topic cho biết thông báo theo chủ đề.

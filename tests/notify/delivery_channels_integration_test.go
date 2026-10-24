@@ -47,7 +47,7 @@ func TestExplicitDeliveryChannelsAllCombinationsAndLegacy(t *testing.T) {
 			addr := fmt.Sprintf("fixture-%d@example.invalid", mask)
 			f.emails.set(actor.actor, addr)
 			channels := &port.DeliveryChannels{InApp: mask&1 != 0, Push: mask&2 != 0, Email: mask&4 != 0}
-			wantApp, wantPush, wantEmail := channels.InApp, channels.Push, channels.Email
+			wantApp, wantPush, wantEmail := channels.InApp || channels.Push, channels.Push, channels.Email
 			if mask == 8 {
 				channels = nil
 				wantApp, wantPush, wantEmail = true, true, true
@@ -76,6 +76,19 @@ func TestExplicitDeliveryChannelsAllCombinationsAndLegacy(t *testing.T) {
 			changes, _, err := f.mod.SyncSource().Changes(actor.ctx(), authz.Scope{Units: []string{ward1}}, port.EntityNotification, 0, 100)
 			if err != nil || len(changes) != wantVisible {
 				t.Fatal("sync channel selection", err, len(changes))
+			}
+			if wantPush {
+				var cached map[string]any
+				if err := json.Unmarshal(changes[0].Data, &cached); err != nil {
+					t.Fatal(err)
+				}
+				if got[0]["id"] != changes[0].ID.String() || got[0]["severity"] != port.SeverityUrgent ||
+					cached["severity"] != port.SeverityUrgent || cached["title"] != title || cached["deep_link"] != "/fixture" {
+					t.Fatalf("push cannot resolve urgent inbox content: inbox=%+v sync=%+v", got[0], cached)
+				}
+				if channels != nil && mask&1 == 0 && channels.InApp {
+					t.Fatal("normalization mutated producer Channels")
+				}
 			}
 			var id uuid.UUID
 			var inApp bool
@@ -112,6 +125,11 @@ func TestExplicitDeliveryChannelsAllCombinationsAndLegacy(t *testing.T) {
 				if r := actor.post("/v1/notifications/"+id.String()+"/read", nil); r.status != http.StatusNotFound {
 					t.Fatal("hidden row readable", r)
 				}
+			} else if wantPush {
+				if r := actor.post("/v1/notifications/"+id.String()+"/read", nil); r.status != http.StatusOK {
+					t.Fatal("push inbox item cannot be marked read", r)
+				}
+				wantVisible = 0 // the mobile read above consumed this unread row
 			}
 			if r := actor.post("/v1/notifications/read-all", nil); r.status != http.StatusOK || r.body["marked"] != float64(wantVisible) {
 				t.Fatal("read-all touched hidden transport row", r)
@@ -135,7 +153,8 @@ func TestExplicitDeliveryChannelsAllCombinationsAndLegacy(t *testing.T) {
 func TestInvalidOrUnconfiguredDeliveryChoiceRollsBackAndRetries(t *testing.T) {
 	f := newFixture(t)
 	actor := f.user(authz.Scope{Units: []string{ward1}})
-	good := port.NotificationDraft{RecipientRef: &actor.actor, Kind: deliveryFixtureKind, Title: "Good", DeepLink: "/fixture", CreatedAt: f.clk.Now()}
+	actor.device("delivery-atomic-sibling-push-token")
+	good := port.NotificationDraft{RecipientRef: &actor.actor, Kind: deliveryFixtureKind, Title: "Good", DeepLink: "/fixture", CreatedAt: f.clk.Now(), Channels: &port.DeliveryChannels{Push: true}}
 	bad := good
 	drafts := func() []port.NotificationDraft { return []port.NotificationDraft{good, bad} }
 	f.mod = deliveryFixtureModule(f, drafts, false)
@@ -152,6 +171,15 @@ func TestInvalidOrUnconfiguredDeliveryChoiceRollsBackAndRetries(t *testing.T) {
 				bad.Channels = &port.DeliveryChannels{Email: true}
 			}
 			event := f.event(f.tenant, deliveryFixtureEvent, map[string]string{"fixture": mode})
+			var deliveriesBefore, deliveriesAfter int
+			countDeliveries := func(dst *int) error {
+				return tenant.WithTenantTx(context.Background(), f.appDB, f.tenant, func(tx pgx.Tx) error {
+					return tx.QueryRow(context.Background(), "SELECT (SELECT count(*) FROM pf_notify.push_delivery) + (SELECT count(*) FROM pf_notify.email_delivery)").Scan(dst)
+				})
+			}
+			if err := countDeliveries(&deliveriesBefore); err != nil {
+				t.Fatal(err)
+			}
 			if _, err := inbox.Process(context.Background(), f.appDB, deliveryFixtureConsumer, event, f.mod.EventHandler()); err == nil {
 				t.Fatal("invalid delivery accepted")
 			}
@@ -166,6 +194,18 @@ func TestInvalidOrUnconfiguredDeliveryChoiceRollsBackAndRetries(t *testing.T) {
 			}
 			if notices != 0 || outboxes != 0 {
 				t.Fatal("invalid choice committed sibling")
+			}
+			if err := countDeliveries(&deliveriesAfter); err != nil {
+				t.Fatal(err)
+			}
+			var claimed int
+			if err := tenant.WithTenantTx(context.Background(), f.appDB, f.tenant, func(tx pgx.Tx) error {
+				return tx.QueryRow(context.Background(), "SELECT count(*) FROM shared.inbox WHERE event_id=$1 AND consumer=$2", event.EventID, deliveryFixtureConsumer).Scan(&claimed)
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if deliveriesAfter != deliveriesBefore || claimed != 0 {
+				t.Fatalf("invalid plan committed a queue or inbox claim: deliveries=%d->%d claims=%d", deliveriesBefore, deliveriesAfter, claimed)
 			}
 			bad = good
 			bad.Channels = &port.DeliveryChannels{InApp: true}

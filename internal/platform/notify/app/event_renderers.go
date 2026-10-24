@@ -85,7 +85,10 @@ func notificationsFromDrafts(drafts []port.NotificationDraft) ([]domain.Notifica
 			if channels.Email && (d.RecipientRef == nil || *d.RecipientRef == uuid.Nil) {
 				return nil, fmt.Errorf("notify: draft %d email requires a concrete recipient", i)
 			}
-			notifications[i].SuppressInApp = !channels.InApp
+			// Data-only push contains only the inbox ID/kind. The mobile client
+			// syncs that row to resolve content, urgency and the deep link.
+			// Normalize the copy, never the source-owned channel plan.
+			notifications[i].SuppressInApp = !(channels.InApp || channels.Push)
 			notifications[i].SuppressPush = !channels.Push
 			notifications[i].Email = channels.Email
 			notifications[i].RequireEmail = channels.Email

@@ -43,7 +43,8 @@ func (s *Service) personalMailer() channel.Mailer {
 	return s.Mailer
 }
 
-// emailEnabled: có kênh gửi và danh bạ thư.
+// emailEnabled checks queue/consumer dependencies, not transport availability.
+// A non-nil disabled mailer must still reach the consumer's dropped audit (#127).
 func (s *Service) emailEnabled() bool { return s.personalMailer() != nil && s.Emails != nil }
 
 // queueEmail xếp email của thông báo n vừa ghi (cá nhân, cờ Email). Kênh email chưa cấu hình → bỏ qua (chỉ trong ứng dụng).

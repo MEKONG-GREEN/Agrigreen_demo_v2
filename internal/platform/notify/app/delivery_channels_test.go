@@ -36,3 +36,18 @@ func TestDraftChannelsCopiedAndInvalidPlansAtomic(t *testing.T) {
 		}
 	}
 }
+
+func TestPushChannelsIncludeInAppWithoutMutatingDraft(t *testing.T) {
+	ref := uuid.New()
+	for _, email := range []bool{false, true} {
+		channels := &port.DeliveryChannels{Push: true, Email: email}
+		drafts := []port.NotificationDraft{{RecipientRef: &ref, Channels: channels}}
+		ns, err := notificationsFromDrafts(drafts)
+		if err != nil || len(ns) != 1 || ns[0].SuppressInApp || ns[0].SuppressPush || ns[0].Email != email {
+			t.Fatalf("push must have a resolvable inbox row: email=%v err=%v notifications=%+v", email, err, ns)
+		}
+		if channels.InApp || drafts[0].Channels.InApp {
+			t.Fatal("normalization mutated the source channel plan")
+		}
+	}
+}

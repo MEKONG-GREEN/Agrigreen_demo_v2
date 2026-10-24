@@ -24,8 +24,9 @@ type NotificationDraft struct {
 	CreatedAt                             time.Time
 	Email                                 bool
 	// Channels nil preserves legacy inbox + push and Email. An explicit choice
-	// replaces that default; at least one channel must be enabled. Email requires
-	// a concrete RecipientRef and configured delivery dependencies.
+	// replaces that default; at least one channel must be enabled. Push implies
+	// InApp. Email requires a concrete RecipientRef and queue dependencies; a
+	// disabled transport is audited as dropped rather than promised delivery.
 	Channels *DeliveryChannels
 }
 
