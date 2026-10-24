@@ -123,7 +123,9 @@ func (r *resolver) resolve(ctx context.Context, roles []string, commune string, 
 // periodAdhoc là loại kỳ native của đợt điều tra CNTS (W11.50 — extension/cntscampaign).
 const periodAdhoc = "adhoc"
 
-// regular bỏ bài nộp của kỳ `adhoc` (đợt điều tra) khỏi chuỗi so sánh của báo cáo định kỳ.
+// regular bỏ bài nộp của kỳ `adhoc` (đợt điều tra) khỏi chuỗi so sánh của báo cáo định kỳ. Mọi truy vấn lịch sử đã
+// loại `adhoc` TRƯỚC LIMIT qua SubmissionQuery.ExcludePeriodKinds (review #27 P2 — nhiều đợt mới hơn không được đẩy kỳ
+// định kỳ ra khỏi cửa sổ); regular chỉ còn là chốt chặn phía KN.
 func regular(rs []formsport.RecordedSubmission) []formsport.RecordedSubmission {
 	out := rs[:0:0]
 	for _, r := range rs {
@@ -248,7 +250,7 @@ func (s *Service) previous(ctx context.Context, tid uuid.UUID, sub formsport.Rec
 	from := sub.From.AddDate(0, 0, -span*int(n))
 	to := sub.From.AddDate(0, 0, -1)
 	rs, err := s.Feed.Latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: sub.TemplateCode, Units: []string{sub.Unit},
-		From: &from, To: &to, Limit: int(n) + 1})
+		From: &from, To: &to, Limit: int(n) + 1, ExcludePeriodKinds: []string{periodAdhoc}})
 	rs = regular(rs)
 	if err != nil || len(rs) == 0 {
 		return nil, err
@@ -263,7 +265,7 @@ func (s *Service) spikeCheck(ctx context.Context, tx pgx.Tx, tid uuid.UUID, sub 
 	}
 	from, to := sub.From.AddDate(0, 0, -28), sub.From.AddDate(0, 0, -1)
 	hs, err := s.Feed.Latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: domain.FormBM01, Units: []string{sub.Unit},
-		From: &from, To: &to, Limit: 60})
+		From: &from, To: &to, Limit: 60, ExcludePeriodKinds: []string{periodAdhoc}})
 	if err != nil {
 		return err
 	}
@@ -286,7 +288,7 @@ func (s *Service) ksgmCheck(ctx context.Context, tx pgx.Tx, tid uuid.UUID, bm04 
 		return nil
 	}
 	ds, err := s.Feed.Latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: domain.FormBM01, Parents: []string{bm04.Unit},
-		From: bm04.From, To: bm04.To, Limit: 1000})
+		From: bm04.From, To: bm04.To, Limit: 1000, ExcludePeriodKinds: []string{periodAdhoc}})
 	if err != nil {
 		return err
 	}
@@ -309,7 +311,7 @@ func (s *Service) bm01ChangedWeek(ctx context.Context, tx pgx.Tx, tid uuid.UUID,
 	day := *bm01.From
 	from := day.AddDate(0, 0, -6)
 	ws, err := s.Feed.Latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: domain.FormBM04, Units: []string{bm01.Parent},
-		From: &from, To: &day, Limit: 7})
+		From: &from, To: &day, Limit: 7, ExcludePeriodKinds: []string{periodAdhoc}})
 	if err != nil {
 		return err
 	}
