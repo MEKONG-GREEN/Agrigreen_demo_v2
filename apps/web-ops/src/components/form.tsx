@@ -4,7 +4,7 @@
 // trường bắt buộc có dấu *, báo lỗi tiếng Việt ngay dưới từng trường, ô số không nhận số âm.
 // Số giữ dạng CHUỖI thập phân máy chủ nhận ("1234.5"), không qua float (R-10). Máy chủ vẫn phải kiểm lại.
 import { useId, type ReactNode } from "react";
-import { normalizeNumberInput } from "@/kn/grid/decimal";
+import { normalizeNumberInput } from "@/lib/exactDecimal";
 
 export interface NumberRule {
   /** Bắt buộc nhập. */
