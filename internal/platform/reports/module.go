@@ -11,8 +11,10 @@ package reports
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -73,6 +75,14 @@ type Deps struct {
 	// trường của cờ Google Sheet (nil → TẮT; ADR-0026 "Đề xuất").
 	Consolidations port.Consolidations
 	Getenv         func(string) string
+	// DispatchLease (P0-WORKER-REPORTS #128): hạn nhận việc gửi email Chi cục (AG_REPORT_DISPATCH_LEASE qua
+	// SendLeaseFromEnv); 0 → mặc định 15 phút.
+	DispatchLease time.Duration
+}
+
+// SendLeaseFromEnv đọc hạn nhận việc gửi báo cáo Chi cục (AG_REPORT_DISPATCH_LEASE, mặc định 15m).
+func SendLeaseFromEnv(getenv func(string) string) (time.Duration, error) {
+	return dispatch.SendLeaseFromEnv(getenv)
 }
 
 // Module là pf/reports đã nối.
@@ -86,7 +96,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		ResolveSession: d.ResolveSession,
 		DB:             db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
 		Store: d.Store, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,
-		LinkBase: d.LinkBase, LinkDownloadBase: d.LinkDownloadBase, Consolidations: d.Consolidations,
+		LinkBase: d.LinkBase, LinkDownloadBase: d.LinkDownloadBase, Consolidations: d.Consolidations, DispatchLease: d.DispatchLease,
 	}
 	if d.FormSeeds != nil {
 		svc.FormSeeds = app.NewFormSeedRegistry(d.FormSeeds...)
@@ -104,6 +114,31 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		svc.GSheet = dispatch.GSheetConfigFromEnv(d.Getenv)
 	}
 	return &Module{svc: svc}
+}
+
+// RequireWorkerDeps (P0-WORKER-REPORTS #128) kiểm phụ thuộc bắt buộc của consumer worker (dựng tệp, gửi email lịch,
+// gửi báo cáo Chi cục): thiếu → lỗi KHỞI ĐỘNG thay vì panic giữa lúc gửi email (worker cũ dựng reports.New(nil, …)).
+func (m *Module) RequireWorkerDeps() error {
+	var miss []string
+	if m == nil || m.svc == nil {
+		return errors.New("pf/reports: module chưa dựng")
+	}
+	if m.svc.DB == nil {
+		miss = append(miss, "DB")
+	}
+	if m.svc.Clock == nil {
+		miss = append(miss, "Clock")
+	}
+	if m.svc.Store == nil {
+		miss = append(miss, "Store")
+	}
+	if m.svc.Params == nil {
+		miss = append(miss, "Params")
+	}
+	if len(miss) > 0 {
+		return fmt.Errorf("pf/reports: thiếu phụ thuộc bắt buộc của worker: %s", strings.Join(miss, ", "))
+	}
+	return nil
 }
 
 // UseConsolidations nối cổng lần tổng hợp của pf/extension (báo cáo Chi cục, KN v7.7 P4).

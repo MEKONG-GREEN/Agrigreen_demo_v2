@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/mail"
 	"strings"
+	"time"
 
 	"github.com/shopspring/decimal"
 
@@ -38,6 +39,26 @@ const (
 	KindTo = "to"
 	KindCC = "cc"
 )
+
+// DefaultSendLease (P0-WORKER-REPORTS #128): hạn nhận việc gửi email của một worker, gia hạn sau mỗi người nhận.
+// Quá hạn khi lần gửi còn "sending" (worker chết giữa chừng) → lượt gửi được nhận lại; người đã nhận không bị gửi lại.
+const DefaultSendLease = 15 * time.Minute
+
+// EnvSendLease là biến môi trường đặt hạn nhận việc (thời lượng Go, vd "15m"); rỗng → DefaultSendLease.
+const EnvSendLease = "AG_REPORT_DISPATCH_LEASE"
+
+// SendLeaseFromEnv đọc AG_REPORT_DISPATCH_LEASE (1 phút – 24 giờ); sai định dạng/ngoài khoảng → lỗi khởi động.
+func SendLeaseFromEnv(getenv func(string) string) (time.Duration, error) {
+	v := strings.TrimSpace(getenv(EnvSendLease))
+	if v == "" {
+		return DefaultSendLease, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d < time.Minute || d > 24*time.Hour {
+		return 0, fmt.Errorf("%s=%q không hợp lệ (thời lượng 1m–24h, vd 15m)", EnvSendLease, v)
+	}
+	return d, nil
+}
 
 // DefaultAttachmentLimitMB: tổng dung lượng đính kèm tối đa (tạm; tham số reports.dispatch_attachment_limit_mb).
 const DefaultAttachmentLimitMB = 10

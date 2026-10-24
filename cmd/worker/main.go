@@ -98,6 +98,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"log/slog"
@@ -110,7 +111,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
@@ -147,6 +147,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -158,6 +159,8 @@ type consumer struct {
 	module  db.ModuleID
 	events  []string
 	handler inbox.Handler
+	// prepare (tùy chọn, P0-WORKER-REPORTS #128) dựng + kiểm phụ thuộc của handler lúc khởi động; lỗi → worker không chạy.
+	prepare func(ctx context.Context) error
 }
 
 func consumers(log *slog.Logger) []consumer {
@@ -297,16 +300,23 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 	if amqpURL == "" {
 		return 0, func() {}, errors.New("thiếu AG_AMQP_URL (hoặc chạy -modules=none)")
 	}
-	conn, err := amqp.Dial(amqpURL)
-	if err != nil {
-		return 0, func() {}, err
+	var sel []consumer
+	for _, c := range allConsumers(log) {
+		if !selected(mods, c.name) {
+			continue
+		}
+		if c.cluster != migrations.PF || !c.module.Valid() {
+			return 0, func() {}, errors.New("worker: consumer " + c.name + " thiếu module (ADR-0028) hoặc không ở cụm pf")
+		}
+		sel = append(sel, c)
 	}
 	var pools []*pgxpool.Pool
+	cur := &currentConn{}
 	closeFn := func() {
 		for _, p := range pools {
 			p.Close()
 		}
-		_ = conn.Close()
+		cur.close()
 	}
 	// W2.6 (ADR-0028): MỘT pool vai đăng nhập app_worker cho mọi consumer; mỗi consumer chạy giao dịch inbox
 	// dưới vai nhóm của module nhận (db.ForModule). GIS US-SYNC-01/02: mọi lần xử lý thất bại ghi vào
@@ -323,7 +333,7 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 		return 0, func() {}, err
 	}
 	pools = append(pools, pool)
-	hs.Add("amqp", healthsrv.Closed(conn.IsClosed))
+	hs.Add("amqp", healthsrv.Closed(cur.isClosed))
 	hs.Add("db", healthsrv.Pools(func() []*pgxpool.Pool { return pools }))
 	// Ghi lần thất bại trên pool riêng (cùng vai app_worker): không tranh kết nối với giao dịch inbox đang mở.
 	recPool, err := db.Open(ctx, dsn, db.Options{AppName: "worker-sync-monitor", MaxConns: 2, ViaPgBouncer: db.OptionsFromEnv("").ViaPgBouncer})
@@ -333,29 +343,41 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 	}
 	pools = append(pools, recPool)
 	rec := syncmod.FailureRecorder(recPool, clock.System{})
-	started := 0
-	for _, c := range allConsumers(log) {
-		if !selected(mods, c.name) {
+	// P0-WORKER-REPORTS (#128): dựng + kiểm phụ thuộc của handler (vd pf/reports cần pool DB thật) TRƯỚC khi nhận
+	// thông điệp — thiếu → không khởi động, thay vì panic giữa lúc xử lý.
+	for _, c := range sel {
+		if c.prepare == nil {
 			continue
 		}
-		if c.cluster != migrations.PF || !c.module.Valid() {
+		if err := c.prepare(ctx); err != nil {
 			closeFn()
-			return 0, func() {}, errors.New("worker: consumer " + c.name + " thiếu module (ADR-0028) hoặc không ở cụm pf")
+			return 0, func() {}, fmt.Errorf("worker: consumer %s chưa sẵn sàng: %w", c.name, err)
 		}
-		ch, err := conn.Channel()
-		if err != nil {
-			closeFn()
-			return 0, func() {}, err
-		}
-		if err := inbox.DeclareQueue(ch, c.name, c.events); err != nil {
-			closeFn()
-			return 0, func() {}, err
-		}
-		started++
-		b := db.ForModule(pool, c.module)
-		go func(c consumer) { errc <- inbox.ConsumeWith(ctx, ch, b, c.name, c.handler, log, rec) }(c)
 	}
-	return started, closeFn, nil
+	dbFor := func(c consumer) tenant.Beginner { return db.ForModule(pool, c.module) }
+	// Lần quay số đầu: lỗi → không khởi động (cấu hình sai lộ ngay). Sau đó mất kết nối → kết nối lại, không thoát.
+	first, err := dialSession(amqpURL, sel, dbFor)
+	if err != nil {
+		closeFn()
+		return 0, func() {}, err
+	}
+	cur.set(first.conn)
+	loop := amqpLoop[*amqpSession]{
+		connect: func(context.Context) (*amqpSession, error) {
+			s, err := dialSession(amqpURL, sel, dbFor)
+			if err == nil {
+				cur.set(s.conn)
+			}
+			return s, err
+		},
+		serve:   func(ctx context.Context, s *amqpSession) error { return serveSession(ctx, s, log, rec) },
+		close:   func(s *amqpSession) { _ = s.conn.Close() },
+		backoff: amqpBackoff,
+		sleep:   sleepCtx,
+		log:     log,
+	}
+	go func() { errc <- loop.run(ctx, first) }()
+	return len(sel), closeFn, nil
 }
 
 type opsSchedule struct {
