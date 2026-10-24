@@ -126,6 +126,42 @@ describe("IdempotentOperation", () => {
     expect(op.peek("same-body")).toBe("key-2");
   });
 
+  it("#129 P2 (re-review) — lượt 65 lệnh, lệnh 65 mất phản hồi: bấm lại phát lại CẢ 65 lệnh bằng khóa cũ (không loại khóa của lượt đang dở)", () => {
+    let n = 0;
+    const op = new IdempotentOperation(() => `key-${++n}`);
+    const steps = Array.from({ length: 65 }, (_, i) => `POST /approve/${i} {}`);
+    const t1 = op.begin();
+    const first = steps.map((s, i) => {
+      const a = beginAttempt(t1, s);
+      a.settle(i < 64 ? { status: 201 } : "network");
+      return a.key;
+    });
+    const t2 = op.begin();
+    const again = steps.map((s) => {
+      const a = beginAttempt(t2, s);
+      a.settle({ status: 201 });
+      return a.key;
+    });
+    expect(again).toEqual(first);
+    t2.complete();
+    expect(op.size).toBe(0);
+  });
+
+  it("giới hạn 64 chỉ loại khóa của lượt cũ đã bỏ dở, không loại khóa của hai lượt gần nhất", () => {
+    let n = 0;
+    const op = new IdempotentOperation(() => `key-${++n}`);
+    const fail = (run: OperationRun, prefix: string, count: number) => {
+      for (let i = 0; i < count; i++) beginAttempt(run, `${prefix}${i}`).settle("network");
+    };
+    fail(op.begin(), "a", 40);
+    fail(op.begin(), "b", 40);
+    fail(op.begin(), "c", 40); // lượt "a" không còn là một trong hai lượt gần nhất → được loại khi vượt 64
+    expect(op.peek("a0")).toBeUndefined();
+    expect(op.peek("b0")).toBeDefined();
+    expect(op.peek("c39")).toBeDefined();
+    expect(op.size).toBe(80);
+  });
+
   it("kết quả chưa rõ: mạng, 0, 408, 425, 429, 5xx, đang xử lý; còn lại dứt khoát", () => {
     expect(["network", { status: 0 }, { status: 408 }, { status: 425 }, { status: 429 }, { status: 500 }, { status: 504 }, { status: 409, code: "idempotency_in_progress" }].every((o) => outcomeUnknown(o as never))).toBe(true);
     expect([{ status: 200 }, { status: 201 }, { status: 400 }, { status: 403 }, { status: 409, code: "party.cooperative_name_taken" }, { status: 422 }].some((o) => outcomeUnknown(o))).toBe(false);

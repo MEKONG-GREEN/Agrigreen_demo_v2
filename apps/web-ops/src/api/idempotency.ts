@@ -60,7 +60,13 @@ export function requestFingerprint(method: string, url: string, context: string 
   return `${method.toUpperCase()} ${path} ctx=${context ?? ""} ${body}`;
 }
 
+/**
+ * Giới hạn MỀM số khóa treo: chỉ loại khóa không thuộc lượt nào còn được bảo vệ. Khóa của lượt đang dở không bao giờ bị
+ * loại âm thầm (lượt 65 lệnh vẫn phát lại đủ 65 khóa — #129 P2 re-review), nên số khóa có thể tạm vượt ngưỡng.
+ */
 const MAX_PENDING = 64;
+/** Số lượt chưa complete gần nhất được bảo vệ: lượt đang chạy và lượt bỏ dở ngay trước nó (lần bấm lại sẽ phát lại). */
+const MAX_OPEN_RUNS = 2;
 
 /**
  * Một "phiên thao tác" (form/màn hình): giữ khóa theo dấu vân tay cho các bước của thao tác người dùng ĐANG dở.
@@ -72,6 +78,8 @@ const MAX_PENDING = 64;
  */
 export class IdempotentOperation {
   private readonly pending = new Map<string, string>();
+  /** Các lượt chưa complete gần nhất (tối đa MAX_OPEN_RUNS); khóa chúng đã dùng không bị loại theo giới hạn. */
+  private readonly openRuns: OperationRun[] = [];
 
   constructor(private readonly generate: () => string = newIdempotencyKey) {}
 
@@ -80,8 +88,17 @@ export class IdempotentOperation {
     if (k) return k;
     const key = this.generate();
     this.pending.set(fingerprint, key);
-    while (this.pending.size > MAX_PENDING) this.pending.delete(this.pending.keys().next().value as string);
+    this.evict(fingerprint);
     return key;
+  }
+
+  /** Loại khóa cũ nhất KHÔNG thuộc lượt được bảo vệ cho tới khi về ngưỡng; hết ứng viên thì dừng (tạm vượt ngưỡng). */
+  private evict(keep: string): void {
+    for (const fp of [...this.pending.keys()]) {
+      if (this.pending.size <= MAX_PENDING) return;
+      if (fp === keep || this.openRuns.some((r) => r.uses(fp))) continue;
+      this.pending.delete(fp);
+    }
   }
 
   /** Khóa đang giữ (để kiểm thử/hiển thị), không sinh mới. */
@@ -104,11 +121,21 @@ export class IdempotentOperation {
 
   /** Bắt đầu một lượt thao tác của người dùng (một lần bấm Lưu/Gửi, có thể gồm nhiều lệnh ghi). */
   begin(): OperationRun {
-    return new OperationRun(this);
+    const run = new OperationRun(this);
+    this.openRuns.push(run);
+    if (this.openRuns.length > MAX_OPEN_RUNS) this.openRuns.shift();
+    return run;
+  }
+
+  /** Lượt đã complete: thôi bảo vệ (các khóa của nó đã được release). */
+  finish(run: OperationRun): void {
+    const i = this.openRuns.indexOf(run);
+    if (i >= 0) this.openRuns.splice(i, 1);
   }
 
   reset(): void {
     this.pending.clear();
+    this.openRuns.length = 0;
   }
 
   get size(): number {
@@ -130,9 +157,15 @@ export class OperationRun {
     this.issued.set(fingerprint, key);
   }
 
+  /** Lượt này đã dùng khóa cho dấu vân tay này chưa. */
+  uses(fingerprint: string): boolean {
+    return this.issued.has(fingerprint);
+  }
+
   complete(): void {
     this.op.release(this.issued);
     this.issued.clear();
+    this.op.finish(this);
   }
 }
 
