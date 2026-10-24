@@ -4,7 +4,6 @@
 // trường bắt buộc có dấu *, báo lỗi tiếng Việt ngay dưới từng trường, ô số không nhận số âm.
 // Số giữ dạng CHUỖI thập phân máy chủ nhận ("1234.5"), không qua float (R-10). Máy chủ vẫn phải kiểm lại.
 import { useId, type ReactNode } from "react";
-import { compareDecimal } from "@/lib/decimal";
 import { normalizeNumberInput } from "@/kn/grid/decimal";
 
 export interface NumberRule {
@@ -33,11 +32,34 @@ export function parseNumberInput(raw: string, rule: NumberRule = {}): ParsedNumb
   if (rule.maxDecimals !== undefined && (v.split(".")[1]?.length ?? 0) > rule.maxDecimals) {
     return { ok: false, error: `Tối đa ${rule.maxDecimals} chữ số thập phân.` };
   }
-  const sign = compareDecimal(v, "0");
+  const sign = compareExact(v, "0");
   if (!rule.allowNegative && sign < 0) return { ok: false, error: "Không được nhập số âm." };
-  if (rule.positive && sign <= 0) return { ok: false, error: "Phải lớn hơn 0." };
-  if (rule.max !== undefined && compareDecimal(v, rule.max) > 0) return { ok: false, error: `Không được lớn hơn ${rule.max}.` };
+  if (rule.positive && !(sign > 0)) return { ok: false, error: "Phải lớn hơn 0." };
+  if (rule.max !== undefined) {
+    const c = compareExact(v, String(rule.max));
+    if (Number.isNaN(c) || c > 0) return { ok: false, error: `Không được lớn hơn ${rule.max}.` };
+  }
   return { ok: true, value: v };
+}
+
+const DECIMAL_RE = /^([+-]?)(\d+)(?:\.(\d+))?$/;
+
+/**
+ * So sánh hai chuỗi thập phân ĐỦ độ chính xác (không cắt chữ số như `compareDecimal` 6 chữ số, không qua float):
+ * "-0.0000001" < 0, "1.0000001" > "1". Chuỗi không hợp lệ → NaN để người gọi coi là sai.
+ */
+export function compareExact(a: string, b: string): number {
+  const x = DECIMAL_RE.exec(a.trim());
+  const y = DECIMAL_RE.exec(b.trim());
+  if (!x || !y) return NaN;
+  const scale = Math.max(x[3]?.length ?? 0, y[3]?.length ?? 0);
+  const toBig = (m: RegExpExecArray) => {
+    const n = BigInt(m[2]! + (m[3] ?? "").padEnd(scale, "0"));
+    return m[1] === "-" ? -n : n;
+  };
+  const p = toBig(x);
+  const q = toBig(y);
+  return p < q ? -1 : p > q ? 1 : 0;
 }
 
 export type FieldRule = { required?: boolean; label?: string } & ({ kind: "text"; maxLength?: number } | ({ kind: "number" } & NumberRule));

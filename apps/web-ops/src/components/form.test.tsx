@@ -22,6 +22,14 @@ describe("parseNumberInput (R-A1)", () => {
     expect(parseNumberInput("abc")).toEqual({ ok: false, error: "Không phải số hợp lệ." });
     expect(parseNumberInput("-3", { allowNegative: true })).toEqual({ ok: true, value: "-3" });
   });
+
+  it("so sánh đủ độ chính xác, không cắt ở chữ số thập phân thứ 7 (review Codex #97)", () => {
+    expect(parseNumberInput("-0.0000001").ok).toBe(false);
+    expect(parseNumberInput("0.0000001", { positive: true }).ok).toBe(true);
+    expect(parseNumberInput("1.0000001", { max: "1" }).ok).toBe(false);
+    expect(parseNumberInput("1.0000000", { max: "1" }).ok).toBe(true);
+    expect(parseNumberInput("-0,00000000001")).toEqual({ ok: false, error: "Không được nhập số âm." });
+  });
 });
 
 describe("validateForm (R-A4)", () => {
