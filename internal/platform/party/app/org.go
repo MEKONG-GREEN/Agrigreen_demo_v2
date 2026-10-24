@@ -127,6 +127,9 @@ func (r *Registry) requireWriteScope(ctx context.Context, p authz.Principal, uni
 // classifyOrgErr quy lỗi ràng buộc duy nhất về mã lỗi nghiệp vụ.
 func classifyOrgErr(err error) error {
 	var pg *pgconn.PgError
+	if errors.As(err, &pg) && pg.Code == "23503" && pg.ConstraintName == "kref_parent_projection_ready" {
+		return ErrDependency.WithDetail("chưa đồng bộ tổ chức cấp trên — cần khôi phục danh mục trước khi thử lại").WithCause(err)
+	}
 	if errors.As(err, &pg) && pg.Code == "23505" {
 		switch pg.ConstraintName {
 		case "org_tenant_id_code_key":
@@ -169,6 +172,11 @@ func replayTx(ctx context.Context, tx pgx.Tx, key string) (*OrgResult, error) {
 func (r *Registry) write(ctx context.Context, tid uuid.UUID, key string, fn func(tx pgx.Tx) (OrgResult, error)) (OrgResult, error) {
 	var res OrgResult
 	err := tenant.WithTenantTx(ctx, r.DB, tid, func(tx pgx.Tx) error {
+		// A concurrent retry must observe the winner before name/code allocation.
+		// Keep this lock in the source transaction; no extra pool connection.
+		if err := store.LockOrgIdempotency(ctx, tx, key); err != nil {
+			return err
+		}
 		if prev, err := replayTx(ctx, tx, key); err != nil {
 			return err
 		} else if prev != nil {
@@ -264,6 +272,12 @@ func (r *Registry) createOrg(ctx context.Context, p authz.Principal, in CreateOr
 		}
 		if profile.TaxCode != "" {
 			if err := r.taxCodeTaken(ctx, p.TenantID, profile.TaxCode, uuid.Nil); err != nil {
+				// A same-key request may commit after the initial replay check but
+				// before this cross-module precheck. Prefer its committed result;
+				// genuine tax-code conflicts still return the original error.
+				if prev, replayErr := r.replay(ctx, p.TenantID, in.IdemKey); replayErr == nil && prev != nil {
+					return r.completeCoop(ctx, p.TenantID, *prev)
+				}
 				return OrgResult{}, err
 			}
 		}
@@ -332,7 +346,8 @@ func (r *Registry) createOrg(ctx context.Context, p authz.Principal, in CreateOr
 		if err := store.InsertOrg(ctx, tx, p.TenantID, o, ev); err != nil {
 			return OrgResult{}, err
 		}
-		// W2.5: pf.party.org.created → worker pf.kref (k_ref.org, k_ref.node_closure).
+		// P0-HTX-KREF: the INSERT trigger already projected k_ref in this tx.
+		// Keep the event for remote projections and share-scope rebuilding.
 		if err := enqueueStatusEvent(ctx, tx, ev, 0); err != nil {
 			return OrgResult{}, err
 		}
