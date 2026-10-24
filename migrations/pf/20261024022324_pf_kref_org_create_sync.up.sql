@@ -40,7 +40,8 @@ BEGIN
        SELECT 1 FROM k_ref.org p
         JOIN k_ref.node_closure c ON c.tenant_id = p.tenant_id AND c.ancestor = p.ref AND c.descendant = p.ref AND c.depth = 0
        WHERE p.tenant_id = NEW.tenant_id AND p.ref = NEW.parent_ref) THEN
-    RAISE EXCEPTION 'k_ref: parent projection is not ready' USING ERRCODE = 'foreign_key_violation';
+    RAISE EXCEPTION 'k_ref: parent projection is not ready'
+      USING ERRCODE = 'foreign_key_violation', CONSTRAINT = 'kref_parent_projection_ready';
   END IF;
   INSERT INTO k_ref.org (tenant_id, ref, kind, code, admin_unit_code, parent_ref, active, source_seq)
     VALUES (NEW.tenant_id, NEW.ref, NEW.kind, NEW.code, NEW.admin_unit_code, NEW.parent_ref, NEW.active, NEW.last_seq)

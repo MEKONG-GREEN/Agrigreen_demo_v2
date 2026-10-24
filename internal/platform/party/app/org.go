@@ -127,6 +127,9 @@ func (r *Registry) requireWriteScope(ctx context.Context, p authz.Principal, uni
 // classifyOrgErr quy lỗi ràng buộc duy nhất về mã lỗi nghiệp vụ.
 func classifyOrgErr(err error) error {
 	var pg *pgconn.PgError
+	if errors.As(err, &pg) && pg.Code == "23503" && pg.ConstraintName == "kref_parent_projection_ready" {
+		return ErrDependency.WithDetail("chưa đồng bộ tổ chức cấp trên — cần khôi phục danh mục trước khi thử lại").WithCause(err)
+	}
 	if errors.As(err, &pg) && pg.Code == "23505" {
 		switch pg.ConstraintName {
 		case "org_tenant_id_code_key":
@@ -269,6 +272,12 @@ func (r *Registry) createOrg(ctx context.Context, p authz.Principal, in CreateOr
 		}
 		if profile.TaxCode != "" {
 			if err := r.taxCodeTaken(ctx, p.TenantID, profile.TaxCode, uuid.Nil); err != nil {
+				// A same-key request may commit after the initial replay check but
+				// before this cross-module precheck. Prefer its committed result;
+				// genuine tax-code conflicts still return the original error.
+				if prev, replayErr := r.replay(ctx, p.TenantID, in.IdemKey); replayErr == nil && prev != nil {
+					return r.completeCoop(ctx, p.TenantID, *prev)
+				}
 				return OrgResult{}, err
 			}
 		}
