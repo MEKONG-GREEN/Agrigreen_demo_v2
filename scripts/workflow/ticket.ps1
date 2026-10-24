@@ -66,11 +66,18 @@ function CreateRef([string]$ref, [string]$base, [string]$holder) {
     if ($LASTEXITCODE -eq 0) { return $sha } else { return $null }
 }
 # DeleteRef removes the ref only while it still points at $sha (our own lock/claim); without $sha it deletes unconditionally.
+# A failed delete (network, auth, or the ref no longer at $sha) is reported loudly, never ignored: a lock left behind
+# blocks every later merge until someone removes it.
 function DeleteRef([string]$ref, [string]$sha = '') {
     $ErrorActionPreference = 'Continue'
     if ($script:AgDryRun) { "[dry-run] git push origin --delete $ref$(if ($sha) { " (lease $sha)" })" | Out-Host; return }
-    if ($sha) { git -C $repo push -q origin "--force-with-lease=refs/heads/${ref}:$sha" --delete $ref 2>&1 | Out-Null }
-    else { git -C $repo push -q origin --delete $ref 2>&1 | Out-Null }
+    if ($sha) { $out = git -C $repo push -q origin "--force-with-lease=refs/heads/${ref}:$sha" --delete $ref 2>&1 }
+    else { $out = git -C $repo push -q origin --delete $ref 2>&1 }
+    if ($LASTEXITCODE -ne 0) {
+        $why = (@($out) | ForEach-Object { "$_" }) -join ' | '
+        "WARNING: FAILED TO DELETE refs/heads/$ref$(if ($sha) { " (lease $sha)" }) — exit $LASTEXITCODE`: $why" | Out-Host
+        Write-Warning "refs/heads/$ref was NOT deleted on origin. Check 'git ls-remote origin refs/heads/$ref'; if it still points at your commit$(if ($sha) { " $sha" }), delete it by hand: git push origin --force-with-lease=refs/heads/${ref}:<sha> --delete $ref"
+    }
 }
 
 switch ($Cmd) {
@@ -143,11 +150,13 @@ switch ($Cmd) {
             if (-not $DryRun) { exit 4 }
         } else { "review pre-check: $($last.Line) ($($last.Url))" }
         $holder = "$Agent/$Pkg"
-        $lockSha = CreateRef 'lock/integration' (RepoRev origin/dev) $holder
-        if (-not $lockSha) { 'LOCK HELD: another agent is merging; retry later'; exit 3 }
         $rc = 1
         $log = Join-Path $ctx.HandoffDir ("merge-{0}{1}-{2}.log" -f $(if ($DryRun) { 'dryrun-' } else { '' }), $Worktree, (Get-Date -Format 'yyyyMMdd-HHmm'))
+        $lockSha = $null
         try {
+            # The lock is created inside try so the finally below always releases it once we hold it.
+            $lockSha = CreateRef 'lock/integration' (RepoRev origin/dev) $holder
+            if (-not $lockSha) { 'LOCK HELD: another agent is merging; retry later'; exit 3 }
             Labels $n @('st:merging') @('st:review')
             if (-not $DryRun) { $env:AG_INTEGRATION_LOCK = $Pkg }
             $t = @($Tests -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
@@ -162,7 +171,7 @@ switch ($Cmd) {
             }
         } finally {
             Remove-Item Env:\AG_INTEGRATION_LOCK -ErrorAction SilentlyContinue
-            DeleteRef 'lock/integration' $lockSha
+            if ($lockSha) { DeleteRef 'lock/integration' $lockSha }
         }
         $text = Get-Content $log -Encoding UTF8
         $tail = ($text | Select-Object -Last 15) -join "`n"

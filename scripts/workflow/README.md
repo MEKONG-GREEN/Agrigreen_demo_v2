@@ -101,21 +101,32 @@ tệp nguồn — kể cả đổi khác nghĩa nhưng cùng dòng `+`/`-` ở c
 
 ## Chuyển từ `kn-handoff/` sang bản trong repo
 
-Các bản đang chạy ở `C:\Dev\claude-skills-main\kn-handoff\` **giữ nguyên** cho tới khi gói này vào `dev`. Sau đó:
+**Gộp gói này (#142) vào `dev` KHÔNG chuyển luồng.** Chỉ chuyển sang luồng PR (dùng `scripts/workflow/ticket.ps1` trong repo)
+khi **đủ cả ba điều kiện**:
 
-1. Đặt biến môi trường (một lần, cho cả Claude Code và Codex):
-   `setx AG_WORKTREE_ROOT C:\Users\manht\agwt` (mặc định đã là `%USERPROFILE%\agwt`; chỉ cần khi khác) và, nếu muốn giữ
-   log ở chỗ cũ, `setx AG_HANDOFF_DIR C:\Dev\claude-skills-main\kn-handoff`.
-2. Chạy từ đường dẫn repo:
-   `powershell -ExecutionPolicy Bypass -File C:\Dev\claude-skills-main\Agrigreen_demo_v2\scripts\workflow\ticket.ps1 <lệnh> …`
+1. #142 đã gộp vào `dev`;
+2. CI trên `dev` xanh;
+3. người dùng đã xác nhận bật bảo vệ nhánh, **kể cả danh sách check bắt buộc** (mục Bảo vệ nhánh dưới đây).
+
+Tới lúc đó, bản `ticket.ps1` ngoài repo do người điều phối cung cấp (thư mục `kn-handoff/`) vẫn là đường gộp duy nhất; không
+chạy `merge` của bản trong repo. Khi đủ ba điều kiện và người dùng xác nhận:
+
+1. Đặt biến môi trường nếu cần (một lần, cho cả Claude Code và Codex): `AG_WORKTREE_ROOT` khi thư mục worktree của gói không
+   phải mặc định `%USERPROFILE%\agwt`; `AG_HANDOFF_DIR` nếu muốn giữ log ở thư mục handoff cũ (xem bảng "Không còn đường dẫn cứng").
+2. Chạy từ gốc repo: `powershell -ExecutionPolicy Bypass -File .\scripts\workflow\ticket.ps1 <lệnh> …`
    (bản checkout chính phải ở `dev` mới nhất; hoặc chạy từ một worktree đang ở `origin/dev`).
 3. `merge` giờ bắt buộc `-Agent` (bên gộp). Bên review dùng `ticket.ps1 review` thay vì gõ tay bình luận.
-4. Có thể thay `kn-handoff\ticket.ps1` bằng một dòng chuyển tiếp:
-   `& 'C:\Dev\claude-skills-main\Agrigreen_demo_v2\scripts\workflow\ticket.ps1' @args; exit $LASTEXITCODE`.
+4. Có thể thay bản `ticket.ps1` người điều phối cung cấp bằng một dòng chuyển tiếp tới bản trong repo:
+   `& '<gốc repo>\scripts\workflow\ticket.ps1' @args; exit $LASTEXITCODE`.
 
 ## Bảo vệ nhánh (đề xuất — CHƯA áp dụng)
 
-Bật sau khi #132 (CI chạy trên `dev` và PR vào `dev`) đã gộp và xanh trên `dev`. Script chạy được cả trước và sau khi bật.
+Bật sau khi #132 (CI chạy trên `dev` và PR vào `dev`) đã gộp và xanh trên `dev`, và người dùng xác nhận.
+
+**Trước khi `dev` có check bắt buộc, mọi lần `merge` đều dừng ở cổng CI (mã 5) — đây là hành vi fail-closed có chủ ý.**
+`ci.yml` có các job chỉ chạy trên `main`/push (vd `images-publish`, `field-app-emulator`); trên PR chúng báo `skipping`, mà
+`skipping` không phải xanh, và khi chưa có check bắt buộc script đòi **mọi** check báo về phải `pass`. Vì vậy việc chuyển luồng
+PR cần cấu hình check bắt buộc trên `dev` (danh sách dưới đây); khi đó chỉ các check bắt buộc được xét.
 `required_status_checks.checks[].context` = tên job CI (`name:` trong `.github/workflows/ci.yml`); chọn các job ổn định, ví dụ:
 
 ```json
