@@ -174,6 +174,9 @@ type fixture struct {
 
 type fixtureOpts struct {
 	communes int // số xã của tỉnh 89 (mặc định 3)
+	// sharedPool > 0 (P0-POOL-KN): pf/extension và pf/reports dùng CHUNG một pool vai đăng nhập app_platform với
+	// MaxConns = sharedPool, như gốc lắp ráp thật (ADR-0028) — để bắt giao dịch lồng nhau làm cạn pool.
+	sharedPool int32
 }
 
 func newFixture(t *testing.T, o fixtureOpts) *fixture {
@@ -209,8 +212,14 @@ func newFixture(t *testing.T, o fixtureOpts) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	extPool := env.Pool(t, migrations.PF, extension.DBRole)
-	repPool := env.Pool(t, migrations.PF, reports.DBRole)
+	var extPool, repPool tenant.Beginner
+	if o.sharedPool > 0 {
+		extPool = sharedUnitPool(t, env, o.sharedPool)
+		repPool = extPool
+	} else {
+		extPool = env.Pool(t, migrations.PF, extension.DBRole)
+		repPool = env.Pool(t, migrations.PF, reports.DBRole)
+	}
 	f.repPool, f.extPool = repPool, extPool
 	f.extParams = &extParams{v: map[string]extParam{extport.ParamPeriodRule: {from: time.Date(2026, 11, 4, 0, 0, 0, 0, clock.Zone()),
 		text: "kn.period_rule/v2;week_start=wed;week=year;month=week_end"}}}
