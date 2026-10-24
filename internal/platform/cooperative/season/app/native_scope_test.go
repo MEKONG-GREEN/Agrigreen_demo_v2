@@ -115,6 +115,14 @@ func TestNativeScopeFailureClosesBeforeBegin(t *testing.T) {
 			}
 		})
 	}
+	t.Run("empty native scope closes before Begin", func(t *testing.T) {
+		b := &nativeScopeDB{}
+		calls := 0
+		s := &Service{DB: b, Scope: nativeScopeFunc(func(context.Context) (authz.Scope, error) { calls++; return authz.Scope{}, nil })}
+		if err := s.inTx(ctx, p.TenantID, func(pgx.Tx) error { t.Fatal("business SQL ran for empty scope"); return nil }); !errors.Is(err, ErrOutOfScope) || calls != 1 || b.begins != 0 {
+			t.Fatalf("err=%v calls=%d begins=%d", err, calls, b.begins)
+		}
+	})
 	t.Run("joined foreign context still forbids scope port I/O", func(t *testing.T) {
 		b := &nativeScopeDB{}
 		calls := 0

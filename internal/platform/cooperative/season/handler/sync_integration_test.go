@@ -67,9 +67,15 @@ func TestSyncPushPull_HTX_US_LOG_04(t *testing.T) {
 	if r := sink.Accept(ctx, scope, c2); r.Status != syncport.StatusConflict {
 		t.Fatalf("sửa 2 trên bản cũ phải conflict: %+v", r)
 	}
-	bad := rec(port.EntityFarmLog, syncport.OpCreate, map[string]any{"plot_ref": f.p3.String(), "activity_code": "gieo_sa"}, nil, "", now)
+	// p2 belongs to linked h2 and is not opened until after this assertion.
+	bad := rec(port.EntityFarmLog, syncport.OpCreate, map[string]any{"plot_ref": f.p2.String(), "activity_code": "gieo_sa"}, nil, "", now)
 	if r := sink.Accept(ctx, scope, bad); r.Status != syncport.StatusRejected || r.Code != "cropcycle.season_not_open" {
 		t.Fatalf("thửa chưa mở vụ: %+v", r)
+	}
+	// p3 belongs to h3, which is not linked to this farmer: no season-state oracle.
+	foreign := rec(port.EntityFarmLog, syncport.OpCreate, map[string]any{"plot_ref": f.p3.String(), "activity_code": "gieo_sa"}, nil, "", now)
+	if r := sink.Accept(ctx, scope, foreign); r.Status != syncport.StatusRejected || r.Code != "cropcycle.out_of_scope" {
+		t.Fatalf("thửa của hộ ngoài quyền: %+v", r)
 	}
 	f.managerA().mustOpen(f.p2)
 	batch := rec(port.EntityLogBatch, syncport.OpCreate, map[string]any{"plot_refs": []string{f.p1.String(), f.p2.String(), f.p3.String()},
