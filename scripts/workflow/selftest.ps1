@@ -203,8 +203,8 @@ function Set-GhChecks([object[]]$Seq, [string]$PrHead = $H) {
         $global:LASTEXITCODE = 1; Write-Error "unexpected gh $($args -join ' ')"
     }
 }
-function W([string[]]$Req = @(), [bool]$NoChecksOk = $false, [string[]]$Allow = @(), [int]$Timeout = 5, [int]$Grace = 0) {
-    $x = Wait-AgPrChecks 'o/r' '7' $H $Req $Timeout $Grace 0 $NoChecksOk $Allow
+function W([string[]]$Req = @(), [int]$Timeout = 5, [int]$Grace = 0) {
+    $x = Wait-AgPrChecks 'o/r' '7' $H $Req $Timeout $Grace 0
     return "$($x.Result)|$($x.Message)"
 }
 function St([string]$s) { ($s -split '\|')[0] }
@@ -226,34 +226,39 @@ Set-GhChecks @(@((Ck 'build' 'pending'), (Ck 'test' 'pending')), @((Ck 'build' '
 Check 'ci: required pending then all pass -> OK' (St (W @('build', 'test'))) 'OK'
 Set-GhChecks @(, @((Ck 'build' 'pass'), (Ck 'build' 'fail'), (Ck 'test' 'pass')))
 Check 'ci: one of two runs of a required check failed -> FAIL' (St (W @('build', 'test'))) 'FAIL'
-Set-GhChecks @(, @((Ck 'build' 'pass'), (Ck 'test' 'pass')))
-Check 'ci: required + -AllowFailingCheck -> FAIL (waivers refused with branch protection)' (St (W @('build', 'test') -Allow @('lint'))) 'FAIL'
 Set-GhChecks @('NOCHECKS')
 $x = W
 Check 'ci: no checks at all after grace -> FAIL (refuse)' "$(St $x) $($x -match 'refusing to merge without CI')" 'FAIL True'
 Set-GhChecks @('NOCHECKS')
-$y = Wait-AgPrChecks 'o/r' '7' $H @() 5 0 0 $true @()
-Check 'ci: no checks + explicit -NoChecksOk -> OK, flagged NoChecks for the PR/issue record' "$($y.Result) $($y.NoChecks) $($y.Message.StartsWith('NO-CHECKS-OK'))" 'OK True True'
+$x = W -Timeout 0 -Grace 0
+Check 'ci: no checks after grace (no bypass flag exists) -> FAIL' "$(St $x) $($x -match 'no bypass')" 'FAIL True'
 Set-GhChecks @('ERROR')
-$x = W -NoChecksOk $true -Timeout 0
-Check 'ci: API read error is not "no checks" (even with -NoChecksOk) -> FAIL' "$(St $x) $($x -match 'HTTP 502')" 'FAIL True'
+$x = W -Timeout 0
+Check 'ci: API read error until timeout -> FAIL (never "no checks", never OK)' "$(St $x) $($x -match 'HTTP 502')" 'FAIL True'
 Set-GhChecks @('ERROR', @((Ck 'build' 'pass')))
 Check 'ci: transient read error then pass -> OK' (St (W)) 'OK'
 Set-GhChecks @(, @((Ck 'build' 'pass'), (Ck 'lint' 'skipping')))
 Check 'ci: no required checks, a reported check SKIPPED -> FAIL' (St (W)) 'FAIL'
 Set-GhChecks @(, @((Ck 'build' 'pass'), (Ck 'lint' 'fail')))
 Check 'ci: no required checks, a reported check failed -> FAIL' (St (W)) 'FAIL'
-Set-GhChecks @(, @((Ck 'build' 'pass'), (Ck 'lint' 'fail')))
-$y = Wait-AgPrChecks 'o/r' '7' $H @() 5 0 0 $false @('lint')
-Check 'ci: exact-name waiver for a non-required failing check -> OK, waiver recorded' "$($y.Result) $(@($y.Waived) -join ',') $($y.Message -match 'WAIVED')" 'OK lint (fail) True'
-Set-GhChecks @(, @((Ck 'build' 'fail'), (Ck 'lint' 'fail')))
-Check 'ci: waiver of another name does not cover a failing check -> FAIL' (St (W -Allow @('lint'))) 'FAIL'
+Set-GhChecks @(, @((Ck 'build' 'pass'), (Ck 'lint' 'cancel')))
+Check 'ci: no required checks, a reported check CANCELLED -> FAIL' (St (W)) 'FAIL'
+Set-GhChecks @(, @((Ck 'build' 'pass'), (Ck 'lint' '')))
+Check 'ci: no required checks, a reported check UNKNOWN (empty bucket) -> FAIL' (St (W)) 'FAIL'
 Set-GhChecks @(, @((Ck 'lint' 'fail')))
-Check 'ci: every reported check waived (none passing) -> FAIL' (St (W -Allow @('lint'))) 'FAIL'
-$e = try { Assert-AgCheckWaivers @('.*'); 'accepted' } catch { 'refused' }
-Check 'ci: -AllowFailingCheck ".*" refused (no regex/wildcards)' $e 'refused'
-$e = try { Assert-AgCheckWaivers @('lint*'); 'accepted' } catch { 'refused' }
-Check 'ci: -AllowFailingCheck "lint*" refused' $e 'refused'
+Check 'ci: only check is a failing non-required one -> FAIL' (St (W)) 'FAIL'
+$x = Resolve-AgCheckState @() @() $true $true
+Check 'ci: resolver, no checks after grace -> FAIL' $x.State 'FAIL'
+$x = Resolve-AgCheckState @((Ck 'build' 'pass'), (Ck 'lint' 'fail')) @() $true $true
+Check 'ci: resolver, failing non-required check -> FAIL' $x.State 'FAIL'
+$x = Resolve-AgCheckState @((Ck 'build' 'pass'), (Ck 'lint' 'skipping')) @() $true $true
+Check 'ci: resolver, skipped check -> FAIL' $x.State 'FAIL'
+$x = Resolve-AgCheckState @((Ck 'build' 'pass'), (Ck 'lint' 'cancel')) @() $true $true
+Check 'ci: resolver, cancelled check -> FAIL' $x.State 'FAIL'
+$x = Resolve-AgCheckState @() @() $false $true
+Check 'ci: resolver, read error is WAIT (never OK; Wait-AgPrChecks turns it into FAIL at timeout)' $x.State 'WAIT'
+$e = @('AllowFailingCheck', 'NoChecksOk' | Where-Object { (Get-Command (Join-Path $PSScriptRoot 'ticket.ps1')).Parameters.ContainsKey($_) -or (Get-Command (Join-Path $PSScriptRoot 'rebase-merge.ps1')).Parameters.ContainsKey($_) })
+Check 'ci: no CI waiver parameter on ticket.ps1/rebase-merge.ps1' ($e -join ',') ''
 Set-GhChecks @(, @((Ck 'build' 'pass'))) -PrHead 'fedcba9876543210fedcba9876543210fedcba98'
 $x = W
 Check 'ci: PR head moved -> FAIL immediately' "$(St $x) $($x -match 'head moved')" 'FAIL True'

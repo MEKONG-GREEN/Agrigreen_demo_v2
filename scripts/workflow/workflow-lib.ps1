@@ -168,28 +168,20 @@ function Resolve-AgReviewGate([object[]]$Verdicts, [string]$Owner, [string]$Head
 
 # --- Check CI (fail-closed) -------------------------------------------------------------------------------------------
 # Bucket của `gh pr checks --json`: pass | fail | pending | skipping | cancel. CHỈ 'pass' là xanh; skipping, cancel, fail,
-# rỗng hay giá trị lạ đều KHÔNG xanh. Tên được miễn (-AllowFailingCheck) là tên chính xác, không regex/ký tự đại diện.
-function Assert-AgCheckWaivers([string[]]$Names) {
-    foreach ($n in @($Names)) {
-        if ("$n".Trim() -eq '') { throw '-AllowFailingCheck: empty check name' }
-        if ("$n" -match '[*?\[\]^$|\\]') { throw "-AllowFailingCheck '$n': exact check names only (no wildcard/regex characters)" }
-    }
-}
+# rỗng hay giá trị lạ đều KHÔNG xanh. Không có đường miễn: CI đỏ hoặc không có check đều chặn gộp.
 
-# Đánh giá MỘT lần đọc. Trả State OK | WAIT | FAIL, Message, Waived (tên đã miễn), NoChecks.
+# Đánh giá MỘT lần đọc. Trả State OK | WAIT | FAIL, Message.
 #   $ReadOk=$false: không đọc được check (lỗi API/mạng) -> WAIT (hết hạn -> FAIL), không bao giờ coi là "không có check".
 #   Có $Required: mỗi tên bắt buộc phải có mặt và mọi lần chạy cùng tên đều 'pass'; thiếu/pending -> WAIT; khác -> FAIL.
-#     Không cho miễn khi có check bắt buộc.
-#   Không có $Required: mọi check báo về phải 'pass', trừ tên được miễn đúng chính xác (và vẫn phải còn >= 1 check xanh
-#     không miễn). Không có check nào sau thời gian ân hạn -> FAIL, trừ khi $NoChecksOk (chỉ trước khi có CI; được ghi lại).
-function Resolve-AgCheckState([object[]]$Checks, [string[]]$Required, [bool]$ReadOk, [bool]$GraceOver, [bool]$NoChecksOk, [string[]]$AllowFailing) {
-    $Checks = @($Checks | Where-Object { $null -ne $_ }); $Required = @($Required | Where-Object { $_ }); $AllowFailing = @($AllowFailing | Where-Object { $_ })
-    $r = { param($s, $m, $w = @(), $n = $false) [pscustomobject]@{ State = $s; Message = $m; Waived = @($w); NoChecks = [bool]$n } }
+#   Không có $Required: mọi check báo về phải 'pass'; pending -> WAIT; bất kỳ bucket nào khác -> FAIL.
+#     Không có check nào sau thời gian ân hạn -> FAIL.
+function Resolve-AgCheckState([object[]]$Checks, [string[]]$Required, [bool]$ReadOk, [bool]$GraceOver) {
+    $Checks = @($Checks | Where-Object { $null -ne $_ }); $Required = @($Required | Where-Object { $_ })
+    $r = { param($s, $m) [pscustomobject]@{ State = $s; Message = $m } }
     if (-not $ReadOk) { return & $r 'WAIT' 'cannot read PR checks (API error) - not treated as "no checks"' }
     $green = { param($c) "$($c.bucket)" -ceq 'pass' }
     $pend = { param($c) "$($c.bucket)" -ceq 'pending' }
     if ($Required.Count) {
-        if ($AllowFailing.Count) { return & $r 'FAIL' "refusing -AllowFailingCheck while dev has required checks ($($Required -join ', '))" }
         $wait = @(); $bad = @()
         foreach ($q in $Required) {
             $runs = @($Checks | Where-Object { "$($_.name)" -ceq $q })
@@ -205,21 +197,13 @@ function Resolve-AgCheckState([object[]]$Checks, [string[]]$Required, [bool]$Rea
     }
     if (-not $Checks.Count) {
         if (-not $GraceOver) { return & $r 'WAIT' 'no checks reported yet' }
-        if ($NoChecksOk) { return & $r 'OK' 'NO-CHECKS-OK: no checks reported on the PR head and dev has no required checks; merging without CI because -NoChecksOk was given explicitly' @() $true }
-        return & $r 'FAIL' 'no checks reported on the PR head and dev has no required checks: refusing to merge without CI (-NoChecksOk only before CI exists, see README)'
+        return & $r 'FAIL' 'no checks reported on the PR head and dev has no required checks: refusing to merge without CI (no bypass; fix CI first)'
     }
     $bad = @($Checks | Where-Object { -not (& $green $_) -and -not (& $pend $_) })
-    $waived = @($bad | Where-Object { $AllowFailing -ccontains "$($_.name)" })
-    $hard = @($bad | Where-Object { $AllowFailing -cnotcontains "$($_.name)" })
-    if ($hard.Count) { return & $r 'FAIL' "check(s) not green: $(($hard | ForEach-Object { "$($_.name) ($(if ($_.bucket) { $_.bucket } else { 'unknown' }))" }) -join '; ')" }
+    if ($bad.Count) { return & $r 'FAIL' "check(s) not green: $(($bad | ForEach-Object { "$($_.name) ($(if ($_.bucket) { $_.bucket } else { 'unknown' }))" }) -join '; ')" }
     $pending = @($Checks | Where-Object { & $pend $_ })
     if ($pending.Count) { return & $r 'WAIT' "pending: $(($pending | ForEach-Object { $_.name }) -join '; ')" }
-    $passing = @($Checks | Where-Object { (& $green $_) -and $AllowFailing -cnotcontains "$($_.name)" })
-    if (-not $passing.Count) { return & $r 'FAIL' 'no passing check left after waivers: refusing to merge' }
-    $wn = @($waived | ForEach-Object { "$($_.name) ($($_.bucket))" })
-    $msg = "all $($passing.Count) non-waived check(s) pass"
-    if ($wn.Count) { $msg += "; WAIVED (explicit -AllowFailingCheck): $($wn -join '; ')" }
-    return & $r 'OK' $msg $wn
+    return & $r 'OK' "all $($Checks.Count) reported check(s) pass"
 }
 
 # Chọn toolchain Go chuẩn cho cổng cục bộ: AG_GO_TOOLCHAIN, rồi GOTOOLCHAIN đặt rõ (goX.Y[.Z]), rồi chỉ thị `toolchain` trong
@@ -351,9 +335,9 @@ function Read-AgPrChecks([string]$GhRepo, [string]$Pr, [bool]$RequiredOnly) {
     return [pscustomobject]@{ Ok = $false; Checks = @(); Error = "gh pr checks rc=$($x.Rc): $($x.Err)" }
 }
 
-# Chờ check của PR trên đúng SHA $Head (fail-closed). Result OK | FAIL; Message; Waived; NoChecks; Checks (lần đọc cuối).
+# Chờ check của PR trên đúng SHA $Head (fail-closed). Result OK | FAIL; Message; Checks (lần đọc cuối).
 # Đầu PR khác $Head -> FAIL ngay. Lỗi đọc liên tục tới hạn -> FAIL (không bao giờ OK).
-function Wait-AgPrChecks([string]$GhRepo, [string]$Pr, [string]$Head, [string[]]$Required, [int]$TimeoutSec, [int]$GraceSec, [int]$PollSec, [bool]$NoChecksOk, [string[]]$AllowFailing) {
+function Wait-AgPrChecks([string]$GhRepo, [string]$Pr, [string]$Head, [string[]]$Required, [int]$TimeoutSec, [int]$GraceSec, [int]$PollSec) {
     $sw = [Diagnostics.Stopwatch]::StartNew()
     $last = 'no read yet'; $checks = @()
     while ($true) {
@@ -361,20 +345,20 @@ function Wait-AgPrChecks([string]$GhRepo, [string]$Pr, [string]$Head, [string[]]
         $readOk = $true
         if ($v.Rc -ne 0 -or $v.Out -notmatch '^[0-9a-fA-F]{40,64}$') { $readOk = $false; $last = "cannot read PR head (rc=$($v.Rc)): $($v.Err)" }
         elseif ($v.Out.ToLower() -ne $Head.ToLower()) {
-            return [pscustomobject]@{ Result = 'FAIL'; Message = "PR head moved to $($v.Out) (expected $Head)"; Waived = @(); NoChecks = $false; Checks = @() }
+            return [pscustomobject]@{ Result = 'FAIL'; Message = "PR head moved to $($v.Out) (expected $Head)"; Checks = @() }
         }
         $st = $null
         if ($readOk) {
             $rd = Read-AgPrChecks $GhRepo $Pr ([bool]@($Required).Count)
             $checks = @($rd.Checks)
-            $st = Resolve-AgCheckState $checks $Required $rd.Ok ($sw.Elapsed.TotalSeconds -ge $GraceSec) $NoChecksOk $AllowFailing
+            $st = Resolve-AgCheckState $checks $Required $rd.Ok ($sw.Elapsed.TotalSeconds -ge $GraceSec)
             $last = if ($rd.Ok) { $st.Message } else { $rd.Error }
             if ($st.State -ne 'WAIT') {
-                return [pscustomobject]@{ Result = $st.State; Message = $st.Message; Waived = $st.Waived; NoChecks = $st.NoChecks; Checks = $checks }
+                return [pscustomobject]@{ Result = $st.State; Message = $st.Message; Checks = $checks }
             }
         }
         if ($sw.Elapsed.TotalSeconds -ge $TimeoutSec) {
-            return [pscustomobject]@{ Result = 'FAIL'; Message = "TIMEOUT after ${TimeoutSec}s (last: $last)"; Waived = @(); NoChecks = $false; Checks = $checks }
+            return [pscustomobject]@{ Result = 'FAIL'; Message = "TIMEOUT after ${TimeoutSec}s (last: $last)"; Checks = $checks }
         }
         Start-Sleep -Seconds $PollSec
     }

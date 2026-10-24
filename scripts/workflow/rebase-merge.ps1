@@ -8,8 +8,6 @@
     [string[]]$Tests = @(),
     [string]$GateRun = 'SchemaIsolation|RLSExplain|ModuleGroup|LoginRoles|NoCrossModule|LedgerAddColumn',
     [int]$ChecksTimeoutMin = 0,          # 0 -> AG_PR_CHECKS_TIMEOUT_MIN hoặc 90
-    [string[]]$AllowFailingCheck = @(),  # TÊN CHÍNH XÁC check không bắt buộc được miễn khi dev CHƯA có check bắt buộc (ghi vào PR/issue)
-    [switch]$NoChecksOk,                 # chỉ trước khi có CI: cho gộp khi PR không có check nào (ghi vào PR/issue)
     [switch]$DryRun
 )
 # Rebase nhánh gói lên origin/dev, gỡ xung đột tài liệu (giữ cả hai) và tệp sinh (lấy dev rồi sinh lại), kiểm cổng review
@@ -25,12 +23,6 @@ $script:AgDryRun = [bool]$DryRun
 if (-not $DryRun -and -not $env:AG_INTEGRATION_LOCK) { throw 'Run through scripts/workflow/ticket.ps1 merge (holds origin lock/integration); direct runs are refused' }
 $ctx = Get-AgContext $sp
 $gh = $ctx.GhRepo
-$AllowFailingCheck = @($AllowFailingCheck | Where-Object { "$_" -ne '' })
-Assert-AgCheckWaivers $AllowFailingCheck
-$waiverNote = @()
-if ($AllowFailingCheck.Count) { $waiverNote += "WAIVER REQUESTED: -AllowFailingCheck $(($AllowFailingCheck | ForEach-Object { "'$_'" }) -join ', ') (exact names; only while dev has no required checks)" }
-if ($NoChecksOk) { $waiverNote += 'WAIVER REQUESTED: -NoChecksOk (merge allowed without any CI check; only before CI exists on dev)' }
-$waiverNote
 $w = Join-Path $ctx.WorktreeRoot $Worktree
 $agBranch = git -C $w symbolic-ref --short HEAD
 if ($LASTEXITCODE -ne 0 -or -not $agBranch -or $agBranch -in @('main', 'dev')) { throw 'Expected a package branch, refusing main/dev or detached HEAD' }
@@ -192,7 +184,7 @@ try {
         '### Cổng cục bộ (scripts/workflow/rebase-merge.ps1)', '', '```', $gateLine) + $testSummary + @('```', '',
         '### Review chéo', '',
         $(if ($gate.Review -and $gate.Ok) { "Chủ gói: $Owner. ``$($gate.Review.Line)`` — $($gate.Review.Url) (khớp: $($gate.Mode))" } else { '(chưa có — dry-run)' }), '',
-        '### Ngoại lệ CI', '', $(if ($waiverNote.Count) { $waiverNote -join "`n" } else { 'Không có (mọi check phải pass).' }), '',
+        '### CI', '', 'Fail-closed, không có đường miễn: mọi check phải pass; không có check, lỗi đọc, skipped/cancel/fail/không rõ đều chặn gộp.', '',
         "Go: $goVersionLine", '',
         '_PR do `ticket.ps1 merge` tạo; gộp bằng merge commit với `--match-head-commit`. Issue được script đóng sau khi gộp._')
     $bodyFile = Join-Path $env:TEMP "agwf-pr-$Worktree.md"
@@ -217,20 +209,12 @@ try {
     if (-not $req.Ok) { "PR CHECKS FAIL: cannot read required checks of dev ($($req.Error)) - PR #$pr left open"; if ($DryRun) { $dryBlocked = $true } else { exit 5 } }
     $required = @($req.Names)
     if ($required.Count) { "required checks on dev: $($required -join ', ')" } else { 'no required checks on dev (branch protection not enabled yet): every reported check must pass' }
-    if ($required.Count -and $AllowFailingCheck.Count) { 'PR CHECKS FAIL: -AllowFailingCheck is refused while dev has required checks'; if ($DryRun) { $dryBlocked = $true } else { exit 5 } }
     if ($DryRun) {
-        "[dry-run] poll: gh pr checks $pr -R $gh$(if ($required.Count) { ' --required' }) --json name,bucket,state (timeout ${ChecksTimeoutMin}m, grace ${graceSec}s; only bucket=pass is green; none after grace -> $(if ($NoChecksOk) { 'NO-CHECKS-OK (explicit)' } else { 'FAIL' }))"
+        "[dry-run] poll: gh pr checks $pr -R $gh$(if ($required.Count) { ' --required' }) --json name,bucket,state (timeout ${ChecksTimeoutMin}m, grace ${graceSec}s; only bucket=pass is green; none after grace -> FAIL; no bypass)"
     } else {
-        $ck = Wait-AgPrChecks $gh $pr $head $required ($ChecksTimeoutMin * 60) $graceSec 30 ([bool]$NoChecksOk) $AllowFailingCheck
+        $ck = Wait-AgPrChecks $gh $pr $head $required ($ChecksTimeoutMin * 60) $graceSec 30
         "checks: $($ck.Result) - $($ck.Message) ($(@($ck.Checks).Count) reported)"
         if ($ck.Result -ne 'OK') { "PR CHECKS FAIL - PR #$pr left open, worktree retained"; exit 5 }
-        $ciNote = @()
-        if (@($ck.Waived).Count) { $ciNote += "WAIVED failing checks (explicit -AllowFailingCheck): $(@($ck.Waived) -join '; ')" }
-        if ($ck.NoChecks) { $ciNote += 'NO-CHECKS-OK: merged without any CI check (explicit -NoChecksOk)' }
-        if ($ciNote.Count) {
-            $ciNote
-            Invoke-AgMut gh @('pr', 'comment', $pr, '-R', $gh, '--body', ("Ngoại lệ CI khi gộp (head ``$head``):`n" + (($ciNote | ForEach-Object { "- $_" }) -join "`n")))
-        }
     }
 
     # --- Cổng review lần 2, sát trước khi gộp: phán quyết có thể đã đổi trong lúc chờ cổng cục bộ/CI ----------------------

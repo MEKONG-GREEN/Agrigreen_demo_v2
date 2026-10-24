@@ -22,14 +22,14 @@ bước cuối của `ticket.ps1 merge` **tạo Pull Request vào `dev`** và g�
 | Repo GitHub | `gh repo view --json nameWithOwner` | `AG_GH_REPO` |
 | Log gộp, báo cáo, `prototype-coverage.tsv` | `<cha repo>\kn-handoff` (nếu có), không thì `%TEMP%\ag-workflow` | `AG_HANDOFF_DIR` |
 | Thời gian chờ check PR | 90 phút | `-ChecksTimeoutMin`, `AG_PR_CHECKS_TIMEOUT_MIN` |
-| Thời gian chờ check xuất hiện trước khi kết luận "không có CI" (→ dừng, trừ `-NoChecksOk`) | 180 giây | `AG_PR_CHECKS_GRACE_SEC` |
+| Thời gian chờ check xuất hiện trước khi kết luận "không có CI" (→ dừng, không có ngoại lệ) | 180 giây | `AG_PR_CHECKS_GRACE_SEC` |
 | Toolchain Go cho sinh lại và cổng cục bộ | chỉ thị `toolchain` trong `go.mod` | `AG_GO_TOOLCHAIN`, hoặc `GOTOOLCHAIN=goX.Y.Z` đặt rõ (`auto`/`local` không tính) |
 | Issue theo dõi tiến độ | #65 | `AG_TRACK_ISSUE` |
 
 ## Luồng `merge`
 
 ```
-ticket.ps1 merge -Pkg P -Agent <bên chạy gộp> [-Worktree w] [-Tests a,b] [-AllowFailingCheck "tên chính xác,..."] [-NoChecksOk] [-DryRun]
+ticket.ps1 merge -Pkg P -Agent <bên chạy gộp> [-Worktree w] [-Tests a,b] [-DryRun]
 ```
 
 0. **Chủ gói** = nhãn `agent:<x>` duy nhất trên issue (do `claim` gắn). Không có hoặc có cả hai nhãn → dừng (mã 4).
@@ -51,10 +51,8 @@ ticket.ps1 merge -Pkg P -Agent <bên chạy gộp> [-Worktree w] [-Tests a,b] [-
    - có check bắt buộc → mỗi tên phải có mặt và mọi lần chạy cùng tên đều `pass`; thiếu/pending → chờ tới hạn rồi dừng;
    - chưa có check bắt buộc → **mọi** check báo trên đầu PR phải `pass`; không có check nào sau thời gian ân hạn → dừng;
    - lỗi đọc `gh pr checks`/`gh pr view` không bao giờ được hiểu là "không có check": đọc lại tới hạn rồi dừng; đầu PR đổi → dừng ngay;
-   - ngoại lệ (chỉ khi `dev` CHƯA có check bắt buộc, có check bắt buộc thì bị từ chối):
-     `-AllowFailingCheck "tên chính xác"` (nhiều tên ngăn bằng dấu phẩy; không regex/ký tự đại diện; vẫn phải còn ít nhất một
-     check không miễn `pass`) và `-NoChecksOk` (chỉ dùng trước khi có CI). Cả hai được ghi vào thân PR (mục "Ngoại lệ CI"),
-     một bình luận PR khi thực sự được dùng (`WAIVED …`/`NO-CHECKS-OK …`) và bình luận "Đã gộp" trên issue.
+   - **không có đường miễn** (không cờ nào cho gộp khi CI đỏ hoặc không có check). CI xanh hoặc không gộp: nếu CI đỏ vì lý do
+     nằm ngoài gói (check hỏng, CI chưa dựng, lỗi hạ tầng), việc gộp phải chờ — sửa CI trước, không có lối tắt.
    Check không đạt → dừng (mã 5), PR để mở.
 9. **Đọc lại cổng review** ngay trước khi gộp (phán quyết có thể đổi trong lúc chờ cổng cục bộ/CI): `CHANGES` mới, lỗi đọc
    hay OK không còn phủ đầu PR → dừng (mã 4), PR để mở.
