@@ -7,10 +7,12 @@ FROM postgis/postgis:17-3.5
 # kia làm đỏ job "Kiểm thử" và "Compose Local/Dev"; file này làm đỏ restore-drill.yml
 # (chạy 02:00 thứ Hai hằng tuần, dựng stack với --build).
 #
-# Chỉ kho pgdg mất; deb.debian.org/debian bullseye vẫn còn, nên pgbackrest
-# (gói của Debian) không bị ảnh hưởng — chỉ postgresql-17-pgrouting cần kho pgdg.
+# 24/10/2026: Debian bullseye-security cũng chuyển sang archive.debian.org;
+# giữ kiểm chữ ký và chỉ bỏ hạn thời gian Release đã đóng băng như kho PGDG.
 RUN sed -i -E 's#(https?://)apt\.postgresql\.org#\1apt-archive.postgresql.org#g' \
       /etc/apt/sources.list.d/pgdg.list \
+ && find /etc/apt -type f -name '*.list' -exec sed -i -E \
+      's#(https?://)(deb.debian.org|security.debian.org)#\1archive.debian.org#g' {} + \
  && apt-get update -o Acquire::Check-Valid-Until=false \
  && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends pgbackrest postgresql-17-pgrouting \

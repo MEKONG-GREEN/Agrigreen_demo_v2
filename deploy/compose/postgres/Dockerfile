@@ -23,10 +23,15 @@ FROM postgis/postgis:17-3.5
 # nên có thể quá hạn Valid-Until; không tắt kiểm tra chữ ký, chỉ tắt kiểm tra
 # ngày.
 #
-# Khi đội nâng PostgreSQL lên 18 thì xoá cả khối sed này.
+# 24/10/2026: Debian bullseye-security cũng đã chuyển kho; Actions tải OpenSSL
+# và tám gói vá khác từ deb.debian.org báo 404. Chuyển nguồn Debian sang archive
+# chính thức, vẫn kiểm chữ ký; HEAD đúng gói OpenSSL trên archive trả 200.
+# Khi đổi image nền sang Debian được hỗ trợ thì bỏ các dòng chuyển kho này.
 # -----------------------------------------------------------------------------
 RUN sed -i -E 's#(https?://)apt\.postgresql\.org#\1apt-archive.postgresql.org#g' \
       /etc/apt/sources.list.d/pgdg.list \
+ && find /etc/apt -type f -name '*.list' -exec sed -i -E \
+      's#(https?://)(deb.debian.org|security.debian.org)#\1archive.debian.org#g' {} + \
  && apt-get update -o Acquire::Check-Valid-Until=false \
  && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends postgresql-17-pgrouting \
