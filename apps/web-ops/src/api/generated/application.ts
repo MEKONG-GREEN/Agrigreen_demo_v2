@@ -12177,12 +12177,17 @@ export interface components {
             /** @description Phòng ban của người gọi dùng check-in GPS (W11.46) — Mobile hiện nút Check-in */
             checkin_enabled?: boolean;
             /**
-             * @description Cấp đăng ký lịch của người gọi theo phiên KN (commune = cán bộ xã, bắt buộc Xã/phường)
+             * @description Cấp đăng ký lịch của người gọi theo phiên KN (commune = cán bộ xã, province = cán bộ tỉnh; cả hai bắt buộc Xã/phường — quyết định PO 25/10/2026)
              * @enum {string}
              */
             owner_level?: "commune" | "province";
-            /** @description Xã phụ trách của người gọi theo phiên KN, có cả khi tuần chưa có lịch (schedule null); rỗng với cán bộ tỉnh */
+            /** @description Xã chọn được khi đăng ký lịch, có cả khi tuần chưa có lịch (schedule null): cán bộ xã → xã phụ trách theo phiên KN; cán bộ tỉnh → mọi xã hiện hành thuộc tỉnh */
             commune_codes?: string[];
+            /** @description Cùng danh sách với commune_codes, kèm tên xã (để chọn trên web/app, kể cả ngoại tuyến) */
+            communes?: {
+                code: string;
+                name: string;
+            }[];
         };
         ExtWorkScheduleCounts: {
             /** Format: date */

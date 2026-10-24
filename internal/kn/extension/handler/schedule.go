@@ -217,12 +217,17 @@ func (h Handler) mySchedule(c *gin.Context) {
 	if m.Detail != nil {
 		sched = toScheduleDetail(*m.Detail)
 	}
+	communes := make([]gin.H, len(m.CommuneOptions))
+	for i, r := range m.CommuneOptions {
+		communes[i] = gin.H{"code": r.Code, "name": r.Name}
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"week_start": m.Week.Format(time.DateOnly), "week_end": m.Week.AddDate(0, 0, 6).Format(time.DateOnly),
 		"submit_due_at": m.SubmitDue.UTC().Format(time.RFC3339), "review_due_at": m.ReviewDue.UTC().Format(time.RFC3339),
 		"locked": m.Locked, "late_now": m.LateNow, "schedule": sched,
 		"previous_week_start": m.PreviousWeek.Format(time.DateOnly), "previous_available": m.PreviousAvailable,
 		"checkin_enabled": m.CheckinEnabled, "owner_level": m.OwnerLevel, "commune_codes": m.Communes,
+		"communes": communes,
 	})
 }
 

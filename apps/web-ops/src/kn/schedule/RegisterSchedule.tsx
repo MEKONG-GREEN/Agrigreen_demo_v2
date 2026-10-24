@@ -76,7 +76,6 @@ export function RegisterSchedule({
   ws,
   api,
   communes,
-  level,
   title = "Lịch làm việc hằng tuần",
   embedded = false,
   week: weekProp,
@@ -85,8 +84,8 @@ export function RegisterSchedule({
 }: {
   ws: WorkScheduleApi;
   api: ApiClient;
+  /** Xã chọn được khi chưa tải `mine` (máy chủ trả `communes` theo cấp, ưu tiên danh sách đó). */
   communes: CommuneOption[];
-  level: "commune" | "province";
   title?: string;
   /** Trong tab "Lịch của tôi" của Cấp Tỉnh: không có tiêu đề trang riêng. */
   embedded?: boolean;
@@ -154,8 +153,11 @@ export function RegisterSchedule({
     return { cards, conflicts: conflicts.size, removed: diff?.removed ?? [], changedCount: changed.size };
   }, [cur, approvedBase]);
 
-  const allCommunes = useMemo(() => [...new Set([...communes.map((c) => c.code), ...(cur?.items.map((x) => x.commune_code ?? "") ?? [])])].filter(Boolean), [communes, cur]);
-  const communeName = useCommuneNames(api, allCommunes, communes);
+  // Xã chọn được theo máy chủ (`mine.communes`, có cả tuần mới): cán bộ xã → xã phụ trách; cán bộ tỉnh → mọi xã
+  // của tỉnh (quyết định PO 25/10/2026). Chưa tải được → danh sách truyền vào (xã phụ trách của phiên KN).
+  const options = useMemo<CommuneOption[]>(() => (cur?.mine.communes?.length ? cur.mine.communes : communes), [cur, communes]);
+  const allCommunes = useMemo(() => [...new Set([...options.map((c) => c.code), ...(cur?.items.map((x) => x.commune_code ?? "") ?? [])])].filter(Boolean), [options, cur]);
+  const communeName = useCommuneNames(api, allCommunes, options);
   const coopName = usePreloadCoops(api, allCommunes);
   const coops = useCoops(api, form?.commune_code || null);
 
@@ -171,7 +173,7 @@ export function RegisterSchedule({
       start_time: "",
       end_time: "",
       content: "",
-      commune_code: level === "commune" && communes.length === 1 ? communes[0]!.code : "",
+      commune_code: options.length === 1 ? options[0]!.code : "",
       cooperative_ref: "",
       location: "",
       participants: "",
@@ -205,8 +207,9 @@ export function RegisterSchedule({
     if (!form || !cur) return;
     const draft = { start_time: n(form.start_time), end_time: n(form.end_time) };
     if (form.content.trim().length < 3) return setFormError("Nội dung công việc bắt buộc (ít nhất 3 ký tự).");
-    // Log bug TT-05/CN-04 (máy chủ kiểm cùng quy tắc): cán bộ xã bắt buộc Xã/phường; Địa điểm bắt buộc (chữ hoặc tọa độ).
-    if (level === "commune" && !form.commune_code) return setFormError("Xã/phường bắt buộc.");
+    // Log bug TT-05/CN-04 (máy chủ kiểm cùng quy tắc): Xã/phường bắt buộc với mọi người đăng ký, cả cán bộ tỉnh
+    // (quyết định PO 25/10/2026); Địa điểm bắt buộc (chữ hoặc tọa độ).
+    if (!form.commune_code) return setFormError("Xã/phường bắt buộc.");
     if (!form.location.trim() && !(form.lat.trim() && form.lon.trim())) return setFormError("Địa điểm bắt buộc — nhập địa điểm cụ thể hoặc tọa độ.");
     const te = timeError(draft);
     if (te) return setFormError(te);
@@ -428,8 +431,7 @@ export function RegisterSchedule({
                   form={form}
                   setForm={(f) => (setForm(f), setFormError(null))}
                   days={days}
-                  communes={communes}
-                  level={level}
+                  communes={options}
                   coops={coops}
                   error={formError}
                   onSave={saveItem}
@@ -466,7 +468,6 @@ function ItemForm({
   setForm,
   days,
   communes,
-  level,
   coops,
   error,
   onSave,
@@ -478,7 +479,6 @@ function ItemForm({
   setForm: (f: FormState | null) => void;
   days: string[];
   communes: CommuneOption[];
-  level: "commune" | "province";
   coops: { ref: string; name: string }[];
   error: string | null;
   onSave: () => void;
@@ -543,11 +543,11 @@ function ItemForm({
         <PiiHint text={form.content} />
       </div>
       <div className="field">
-        <label htmlFor="ws-commune" className={level === "commune" ? "req" : undefined}>
+        <label htmlFor="ws-commune" className="req">
           Địa điểm: xã/phường
         </label>
         <select id="ws-commune" className="select" value={form.commune_code} onChange={(e) => set({ commune_code: e.target.value, cooperative_ref: "" })}>
-          <option value="">{level === "commune" ? "— Chọn xã/phường —" : "— Không chọn / ngoài danh sách —"}</option>
+          <option value="">— Chọn xã/phường —</option>
           {communes.map((c) => (
             <option key={c.code} value={c.code}>
               {c.name}

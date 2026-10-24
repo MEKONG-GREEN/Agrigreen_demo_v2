@@ -46,6 +46,7 @@ class WeekSchedule {
     this.fetchedAt,
     this.loadError,
     this.communeCodes = const [],
+    this.communeNames = const {},
     this.ownerLevel,
     this.checkinItems = const [],
     this.checkinEnabled = false,
@@ -156,18 +157,18 @@ class WeekSchedule {
   /// Lỗi tải (403…) khi không có bản đệm.
   final String? loadError;
 
-  /// Xã phụ trách của người dùng theo phiên KN (`mine.commune_codes`, có cả
-  /// khi tuần chưa có lịch); bản đệm cũ chưa có trường này → xã của lịch.
+  /// Xã chọn được khi đăng ký lịch (`mine.commune_codes`, có cả khi tuần chưa
+  /// có lịch): cán bộ xã → xã phụ trách; cán bộ tỉnh → mọi xã của tỉnh (quyết
+  /// định PO 25/10/2026). Bản đệm cũ chưa có trường này → xã của lịch.
+  /// Xã/phường luôn bắt buộc (R-B1, như máy chủ).
   final List<String> communeCodes;
+
+  /// Tên xã theo mã (`mine.communes`); thiếu → hiện mã.
+  final Map<String, String> communeNames;
 
   /// Cấp đăng ký lịch (`mine.owner_level`): `commune` | `province`; null khi
   /// chưa biết (chưa từng tải được từ máy chủ).
   final String? ownerLevel;
-
-  /// Cán bộ xã bắt buộc chọn Xã/phường (R-B1, như máy chủ). Chưa biết cấp →
-  /// suy từ danh sách xã (cán bộ tỉnh không có xã phụ trách).
-  bool get requireCommune =>
-      ownerLevel == null ? communeCodes.isNotEmpty : ownerLevel == 'commune';
 
   bool get versionConflict =>
       syncError == WorkScheduleService.versionConflictCode;
@@ -408,6 +409,7 @@ class WorkScheduleService {
       fetchedAt: v.fetchedAt,
       loadError: v.loadError,
       communeCodes: v.communeCodes,
+      communeNames: v.communeNames,
       ownerLevel: v.ownerLevel,
       checkinItems: v.checkinItems,
       checkinEnabled: enabled,
@@ -622,6 +624,11 @@ class WorkScheduleService {
                 const [])
           if (c is String) c,
       ],
+      communeNames: {
+        for (final c in _list(scope?['communes']) ?? const [])
+          if (c is Map && c['code'] is String && c['name'] is String)
+            c['code']! as String: c['name']! as String,
+      },
       ownerLevel:
           scope?['owner_level'] as String? ?? sched?['owner_level'] as String?,
       checkinItems: switch (WsStatus.tryParse(sched?['status'])) {
@@ -659,8 +666,8 @@ class WorkScheduleService {
   /// Thêm hoặc sửa (theo `id`) một mục. Ném [WorkScheduleError] khi sai.
   Future<WeekSchedule> upsertItem(DateTime week, WsItem item) async {
     week = mondayOf(week);
-    final (v, d) = await _editable(week);
-    validateItem(item, week, requireCommune: v.requireCommune);
+    validateItem(item, week);
+    final (_, d) = await _editable(week);
     final idx = d.items.indexWhere((i) => i.id == item.id);
     if (idx < 0 && d.items.length >= maxScheduleItems) {
       throw WorkScheduleError(
@@ -797,7 +804,7 @@ class WorkScheduleService {
       );
     }
     for (final i in d.items) {
-      validateItem(i, week, requireCommune: v.requireCommune);
+      validateItem(i, week);
     }
     // Lệnh trước chưa gửi → thay bằng lệnh mới (một POST cho trạng thái cuối).
     final prevId = d.actionId;

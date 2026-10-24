@@ -303,7 +303,7 @@ export function ApproveSchedules({ ws, api, readOnly = false }: { ws: WorkSchedu
       ) : null}
 
       {view === "mine" ? (
-        <RegisterSchedule ws={ws} api={api} communes={[]} level="province" embedded week={week} onWeekChange={changeWeek} onChanged={() => setReloadKey((k) => k + 1)} />
+        <RegisterSchedule ws={ws} api={api} communes={[]} embedded week={week} onWeekChange={changeWeek} onChanged={() => setReloadKey((k) => k + 1)} />
       ) : err ? (
         <ProblemAlert problem={err} onRetry={reload} />
       ) : !shown ? (

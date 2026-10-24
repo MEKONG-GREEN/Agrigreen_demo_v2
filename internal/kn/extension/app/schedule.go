@@ -458,18 +458,19 @@ func (s *Service) SaveSchedule(ctx context.Context, in ScheduleSaveInput) (Sched
 	if domain.WeekLocked(in.WeekStart, now, zone) {
 		return ScheduleDetail{}, ErrWeekLocked
 	}
-	var allowed []string
-	if a.Role == port.KNRoleXa {
-		allowed = a.Communes
+	// Xã chọn được: cán bộ xã → xã phụ trách; cán bộ tỉnh → mọi xã thuộc tỉnh (quyết định PO 25/10/2026).
+	allowed, err := s.scheduleCommunes(ctx, a, false)
+	if err != nil {
+		return ScheduleDetail{}, err
 	}
-	items, err := domain.NormalizeItems(in.WeekStart, in.Items, allowed, ids.New)
+	items, err := domain.NormalizeItems(in.WeekStart, in.Items, communeCodes(allowed), ids.New)
 	if err != nil {
 		return ScheduleDetail{}, fieldProblem(err)
 	}
 	if in.Action == domain.SaveSubmit && len(items) == 0 {
 		return ScheduleDetail{}, problem.Validation.WithField("items", domain.ErrSubmitEmpty.Error())
 	}
-	if err := s.checkScheduleItems(ctx, a, items); err != nil {
+	if err := s.checkScheduleItems(ctx, items); err != nil {
 		return ScheduleDetail{}, err
 	}
 	st, err := s.scheduleSettings(ctx, a.Department, a.ProvinceCode, now)
@@ -586,18 +587,10 @@ func (s *Service) SaveSchedule(ctx context.Context, in ScheduleSaveInput) (Sched
 	return s.scheduleDetail(ctx, a, sched.ID, 0)
 }
 
-// checkScheduleItems kiểm địa điểm: xã của Cấp Tỉnh thuộc tỉnh mình; HTX đang hoạt động và thuộc xã đã chọn.
-func (s *Service) checkScheduleItems(ctx context.Context, a knActor, items []domain.ScheduleItem) error {
+// checkScheduleItems kiểm HTX đang hoạt động và thuộc xã đã chọn (xã thuộc phạm vi đã kiểm ở NormalizeItems:
+// xã phụ trách của cán bộ xã, xã thuộc tỉnh của cán bộ tỉnh).
+func (s *Service) checkScheduleItems(ctx context.Context, items []domain.ScheduleItem) error {
 	for _, it := range items {
-		if it.CommuneCode != "" && a.Role == port.KNRoleTinh {
-			prov, level, err := s.provinceOf(ctx, it.CommuneCode, "items.commune_code")
-			if err != nil {
-				return err
-			}
-			if level != partyport.LevelCommune || prov != a.ProvinceCode {
-				return ErrOutOfScope.WithField("items.commune_code", "xã không thuộc tỉnh của bạn")
-			}
-		}
 		if it.CooperativeRef != uuid.Nil {
 			if it.CommuneCode == "" {
 				return problem.Validation.WithField("items.commune_code", "chọn xã của HTX")
@@ -1099,10 +1092,85 @@ type MySchedule struct {
 	PreviousAvailable bool
 	// CheckinEnabled: phòng ban của người gọi dùng check-in GPS (W11.46) — Mobile hiện nút "Check-in".
 	CheckinEnabled bool
-	// OwnerLevel, Communes: cấp và xã phụ trách của người gọi theo phiên KN, không phụ thuộc lịch tuần đã có
-	// (tuần mới chưa đăng ký vẫn biết xã để chọn và bắt buộc Xã/phường với cán bộ xã — BF-SCHED R-B1).
-	OwnerLevel string
-	Communes   []string
+	// OwnerLevel, Communes: cấp và xã chọn được khi đăng ký lịch, không phụ thuộc lịch tuần đã có (tuần mới
+	// chưa đăng ký vẫn biết xã để chọn — BF-SCHED R-B1). Cán bộ xã: xã phụ trách theo phiên KN; cán bộ tỉnh:
+	// mọi xã hiện hành thuộc tỉnh (quyết định PO 25/10/2026). CommuneOptions: cùng danh sách, kèm tên xã.
+	OwnerLevel     string
+	Communes       []string
+	CommuneOptions []CommuneRef
+}
+
+// CommuneRef là một xã chọn được khi đăng ký lịch (mã, tên đơn vị hành chính).
+type CommuneRef struct {
+	Code string
+	Name string
+}
+
+// scheduleCommunes trả xã người gọi chọn được khi đăng ký lịch (BF-SCHED R-B1, quyết định PO 25/10/2026: cán bộ
+// tỉnh cũng bắt buộc Xã/phường): cán bộ xã → xã phụ trách theo phiên KN; cán bộ tỉnh → mọi xã hiện hành thuộc
+// tỉnh (cây đơn vị hành chính). withNames: tra tên xã (chỉ `mine` cần; lưu lịch chỉ cần mã).
+func (s *Service) scheduleCommunes(ctx context.Context, a knActor, withNames bool) ([]CommuneRef, error) {
+	now := s.now()
+	var codes []string
+	switch a.Role {
+	case port.KNRoleXa:
+		codes = slices.Clone(a.Communes)
+	case port.KNRoleTinh:
+		if s.Units == nil {
+			return nil, ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
+		}
+		if a.ProvinceCode == "" {
+			return []CommuneRef{}, nil
+		}
+		if tree, ok := s.Units.(partyport.AdminUnitTree); ok {
+			us, err := tree.Children(ctx, a.ProvinceCode, now)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]CommuneRef, 0, len(us))
+			for _, u := range us {
+				if u.Level == partyport.LevelCommune {
+					out = append(out, CommuneRef{Code: u.Code, Name: u.Name})
+				}
+			}
+			slices.SortFunc(out, func(x, y CommuneRef) int { return strings.Compare(x.Code, y.Code) })
+			return out, nil
+		}
+		ds, err := s.Units.Descendants(ctx, a.ProvinceCode, now)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range ds {
+			if c != a.ProvinceCode {
+				codes = append(codes, c)
+			}
+		}
+		slices.Sort(codes)
+		withNames = true // cần Get để biết cấp (Descendants không trả cấp)
+	}
+	out := make([]CommuneRef, 0, len(codes))
+	for _, c := range codes {
+		r := CommuneRef{Code: c, Name: c}
+		if withNames && s.Units != nil {
+			u, err := s.Units.Get(ctx, c, now)
+			if err == nil && a.Role == port.KNRoleTinh && u.Level != partyport.LevelCommune {
+				continue
+			}
+			if err == nil && u.Name != "" {
+				r.Name = u.Name
+			}
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+func communeCodes(rs []CommuneRef) []string {
+	out := make([]string, len(rs))
+	for i, r := range rs {
+		out[i] = r.Code
+	}
+	return out
 }
 
 // GetMySchedule trả lịch tuần của người gọi (mặc định tuần kế tiếp) kèm hạn đăng ký (FN-XA-03.08 thiết kế:
@@ -1126,10 +1194,11 @@ func (s *Service) GetMySchedule(ctx context.Context, weekRaw string) (MySchedule
 	}
 	m := MySchedule{Week: week, SubmitDue: st.SubmitDue(week), ReviewDue: st.ReviewDue(week),
 		Locked: domain.WeekLocked(week, now, clock.Zone()), PreviousWeek: week.AddDate(0, 0, -7), CheckinEnabled: st.Checkin,
-		OwnerLevel: a.level(), Communes: []string{}}
-	if a.Role == port.KNRoleXa {
-		m.Communes = slices.Clone(a.Communes)
+		OwnerLevel: a.level()}
+	if m.CommuneOptions, err = s.scheduleCommunes(ctx, a, true); err != nil {
+		return MySchedule{}, err
 	}
+	m.Communes = communeCodes(m.CommuneOptions)
 	var cur, prev *domain.Schedule
 	err = tenant.WithTenantTx(ctx, s.DB, a.TenantID, func(tx pgx.Tx) error {
 		var e error

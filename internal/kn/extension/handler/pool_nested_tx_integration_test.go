@@ -263,7 +263,7 @@ func TestP0PoolKN2_ExtensionPathsNoNestedTx(t *testing.T) {
 		off := off
 		calls = append(calls, stormCall{name: fmt.Sprintf("SaveSchedule#%d", i), want: []int{200, 201}, do: func(ctx context.Context) (int, string, error) {
 			return off.callCtx(ctx, http.MethodPost, "/v1/extension/work-schedules", map[string]any{"week_start": nextWeek, "action": "draft",
-				"items": []map[string]any{sItem("2026-09-21", "morning", "08:00", "10:00", "Kiểm tra đồng ruộng ấp 1")}})
+				"items": off.fill(sItem("2026-09-21", "morning", "08:00", "10:00", "Kiểm tra đồng ruộng ấp 1"))})
 		}})
 	}
 	for i := 0; i < 2; i++ {

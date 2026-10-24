@@ -82,6 +82,10 @@ export const KN_COMMUNES: readonly { code: string; name: string }[] = [
 
 const communeName = (code: string | null | undefined) => KN_COMMUNES.find((c) => c.code === code)?.name ?? code ?? "";
 
+/** Xã chọn được khi đăng ký lịch (như máy chủ): cán bộ xã → xã phụ trách; cán bộ tỉnh → mọi xã của tỉnh giả lập. */
+const selectableCommunes = (c: { level: "commune" | "province"; communes: readonly string[] }): string[] =>
+  c.level === "commune" ? [...c.communes] : KN_COMMUNES.map((x) => x.code);
+
 /** HTX giả lập của các xã KN (địa điểm "HTX" của mục công tác). */
 const KN_COOP_NAMES: readonly [string, string][] = [
   ["91301", "HTX Mỹ Hòa"],
@@ -444,7 +448,8 @@ export class WorkScheduleStore {
       previous_week_start: prev,
       previous_available: !!prevRec && this.current(prevRec).items.length > 0,
       owner_level: c.level,
-      commune_codes: c.level === "commune" ? [...c.communes] : [],
+      commune_codes: selectableCommunes(c),
+      communes: selectableCommunes(c).map((code) => ({ code, name: communeName(code) })),
     });
   }
 
@@ -550,11 +555,13 @@ export class WorkScheduleStore {
       const te = timeError({ start_time, end_time });
       if (te) errors.push({ field: f("start_time"), reason: te });
       const commune_code = cleanStr(x?.commune_code);
-      if (commune_code && c.level === "commune" && !c.communes.includes(commune_code)) errors.push({ field: f("commune_code"), reason: "Xã không thuộc phạm vi phụ trách" });
+      // Như máy chủ: xã chọn được = xã phụ trách (cán bộ xã) hoặc mọi xã của tỉnh (cán bộ tỉnh — PO 25/10/2026).
+      if (commune_code && !selectableCommunes(c).includes(commune_code)) errors.push({ field: f("commune_code"), reason: "Xã không thuộc phạm vi phụ trách" });
       const cooperative_ref = cleanStr(x?.cooperative_ref);
       if (cooperative_ref && !UUID_RE.test(cooperative_ref)) errors.push({ field: f("cooperative_ref"), reason: "Mã HTX không hợp lệ" });
-      // Log bug TT-05/CN-04 (như máy chủ): cán bộ xã bắt buộc Xã/phường; Địa điểm bắt buộc (chữ hoặc vị trí).
-      if (!commune_code && c.level === "commune") errors.push({ field: f("commune_code"), reason: "Xã/phường bắt buộc" });
+      // Log bug TT-05/CN-04 (như máy chủ): Xã/phường bắt buộc với mọi người đăng ký (cả cán bộ tỉnh — quyết định PO
+      // 25/10/2026); Địa điểm bắt buộc (chữ hoặc vị trí).
+      if (!commune_code) errors.push({ field: f("commune_code"), reason: "Xã/phường bắt buộc" });
       const location = cleanStr(x?.location);
       const hasPlace = typeof x?.place === "object" && x.place !== null;
       if (!location && !hasPlace) errors.push({ field: f("location"), reason: "Địa điểm bắt buộc (nhập địa điểm hoặc chọn vị trí)" });
@@ -923,7 +930,7 @@ export function seedWorkSchedules(store: WorkScheduleStore): void {
     { kind: "approve", hoursAgo: before(45), by: binh },
   ]);
   // Lịch của chính Trưởng phòng: chờ người duyệt khác (không tự duyệt, R-56).
-  store.seedSchedule(binh, cur, [it(d(cur, 3), "morning", "08:00", "11:30", "Họp giao ban Phòng Trồng trọt")], [{ kind: "submit", hoursAgo: before(66) }]);
+  store.seedSchedule(binh, cur, [it(d(cur, 3), "morning", "08:00", "11:30", "Họp giao ban Phòng Trồng trọt", { commune_code: "91303" })], [{ kind: "submit", hoursAgo: before(66) }]);
 
   // Tuần sau — Chờ duyệt (2): Lý Thị Hoa (trùng giờ T3), Lê Thị Mai; Đặng Thị Thu mới lưu nháp; Nguyễn Văn An, Huỳnh Văn Phúc chưa đăng ký.
   const recentHours = Math.min(6, Math.max(1, daysSinceMonday / 2));

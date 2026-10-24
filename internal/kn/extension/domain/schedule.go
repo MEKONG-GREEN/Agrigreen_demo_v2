@@ -172,7 +172,7 @@ func ParseClock(s string) (string, int, error) {
 }
 
 // NormalizeItems kiểm và chuẩn hóa mục của một phiên bản: ngày trong tuần, buổi, giờ, độ dài, địa điểm bắt buộc (chữ hoặc vị trí), xã bắt buộc và thuộc
-// allowedCommunes (nil = không giới hạn), không SĐT/CCCD trong văn bản tự do (RB-3, gap §4.2). Mục thiếu
+// allowedCommunes (nil = không giới hạn phạm vi, vẫn bắt buộc có xã), không SĐT/CCCD trong văn bản tự do (RB-3, gap §4.2). Mục thiếu
 // ItemID được gán newID(). Thứ tự sau chuẩn hóa: ngày, buổi, giờ bắt đầu, vị trí gửi lên.
 func NormalizeItems(weekStart time.Time, items []ScheduleItem, allowedCommunes []string, newID func() uuid.UUID) ([]ScheduleItem, error) {
 	if len(items) > MaxScheduleItems {
@@ -212,8 +212,8 @@ func NormalizeItems(weekStart time.Time, items []ScheduleItem, allowedCommunes [
 			return nil, FieldError{Field: f("content"), Err: ErrItemContent}
 		}
 		it.CommuneCode = strings.TrimSpace(it.CommuneCode)
-		// Cán bộ xã (có danh sách xã phụ trách) bắt buộc chọn Xã/phường (log bug TT-05/CN-04).
-		if it.CommuneCode == "" && allowedCommunes != nil {
+		// Xã/phường bắt buộc với mọi người đăng ký (log bug TT-05/CN-04; quyết định PO 25/10/2026: cả cán bộ tỉnh).
+		if it.CommuneCode == "" {
 			return nil, FieldError{Field: f("commune_code"), Err: ErrItemCommuneReq}
 		}
 		if it.CommuneCode != "" && allowedCommunes != nil && !contains(allowedCommunes, it.CommuneCode) {

@@ -332,6 +332,38 @@ func TestFN_TI_02_07_SelfApprovalBlockedAndProvinceOwnSchedule(t *testing.T) {
 	}
 }
 
+// BF-SCHED R-B1, quyết định PO 25/10/2026: cán bộ tỉnh cũng bắt buộc Xã/phường; xã chọn được là mọi xã thuộc
+// tỉnh của cán bộ (máy chủ kiểm, lỗi theo từng trường); `mine` trả danh sách đó cả khi tuần chưa có lịch.
+func TestBF_SCHED_ProvinceOfficerCommuneRequired(t *testing.T) {
+	f := newFixture(t)
+	p := f.seedPeople()
+	mine := p.admin89.must(p.admin89.get("/v1/extension/work-schedules/mine"), http.StatusOK, "lịch của tôi tuần mới")
+	if mine.body["schedule"] != nil || str(mine.body, "owner_level") != "province" || joinRefs(mine.body["commune_codes"]) != "30001,30002" {
+		t.Fatalf("cán bộ tỉnh 89: xã chọn được = mọi xã của tỉnh, có cả khi tuần chưa có lịch: %v", mine.body)
+	}
+	if joinField(mine.body["communes"], "code") != "30001,30002" || joinField(mine.body["communes"], "name") != "ĐV 30001,ĐV 30002" {
+		t.Fatalf("mine trả kèm tên xã: %v", mine.body["communes"])
+	}
+	ok := sItem("2026-09-22", "morning", "", "", "Kiểm tra đồng ruộng xã 30002")
+	ok["commune_code"] = "30002"
+	none := sItem("2026-09-23", "morning", "", "", "Họp giao ban phòng Trồng trọt")
+	none["commune_code"] = ""
+	r := p.admin89.saveSched(nextWeek, "draft", nil, ok, none)
+	if r.status != http.StatusUnprocessableEntity || joinField(r.body["errors"], "field") != "items[1].commune_code" {
+		t.Fatalf("cán bộ tỉnh thiếu Xã/phường → 422 items[1].commune_code: %d %v", r.status, r.body)
+	}
+	outside := sItem("2026-09-23", "morning", "", "", "Thăm mô hình tỉnh khác")
+	outside["commune_code"] = "31001"
+	r = p.admin89.saveSched(nextWeek, "draft", nil, outside)
+	if r.status != http.StatusUnprocessableEntity || joinField(r.body["errors"], "field") != "items[0].commune_code" {
+		t.Fatalf("cán bộ tỉnh chọn xã ngoài tỉnh → 422 items[0].commune_code: %d %v", r.status, r.body)
+	}
+	d := p.admin89.must(p.admin89.saveSched(nextWeek, "draft", nil, ok), http.StatusCreated, "xã thuộc tỉnh")
+	if it := schedItems(d); len(it) != 1 || it[0].(map[string]any)["commune_code"] != "30002" {
+		t.Fatalf("lưu mục có xã của tỉnh: %v", d.body)
+	}
+}
+
 // FN-TI-02.07 AC: không xem được lịch Phòng ban/tỉnh khác; Cấp Xã chỉ thấy lịch của mình; Cấp Quốc gia không có
 // quyền; tách tenant (RLS).
 func TestFN_TI_02_07_ScopeAndTenantIsolation(t *testing.T) {

@@ -91,7 +91,7 @@ class _WorkScheduleScreenState extends ConsumerState<WorkScheduleScreen> {
           day: day,
           session: session,
           communeCodes: v.communeCodes,
-          requireCommune: v.requireCommune,
+          communeNames: v.communeNames,
           newId: _svc.newItemId,
           readOnly: !v.editable,
         ),
@@ -768,7 +768,7 @@ class WorkScheduleItemScreen extends StatefulWidget {
     this.day,
     this.session,
     this.communeCodes = const [],
-    this.requireCommune = false,
+    this.communeNames = const {},
     this.readOnly = false,
   });
 
@@ -776,10 +776,13 @@ class WorkScheduleItemScreen extends StatefulWidget {
   final WsItem? item;
   final DateTime? day;
   final WsSession? session;
+
+  /// Xã chọn được (cán bộ xã: xã phụ trách; cán bộ tỉnh: mọi xã của tỉnh).
+  /// Xã/phường luôn bắt buộc và luôn hiện ô chọn (R-B1, PO 25/10/2026).
   final List<String> communeCodes;
 
-  /// Cán bộ xã: Xã/phường bắt buộc và luôn hiện ô chọn (R-B1).
-  final bool requireCommune;
+  /// Tên xã theo mã; thiếu → hiện mã.
+  final Map<String, String> communeNames;
   final String Function() newId;
   final bool readOnly;
 
@@ -808,10 +811,8 @@ class _WorkScheduleItemScreenState extends State<WorkScheduleItemScreen> {
     _day = widget.item?.day ?? widget.day ?? widget.weekStart;
     _session = widget.item?.session ?? widget.session ?? WsSession.morning;
     _commune = widget.item?.communeCode;
-    // Mục mới của cán bộ chỉ phụ trách một xã: chọn sẵn xã đó.
-    if (widget.item == null &&
-        widget.requireCommune &&
-        widget.communeCodes.length == 1) {
+    // Mục mới khi chỉ có một xã chọn được: chọn sẵn xã đó.
+    if (widget.item == null && widget.communeCodes.length == 1) {
       _commune = widget.communeCodes.first;
     }
   }
@@ -845,7 +846,7 @@ class _WorkScheduleItemScreenState extends State<WorkScheduleItemScreen> {
       changed: widget.item?.changed ?? false,
     );
     try {
-      validateItem(it, widget.weekStart, requireCommune: widget.requireCommune);
+      validateItem(it, widget.weekStart);
     } on WorkScheduleError catch (e) {
       setState(() {
         _errorField = e.field;
@@ -944,26 +945,28 @@ class _WorkScheduleItemScreenState extends State<WorkScheduleItemScreen> {
               errorText: _err('content'),
             ),
           ),
-          if (widget.requireCommune || communes.isNotEmpty) ...[
-            DropdownButtonFormField<String?>(
-              key: const ValueKey('ws-f-commune'),
-              initialValue: _commune,
-              decoration: InputDecoration(
-                labelText: widget.requireCommune ? 'Xã/phường *' : 'Xã/phường',
-                helperText: widget.requireCommune && communes.isEmpty
-                    ? 'Chưa tải được danh sách xã phụ trách — cần có mạng.'
-                    : null,
-                errorText: _err('commune_code'),
-              ),
-              items: [
-                const DropdownMenuItem<String?>(child: Text('—')),
-                for (final c in communes)
-                  DropdownMenuItem<String?>(value: c, child: Text(c)),
-              ],
-              onChanged: ro ? null : (c) => setState(() => _commune = c),
+          DropdownButtonFormField<String?>(
+            key: const ValueKey('ws-f-commune'),
+            initialValue: _commune,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: 'Xã/phường *',
+              helperText: communes.isEmpty
+                  ? 'Chưa tải được danh sách xã — cần có mạng.'
+                  : null,
+              errorText: _err('commune_code'),
             ),
-            const SizedBox(height: 12),
-          ],
+            items: [
+              const DropdownMenuItem<String?>(child: Text('—')),
+              for (final c in communes)
+                DropdownMenuItem<String?>(
+                  value: c,
+                  child: Text(widget.communeNames[c] ?? c),
+                ),
+            ],
+            onChanged: ro ? null : (c) => setState(() => _commune = c),
+          ),
+          const SizedBox(height: 12),
           TextField(
             key: const ValueKey('ws-f-location'),
             controller: _location,

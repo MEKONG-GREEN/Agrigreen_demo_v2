@@ -241,7 +241,8 @@ void main() {
       bad(_item('a', _week, end: '24:00'), 'end_time');
       bad(_item('a', _week, start: '10:00', end: '09:00'), 'end_time');
       bad(_item('a', _week, start: null, end: '09:00'), 'start_time');
-      // Log bug TT-05/CN-04: Địa điểm bắt buộc (chữ hoặc vị trí); cán bộ có xã phụ trách bắt buộc Xã/phường.
+      // Log bug TT-05/CN-04: Địa điểm bắt buộc (chữ hoặc vị trí); Xã/phường bắt
+      // buộc với mọi người đăng ký, cả cán bộ tỉnh (quyết định PO 25/10/2026).
       bad(_item('a', _week, location: ' '), 'location');
       validateItem(
         WsItem(
@@ -249,25 +250,13 @@ void main() {
           day: _week,
           session: WsSession.morning,
           content: 'Thăm đồng',
+          communeCode: '30280',
           place: const WsPlace(lat: 10, lon: 105),
         ),
         _week,
       );
-      expect(
-        () => validateItem(
-          _item('a', _week, commune: null),
-          _week,
-          requireCommune: true,
-        ),
-        throwsA(
-          isA<WorkScheduleError>().having(
-            (e) => e.field,
-            'field',
-            'commune_code',
-          ),
-        ),
-      );
-      validateItem(_item('a', _week, commune: null), _week);
+      bad(_item('a', _week, commune: null), 'commune_code');
+      bad(_item('a', _week, commune: ' '), 'commune_code');
       validateItem(_item('a', _week, start: '09:00', end: '09:00'), _week);
     });
 
@@ -475,7 +464,6 @@ void main() {
       var v = await svc.load(_week);
       expect(v.scheduleId, isNull, reason: 'tuần chưa đăng ký');
       expect(v.communeCodes, ['30280', '30281']);
-      expect(v.requireCommune, isTrue);
       await expectLater(
         svc.upsertItem(_week, _item(svc.newItemId(), _week, commune: null)),
         throwsA(
@@ -505,19 +493,45 @@ void main() {
       v = await svc.load(_week.add(const Duration(days: 7)));
       expect(v.offline, isTrue);
       expect(v.communeCodes, ['30280', '30281']);
-      expect(v.requireCommune, isTrue);
     });
 
-    test('R-B1: cán bộ tỉnh (owner_level province) — Xã/phường không bắt buộc (giả định chờ PO)', () async {
-      srv.scope = {'owner_level': 'province', 'commune_codes': <Object?>[]};
+    test('R-B1 (PO 25/10/2026): cán bộ tỉnh cũng bắt buộc Xã/phường, chọn trong mọi xã của tỉnh (có tên, cả ngoại tuyến)', () async {
+      srv.scope = {
+        'owner_level': 'province',
+        'commune_codes': ['30280', '30281', '30282'],
+        'communes': [
+          {'code': '30280', 'name': 'Mỹ Hòa Hưng'},
+          {'code': '30281', 'name': 'Bình Đức'},
+          {'code': '30282', 'name': 'Núi Sam'},
+        ],
+      };
       var v = await svc.load(_week);
-      expect(v.communeCodes, isEmpty);
-      expect(v.requireCommune, isFalse);
+      expect(v.scheduleId, isNull, reason: 'tuần chưa đăng ký');
+      expect(v.ownerLevel, 'province');
+      expect(v.communeCodes, ['30280', '30281', '30282']);
+      expect(v.communeNames['30282'], 'Núi Sam');
+      await expectLater(
+        svc.upsertItem(_week, _item(svc.newItemId(), _week, commune: null)),
+        throwsA(
+          isA<WorkScheduleError>().having(
+            (e) => e.field,
+            'field',
+            'commune_code',
+          ),
+        ),
+      );
       v = await svc.upsertItem(
         _week,
-        _item(svc.newItemId(), _week, commune: null),
+        _item(svc.newItemId(), _week, commune: '30282'),
       );
-      expect(v.items, hasLength(1));
+      expect(v.items.single.communeCode, '30282');
+
+      // Ngoại tuyến, mở tuần chưa từng tải: cùng danh sách xã (bản đệm `mine`).
+      srv.offline = true;
+      v = await svc.load(_week.add(const Duration(days: 7)));
+      expect(v.offline, isTrue);
+      expect(v.communeCodes, ['30280', '30281', '30282']);
+      expect(v.communeNames['30281'], 'Bình Đức');
     });
 
     test(

@@ -14,7 +14,7 @@ import { useWorkSchedule } from "@/kn/schedule/useWorkSchedule";
 export default function WorkSchedulePage() {
   const { api, kn } = useAuth();
   const { ws, mode } = useWorkSchedule();
-  if (mode === "register") return <RegisterSchedule ws={ws} api={api} communes={kn.context?.communes ?? []} level="commune" />;
+  if (mode === "register") return <RegisterSchedule ws={ws} api={api} communes={kn.context?.communes ?? []} />;
   if (mode === "approve") return <ApproveSchedules ws={ws} api={api} />;
   if (mode === "view") return <ApproveSchedules ws={ws} api={api} readOnly />;
   return (

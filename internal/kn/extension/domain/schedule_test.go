@@ -63,8 +63,17 @@ func TestFN_XA_03_08_ItemRules(t *testing.T) {
 	if _, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{noCommune}, []string{"30001"}, uuid.New); !errors.Is(err, ErrItemCommuneReq) || !errors.As(err, &fe) || fe.Field != "items[0].commune_code" {
 		t.Fatalf("cán bộ xã thiếu xã: %v", err)
 	}
-	if _, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{noCommune}, nil, uuid.New); errors.Is(err, ErrItemCommuneReq) {
-		t.Fatalf("cán bộ tỉnh (không giới hạn xã) không bắt buộc xã: %v", err)
+	// Quyết định PO 25/10/2026 (R-B1): cán bộ tỉnh cũng bắt buộc Xã/phường; xã phải thuộc tỉnh (allowed = xã của tỉnh).
+	if _, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{b, noCommune}, []string{"30001", "30002"}, uuid.New); !errors.Is(err, ErrItemCommuneReq) || !errors.As(err, &fe) || fe.Field != "items[1].commune_code" {
+		t.Fatalf("cán bộ tỉnh thiếu xã: %v", err)
+	}
+	if _, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{noCommune}, nil, uuid.New); !errors.Is(err, ErrItemCommuneReq) {
+		t.Fatalf("không giới hạn xã (nil) vẫn bắt buộc xã: %v", err)
+	}
+	other := a
+	other.CommuneCode = "31001"
+	if _, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{other}, []string{"30001", "30002"}, uuid.New); !errors.Is(err, ErrItemCommune) || !errors.As(err, &fe) || fe.Field != "items[0].commune_code" {
+		t.Fatalf("cán bộ tỉnh chọn xã ngoài tỉnh: %v", err)
 	}
 	if _, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{noPlace}, nil, uuid.New); !errors.Is(err, ErrItemLocationReq) || !errors.As(err, &fe) || fe.Field != "items[0].location" {
 		t.Fatalf("thiếu địa điểm: %v", err)

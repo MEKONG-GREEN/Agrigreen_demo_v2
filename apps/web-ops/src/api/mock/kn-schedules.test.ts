@@ -3,7 +3,7 @@ import { createApiClient } from "@/api/client";
 import { createWorkScheduleApi } from "@/kn/schedule/api";
 import type { WsItemInput } from "@/kn/schedule/model";
 import { mockFetchNoDelay } from "./handler";
-import { callerOf, resetWorkSchedules, stableUuid, WS_ROSTER, type Result, type WorkScheduleStore, type WsCaller } from "./kn-schedules";
+import { callerOf, KN_COMMUNES, resetWorkSchedules, stableUuid, WS_ROSTER, type Result, type WorkScheduleStore, type WsCaller } from "./kn-schedules";
 import { findPersona } from "./personas";
 
 // Thứ Sáu 02/10/2026 10:00 giờ Việt Nam: tuần này 28/09, tuần sau 05/10, hạn đăng ký tuần sau 02/10 17:00.
@@ -73,7 +73,7 @@ describe("sổ lịch công tác giả lập — trạng thái", () => {
     // BF-SCHED R-B1: tuần chưa có lịch vẫn trả cấp và xã phụ trách (app chọn xã cho lịch mới).
     expect(mine0.owner_level).toBe("commune");
     expect(mine0.commune_codes).toContain("91301");
-    expect(body(store.mine(binh(), null))).toMatchObject({ owner_level: "province", commune_codes: [] });
+    expect(body(store.mine(binh(), null))).toMatchObject({ owner_level: "province", commune_codes: KN_COMMUNES.map((c) => c.code) });
 
     const d1 = body(store.save(an(), { week_start: NEXT, action: "draft", base_version: null, items: [item(NEXT, { commune_code: "91301" })] }));
     expect(d1.schedule).toMatchObject({ status: "draft", version: 1, item_count: 1 });
@@ -155,6 +155,19 @@ describe("sổ lịch công tác giả lập — trạng thái", () => {
     expect(!bad.ok && (bad.extra?.errors as { field: string }[]).map((e) => e.field)).toEqual(["items[0].commune_code", "items[0].participants"]);
     expect(code(store.save(an(), { week_start: NEXT, action: "draft", base_version: null, items: [item("2026-10-12")] }))).toBe("validation_failed");
     expect(code(store.unregistered(an(), NEXT, null))).toBe("forbidden");
+  });
+
+  it("BF-SCHED R-B1 (PO 25/10/2026): cán bộ tỉnh cũng bắt buộc Xã/phường, chỉ xã thuộc tỉnh; mine trả mọi xã của tỉnh", () => {
+    const m = body(store.mine(binh(), NEXT));
+    expect(m.owner_level).toBe("province");
+    expect(m.commune_codes).toEqual(KN_COMMUNES.map((c) => c.code));
+    expect(m.communes).toEqual(KN_COMMUNES.map((c) => ({ code: c.code, name: c.name })));
+    const fields = (r: ReturnType<WorkScheduleStore["save"]>) => (!r.ok ? (r.extra?.errors as { field: string }[]).map((e) => e.field) : []);
+    const none = store.save(binh(), { week_start: NEXT, action: "draft", base_version: null, items: [item(NEXT, { commune_code: "91302" }), item(NEXT, { commune_code: null, session: "afternoon" })] });
+    expect(fields(none)).toEqual(["items[1].commune_code"]);
+    const outside = store.save(binh(), { week_start: NEXT, action: "draft", base_version: null, items: [item(NEXT, { commune_code: "89001" })] });
+    expect(fields(outside)).toEqual(["items[0].commune_code"]);
+    expect(store.save(binh(), { week_start: NEXT, action: "draft", base_version: null, items: [item(NEXT, { commune_code: "91306" })] }).ok).toBe(true);
   });
 
   it("duyệt hàng loạt: bỏ qua lịch của chính mình và lịch không còn Chờ duyệt", () => {
