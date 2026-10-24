@@ -296,3 +296,40 @@ func TestCompileRejectsInvalidSources(t *testing.T) {
 		t.Errorf("missing tables accepted: %v", err)
 	}
 }
+
+// Review Codex #76: Admin không gắn nút (UnitRef nil) thấy phòng của mọi đơn vị; hai đơn vị cùng mã phòng
+// phải dựng được menu (khóa mục cha thêm OrgRef), mã không trùng giữ khóa cũ, nhãn/route/trạng thái giữ nguyên.
+func TestAdminWithoutUnitAcceptsSameCodeAcrossUnits(t *testing.T) {
+	c := catalog(t)
+	reg, err := c.Registry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, b, other := uuid.New(), uuid.New(), uuid.New()
+	request := partyport.MenuBuildRequest{NavigationRequest: partyport.NavigationRequest{Audience: partyport.AudienceAdmin}, Mode: partyport.MenuAdmin,
+		Departments: []partyport.Department{
+			department(a, "hanh_chinh_tong_hop", partyport.MenuProfileHanhChinhTongHop),
+			department(b, "hanh_chinh_tong_hop", partyport.MenuProfileHanhChinhTongHop),
+			department(other, "trong_trot", partyport.MenuProfileTrongTrot),
+		}}
+	def, err := reg.Build(context.Background(), request)
+	if err != nil {
+		t.Fatalf("hai đơn vị cùng mã phòng: %v", err)
+	}
+	var keys []string
+	for _, g := range def.Groups {
+		if g.Key != groupDepartments {
+			continue
+		}
+		for _, it := range g.Items {
+			keys = append(keys, it.Key)
+			if it.Label != "Phòng "+strings.Split(strings.TrimPrefix(it.Key, groupDepartments+"."), ".")[0] || len(it.Children) == 0 {
+				t.Errorf("mục %s mất nhãn hoặc mục con: %+v", it.Key, it)
+			}
+		}
+	}
+	want := []string{"phong_ban.hanh_chinh_tong_hop." + a.String(), "phong_ban.hanh_chinh_tong_hop." + b.String(), "phong_ban.trong_trot"}
+	if !slices.Equal(keys, want) {
+		t.Fatalf("khóa mục Phòng ban %v, muốn %v", keys, want)
+	}
+}

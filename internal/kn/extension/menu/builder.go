@@ -489,6 +489,12 @@ func (c *Catalog) adminDepartment(d partyport.Department) (partyport.MenuItem, e
 
 func (c *Catalog) admin(request partyport.MenuBuildRequest) ([]partyport.MenuGroup, error) {
 	departments := make([]partyport.MenuItem, 0, len(request.Departments))
+	// Admin không gắn nút (UnitRef nil) thấy phòng của mọi đơn vị: hai đơn vị có thể cùng mã phòng.
+	// Khi mã trùng, khóa mục cha thêm OrgRef để khóa anh em duy nhất; mã không trùng giữ khóa cũ.
+	codes := map[string]int{}
+	for _, d := range request.Departments {
+		codes[d.Code]++
+	}
 	for _, d := range request.Departments {
 		if request.UnitRef != uuid.Nil && d.OrgRef != request.UnitRef {
 			return nil, ErrDenied
@@ -496,6 +502,9 @@ func (c *Catalog) admin(request partyport.MenuBuildRequest) ([]partyport.MenuGro
 		it, err := c.adminDepartment(d)
 		if err != nil {
 			return nil, err
+		}
+		if codes[d.Code] > 1 {
+			it.Key += "." + d.OrgRef.String()
 		}
 		departments = append(departments, it)
 	}
