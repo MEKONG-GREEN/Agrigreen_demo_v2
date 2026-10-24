@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
+	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	shareddb "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -79,7 +80,7 @@ func TestNativeGISScopeResolvesBeforeSingleConnectionTx(t *testing.T) {
 	scope := &nativeScopeProbe{pool: pool, scope: authz.Scope{Units: units}}
 	db := &nativeBeginProbe{Beginner: shareddb.ForModule(pool, coopDB), before: func() { units[0] = "31120" }}
 	g.mod.svc.DB, g.mod.svc.Scope = db, scope
-	ctx := syncCtx(g.fixture, g.orgA, coopport.RolePlotViewer)
+	ctx := syncCtx(g.fixture, g.orgA, syncport.RoleConflictResolver)
 	changes, _, err := g.mod.SyncSource().Changes(ctx, authz.Scope{Units: []string{"31117"}}, "plot", 0, 100)
 	if err != nil || len(changes) != 1 || changes[0].ID != plot {
 		t.Fatalf("native scope before tx: %v %+v", err, changes)
