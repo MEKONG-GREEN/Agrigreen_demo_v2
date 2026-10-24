@@ -65,14 +65,17 @@ Ticket = **GitHub Issue**, tiêu đề `[<PKG>] …` (vd `[P0-POOL-KN] …`), t�
 | `size:` | `S`, `M`, `L`, `XL` |
 | khác | `kn`, `g1` (phạm vi/mốc) |
 
-Lệnh (từ gốc repo, sau [#142](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142)):
+> **Giai đoạn chuyển — tới khi [#142](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142) vào `dev`:** `scripts/workflow/` chưa có trong repo và `dev` chưa bật bảo vệ nhánh. Trong thời gian này dùng bản `ticket.ps1` hiện hành do người điều phối cung cấp (ngoài repo) — xem [two-tool-workflow.md](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142). Các lệnh và luồng PR dưới đây là quy trình **sau #142**.
+
+Lệnh (từ gốc repo, **sau #142**):
 
 ```powershell
 .\scripts\workflow\ticket.ps1 list  [-Lane kn|shared]
 .\scripts\workflow\ticket.ps1 claim -Pkg <PKG> -Agent claude|codex   # exit 3 nếu đã có người nhận
 .\scripts\workflow\ticket.ps1 ready -Pkg <PKG> -Note "<commit; lệnh kiểm; kết quả>"
+.\scripts\workflow\ticket.ps1 review -Pkg <PKG> -Agent <bên review> -Sha <sha> -Ok|-Changes [-Note "…"]
 .\scripts\workflow\ticket.ps1 release -Pkg <PKG> -Note "<lý do>"
-.\scripts\workflow\ticket.ps1 merge -Pkg <PKG> -Worktree <thư mục> -Tests "./internal/...,./tests/..."
+.\scripts\workflow\ticket.ps1 merge -Pkg <PKG> -Agent <bên chạy gộp> -Worktree <thư mục> -Tests "./internal/...,./tests/..."
 .\scripts\workflow\ticket.ps1 lock-status
 ```
 
@@ -91,17 +94,17 @@ Lệnh (từ gốc repo, sau [#142](https://github.com/MEKONG-GREEN/Agrigreen_de
 
 ## 5. Luồng gộp qua Pull Request (phương án (a))
 
-Chốt ngày **24/10/2026** (ticket [#142 WORKFLOW-PR](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142)). `ticket.ps1 merge`:
+Chốt ngày **24/10/2026** (ticket [#142 WORKFLOW-PR](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142)). **Có hiệu lực khi #142 vào `dev`**; trước đó xem [giai đoạn chuyển](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142) — bản hiện hành gộp dưới khóa nhưng chưa qua PR, chưa chờ CI và không tự kiểm bình luận review. Sau #142, `ticket.ps1 merge`:
 
 1. Giữ khóa gộp `refs/heads/lock/integration` (tạo nguyên tử; luôn nhả khi xong hoặc lỗi).
 2. Rebase nhánh gói lên `origin/dev` (xung đột tài liệu → giữ cả hai; tệp sinh → sinh lại; xung đột mã → dừng, trả về chủ gói).
-3. Chạy cổng cục bộ (mục 8) và test DB thật của các gói khai báo trong `-Tests`.
-4. Push nhánh PR, mở **Pull Request vào `dev`** (mô tả theo [mẫu PR](.github/pull_request_template.md)).
-5. Kiểm **cổng review**: phải có bình luận của bên còn lại dạng `Review OK — <công cụ> (review chéo tại <sha>)` với `<sha>` **trùng SHA đầu PR**. Claude và Codex dùng chung một tài khoản GitHub nên GitHub không thể bắt buộc approval; script kiểm bình luận này thay.
-6. Chờ các check CI bắt buộc xanh.
-7. Gộp bằng `gh pr merge --merge --match-head-commit <sha>` (đầu PR đổi sau khi review → từ chối, phải review lại).
+3. Kiểm **cổng review**: phải có bình luận của bên **khác chủ gói** (chủ gói = nhãn `agent:` của issue, không phụ thuộc ai chạy `merge`) dạng `Review OK — <công cụ> (review chéo tại <sha>)` ở đầu dòng, với `<sha>` là SHA đầu PR — hoặc SHA trước rebase khi nội dung các tệp nguồn của gói không đổi. `CHANGES` mới hơn vô hiệu `OK`. Claude và Codex dùng chung một tài khoản GitHub nên GitHub không thể bắt buộc approval; script kiểm bình luận này thay.
+4. Chạy cổng cục bộ (mục 8, đúng toolchain Go của CI) và test DB thật của các gói khai báo trong `-Tests`.
+5. Push nhánh PR, mở **Pull Request vào `dev`** (mô tả theo [mẫu PR](.github/pull_request_template.md)).
+6. Chờ CI — fail-closed: mọi check (bắt buộc, hoặc mọi check báo về khi chưa bật bảo vệ nhánh) phải `pass`; không có check, check bị bỏ qua hay lỗi đọc → dừng.
+7. Đọc lại cổng review ngay trước khi gộp, rồi gộp bằng `gh pr merge --merge --match-head-commit <sha>` (đầu PR đổi → từ chối).
 
-**Bảo vệ nhánh** `dev` và `main` (sẽ bật sau khi #142 gộp): bắt buộc PR, bắt buộc CI xanh, cấm push thẳng, cấm force-push, áp cả admin. Đừng thử `git push origin <nhánh>:dev`.
+**Bảo vệ nhánh** `dev` và `main` (sẽ bật sau khi #142 gộp): bắt buộc PR, bắt buộc CI xanh, cấm push thẳng, cấm force-push, áp cả admin. Kể cả trước đó: đừng `git push origin <nhánh>:dev` bằng tay.
 
 Chi tiết và lịch sử quy trình: [docs/process/two-tool-workflow.md](docs/process/two-tool-workflow.md).
 
@@ -161,7 +164,7 @@ Rút ra từ đợt kiểm tra 22–24/10/2026 (báo cáo Ecombox và các ticke
 | # | Quy tắc | Vì sao | Kiểm bằng |
 |---|---|---|---|
 | 1 | **Không gọi port module khác, không I/O mạng (email, lưu tệp, KMS/vault, HTTP) bên trong DB transaction.** Đọc trước tx, gửi sau commit hoặc qua outbox. | Mỗi tx giữ một kết nối; lời gọi lồng mở kết nối thứ hai → pool cạn → treo toàn hệ ở 20 CCU. [#125](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/125), [#126](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/126), [#139](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/139) | test pool nhỏ, gọi song song ≥ kích thước pool; review. [Quy ước](docs/conventions/transactions-and-io.md) |
-| 2 | **Cấu hình fail-closed**: thiếu SMTP/FCM/URL công khai ngoài `AG_DEPLOY_ENV=demo/dev` → không khởi động hoặc kênh trả lỗi; không bao giờ ghi "Đã gửi" khi chưa gửi. | `LogMailer` mặc định khiến thông báo báo thành công giả. [#127](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/127) | test fail-closed theo môi trường. [Quy ước](docs/conventions/fail-closed-config.md) |
+| 2 | **Cấu hình fail-closed**: thiếu SMTP/FCM/URL công khai → kênh tắt, bản gửi `dropped` kèm lý do; cấu hình một phần/sai → không khởi động; bộ giả ghi log chỉ khi đặt rõ `AG_MAILER=log` trên máy phát triển. Không bao giờ ghi "Đã gửi" khi chưa gửi. | `LogMailer` mặc định khiến thông báo báo thành công giả. [#127](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/127) | test fail-closed theo môi trường. [Quy ước](docs/conventions/fail-closed-config.md) |
 | 3 | **Một `Idempotency-Key` cho mỗi thao tác người dùng**, sinh khi mở form/bắt đầu thao tác, dùng lại khi thử lại, đổi sau khi thành công. | Sinh khóa mỗi request → bấm Lưu lần hai tạo 409 + bản ghi mồ côi. [#129](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/129) | vitest bấm lại cùng khóa. [Quy ước](docs/conventions/idempotency.md) |
 | 4 | **Worker kiểm phụ thuộc khi khởi động** (pool DB, broker, kênh gửi); **nhận việc gửi nguyên tử** (`UPDATE … WHERE status='pending' RETURNING`), trả việc `sending` quá hạn về `pending`. | Worker chạy với DB nil → panic; gửi trùng 6 email; kẹt `sending`. [#128](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/128) | test không gửi trùng, sống qua restart broker |
 | 5 | **RLS fail-closed**: policy không được bỏ qua kiểm khi bảng chiếu (`k_ref`, …) rỗng. | Tenant chưa có `k_ref` thì policy cho qua hết. [#130](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/130) | test RLS với chiếu rỗng và có dữ liệu |
@@ -173,19 +176,20 @@ Quy tắc mã chung khác (cấm float cho tiền/khối lượng, UUIDv7, mã l
 
 ## 10. Review chéo
 
-Từ 23/10/2026 **mọi gói** phải được bên còn lại review trước khi gộp. Reviewer:
+Từ 23/10/2026 **mọi gói** phải được bên còn lại (bên khác chủ gói, theo nhãn `agent:`) review trước khi gộp. Reviewer:
 
 1. Checkout đúng **SHA đầu PR** (`gh pr checkout <n>`; `git rev-parse HEAD`).
 2. Đọc diff toàn bộ, đối chiếu tiêu chí nghiệm thu trong issue và [mục 9](#9-lỗi-bắt-buộc-tránh).
 3. Chạy lại tối thiểu: cổng tĩnh của phần bị đụng (mục 8), test DB của gói với `-v` (thấy `--- PASS`), web/Flutter nếu đụng.
 4. Kiểm: migration mới xếp sau dev, tệp sinh khớp lệnh sinh, không có bí mật/đường dẫn máy, tài liệu gói (`docs/kn/gia-dinh/<PKG>.md`, `docs/roadmap.d/…/<PKG>.md`).
-5. Bình luận trên PR (hoặc issue) đúng một dòng:
+5. Bình luận trên PR (hoặc issue) một dòng **ở đầu dòng** (không trong khối code hay trích dẫn — ví dụ trong khối code không được tính):
 
    ```
-   Review OK — <claude|codex|tên người> (review chéo tại <sha đầy đủ>)
+   Review OK — <Claude|Codex> (review chéo tại <sha đầy đủ>)
+   Review CHANGES — <Claude|Codex> (review chéo tại <sha đầy đủ>)
    ```
 
-   Có vấn đề → bình luận danh sách cần sửa, không ghi "Review OK". Gặp xung đột mã thật thì không tự viết lại, trả về chủ gói.
+   Sau #142 dùng `ticket.ps1 review -Pkg <PKG> -Agent <bên review> -Sha <sha> -Ok|-Changes` để đăng đúng mẫu. Có vấn đề → `Review CHANGES …` kèm danh sách cần sửa, không ghi "Review OK". Gặp xung đột mã thật thì không tự viết lại, trả về chủ gói.
 
 Reviewer đã ghi "Review OK" có thể chạy `ticket.ps1 merge` cho gói đó.
 
@@ -193,6 +197,6 @@ Reviewer đã ghi "Review OK" có thể chạy `ticket.ps1 merge` cho gói đó.
 
 - **Cài môi trường trên máy sạch chưa kiểm lại** (cả hai cách trong [docs/dev-setup.md](docs/dev-setup.md)). TODO: một người mới chạy từ đầu và ghi lệch.
 - **Tài liệu kiến trúc v4.3 chưa có trong repo** (repo chỉ có [v4.1](docs/kien-truc/AgriGreen-Thiet-ke-kien-truc-he-thong-v4_1.md)). TODO: đưa v4.3 vào `docs/kien-truc/` và cập nhật liên kết ở đây.
-- Script `scripts/workflow/` và bảo vệ nhánh: phụ thuộc [#142](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142); trước khi #142 gộp, lệnh ticket vẫn chạy từ bản cục bộ cũ.
+- Script `scripts/workflow/` và bảo vệ nhánh: phụ thuộc [#142](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/142); trước khi #142 gộp, lệnh ticket chạy từ bản do người điều phối cung cấp ([giai đoạn chuyển](docs/process/two-tool-workflow.md#giai-đoạn-chuyển-trước-142)).
 - `docs/kn/ui-kit.md`: phụ thuộc [#97](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/97).
 - Chủ sở hữu CODEOWNERS cho Ecombox/Tech Lead: chưa quyết.

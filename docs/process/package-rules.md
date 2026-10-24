@@ -5,7 +5,7 @@
 ## 1. Không gian làm việc
 
 - Mỗi gói một worktree riêng, nhánh tạo từ `origin/dev` (lấy bằng `git fetch origin +refs/heads/dev:refs/remotes/origin/dev`). Chỉ làm trong worktree của mình; dùng đường dẫn tuyệt đối khi ghi tệp.
-- Không push, không gộp ngoài `ticket.ps1 merge` ([two-tool-workflow.md §4](two-tool-workflow.md#4-gộp-khóa-tích-hợp--pull-request)). Rebase thì rebase lên `origin/dev`.
+- Không push, không gộp ngoài `ticket.ps1 merge` ([two-tool-workflow.md §4](two-tool-workflow.md#4-gộp-khóa-tích-hợp--pull-request); trước #142 là bản do người điều phối cung cấp — [giai đoạn chuyển](two-tool-workflow.md#giai-đoạn-chuyển-trước-142)). Rebase thì rebase lên `origin/dev`.
 - Không đụng checkout chính của người khác hay worktree của gói khác.
 - Ưu tiên sửa tệp bằng công cụ sửa từng đoạn; nếu viết lại cả tệp bằng script, kiểm kích thước/diff trước khi commit.
 - Hook kiểm tra (vd GateGuard) có thể hỏi xác nhận trước lệnh/sửa — trả lời ngắn và thử lại.
@@ -40,7 +40,7 @@
 | Giả định gói | tệp chung | `docs/kn/gia-dinh/<PKG>.md` |
 | Roadmap | `docs/roadmap.md` | `docs/roadmap.d/<mục>/<PKG>.md` |
 | Kiểm thử DB | PG chung localhost:5432 | `dev-env.ps1` hoặc `pg-ephemeral.ps1`; phải thấy `--- PASS` |
-| Gộp | push vào nhánh tích hợp | PR vào `dev` qua `ticket.ps1 merge` |
+| Gộp | push vào nhánh tích hợp | `ticket.ps1 merge`: sau #142 qua PR vào `dev`; trước đó bản hiện hành gộp dưới khóa (giai đoạn chuyển) |
 
 ## 5. Kiểm thử
 

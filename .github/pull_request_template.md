@@ -1,4 +1,4 @@
-<!-- Quy tắc đầy đủ: AGENTS.md. PR chỉ vào `dev`, không vào `main`. -->
+<!-- Quy tắc đầy đủ: AGENTS.md. PR chỉ vào `dev`, không vào `main`. Liên kết trong mẫu dùng URL đầy đủ (blob/dev) vì thân PR không hiểu đường dẫn tương đối theo tệp. -->
 
 ## Ticket
 
@@ -29,9 +29,9 @@
 
 - [ ] Nhánh từ `origin/dev`, không xếp chồng (nếu có: SHA gốc + `git rebase --onto` đã ghi trong issue)
 - [ ] Commit tiếng Việt `<PKG>: …`; commit AI có `Co-Authored-By`
-- [ ] Không gọi port module khác / I-O ngoài trong DB transaction ([quy ước](../docs/conventions/transactions-and-io.md))
-- [ ] Cấu hình kênh ngoài fail-closed; worker kiểm phụ thuộc; claim nguyên tử ([quy ước](../docs/conventions/fail-closed-config.md))
-- [ ] Lệnh ghi từ web dùng một `Idempotency-Key` cho mỗi thao tác ([quy ước](../docs/conventions/idempotency.md))
+- [ ] Không gọi port module khác / I-O ngoài trong DB transaction ([quy ước](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/blob/dev/docs/conventions/transactions-and-io.md))
+- [ ] Cấu hình kênh ngoài fail-closed; worker kiểm phụ thuộc; claim nguyên tử ([quy ước](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/blob/dev/docs/conventions/fail-closed-config.md))
+- [ ] Lệnh ghi từ web dùng một `Idempotency-Key` cho mỗi thao tác ([quy ước](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/blob/dev/docs/conventions/idempotency.md))
 - [ ] RLS fail-closed; số kiểm ở server
 - [ ] Tệp sinh đã sinh lại (modgen, `gen:api`, golden menu), không sửa tay
 - [ ] Migration forward-only, mốc UTC, xếp sau dev
@@ -41,5 +41,5 @@
 
 ## Review chéo
 
-<!-- Bên còn lại bình luận đúng một dòng, SHA phải trùng đầu PR; đầu PR đổi thì review lại. -->
+<!-- Bên khác chủ gói bình luận một dòng ở đầu dòng (không trong khối code), SHA phải trùng đầu PR; đầu PR đổi thì review lại. -->
 `Review OK — <claude|codex|tên> (review chéo tại <sha đầu PR>)`
