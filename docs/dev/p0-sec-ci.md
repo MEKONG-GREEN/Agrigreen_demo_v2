@@ -5,9 +5,11 @@
 - CI chạy trên push `dev`/`main`, PR vào `dev`/`main`, và lệnh chạy tay. Giữ nguyên điều kiện chỉ phát hành/ký image trên push `main`; không phát hành từ PR hoặc `dev`. Các bước scanner không bị bỏ qua. Cổng Trivy của image PostgreSQL vốn chỉ báo cáo được đổi sang exit 1, cùng ngưỡng CRITICAL/HIGH có bản vá như image khác.
 - Mức Go tối thiểu và toolchain là 1.26.10; Docker build dùng cùng phiên bản. Release chính thức ngày 19/10/2026 sửa crypto/x509: <https://go.dev/doc/devel/release#go1.26.10>.
 - Excelize ghim `v2.11.1-0.20261020033641-611b222fd8f7` (commit upstream 20/10), vì chưa có thẻ 2.11.1 tại lúc chọn bản vá. Gỡ toàn bộ chín suppress Excelize khỏi `.trivyignore`; không coi govulncheck im lặng là thay thế cho Trivy/GHSA. Nguồn advisory upstream: <https://github.com/qax-os/excelize/security/advisories>.
-- Image `deploy/compose/postgres` và `backup` mặc định chạy `postgres:postgres`, có HEALTHCHECK `pg_isready`; tạo sẵn thư mục dữ liệu/socket thuộc postgres khi build.
+- Image `deploy/compose/postgres` và `backup` chuyển sang PostgreSQL17/PostGIS3.6 trên Debian13Trixie, mặc định chạy `postgres:postgres`, có HEALTHCHECK `pg_isready`; tạo sẵn thư mục dữ liệu/socket thuộc postgres khi build.
 
 ## Volume và kiểm thật
+
+Bắt buộc phục hồi logic vào volume mới khi chuyển từ Bullseye3.5; startup guard từ chối dữ liệu vật lý cũ. [Runbook chuyển base](p0-postgres17-upgrade.md).
 
 Named volume mới lấy ownership của thư mục trong image. Volume có sẵn phải thuộc UID/GID postgres của image; không cấp root cho dịch vụ để tự sửa quyền, không xóa dữ liệu. Kiểm tra ownership trước deploy; nếu sai thì vận hành dừng DB và sửa quyền volume có kiểm soát theo runbook VPS.
 
