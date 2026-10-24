@@ -1,6 +1,10 @@
 #!/bin/sh
 # Refuse physical reuse across OS/glibc/PostGIS changes: logical restore into a new volume.
 set -eu
+if [ "$(id -u)" -eq 0 ]; then
+    echo "Refuse root: this image must run as postgres; no privilege-drop helper is installed." >&2
+    exit 78
+fi
 case "${1:-}" in
     postgres|-*)
         data=${PGDATA:-/var/lib/postgresql/data}

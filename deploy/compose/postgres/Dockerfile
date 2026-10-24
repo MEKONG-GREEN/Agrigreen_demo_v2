@@ -6,12 +6,14 @@ RUN apt-get update \
  && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends postgresql-17-pgrouting \
  && rm -rf /var/lib/apt/lists/* \
+ && rm -f /usr/local/bin/gosu \
  && test -f /usr/share/postgresql/17/extension/pgrouting.control \
  && install -d -o postgres -g postgres -m 0700 /var/lib/postgresql/data \
  && install -d -o postgres -g postgres -m 3775 /var/run/postgresql
 COPY --chown=postgres:postgres agrigreen-entrypoint.sh /usr/local/bin/agrigreen-entrypoint.sh
 COPY --chown=postgres:postgres 00-runtime-compat.sh /docker-entrypoint-initdb.d/00-runtime-compat.sh
 RUN chmod 0755 /usr/local/bin/agrigreen-entrypoint.sh
+# gosu chỉ phục vụ entrypoint chạy root; wrapper từ chối root, không cần helper cũ.
 USER postgres:postgres
 ENTRYPOINT ["/usr/local/bin/agrigreen-entrypoint.sh"]
 CMD ["postgres"]

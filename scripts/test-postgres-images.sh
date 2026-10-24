@@ -24,6 +24,13 @@ docker build --pull -t "$image" "deploy/compose/$variant"
 user=$(docker image inspect -f '{{.Config.User}}' "$image")
 case "$user" in ''|root|root:*|0|0:*) echo "image defaults to root" >&2; exit 1 ;; esac
 test "$(docker run --rm --network none --entrypoint id "$image" -u)" -ne 0
+docker run --rm --network none --entrypoint sh "$image" -ec 'test ! -e /usr/local/bin/gosu'
+set +e
+docker run --rm --network none --user root "$image" postgres --version > "$tmp/root.log" 2>&1
+root_rc=$?
+set -e
+test "$root_rc" = 78
+grep -q 'Refuse root' "$tmp/root.log"
 test "$(docker image inspect -f '{{json .Config.Healthcheck.Test}}' "$image")" != null
 docker volume create "$data" >/dev/null
 if [ "$variant" = backup ]; then
