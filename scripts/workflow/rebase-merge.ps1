@@ -34,6 +34,7 @@ $prBranch = "pr/$Ticket"
 "package $Ticket (#$Issue) branch $agBranch head $($oldHead.Substring(0,12)) -> PR head $prBranch, base dev $("$(git -C $w rev-parse --short origin/dev)".Trim())"
 
 $dryWt = $null
+$dryBlocked = $false
 if ($DryRun) {
     # Rebase thử trên bản sao tách rời để lấy SHA đầu PR thật mà không sửa nhánh/worktree của gói.
     $dryWt = Join-Path $env:TEMP ("agwf-dry-{0}-{1}" -f $Worktree, [IO.Path]::GetRandomFileName().Replace('.', ''))
@@ -110,7 +111,7 @@ try {
     $gate = Resolve-AgReviewGate $verdicts $Agent $head $w 'origin/dev' $Ticket
     $gate.Message
     if (-not $gate.Ok) {
-        if ($DryRun) { '[dry-run] a real merge would STOP here (exit 4); continuing to print the plan' } else { exit 4 }
+        if ($DryRun) { $dryBlocked = $true; '[dry-run] a real merge would STOP here (exit 4); continuing to print the plan' } else { exit 4 }
     }
 
     # --- Cổng cục bộ (giữ nguyên như quy trình cũ) ----------------------------------------------------------------------
@@ -233,6 +234,7 @@ try {
     if ($LASTEXITCODE -ne 0) { "PR MERGE FAIL - PR #$pr left open"; exit 6 }
     if ($DryRun) {
         "[dry-run] verify: git fetch origin dev; git merge-base --is-ancestor $head origin/dev"
+        if ($dryBlocked) { "DRY-RUN BLOCKED - review gate: a real merge exits 4 before the local gates (head $head)"; exit 4 }
         "DRY-RUN OK - would merge via PR (head $head)"
         exit 0
     }
