@@ -1,9 +1,9 @@
 # P0-HTX-KREF (#130): tạo Nút và bản chiếu cùng giao dịch
 
-**Đang sửa hồi quy; chưa sẵn sàng tích hợp.** Full CI ứng viên `080c174e`
-đã kết thúc FAIL (58 ca chính, 9 package), không còn là một lượt đang chờ.
-Mã production đã thay đổi sau ứng viên đó; các PASS cũ chỉ là bằng chứng lịch sử.
-Không dùng chúng thay kiểm thử và Review OK của SHA cuối.
+**Đã kiểm các sửa hồi quy riêng; chưa đủ điều kiện gộp.** Nguồn kiểm cuối là
+`f67c8cd86631e1af00b96de679000a74ff70fc87`. Full CI của ứng viên cũ `080c174e`
+FAIL; cần CI mới và Claude Review OK tại SHA bàn giao cuối. Các kết quả theo SHA
+được tách dưới đây, không dùng PASS từng package thay cổng tổng thể.
 
 ## Phạm vi
 
@@ -61,15 +61,37 @@ trước BeginTx; joined/direct transaction bị chặn trước lời gọi por
 node, không thay tenant/vai, không thay Principal.KN hoặc selected-session projection.
 Manager/farmer, job, partner và selected KN giữ boundary riêng của mình.
 
-CI còn lộ hai đường cần sửa trước khi chốt gói: tombstone khi thửa rời HTX phải
-chỉ mang ID/phiên bản, không đọc hình/thuộc tính của HTX mới; log vụ mùa bị RLS
-che phải phân loại lỗi quyền trước lỗi trạng thái. Các bản sửa đang được kiểm
-riêng, chưa được tính là PASS của toàn bộ cooperative.
+Nhật ký vụ mùa phân biệt quyền trước trạng thái: với manager/farmer, vụ ẩn hoặc
+không tồn tại cùng bị từ chối. Chỉ trả “chưa mở vụ” sau khi port thửa, ngoài
+transaction, xác nhận quyền ghi. Thửa của hộ khác không trở thành oracle về vụ.
+
+### Tombstone khi thửa rời HTX
+
+Migration `20261024050100_pf_coop_plot_scope_tombstone` thêm projection sáu cột:
+tenant, ID thửa, HTX cũ, xã, revision và sync_seq. Không có hình, tên, chủ mới.
+Trigger AFTER UPDATE ghi mất quyền cùng transaction nguồn; chỉ owner NOLOGIN,
+NOBYPASSRLS được INSERT, app chỉ SELECT. FORCE RLS đòi đúng node HTX cũ và self
+projection; xã đơn thuần, thiếu node/tenant/projection đều không đọc được.
+UPDATE/DELETE/TRUNCATE bị chặn, hàm không có PUBLIC EXECUTE hoặc tham số trực tiếp.
+
+Native manager lấy current và tombstone bằng một SQL statement snapshot, chung
+ORDER/LIMIT; chỉ fetch geometry sau page, không join tombstone vào thửa của chủ
+mới. Hai SELECT Read Committed có thể đẩy cursor qua một upsert ghi xen kẽ;
+regression HTTP writer đã kiểm trường hợp này. Thửa quay lại A sau A→B→A trả
+upsert mới, không phát tombstone cũ đè lên. KN/selected và farmer giữ feed sẵn có;
+contract cấp tài khoản farmer không có org_ref, scope theo household.
+
+Backfill đọc danh sách tenant từ metadata chain_head, rồi đọc nguồn FORCE RLS
+trong từng tenant của migration. Cấp cursor mới cho từng chủ cũ/thửa DISTINCT để
+thiết bị đã đi qua cursor nguồn vẫn nhận lệnh xóa. Giữ nguyên nguồn, sổ và k_ref;
+khôi phục tenant/node/xa của caller. Khóa writer bảng plot trong migration, không
+lấy advisory lock sau table lock. Không tắt FORCE RLS hoặc cấp BYPASSRLS.
 
 ## Triển khai forward-only
 
-1. Giữ endpoint tạo/di chuyển tổ chức ở chế độ bảo trì trong cửa sổ migration.
-2. Áp ba migration timestamp của gói (kref function, party trigger, coop policies).
+1. Giữ writer tổ chức và thửa ở chế độ bảo trì trong cửa sổ migration.
+2. Áp bốn migration timestamp: 20261024022324/22325/22326 và 20261024050100
+   (kref function, party trigger, coop policies, ID-only tombstone/backfill).
 3. Với tenant cũ chưa chiếu hoặc parent thiếu, chạy worker -kref-rebuild bằng vai
    worker đã cấu hình, trong khi writer nguồn vẫn khóa; không dựng lại đồng thời
    với nguồn đang đổi. So khớp nguồn/projection theo runbook k_ref trước mở lại.
@@ -84,46 +106,38 @@ snapshot cũ; cửa sổ bảo trì là điều kiện vận hành cho Rebuild h
 
 ## Bằng chứng
 
-- Nguồn và fixture `e92fd017`: Go 1.26.10, `scripts/pg-ephemeral.ps1`,
-  `go test -v -count=1 -p 1 -timeout 20m ./tests/p0kref` — 10 ca PASS,
-  0 FAIL, 0 SKIP; database và cluster tạm đã dọn. Gồm bản chiếu có dữ liệu,
-  rollback nguồn/outbox/closure, 24 yêu cầu đồng thời với 13 hồ sơ thật,
-  replay cùng khóa khi kiểm MST chạy đua, RLS đóng, quyền module/cross-tenant,
-  cha chờ di chuyển rồi worker đồng bộ và retry, đổi tên nguồn, đường cha thiếu.
-- Fixture drill `b8e1a3c5`: `go test -v -count=1 -p 1 -timeout 20m
-  ./cmd/drill -run ''^TestDrillKRefRebuildMatchesSource_W25$''` trên Go 1.26.10
-  qua PostgreSQL tạm — 1 PASS, 0 FAIL, 0 SKIP; cluster đã dọn. Fixture xóa đúng
-  tenant giả khỏi projection sau INSERT nguồn để mô phỏng dữ liệu cũ chưa chiếu,
-  giữ yêu cầu Before=0/After=6 và lần rebuild lặp không drift. Không sửa mã rebuild
-  hoặc tắt trigger. Lượt trước ở `72a8dfb9` FAIL vì fixture giả định INSERT chưa
-  tự chiếu; không dùng kết quả đó làm PASS.
-- Toàn bộ `party/app` và `party/handler` PASS trên ứng viên lịch sử `080c174e`.
-  Nguồn cuối nay có thêm sửa policy và boundary native, cần kiểm lại theo SHA mới. Lượt ghép đó có hai lỗi fixture
-  đọc nhầm `seq` thay vì `event.seq`; e92 sửa đúng fixture và chạy lại đủ 10 ca.
-  Không gọi toàn bộ lệnh ghép cũ là PASS.
-- [Cổng tĩnh của 080c](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/actions/runs/40058807292/job/120767667765)
-  và [Compose VPS thật cùng guard/migration](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/actions/runs/40058807178)
-  PASS. Runtime này kiểm cây kết hợp #130/#131/#132, không thay nghiệm thu VPS đích.
-- Cổng ledger upgrade PF/MKG, schema isolation và EXPLAIN 498 bảng của d3 đã PASS
-  trước khi thêm guard cha; đây là bằng chứng cũ, không thay kiểm của cây cuối.
+Nguồn `f67c8cd8`, Go 1.26.10, CI=true, bỏ PgBouncer, PostgreSQL riêng qua
+`scripts/pg-ephemeral.ps1`. Log và proof giữ tại TEMP, tiền tố
+`agrigreen-p0130-combined-f67c8cd8-*` và `agrigreen-p0130-combined-final-proof-20261024.json`:
 
-- Nguồn `ee296397`: Go 1.26.10/private PG, bốn nhóm migration W3.4/W4.2/D2/KN
-  và `tests/p0kref`, drill: 15 ca chính PASS, 0 FAIL, 0 SKIP. Năm XFAIL legacy
-  KNSPLIT0 có sẵn vẫn được báo riêng; không gọi toàn bộ KNSPLIT hoàn tất.
-- Sửa member `d7a02c07` (cherry `25a1a973`): toàn bộ handler member 14 ca chính
-  + 4 ca con PASS, 0 FAIL/SKIP; kiểm lookup cùng pool một kết nối, restore trước
-  ghi/commit và KN/selected/empty projection. PostgreSQL tạm đã dọn.
-- Native plot `50ee8c07` (cherry `90f80277`): 36 ca chính + 6 ca con PASS,
-  2 FAIL, 0 SKIP; hai lỗi là consumer conflict và tombstone transfer, chưa gọi
-  toàn bộ plot PASS. Bổ sung consumer ở `8b6d1442` (cherry `74c9e2dc`) mới kiểm
-  tĩnh; chờ ghép tombstone rồi chạy toàn bộ handler.
-- Fixture HTX `0d4c355d` (cherry `5569907a`): 11 PASS, 3 FAIL, 0 SKIP. Lỗi còn lại
-  thuộc contract/context publication KN; đã mở lane:kn #145, không sửa assertion
-  dương hoặc tạo đường ghi HTX từ KN để chữa test.
-- Season `30b92145`: 29 PASS, 2 FAIL, 0 SKIP; đang kiểm sửa classification và
-  joined preflight ở `2eaeea08`, chưa có kết quả cuối.
+| Kiểm | Kết quả |
+|---|---|
+| `go test -json -count=1 -p 1 -timeout 30m ./internal/platform/cooperative/plot/...` | 54 ca chính PASS, 0 FAIL, 0 test SKIP; 3 package có test và 2 package không có test đã compile. Handler 47 ca chính gồm tombstone, cursor HTTP xen kẽ, tenant/node và scope rỗng. |
+| `go test -json -count=1 -p 1 -timeout 30m ./migrations -run '^(TestCoopScopeRLS_W34\|TestShareScopeRLS_W42\|TestHTXAnchorRLSAfterClaim_D2\|TestKNPrincipalHTXDataAccess_KNSPLIT0\|TestNoCrossModuleSchemaPrivileges_W91\|TestRLSExplainNoPerRowFunctions_W91\|TestRLSExplainGateDetects_W91)$'` | 7 ca chính PASS, 0 FAIL/SKIP; EXPLAIN 499 bảng, không bỏ qua/ngoại lệ. Năm XFAIL legacy tenant lưu ký KNSPLIT0 vẫn báo riêng; không coi KNSPLIT-4 hoàn tất. |
+| `go test -json -count=1 -p 1 -timeout 30m ./tests/p0kref ./cmd/drill -run '^(TestP0KRef.*\|TestDrillKRefRebuildMatchesSource_W25)$'` | 11 ca chính PASS, 0 FAIL/SKIP; cả P0 và drill đều chạy thật. |
 
-Chưa ready lại hoặc gộp. Full CI phải xanh sau sửa hồi quy và các dependency
-#81/#140/#145, web #134/#138. Cần Claude bình luận Review OK tại SHA cuối trước
-`ticket.ps1 merge`. Không dùng PASS từng package để bỏ cổng tổng thể; không
-đổi test FAIL/SKIP thành đạt và không dùng toolchain host 1.27 thay Go 1.26.10.
+P0 kiểm 24 request tạo 13 Nút/hồ sơ thật không503/409/orphan trong ca đồng thời;
+projection hiện hữu, rollback nguồn/ledger/outbox/closure, race MST, cha chờ move
+rồi worker/retry cùng khóa, rename và thiếu đường cha. Drill giả lập tenant chưa
+chiếu bằng xóa đúng projection tenant test, không tắt trigger hoặc đổi rebuild.
+Bộ tổng hợp log đầu dừng nhầm vì hai package `[no test files]`; đã phân loại lại
+từ log nguyên vẹn, chỉ chạy tiếp phần chưa chạy, không gọi test SKIP là PASS.
+
+Kiểm native độc lập, cùng byte production trong cây cuối:
+
+- Member `d7a02c07`/cherry `25a1a973`: 14 ca chính + 4 ca con PASS, 0 FAIL/SKIP;
+  lookup cùng pool một kết nối, restore trước ghi/commit, KN/selected đóng nguyên.
+- Season `9d9b5bf8`/cherry `8ec08e31`: 33 ca chính PASS, 0 FAIL/SKIP; gồm scope
+  rỗng, joined/foreign context, quyền log/batch và sync. Fixture “chưa mở vụ” dùng
+  thửa của hộ đã liên kết, giữ expected409; thêm ca hộ ngoài quyền bị từ chối.
+- Build và vet toàn repo, modgen -check, migratecheck -base origin/dev, archlint,
+  knboundary, contractcheck, docscheck, diff --check tại `f67c8cd8` đều đạt.
+
+Lịch sử RED được giữ: CI080c 58 ca chính FAIL/9 package; plot trước sửa2FAIL,
+season30b 2FAIL, season2ea 1FAIL (fixture hộ ngoài quyền), tombstone lượt đầu
+1FAIL fixture assign cùng chủ. Các sửa không hạ expected hoặc tắt kiểm quyền.
+Fixture HTX `0d4c355d`/cherry `5569907a`: 11PASS/3FAIL thuộc contract/context
+publication KN, đã chuyển lane:kn #145; không giả Session hoặc nới RLS để chữa.
+
+Chờ cổng #81/#140/#145, web #134/#138, full CI mới và Claude Review OK tại SHA cuối.
+Chỉ `ticket.ps1 merge` vào dev khi đủ cổng; roadmap vẫn chưa đánh hoàn tất.
