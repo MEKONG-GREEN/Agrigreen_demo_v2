@@ -222,10 +222,14 @@ func (s *Service) CreateFolder(ctx context.Context, in FolderInput, idem string)
 	var out store.FolderRow
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.FolderByIdem(ctx, tx, idem); err != nil || prev != nil {
-			if prev != nil {
-				out = *prev
+			if err != nil {
+				return err
 			}
-			return err
+			if err := c.replayable(prev.Department, prev.ActorRef, prev.Event, domain.FolderCreated); err != nil {
+				return err
+			}
+			out = *prev
+			return nil
 		}
 		if err := store.Lock(ctx, tx, "folders:"+c.dept); err != nil {
 			return err
@@ -288,10 +292,17 @@ func (s *Service) ChangeFolder(ctx context.Context, in FolderChange, idem string
 	var out store.FolderRow
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.FolderByIdem(ctx, tx, idem); err != nil || prev != nil {
-			if prev != nil {
-				out = *prev
+			if err != nil {
+				return err
 			}
-			return err
+			if err := c.replayable(prev.Department, prev.ActorRef, prev.Event, in.Event); err != nil {
+				return err
+			}
+			if prev.Ref != in.Ref {
+				return problem.IdempotencyConflict
+			}
+			out = *prev
+			return nil
 		}
 		if err := store.Lock(ctx, tx, "folders:"+c.dept); err != nil {
 			return err

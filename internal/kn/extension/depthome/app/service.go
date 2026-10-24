@@ -141,6 +141,17 @@ func (c caller) checkWrite() error {
 
 // resolve giải người gọi và phòng: Admin chọn phòng bằng tham số (bắt buộc); vai khác dùng phòng của phiên — tham số
 // khác phòng của phiên → 403.
+// replayable kiểm bản đã ghi với Idempotency-Key trước khi trả lại (phát lại): khóa chỉ dùng lại được trong đúng phòng
+// của ngữ cảnh HIỆN HÀNH (c.dept — quyền phòng đã kiểm lại ở resolve/writerOf/managerOf với phiên hiện hành), cùng người
+// ghi và cùng thao tác (event). Khóa đã dùng ở phòng/người/thao tác khác → idempotency_key_reused (422), không trả bản ghi
+// của phòng khác (sổ idem sống lâu hơn cache HTTP 48 giờ).
+func (c caller) replayable(dept string, actor uuid.UUID, event, want string) error {
+	if dept != c.dept || actor != c.p.ActorRef || event != want {
+		return problem.IdempotencyConflict
+	}
+	return nil
+}
+
 func (s *Service) resolve(ctx context.Context, dept string, roles ...string) (caller, error) {
 	p, k, err := port.RequireSession(ctx)
 	if err != nil {
@@ -257,10 +268,14 @@ func (s *Service) SaveProfile(ctx context.Context, in ProfileInput, idem string)
 	var out store.ProfileRow
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.ProfileByIdem(ctx, tx, idem); err != nil || prev != nil {
-			if prev != nil {
-				out = *prev
+			if err != nil {
+				return err
 			}
-			return err
+			if err := c.replayable(prev.Department, prev.ActorRef, prev.Event, domain.EventProfileSaved); err != nil {
+				return err
+			}
+			out = *prev
+			return nil
 		}
 		if err := store.Lock(ctx, tx, "profile:"+c.dept); err != nil {
 			return err
