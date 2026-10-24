@@ -175,8 +175,16 @@ def reset_email(browser, username):
     return Page(browser.opener.open(local(link)).read().decode())
 
 
+def recovery_retry_delay(policy):
+    # Empty OTP is a failed credential too. Two rapid negative probes otherwise
+    # trigger Keycloak's legitimate quick-login lock before the positive probe.
+    return max(1, int(policy["quickLoginCheckMilliSeconds"])) / 1000 + 0.1
+
+
 def recovery_probe(admin, realm, client, configured):
     root = "/admin/realms/" + realm
+    _, recovery_policy = call("GET", root, token=admin)
+    retry_delay = recovery_retry_delay(recovery_policy)
     username = "p0-reset-" + secrets.token_hex(7)
     password, new_password = "Aa7#" + secrets.token_urlsafe(24), "Bb8#" + secrets.token_urlsafe(24)
     secret = secrets.token_urlsafe(24)
@@ -217,11 +225,18 @@ def recovery_probe(admin, realm, client, configured):
             page = browser.post(page, otp="")
             assert "otp" in page.inputs
             no_session(admin, root, uid)
+            time.sleep(retry_delay)
             page = browser.post(page, otp="invalid-otp")
             assert "otp" in page.inputs
             no_session(admin, root, uid)
+            time.sleep(retry_delay)
             page = browser.post(page, otp=totp(secret))
-            assert {"password-new", "password-confirm"}.issubset(page.inputs)
+            if not {"password-new", "password-confirm"}.issubset(page.inputs):
+                _, failure = call("GET", root + "/attack-detection/brute-force/users/" + uid, token=admin)
+                raise AssertionError("valid OTP did not reach password form in " + realm +
+                    "; input names=" + ",".join(sorted(page.inputs)) +
+                    "; failures=" + str(failure.get("numFailures", 0)) +
+                    "; temporary lock=" + str(failure.get("disabled", False)))
             no_session(admin, root, uid)
         except CompletedRedirect:
             raise AssertionError("MFA bypass: email recovery returned an authorization code before OTP") from None

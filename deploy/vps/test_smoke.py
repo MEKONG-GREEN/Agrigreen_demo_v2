@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent))
-from smoke import Page, local, totp, CompletedRedirect, RecoveryBrowser
+from smoke import Page, local, totp, CompletedRedirect, RecoveryBrowser, recovery_retry_delay
 
 class SmokeHarnessTest(unittest.TestCase):
     def test_keycloak_relative_recovery_url_keeps_approved_host(self):
@@ -44,6 +44,10 @@ class SmokeHarnessTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 browser.exchange(completed)
             request.assert_not_called()
+    def test_negative_otp_probes_respect_quick_login_window(self):
+        self.assertGreater(recovery_retry_delay({'quickLoginCheckMilliSeconds':1000}),1)
+        self.assertGreater(recovery_retry_delay({'quickLoginCheckMilliSeconds':1}),0.001)
+        self.assertGreater(recovery_retry_delay({'quickLoginCheckMilliSeconds':0}),0)
     def test_exchange_uses_actual_code_and_matching_pkce(self):
         browser=RecoveryBrowser('agrigreen','agrigreen-web-ops')
         completed=CompletedRedirect('https://app.vps.example.test/?code=opaque&state='+browser.state)
