@@ -80,6 +80,8 @@ def main():
         if "=" in line and not line.lstrip().startswith("#"):
             key, value = line.split("=", 1)
             values[key] = value.strip("'\"")
+    if values.get("AG_DOMAIN") != "vps.example.test" or not os.environ.get("COMPOSE_PROJECT_NAME", "").startswith("agrigreen-p0-"):
+        raise RuntimeError("refusing smoke outside the generated isolated Compose project/domain")
     _, session = call("POST", "/realms/master/protocol/openid-connect/token", {
         "grant_type": "password", "client_id": "admin-cli", "username": "admin",
         "password": values["KEYCLOAK_ADMIN_PASSWORD"]}, form=True)
