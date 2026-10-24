@@ -128,7 +128,7 @@ func (r *Registry) requireWriteScope(ctx context.Context, p authz.Principal, uni
 func classifyOrgErr(err error) error {
 	var pg *pgconn.PgError
 	if errors.As(err, &pg) && pg.Code == "23503" && pg.ConstraintName == "kref_parent_projection_ready" {
-		return ErrDependency.WithDetail("chưa đồng bộ tổ chức cấp trên — cần khôi phục danh mục trước khi thử lại").WithCause(err)
+		return ErrDependency.WithDetail("tổ chức cấp trên chưa sẵn sàng — thử lại sau khi đồng bộ danh mục").WithCause(err)
 	}
 	if errors.As(err, &pg) && pg.Code == "23505" {
 		switch pg.ConstraintName {

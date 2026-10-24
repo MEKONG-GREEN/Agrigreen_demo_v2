@@ -20,6 +20,13 @@ Nếu yêu cầu cùng khóa commit giữa bước đọc sổ ban đầu và ki
 đã commit được đọc lại trước khi trả lỗi trùng. Xung đột nghiệp vụ thật (hai thao tác
 khác nhau cùng tên/MST) vẫn bị từ chối.
 
+Trước INSERT có guard SECURITY INVOKER đọc metadata nguồn và đường tổ tiên của cha
+bằng quyền SELECT sẵn có của caller, cùng khóa tenant với worker. Nếu một move còn
+đợi outbox hoặc đường closure thiếu, giao dịch nguồn rollback trước bước hồ sơ.
+Gọi lại cùng khóa sau khi worker chiếu xong; không để lại Nút thiếu hồ sơ. Guard so
+parent_ref/admin_unit_code/active và tính đầy đủ của đường, không so last_seq: đổi
+tên nguồn không có trong projection vẫn cho tạo bình thường. Không thêm quyền DB.
+
 ## RLS
 
 Migration mới ALTER 19 p_scope RESTRICTIVE, giữ p_tenant. Bỏ nhánh tenant chưa có
