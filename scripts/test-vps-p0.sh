@@ -29,7 +29,7 @@ dc config --format json | python3 -c '
 import json,sys
 c=json.load(sys.stdin)
 for name,s in c["services"].items():
- assert s.get("mem_limit",0)>0 and float(s.get("cpus",0))>0, name
+ assert float(s.get("mem_limit",0))>0 and float(s.get("cpus",0))>0, name
 for name in ("api-platform","worker"):
  e=c["services"][name]["environment"]
  for key in ("AG_SMTP_HOST","AG_SMTP_FROM","AG_FCM_PROJECT_ID","AG_FCM_CREDENTIALS_FILE","AG_WEB_OPS_URL","AG_REPORT_LINK_BASE"):
