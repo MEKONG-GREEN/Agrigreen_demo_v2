@@ -128,8 +128,9 @@ export function PublishScreen() {
     if (!errs.to && !errs.from && to < from) errs.to = "Đến ngày phải sau hoặc bằng Từ ngày.";
     const pe: Record<string, string> = {};
     const norm: typeof pv = {};
-    for (const [tpl, byCommune] of Object.entries(pv)) {
-      for (const [cm, cells] of Object.entries(byCommune)) {
+    // Codex review #100: chỉ kiểm/gửi Tỉnh giao của biểu đang chọn — ô của biểu đã bỏ chọn bị ẩn, không được chặn.
+    for (const tpl of picked) {
+      for (const [cm, cells] of Object.entries(pv[tpl] ?? {})) {
         for (const [letter, raw] of Object.entries(cells)) {
           const p = parseNumberInput(raw);
           if (!p.ok) pe[`${tpl}|${cm}|${letter}`] = p.error;
@@ -198,6 +199,12 @@ export function PublishScreen() {
       return next;
     });
   };
+  /** Bỏ Tỉnh giao (giá trị + lỗi) của biểu bị bỏ chọn; không truyền = bỏ hết (đổi loại báo cáo). Chọn lại thì ô trống. */
+  const dropPv = (tpls?: string[]) => {
+    const gone = (tpl: string) => !tpls || tpls.includes(tpl);
+    setPv((x) => Object.fromEntries(Object.entries(x).filter(([tpl]) => !gone(tpl))));
+    setPvErr((x) => Object.fromEntries(Object.entries(x).filter(([k]) => !gone(k.split("|")[0]!))));
+  };
   const formCols: Column<RcFormItem>[] = [
     {
       key: "pick",
@@ -207,7 +214,11 @@ export function PublishScreen() {
           type="checkbox"
           aria-label={`Chọn ${f.code}`}
           checked={picked.includes(f.template_id)}
-          onChange={(e) => setPicked((p) => (e.target.checked ? [...p, f.template_id] : p.filter((x) => x !== f.template_id)))}
+          onChange={(e) => {
+            const on = e.target.checked;
+            setPicked((p) => (on ? [...p, f.template_id] : p.filter((x) => x !== f.template_id)));
+            if (!on) dropPv([f.template_id]);
+          }}
         />
       ),
     },
@@ -399,7 +410,7 @@ export function PublishScreen() {
             <h2>Bước 3 · Kỳ và hạn nộp</h2>
             <label className="field">
               <span>Loại kỳ*</span>
-              <select className="input" value={rt} onChange={(e) => (setRt(e.target.value as typeof rt), setPt(""), setPicked([]), setPreview(null))}>
+              <select className="input" value={rt} onChange={(e) => (setRt(e.target.value as typeof rt), setPt(""), setPicked([]), dropPv(), setPreview(null))}>
                 <option value="weekly">Tuần</option>
                 <option value="monthly">Tháng</option>
                 <option value="seasonal">Vụ</option>
