@@ -56,5 +56,22 @@ snapshot cũ; cửa sổ bảo trì là điều kiện vận hành cho Rebuild h
 
 ## Bằng chứng
 
-Đang kiểm trên PostgreSQL riêng bằng scripts/pg-ephemeral.ps1. Chưa gọi gói đạt,
-chưa gộp và chưa xác nhận runtime VPS trước khi lưu kết quả kiểm thật và Review OK.
+- Nguồn và fixture `e92fd017`: Go 1.26.10, `scripts/pg-ephemeral.ps1`,
+  `go test -v -count=1 -p 1 -timeout 20m ./tests/p0kref` — 10 ca PASS,
+  0 FAIL, 0 SKIP; database và cluster tạm đã dọn. Gồm bản chiếu có dữ liệu,
+  rollback nguồn/outbox/closure, 24 yêu cầu đồng thời với 13 hồ sơ thật,
+  replay cùng khóa khi kiểm MST chạy đua, RLS đóng, quyền module/cross-tenant,
+  cha chờ di chuyển rồi worker đồng bộ và retry, đổi tên nguồn, đường cha thiếu.
+- Toàn bộ `party/app` và `party/handler` PASS trên ứng viên `080c174e` có cùng
+  byte mã production/migration với nguồn cuối. Lượt ghép đó có hai lỗi fixture
+  đọc nhầm `seq` thay vì `event.seq`; e92 sửa đúng fixture và chạy lại đủ 10 ca.
+  Không gọi toàn bộ lệnh ghép cũ là PASS.
+- [Cổng tĩnh của 080c](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/actions/runs/40058807292/job/120767667765)
+  và [Compose VPS thật cùng guard/migration](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/actions/runs/40058807178)
+  PASS. Runtime này kiểm cây kết hợp #130/#131/#132, không thay nghiệm thu VPS đích.
+- Cổng ledger upgrade PF/MKG, schema isolation và EXPLAIN 498 bảng của d3 đã PASS
+  trước khi thêm guard cha; đây là bằng chứng cũ, không thay kiểm của cây cuối.
+
+Gói sẵn sàng review mã, chưa gộp. Full CI vẫn phải xanh sau các dependency fixture
+#81/#140 và web #134/#138; cần Claude bình luận Review OK tại SHA cuối trước
+`ticket.ps1 merge`. Không dùng kết quả riêng từng package để bỏ cổng CI tổng thể.
