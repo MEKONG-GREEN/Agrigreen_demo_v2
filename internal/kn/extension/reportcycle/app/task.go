@@ -156,10 +156,18 @@ func (s *Service) GetTask(ctx context.Context, id uuid.UUID) (TaskDetail, error)
 	}
 	now := s.now()
 	var d TaskDetail
-	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+	// P0-POOL-KN: phiên bản mẫu (pf/reports) đọc NGOÀI giao dịch — lần đầu thiếu thì hủy, nạp, đọc lại công việc.
+	dp := s.newDeps(a.p.TenantID)
+	err = s.txDeps(ctx, a.p.TenantID, dp, func(tx pgx.Tx) error {
+		d = TaskDetail{}
 		t, err := s.taskInScope(ctx, tx, a, id, false)
 		if err != nil {
 			return err
+		}
+		if t.PeriodBlock {
+			if err := dp.want(ctx, []uuid.UUID{t.VersionID}, ""); err != nil {
+				return err
+			}
 		}
 		b, err := store.BatchByID(ctx, tx, t.BatchID, false)
 		if err != nil {
@@ -201,7 +209,7 @@ func (s *Service) GetTask(ctx context.Context, id uuid.UUID) (TaskDetail, error)
 			}
 		}
 		if t.PeriodBlock {
-			fi, err := s.forms(a.p.TenantID).get(ctx, t.VersionID)
+			fi, err := dp.form(ctx, t.VersionID)
 			if err != nil {
 				return err
 			}
@@ -264,8 +272,12 @@ func (s *Service) Submit(ctx context.Context, taskID uuid.UUID, in SubmissionInp
 		subID = *in.ID
 	}
 	var out SubmissionResult
-	fc := s.forms(a.p.TenantID)
-	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+	// P0-POOL-KN: phiên bản mẫu (pf/reports), khu vực + tên xã (pf/party) đọc NGOÀI giao dịch (txDeps).
+	dp := s.newDeps(a.p.TenantID)
+	rows0 := slices.Clone(in.Rows)
+	err = s.txDeps(ctx, a.p.TenantID, dp, func(tx pgx.Tx) error {
+		out = SubmissionResult{}
+		in.Rows = slices.Clone(rows0)
 		if in.ID != nil {
 			old, err := store.SubmissionByID(ctx, tx, subID)
 			if err != nil {
@@ -299,7 +311,10 @@ func (s *Service) Submit(ctx context.Context, taskID uuid.UUID, in SubmissionInp
 		if !st.Open(now) {
 			return ErrPeriodClosed
 		}
-		fi, err := fc.get(ctx, t.VersionID)
+		if err := dp.want(ctx, []uuid.UUID{t.VersionID}, t.ProvinceCode, t.CommuneCode); err != nil {
+			return err // hủy trước khi ghi; nạp ngoài giao dịch rồi chạy lại
+		}
+		fi, err := dp.form(ctx, t.VersionID)
 		if err != nil {
 			return err
 		}
@@ -313,7 +328,7 @@ func (s *Service) Submit(ctx context.Context, taskID uuid.UUID, in SubmissionInp
 		if err != nil {
 			return err
 		}
-		names, err := s.regionNames(ctx, t.ProvinceCode)
+		names, err := dp.book(ctx, t.ProvinceCode)
 		if err != nil {
 			return err
 		}

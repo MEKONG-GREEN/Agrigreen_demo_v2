@@ -507,10 +507,11 @@ func (s *Service) CommuneStatsOf(ctx context.Context, commune string, batchID *u
 	if a.k.Role == port.SessionRoleCommune && !slices.Contains(a.k.Communes, commune) {
 		return CommuneStats{}, ErrOutOfScope
 	}
-	out := CommuneStats{Commune: commune}
+	var out CommuneStats
 	now := s.now()
-	fc := s.forms(a.p.TenantID)
-	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+	dp := s.newDeps(a.p.TenantID) // P0-POOL-KN: phiên bản mẫu đọc ngoài giao dịch
+	err = s.txDeps(ctx, a.p.TenantID, dp, func(tx pgx.Tx) error {
+		out = CommuneStats{Commune: commune}
 		f := store.TaskFilter{Department: a.dept(), Province: a.province, Communes: []string{commune}, BatchID: batchID, OrderByDue: true}
 		tasks, err := store.ListTasks(ctx, tx, f)
 		if err != nil {
@@ -548,12 +549,19 @@ func (s *Service) CommuneStatsOf(ctx context.Context, commune string, batchID *u
 				}
 			}
 		}
+		versions := make([]uuid.UUID, 0, len(latestBy))
+		for _, t := range latestBy {
+			versions = append(versions, t.VersionID)
+		}
+		if err := dp.want(ctx, versions, ""); err != nil {
+			return err
+		}
 		for code, t := range latestBy {
 			sub, err := store.SubmissionByID(ctx, tx, *t.SubmittedSubmissionID)
 			if err != nil || sub == nil {
 				return err
 			}
-			fi, err := fc.get(ctx, t.VersionID)
+			fi, err := dp.form(ctx, t.VersionID)
 			if err != nil {
 				return err
 			}

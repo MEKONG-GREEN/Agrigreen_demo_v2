@@ -59,13 +59,18 @@ func (s *Service) afterConsolidate(c consolidateOut) {
 // consolidateTx dựng lần tổng hợp cho các biểu của kỳ (templates nil = mọi biểu): lấy bản "Đã gửi" mới nhất từng
 // xã, tính lại công thức và dòng Khu vực/Toàn tỉnh (FormEngine.Totals), so khác ô với lần trước, ghi lần chạy
 // bất biến + ảnh chụp + chỉ số dashboard. Không có thay đổi → "Dữ liệu đã mới nhất" (không ghi).
-func (s *Service) consolidateTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p store.Period, b store.Batch, templates []uuid.UUID, trigger string,
+//
+// P0-POOL-KN: phiên bản mẫu, khu vực + tên xã lấy từ d (nạp ngoài giao dịch — wantPeriod, txDeps).
+func (s *Service) consolidateTx(ctx context.Context, tx pgx.Tx, d *extDeps, tid uuid.UUID, p store.Period, b store.Batch, templates []uuid.UUID, trigger string,
 	actor uuid.UUID, obo *uuid.UUID, idem string, now time.Time) (consolidateOut, error) {
 	var out consolidateOut
 	if s.Forms == nil {
 		return out, ErrDependency.WithDetail("chưa nối engine mẫu báo cáo (pf/reports)")
 	}
-	nb, err := s.regionNames(ctx, p.ProvinceCode)
+	if err := s.wantPeriod(ctx, tx, d, p, b, templates); err != nil {
+		return out, err
+	}
+	nb, err := d.book(ctx, p.ProvinceCode)
 	if err != nil {
 		return out, err
 	}
@@ -73,14 +78,13 @@ func (s *Service) consolidateTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p
 	if err != nil {
 		return out, err
 	}
-	fc := s.forms(tid)
 	var codes []string
 	cells := 0
 	for _, f := range b.Forms {
 		if templates != nil && !slices.Contains(templates, f.TemplateID) {
 			continue
 		}
-		fi, err := fc.get(ctx, f.VersionID)
+		fi, err := d.form(ctx, f.VersionID)
 		if err != nil {
 			return out, err
 		}
@@ -370,7 +374,9 @@ func (s *Service) Consolidate(ctx context.Context, periodID uuid.UUID, templateI
 	}
 	now := s.now()
 	var c consolidateOut
-	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+	dp := s.newDeps(a.p.TenantID)
+	err = s.txDeps(ctx, a.p.TenantID, dp, func(tx pgx.Tx) error {
+		c = consolidateOut{}
 		p, b, err := s.periodInScope(ctx, tx, a, periodID, true)
 		if err != nil {
 			return err
@@ -379,7 +385,7 @@ func (s *Service) Consolidate(ctx context.Context, periodID uuid.UUID, templateI
 		if len(templateIDs) > 0 {
 			tpls = templateIDs
 		}
-		c, err = s.consolidateTx(ctx, tx, a.p.TenantID, *p, *b, tpls, domain.TriggerManual, a.p.ActorRef, a.onBehalf(), idemOr(idem, "cons"), now)
+		c, err = s.consolidateTx(ctx, tx, dp, a.p.TenantID, *p, *b, tpls, domain.TriggerManual, a.p.ActorRef, a.onBehalf(), idemOr(idem, "cons"), now)
 		return err
 	})
 	if err != nil {

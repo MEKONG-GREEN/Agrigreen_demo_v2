@@ -213,10 +213,15 @@ func (s *Service) ClosePeriod(ctx context.Context, id uuid.UUID, idem string) (P
 	}
 	now := s.now()
 	var cons consolidateOut
-	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+	dp := s.newDeps(a.p.TenantID)
+	err = s.txDeps(ctx, a.p.TenantID, dp, func(tx pgx.Tx) error {
+		cons = consolidateOut{}
 		p, b, err := s.periodInScope(ctx, tx, a, id, true)
 		if err != nil {
 			return err
+		}
+		if err := s.wantPeriod(ctx, tx, dp, *p, *b, nil); err != nil {
+			return err // P0-POOL-KN: hủy trước khi ghi; nạp ngoài giao dịch rồi chạy lại
 		}
 		tasks, err := store.TasksOfPeriod(ctx, tx, id, nil, true)
 		if err != nil {
@@ -237,10 +242,10 @@ func (s *Service) ClosePeriod(ctx context.Context, id uuid.UUID, idem string) (P
 			if len(reopened) == 0 {
 				return problem.Conflict.WithDetail("Kỳ đã chốt")
 			}
-			cons, err = s.reclose(ctx, tx, a.p.TenantID, *p, *b, tasks, reopened, a.p.ActorRef, a.onBehalf(), idemOr(idem, "reclose"), now)
+			cons, err = s.reclose(ctx, tx, dp, a.p.TenantID, *p, *b, tasks, reopened, a.p.ActorRef, a.onBehalf(), idemOr(idem, "reclose"), now)
 			return err
 		}
-		cons, err = s.closeTx(ctx, tx, a.p.TenantID, *p, *b, a.p.ActorRef, a.onBehalf(), "manual", idemOr(idem, "close"), now)
+		cons, err = s.closeTx(ctx, tx, dp, a.p.TenantID, *p, *b, a.p.ActorRef, a.onBehalf(), "manual", idemOr(idem, "close"), now)
 		return err
 	})
 	if err != nil {
@@ -251,7 +256,7 @@ func (s *Service) ClosePeriod(ctx context.Context, id uuid.UUID, idem string) (P
 }
 
 // closeTx chốt kỳ: sổ period_event + chiếu + tổng hợp tự động (Hệ thống) + sự kiện.
-func (s *Service) closeTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p store.Period, b store.Batch, actor uuid.UUID, obo *uuid.UUID, mode, idem string,
+func (s *Service) closeTx(ctx context.Context, tx pgx.Tx, d *extDeps, tid uuid.UUID, p store.Period, b store.Batch, actor uuid.UUID, obo *uuid.UUID, mode, idem string,
 	now time.Time) (consolidateOut, error) {
 	action := "closed"
 	if mode == "auto" {
@@ -266,7 +271,7 @@ func (s *Service) closeTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p store
 		return consolidateOut{}, err
 	}
 	p.Status = "closed"
-	cons, err := s.consolidateTx(ctx, tx, tid, p, b, nil, domain.TriggerSystem, port.SystemActor, nil, idem+":cons", now)
+	cons, err := s.consolidateTx(ctx, tx, d, tid, p, b, nil, domain.TriggerSystem, port.SystemActor, nil, idem+":cons", now)
 	if err != nil {
 		return cons, err
 	}
@@ -279,7 +284,7 @@ func (s *Service) closeTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p store
 }
 
 // reclose chốt lại các xã/biểu đã mở lại, tổng hợp lại (lưu "phiên bản điều chỉnh" = lần tổng hợp mới).
-func (s *Service) reclose(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p store.Period, b store.Batch, tasks []store.Task, ids_ []uuid.UUID,
+func (s *Service) reclose(ctx context.Context, tx pgx.Tx, d *extDeps, tid uuid.UUID, p store.Period, b store.Batch, tasks []store.Task, ids_ []uuid.UUID,
 	actor uuid.UUID, obo *uuid.UUID, idem string, now time.Time) (consolidateOut, error) {
 	var communes []string
 	var tpls []uuid.UUID
@@ -301,7 +306,7 @@ func (s *Service) reclose(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p store
 	if err := store.SetReopened(ctx, tx, ids_, nil, now); err != nil {
 		return consolidateOut{}, err
 	}
-	cons, err := s.consolidateTx(ctx, tx, tid, p, b, tpls, domain.TriggerSystem, port.SystemActor, nil, idem+":cons", now)
+	cons, err := s.consolidateTx(ctx, tx, d, tid, p, b, tpls, domain.TriggerSystem, port.SystemActor, nil, idem+":cons", now)
 	if err != nil {
 		return cons, err
 	}
@@ -343,9 +348,19 @@ func (s *Service) ReopenPeriod(ctx context.Context, id uuid.UUID, in ReopenInput
 	if !until.After(now) || until.After(now.AddDate(0, 0, 30)) {
 		return ReopenResult{}, problem.Validation.WithField("until", "thời hạn mở phải sau hiện tại và không quá 30 ngày")
 	}
+	// P0-POOL-KN: "kỳ đã gửi Chi cục" (pf/reports) đọc TRƯỚC giao dịch — gọi trong giao dịch giữ một kết nối trong khi
+	// cổng pf/reports chờ kết nối thứ hai trên cùng pool. Chỉ dùng khi giao dịch mở lại thành công (kiểm phạm vi kỳ
+	// vẫn trong giao dịch); gửi Chi cục chen giữa hai bước chỉ làm cờ cảnh báo trễ một lần — như gửi ngay sau khi mở lại.
+	dispatchChanged := false
+	if s.Dispatches != nil {
+		if dispatchChanged, err = s.Dispatches.SentForPeriod(ctx, a.p.TenantID, id); err != nil {
+			return ReopenResult{}, err
+		}
+	}
 	var out ReopenResult
 	var evt port.PeriodReopenedV1
 	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+		out = ReopenResult{DispatchChanged: dispatchChanged}
 		p, _, err := s.periodInScope(ctx, tx, a, id, true)
 		if err != nil {
 			return err
@@ -393,11 +408,6 @@ func (s *Service) ReopenPeriod(ctx context.Context, id uuid.UUID, in ReopenInput
 		}
 		if err := s.mirrorForms(ctx, tx, *p, formsport.ActionReopened, formsport.ModeManual, communes, why, a.p.ActorRef, idemOr(idem, "reopen"), now, nil); err != nil {
 			return err // W6.2: cap/forms
-		}
-		if s.Dispatches != nil {
-			if out.DispatchChanged, err = s.Dispatches.SentForPeriod(ctx, a.p.TenantID, p.ID); err != nil {
-				return err
-			}
 		}
 		sort.Strings(communes)
 		sort.Strings(forms)

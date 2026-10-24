@@ -159,11 +159,24 @@ func (s *Service) syncTasks(ctx context.Context, p authz.Principal, k port.Sessi
 	now := s.now()
 	var out []syncport.Change
 	last := after
-	books := map[string]*nameBook{}
-	err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+	dp := s.newDeps(p.TenantID) // P0-POOL-KN: khu vực + tên xã (pf/party) đọc ngoài giao dịch
+	err := s.txDeps(ctx, p.TenantID, dp, func(tx pgx.Tx) error {
+		out, last = nil, after
 		tasks, err := store.TasksChangedSince(ctx, tx, k.Department, communes, after, limit, false)
 		if err != nil {
 			return err
+		}
+		want := map[string][]string{}
+		for _, t := range tasks {
+			want[t.ProvinceCode] = append(want[t.ProvinceCode], t.CommuneCode)
+		}
+		for prov, cs := range want {
+			if err := dp.want(ctx, nil, prov, cs...); err != nil && !errors.Is(err, errNeedDeps) {
+				return err
+			}
+		}
+		if dp.pending() {
+			return errNeedDeps
 		}
 		pids, bids := []uuid.UUID{}, []uuid.UUID{}
 		for _, t := range tasks {
@@ -207,12 +220,9 @@ func (s *Service) syncTasks(ctx context.Context, p authz.Principal, k port.Sessi
 				}
 				provincial[pk] = pv[t.TemplateID]
 			}
-			nb := books[t.ProvinceCode]
-			if nb == nil {
-				if nb, err = s.regionNames(ctx, t.ProvinceCode); err != nil {
-					return err
-				}
-				books[t.ProvinceCode] = nb
+			nb, err := dp.book(ctx, t.ProvinceCode)
+			if err != nil {
+				return err
 			}
 			per := periods[t.PeriodID]
 			v := viewOf(t.Task, per, &b, now)
