@@ -165,10 +165,11 @@ func OpenDeliveries(ctx context.Context, tx pgx.Tx, batch uuid.UUID) ([]domain.D
 	return out, rows.Err()
 }
 
-// FinishDelivery ghi kết quả một lần thử. lastErr chỉ là mã lỗi ngắn, không token.
+// FinishDelivery ghi kết quả một lần thử (finished_at = now, cùng UPDATE với status — mốc của delivery-health).
+// lastErr chỉ là mã lỗi ngắn, không token.
 func FinishDelivery(ctx context.Context, tx pgx.Tx, id uuid.UUID, status string, lastErr *string, now time.Time) error {
 	_, err := tx.Exec(ctx, `UPDATE pf_notify.push_delivery SET status = $2, attempts = attempts + 1, last_error = $3,
-	    sent_at = CASE WHEN $2 = 'sent' THEN $4::timestamptz ELSE sent_at END
+	    finished_at = $4::timestamptz, sent_at = CASE WHEN $2 = 'sent' THEN $4::timestamptz ELSE sent_at END
 	  WHERE id = $1`, id, status, lastErr, now.UTC())
 	return err
 }

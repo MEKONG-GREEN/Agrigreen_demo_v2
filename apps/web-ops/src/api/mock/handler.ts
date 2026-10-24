@@ -53,13 +53,14 @@ import { adminRoutes12 as route42 } from "./legacy-party";
 import { metricsRoutes as route43 } from "./metrics";
 import { mrvAppRoutes as route44 } from "./mrv";
 import { mrvAdminRoutes as route45 } from "./mrv";
-import { opsRoutes as route46 } from "./ops";
-import { orgCreateRoutes as route47 } from "./orgs-create";
-import { rosterRoutes as route48 } from "./roster";
-import { simulationRoutes as route49 } from "./simulation";
-import { syncMonitorRoutes as route50 } from "./syncmonitor";
-import { waterwayAppRoutes as route51 } from "./waterway";
-import { waterwayAdminRoutes as route52 } from "./waterway";
+import { notifyHealthAdminRoutes as route46 } from "./notify-health";
+import { opsRoutes as route47 } from "./ops";
+import { orgCreateRoutes as route48 } from "./orgs-create";
+import { rosterRoutes as route49 } from "./roster";
+import { simulationRoutes as route50 } from "./simulation";
+import { syncMonitorRoutes as route51 } from "./syncmonitor";
+import { waterwayAppRoutes as route52 } from "./waterway";
+import { waterwayAdminRoutes as route53 } from "./waterway";
 
 export const commonRouteRegistrations: RouteRegistration[] = [
   { surface: "admin", order: 13, routes: route0 },
@@ -108,13 +109,14 @@ export const commonRouteRegistrations: RouteRegistration[] = [
   { surface: "app", order: 55, routes: route43 },
   { surface: "app", order: 56, routes: route44 },
   { surface: "admin", order: 21, routes: route45 },
-  { surface: "app", order: 48, routes: route46 },
-  { surface: "admin", order: 14, routes: route47 },
-  { surface: "app", order: 49, routes: route48 },
-  { surface: "app", order: 52, routes: route49 },
-  { surface: "admin", order: 15, routes: route50 },
-  { surface: "app", order: 51, routes: route51 },
-  { surface: "admin", order: 18, routes: route52 },
+  { surface: "admin", order: 24, routes: route46 },
+  { surface: "app", order: 48, routes: route47 },
+  { surface: "admin", order: 14, routes: route48 },
+  { surface: "app", order: 49, routes: route49 },
+  { surface: "app", order: 52, routes: route50 },
+  { surface: "admin", order: 15, routes: route51 },
+  { surface: "app", order: 51, routes: route52 },
+  { surface: "admin", order: 18, routes: route53 },
 ];
 
 const registrations = [...commonRouteRegistrations, ...registeredKnRoutes()];

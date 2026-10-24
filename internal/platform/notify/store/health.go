@@ -10,6 +10,8 @@ import (
 
 // ChannelCounts đếm lần gửi của một kênh (đẩy/email) của tenant từ một mốc — cho GET /v1/notify/delivery-health
 // (P0-NOTIFY-FAILCLOSED). Disabled là số bản gửi "dropped" vì kênh tắt (last_error channel_disabled:<lý do>).
+// LastDisabledAt là thời điểm THỬ của lần bỏ vì kênh tắt gần nhất (finished_at, ghi cùng Finish*Delivery) để so được
+// với LastSentAt (sent_at thật) — không dùng created_at (lúc vào hàng đợi; lô cũ có thể được thử muộn sau khi kênh tắt).
 type ChannelCounts struct {
 	Sent, Failed, Dropped, Pending, Disabled int
 	LastDisabledCode                         *string
@@ -31,10 +33,11 @@ const (
 	    count(*) FILTER (WHERE status = 'dropped' AND last_error LIKE 'channel\_disabled%'),
 	    max(sent_at)
 	  FROM `
-	healthCountsTail = ` WHERE created_at >= $1`
-	healthLastHead   = `SELECT last_error, created_at FROM `
-	healthLastTail   = ` WHERE created_at >= $1 AND status = 'dropped' AND last_error LIKE 'channel\_disabled%'
-	  ORDER BY created_at DESC, id DESC LIMIT 1`
+	// Mốc của một bản gửi: lần thử/kết quả gần nhất; bản chưa thử (pending) hoặc dòng cũ trước cột finished_at → created_at.
+	healthCountsTail = ` WHERE coalesce(finished_at, created_at) >= $1`
+	healthLastHead   = `SELECT last_error, coalesce(finished_at, created_at) FROM `
+	healthLastTail   = ` WHERE coalesce(finished_at, created_at) >= $1 AND status = 'dropped' AND last_error LIKE 'channel\_disabled%'
+	  ORDER BY coalesce(finished_at, created_at) DESC, id DESC LIMIT 1`
 )
 
 // healthSQL: câu truy vấn theo bảng (hằng, ghép lúc biên dịch).
@@ -43,7 +46,8 @@ var healthSQL = map[string][2]string{
 	TableEmailDelivery: {healthCountsHead + TableEmailDelivery + healthCountsTail, healthLastHead + TableEmailDelivery + healthLastTail},
 }
 
-// DeliveryHealth đếm lần gửi của bảng table (TablePushDelivery|TableEmailDelivery) tạo từ since, theo RLS tenant.
+// DeliveryHealth đếm lần gửi của bảng table (TablePushDelivery|TableEmailDelivery) có lần thử (hoặc tạo, nếu chưa thử)
+// từ since, theo RLS tenant.
 func DeliveryHealth(ctx context.Context, tx pgx.Tx, table string, since time.Time) (ChannelCounts, error) {
 	q, ok := healthSQL[table]
 	if !ok {

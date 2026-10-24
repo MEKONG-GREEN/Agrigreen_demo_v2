@@ -12,6 +12,7 @@ import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
 import { deepLinkHref } from "@/lib/deepLink";
 import { formatDateTime } from "@/lib/format";
 import { toApiProblem } from "@/lib/useAsync";
+import { DeliveryHealthBanner } from "@/notify/DeliveryHealthBanner";
 import { announceNotificationsChanged, KIND_LABEL, markAllRead, markRead, relativeTime } from "@/notify/notify";
 
 /** Hộp thư thông báo (pf/notify): chưa đọc/tất cả, đánh dấu đã đọc, mở đúng màn hình theo deep_link. */
@@ -65,6 +66,7 @@ export default function InboxPage() {
           </button>
         }
       />
+      <DeliveryHealthBanner />
       {problem ? <ProblemAlert problem={problem} /> : null}
       <div className="card sec inbox">
         <div className="sec-h">

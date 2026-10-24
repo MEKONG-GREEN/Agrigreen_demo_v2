@@ -1,8 +1,9 @@
 ## P0-NOTIFY-FAILCLOSED — Thông báo không báo "Đã gửi" khi chưa cấu hình SMTP/FCM (#127)
 
 Phạm vi: kênh gửi ra ngoài của pf/notify (email theo người nhận, email tóm tắt, đẩy FCM) và bộ gửi email của pf/reports.
-Không migration (bảng `push_delivery`/`email_delivery` đã có `status = dropped` và `last_error` tự do ≤ 200 ký tự). Ngoại
-lệ làn shared (Claude làm, Codex review chéo).
+Bảng `push_delivery`/`email_delivery` đã có `status = dropped` và `last_error` tự do ≤ 200 ký tự. Một migration chỉ thêm cột
+(`pf/20261024070000_pf_notify_delivery_finished_at`: `finished_at timestamptz NULL` cho cả hai bảng, sau review Codex P2) —
+không đổi dữ liệu, RLS hay quyền. Ngoại lệ làn shared (Claude làm, Codex review chéo).
 
 ### Lựa chọn: kênh TẮT thay vì từ chối khởi động
 
@@ -27,8 +28,15 @@ lệ làn shared (Claude làm, Codex review chéo).
   đếm lần gửi 7 ngày theo trạng thái, `disabled` (bản bị bỏ vì kênh tắt), `status ∈ ok|disabled|failing|idle`,
   `disabled_reason`, `warning` tiếng Việt. Tính từ bản ghi lần gửi của tenant vì api-platform không đọc cấu hình kênh
   của worker; kênh chưa từng có bản gửi → `idle` (cảnh báo cấu hình khi đó ở log khởi động worker).
+- Mốc so sánh là **thời điểm thử/kết quả** (`finished_at`, ghi trong cùng UPDATE của `FinishDelivery`/`FinishEmailDelivery`
+  với `status`/`sent_at`), không phải `created_at`: lô cũ vào hàng đợi trước nhưng được thử SAU khi kênh tắt (thử lại, hàng
+  chờ chậm) vẫn làm kênh `disabled` dù có lô mới hơn đã `sent` trước đó. Dòng cũ chưa có `finished_at` → `created_at`.
+  Cửa sổ 7 ngày cũng tính theo `coalesce(finished_at, created_at)`.
 - Log khởi động worker: `kênh email|push TẮT …` mức WARN kèm lý do.
-- Chưa làm màn web riêng (ngoài phạm vi P0); web có kiểu sinh `adminNotifyDeliveryHealth` để gắn sau.
+- Web-ops: `DeliveryHealthBanner` (`apps/web-ops/src/notify/`) trên trang **Thông báo** (`/thong-bao`) — chỉ với vai trên và
+  đã qua MFA — hiện cảnh báo đỏ theo kênh, vd "Email đang TẮT: chưa cấu hình SMTP — thông báo không được gửi"; kênh
+  `failing` dùng `warning` của máy chủ. Không quyền/lỗi gọi → không hiện (không chặn hộp thư). Mock (`notify-health.ts`)
+  giả lập máy demo: email bình thường, đẩy TẮT `fcm_not_configured`.
 
 ### Giả định / còn mở
 
