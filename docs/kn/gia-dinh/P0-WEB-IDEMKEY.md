@@ -30,7 +30,7 @@ Lệnh ghi do người dùng bấm phải chạy trong phiên thao tác: `act.ru
 
 ### Kiểm thử
 
-`src/api/mock/idempotency-retry.test.ts`: tạo HTX mất phản hồi → bấm lại cùng khóa → phát lại, không 409, đúng một HTX (đối chứng không phiên → 409); 503 → thử lại cùng khóa, thành công → khóa mới; đổi dữ liệu → khóa mới; bấm hai lần liên tiếp → một HTX; `useAction` thật qua renderHook; nộp báo cáo Xã mất phản hồi → lịch sử chỉ thêm một bản; openapi-fetch 503/422/lỗi mạng/ngoài phiên. Sau Codex review: `#129 P1 — form hai lệnh, lệnh thứ hai mất phản hồi…` (lõi) và `#129 P1 — useAction: … A 201, B mất phản hồi → bấm Lưu lại …` (renderHook + openapi-fetch + máy chủ có bảng khóa: mỗi lệnh ghi đúng một lần); `#129 P2 — phản hồi muộn của lần gửi cũ không xóa khóa của lần gửi mới đang chờ`.
+`src/kn/cycle/idempotency-retry.test.ts`: tạo HTX mất phản hồi → bấm lại cùng khóa → phát lại, không 409, đúng một HTX (đối chứng không phiên → 409); 503 → thử lại cùng khóa, thành công → khóa mới; đổi dữ liệu → khóa mới; bấm hai lần liên tiếp → một HTX; `useAction` thật qua renderHook; nộp báo cáo Xã mất phản hồi → lịch sử chỉ thêm một bản; openapi-fetch 503/422/lỗi mạng/ngoài phiên. Sau Codex review: `#129 P1 — form hai lệnh, lệnh thứ hai mất phản hồi…` (lõi) và `#129 P1 — useAction: … A 201, B mất phản hồi → bấm Lưu lại …` (renderHook + openapi-fetch + máy chủ có bảng khóa: mỗi lệnh ghi đúng một lần); `#129 P2 — phản hồi muộn của lần gửi cũ không xóa khóa của lần gửi mới đang chờ`.
 
 ### Xung đột dự kiến với nhánh chưa gộp
 

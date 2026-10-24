@@ -8,10 +8,10 @@ import { ApiProblem } from "@/api/problem";
 import { useIdempotentAction } from "@/api/useIdempotentAction";
 import { createCollectApi, createCycleApi } from "@/kn/cycle/api";
 import { useAction } from "@/kn/cycle/common";
-import { mockFetchNoDelay } from "./handler";
-import { resetMockForms } from "./forms/routes";
-import { resetKnCollect } from "./kn-collect";
-import { resetReportCycle } from "./kn-reports/store";
+import { mockFetchNoDelay } from "@/api/mock/handler";
+import { resetMockForms } from "@/api/mock/forms/routes";
+import { resetKnCollect } from "@/api/mock/kn-collect";
+import { resetReportCycle } from "@/api/mock/kn-reports/store";
 
 type Mode = "pass" | "lost" | "503";
 
