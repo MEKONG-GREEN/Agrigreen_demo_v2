@@ -1,1 +1,1 @@
-- [ ] P0-HTX-KREF (#130): tạo Nút và k_ref cùng giao dịch, RLS đóng khi projection thiếu; 10 hồi quy PG PASS, party và static/runtime đã kiểm; chờ Review OK và full CI xanh trước gộp.
+- [ ] P0-HTX-KREF (#130): tạo Nút và k_ref cùng giao dịch, RLS đóng khi projection thiếu; 10 hồi quy PG và drill tương thích PASS, party và static/runtime đã kiểm; chờ Review OK và full CI xanh trước gộp.
