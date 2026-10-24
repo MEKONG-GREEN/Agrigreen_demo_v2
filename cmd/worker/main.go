@@ -83,7 +83,7 @@
 //	AG_WEB_OPS_URL                     (tùy chọn) URL web-ops cho liên kết tải lại trong email
 //	AG_REPORT_LINK_BASE                URL gốc công khai api-platform (vd https://api.<domain>) cho liên kết tải
 //	                                   báo cáo Chi cục 7 ngày (A4); thiếu → email vượt giới hạn đính kèm ghi "Gửi lỗi"
-//	AG_REPORT_DISPATCH_LEASE           (tùy chọn) hạn nhận việc gửi báo cáo Chi cục, mặc định 15m (P0-WORKER-REPORTS):
+//	AG_REPORT_DISPATCH_LEASE           (tùy chọn) hạn nhận việc gửi báo cáo Chi cục, 3m–24h, mặc định 15m (P0-WORKER-REPORTS):
 //	                                   quá hạn khi còn "Đang gửi" → "Gửi lại" tiếp tục cùng lượt, không gửi lại người đã nhận
 //	AG_RABBITMQ_MGMT_URL               (tùy chọn) management API cho metric độ sâu DLQ
 //	AG_INTEGRATION_CONTRIBUTORS        (W5.3) tenant đóng góp tập tổng hợp của feed cổng tích hợp (job apiclient_feed_build);

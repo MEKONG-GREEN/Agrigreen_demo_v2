@@ -109,6 +109,10 @@ func buildReportsModule(ctx context.Context, log *slog.Logger, pool *pgxpool.Poo
 	if err != nil {
 		return nil, err
 	}
+	// Review #128: consumer gửi Chi cục dùng hạn xử lý mặc định của inbox; hạn nhận việc phải dài hơn hạn đó + biên.
+	if err := reports.ValidateSendLease(lease, inbox.DefaultHandlerTimeout); err != nil {
+		return nil, err
+	}
 	// P0-WORKER-REPORTS (#128): pool THẬT (trước đây nil → panic khi ghi dấu người nhận, giao lại gửi trùng 6 email).
 	return reports.New(pool, clk, reports.Deps{FormSeeds: []repport.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: kn.ReportData(), Orgs: knOrgs, Units: knUnits, Catalogs: md.Catalogs(), Clock: clk}), Catalog: []repport.CatalogRegistration{extension.ReportCatalog()}, Policies: []repport.Policy{extension.ReportPolicy()},
 		ResolveSession: extension.ReportSessionResolver(knOrgs),

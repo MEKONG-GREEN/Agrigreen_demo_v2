@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -51,6 +53,19 @@ func TestReportsWorkerNilDBFailsFast(t *testing.T) {
 	}
 	if d, err := reports.SendLeaseFromEnv(func(string) string { return "" }); err != nil || d.Minutes() != 15 {
 		t.Fatalf("mặc định 15 phút: %v %v", d, err)
+	}
+	// Review #128: hạn nhận việc ngắn hơn hạn xử lý thông điệp của inbox (2m) + biên → SMTP có thể sống quá hạn → từ chối.
+	if _, err := reports.SendLeaseFromEnv(func(string) string { return "1m" }); err == nil {
+		t.Fatal("AG_REPORT_DISPATCH_LEASE=1m (< hạn inbox 2m + biên) phải lỗi khởi động")
+	}
+	if err := reports.ValidateSendLease(2*time.Minute, inbox.DefaultHandlerTimeout); err == nil {
+		t.Fatal("hạn nhận việc 2m = hạn inbox phải lỗi")
+	}
+	if err := reports.ValidateSendLease(5*time.Minute, 4*time.Minute+45*time.Second); err == nil {
+		t.Fatal("hạn nhận việc < hạn xử lý + biên 30s phải lỗi")
+	}
+	if err := reports.ValidateSendLease(3*time.Minute, inbox.DefaultHandlerTimeout); err != nil {
+		t.Fatalf("3m ≥ 2m + 30s phải hợp lệ: %v", err)
 	}
 }
 

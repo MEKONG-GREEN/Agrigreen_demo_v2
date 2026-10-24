@@ -243,6 +243,14 @@ func HasDispatchEvent(ctx context.Context, tx pgx.Tx, dispatchID uuid.UUID, idem
 	return ok, err
 }
 
+// CountDispatchEvents đếm dòng sổ của lần gửi theo action (vd 'sent' = số vòng gửi đã hoàn tất) — đọc mới.
+func CountDispatchEvents(ctx context.Context, tx pgx.Tx, dispatchID uuid.UUID, action string) (int, error) {
+	var n int
+	err := tx.QueryRow(ctx, `SELECT count(*) FROM pf_reports.dispatch_event WHERE dispatch_id = $1::uuid AND action = $2`,
+		dispatchID, action).Scan(&n)
+	return n, err
+}
+
 // SentForPeriod cho biết đã có lần gửi thành công cho kỳ.
 func SentForPeriod(ctx context.Context, tx pgx.Tx, periodID uuid.UUID) (bool, error) {
 	var ok bool

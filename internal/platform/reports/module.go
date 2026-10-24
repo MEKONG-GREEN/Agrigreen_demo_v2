@@ -80,6 +80,12 @@ type Deps struct {
 	DispatchLease time.Duration
 }
 
+// ValidateSendLease kiểm hạn nhận việc gửi Chi cục so với hạn xử lý thông điệp của consumer (lease ≥ hạn + biên) —
+// worker gọi lúc khởi động với inbox.DefaultHandlerTimeout (review #128).
+func ValidateSendLease(lease, handlerTimeout time.Duration) error {
+	return dispatch.ValidateSendLease(lease, handlerTimeout)
+}
+
 // SendLeaseFromEnv đọc hạn nhận việc gửi báo cáo Chi cục (AG_REPORT_DISPATCH_LEASE, mặc định 15m).
 func SendLeaseFromEnv(getenv func(string) string) (time.Duration, error) {
 	return dispatch.SendLeaseFromEnv(getenv)
@@ -152,6 +158,10 @@ func (m *Module) RegisterPublic(rg *gin.RouterGroup) { handler.Handler{Svc: m.sv
 
 // UseMailer nối bộ gửi SMTP (worker: consumer báo cáo Chi cục).
 func (m *Module) UseMailer(ml port.Mailer) { m.svc.Mailer = ml }
+
+// UseDispatchLease đặt hạn nhận việc gửi Chi cục sau khi dựng (kiểm thử hạn ngắn; vận hành dùng Deps.DispatchLease đã qua
+// SendLeaseFromEnv/ValidateSendLease).
+func (m *Module) UseDispatchLease(d time.Duration) { m.svc.DispatchLease = d }
 
 // DispatchHandler là inbox.Handler cho pf.reports.dispatch.requested (consumer port.DispatchConsumer).
 func (m *Module) DispatchHandler() inbox.Handler { return m.svc.HandleDispatchRequested }

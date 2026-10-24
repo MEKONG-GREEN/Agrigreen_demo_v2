@@ -3,6 +3,7 @@ package kn77_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"sync"
 	"testing"
@@ -219,5 +220,179 @@ func TestP0WorkerReports_StaleSendingResumes(t *testing.T) {
 	if n := f.count(`SELECT count(*) FROM pf_reports.dispatch_event WHERE tenant_id = $1 AND dispatch_id::text = $2 AND action = 'send_requested'
 	    AND payload->>'resumed' = 'true'`, f.tenant, did); n != 1 {
 		t.Fatalf("sổ ghi lần tiếp tục: %d", n)
+	}
+}
+
+// flakyMailer: SMTP từ chối lần đầu gửi tới failOnce; block: lần đầu gửi tới địa chỉ này thì báo entered rồi giữ tới khi
+// release hoặc ctx hết hạn (SMTP thật tôn trọng deadline của ctx); ignoreCtx: giữ tới release bất kể ctx (thư viện SMTP xấu).
+// Chỉ lời gọi trả nil được đếm (SMTP đã chấp nhận).
+type flakyMailer struct {
+	mu        sync.Mutex
+	n         map[string]int
+	failOnce  string
+	block     string
+	ignoreCtx bool
+	entered   chan struct{}
+	release   chan struct{}
+}
+
+func (m *flakyMailer) Send(ctx context.Context, msg repport.Message) error {
+	m.mu.Lock()
+	if m.failOnce != "" && msg.To == m.failOnce {
+		m.failOnce = ""
+		m.mu.Unlock()
+		return errors.New("550 hộp thư tạm từ chối")
+	}
+	blk := m.block != "" && msg.To == m.block
+	if blk {
+		m.block = ""
+	}
+	m.mu.Unlock()
+	if blk {
+		close(m.entered)
+		if m.ignoreCtx {
+			<-m.release
+		} else {
+			select {
+			case <-m.release:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.n[msg.To]++
+	return nil
+}
+
+func (m *flakyMailer) count(addr string) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.n[addr]
+}
+
+// TestP0WorkerReports_PartialFailureRetryKeepsMailed — #128 review [P1]: người 1 nhận, SMTP từ chối người 2 → "Gửi lỗi";
+// "Gửi lại" cùng danh sách (lượt attempts mới) tiếp tục VÒNG GỬI cũ: chỉ người 2 được gửi, người 1 không nhận lần hai.
+// Sau khi đã "sent", "Gửi lại" là vòng mới chủ động → mọi người nhận lại.
+func TestP0WorkerReports_PartialFailureRetryKeepsMailed(t *testing.T) {
+	c := setupCycle(t)
+	f := c.f
+	did, rids := dispatchWithTwoRecipients(t, c)
+	m := &flakyMailer{n: map[string]int{}, failOnce: claimAddr2}
+	f.rep.UseMailer(m)
+	c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusAccepted, "gửi email")
+	evs := f.events(repport.EventDispatchRequested)
+	if err := deliver(f, evs[len(evs)-1]); err != nil {
+		t.Fatal(err)
+	}
+	if m.count(claimAddr1) != 1 || m.count(claimAddr2) != 0 {
+		t.Fatalf("lượt 1: %v", m.n)
+	}
+	if n := f.count(`SELECT count(*) FROM pf_reports.dispatch WHERE tenant_id = $1 AND id::text = $2 AND status = 'failed'`, f.tenant, did); n != 1 {
+		t.Fatal("lượt 1 phải Gửi lỗi")
+	}
+	c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusAccepted, "gửi lại")
+	evs = f.events(repport.EventDispatchRequested)
+	if err := deliver(f, evs[len(evs)-1]); err != nil {
+		t.Fatal(err)
+	}
+	if m.count(claimAddr1) != 1 || m.count(claimAddr2) != 1 {
+		t.Fatalf("gửi lại sau lỗi một phần gửi trùng người đã nhận: %v", m.n)
+	}
+	if n := f.count(`SELECT count(*) FROM pf_reports.dispatch WHERE tenant_id = $1 AND id::text = $2 AND status = 'sent' AND attempts = 2`,
+		f.tenant, did); n != 1 {
+		t.Fatal("trạng thái sent ở lượt 2")
+	}
+	// Vòng mới chủ động sau khi đã gửi xong → gửi lại cho mọi người.
+	c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusAccepted, "gửi vòng mới")
+	evs = f.events(repport.EventDispatchRequested)
+	if err := deliver(f, evs[len(evs)-1]); err != nil {
+		t.Fatal(err)
+	}
+	if m.count(claimAddr1) != 2 || m.count(claimAddr2) != 2 {
+		t.Fatalf("vòng mới phải gửi mọi người: %v", m.n)
+	}
+}
+
+// TestP0WorkerReports_LeaseExpiryDuringSMTPSendsOnce — #128 review [P1]: worker A giữ việc và treo trong SMTP của người 1;
+// hạn nhận việc (2s) trôi qua → B được nhận lại. Lời gọi SMTP của A phải bị cắt trước khi hạn hết (deadline < hạn − biên)
+// nên chỉ một lời gọi SMTP thành công tới người 1.
+func TestP0WorkerReports_LeaseExpiryDuringSMTPSendsOnce(t *testing.T) {
+	c := setupCycle(t)
+	f := c.f
+	did, rids := dispatchWithTwoRecipients(t, c)
+	const lease = 2 * time.Second
+	f.rep.UseDispatchLease(lease)
+	m := &flakyMailer{n: map[string]int{}, block: claimAddr1, entered: make(chan struct{}), release: make(chan struct{})}
+	f.rep.UseMailer(m)
+	c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusAccepted, "gửi email")
+	evs := f.events(repport.EventDispatchRequested)
+	errA := make(chan error, 1)
+	go func() { errA <- deliver(f, evs[len(evs)-1]) }()
+	<-m.entered
+	aDone := false
+	select {
+	case err := <-errA:
+		aDone = true
+		if err != nil {
+			t.Fatalf("worker A: %v", err)
+		}
+	case <-time.After(lease + 500*time.Millisecond):
+	}
+	f.setClock(f.clk.Now().Add(lease + time.Second))
+	c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusAccepted, "gửi lại sau hạn")
+	evs = f.events(repport.EventDispatchRequested)
+	if err := deliver(f, evs[len(evs)-1]); err != nil {
+		t.Fatalf("worker B: %v", err)
+	}
+	close(m.release)
+	if !aDone {
+		if err := <-errA; err != nil {
+			t.Logf("worker A kết thúc muộn: %v", err)
+		}
+	}
+	if m.count(claimAddr1) != 1 || m.count(claimAddr2) != 1 {
+		t.Fatalf("SMTP thành công tới người 1 phải đúng một lần: %v", m.n)
+	}
+	if n := f.count(`SELECT count(*) FROM pf_reports.dispatch WHERE tenant_id = $1 AND id::text = $2 AND status = 'sent' AND claim_token IS NULL`,
+		f.tenant, did); n != 1 {
+		t.Fatal("trạng thái sent, đã nhả việc")
+	}
+}
+
+// TestP0WorkerReports_LateFinisherMarkTolerated — #128 review [P1]: thư viện SMTP bỏ qua deadline (trường hợp xấu nhất)
+// → A gửi xong sau khi B đã gửi và ghi dấu. Ghi dấu muộn của A gặp idem đã có (23505) → coi là đã ghi (ghi log trùng),
+// handler không lỗi (không NACK/giao lại vô ích), sổ chỉ một dấu cho người 1.
+func TestP0WorkerReports_LateFinisherMarkTolerated(t *testing.T) {
+	c := setupCycle(t)
+	f := c.f
+	did, rids := dispatchWithTwoRecipients(t, c)
+	const lease = 2 * time.Second
+	f.rep.UseDispatchLease(lease)
+	m := &flakyMailer{n: map[string]int{}, block: claimAddr1, ignoreCtx: true, entered: make(chan struct{}), release: make(chan struct{})}
+	f.rep.UseMailer(m)
+	c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusAccepted, "gửi email")
+	evs := f.events(repport.EventDispatchRequested)
+	errA := make(chan error, 1)
+	go func() { errA <- deliver(f, evs[len(evs)-1]) }()
+	<-m.entered
+	f.setClock(f.clk.Now().Add(lease + time.Second))
+	c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusAccepted, "gửi lại sau hạn")
+	evs = f.events(repport.EventDispatchRequested)
+	if err := deliver(f, evs[len(evs)-1]); err != nil {
+		t.Fatalf("worker B: %v", err)
+	}
+	close(m.release)
+	if err := <-errA; err != nil {
+		t.Fatalf("worker A ghi dấu muộn phải dung thứ dấu đã có: %v", err)
+	}
+	if n := f.count(`SELECT count(*) FROM pf_reports.dispatch_event WHERE tenant_id = $1 AND dispatch_id::text = $2 AND action = 'recipient_mailed'`,
+		f.tenant, did); n != 2 {
+		t.Fatalf("dấu recipient_mailed: %d", n)
+	}
+	if n := f.count(`SELECT count(*) FROM pf_reports.dispatch WHERE tenant_id = $1 AND id::text = $2 AND status = 'sent' AND claim_token IS NULL`,
+		f.tenant, did); n != 1 {
+		t.Fatal("trạng thái sent do B ghi")
 	}
 }
