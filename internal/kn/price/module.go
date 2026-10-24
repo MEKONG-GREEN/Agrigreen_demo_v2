@@ -28,7 +28,7 @@
 // PointLines, PublishedBetween); sự kiện pf.price.ticket.proxied (nhập thay → cán bộ Xã); xuất qua điểm kiểm soát xuất
 // (UseEgress).
 //
-// W11.78 (pf 20261020161354): điều tra giá thành sản xuất theo vụ — đợt, nhập tệp hai bước (xem trước → ghi nhận, chống
+// W11.78 (pf 20261024091116): điều tra giá thành sản xuất theo vụ — đợt, nhập tệp hai bước (xem trước → ghi nhận, chống
 // trùng), rà soát + cờ CT-06, chốt đợt, báo cáo giá thành (CT-05); họ tên, SĐT nông hộ / cán bộ điều tra ở kho định danh
 // (UseSurvey, cổng dữ liệu thật port.EnvSurveyPII — chờ DPIA Q-005).
 //

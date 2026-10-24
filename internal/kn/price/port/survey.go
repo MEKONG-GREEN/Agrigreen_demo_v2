@@ -1,6 +1,6 @@
 package port
 
-// Điều tra giá thành sản xuất theo vụ (W11.78, pf 20261020161354; BRD Báo giá v1.3 FN-TI-02.10…02.12, FN-TW-01.04).
+// Điều tra giá thành sản xuất theo vụ (W11.78, pf 20261024091116; BRD Báo giá v1.3 FN-TI-02.10…02.12, FN-TW-01.04).
 // Họ tên, SĐT nông hộ và cán bộ điều tra ở kho định danh (mục đích SurveyPurpose — R-04, R-42); pf_price chỉ giữ mã chủ thể.
 
 import (

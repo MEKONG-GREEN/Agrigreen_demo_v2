@@ -1,6 +1,6 @@
 package app
 
-// Điều tra giá thành sản xuất theo vụ — đợt điều tra (W11.78, pf 20261020161354; BRD Báo giá v1.3 FN-TI-02.10, Mục II.3
+// Điều tra giá thành sản xuất theo vụ — đợt điều tra (W11.78, pf 20261024091116; BRD Báo giá v1.3 FN-TI-02.10, Mục II.3
 // bảng 3.4):
 //   - Cấp Tỉnh tạo / sửa / mở / đóng sớm / gia hạn đợt; Quản trị nghiệp vụ mở lại đợt đã chốt (lý do bắt buộc); Admin chỉ
 //     xem (ma trận phân quyền Mục V.2). Cấp TW, Cấp Xã không vào màn đợt.

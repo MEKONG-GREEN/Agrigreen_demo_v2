@@ -27,7 +27,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// Điều tra giá thành W11.78 (pf 20261020161354; BRD Báo giá v1.3 FN-TI-02.10…02.12, FN-TW-01.04) qua HTTP. Mỗi kiểm thử
+// Điều tra giá thành W11.78 (pf 20261024091116; BRD Báo giá v1.3 FN-TI-02.10…02.12, FN-TW-01.04) qua HTTP. Mỗi kiểm thử
 // một tenant mới: ba xã (Núi Cấm, An Châu — nhóm vùng An Giang; Hà Tiên — Kiên Giang), bốn mặt hàng (Dưa leo Loại 1, Mít
 // Thái, Lúa OM 18, Xoài keo), kho định danh giả (họ tên, SĐT nông hộ / cán bộ điều tra không vào pf_price).
 

@@ -1,6 +1,6 @@
 package handler
 
-// HTTP điều tra giá thành sản xuất theo vụ (W11.78, pf 20261020161354; BRD Báo giá v1.3 FN-TI-02.10…02.12, FN-TW-01.04) —
+// HTTP điều tra giá thành sản xuất theo vụ (W11.78, pf 20261024091116; BRD Báo giá v1.3 FN-TI-02.10…02.12, FN-TW-01.04) —
 // Application API /v1/price/surveys/*, /v1/price/survey-report*. Hợp đồng ở contracts/openapi/modules/price/application.yaml
 // mục W11.78. Tiền, % là chuỗi decimal. Họ tên, SĐT chỉ có ở phản hồi cho Cấp Tỉnh, Admin.
 

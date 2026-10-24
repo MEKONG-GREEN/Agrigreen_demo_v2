@@ -1,6 +1,6 @@
 package store
 
-// SQL của điều tra giá thành (W11.78, pf 20261020161354): đợt, xã điều tra, cán bộ điều tra, phiếu, lần nhập + dòng lỗi,
+// SQL của điều tra giá thành (W11.78, pf 20261024091116): đợt, xã điều tra, cán bộ điều tra, phiếu, lần nhập + dòng lỗi,
 // bảng từ đồng nghĩa. Sổ chỉ ghi thêm — phiên bản hiện hành = seq lớn nhất của chuỗi. Số qua text ↔ decimal (R-CODE-01).
 
 import (
