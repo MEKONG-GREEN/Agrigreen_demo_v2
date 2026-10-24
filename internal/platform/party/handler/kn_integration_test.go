@@ -400,8 +400,14 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 		!slices.Equal(groupKeys(r), []string{"dieu_hanh", "bao_cao", "du_lieu", "dung_chung"}) {
 		t.Fatalf("menu phòng ban vừa bật (CNTS Cấp Xã theo UP-03, kn.menu/v6): %d %v", r.status, r.body)
 	}
-	// Mục của module chưa có: "Sắp có", không bấm được.
-	if raw, _ := json.Marshal(r.body); !strings.Contains(string(raw), `"status":"coming_soon","status_label":"Sắp có"`) {
+	// Mục của module chưa có: "Sắp có", không bấm được. Từ W11.54 CNTS Cấp Xã không còn mục Sắp có (nhật ký W11.48, bản đồ
+	// W11.52, Quy trình, văn bản W11.54) → kiểm ở CNTS Cấp Tỉnh (Thiết kế biểu mẫu, Tạo chiến dịch… còn Sắp có).
+	if raw, _ := json.Marshal(r.body); strings.Contains(string(raw), `"status":"coming_soon"`) {
+		t.Fatalf("CNTS Cấp Xã còn mục Sắp có: %s", raw)
+	}
+	if rt := tinh.appDo(http.MethodGet, "/v1/menu?department=chan_nuoi_thuy_san", nil); rt.status != http.StatusOK {
+		t.Fatalf("menu CNTS Cấp Tỉnh: %d %v", rt.status, rt.body)
+	} else if raw, _ := json.Marshal(rt.body); !strings.Contains(string(raw), `"status":"coming_soon","status_label":"Sắp có"`) {
 		t.Fatalf("mục Sắp có: %s", raw)
 	}
 	// W11.42 + BF-MENU (#98): "Việc cần làm" (màn Báo cáo kỳ CNTS) của Cấp Xã đã mở.
