@@ -8,7 +8,7 @@ Toàn bộ nền tảng trên **một** máy bằng Docker Compose: `deploy/comp
 |---|---|
 | Dữ liệu | Mặc định `AG_ENV=staging`, chỉ dùng **dữ liệu tổng hợp** (`cmd/seed-synthetic`). Dữ liệu thật cần rà soát bảo mật riêng, `AG_ENV=production` và bản sao lưu đặt ngoài VPS. |
 | RB-7 | VPS phải ở trung tâm dữ liệu trong nước. Không đặt S3, sao lưu hay giám sát ở nhà cung cấp nước ngoài. |
-| Cấu hình | Tối thiểu 4 vCPU, 12 GB RAM, 80 GB SSD cho toàn bộ stack; dành RAM riêng lúc build. Hạn mức runtime của từng container nằm trong file VPS (tổng cap không phải mức dùng thường trực). Build image lần đầu trên máy 4 vCPU mất khoảng 15–20 phút. |
+| Cấu hình | Baseline 4 vCPU, 8 GB RAM, 80 GB SSD; cần đo RSS và tải trên VPS thật trước UAT, đây chưa phải cấu hình đã nghiệm thu. Dành RAM riêng lúc build. Hạn mức runtime của từng container nằm trong file VPS; tổng cap không phải mức dùng thường trực hoặc mức RAM đặt trước. Build image lần đầu trên máy 4 vCPU mất khoảng 15–20 phút. |
 | Hệ điều hành | Ubuntu 24.04 LTS. |
 | Tên miền | Năm bản ghi A trỏ về IP của VPS: `app.`, `api.`, `auth.`, `admin.`, `files.` + `<domain>`. |
 | IP quản trị | Một hoặc nhiều CIDR (IP văn phòng, VPN). Chỉ các IP này vào được `admin.<domain>` và `/admin` của Keycloak. |
@@ -140,7 +140,7 @@ Gắn tài khoản vào `org_ref` vừa tạo qua Admin API/Keycloak theo quy tr
 
 ### 5.2 Bằng chứng kiểm thật
 
-Workflow [vps-p0-smoke.yml](../../.github/workflows/vps-p0-smoke.yml) chạy `AG_P0_SMOKE_DISPOSABLE=1 sh scripts/test-vps-p0.sh` trên Linux có Docker. Nó dựng project/volume riêng, kiểm merged Compose/resource caps, Keycloak password+TOTP thật và claim AMR, bootstrap qua Admin API với hình **tổng hợp chỉ-CI**, hết hạn khóa tạm (probe 2 giây rồi phục hồi chính sách 900 giây), form quên mật khẩu gửi vào Mailpit và S3 ký host công khai qua Caddy thật. SMTP/FCM chỉ-CI không đi ra nhà cung cấp. Thiếu Docker hoặc lệnh hỏng không được ghi PASS; không dùng overlay `docker-compose.vps-smoke.yml` trên VPS thật.
+Workflow [vps-p0-smoke.yml](../../.github/workflows/vps-p0-smoke.yml) chạy `AG_P0_SMOKE_DISPOSABLE=1 sh scripts/test-vps-p0.sh` trên Linux có Docker. Nó dựng project/volume riêng, kiểm merged Compose/resource caps, Keycloak password+TOTP thật và claim AMR, bootstrap qua Admin API với hình **tổng hợp chỉ-CI**, hết hạn khóa tạm (probe 2 giây rồi phục hồi chính sách 900 giây), đổi mật khẩu qua email Mailpit (mật khẩu cũ bị từ chối, credential OTP giữ nguyên, mật khẩu mới vẫn cần OTP để có quyền Admin) và S3 ký host công khai qua Caddy thật. SMTP/FCM chỉ-CI không đi ra nhà cung cấp. Thiếu Docker hoặc lệnh hỏng không được ghi PASS; không dùng overlay `docker-compose.vps-smoke.yml` trên VPS thật.
 
 Smoke này không thay nghiệm thu SMTP/FCM công vụ, DNS/TLS công khai, dữ liệu ranh giới thật và tải 500 CCU trên VPS. Ghi URL run CI và kết quả kiểm môi trường đích vào ticket #131 trước khi chốt; không đính kèm bí mật, token hoặc email reset.
 
