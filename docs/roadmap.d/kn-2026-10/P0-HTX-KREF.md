@@ -1,1 +1,1 @@
-- [ ] P0-HTX-KREF (#130): nguồn và k_ref cùng giao dịch, RLS đóng khi projection thiếu. Kiểm riêng tạo HTX/RLS/member đạt; đang sửa hồi quy plot/season và chờ context KN #145. Full CI ứng viên080c FAIL, chưa ready lại; chỉ gộp sau Review OK SHA cuối và CI xanh.
+- [ ] P0-HTX-KREF (#130): nguồn/k_ref cùng transaction, RLS fail-closed, native boundary và tombstone một snapshot đã kiểm; plot54, migration7 và P0/drill11 ca chính PASS, không test SKIP. Member/season kiểm riêng đạt. Chờ Claude Review OK SHA cuối và full CI xanh sau các ticket KN/web đang chặn; chưa gộp.
