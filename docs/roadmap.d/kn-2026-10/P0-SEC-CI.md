@@ -1,0 +1,1 @@
+- [ ] P0-SEC-CI (#132, 24/10/2026): CI dev/PR, Go 1.26.10, Excelize vá và image PostgreSQL/backup nonroot + HEALTHCHECK; chờ kiểm scanner, hồi quy consumer và Linux Docker thật cùng Review OK trước dev. [Chi tiết](../../dev/p0-sec-ci.md).

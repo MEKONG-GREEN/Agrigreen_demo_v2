@@ -4,8 +4,9 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
+    branches: [main, dev]
   # Chạy tay (ví dụ kiểm thử tích hợp app hiện trường trên emulator).
   workflow_dispatch:
 
@@ -800,16 +801,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Quet de BAO CAO, khong chan. Anh nay dua tren postgis/postgis:17-3.5;
-      # mot CVE chua co ban va o anh goc ma chan luon thi ca duong ong deploy
-      # thanh con tin cua thuong nguon. Khi doi ngu da quen thi doi exit-code
-      # thanh "1" cho khop voi job images san co.
-      - name: Trivy - quet anh (bao cao, khong chan)
+      # Cùng cổng CRITICAL/HIGH như mọi image khác; không đẩy dev khi quét đỏ.
+      - name: Trivy - quet anh (chan khi co ban va)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/agrigreen-postgres:${{ github.sha }}
           severity: "CRITICAL,HIGH"
-          exit-code: "0"
+          exit-code: "1"
           ignore-unfixed: true
 
   # ---------- Anh web-ops: ten mien duoc NHUNG LUC BUILD ------------------
