@@ -34,7 +34,7 @@ setvar ACME_EMAIL "$email"
 setvar ADMIN_ALLOW_CIDR "'$cidr'"
 
 out="$root/deploy/compose/.vps/keycloak"
-mkdir -p "$out"
+mkdir -p "$out" "$root/deploy/compose/.vps/notify"
 sed -e "s#http://localhost:3000#https://app.$domain#g" \
     -e "s#http://127.0.0.1:3000#https://app.$domain#g" \
     -e "s#http://localhost:8082#https://admin.$domain#g" \
@@ -62,4 +62,4 @@ chmod 755 "$root/deploy/compose/.vps" "$out"
 chmod 644 "$out/agrigreen-realm.json" "$out/agrigreen-kn-admin-realm.json"
 
 echo "Xong: $envf (đã thêm biến VPS), $out/agrigreen-realm.json, $out/agrigreen-kn-admin-realm.json"
-echo "Cần bản ghi DNS A: app.$domain api.$domain auth.$domain admin.$domain → IP của VPS"
+echo "Cần bản ghi DNS A: app.$domain api.$domain auth.$domain admin.$domain files.$domain → IP của VPS"

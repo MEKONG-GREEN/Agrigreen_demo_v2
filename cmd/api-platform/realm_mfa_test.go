@@ -170,7 +170,7 @@ func TestAdminRealmPasswordPolicy_D24(t *testing.T) {
 			t.Errorf("realm quản trị: chính sách mật khẩu thiếu %s (%q)", p, realm.PasswordPolicy)
 		}
 	}
-	if realm.RegistrationAllowed || !realm.BruteForceProtected || realm.FailureFactor != 5 || !realm.PermanentLockout || realm.MaxTemporaryLockouts != 3 {
+	if realm.RegistrationAllowed || !realm.BruteForceProtected || realm.FailureFactor != 5 || realm.PermanentLockout || realm.MaxTemporaryLockouts != 0 || !realm.ResetPasswordAllowed {
 		t.Errorf("realm quản trị: chống dò/đăng ký: đăng ký=%v chống dò=%v sai=%d khóa hẳn=%v khóa tạm=%d",
 			realm.RegistrationAllowed, realm.BruteForceProtected, realm.FailureFactor, realm.PermanentLockout, realm.MaxTemporaryLockouts)
 	}

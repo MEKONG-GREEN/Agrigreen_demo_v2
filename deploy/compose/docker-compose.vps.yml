@@ -18,6 +18,34 @@ x-vps-env: &vps-env
   AG_ENV: ${AG_ENV:-staging}
   # Chỉ có hiệu lực khi AG_ENV=production: mọi đích phải thuộc tên miền của mình hoặc dịch vụ nội bộ.
   AG_RESIDENCY_ALLOWLIST: ${AG_DOMAIN:?chạy deploy/vps/prepare.sh},single-label
+  # I/O trong mạng Compose; chữ ký GET ràng buộc host mà trình duyệt truy cập.
+  AG_S3_PUBLIC_ENDPOINT: files.${AG_DOMAIN}
+  AG_S3_PUBLIC_USE_TLS: "true"
+  AG_S3_REGION: ${AG_S3_REGION:-us-east-1}
+
+# Cấu hình tại .env trên VPS; không đưa giá trị bí mật vào tệp được theo dõi.
+x-vps-notify: &vps-notify
+  AG_SMTP_HOST: ${AG_SMTP_HOST:-}
+  AG_SMTP_PORT: ${AG_SMTP_PORT:-587}
+  AG_SMTP_USERNAME: ${AG_SMTP_USERNAME:-}
+  AG_SMTP_PASSWORD: ${AG_SMTP_PASSWORD:-}
+  AG_SMTP_FROM: ${AG_SMTP_FROM:-}
+  AG_SMTP_TLS: ${AG_SMTP_TLS:-starttls}
+  AG_SMTP_ALLOW_PLAIN: "false"
+  AG_SMTP_DIGEST_TO: ${AG_SMTP_DIGEST_TO:-}
+  AG_FCM_PROJECT_ID: ${AG_FCM_PROJECT_ID:-}
+  AG_FCM_CREDENTIALS_FILE: ${AG_FCM_CREDENTIALS_FILE:-}
+  AG_FCM_ENDPOINT: ${AG_FCM_ENDPOINT:-https://fcm.googleapis.com}
+  AG_FCM_TOKEN_URL: ${AG_FCM_TOKEN_URL:-https://oauth2.googleapis.com/token}
+  AG_WEB_OPS_URL: https://app.${AG_DOMAIN}
+  AG_REPORT_LINK_BASE: https://api.${AG_DOMAIN}
+
+x-vps-notify-files: &vps-notify-files
+  - type: bind
+    source: ./.vps/notify
+    target: /run/secrets/notify
+    read_only: true
+    bind: { create_host_path: false }
 
 x-vps-oidc: &vps-oidc
   AG_OIDC_ISSUER: https://auth.${AG_DOMAIN}/realms/agrigreen
@@ -35,6 +63,8 @@ x-vps-proxy: &vps-proxy
 
 services:
   caddy:
+    mem_limit: 128m
+    cpus: "0.50"
     image: caddy:2.10-alpine
     depends_on:
       web-ops: { condition: service_started }
@@ -57,6 +87,8 @@ services:
 
   # Một lần: tạo vai + database cho Keycloak (idempotent).
   kc-db-init:
+    mem_limit: 128m
+    cpus: "0.50"
     image: postgis/postgis:17-3.5
     depends_on:
       postgres: { condition: service_healthy }
@@ -79,6 +111,8 @@ services:
     restart: "no"
 
   keycloak:
+    mem_limit: 1536m
+    cpus: "2.00"
     command: ["start", "--import-realm"]
     depends_on:
       kc-db-init: { condition: service_completed_successfully }
@@ -87,6 +121,15 @@ services:
       KC_HTTP_ENABLED: "true"          # TLS kết thúc ở Caddy
       KC_PROXY_HEADERS: xforwarded
       KC_PROXY_TRUSTED_ADDRESSES: ${AG_VPS_CADDY_IP:-172.30.10.10}  # chỉ tin X-Forwarded-* từ Caddy (M12)
+      JAVA_OPTS_KC_HEAP: "-Xms256m -Xmx768m"
+      AG_SMTP_HOST: ${AG_SMTP_HOST:-}
+      AG_SMTP_PORT: ${AG_SMTP_PORT:-587}
+      AG_SMTP_FROM: ${AG_SMTP_FROM:-}
+      AG_SMTP_USERNAME: ${AG_SMTP_USERNAME:-}
+      AG_SMTP_PASSWORD: ${AG_SMTP_PASSWORD:-}
+      AG_KC_SMTP_AUTH: ${AG_KC_SMTP_AUTH:-true}
+      AG_KC_SMTP_STARTTLS: ${AG_KC_SMTP_STARTTLS:-true}
+      AG_KC_SMTP_SSL: ${AG_KC_SMTP_SSL:-false}
       KC_CACHE: local                  # một node: không lập cụm JGroups
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
@@ -102,6 +145,8 @@ services:
   # đặt AG_VAULT_KMS=<nhà cung cấp> và BỎ AG_VAULT_ALLOW_LOCAL_KMS. Trong lúc chờ: kho ghi cảnh báo
   # event=security.kms_software lúc khởi động, /readyz trả kms_local=1, metric ag_vault_kms_software=1.
   identity-vault:
+    mem_limit: 256m
+    cpus: "1.00"
     environment:
       <<: [*vps-env, *vps-oidc]
       AG_VAULT_ALLOW_PLAINTEXT: "1"
@@ -110,8 +155,10 @@ services:
   # Listener Internal :8084 (mTLS, optimizer) vẫn chỉ trong mạng compose — Caddy không định
   # tuyến tới, không publish. Chứng thư dev do prepare.sh → gen-dev-secrets → gen-dev-certs sinh.
   api-platform:
+    mem_limit: 768m
+    cpus: "2.00"
     environment:
-      <<: [*vps-env, *vps-oidc, *vps-proxy]
+      <<: [*vps-env, *vps-oidc, *vps-proxy, *vps-notify]
       AG_CORS_ORIGINS: https://app.${AG_DOMAIN}
       AG_KC_ACTIONS_REDIRECT_URI: https://app.${AG_DOMAIN}/
       # Cờ DEMO bỏ kiểm amr ở Admin API (authz.DemoMFABypassAllowed). Mặc định TẮT ở file dùng chung này: chỉ máy
@@ -121,17 +168,25 @@ services:
       AG_MFA_DISABLED: ${AG_MFA_DISABLED:-0}
       AG_DEPLOY_ENV: ${AG_DEPLOY_ENV:-}
 
+    volumes: *vps-notify-files
+
   # API nội bộ MKG: KHÔNG ra internet (Caddy không định tuyến), chỉ 127.0.0.1 của VPS.
   api-internal:
+    mem_limit: 512m
+    cpus: "1.50"
     environment:
       <<: [*vps-env, *vps-oidc]
 
   outbox-publisher:
+    mem_limit: 256m
+    cpus: "1.00"
     environment:
       <<: *vps-env
 
   # Consumer sự kiện nội bộ MKG (vhost mkg.internal, ADR-0018): không ra internet.
   worker-internal:
+    mem_limit: 384m
+    cpus: "1.00"
     environment:
       <<: *vps-env
 
@@ -141,23 +196,36 @@ services:
   # Chứng thư thiết bị do CA THIẾT BỊ riêng ký CSR của `edge-agent enroll`; AG_INGEST_CLIENT_CA chỉ chứa CA
   # thiết bị (ingest từ chối khởi động nếu CA này ký chứng thư máy chủ — docs/runbooks/device-pki.md).
   ingest:
+    mem_limit: 384m
+    cpus: "1.00"
     environment:
       <<: *vps-env
 
   # Agent biên mô phỏng chỉ dành cho Local/Dev/CI — không chạy trên VPS (bật lại bằng --profile dev-sim).
   edge-sim-init:
+    mem_limit: 128m
+    cpus: "0.50"
     profiles: ["dev-sim"]
   edge-sim-enroll:
+    mem_limit: 128m
+    cpus: "0.50"
     profiles: ["dev-sim"]
   edge-sim:
+    mem_limit: 128m
+    cpus: "0.50"
     profiles: ["dev-sim"]
 
   worker:
+    mem_limit: 512m
+    cpus: "1.50"
+    volumes: *vps-notify-files
     environment:
-      <<: *vps-env
+      <<: [*vps-env, *vps-notify]
       AG_KC_ACTIONS_REDIRECT_URI: https://app.${AG_DOMAIN}/
 
   web-ops:
+    mem_limit: 512m
+    cpus: "1.00"
     build:
       args:
         # Ghi đè dev của docker-compose.yml: bản VPS là production (URL https bắt buộc).
@@ -171,6 +239,58 @@ services:
       NEXT_PUBLIC_API_BASE_URL: https://api.${AG_DOMAIN}
       NEXT_PUBLIC_ADMIN_API_BASE: https://admin.${AG_DOMAIN}
       NEXT_PUBLIC_OIDC_ISSUER: https://auth.${AG_DOMAIN}/realms/agrigreen
+
+
+  # Hạn mức runtime; build image cần RAM riêng và không nằm trong các cap này.
+  postgres:
+    mem_limit: 1536m
+    cpus: "2.00"
+  pgbouncer:
+    mem_limit: 128m
+    cpus: "0.50"
+  migrate-bootstrap:
+    mem_limit: 256m
+    cpus: "1.00"
+  migrate-up:
+    mem_limit: 512m
+    cpus: "1.00"
+  rabbitmq:
+    mem_limit: 512m
+    cpus: "1.00"
+  rabbitmq-init:
+    mem_limit: 64m
+    cpus: "0.50"
+  valkey:
+    mem_limit: 128m
+    cpus: "0.50"
+    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "96mb", "--maxmemory-policy", "allkeys-lru"]
+  seaweedfs:
+    mem_limit: 768m
+    cpus: "1.00"
+  s3-init:
+    mem_limit: 256m
+    cpus: "0.50"
+  otel-collector:
+    mem_limit: 192m
+    cpus: "0.50"
+  optimizer:
+    mem_limit: 512m
+    cpus: "1.00"
+  api-public:
+    mem_limit: 256m
+    cpus: "1.00"
+    environment:
+      <<: *vps-env
+  integration-gateway:
+    mem_limit: 256m
+    cpus: "1.00"
+    environment:
+      <<: *vps-env
+  web-internal:
+    mem_limit: 384m
+    cpus: "1.00"
+    # Bề mặt MKG không phục vụ trên VPS KN.
+    profiles: ["mkg-web"]
 
 networks:
   default:

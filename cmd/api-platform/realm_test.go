@@ -69,10 +69,11 @@ func roleConstants(t *testing.T) map[string]string {
 }
 
 type realmFile struct {
-	RegistrationAllowed bool `json:"registrationAllowed"`
-	BruteForceProtected bool `json:"bruteForceProtected"`
-	FailureFactor       int  `json:"failureFactor"`
-	MaxDeltaTimeSeconds int  `json:"maxDeltaTimeSeconds"`
+	RegistrationAllowed  bool `json:"registrationAllowed"`
+	ResetPasswordAllowed bool `json:"resetPasswordAllowed"`
+	BruteForceProtected  bool `json:"bruteForceProtected"`
+	FailureFactor        int  `json:"failureFactor"`
+	MaxDeltaTimeSeconds  int  `json:"maxDeltaTimeSeconds"`
 	// A3 / Q-21: MULTIPLE = khóa ở mỗi bội số failureFactor (5, 10, 15…), không khóa lại ở từng lần sai lẻ.
 	BruteForceStrategy string `json:"bruteForceStrategy"`
 	// KN v7.7 N-10 (thay GIS US-LOG-01 AC-3): khóa TẠM 15 phút, tự mở sau thời gian chờ.
@@ -151,15 +152,12 @@ func TestKeycloakRealmCoversRolesAndClaims(t *testing.T) {
 		t.Errorf("chính sách đăng nhập: đăng ký=%v chống dò=%v sai tối đa=%d cửa sổ=%ds mật khẩu=%q",
 			realm.RegistrationAllowed, realm.BruteForceProtected, realm.FailureFactor, realm.MaxDeltaTimeSeconds, realm.PasswordPolicy)
 	}
-	// KN v7.7 FN-CH-00.01 / N-10 (thay GIS US-LOG-01 AC-3 — BRD v7.7 mới hơn, gap §4.6) + A3/Q-21 (chốt
-	// 03/10/2026): mỗi 5 lần sai → khóa TẠM 15 phút rồi tự mở (chờ 900 s); sau 3 lần khóa tạm trong cửa sổ 24 giờ
-	// → khóa HẲN (permanentLockout = true, maxTemporaryLockouts = 3; Keycloak 26 đặt enabled = false), Admin mở
-	// qua pf/accounts unlock. Tài khoản bị khóa giữ thông báo "liên hệ Admin".
+	// P0-VPS-OPS (PO 24/10): sai 5 lần chỉ khóa tạm 15 phút, không khóa hẳn.
 	const lockedMsg = "Tài khoản đã bị khóa, vui lòng liên hệ Admin để mở khóa."
-	if !realm.PermanentLockout || realm.MaxTemporaryLockouts != 3 || realm.BruteForceStrategy != "MULTIPLE" ||
+	if realm.PermanentLockout || realm.MaxTemporaryLockouts != 0 || !realm.ResetPasswordAllowed || realm.BruteForceStrategy != "MULTIPLE" ||
 		realm.WaitIncrementSeconds != 900 || realm.MaxFailureWaitSeconds != 900 ||
 		realm.LocalizationTexts["vi"]["accountPermanentlyDisabledMessage"] != lockedMsg ||
-		!strings.Contains(realm.LocalizationTexts["vi"]["invalidUserMessage"], "3 lần trong 24 giờ") ||
+		!strings.Contains(realm.LocalizationTexts["vi"]["invalidUserMessage"], "15 phút rồi tự mở") ||
 		!strings.Contains(realm.LocalizationTexts["vi"]["accountTemporarilyDisabledMessage"], "15 phút") ||
 		realm.LocalizationTexts["vi"]["accountDisabledMessage"] != lockedMsg {
 		t.Errorf("KN v7.7 N-10 / A3: permanentLockout=%v maxTemporaryLockouts=%d strategy=%q waitIncrement=%d maxFailureWait=%d thông báo khóa tạm=%q",
