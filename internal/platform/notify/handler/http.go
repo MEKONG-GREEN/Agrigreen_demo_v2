@@ -32,9 +32,20 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/sync/nudge", h.nudge)
 }
 
-// RegisterAdmin gắn route Admin API (MFA): đồng bộ ngay từ web quản trị.
+// RegisterAdmin gắn route Admin API (MFA): đồng bộ ngay từ web quản trị; tình trạng kênh gửi.
 func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.POST("/sync/nudge", h.nudge)
+	rg.GET("/notify/delivery-health", h.deliveryHealth)
+}
+
+// deliveryHealth: tình trạng kênh email/đẩy của tenant (P0-NOTIFY-FAILCLOSED) — kênh tắt có cảnh báo.
+func (h Handler) deliveryHealth(c *gin.Context) {
+	res, err := h.Svc.DeliveryHealth(c.Request.Context())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, res)
 }
 
 func bindJSON(c *gin.Context, v any) bool {

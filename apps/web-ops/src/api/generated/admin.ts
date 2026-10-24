@@ -1820,6 +1820,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notify/delivery-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tình trạng kênh gửi email/đẩy của tenant (P0-NOTIFY-FAILCLOSED) — kênh chưa cấu hình có cảnh báo
+         * @description Đếm lần gửi email/đẩy của tenant người gọi trong window_days ngày từ chính bản ghi lần gửi (pf_notify). Kênh chưa cấu hình (thiếu AG_SMTP_*, AG_FCM_*, AG_WEB_OPS_URL) không giả gửi: bản gửi ghi "dropped" với lý do channel_disabled:<lý do>, status = disabled và warning nêu cấu hình còn thiếu. Vai: admin, kn_province_admin, kn_national_admin, platform_admin.
+         */
+        get: operations["adminNotifyDeliveryHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sync/nudge": {
         parameters: {
             query?: never;
@@ -5421,6 +5441,33 @@ export interface components {
             unit?: string;
             /** @description KN US-SYNC-02: nhóm dữ liệu cần đồng bộ ngay (entity pf/sync); rỗng = tất cả. Thông điệp sync_now mang khóa entities (nối bằng dấu phẩy). */
             entities?: string[];
+        };
+        NotifyChannelHealth: {
+            /**
+             * @description disabled: lần bỏ vì kênh tắt mới hơn lần gửi thành công cuối — email/đẩy KHÔNG được gửi
+             * @enum {string}
+             */
+            status: "ok" | "disabled" | "failing" | "idle";
+            sent: number;
+            failed: number;
+            /** @description Gồm cả bản gửi bị bỏ vì kênh tắt */
+            dropped: number;
+            pending: number;
+            /** @description Bản gửi bị bỏ vì kênh chưa cấu hình (không phải đã gửi) */
+            disabled: number;
+            /** @description smtp_not_configured | link_base_missing | fcm_not_configured | disabled_by_config */
+            disabled_reason: string | null;
+            /** Format: date-time */
+            last_disabled_at: string | null;
+            /** Format: date-time */
+            last_sent_at: string | null;
+            /** @description Cảnh báo tiếng Việt cho quản trị */
+            warning: string | null;
+        };
+        NotifyDeliveryHealth: {
+            window_days: number;
+            email: components["schemas"]["NotifyChannelHealth"];
+            push: components["schemas"]["NotifyChannelHealth"];
         };
         NudgeResult: {
             /** Format: uuid */
@@ -10539,6 +10586,28 @@ export interface operations {
             403: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    adminNotifyDeliveryHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tình trạng kênh email và đẩy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotifyDeliveryHealth"];
+                };
+            };
+            /** @description forbidden | mfa_required */
+            403: components["responses"]["Problem"];
         };
     };
     adminSyncNudge: {
