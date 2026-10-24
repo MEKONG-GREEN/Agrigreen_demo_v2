@@ -51,13 +51,23 @@ type fixture struct {
 	admin      *pgxpool.Pool
 	native     *cooperative.Module
 	tid, other uuid.UUID
+	// knTree seeds the primary tenant as the production G1 custodial tree:
+	// TTKN national 906 -> TTKN province 901 (89) -> extension team 903 (89001)
+	// -> HTX 101/102/104; 906 -> TTKN province 902 (92) -> HTX 103; HTX 105
+	// standalone. This is the parent rule of party CreateKNCooperative (commune
+	// team, else TTKN province) and of cmd/seed-synthetic. Only pf_party.org
+	// source rows are written; k_ref org and closure come solely from the #130
+	// source INSERT trigger.
+	knTree bool
 }
 
-func newFixture(t *testing.T) *fixture {
+func newFixture(t *testing.T) *fixture { return newFixtureWith(t, false) }
+
+func newFixtureWith(t *testing.T, knTree bool) *fixture {
 	env := pgtest.Get(t)
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	directory := party.New(pool, clock.System{}).OrgDirectory()
-	f := &fixture{t: t, admin: env.AdminPool(t, migrations.PF), tid: ids.New(), other: ids.New()}
+	f := &fixture{t: t, admin: env.AdminPool(t, migrations.PF), tid: ids.New(), other: ids.New(), knTree: knTree}
 	f.native = cooperative.New(pool, clock.System{}, cooperative.Deps{Dir: directory, Scope: fixtureScope{}})
 	f.seed(f.tid, false)
 	f.seed(f.other, true)
@@ -100,16 +110,35 @@ func (f *fixture) seedPrincipalScopeProjection(tid uuid.UUID) {
 		}
 		f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$3,1)", tid, ref(root), ref(n))
 	}
-	// KN commune caller 998: a projected node (self edge only, no HTX
-	// descendants), so it reaches HTX rows solely through app.xa_ids. Since
-	// #130 an unprojected caller is denied even on the commune branch; 997
-	// stays unprojected for that negative case.
-	f.exec(`INSERT INTO k_ref.org(tenant_id,ref,kind,code,admin_unit_code,active,source_seq)
-    VALUES($1,$2,'extension_team','N998','89001',true,1)`, tid, ref(998))
-	f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$2,0)", tid, ref(998))
+	// KN commune caller 998: a pf_party.org source node (no HTX descendants)
+	// whose projection is made by the source INSERT trigger, never inserted
+	// into k_ref here. It reaches HTX rows solely through app.xa_ids. Since
+	// #130 an unprojected caller is denied even on the commune branch; 997 has
+	// no source row and therefore no projection, for that negative case.
+	f.exec(`INSERT INTO pf_party.org(tenant_id,ref,kind,code,name,admin_unit_code,active,last_event_id,last_seq)
+    VALUES($1,$2,'extension_team','N998','KN fixture','89001',true,$3,1)`, tid, ref(998), ref(1998))
+	var self int
+	if err := f.admin.QueryRow(context.Background(), `SELECT count(*) FROM k_ref.node_closure
+    WHERE tenant_id=$1 AND ancestor=$2 AND descendant=$2 AND depth=0`, tid, ref(998)).Scan(&self); err != nil || self != 1 {
+		f.t.Fatalf("caller 998 projection from source trigger: %d %v", self, err)
+	}
 }
 
 func (f *fixture) seed(tid uuid.UUID, other bool) {
+	tree := f.knTree && !other
+	if tree {
+		for _, o := range []struct {
+			n, parent  int
+			kind, unit string
+		}{{906, 0, "ttkn_national", ""}, {901, 906, "ttkn_province", "89"}, {902, 906, "ttkn_province", "92"}, {903, 901, "extension_team", "89001"}} {
+			var parent any
+			if o.parent != 0 {
+				parent = ref(o.parent)
+			}
+			f.exec(`INSERT INTO pf_party.org(tenant_id,ref,kind,code,name,admin_unit_code,parent_ref,active,last_event_id,last_seq)
+		 VALUES($1,$2,$3,$4,'KN fixture',NULLIF($5,''),$6,true,$7,1)`, tid, ref(o.n), o.kind, fmt.Sprintf("N%d", o.n), o.unit, parent, ref(o.n+1000))
+		}
+	}
 	for n := 101; n <= 105; n++ {
 		unit := "89001"
 		if n == 103 {
@@ -122,9 +151,16 @@ func (f *fixture) seed(tid uuid.UUID, other bool) {
 		if other {
 			active = n == 101
 		}
-		f.exec(`INSERT INTO pf_party.org(tenant_id,ref,kind,code,name,admin_unit_code,active,last_event_id,last_seq)
-		 VALUES($1,$2,'cooperative',$3,'HTX fixture',NULLIF($4,''),$5,$6,1)`,
-			tid, ref(n), fmt.Sprintf("C%d", n), unit, active, ref(n+1000))
+		var parent any
+		if tree && n != 105 {
+			parent = ref(903) // extension team of commune 89001
+			if n == 103 {
+				parent = ref(902) // no team for 92001: TTKN province
+			}
+		}
+		f.exec(`INSERT INTO pf_party.org(tenant_id,ref,kind,code,name,admin_unit_code,parent_ref,active,last_event_id,last_seq)
+		 VALUES($1,$2,'cooperative',$3,'HTX fixture',NULLIF($4,''),$5,$6,$7,1)`,
+			tid, ref(n), fmt.Sprintf("C%d", n), unit, parent, active, ref(n+1000))
 		if n != 102 {
 			f.exec("INSERT INTO pf_coop.cooperative(tenant_id,org_ref) VALUES($1,$2)", tid, ref(n))
 		}
