@@ -24,7 +24,7 @@ class Bootstrap:
         raw = None if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
         headers = {"Authorization": "Bearer " + self.token, "Accept": "application/json"}
         if raw is not None:
-            headers["Content-Type"] = "application/json"
+            headers["Content-Type"] = "application/geo+json" if path.startswith("/v1/geo/admin-boundaries/import") else "application/json"
         if key:
             headers["Idempotency-Key"] = key
         req = urllib.request.Request((self.admin if admin else self.app) + path, data=raw, headers=headers, method=method)
