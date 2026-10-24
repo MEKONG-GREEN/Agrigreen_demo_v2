@@ -115,6 +115,15 @@ func TestNativeScopeFailureClosesBeforeBegin(t *testing.T) {
 			}
 		})
 	}
+	t.Run("joined foreign context still forbids scope port I/O", func(t *testing.T) {
+		b := &nativeScopeDB{}
+		calls := 0
+		s := &Service{DB: b, Scope: nativeScopeFunc(func(context.Context) (authz.Scope, error) { calls++; return authz.Scope{}, nil })}
+		joined := shareddb.JoinTx(tenant.WithID(ctx, ids.New()), &nativeScopeTxFake{b: b})
+		if _, err := s.access(joined, readRoles...); err == nil || calls != 0 || b.begins != 0 {
+			t.Fatalf("err=%v calls=%d begins=%d", err, calls, b.begins)
+		}
+	})
 	t.Run("direct reusable transaction", func(t *testing.T) {
 		b := &nativeScopeDB{}
 		calls := 0

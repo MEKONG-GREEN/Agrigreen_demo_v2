@@ -183,7 +183,7 @@ func (s *Service) accessFor(ctx context.Context, p authz.Principal, roles []stri
 		if has(r) {
 			// A native caller inside a joined transaction must not acquire a
 			// second pool connection through ScopeResolver before inTx runs.
-			if err := s.nativeScopePreflight(ctx, p.TenantID); err != nil {
+			if err := s.nativeScopePreflight(ctx); err != nil {
 				return access{}, err
 			}
 			if s.Scope == nil {
