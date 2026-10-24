@@ -7,6 +7,7 @@ on:
       - deploy/compose/postgres/**
       - deploy/compose/backup/**
       - scripts/test-postgres-images.sh
+      - scripts/test-postgres-logical-upgrade.sh
       - .github/workflows/postgres-images.yml
   push:
     branches: [main, dev]
@@ -14,6 +15,7 @@ on:
       - deploy/compose/postgres/**
       - deploy/compose/backup/**
       - scripts/test-postgres-images.sh
+      - scripts/test-postgres-logical-upgrade.sh
       - .github/workflows/postgres-images.yml
   workflow_dispatch:
 
@@ -46,3 +48,16 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
+
+  logical-upgrade:
+    name: Logical PostGIS 3.5 to 3.6, old-volume refusal
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Keep independent Docker contexts on the same compatibility contract
+        run: |
+          cmp deploy/compose/postgres/agrigreen-entrypoint.sh deploy/compose/backup/agrigreen-entrypoint.sh
+          cmp deploy/compose/postgres/00-runtime-compat.sh deploy/compose/backup/00-runtime-compat.sh
+      - name: Actual logical restore into a clean volume and PostgreSQL checks
+        run: sh scripts/test-postgres-logical-upgrade.sh

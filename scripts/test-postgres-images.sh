@@ -80,3 +80,13 @@ if [ "$variant" = backup ]; then
     test "$(docker exec "$restore_name" psql -U postgres -d postgres -Atc 'SELECT id FROM p0132_probe')" = 132
     echo '--- PASS: encrypted pgBackRest full backup and restore into clean nonroot volume'
 fi
+# A preexisting volume cannot be silently accepted after losing/mismatching its marker.
+docker exec "$name" rm /var/lib/postgresql/data/.agrigreen-runtime-compat
+docker restart "$name" >/dev/null
+for _ in $(seq 1 20); do
+    [ "$(docker inspect -f '{{.State.Running}}' "$name")" = false ] && break
+    sleep 1
+done
+test "$(docker inspect -f '{{.State.Running}}' "$name")" = false
+test "$(docker inspect -f '{{.State.ExitCode}}' "$name")" = 78
+echo "--- PASS: $variant rejects preexisting physical PGDATA without compatibility marker"
