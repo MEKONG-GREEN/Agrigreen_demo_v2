@@ -1,5 +1,10 @@
 # P0-HTX-KREF (#130): tạo Nút và bản chiếu cùng giao dịch
 
+**Đang sửa hồi quy; chưa sẵn sàng tích hợp.** Full CI ứng viên `080c174e`
+đã kết thúc FAIL (58 ca chính, 9 package), không còn là một lượt đang chờ.
+Mã production đã thay đổi sau ứng viên đó; các PASS cũ chỉ là bằng chứng lịch sử.
+Không dùng chúng thay kiểm thử và Review OK của SHA cuối.
+
 ## Phạm vi
 
 Giữ k_ref và outbox. Trigger k_ref.project_created_org thuộc NOLOGIN own_kref,
@@ -38,6 +43,29 @@ của job/Admin vẫn có ngữ nghĩa native được ghi ở W3.4, không suy 
 Household được INSERT trước membership: WITH CHECK chỉ đòi projection của caller,
 không đòi dòng membership chưa tồn tại; USING vẫn kiểm thành viên/xã.
 
+Giữ nhánh đọc qua cấp phép W4.2 trong USING của bảng đã có p_share FOR SELECT:
+foreign tenant vẫn phải qua p_share (grant, purpose, owner, node, thời hạn).
+WITH CHECK không có nhánh foreign tenant; p_tenant và quyền ghi không đổi.
+Đây là sửa hồi quy của bản ALTER ban đầu, không phải cấp thêm quyền đọc nội bộ.
+
+## Tương thích native khi projection luôn có dữ liệu
+
+Không dùng Session giả hoặc nới RLS để giữ các test cũ xanh. Fixture plot/season
+phải tạo cây tổ chức qua nguồn thật; fixture HTX không INSERT projection trùng
+sau source INSERT. Các số liệu dương và ca âm về tenant/phạm vi vẫn được giữ.
+
+Các consumer native cần truyền phạm vi do server giải xuống transaction của module:
+member chỉ mở phạm vi xã cho bước lookup hộ, khôi phục biến trước ghi/commit;
+plot GIS/đối soát và season staff chỉ bind xã ở boundary phù hợp. Resolver chạy
+trước BeginTx; joined/direct transaction bị chặn trước lời gọi port. Không xóa
+node, không thay tenant/vai, không thay Principal.KN hoặc selected-session projection.
+Manager/farmer, job, partner và selected KN giữ boundary riêng của mình.
+
+CI còn lộ hai đường cần sửa trước khi chốt gói: tombstone khi thửa rời HTX phải
+chỉ mang ID/phiên bản, không đọc hình/thuộc tính của HTX mới; log vụ mùa bị RLS
+che phải phân loại lỗi quyền trước lỗi trạng thái. Các bản sửa đang được kiểm
+riêng, chưa được tính là PASS của toàn bộ cooperative.
+
 ## Triển khai forward-only
 
 1. Giữ endpoint tạo/di chuyển tổ chức ở chế độ bảo trì trong cửa sổ migration.
@@ -69,8 +97,8 @@ snapshot cũ; cửa sổ bảo trì là điều kiện vận hành cho Rebuild h
   giữ yêu cầu Before=0/After=6 và lần rebuild lặp không drift. Không sửa mã rebuild
   hoặc tắt trigger. Lượt trước ở `72a8dfb9` FAIL vì fixture giả định INSERT chưa
   tự chiếu; không dùng kết quả đó làm PASS.
-- Toàn bộ `party/app` và `party/handler` PASS trên ứng viên `080c174e` có cùng
-  byte mã production/migration với nguồn cuối. Lượt ghép đó có hai lỗi fixture
+- Toàn bộ `party/app` và `party/handler` PASS trên ứng viên lịch sử `080c174e`.
+  Nguồn cuối nay có thêm sửa policy và boundary native, cần kiểm lại theo SHA mới. Lượt ghép đó có hai lỗi fixture
   đọc nhầm `seq` thay vì `event.seq`; e92 sửa đúng fixture và chạy lại đủ 10 ca.
   Không gọi toàn bộ lệnh ghép cũ là PASS.
 - [Cổng tĩnh của 080c](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/actions/runs/40058807292/job/120767667765)
@@ -79,6 +107,23 @@ snapshot cũ; cửa sổ bảo trì là điều kiện vận hành cho Rebuild h
 - Cổng ledger upgrade PF/MKG, schema isolation và EXPLAIN 498 bảng của d3 đã PASS
   trước khi thêm guard cha; đây là bằng chứng cũ, không thay kiểm của cây cuối.
 
-Gói sẵn sàng review mã, chưa gộp. Full CI vẫn phải xanh sau các dependency fixture
-#81/#140 và web #134/#138; cần Claude bình luận Review OK tại SHA cuối trước
-`ticket.ps1 merge`. Không dùng kết quả riêng từng package để bỏ cổng CI tổng thể.
+- Nguồn `ee296397`: Go 1.26.10/private PG, bốn nhóm migration W3.4/W4.2/D2/KN
+  và `tests/p0kref`, drill: 15 ca chính PASS, 0 FAIL, 0 SKIP. Năm XFAIL legacy
+  KNSPLIT0 có sẵn vẫn được báo riêng; không gọi toàn bộ KNSPLIT hoàn tất.
+- Sửa member `d7a02c07` (cherry `25a1a973`): toàn bộ handler member 14 ca chính
+  + 4 ca con PASS, 0 FAIL/SKIP; kiểm lookup cùng pool một kết nối, restore trước
+  ghi/commit và KN/selected/empty projection. PostgreSQL tạm đã dọn.
+- Native plot `50ee8c07` (cherry `90f80277`): 36 ca chính + 6 ca con PASS,
+  2 FAIL, 0 SKIP; hai lỗi là consumer conflict và tombstone transfer, chưa gọi
+  toàn bộ plot PASS. Bổ sung consumer ở `8b6d1442` (cherry `74c9e2dc`) mới kiểm
+  tĩnh; chờ ghép tombstone rồi chạy toàn bộ handler.
+- Fixture HTX `0d4c355d` (cherry `5569907a`): 11 PASS, 3 FAIL, 0 SKIP. Lỗi còn lại
+  thuộc contract/context publication KN; đã mở lane:kn #145, không sửa assertion
+  dương hoặc tạo đường ghi HTX từ KN để chữa test.
+- Season `30b92145`: 29 PASS, 2 FAIL, 0 SKIP; đang kiểm sửa classification và
+  joined preflight ở `2eaeea08`, chưa có kết quả cuối.
+
+Chưa ready lại hoặc gộp. Full CI phải xanh sau sửa hồi quy và các dependency
+#81/#140/#145, web #134/#138. Cần Claude bình luận Review OK tại SHA cuối trước
+`ticket.ps1 merge`. Không dùng PASS từng package để bỏ cổng tổng thể; không
+đổi test FAIL/SKIP thành đạt và không dùng toolchain host 1.27 thay Go 1.26.10.
