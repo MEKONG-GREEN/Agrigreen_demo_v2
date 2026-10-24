@@ -227,6 +227,12 @@ services:
     environment:
       <<: [*vps-env, *vps-notify]
       AG_KC_ACTIONS_REDIRECT_URI: https://app.${AG_DOMAIN}/
+      # P0-NOTIFY-FAILCLOSED (docs/runbooks/vps-deploy.md §3.3): AG_SMTP_*, AG_FCM_*, AG_WEB_OPS_URL và
+      # AG_REPORT_LINK_BASE lấy từ *vps-notify (P0-VPS-OPS) — không khai lại ở đây để giữ mặc định 587/STARTTLS.
+      # Thiếu cấu hình → kênh TẮT, bản gửi ghi "bị bỏ" (không "đã gửi") và GET /v1/notify/delivery-health cảnh báo.
+      # AG_MAILER/AG_PUSHER=log bị từ chối ở VPS (AG_ENV khác máy phát triển).
+      AG_MAILER: ${AG_MAILER:-}
+      AG_PUSHER: ${AG_PUSHER:-}
 
   web-ops:
     mem_limit: 512m

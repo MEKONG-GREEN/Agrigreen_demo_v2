@@ -73,14 +73,17 @@
 //	AG_DB_MAX_CONNS                    (tùy chọn) cỡ pool vai đơn vị, mặc định 20
 //	AG_DB_PASSWORD_APP_AGG             (chỉ -agg-run) vai đăng nhập riêng app_agg của job tổng hợp (ADR-0031 §3, gói FC) —
 //	                                   pool 2 kết nối, trên AG_DB_REPLICA_URL khi có; AG_AGG_GOVERNANCE_TENANT: tenant quản trị
-//	AG_FCM_PROJECT_ID, AG_FCM_CREDENTIALS_FILE  FCM HTTP v1 (không đặt → kênh đẩy chỉ ghi log); AG_FCM_ENDPOINT, AG_FCM_TOKEN_URL tùy chọn
+//	AG_FCM_PROJECT_ID, AG_FCM_CREDENTIALS_FILE  FCM HTTP v1 (không đặt → kênh đẩy TẮT: bản gửi "dropped", không "sent" —
+//	                                   P0-NOTIFY-FAILCLOSED); AG_FCM_ENDPOINT, AG_FCM_TOKEN_URL tùy chọn
+//	AG_MAILER, AG_PUSHER               rỗng (tự chọn) | smtp/fcm | disabled | log (CHỈ AG_ENV=development|dev|local|test)
 //	AG_SMTP_HOST, AG_SMTP_PORT, AG_SMTP_USERNAME, AG_SMTP_PASSWORD, AG_SMTP_FROM  email (SMTP trong lãnh thổ)
 //	AG_KN_DIGEST_RECIPIENTS_JSON  hộp thư công vụ theo tenant KN; thiếu ánh xạ giữ nguyên hàng chờ, không dùng AG_SMTP_DIGEST_TO
 //	AG_ANCHOR_SIGNING_KEY              Ed25519 (base64 seed 32 byte) — bắt buộc khi có job anchor
 //	AG_ANCHOR_KEY_ID                   (tùy chọn) mã khóa ghi vào manifest
 //	AG_S3_* hoặc AG_OBJSTORE_DIR       kho manifest, tệp báo cáo (shared/objstore)
 //	AG_SMTP_HOST/PORT/USERNAME/PASSWORD/FROM/TLS  (tùy chọn) email lịch gửi báo cáo; thiếu → bỏ gửi kèm cảnh báo
-//	AG_WEB_OPS_URL                     (tùy chọn) URL web-ops cho liên kết tải lại trong email
+//	AG_WEB_OPS_URL                     URL web-ops cho liên kết trong email; ngoài máy phát triển thiếu/localhost → email
+//	                                   thông báo theo người nhận TẮT, email báo cáo bỏ dòng tải lại
 //	AG_REPORT_LINK_BASE                URL gốc công khai api-platform (vd https://api.<domain>) cho liên kết tải
 //	                                   báo cáo Chi cục 7 ngày (A4); thiếu → email vượt giới hạn đính kèm ghi "Gửi lỗi"
 //	AG_REPORT_DISPATCH_LEASE           (tùy chọn) hạn nhận việc gửi báo cáo Chi cục, 3m–24h, mặc định 15m (P0-WORKER-REPORTS):
