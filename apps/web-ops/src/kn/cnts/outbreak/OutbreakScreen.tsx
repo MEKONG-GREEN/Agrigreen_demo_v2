@@ -568,12 +568,14 @@ function OutbreakEditor({
     setErrs(fe);
     if (Object.keys(fe).length) return;
     try {
-      const o =
+      // P0-WEB-IDEMKEY: trong phiên thao tác của act — gửi lại sau lỗi mạng dùng lại khóa cũ.
+      const o = await act.idem(() =>
         mode.kind === "new"
-          ? await oapi.report(payload(f))
+          ? oapi.report(payload(f))
           : mode.kind === "progress"
-            ? await oapi.progress(mode.o.ref, payload(f, mode.o.version))
-            : await oapi.confirm(mode.s.ref, payload(f, mode.s.version));
+            ? oapi.progress(mode.o.ref, payload(f, mode.o.version))
+            : oapi.confirm(mode.s.ref, payload(f, mode.s.version)),
+      );
       onDone(o.ref);
     } catch (e) {
       if (e instanceof ApiProblem && (e.problem.code === "extension.cnts_outbreak_version_conflict" || e.problem.code === "extension.cnts_suspect_version_conflict")) {

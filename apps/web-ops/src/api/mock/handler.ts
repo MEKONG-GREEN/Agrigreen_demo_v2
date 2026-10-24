@@ -127,6 +127,8 @@ function sleep(ms: number) {
 }
 
 const replay = new Map<string, { status: number; body: string; headers: Record<string, string>; fingerprint: string }>();
+/** Khóa đã chạy xong dispatch nhưng chưa ghi xong bản phát lại (khoảng await) → dấu vân tay. */
+const inflight = new Map<string, string>();
 
 function binaryFingerprint(bytes: Uint8Array): string {
   let h = 2166136261;
@@ -187,6 +189,12 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
         if (prev.fingerprint !== fingerprint) return problem(422, "idempotency_key_reused", "Idempotency key reused");
         return new Response(prev.body, { status: prev.status, headers: { ...prev.headers, "Idempotent-Replayed": "true" } });
       }
+      // P0-WEB-IDEMKEY: cùng khóa đang xử lý (bấm hai lần liên tiếp) → 409 idempotency_in_progress, không chạy lần hai.
+      const running = inflight.get(key);
+      if (running !== undefined) {
+        if (running !== fingerprint) return problem(422, "idempotency_key_reused", "Idempotency key reused");
+        return problem(409, "idempotency_in_progress", "Request with this Idempotency-Key is in progress");
+      }
       // FN-AD-04.07: chế độ hỗ trợ — lý do bắt buộc, nhật ký attempted + completed.
       const guard = supportGuard(request, url);
       if (guard) return guard;
@@ -194,7 +202,12 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
       const res = dispatch(routes, request, url, persona, body);
       supportRecord(request, url, res.status, "completed", key);
       if (res.ok) {
-        replay.set(key, { status: res.status, body: replayBody(res, await res.clone().text()), headers: { "Content-Type": res.headers.get("Content-Type") ?? "application/json" }, fingerprint });
+        inflight.set(key, fingerprint);
+        try {
+          replay.set(key, { status: res.status, body: replayBody(res, await res.clone().text()), headers: { "Content-Type": res.headers.get("Content-Type") ?? "application/json" }, fingerprint });
+        } finally {
+          inflight.delete(key);
+        }
       }
       return res;
     }

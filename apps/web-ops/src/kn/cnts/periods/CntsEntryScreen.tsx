@@ -176,14 +176,17 @@ function Entry({
     setErrs(fe);
     if (Object.keys(fe).length) return;
     try {
-      await capi.submit(task.period_id, {
-        unit: task.unit,
-        values: payloadValues(task.fields, d.values, d.nil),
-        base_version: task.version,
-        nil_report: d.nil,
-        note: d.note || undefined,
-        explanation: d.explanation || undefined,
-      });
+      // P0-WEB-IDEMKEY: trong phiên thao tác của act — gửi lại sau lỗi mạng dùng lại khóa cũ.
+      await act.idem(() =>
+        capi.submit(task.period_id, {
+          unit: task.unit,
+          values: payloadValues(task.fields, d.values, d.nil),
+          base_version: task.version,
+          nil_report: d.nil,
+          note: d.note || undefined,
+          explanation: d.explanation || undefined,
+        }),
+      );
       clearDraft(task);
       act.setNote("Đã gửi báo cáo.");
       onDone(true);

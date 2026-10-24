@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ApiClient } from "@/api/client";
 import { uuidv7 } from "@/api/idempotency";
+import { useIdempotentAction } from "@/api/useIdempotentAction";
 import type { ApiProblem } from "@/api/problem";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/Icon";
@@ -108,6 +109,7 @@ export function RegisterSchedule({
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<"draft" | "submit" | "copy" | null>(null);
   const [confirmCopy, setConfirmCopy] = useState(false);
+  const idem = useIdempotentAction(); // P0-WEB-IDEMKEY: Lưu nháp/Gửi duyệt bấm lại sau lỗi mạng → cùng khóa
   const [logKey, setLogKey] = useState(0);
 
   useEffect(() => {
@@ -242,7 +244,7 @@ export function RegisterSchedule({
     setProblem(null);
     setNotice(null);
     try {
-      const d = await ws.save({ week_start: week, action, base_version: cur.base, items: cur.items.map(toInput) });
+      const d = await idem.run(() => ws.save({ week_start: week, action, base_version: cur.base, items: cur.items.map(toInput) }));
       setLocal(fromDetail(week, cur.mine, d));
       setForm(null);
       setLogKey((k) => k + 1);
@@ -267,7 +269,7 @@ export function RegisterSchedule({
     setProblem(null);
     setNotice(null);
     try {
-      const d = await ws.copyPrevious(week);
+      const d = await idem.run(() => ws.copyPrevious(week));
       if (cur) setLocal(fromDetail(week, cur.mine, d));
       setLogKey((k) => k + 1);
       setNotice(`Đã sao chép ${d.items.length} mục từ tuần trước (ngày dời +7) thành nháp.`);

@@ -331,11 +331,12 @@ export function WorkDialog({
     const bad = validateWork(d.events, v);
     setErr(bad);
     if (bad) return;
-    const r = await act.run(async () => {
+    // P0-WEB-IDEMKEY: mỗi lời gọi sau await phải bọc idem() để bấm lại không ghi trùng sự kiện đã lưu.
+    const r = await act.run(async (idem) => {
       for (const o of ops) {
-        if (o.op === "add") await sa.addEvent(d.id, o.body);
-        else if (o.op === "replace") await sa.replaceEvent(d.id, o.event, o.body);
-        else await sa.voidEvent(d.id, o.event, o.reason);
+        if (o.op === "add") await idem(() => sa.addEvent(d.id, o.body));
+        else if (o.op === "replace") await idem(() => sa.replaceEvent(d.id, o.event, o.body));
+        else await idem(() => sa.voidEvent(d.id, o.event, o.reason));
       }
       return true;
     });

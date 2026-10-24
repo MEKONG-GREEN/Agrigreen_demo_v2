@@ -196,7 +196,7 @@ export function EntryScreen() {
                 input: Object.fromEntries(Object.entries(cur[r.key] ?? {}).filter(([l, v]) => v !== "" && editable(l))),
               }));
               try {
-                await cycleApi.submit(x.task.id, { kind, rows });
+                await act.idem(() => cycleApi.submit(x.task.id, { kind, rows })); // P0-WEB-IDEMKEY: bấm lại → cùng khóa
               } catch (e) {
                 const msg = e instanceof Error ? e.message : String(e);
                 setIssues((xs) => [...xs, `${communeNameOf(communesCtx, x.task.commune_code)}: không ${kind === "draft" ? "lưu" : "gửi"} được — ${msg}`]);
