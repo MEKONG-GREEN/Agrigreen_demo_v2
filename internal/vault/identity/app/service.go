@@ -129,6 +129,13 @@ func (s *Service) logAccess(ctx context.Context, tx pgx.Tx, p authz.Principal, r
 	return ledger.Classify(store.AppendAccess(ctx, tx, &a))
 }
 
+// logAccessTx ghi một dòng sổ truy cập cho chủ thể ref trong giao dịch ngắn riêng (sau bước KMS ngoài giao dịch).
+func (s *Service) logAccessTx(ctx context.Context, p authz.Principal, ref uuid.UUID, op string, purpose client.Purpose, outcome string) error {
+	return tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
+		return s.logAccess(ctx, tx, p, &ref, true, op, purpose, outcome)
+	})
+}
+
 // errBlindRace: request song song vừa ghi cùng chỉ mục mù — chạy lại để trả ErrDuplicate.
 var errBlindRace = errors.New("vault: tranh chấp chỉ mục mù")
 
@@ -296,46 +303,13 @@ type plain struct {
 	Address    string `pii:"true"`
 }
 
-func (s *Service) decrypt(ctx context.Context, tx pgx.Tx, tid, ref uuid.UUID) (plain, error) {
-	var out plain
-	k, err := store.GetKey(ctx, tx, ref)
-	if err != nil {
-		return out, err
-	}
-	row, err := store.GetIdentity(ctx, tx, ref)
-	if err != nil {
-		return out, err
-	}
-	if k == nil || row == nil {
-		return out, errors.New("vault: chủ thể chưa xóa nhưng thiếu khóa hoặc định danh")
-	}
-	dk, err := s.KMS.Unwrap(ctx, k.KEKID, k.WrappedDataKey, domain.AAD(useDataKey, tid, ref))
-	if err != nil {
-		return out, err
-	}
-	defer clear(dk)
-	for _, f := range []struct {
-		dst *string
-		use string
-		ct  []byte
-	}{
-		{&out.FullName, useName, row.FullNameCT}, {&out.Phone, usePhone, row.PhoneCT},
-		{&out.NationalID, useNational, row.NationalIDCT}, {&out.Address, useAddress, row.AddressCT},
-	} {
-		if *f.dst, err = openField(dk, domain.AAD(f.use, tid, ref), f.ct); err != nil {
-			return plain{}, err
-		}
-	}
-	return out, nil
-}
-
 // Display trả nhãn hiển thị tối thiểu (mục 10.4). Đã xóa → nhãn "(đã xóa định danh)" kèm client.ProblemErased.
 func (s *Service) Display(ctx context.Context, purpose client.Purpose, ref uuid.UUID) (client.Display, error) {
 	p, err := s.begin(ctx, domain.OpDisplay, purpose, client.RoleRegistrar, client.RoleDisplay, client.RoleEvidenceViewer)
 	if err != nil {
 		return client.Display{}, err
 	}
-	var out client.Display
+	var sealed sealedIdentity
 	var result error
 	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
 		st, err := s.subjectState(ctx, tx, p, ref, domain.OpDisplay, purpose, false)
@@ -343,15 +317,24 @@ func (s *Service) Display(ctx context.Context, purpose client.Purpose, ref uuid.
 			result = st.fail
 			return err
 		}
-		pl, err := s.decrypt(ctx, tx, p.TenantID, ref)
-		if err != nil {
-			return err
-		}
-		out = client.Display{Ref: ref, Label: domain.Label(pl.FullName), MaskedPhone: domain.MaskPhone(pl.Phone)}
-		return s.logAccess(ctx, tx, p, &ref, true, domain.OpDisplay, purpose, domain.OutcomeOK)
+		sealed, err = fetchIdentity(ctx, tx, ref)
+		return err
 	})
 	if err != nil {
 		return client.Display{}, err
+	}
+	var out client.Display
+	if result == nil {
+		// Ngoài giao dịch: KMS + giải mã; rồi giao dịch ngắn ghi sổ (P0-POOL-SHARED).
+		pl, err := s.openIdentity(ctx, p.TenantID, ref, sealed)
+		if err != nil {
+			return client.Display{}, err
+		}
+		out = client.Display{Ref: ref, Label: domain.Label(pl.FullName), MaskedPhone: domain.MaskPhone(pl.Phone)}
+		clearPlain(&pl)
+		if err := s.logAccessTx(ctx, p, ref, domain.OpDisplay, purpose, domain.OutcomeOK); err != nil {
+			return client.Display{}, err
+		}
 	}
 	if errors.Is(result, client.ErrErased) {
 		return client.Display{Ref: ref, Label: client.ErasedLabel}, result
@@ -368,7 +351,8 @@ func (s *Service) Resolve(ctx context.Context, purpose client.Purpose, ref uuid.
 	if err := s.sensitive(ctx, p, domain.OpResolve, purpose, true, true); err != nil {
 		return client.Identity{}, err
 	}
-	var out client.Identity
+	var sealed sealedIdentity
+	var subj *store.Subject
 	var result error
 	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
 		st, err := s.subjectState(ctx, tx, p, ref, domain.OpResolve, purpose, false)
@@ -376,21 +360,30 @@ func (s *Service) Resolve(ctx context.Context, purpose client.Purpose, ref uuid.
 			result = st.fail
 			return err
 		}
-		subj := st.subj
-		pl, err := s.decrypt(ctx, tx, p.TenantID, ref)
-		if err != nil {
-			return err
-		}
-		out = client.Identity{
-			Kind: client.SubjectKind(subj.Kind), FullName: pl.FullName, Phone: pl.Phone, NationalID: pl.NationalID,
-			Address: pl.Address, AreaCode: subj.AreaCode,
-		}
-		return s.logAccess(ctx, tx, p, &ref, true, domain.OpResolve, purpose, domain.OutcomeOK)
+		subj = st.subj
+		sealed, err = fetchIdentity(ctx, tx, ref)
+		return err
 	})
 	if err != nil {
 		return client.Identity{}, err
 	}
-	return out, result
+	if result != nil {
+		return client.Identity{}, result
+	}
+	// Ngoài giao dịch: KMS + giải mã; trả định danh chỉ sau khi dòng sổ resolve đã commit (R-42).
+	pl, err := s.openIdentity(ctx, p.TenantID, ref, sealed)
+	if err != nil {
+		return client.Identity{}, err
+	}
+	out := client.Identity{
+		Kind: client.SubjectKind(subj.Kind), FullName: pl.FullName, Phone: pl.Phone, NationalID: pl.NationalID,
+		Address: pl.Address, AreaCode: subj.AreaCode,
+	}
+	clearPlain(&pl)
+	if err := s.logAccessTx(ctx, p, ref, domain.OpResolve, purpose, domain.OutcomeOK); err != nil {
+		return client.Identity{}, err
+	}
+	return out, nil
 }
 
 // Lookup tìm chủ thể theo SĐT hoặc CCCD qua chỉ mục mù. Không thấy → ProblemNotFound (vẫn ghi sổ).
@@ -444,7 +437,7 @@ func (s *Service) Unwrap(ctx context.Context, purpose client.Purpose, ref uuid.U
 	if len(wrappedDEK) != envelope.WrappedDEKLen {
 		return nil, problem.Validation.WithField("wrapped_dek", "phải đúng 80 byte (crypto_box_seal của DEK 32 byte)")
 	}
-	var dek []byte
+	var k *store.Key
 	var result error
 	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
 		st, err := s.subjectState(ctx, tx, p, ref, domain.OpUnwrap, purpose, false)
@@ -452,33 +445,10 @@ func (s *Service) Unwrap(ctx context.Context, purpose client.Purpose, ref uuid.U
 			result = st.fail
 			return err
 		}
-		k, err := store.GetKey(ctx, tx, ref)
-		if err != nil {
-			return err
+		if k, err = store.GetKey(ctx, tx, ref); err == nil && k == nil {
+			err = errors.New("vault: chủ thể chưa xóa nhưng thiếu khóa")
 		}
-		if k == nil {
-			return errors.New("vault: chủ thể chưa xóa nhưng thiếu khóa")
-		}
-		privRaw, err := s.KMS.Unwrap(ctx, k.KEKID, k.WrappedPrivateKey, domain.AAD(useX25519, p.TenantID, ref))
-		if err != nil {
-			return err
-		}
-		defer clear(privRaw)
-		pub, err := envelope.Key32(k.PublicKey)
-		if err != nil {
-			return err
-		}
-		priv, err := envelope.Key32(privRaw)
-		if err != nil {
-			return err
-		}
-		defer clear(priv[:])
-		dek, err = envelope.UnwrapDEK(wrappedDEK, pub, priv)
-		if err != nil {
-			result = client.ProblemUnwrapFailed
-			return s.logAccess(ctx, tx, p, &ref, true, domain.OpUnwrap, purpose, domain.OutcomeRejected)
-		}
-		return s.logAccess(ctx, tx, p, &ref, true, domain.OpUnwrap, purpose, domain.OutcomeOK)
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -486,7 +456,42 @@ func (s *Service) Unwrap(ctx context.Context, purpose client.Purpose, ref uuid.U
 	if result != nil {
 		return nil, result
 	}
+	// Ngoài giao dịch: KMS mở khóa riêng X25519, mở DEK; rồi giao dịch ngắn ghi sổ (P0-POOL-SHARED).
+	dek, outcome, err := s.unwrapDEK(ctx, p.TenantID, ref, k, wrappedDEK)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.logAccessTx(ctx, p, ref, domain.OpUnwrap, purpose, outcome); err != nil {
+		clear(dek)
+		return nil, err
+	}
+	if outcome != domain.OutcomeOK {
+		return nil, client.ProblemUnwrapFailed
+	}
 	return dek, nil
+}
+
+// unwrapDEK mở DEK đã seal bằng khóa công khai của chủ thể (NGOÀI giao dịch). DEK sai → outcome rejected, không lỗi.
+func (s *Service) unwrapDEK(ctx context.Context, tid, ref uuid.UUID, k *store.Key, wrappedDEK []byte) ([]byte, string, error) {
+	privRaw, err := s.KMS.Unwrap(ctx, k.KEKID, k.WrappedPrivateKey, domain.AAD(useX25519, tid, ref))
+	if err != nil {
+		return nil, "", err
+	}
+	defer clear(privRaw)
+	pub, err := envelope.Key32(k.PublicKey)
+	if err != nil {
+		return nil, "", err
+	}
+	priv, err := envelope.Key32(privRaw)
+	if err != nil {
+		return nil, "", err
+	}
+	defer clear(priv[:])
+	dek, err := envelope.UnwrapDEK(wrappedDEK, pub, priv)
+	if err != nil {
+		return nil, domain.OutcomeRejected, nil
+	}
+	return dek, domain.OutcomeOK, nil
 }
 
 // Erase xóa định danh theo yêu cầu (RB-3): xóa định danh, khóa bí mật, chỉ mục

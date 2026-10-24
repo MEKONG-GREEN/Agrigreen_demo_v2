@@ -8,9 +8,13 @@
 -- Tiến trình chết giữa 2 và 3 → hết claimed_until thì mục được nhận lại (ít nhất một lần, như trước: trước đây chết
 -- sau khi gửi mà chưa commit cũng gửi lại). email_digest_item là bảng trạng thái (không phải sổ), cột mới NULL được.
 
+SET LOCAL lock_timeout = '5s';
+
 ALTER TABLE pf_notify.email_digest_item
   ADD COLUMN claim_id      uuid        NULL,
-  ADD COLUMN claimed_until timestamptz NULL,
-  ADD CONSTRAINT email_digest_item_claim_check CHECK ((claim_id IS NULL) = (claimed_until IS NULL));
+  ADD COLUMN claimed_until timestamptz NULL;
+ALTER TABLE pf_notify.email_digest_item
+  ADD CONSTRAINT email_digest_item_claim_check CHECK ((claim_id IS NULL) = (claimed_until IS NULL)) NOT VALID;
+ALTER TABLE pf_notify.email_digest_item VALIDATE CONSTRAINT email_digest_item_claim_check;
 
 GRANT UPDATE (claim_id, claimed_until) ON pf_notify.email_digest_item TO r_notify;

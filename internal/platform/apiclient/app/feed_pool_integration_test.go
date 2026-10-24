@@ -65,7 +65,7 @@ func snapshotSHA(t *testing.T, f *feedFixture, key string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 	h := sha256.New()
 	if _, err := io.Copy(h, rc); err != nil {
 		t.Fatal(err)

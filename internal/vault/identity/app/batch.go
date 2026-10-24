@@ -4,7 +4,6 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -57,7 +56,14 @@ func (s *Service) ReadBatch(ctx context.Context, req client.BatchRequest) ([]cli
 		return nil, err
 	}
 	tid := p.TenantID
-	out := make([]client.BatchItem, 0, len(req.Refs))
+	// P0-POOL-SHARED (#126): giao dịch 1 chỉ đọc bản mã; KMS + giải mã ngoài giao dịch; giao dịch 2 ghi sổ mọi chủ thể.
+	type pending struct {
+		ref      uuid.UUID
+		erased   bool
+		identity sealedIdentity
+		section  *store.Section
+	}
+	var rows []pending
 	seen := map[uuid.UUID]bool{}
 	err = tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
 		for _, ref := range req.Refs {
@@ -72,29 +78,51 @@ func (s *Service) ReadBatch(ctx context.Context, req client.BatchRequest) ([]cli
 			if subj == nil {
 				continue
 			}
-			it := client.BatchItem{Ref: ref, Fields: client.Fields{}}
-			if subj.ErasedAt != nil {
-				it.Erased = true
-				out = append(out, it)
-				if err := s.logBatch(ctx, tx, p, ref, req, domain.OutcomeErased); err != nil {
-					return err
-				}
-				continue
-			}
-			if req.Identity {
-				pl, err := s.decrypt(ctx, tx, tid, ref)
-				if err != nil {
-					return err
-				}
-				it.FullName, it.Phone, it.Address = pl.FullName, pl.Phone, pl.Address
-			}
-			if req.Section != "" {
-				if it.Fields, err = s.batchSection(ctx, tx, tid, ref, req.Section); err != nil {
+			r := pending{ref: ref, erased: subj.ErasedAt != nil}
+			if !r.erased && req.Identity {
+				if r.identity, err = fetchIdentity(ctx, tx, ref); err != nil {
 					return err
 				}
 			}
-			out = append(out, it)
-			if err := s.logBatch(ctx, tx, p, ref, req, domain.OutcomeOK); err != nil {
+			if !r.erased && req.Section != "" {
+				if r.section, err = store.GetSection(ctx, tx, ref, req.Section); err != nil {
+					return err
+				}
+			}
+			rows = append(rows, r)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]client.BatchItem, 0, len(rows))
+	for _, r := range rows {
+		it := client.BatchItem{Ref: r.ref, Fields: client.Fields{}, Erased: r.erased}
+		if !r.erased && req.Identity {
+			pl, err := s.openIdentity(ctx, tid, r.ref, r.identity)
+			if err != nil {
+				return nil, err
+			}
+			it.FullName, it.Phone, it.Address = pl.FullName, pl.Phone, pl.Address
+			clearPlain(&pl)
+		}
+		if !r.erased && req.Section != "" {
+			fields, err := s.openSectionRow(ctx, tid, r.ref, req.Section, r.section)
+			if err != nil {
+				return nil, err
+			}
+			it.Fields = fields
+		}
+		out = append(out, it)
+	}
+	err = tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+		for _, r := range rows {
+			outcome := domain.OutcomeOK
+			if r.erased {
+				outcome = domain.OutcomeErased
+			}
+			if err := s.logBatch(ctx, tx, p, r.ref, req, outcome); err != nil {
 				return err
 			}
 		}
@@ -117,26 +145,4 @@ func (s *Service) logBatch(ctx context.Context, tx pgx.Tx, p authz.Principal, re
 		return s.logAccess(ctx, tx, p, &ref, true, domain.OpSectionRead, req.Purpose, outcome)
 	}
 	return nil
-}
-
-// batchSection giải mã một ngăn trong giao dịch (chưa ghi → map rỗng).
-func (s *Service) batchSection(ctx context.Context, tx pgx.Tx, tid, ref uuid.UUID, section string) (client.Fields, error) {
-	out := client.Fields{}
-	row, err := store.GetSection(ctx, tx, ref, section)
-	if err != nil || row == nil {
-		return out, err
-	}
-	key, err := s.KMS.Unwrap(ctx, row.KEKID, row.WrappedKey, domain.AAD(useSectionKey(section), tid, ref))
-	if err != nil {
-		return nil, err
-	}
-	defer clear(key)
-	plainText, err := openField(key, domain.AAD(useSectionData(section), tid, ref), row.PayloadCT)
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal([]byte(plainText), &out); err != nil {
-		return nil, err
-	}
-	return out, nil
 }

@@ -17,9 +17,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/channel"
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -54,7 +52,7 @@ func (m *blockingMailer) Send(ctx context.Context, _ []string, _, _ string) erro
 	return nil
 }
 
-func sizedDigestModule(f *fixture, pool *pgxpool.Pool, m channel.Mailer) *notify.Module {
+func sizedDigestModule(f *fixture, pool *pgxpool.Pool, m *blockingMailer) *notify.Module {
 	return notify.New(pool, f.clk, notify.Deps{Kinds: []notifyport.KindRegistration{extension.NotificationKinds()},
 		Consumers: []notifyport.ConsumerRegistration{extension.NotificationConsumers()}, Builders: extension.DirectiveNotificationBuilders(nil, nil),
 		Digests: []notifyport.DigestRegistration{extension.NotificationDigest()}, Mailer: m, DigestTo: []string{"global@example.vn"}})
@@ -159,10 +157,12 @@ func TestDigestClaimLeaseExpires(t *testing.T) {
 	ref := queueRecipientDigest(t, f, f.tenant)
 	other := ids.New()
 	now := f.clk.Now()
+	// Worker khác đang giữ mục (hạn nhận còn 1 giờ theo đồng hồ của job).
 	if err := tenant.WithTenantTx(context.Background(), f.appDB, f.tenant, func(tx pgx.Tx) error {
-		items, err := store.ClaimDigest(context.Background(), tx, other, now, now.Add(time.Hour), 10)
-		if err == nil && len(items) != 1 {
-			err = fmt.Errorf("nhận %d mục", len(items))
+		tag, err := tx.Exec(context.Background(), `UPDATE pf_notify.email_digest_item SET claim_id = $1, claimed_until = $2
+		  WHERE directive_id = $3 AND sent_at IS NULL`, other, now.Add(time.Hour), ref)
+		if err == nil && tag.RowsAffected() != 1 {
+			err = fmt.Errorf("nhận %d mục", tag.RowsAffected())
 		}
 		return err
 	}); err != nil {
@@ -186,14 +186,11 @@ func TestDigestClaimLeaseExpires(t *testing.T) {
 	if st := digestState(t, f, f.tenant, ref); !st.sent || st.claimed || mail.calls.Load() != 1 {
 		t.Fatalf("hết hạn nhận không được nhận lại: %+v", st)
 	}
-	// Worker cũ "sống lại" kết lần nhận của nó: không còn mục nào giữ claim cũ.
+	// Lần nhận cũ đã bị thay: không còn mục nào giữ claim cũ (worker cũ "sống lại" kết được 0 mục).
+	var stale int
 	if err := tenant.WithTenantTx(context.Background(), f.appDB, f.tenant, func(tx pgx.Tx) error {
-		n, err := store.MarkDigestSent(context.Background(), tx, other, f.clk.Now())
-		if err == nil && n != 0 {
-			err = fmt.Errorf("kết %d mục của lần nhận đã hết hạn", n)
-		}
-		return err
-	}); err != nil {
-		t.Fatal(err)
+		return tx.QueryRow(context.Background(), `SELECT count(*) FROM pf_notify.email_digest_item WHERE claim_id = $1 OR digest_id = $1`, other).Scan(&stale)
+	}); err != nil || stale != 0 {
+		t.Fatalf("lần nhận đã hết hạn còn giữ mục: %d %v", stale, err)
 	}
 }
