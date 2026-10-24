@@ -5,6 +5,7 @@ No token, password, OTP or signed URL is printed. Not a production maintenance t
 import base64
 import hashlib
 import hmac
+import http.client
 import http.cookiejar
 from html.parser import HTMLParser
 import json
@@ -66,9 +67,21 @@ class Page(HTMLParser):
             self.reset = attrs["href"]
 
 
+class LoopbackHTTPS(urllib.request.HTTPSHandler):
+    # Model TLS termination at the VPS proxy while keeping logical HTTPS URLs
+    # for Secure cookies. This test transport connects only to isolated Keycloak
+    # on localhost; it makes no claim about external DNS/certificate acceptance.
+    def https_open(self, request):
+        if request.host != "auth.vps.example.test":
+            raise RuntimeError("unexpected browser host in isolated smoke")
+        return self.do_open(lambda *_args, **_kwargs: http.client.HTTPConnection("127.0.0.1", 8180, timeout=30), request)
+
+
 def local(url):
     parsed = urllib.parse.urlsplit(url)
-    return KC + parsed.path + ("?" + parsed.query if parsed.query else "")
+    if parsed.scheme != "https" or parsed.hostname != "auth.vps.example.test":
+        raise RuntimeError("unexpected browser URL in isolated smoke")
+    return url
 
 
 def main():
@@ -157,10 +170,10 @@ def main():
         login()
         print("--- PASS: real brute-force lock expires; login resumes without administrator unlock (2s isolated policy probe)")
         # Follow the actual password-reset form. SMTP points to isolated Mailpit.
-        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        opener = urllib.request.build_opener(LoopbackHTTPS(), urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
         query = urllib.parse.urlencode({"client_id": "agrigreen-web-ops", "redirect_uri": "https://app.vps.example.test/",
             "response_type": "code", "scope": "openid profile", "code_challenge": "A" * 43, "code_challenge_method": "S256"})
-        page = Page(opener.open(KC + "/realms/agrigreen/protocol/openid-connect/auth?" + query).read().decode())
+        page = Page(opener.open("https://auth.vps.example.test/realms/agrigreen/protocol/openid-connect/auth?" + query).read().decode())
         assert page.reset, "login must expose forgot-password link"
         reset = Page(opener.open(local(page.reset)).read().decode())
         assert reset.action
