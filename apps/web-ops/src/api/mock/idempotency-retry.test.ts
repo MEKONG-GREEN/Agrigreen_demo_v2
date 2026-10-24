@@ -3,7 +3,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApiClient, unwrap } from "@/api/client";
-import { IDEMPOTENCY_HEADER, IdempotentOperation, outcomeUnknown, withIdempotentOperation } from "@/api/idempotency";
+import { IDEMPOTENCY_HEADER, IdempotentOperation, beginAttempt, outcomeUnknown, withIdempotentOperation, type AttemptOutcome, type OperationRun } from "@/api/idempotency";
 import { ApiProblem } from "@/api/problem";
 import { useIdempotentAction } from "@/api/useIdempotentAction";
 import { createCollectApi, createCycleApi } from "@/kn/cycle/api";
@@ -54,24 +54,76 @@ beforeEach(() => {
 });
 
 describe("IdempotentOperation", () => {
-  it("cùng dấu vân tay → cùng khóa đến khi có kết quả dứt khoát; khác dấu → khóa khác", () => {
+  it("cùng dấu vân tay → cùng khóa đến khi lượt thao tác xong; 4xx dứt khoát bỏ khóa bước đó; khác dấu → khóa khác", () => {
     const op = new IdempotentOperation();
     const k1 = op.keyFor("POST /a {}");
     expect(op.keyFor("POST /a {}")).toBe(k1);
     expect(op.keyFor("POST /a {\"x\":1}")).not.toBe(k1);
-    op.settle("POST /a {}", "network");
+    op.settle("POST /a {}", k1, "network");
     expect(op.keyFor("POST /a {}")).toBe(k1);
-    op.settle("POST /a {}", { status: 503 });
+    op.settle("POST /a {}", k1, { status: 503 });
     expect(op.keyFor("POST /a {}")).toBe(k1);
-    op.settle("POST /a {}", { status: 409, code: "idempotency_in_progress" });
+    op.settle("POST /a {}", k1, { status: 409, code: "idempotency_in_progress" });
     expect(op.keyFor("POST /a {}")).toBe(k1);
-    op.settle("POST /a {}", { status: 201 });
+    op.settle("POST /a {}", k1, { status: 201 }); // bước xong nhưng thao tác chưa xong → vẫn giữ
+    expect(op.keyFor("POST /a {}")).toBe(k1);
+    op.release(new Map([["POST /a {}", k1]])); // cả thao tác thành công → nhả
     const k2 = op.keyFor("POST /a {}");
     expect(k2).not.toBe(k1);
-    op.settle("POST /a {}", { status: 422, code: "validation_failed" });
+    op.settle("POST /a {}", k2, { status: 422, code: "validation_failed" });
     expect(op.keyFor("POST /a {}")).not.toBe(k2);
     op.reset();
     expect(op.size).toBe(0);
+  });
+
+  it("#129 P1 — form hai lệnh, lệnh thứ hai mất phản hồi: bấm lại phát lại lệnh đầu bằng ĐÚNG khóa cũ (không ghi lần hai)", () => {
+    let n = 0;
+    const op = new IdempotentOperation(() => `key-${++n}`);
+    const seen = new Set<string>();
+    const writes = { first: 0, second: 0 };
+    const send = (run: OperationRun, step: "first" | "second", outcome: AttemptOutcome) => {
+      const a = beginAttempt(run, step);
+      if (!seen.has(a.key)) {
+        seen.add(a.key);
+        writes[step]++;
+      }
+      a.settle(outcome);
+      return a.key;
+    };
+    const t1 = op.begin();
+    const a1 = send(t1, "first", { status: 201 });
+    const b1 = send(t1, "second", "network"); // lượt lỗi → không complete
+    const t2 = op.begin();
+    expect(send(t2, "first", { status: 201 })).toBe(a1);
+    expect(send(t2, "second", { status: 201 })).toBe(b1);
+    t2.complete();
+    expect(writes).toEqual({ first: 1, second: 1 });
+    expect(op.size).toBe(0);
+    // Thao tác sau (cùng dữ liệu) là thao tác mới → khóa mới.
+    expect(beginAttempt(op.begin(), "first").key).not.toBe(a1);
+  });
+
+  it("#129 P2 — phản hồi muộn của lần gửi cũ không xóa khóa của lần gửi mới đang chờ", () => {
+    let n = 0;
+    const op = new IdempotentOperation(() => `key-${++n}`);
+    const r1 = op.begin();
+    const r2 = op.begin();
+    const a1 = beginAttempt(r1, "same-body");
+    const a2 = beginAttempt(r2, "same-body"); // bấm đúp: cùng khóa K1
+    expect(a2.key).toBe(a1.key);
+    a1.settle({ status: 201 });
+    r1.complete(); // A1 xong → nhả K1
+    const r3 = op.begin();
+    const next = beginAttempt(r3, "same-body"); // thao tác mới → K2
+    expect(next.key).toBe("key-2");
+    a2.settle({ status: 201 }); // phản hồi muộn của A2 (K1)
+    r2.complete(); // lượt A2 xong muộn — chỉ nhả K1, không đụng K2
+    next.settle("network"); // K2 mất phản hồi
+    const retry = beginAttempt(op.begin(), "same-body");
+    expect(retry.key).toBe(next.key);
+    // settle bằng khóa cũ trực tiếp trên phiên cũng không tác động.
+    op.settle("same-body", "key-1", { status: 422 });
+    expect(op.peek("same-body")).toBe("key-2");
   });
 
   it("kết quả chưa rõ: mạng, 0, 408, 425, 429, 5xx, đang xử lý; còn lại dứt khoát", () => {
@@ -257,5 +309,61 @@ describe("openapi-fetch (createApiClient) trong phiên thao tác", () => {
     await withIdempotentOperation(op, () => post(api, "x"));
     expect(keys[1]).toBe(keys[0]);
     expect(op.size).toBe(0);
+  });
+});
+
+describe("#129 P1 — useAction: một lần Lưu gửi nhiều lệnh nối tiếp (như WorkInfoScreens)", () => {
+  /** Máy chủ giả có bảng Idempotency-Key: cùng khóa → phát lại; "lost" = đã ghi nhưng mất phản hồi. */
+  function server(plan: ("pass" | "lost")[]) {
+    const keys: string[] = [];
+    const store = new Map<string, string>();
+    const writes: Record<string, number> = {};
+    const fetch = async (req: Request) => {
+      const key = req.headers.get(IDEMPOTENCY_HEADER) ?? "";
+      keys.push(key);
+      const path = new URL(req.url).pathname;
+      let body = store.get(key);
+      if (body === undefined) {
+        writes[path] = (writes[path] ?? 0) + 1;
+        body = JSON.stringify({ ok: true, path, n: writes[path] });
+        store.set(key, body);
+      }
+      if ((plan.shift() ?? "pass") === "lost") throw new TypeError("Failed to fetch");
+      return new Response(body, { status: 201, headers: { "Content-Type": "application/json" } });
+    };
+    return { keys, writes, fetch };
+  }
+  const post = (api: ReturnType<typeof createApiClient>, id: string) =>
+    unwrap(api.POST("/v1/extension/directives/{id}/ack", { params: { path: { id }, header: {} as { "Idempotency-Key": string } }, body: { note: "x" } as never }));
+
+  it("A 201, B mất phản hồi → bấm Lưu lại: A và B phát lại bằng khóa cũ, mỗi lệnh ghi đúng một lần; xong → khóa mới", async () => {
+    const net = server(["pass", "lost", "pass", "pass", "pass", "pass"]);
+    const api = createApiClient({ baseUrl: "https://api.test", getAccessToken: async () => "tok", fetch: net.fetch });
+    const { result } = renderHook(() => useAction());
+    const save = () =>
+      result.current.run(async (idem) => {
+        await idem(() => post(api, "A")); // lời gọi sau await → bọc idem của lượt
+        await idem(() => post(api, "B"));
+        return true;
+      });
+    let r: unknown;
+    await act(async () => {
+      r = await save();
+    });
+    expect(r).toBeNull();
+    expect(result.current.problem?.code).toBe("network_error");
+    await act(async () => {
+      r = await save();
+    });
+    expect(r).toBe(true);
+    expect(net.keys[2]).toBe(net.keys[0]); // A phát lại
+    expect(net.keys[3]).toBe(net.keys[1]); // B phát lại
+    expect(net.writes).toEqual({ "/v1/extension/directives/A/ack": 1, "/v1/extension/directives/B/ack": 1 });
+    // Cả form đã thành công → lần Lưu sau là thao tác mới.
+    await act(async () => {
+      r = await save();
+    });
+    expect(net.keys[4]).not.toBe(net.keys[0]);
+    expect(net.keys[5]).not.toBe(net.keys[1]);
   });
 });

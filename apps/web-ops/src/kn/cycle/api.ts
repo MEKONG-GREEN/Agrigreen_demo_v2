@@ -5,7 +5,7 @@
 // (FN-AD-04.07: mọi thao tác ghi bắt buộc lý do ≥ 10 ký tự, mã hóa phần trăm).
 import type { components as AppC } from "@/api/generated/application";
 import type { components as AdmC } from "@/api/generated/admin";
-import { beginAttempt, currentIdempotentOperation, requestFingerprint, type IdempotencyAttempt } from "@/api/idempotency";
+import { beginAttempt, currentIdempotentRun, requestFingerprint, type IdempotencyAttempt } from "@/api/idempotency";
 import { ApiProblem, networkProblem, toProblem } from "@/api/problem";
 import { CONTEXT_HEADER, REASON_HEADER } from "../contract";
 
@@ -222,7 +222,7 @@ export function knHttp(opts: KnHttpOptions) {
   // idem: khóa tường minh của nơi gọi. Không truyền → khóa của phiên thao tác hiện hành (useAction/useIdempotentAction,
   // P0-WEB-IDEMKEY #129: bấm lại cùng dữ liệu sau lỗi mạng/5xx dùng lại khóa) → ngoài phiên mới sinh khóa mới.
   return async function call<T>(method: "GET" | "POST" | "PUT" | "PATCH", path: string, body?: unknown, query?: Q, idem?: string): Promise<T> {
-    const op = currentIdempotentOperation(); // đọc đồng bộ, trước mọi await
+    const op = currentIdempotentRun(); // đọc đồng bộ, trước mọi await
     const headers = new Headers({ Accept: "application/json, application/problem+json" });
     const token = opts.getAccessToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);

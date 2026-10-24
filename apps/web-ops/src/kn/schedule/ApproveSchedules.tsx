@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { ApiClient } from "@/api/client";
 import type { ApiProblem } from "@/api/problem";
+import { withIdempotentOperation } from "@/api/idempotency";
 import { useIdempotentAction } from "@/api/useIdempotentAction";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/Icon";
@@ -127,15 +128,19 @@ export function ApproveSchedules({ ws, api, readOnly = false }: { ws: WorkSchedu
     setNotice(null);
     const okNames: string[] = [];
     const failed: string[] = [];
+    // #129 P1: cả lượt duyệt nhiều dòng là MỘT thao tác — chỉ nhả khóa khi mọi dòng thành công; bấm lại sau lỗi giữa
+    // chừng phát lại dòng đã xong bằng khóa cũ thay vì gửi lệnh mới.
+    const turn = idem.begin();
     for (const r of selectedRows) {
       try {
-        await idem.run(() => fn(r));
+        await withIdempotentOperation(turn, () => fn(r));
         okNames.push(r.owner_display ?? r.id);
       } catch (e) {
         const p = toApiProblem(e);
         failed.push(`${r.owner_display ?? r.id}: ${SKIP_LABEL[p.code] ?? p.message}`);
       }
     }
+    if (!failed.length) turn.complete();
     setBusy(false);
     setDialog(null);
     setNotice({ tone: failed.length ? "warn" : "info", lines: [`${label} ${okNames.length} lịch${okNames.length ? `: ${okNames.join(", ")}` : ""}.`, ...failed.map((f) => `Không thực hiện được — ${f}`)] });

@@ -30,8 +30,9 @@ export function newIdempotencyKey(): string {
 // ---------------------------------------------------------------------------------------------------------------------
 // P0-WEB-IDEMKEY (#129): MỘT khóa cho mỗi thao tác của người dùng.
 // Khóa gắn với "dấu vân tay" của yêu cầu (phương thức + đường dẫn + ngữ cảnh + thân). Bấm lại sau lỗi mạng/5xx/hết giờ
-// → cùng thân → cùng khóa → máy chủ trả lại kết quả cũ thay vì tạo bản ghi thứ hai (409 + node mồ côi). Thành công hoặc
-// lỗi nghiệp vụ dứt khoát (4xx) → bỏ khóa: lần gửi sau là thao tác mới. Đổi dữ liệu form → thân khác → khóa mới.
+// → cùng thân → cùng khóa → máy chủ trả lại kết quả cũ thay vì tạo bản ghi thứ hai (409 + node mồ côi). Khóa sống theo
+// CẢ thao tác (một lần bấm có thể gồm nhiều lệnh): chỉ nhả khi cả thao tác thành công; lỗi nghiệp vụ dứt khoát (4xx) của
+// một bước → bỏ khóa bước đó. Đổi dữ liệu form → thân khác → khóa mới. Kết quả chỉ tác động lên đúng khóa đã cấp.
 // ---------------------------------------------------------------------------------------------------------------------
 
 /** Kết quả một lần gửi: mã HTTP (+ code problem+json) hoặc "network" (không tới được máy chủ / hết giờ). */
@@ -62,10 +63,12 @@ export function requestFingerprint(method: string, url: string, context: string 
 const MAX_PENDING = 64;
 
 /**
- * Một "phiên thao tác" (form/màn hình): giữ khóa cho các yêu cầu CHƯA có kết quả dứt khoát, theo dấu vân tay.
- * - keyFor(fp): khóa đang treo cho fp, hoặc khóa mới (uuidv7) nếu chưa có.
- * - settle(fp, kết quả): kết quả dứt khoát → bỏ khóa (lần sau là thao tác mới); chưa rõ → giữ để thử lại.
- * - reset(): bỏ mọi khóa (vd đóng/mở lại form muốn bắt đầu thao tác mới).
+ * Một "phiên thao tác" (form/màn hình): giữ khóa theo dấu vân tay cho các bước của thao tác người dùng ĐANG dở.
+ * - keyFor(fp): khóa đang giữ cho fp, hoặc khóa mới (uuidv7) nếu chưa có.
+ * - settle(fp, khóa, kết quả): chỉ tác động khi entry còn giữ ĐÚNG khóa đã cấp cho lần gửi đó (phản hồi muộn của một lần
+ *   gửi cũ không xóa khóa của lần gửi mới — #129 P2). 2xx → GIỮ khóa (bước đã xong nhưng cả thao tác có thể chưa xong:
+ *   bấm lại form nhiều lệnh phải phát lại bước này bằng đúng khóa cũ — #129 P1); chưa rõ → giữ; 4xx dứt khoát → bỏ.
+ * - Khóa chỉ được nhả khi CẢ thao tác thành công (OperationRun.complete) hoặc reset() (mở lại form / thao tác mới).
  */
 export class IdempotentOperation {
   private readonly pending = new Map<string, string>();
@@ -81,13 +84,27 @@ export class IdempotentOperation {
     return key;
   }
 
-  /** Khóa đang treo (để kiểm thử/hiển thị), không sinh mới. */
+  /** Khóa đang giữ (để kiểm thử/hiển thị), không sinh mới. */
   peek(fingerprint: string): string | undefined {
     return this.pending.get(fingerprint);
   }
 
-  settle(fingerprint: string, outcome: AttemptOutcome): void {
-    if (!outcomeUnknown(outcome)) this.pending.delete(fingerprint);
+  /** Báo kết quả một lần gửi đã dùng `key`. Entry đã đổi khóa (hoặc đã nhả) → bỏ qua. */
+  settle(fingerprint: string, key: string, outcome: AttemptOutcome): void {
+    if (this.pending.get(fingerprint) !== key) return;
+    if (outcomeUnknown(outcome)) return;
+    if (outcome !== "network" && outcome.status >= 200 && outcome.status < 300) return; // giữ tới khi cả thao tác xong
+    this.pending.delete(fingerprint);
+  }
+
+  /** Nhả các khóa một lượt thao tác đã dùng — chỉ entry còn giữ đúng khóa đó. */
+  release(issued: ReadonlyMap<string, string>): void {
+    for (const [fp, key] of issued) if (this.pending.get(fp) === key) this.pending.delete(fp);
+  }
+
+  /** Bắt đầu một lượt thao tác của người dùng (một lần bấm Lưu/Gửi, có thể gồm nhiều lệnh ghi). */
+  begin(): OperationRun {
+    return new OperationRun(this);
   }
 
   reset(): void {
@@ -99,26 +116,71 @@ export class IdempotentOperation {
   }
 }
 
-let activeOperation: IdempotentOperation | null = null;
-
 /**
- * Chạy fn với op là phiên thao tác hiện hành. Client đọc phiên ĐỒNG BỘ lúc bắt đầu gửi (trước await đầu tiên), nên
- * mọi lời gọi ghi khởi phát ngay trong fn (kể cả lời gọi đầu tiên sau `async () => { await api.x() }`) dùng khóa
- * của op. Lời gọi nằm SAU một await khác trong fn không còn trong phạm vi → bọc lại bằng withIdempotentOperation
- * (useAction truyền sẵn hàm `idem` cho việc này).
+ * Một lượt thao tác (một lần bấm): ghi lại các khóa đã dùng; complete() khi CẢ lượt thành công → nhả đúng các khóa đó
+ * (lần bấm sau là thao tác mới). Lượt thất bại giữa chừng không complete → bấm lại phát lại mọi bước bằng khóa cũ
+ * (bước đã xong được máy chủ trả lại kết quả cũ, không ghi lần hai).
  */
-export function withIdempotentOperation<T>(op: IdempotentOperation, fn: () => T): T {
-  const prev = activeOperation;
-  activeOperation = op;
-  try {
-    return fn();
-  } finally {
-    activeOperation = prev;
+export class OperationRun {
+  private readonly issued = new Map<string, string>();
+
+  constructor(readonly op: IdempotentOperation) {}
+
+  record(fingerprint: string, key: string): void {
+    this.issued.set(fingerprint, key);
+  }
+
+  complete(): void {
+    this.op.release(this.issued);
+    this.issued.clear();
   }
 }
 
+let activeRun: OperationRun | null = null;
+
+function isThenable(x: unknown): x is PromiseLike<unknown> {
+  return typeof (x as { then?: unknown } | null)?.then === "function";
+}
+
+/**
+ * Chạy fn trong một lượt thao tác. Client đọc lượt hiện hành ĐỒNG BỘ lúc bắt đầu gửi (trước await đầu tiên), nên mọi lời
+ * gọi ghi khởi phát ngay trong fn dùng khóa của phiên. Lời gọi nằm SAU một await khác trong fn không còn trong phạm vi
+ * → bọc lại bằng withIdempotentOperation(run, …) với CÙNG lượt (useAction truyền sẵn hàm `idem` cho việc này).
+ * - target là IdempotentOperation: mở lượt mới (hoặc nhập lượt đang chạy đồng bộ của cùng phiên); fn trả Promise
+ *   thành công → complete() lượt đó; thất bại → giữ khóa cho lần bấm lại.
+ * - target là OperationRun: nhập lượt đó, không tự complete (nơi mở lượt quyết định).
+ */
+export function withIdempotentOperation<T>(target: IdempotentOperation | OperationRun, fn: () => T): T {
+  const prev = activeRun;
+  let run: OperationRun;
+  let owns = false;
+  if (target instanceof OperationRun) run = target;
+  else if (prev && prev.op === target) run = prev;
+  else {
+    run = target.begin();
+    owns = true;
+  }
+  activeRun = run;
+  let result: T;
+  try {
+    result = fn();
+  } finally {
+    activeRun = prev;
+  }
+  if (owns) {
+    if (isThenable(result)) result.then(() => run.complete(), () => undefined);
+    else run.complete();
+  }
+  return result;
+}
+
+/** Lượt thao tác hiện hành (đọc đồng bộ khi bắt đầu gửi). */
+export function currentIdempotentRun(): OperationRun | null {
+  return activeRun;
+}
+
 export function currentIdempotentOperation(): IdempotentOperation | null {
-  return activeOperation;
+  return activeRun?.op ?? null;
 }
 
 /** Một lần gửi: khóa dùng + báo kết quả cho phiên thao tác. */
@@ -129,12 +191,15 @@ export interface IdempotencyAttempt {
 
 /**
  * Chọn khóa cho một lần gửi: khóa nơi gọi truyền tường minh > khóa của phiên thao tác (theo dấu vân tay) > khóa mới
- * (chỉ cho lời gọi một lần, không có nút "thử lại").
+ * (chỉ cho lời gọi một lần, không có nút "thử lại"). settle gắn với ĐÚNG khóa đã cấp cho lần gửi này.
  */
-export function beginAttempt(op: IdempotentOperation | null, fingerprint: string, explicit?: string | null): IdempotencyAttempt {
+export function beginAttempt(scope: IdempotentOperation | OperationRun | null, fingerprint: string, explicit?: string | null): IdempotencyAttempt {
   if (explicit) return { key: explicit, settle: () => undefined };
-  if (!op) return { key: newIdempotencyKey(), settle: () => undefined };
-  return { key: op.keyFor(fingerprint), settle: (o) => op.settle(fingerprint, o) };
+  if (!scope) return { key: newIdempotencyKey(), settle: () => undefined };
+  const op = scope instanceof OperationRun ? scope.op : scope;
+  const key = op.keyFor(fingerprint);
+  if (scope instanceof OperationRun) scope.record(fingerprint, key);
+  return { key, settle: (o) => op.settle(fingerprint, key, o) };
 }
 
 async function problemCode(res: Response): Promise<string | null> {
@@ -149,7 +214,7 @@ async function problemCode(res: Response): Promise<string | null> {
 
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH"]);
 /** Phiên thao tác bắt được lúc yêu cầu khởi phát (theo id yêu cầu của openapi-fetch). */
-const capturedOps = new Map<string, IdempotentOperation>();
+const capturedRuns = new Map<string, OperationRun>();
 
 /**
  * Middleware đặt ĐẦU TIÊN trong client openapi-fetch: onRequest của middleware đầu chạy đồng bộ trong lời gọi
@@ -158,8 +223,8 @@ const capturedOps = new Map<string, IdempotentOperation>();
 export function idempotencyScopeMiddleware(): Middleware {
   return {
     onRequest({ request, id }) {
-      const op = currentIdempotentOperation();
-      if (op && WRITE_METHODS.has(request.method.toUpperCase())) capturedOps.set(id, op);
+      const run = currentIdempotentRun();
+      if (run && WRITE_METHODS.has(request.method.toUpperCase())) capturedRuns.set(id, run);
       return undefined;
     },
   };
@@ -175,11 +240,11 @@ export function idempotencyMiddleware(generate: () => string = newIdempotencyKey
   return {
     async onRequest({ request, id }) {
       const method = request.method.toUpperCase();
-      const op = capturedOps.get(id) ?? currentIdempotentOperation();
-      capturedOps.delete(id);
-      if (op && WRITE_METHODS.has(method)) {
+      const run = capturedRuns.get(id) ?? currentIdempotentRun();
+      capturedRuns.delete(id);
+      if (run && WRITE_METHODS.has(method)) {
         const body = await request.clone().text();
-        const att = beginAttempt(op, requestFingerprint(method, request.url, request.headers.get("X-AG-Context"), body));
+        const att = beginAttempt(run, requestFingerprint(method, request.url, request.headers.get("X-AG-Context"), body));
         attempts.set(id, att);
         request.headers.set(IDEMPOTENCY_HEADER, att.key);
         return request;

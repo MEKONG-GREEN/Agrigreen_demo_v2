@@ -1,7 +1,7 @@
 // Client hợp đồng tạm KN v7.7 (contract.ts). Dùng fetch(Request) thuần để chạy được với backend giả lập
 // (mockFetch nhận Request) và backend thật như nhau; Bearer, Idempotency-Key và X-AG-Context đặt ở đây.
 // Kiểu trên dây là kiểu sinh từ OpenAPI (KNAssignment, KNSessionContext, KNMenu); menu dựng sang cây của khung ở đây.
-import { beginAttempt, currentIdempotentOperation, requestFingerprint, type IdempotencyAttempt } from "@/api/idempotency";
+import { beginAttempt, currentIdempotentRun, requestFingerprint, type IdempotencyAttempt } from "@/api/idempotency";
 import { ApiProblem, networkProblem, toProblem } from "@/api/problem";
 import { CONTEXT_HEADER, type KnApi, type KnMenu, type MenuBadges, type MeContexts, type SessionContext } from "./contract";
 import { fromKnMenu } from "./menuAdapter";
@@ -19,7 +19,7 @@ export function createKnApi(opts: KnApiOptions): KnApi {
 
   // P0-WEB-IDEMKEY (#129): khóa tường minh > khóa của phiên thao tác hiện hành (bấm lại cùng dữ liệu → cùng khóa) > khóa mới.
   async function call<T>(method: "GET" | "POST", path: string, body?: unknown, idem?: string): Promise<T> {
-    const op = currentIdempotentOperation(); // đọc đồng bộ, trước mọi await
+    const op = currentIdempotentRun(); // đọc đồng bộ, trước mọi await
     const headers = new Headers({ Accept: "application/json, application/problem+json" });
     const token = opts.getAccessToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
