@@ -69,11 +69,12 @@ func roleConstants(t *testing.T) map[string]string {
 }
 
 type realmFile struct {
-	RegistrationAllowed  bool `json:"registrationAllowed"`
-	ResetPasswordAllowed bool `json:"resetPasswordAllowed"`
-	BruteForceProtected  bool `json:"bruteForceProtected"`
-	FailureFactor        int  `json:"failureFactor"`
-	MaxDeltaTimeSeconds  int  `json:"maxDeltaTimeSeconds"`
+	RegistrationAllowed  bool   `json:"registrationAllowed"`
+	ResetPasswordAllowed bool   `json:"resetPasswordAllowed"`
+	ResetCredentialsFlow string `json:"resetCredentialsFlow"`
+	BruteForceProtected  bool   `json:"bruteForceProtected"`
+	FailureFactor        int    `json:"failureFactor"`
+	MaxDeltaTimeSeconds  int    `json:"maxDeltaTimeSeconds"`
 	// A3 / Q-21: MULTIPLE = khóa ở mỗi bội số failureFactor (5, 10, 15…), không khóa lại ở từng lần sai lẻ.
 	BruteForceStrategy string `json:"bruteForceStrategy"`
 	// KN v7.7 N-10 (thay GIS US-LOG-01 AC-3): khóa TẠM 15 phút, tự mở sau thời gian chờ.

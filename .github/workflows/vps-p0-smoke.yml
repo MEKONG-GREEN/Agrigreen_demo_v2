@@ -9,6 +9,9 @@ on:
       - internal/shared/objstore/**
       - scripts/test-vps-p0.sh
       - .github/workflows/vps-p0-smoke.yml
+concurrency:
+  group: vps-p0-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -23,5 +26,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Bootstrap and recovery harness regressions
+        run: python3 -m unittest discover -s deploy/vps -p 'test_*.py' -v
       - name: Real Compose, Keycloak TOTP/reset and public S3 proxy
         run: sh scripts/test-vps-p0.sh

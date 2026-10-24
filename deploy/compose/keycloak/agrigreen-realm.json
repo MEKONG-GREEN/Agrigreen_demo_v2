@@ -4,6 +4,7 @@
   "displayName": "AgriGreen (Local/Dev)",
   "registrationAllowed": false,
   "resetPasswordAllowed": true,
+  "resetCredentialsFlow": "agrigreen password recovery",
   "smtpServer": {
     "host": "${AG_SMTP_HOST:}", "port": "${AG_SMTP_PORT:587}", "from": "${AG_SMTP_FROM:}",
     "user": "${AG_SMTP_USERNAME:}", "password": "${AG_SMTP_PASSWORD:}",
@@ -189,6 +190,15 @@
     { "alias": "agrigreen-not-login-totp-role", "config": { "condUserRole": "login_totp_required", "negate": "true" } }
   ],
   "authenticationFlows": [
+    {
+      "alias": "agrigreen password recovery", "description": "Quên mật khẩu qua email; GIỮ nguyên credential TOTP, không tự reset OTP",
+      "providerId": "basic-flow", "topLevel": true, "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "reset-credentials-choose-user", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10 },
+        { "authenticator": "reset-credential-email", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20 },
+        { "authenticator": "reset-password", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 30 }
+      ]
+    },
     {
       "alias": "agrigreen direct grant", "description": "Chỉ-dev seed: password + OTP đã cấu hình; AMR chỉ từ execution thành công",
       "providerId": "basic-flow", "topLevel": true, "builtIn": false,

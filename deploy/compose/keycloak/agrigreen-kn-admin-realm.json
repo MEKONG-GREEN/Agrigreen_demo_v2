@@ -4,6 +4,7 @@
   "displayName": "AgriGreen KN — Quản trị (realm riêng, Local/Dev)",
   "registrationAllowed": false,
   "resetPasswordAllowed": true,
+  "resetCredentialsFlow": "agrigreen password recovery",
   "smtpServer": {
     "host": "${AG_SMTP_HOST:}", "port": "${AG_SMTP_PORT:587}", "from": "${AG_SMTP_FROM:}",
     "user": "${AG_SMTP_USERNAME:}", "password": "${AG_SMTP_PASSWORD:}",
@@ -73,6 +74,15 @@
     { "alias": "agrigreen-amr-otp", "config": { "default.reference.value": "otp", "default.reference.maxAge": "86400" } }
   ],
   "authenticationFlows": [
+    {
+      "alias": "agrigreen password recovery", "description": "Quên mật khẩu qua email; GIỮ nguyên credential TOTP, không tự reset OTP",
+      "providerId": "basic-flow", "topLevel": true, "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "reset-credentials-choose-user", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10 },
+        { "authenticator": "reset-credential-email", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20 },
+        { "authenticator": "reset-password", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 30 }
+      ]
+    },
     {
       "alias": "kn-admin browser",
       "description": "D24/D25: realm quản trị — cookie hoặc mật khẩu + TOTP BẮT BUỘC cho mọi tài khoản (chưa có thì đăng ký ở lần đăng nhập đầu)",

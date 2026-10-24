@@ -29,7 +29,7 @@ def call(method, path, body=None, token=None, form=False):
     data = None if body is None else (urllib.parse.urlencode(body).encode() if form else json.dumps(body).encode())
     headers = {"Content-Type": "application/x-www-form-urlencoded" if form else "application/json"}
     if token:
-        headers["Authorization"] = "Bearer " + token
+        headers["Authorization"] = "Bearer " + (token() if callable(token) else token)
     request = urllib.request.Request(KC + path, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
@@ -55,16 +55,34 @@ class Page(HTMLParser):
         self.action = None
         self.fields = {}
         self.reset = None
+        self.links = []
+        self.inputs = set()
         self.feed(raw)
 
     def handle_starttag(self, tag, attributes):
         attrs = dict(attributes)
         if tag == "form":
             self.action = attrs.get("action")
+        if tag == "input" and attrs.get("name"):
+            self.inputs.add(attrs["name"])
+        if tag == "a" and attrs.get("href"):
+            self.links.append(attrs["href"])
         if tag == "input" and attrs.get("type") == "hidden":
             self.fields[attrs["name"]] = attrs.get("value", "")
         if tag == "a" and "reset-credentials" in attrs.get("href", ""):
             self.reset = attrs["href"]
+
+
+class CompletedRedirect(Exception):
+    pass
+
+
+class StopAtApp(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, target):
+        if urllib.parse.urlsplit(target).hostname == "app.vps.example.test":
+            # Completion is verified independently by password grants below.
+            raise CompletedRedirect()
+        return super().redirect_request(request, response, code, message, headers, target)
 
 
 class LoopbackHTTPS(urllib.request.HTTPSHandler):
@@ -78,6 +96,7 @@ class LoopbackHTTPS(urllib.request.HTTPSHandler):
 
 
 def local(url):
+    url = urllib.parse.urljoin("https://auth.vps.example.test/", url)
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme != "https" or parsed.hostname != "auth.vps.example.test":
         raise RuntimeError("unexpected browser URL in isolated smoke")
@@ -98,11 +117,22 @@ def main():
     _, session = call("POST", "/realms/master/protocol/openid-connect/token", {
         "grant_type": "password", "client_id": "admin-cli", "username": "admin",
         "password": values["KEYCLOAK_ADMIN_PASSWORD"]}, form=True)
-    admin = session["access_token"]
+    admin_expires = time.monotonic() + max(1, session.get("expires_in", 60) - 15)
+    def admin():
+        nonlocal session, admin_expires
+        if time.monotonic() >= admin_expires:
+            _, session = call("POST", "/realms/master/protocol/openid-connect/token", {
+                "grant_type": "password", "client_id": "admin-cli", "username": "admin",
+                "password": values["KEYCLOAK_ADMIN_PASSWORD"]}, form=True)
+            admin_expires = time.monotonic() + max(1, session.get("expires_in", 60) - 15)
+        return session["access_token"]
     _, policy = call("GET", REALM, token=admin)
     assert policy["permanentLockout"] is False and policy["failureFactor"] == 5
     assert policy["waitIncrementSeconds"] == 900 and policy["maxFailureWaitSeconds"] == 900
     assert policy["resetPasswordAllowed"] is True
+    assert policy["resetCredentialsFlow"] == "agrigreen password recovery"
+    _, recovery = call("GET", REALM + "/authentication/flows/agrigreen%20password%20recovery/executions", token=admin)
+    assert {step.get("providerId") for step in recovery} == {"reset-credentials-choose-user", "reset-credential-email", "reset-password"}
     print("--- PASS: imported production policy is temporary 15-minute lockout plus password reset")
     _, clients = call("GET", REALM + "/clients?clientId=agrigreen-seed", token=admin)
     client = clients[0]
@@ -132,10 +162,12 @@ def main():
             roles.append(role_rep)
         call("POST", REALM + "/users/" + uid + "/role-mappings/realm", roles, token=admin)
 
-        def login(pwd=password):
-            return call("POST", "/realms/agrigreen/protocol/openid-connect/token", {
-                "grant_type": "password", "client_id": "agrigreen-seed", "username": username,
-                "password": pwd, "totp": totp(otp_secret), "otp": totp(otp_secret), "scope": "openid profile"}, form=True)[1]
+        def login(pwd=password, with_otp=True):
+            fields = {"grant_type": "password", "client_id": "agrigreen-seed", "username": username,
+                      "password": pwd, "scope": "openid profile"}
+            if with_otp:
+                fields.update({"totp": totp(otp_secret), "otp": totp(otp_secret)})
+            return call("POST", "/realms/agrigreen/protocol/openid-connect/token", fields, form=True)[1]
 
         token = login()["access_token"]
         payload = json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "=="))
@@ -170,7 +202,10 @@ def main():
         login()
         print("--- PASS: real brute-force lock expires; login resumes without administrator unlock (2s isolated policy probe)")
         # Follow the actual password-reset form. SMTP points to isolated Mailpit.
-        opener = urllib.request.build_opener(LoopbackHTTPS(), urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        _, prior_credentials = call("GET", REALM + "/users/" + uid + "/credentials", token=admin)
+        prior_otps = {credential["id"] for credential in prior_credentials if credential["type"] == "otp"}
+        assert prior_otps
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), LoopbackHTTPS(), StopAtApp(), urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
         query = urllib.parse.urlencode({"client_id": "agrigreen-web-ops", "redirect_uri": "https://app.vps.example.test/",
             "response_type": "code", "scope": "openid profile", "code_challenge": "A" * 43, "code_challenge_method": "S256"})
         page = Page(opener.open("https://auth.vps.example.test/realms/agrigreen/protocol/openid-connect/auth?" + query).read().decode())
@@ -181,8 +216,51 @@ def main():
         response = opener.open(local(reset.action), data=urllib.parse.urlencode(fields).encode())
         assert response.status == 200
         with urllib.request.urlopen("http://127.0.0.1:8025/api/v1/messages", timeout=15) as mail:
-            assert json.load(mail)["total"] >= 1
-        print("--- PASS: actual forgot-password form delivers reset email to isolated SMTP capture")
+            mailbox = json.load(mail)
+        message_id = next(message["ID"] for message in mailbox["messages"]
+                          if any(recipient["Address"] == username + "@example.test" for recipient in message["To"]))
+        with urllib.request.urlopen("http://127.0.0.1:8025/api/v1/message/" + message_id, timeout=15) as mail:
+            captured = json.load(mail)
+        # Parse only in memory; a reset link is a credential and must never be logged.
+        links = Page(captured["HTML"]).links
+        link = next(link for link in links if "/login-actions/action-token" in link)
+        password_page = Page(opener.open(local(link)).read().decode())
+        assert password_page.action and {"password-new", "password-confirm"}.issubset(password_page.inputs)
+        new_password = secrets.token_urlsafe(24) + "#8"
+        fields = dict(password_page.fields, **{"password-new": new_password, "password-confirm": new_password})
+        try:
+            opener.open(local(password_page.action), data=urllib.parse.urlencode(fields).encode()).read()
+        except CompletedRedirect:
+            pass
+        # Probe the old password with a fresh, unused TOTP to avoid mistaking
+        # OTP replay rejection for password revocation.
+        time.sleep(max(1, 31 - int(time.time()) % 30))
+        try:
+            login(password)
+            raise AssertionError("old password still accepted after reset")
+        except RuntimeError as error:
+            assert "HTTP 400" in str(error) or "HTTP 401" in str(error)
+        try:
+            no_otp_token = login(new_password, with_otp=False)["access_token"]
+        except RuntimeError as error:
+            assert "HTTP 400" in str(error) or "HTTP 401" in str(error)
+        else:
+            claims = json.loads(base64.urlsafe_b64decode(no_otp_token.split(".")[1] + "=="))
+            assert "otp" not in claims.get("amr", [])
+            try:
+                Bootstrap("http://127.0.0.1:8080", "http://127.0.0.1:8082", no_otp_token).request(
+                    "POST", "/v1/masterdata/seed", {}, admin=True, key="no-otp-must-be-denied")
+                raise AssertionError("password-only token acquired Admin API authority")
+            except RuntimeError as error:
+                assert "HTTP 401" in str(error) or "HTTP 403" in str(error)
+        _, after_credentials = call("GET", REALM + "/users/" + uid + "/credentials", token=admin)
+        after_otps = {credential["id"] for credential in after_credentials if credential["type"] == "otp"}
+        assert after_otps == prior_otps
+        time.sleep(max(1, 31 - int(time.time()) % 30))
+        new_token = login(new_password)["access_token"]
+        claims = json.loads(base64.urlsafe_b64decode(new_token.split(".")[1] + "=="))
+        assert {"pwd", "otp"}.issubset(claims.get("amr", []))
+        print("--- PASS: actual email password reset rejects old password, preserves OTP credential, denies password-only Admin access and accepts new password+OTP")
     finally:
         call("PUT", REALM, {key: policy[key] for key in ["waitIncrementSeconds", "maxFailureWaitSeconds", "minimumQuickLoginWaitSeconds", "quickLoginCheckMilliSeconds"]}, token=admin)
         call("PUT", REALM + "/clients/" + client["id"], {"enabled": False}, token=admin)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"slices"
 	"testing"
 )
@@ -48,6 +49,36 @@ func TestRealmP0ScopesAndAuthenticatorReferences(t *testing.T) {
 			if slices.Contains([]string{"agrigreen-web-ops", "kn-web", "kn-admin-web"}, client.ClientID) && !slices.Contains(client.DefaultClientScopes, "profile") {
 				t.Errorf("%s: %s cannot request profile", name, client.ClientID)
 			}
+		}
+	}
+}
+
+// Self-service password recovery must not delete TOTP or mint a constant MFA claim.
+func TestRealmP0PasswordRecoveryKeepsOTP(t *testing.T) {
+	for _, name := range []string{"agrigreen-realm.json", "agrigreen-kn-admin-realm.json"} {
+		realm := loadRealm(t, name)
+		if realm.ResetCredentialsFlow != "agrigreen password recovery" {
+			t.Fatalf("%s: unexpected recovery flow %q", name, realm.ResetCredentialsFlow)
+		}
+		found := false
+		for _, flow := range realm.AuthenticationFlows {
+			if flow.Alias != realm.ResetCredentialsFlow {
+				continue
+			}
+			found = true
+			got := []string{}
+			for _, e := range flow.Executions {
+				if e.Requirement != "REQUIRED" || e.FlowAlias != "" {
+					t.Errorf("%s: recovery step must be explicit and required", name)
+				}
+				got = append(got, e.Authenticator)
+			}
+			if !reflect.DeepEqual(got, []string{"reset-credentials-choose-user", "reset-credential-email", "reset-password"}) {
+				t.Errorf("%s: recovery must change only password: %v", name, got)
+			}
+		}
+		if !found {
+			t.Fatalf("%s: configured recovery flow missing", name)
 		}
 	}
 }
