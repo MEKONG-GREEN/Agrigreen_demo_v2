@@ -54,7 +54,7 @@ Issue #98, xếp chồng trên #76 (`knsplit2-menu-kn`). Nguồn: PRD `kn-bugfix
 | CNTS tỉnh | Điều hành | Lịch › Lịch trực KSGM; Lịch tiêm phòng | `/kn/cnts/lich-truc`; `/kn/cnts/lich-tiem` | Có màn |
 | CNTS tỉnh | Điều hành | Lịch › Lịch công tác cán bộ xã | `/kn/nhiem-vu/lich-cong-tac` (badge `work_schedules.pending`) | Có màn |
 | CNTS tỉnh | Điều hành | Lịch › Lịch công tác phòng | `/kn/nhiem-vu/lich-cong-tac` (tab Lịch của tôi) | Có màn |
-| CNTS tỉnh | Điều hành | Chiến dịch điều tra › Quản lý chiến dịch; Tạo chiến dịch | `/kn/cnts/chien-dich`; `/kn/cnts/chien-dich/tao` | Sắp có |
+| CNTS tỉnh | Điều hành | Chiến dịch điều tra › Quản lý chiến dịch; Tạo chiến dịch | `/kn/cnts/chien-dich`; `/kn/cnts/chien-dich/tao` | Quản lý chiến dịch: Có màn (W11.50, tạo đợt trong màn); Tạo chiến dịch: Sắp có |
 | CNTS tỉnh | Báo cáo | Báo cáo định kỳ | `/kn/cnts/bao-cao-dinh-ky` | Sắp có |
 | CNTS tỉnh | Báo cáo | KSGM tuần, tháng; Thủy sản (Phụ lục 2); Báo cáo dịch bệnh | `/kn/cnts/ksgm`; `/kn/cnts/phu-luc-2`; `/kn/cnts/dich-benh` | Có màn |
 | CNTS tỉnh | Dữ liệu | Số liệu cấp xã › Nhập liệu tuần; Khai thác thủy sản; Nhật ký sản xuất | `/kn/cnts/so-lieu-xa/nhap-lieu-tuan`, `/khai-thac-thuy-san`, `/nhat-ky` | Sắp có |
