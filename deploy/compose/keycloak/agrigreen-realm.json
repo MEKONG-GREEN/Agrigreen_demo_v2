@@ -3,7 +3,13 @@
   "enabled": true,
   "displayName": "AgriGreen (Local/Dev)",
   "registrationAllowed": false,
-  "resetPasswordAllowed": false,
+  "resetPasswordAllowed": true,
+  "resetCredentialsFlow": "agrigreen password recovery",
+  "smtpServer": {
+    "host": "${AG_SMTP_HOST:}", "port": "${AG_SMTP_PORT:587}", "from": "${AG_SMTP_FROM:}",
+    "user": "${AG_SMTP_USERNAME:}", "password": "${AG_SMTP_PASSWORD:}",
+    "auth": "${AG_KC_SMTP_AUTH:true}", "starttls": "${AG_KC_SMTP_STARTTLS:true}", "ssl": "${AG_KC_SMTP_SSL:false}"
+  },
   "loginWithEmailAllowed": true,
   "loginTheme": "agrigreen",
   "eventsEnabled": true,
@@ -19,8 +25,8 @@
   "maxFailureWaitSeconds": 900,
   "minimumQuickLoginWaitSeconds": 60,
   "quickLoginCheckMilliSeconds": 1000,
-  "permanentLockout": true,
-  "maxTemporaryLockouts": 3,
+  "permanentLockout": false,
+  "maxTemporaryLockouts": 0,
   "accessTokenLifespan": 300,
   "ssoSessionIdleTimeout": 14400,
   "ssoSessionMaxLifespan": 86400,
@@ -33,6 +39,7 @@
   "otpPolicyDigits": 6,
   "otpPolicyPeriod": 30,
   "browserFlow": "agrigreen browser",
+  "directGrantFlow": "agrigreen direct grant",
   "internationalizationEnabled": true,
   "supportedLocales": ["vi", "en"],
   "defaultLocale": "vi",
@@ -41,7 +48,7 @@
       "accountPermanentlyDisabledMessage": "Tài khoản đã bị khóa, vui lòng liên hệ Admin để mở khóa.",
       "accountTemporarilyDisabledMessage": "Sai thông tin đăng nhập 5 lần — tài khoản tạm khóa 15 phút. Thử lại sau hoặc liên hệ Admin.",
       "accountDisabledMessage": "Tài khoản đã bị khóa, vui lòng liên hệ Admin để mở khóa.",
-      "invalidUserMessage": "Sai tài khoản hoặc mật khẩu. Sau 5 lần sai, tài khoản bị khóa tạm 15 phút; bị khóa tạm 3 lần trong 24 giờ thì khóa hẳn (liên hệ Admin).",
+      "invalidUserMessage": "Sai tài khoản hoặc mật khẩu. Sau 5 lần sai, tài khoản tạm khóa 15 phút rồi tự mở. Có thể dùng Quên mật khẩu hoặc liên hệ Admin.",
       "usernameOrEmail": "Email hoặc số điện thoại",
       "updatePasswordTitle": "Đặt mật khẩu cho lần đăng nhập đầu tiên"
     },
@@ -49,13 +56,13 @@
       "accountPermanentlyDisabledMessage": "Tài khoản đã bị khóa, vui lòng liên hệ Admin để mở khóa.",
       "accountTemporarilyDisabledMessage": "Sai thông tin đăng nhập 5 lần — tài khoản tạm khóa 15 phút. Thử lại sau hoặc liên hệ Admin.",
       "accountDisabledMessage": "Tài khoản đã bị khóa, vui lòng liên hệ Admin để mở khóa.",
-      "invalidUserMessage": "Sai tài khoản hoặc mật khẩu. Sau 5 lần sai, tài khoản bị khóa tạm 15 phút; bị khóa tạm 3 lần trong 24 giờ thì khóa hẳn (liên hệ Admin).",
+      "invalidUserMessage": "Sai tài khoản hoặc mật khẩu. Sau 5 lần sai, tài khoản tạm khóa 15 phút rồi tự mở. Có thể dùng Quên mật khẩu hoặc liên hệ Admin.",
       "usernameOrEmail": "Email hoặc số điện thoại",
       "updatePasswordTitle": "Đặt mật khẩu cho lần đăng nhập đầu tiên"
     }
   },
   "attributes": {
-    "lockout_note": "Quyết định A3 / Q-21 (chốt 03/10/2026, KN v7.7 FN-CH-00.01 / N-10 thay GIS US-LOG-01 AC-3): mỗi 5 lần sai mật khẩu → khóa TẠM 15 phút (bruteForceStrategy MULTIPLE, failureFactor 5, waitIncrementSeconds = maxFailureWaitSeconds = 900), tự mở sau thời gian chờ; sau 3 lần khóa tạm (maxTemporaryLockouts 3, permanentLockout true) lần khóa kế tiếp là khóa HẲN (Keycloak đặt enabled = false) tới khi Admin mở qua pf/accounts (POST /v1/accounts/users/{id}/unlock). Cửa sổ đếm 24 giờ: maxDeltaTimeSeconds 86400 — Keycloak xóa bộ đếm lần sai VÀ số lần khóa tạm khi lần sai kế tiếp cách lần sai trước > 24 giờ, hoặc khi đăng nhập thành công. Tài khoản bị Admin khóa (enabled = false) vẫn khóa tới khi mở. Đăng nhập bằng email hoặc SĐT: username = SĐT chuẩn hóa 0xxxxxxxxx (pf/accounts tạo), email qua loginWithEmailAllowed.",
+    "lockout_note": "P0-VPS-OPS (PO 24/10/2026, thay cấu hình khóa hẳn A3/Q-21): mỗi 5 lần sai mật khẩu → khóa TẠM 15 phút (bruteForceStrategy MULTIPLE, failureFactor 5, waitIncrementSeconds = maxFailureWaitSeconds = 900), tự mở sau thời gian chờ, permanentLockout false. Quên mật khẩu gửi liên kết qua SMTP đã cấu hình. Admin vẫn có thể khóa hành chính tới khi mở qua pf/accounts (POST /v1/accounts/users/{id}/unlock). Cửa sổ đếm 24 giờ: maxDeltaTimeSeconds 86400 — Keycloak xóa bộ đếm lần sai VÀ số lần khóa tạm khi lần sai kế tiếp cách lần sai trước > 24 giờ, hoặc khi đăng nhập thành công. Tài khoản bị Admin khóa (enabled = false) vẫn khóa tới khi mở. Đăng nhập bằng email hoặc SĐT: username = SĐT chuẩn hóa 0xxxxxxxxx (pf/accounts tạo), email qua loginWithEmailAllowed.",
     "session_note": "KN v7.7: web-ops hết phiên sau 4 giờ không thao tác (client.session.idle.timeout 14400), app hiện trường phiên 24 giờ (86400) + ngoại tuyến 72 giờ (offline 259200, PIN 6 số giữ trong app); các client khác giữ 1 giờ không thao tác như trước. Lần đầu đăng nhập bắt buộc đặt mật khẩu qua liên kết kích hoạt (required action UPDATE_PASSWORD), không gửi mật khẩu tạm. Theme đăng nhập agrigreen (loginTheme) gắn từ deploy/compose/keycloak-themes/agrigreen vào /opt/keycloak/themes/agrigreen: xem docs/brd/kn-p1-realm-patch.md.",
     "note": "Vai đánh dấu [MFA] chỉ dùng trên Admin API — backend chặn token không có yếu tố thứ hai (httpx.RequireMFA, mục 11). Người giữ vai này phải cấu hình TOTP (required action CONFIGURE_TOTP) khi tạo tài khoản.",
     "mfa_note": "D24 (CEO 13/10/2026, QĐ-4 phương án c): TOTP bắt buộc khi đăng nhập cho cán bộ KN (kn_user, kn_national_admin, kn_province_admin, kn_officer) và mọi vai [MFA] từ G1. Các vai này là vai tổng hợp chứa vai đánh dấu login_totp_required; luồng browser 'agrigreen browser' có nhánh có điều kiện (Condition - user role = login_totp_required → OTP Form): chưa có TOTP thì Keycloak tự thêm CONFIGURE_TOTP và bắt đăng ký ngay ở lần đăng nhập đầu. Người không có vai đánh dấu nhưng đã tự cấu hình TOTP vẫn bị hỏi OTP (nhánh Condition - user configured). Phiên GIỮ NGUYÊN 4 giờ/24 giờ theo D9 kèm đánh giá rủi ro docs/security/danh-gia-rui-ro-phien-4h-24h.md. Mật khẩu 14 ký tự/không trùng 10 CHỈ ở realm quản trị riêng agrigreen-kn-admin (D24, D25). Realm đã nhập ở môi trường thật không tự cập nhật: làm theo docs/runbooks/keycloak-mfa-d24.md."
@@ -154,7 +161,7 @@
     }
   ],
   "defaultRole": { "name": "default-roles-agrigreen", "composite": true },
-  "defaultDefaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
+  "defaultDefaultClientScopes": ["basic", "roles", "web-origins", "profile", "agrigreen-claims"],
   "defaultOptionalClientScopes": ["offline_access"],
   "groups": [
     {
@@ -177,10 +184,56 @@
     ]
   },
   "authenticatorConfig": [
+    { "alias": "agrigreen-amr-pwd", "config": { "default.reference.value": "pwd", "default.reference.maxAge": "86400" } },
+    { "alias": "agrigreen-amr-otp", "config": { "default.reference.value": "otp", "default.reference.maxAge": "86400" } },
     { "alias": "agrigreen-login-totp-role", "config": { "condUserRole": "login_totp_required", "negate": "false" } },
     { "alias": "agrigreen-not-login-totp-role", "config": { "condUserRole": "login_totp_required", "negate": "true" } }
   ],
   "authenticationFlows": [
+    {
+      "alias": "agrigreen password recovery", "description": "Quên mật khẩu qua email; GIỮ nguyên credential TOTP, không tự reset OTP",
+      "providerId": "basic-flow", "topLevel": true, "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "reset-credentials-choose-user", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10 },
+        { "authenticator": "reset-credential-email", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20 },
+        { "flowAlias": "agrigreen recovery role otp", "authenticatorFlow": true, "requirement": "CONDITIONAL", "priority": 30 },
+        { "flowAlias": "agrigreen recovery configured otp", "authenticatorFlow": true, "requirement": "CONDITIONAL", "priority": 40 },
+        { "authenticator": "reset-password", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 50 }
+      ]
+    },
+    {
+      "alias": "agrigreen recovery role otp", "description": "D24: vai bắt MFA phải xác thực OTP trước reset; chưa có OTP thì CONFIGURE_TOTP bắt buộc trước khi hoàn tất phiên",
+      "providerId": "basic-flow", "topLevel": false, "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "conditional-user-role", "authenticatorConfig": "agrigreen-login-totp-role", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10 },
+        { "authenticator": "auth-otp-form", "authenticatorConfig": "agrigreen-amr-otp", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20 }
+      ]
+    },
+    {
+      "alias": "agrigreen recovery configured otp", "description": "Không thuộc vai bắt MFA nhưng đã có OTP: vẫn phải xác thực OTP khi reset, không hỏi hai lần",
+      "providerId": "basic-flow", "topLevel": false, "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "conditional-user-role", "authenticatorConfig": "agrigreen-not-login-totp-role", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10 },
+        { "authenticator": "conditional-user-configured", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20 },
+        { "authenticator": "auth-otp-form", "authenticatorConfig": "agrigreen-amr-otp", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 30 }
+      ]
+    },
+    {
+      "alias": "agrigreen direct grant", "description": "Chỉ-dev seed: password + OTP đã cấu hình; AMR chỉ từ execution thành công",
+      "providerId": "basic-flow", "topLevel": true, "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "direct-grant-validate-username", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10 },
+        { "authenticator": "direct-grant-validate-password", "authenticatorConfig": "agrigreen-amr-pwd", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20 },
+        { "flowAlias": "agrigreen direct grant otp", "authenticatorFlow": true, "requirement": "CONDITIONAL", "priority": 30 }
+      ]
+    },
+    {
+      "alias": "agrigreen direct grant otp", "providerId": "basic-flow", "topLevel": false, "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "conditional-user-configured", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10 },
+        { "authenticator": "direct-grant-validate-otp", "authenticatorConfig": "agrigreen-amr-otp", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20 }
+      ]
+    },
     {
       "alias": "agrigreen browser",
       "description": "D24: browser flow — cookie hoặc mật khẩu + TOTP có điều kiện theo vai đánh dấu login_totp_required",
@@ -200,7 +253,7 @@
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
-        { "authenticator": "auth-username-password-form", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
+        { "authenticator": "auth-username-password-form", "authenticatorConfig": "agrigreen-amr-pwd", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
         { "flowAlias": "agrigreen browser - TOTP theo vai", "authenticatorFlow": true, "autheticatorFlow": true, "requirement": "CONDITIONAL", "priority": 20, "userSetupAllowed": false },
         { "flowAlias": "agrigreen browser - TOTP da cau hinh", "authenticatorFlow": true, "autheticatorFlow": true, "requirement": "CONDITIONAL", "priority": 30, "userSetupAllowed": false }
       ]
@@ -213,7 +266,7 @@
       "builtIn": false,
       "authenticationExecutions": [
         { "authenticator": "conditional-user-role", "authenticatorConfig": "agrigreen-login-totp-role", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
-        { "authenticator": "auth-otp-form", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false }
+        { "authenticator": "auth-otp-form", "authenticatorConfig": "agrigreen-amr-otp", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false }
       ]
     },
     {
@@ -225,11 +278,19 @@
       "authenticationExecutions": [
         { "authenticator": "conditional-user-role", "authenticatorConfig": "agrigreen-not-login-totp-role", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
         { "authenticator": "conditional-user-configured", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false },
-        { "authenticator": "auth-otp-form", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 30, "userSetupAllowed": false }
+        { "authenticator": "auth-otp-form", "authenticatorConfig": "agrigreen-amr-otp", "authenticatorFlow": false, "autheticatorFlow": false, "requirement": "REQUIRED", "priority": 30, "userSetupAllowed": false }
       ]
     }
   ],
   "clientScopes": [
+    {
+      "name": "profile", "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true", "display.on.consent.screen": "false" },
+      "protocolMappers": [
+        { "name": "username", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": { "user.attribute": "username", "claim.name": "preferred_username", "jsonType.label": "String", "id.token.claim": "true", "access.token.claim": "true", "userinfo.token.claim": "true" } }
+      ]
+    },
     {
       "name": "basic",
       "description": "sub và auth_time (Keycloak 25+ tách khỏi scope openid)",
@@ -323,7 +384,7 @@
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
-      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"]
+      "defaultClientScopes": ["basic", "roles", "web-origins", "profile", "agrigreen-claims"]
     },
     {
       "clientId": "agrigreen-api",
@@ -343,7 +404,7 @@
       "redirectUris": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
       "webOrigins": ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8082"],
       "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:3000/*##http://127.0.0.1:3000/*", "client.session.idle.timeout": "14400", "client.session.max.lifespan": "36000" },
-      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"]
+      "defaultClientScopes": ["basic", "roles", "web-origins", "profile", "agrigreen-claims"]
     },
     {
       "clientId": "kn-web",
@@ -361,7 +422,7 @@
       "webOrigins": ["http://localhost:3000", "http://127.0.0.1:3000"],
       "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:3000/*##http://127.0.0.1:3000/*", "client.session.idle.timeout": "14400", "client.session.max.lifespan": "36000" },
       "authenticationFlowBindingOverrides": {},
-      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
+      "defaultClientScopes": ["basic", "roles", "web-origins", "profile", "agrigreen-claims"],
       "optionalClientScopes": []
     },
     {
@@ -374,7 +435,7 @@
       "redirectUris": ["http://localhost:3001/*", "http://127.0.0.1:3001/*"],
       "webOrigins": ["http://localhost:3001", "http://127.0.0.1:3001"],
       "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:3001/*##http://127.0.0.1:3001/*", "client.session.idle.timeout": "3600" },
-      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"]
+      "defaultClientScopes": ["basic", "roles", "web-origins", "profile", "agrigreen-claims"]
     },
     {
       "clientId": "agrigreen-field-app",
@@ -385,7 +446,7 @@
       "directAccessGrantsEnabled": false,
       "redirectUris": ["vn.agrigreen.field:/oauth2redirect"],
       "attributes": { "pkce.code.challenge.method": "S256", "client.session.idle.timeout": "86400", "client.session.max.lifespan": "86400", "client.offline.session.idle.timeout": "259200", "client.offline.session.max.lifespan": "259200" },
-      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
+      "defaultClientScopes": ["basic", "roles", "web-origins", "profile", "agrigreen-claims"],
       "optionalClientScopes": ["offline_access"]
     },
     {
@@ -397,7 +458,7 @@
       "directAccessGrantsEnabled": false,
       "redirectUris": ["vn.agrigreen.htx:/oauth2redirect"],
       "attributes": { "pkce.code.challenge.method": "S256", "client.session.idle.timeout": "3600" },
-      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
+      "defaultClientScopes": ["basic", "roles", "web-origins", "profile", "agrigreen-claims"],
       "optionalClientScopes": ["offline_access"]
     },
     {
@@ -409,7 +470,7 @@
       "directAccessGrantsEnabled": false,
       "redirectUris": ["vn.agrigreen.mkgfield:/oauth2redirect"],
       "attributes": { "pkce.code.challenge.method": "S256", "client.session.idle.timeout": "3600" },
-      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
+      "defaultClientScopes": ["basic", "roles", "web-origins", "profile", "agrigreen-claims"],
       "optionalClientScopes": ["offline_access"]
     },
     {

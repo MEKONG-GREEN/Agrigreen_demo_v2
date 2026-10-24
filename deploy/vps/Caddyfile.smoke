@@ -1,0 +1,10 @@
+# CI ONLY: loopback-published HTTP, no public TLS bypass in production config.
+{
+ admin off
+ auto_https off
+}
+http://files.vps.example.test:9080 {
+ reverse_proxy seaweedfs:9000 {
+  header_up Host {http.request.host}
+ }
+}
