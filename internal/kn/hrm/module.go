@@ -26,7 +26,7 @@
 // số, xếp loại năm, trạng thái xử lý, xuất Mẫu số 1/2/4 (Excel, dựng lại + SHA-256), sổ quyết định (áp bậc cùng giao dịch,
 // hủy = sự kiện bù), job hrm_promotion_scan (module_promotion.go).
 //
-// W11.27 (pf 20261024064206) — KẾ HOẠCH NHÂN LỰC NĂM (FN-11, D3 H7): profile "hrm_plan" của cap/forms (đơn vị lá = đơn vị
+// W11.27 (pf 20261024091030) — KẾ HOẠCH NHÂN LỰC NĂM (FN-11, D3 H7): profile "hrm_plan" của cap/forms (đơn vị lá = đơn vị
 // nội bộ), số hiện có/dự kiến nghỉ hưu tự tính từ hồ sơ tại ngày chốt, nháp và điều chỉnh sau chốt ở sổ pf_hrm.
 //
 // Gói sau của cùng module: W11.26 đánh giá. Module khác chỉ import hrm/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.

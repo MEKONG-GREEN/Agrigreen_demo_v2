@@ -82,7 +82,7 @@ Lý do không đặt danh mục ở `cap/masterdata`: một bên dùng (chưa đ
 - Tệp qua `pf/evidence` (`UseResolver("pf/hrm")`, chủ thể `hr_folder`, mục đích `hr_records` — thêm vào `evidence/domain.Purposes`, vault `OpUnwrap`; không kiểm đồng ý cho mục đích này). Máy chủ seal bằng khóa công khai của chủ thể "kho tài liệu" của tenant ở kho định danh (địa bàn `hrm_docs`, tạo lần đầu). `pf/hrm` thêm phụ thuộc `pf/evidence`.
 - Giả định: [W11.24](../kn/gia-dinh/W11.24.md).
 
-### W11.27 kế hoạch nhân lực năm (20/10/2026, pf 20261024064206)
+### W11.27 kế hoạch nhân lực năm (20/10/2026, pf 20261024091030)
 
 - Vòng đời kỳ trên `cap/forms` (D3 H7): pf/hrm đăng ký profile `hrm_plan` (`hrm.FormProfiles`, resolver phiên KN + `hrm.PlanValidator`) — cấp `TT` (Phòng HCTH, Admin) mở kỳ năm, rà soát, chốt; cấp lá `DV` = đơn vị nội bộ W11.07 (loại đơn vị lá `department`). Gốc lắp ráp nối profile vào `forms.Deps` và `UsePlans(Publisher, Control, Entry)`; `pf/hrm` thêm phụ thuộc port `pf/forms`.
 - Sổ `pf_hrm.plan_period` (năm → kỳ cap/forms, ngày chốt số liệu, hạn), `plan_draft` (lưu nháp), `plan_adjustment` (điều chỉnh sau chốt có lý do — BR-02); số hiện có, dự kiến nghỉ hưu tự tính từ phép chiếu as-of tại ngày chốt (BR-01).
