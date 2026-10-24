@@ -16,7 +16,9 @@ không ghi đè; outbox tiếp tục phục vụ projection ở cụm khác và 
 
 Retry cùng Idempotency-Key được tuần tự hóa trong giao dịch nguồn trước đọc sổ,
 kiểm trùng tên và cấp mã. Không giữ kết nối này khi gọi pf/cooperative ở bước hai.
-Xung đột nghiệp vụ thật (hai thao tác khác nhau cùng tên/MST) vẫn bị từ chối.
+Nếu yêu cầu cùng khóa commit giữa bước đọc sổ ban đầu và kiểm MST qua port, kết quả
+đã commit được đọc lại trước khi trả lỗi trùng. Xung đột nghiệp vụ thật (hai thao tác
+khác nhau cùng tên/MST) vẫn bị từ chối.
 
 ## RLS
 
@@ -38,7 +40,9 @@ không đòi dòng membership chưa tồn tại; USING vẫn kiểm thành viên
    nhiều request đồng thời. Không đổi tenant hoặc dữ liệu sổ để chữa lỗi quyền.
 
 Parent chưa có projection làm giao dịch tạo con rollback hoàn toàn, không sinh
-closure tự nó mà thiếu tổ tiên. Không hứa hỗ trợ nguồn đang chạy cùng Rebuild từ
+closure tự nó mà thiếu tổ tiên. Lỗi này trả 503 party.dependency_unavailable với
+chi tiết không chứa dữ liệu cá nhân; quản trị viên cần khôi phục projection cha trước
+khi thử lại, không nới RLS. Không hứa hỗ trợ nguồn đang chạy cùng Rebuild từ
 snapshot cũ; cửa sổ bảo trì là điều kiện vận hành cho Rebuild hiện hữu.
 
 ## Bằng chứng
