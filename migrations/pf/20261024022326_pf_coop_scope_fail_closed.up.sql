@@ -1,7 +1,11 @@
 -- P0-HTX-KREF (#130): forward-only hardening of the W3.4 restrictive policies.
 -- Keep p_tenant and explicit node-less jobs/Admin behavior; scoped sessions need
 -- a projected caller node even for commune/draft branches. An empty k_ref never
--- falls back to tenant-wide access. No source or append-only ledger is rewritten.
+-- falls back to tenant-wide access. Preserve W4.2 read delegation for tables
+-- with p_share: only USING accepts foreign-tenant rows, whose SELECT permission
+-- still comes from p_share (purpose, grant, owner, node, validity). WITH CHECK
+-- never receives that branch; p_tenant still rejects foreign writes. No source
+-- or append-only ledger is rewritten.
 DO $$
 DECLARE
   spec constant text[][] := ARRAY[
@@ -29,6 +33,7 @@ DECLARE
   unscoped constant text := $f$k_ref.ctx_uuid('app.node_id') IS NULL$f$;
   expr text;
   scoped text;
+  read_expr text;
   t text;
   n text;
 BEGIN
@@ -48,7 +53,13 @@ BEGIN
       scoped := scoped || format($f$ OR (%1$I.%2$I IS NULL AND k_ref.ctx_text('app.xa_ids') IS NULL)$f$, t, n);
     END IF;
     expr := unscoped || ' OR (' || ready || ' AND (' || scoped || '))';
-    EXECUTE format('ALTER POLICY p_scope ON pf_coop.%I USING (%s) WITH CHECK (%s)', t, expr, expr);
+    read_expr := expr;
+    IF EXISTS (SELECT 1 FROM pg_policy p
+      WHERE p.polrelid = format('pf_coop.%I', t)::regclass AND p.polname = 'p_share'
+        AND p.polpermissive AND p.polcmd = 'r' AND p.polwithcheck IS NULL) THEN
+      read_expr := format('%I.tenant_id <> shared.current_tenant() OR (%s)', t, expr);
+    END IF;
+    EXECUTE format('ALTER POLICY p_scope ON pf_coop.%I USING (%s) WITH CHECK (%s)', t, read_expr, expr);
   END LOOP;
   scoped := $f$EXISTS (SELECT 1 FROM pf_coop.household_membership m
     JOIN k_ref.node_closure nc ON nc.tenant_id = m.tenant_id AND nc.descendant = m.org_ref
@@ -59,7 +70,10 @@ BEGIN
   expr := unscoped || ' OR (' || ready || ' AND (' || scoped || '))';
   -- Membership is inserted after the household in the same transaction. The
   -- INSERT readiness check must not depend on that not-yet-existing membership.
-  EXECUTE format('ALTER POLICY p_scope ON pf_coop.household USING (%s) WITH CHECK (%s)', expr, unscoped || ' OR ' || ready);
+  -- household has a W4.2 p_share FOR SELECT as well. Its membership subquery
+  -- must be able to read the owner's shared memberships through their p_share.
+  read_expr := 'household.tenant_id <> shared.current_tenant() OR (' || expr || ')';
+  EXECUTE format('ALTER POLICY p_scope ON pf_coop.household USING (%s) WITH CHECK (%s)', read_expr, unscoped || ' OR ' || ready);
   scoped := $f$(kn_profile_event.subject_kind = 'cooperative' AND EXISTS (
     SELECT 1 FROM k_ref.node_closure nc WHERE nc.tenant_id = kn_profile_event.tenant_id
       AND nc.ancestor = k_ref.ctx_uuid('app.node_id') AND nc.descendant = kn_profile_event.subject_ref))
