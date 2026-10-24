@@ -192,10 +192,12 @@ func Dispatches(ctx context.Context, tx pgx.Tx, province, dept string, periodID 
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Dispatch, error) { return scanDisp(r) })
 }
 
-// UpdateDispatchSend ghi trạng thái gửi.
+// UpdateDispatchSend ghi trạng thái gửi (xếp gửi / "Gửi lại"). Nhả việc đã quá hạn (claim_token/claim_until = NULL): lượt
+// vừa xếp chưa ai nhận nên "Gửi lại" khóa lại tới updated_at + hạn (review #128 — không mở ngay theo claim_until cũ), và
+// worker cũ còn sống muộn mất quyền gia hạn/ghi kết quả.
 func UpdateDispatchSend(ctx context.Context, tx pgx.Tx, d Dispatch) error {
 	_, err := tx.Exec(ctx, `UPDATE pf_reports.dispatch SET status = $2, recipient_ids = $3::uuid[], cc_ids = $4::uuid[], subject = $5, body = $6,
-	    link_only = $7, attempts = $8, last_error = $9, sent_at = $10, updated_at = $11 WHERE id = $1`,
+	    link_only = $7, attempts = $8, last_error = $9, sent_at = $10, updated_at = $11, claim_token = NULL, claim_until = NULL WHERE id = $1`,
 		d.ID, d.Status, idStrs(d.Recipients), idStrs(d.CC), d.Subject, d.Body, d.LinkOnly, d.Attempts, d.LastError, d.SentAt, d.UpdatedAt.UTC())
 	return err
 }

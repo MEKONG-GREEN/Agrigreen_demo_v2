@@ -604,6 +604,7 @@ func (s *Service) SendDispatch(ctx context.Context, id uuid.UUID, in SendInput, 
 			attempt = d.Attempts
 		}
 		d.Status, d.Recipients, d.CC, d.Subject, d.Attempts, d.LastError, d.UpdatedAt = dispatch.StatusSending, to, cc, &subj, attempt, nil, now
+		d.ClaimUntil = nil // UpdateDispatchSend nhả việc quá hạn — lượt mới xếp khóa tới updated_at + hạn.
 		if body != "" {
 			d.Body = &body
 		} else {
@@ -922,10 +923,32 @@ func (s *Service) sendLease() time.Duration {
 // sendingStale: lần gửi "Đang gửi" đã quá hạn nhận việc — worker giữ đã quá hạn, hoặc chưa ai nhận sau một hạn kể từ
 // lúc xếp gửi (sự kiện mất/vào DLQ).
 func (s *Service) sendingStale(d store.Dispatch, now time.Time) bool {
+	return !s.resumableAt(d).After(now)
+}
+
+// resumableAt là thời điểm lần gửi "Đang gửi" bắt đầu được "Gửi lại" (tiếp tục cùng lượt): hạn nhận việc của worker đang
+// giữ, hoặc updated_at + hạn khi chưa ai nhận. Cùng một nguồn cho SendDispatch (409 reports.dispatch_sending) và DTO đọc.
+func (s *Service) resumableAt(d store.Dispatch) time.Time {
 	if d.ClaimUntil != nil {
-		return !d.ClaimUntil.After(now)
+		return *d.ClaimUntil
 	}
-	return !d.UpdatedAt.Add(s.sendLease()).After(now)
+	return d.UpdatedAt.Add(s.sendLease())
+}
+
+// ResendState là trạng thái nút "Gửi email/Gửi lại" tính tại máy chủ lúc đọc (review #128): CanSend = POST /send hiện
+// được chấp nhận (không 409 reports.dispatch_sending); ResumableAt chỉ có khi "Đang gửi" — mốc từ đó được tiếp tục.
+type ResendState struct {
+	CanSend     bool
+	ResumableAt *time.Time
+}
+
+// DispatchResendState tính ResendState của một lần xuất/gửi theo đồng hồ dịch vụ, cùng điều kiện với SendDispatch.
+func (s *Service) DispatchResendState(d store.Dispatch) ResendState {
+	if d.Status != dispatch.StatusSending {
+		return ResendState{CanSend: true}
+	}
+	at := s.resumableAt(d)
+	return ResendState{CanSend: !at.After(s.now()), ResumableAt: &at}
 }
 
 // ActionRecipientMailed là dòng sổ dispatch_event "đã gửi email tới một người nhận" của một lượt gửi (migration 000086).

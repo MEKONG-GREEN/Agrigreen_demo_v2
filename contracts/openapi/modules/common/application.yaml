@@ -8051,7 +8051,7 @@ components:
 # @ag-order: 822
     Dispatch:
       type: object
-      required: [id, department_code, province_code, period_id, period_label, run_ids, forms, formats, provisional, missing_communes, status, recipient_ids, cc_ids, subject, body, link_only, attempts, last_error, sent_at, created_by, created_at, updated_at]
+      required: [id, department_code, province_code, period_id, period_label, run_ids, forms, formats, provisional, missing_communes, status, recipient_ids, cc_ids, subject, body, link_only, attempts, last_error, sent_at, created_by, created_at, updated_at, can_resend, resumable_at]
       properties:
         id: {type: string, format: uuid}
         department_code: {type: string}
@@ -8075,6 +8075,13 @@ components:
         created_by: {type: string, format: uuid}
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
+        can_resend:
+          type: boolean
+          description: Máy chủ tính lúc đọc — true khi POST /send hiện được chấp nhận. "Đang gửi" chỉ true khi đã quá hạn nhận việc (Gửi lại tiếp tục cùng lượt); còn hạn thì POST trả 409 reports.dispatch_sending.
+        resumable_at:
+          type: [string, "null"]
+          format: date-time
+          description: Chỉ có khi status = sending — mốc từ đó "Gửi lại" được chấp nhận (hạn nhận việc của worker, hoặc updated_at + hạn khi chưa ai nhận). null với trạng thái khác.
 # @ag-order: 823
     DispView:
       type: object

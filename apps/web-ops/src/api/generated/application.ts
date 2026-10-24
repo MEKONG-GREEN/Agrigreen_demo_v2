@@ -14729,6 +14729,13 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+            /** @description Máy chủ tính lúc đọc — true khi POST /send hiện được chấp nhận. "Đang gửi" chỉ true khi đã quá hạn nhận việc (Gửi lại tiếp tục cùng lượt); còn hạn thì POST trả 409 reports.dispatch_sending. */
+            can_resend: boolean;
+            /**
+             * Format: date-time
+             * @description Chỉ có khi status = sending — mốc từ đó "Gửi lại" được chấp nhận (hạn nhận việc của worker, hoặc updated_at + hạn khi chưa ai nhận). null với trạng thái khác.
+             */
+            resumable_at: string | null;
         };
         DispView: {
             dispatch: components["schemas"]["Dispatch"];

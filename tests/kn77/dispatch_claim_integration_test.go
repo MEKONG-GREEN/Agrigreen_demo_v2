@@ -14,6 +14,7 @@ import (
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
 // countMailer đếm email theo địa chỉ; delay giữ worker trong lúc gửi để các worker chồng nhau; crashOn: lần đầu gửi tới
@@ -394,5 +395,117 @@ func TestP0WorkerReports_LateFinisherMarkTolerated(t *testing.T) {
 	if n := f.count(`SELECT count(*) FROM pf_reports.dispatch WHERE tenant_id = $1 AND id::text = $2 AND status = 'sent' AND claim_token IS NULL`,
 		f.tenant, did); n != 1 {
 		t.Fatal("trạng thái sent do B ghi")
+	}
+}
+
+// resendState đọc can_resend/resumable_at của lần gửi qua GET chi tiết và danh sách của kỳ (cùng giá trị ở hai nơi).
+func resendState(t *testing.T, c *cycle, did string) (bool, string) {
+	t.Helper()
+	d := obj(c.tinh.must(c.tinh.get("/v1/reports/dispatches/"+did), http.StatusOK, "chi tiết").body, "dispatch")
+	can, ok := d["can_resend"].(bool)
+	if !ok {
+		t.Fatalf("thiếu can_resend: %v", d)
+	}
+	if _, ok := d["resumable_at"]; !ok {
+		t.Fatalf("thiếu resumable_at: %v", d)
+	}
+	at := str(d, "resumable_at")
+	for _, it := range arr(c.tinh.must(c.tinh.get("/v1/reports/dispatches?period_id="+c.p1), http.StatusOK, "danh sách").body, "items") {
+		if str(it, "id") == did && (it["can_resend"] != can || str(it, "resumable_at") != at) {
+			t.Fatalf("danh sách lệch chi tiết: %v vs %v/%s", it, can, at)
+		}
+	}
+	return can, at
+}
+
+func sameInstant(rfc string, want time.Time) bool {
+	got, err := time.Parse(time.RFC3339Nano, rfc)
+	return err == nil && got.Equal(want)
+}
+
+func dispatchTimes(t *testing.T, f *fixture, did string) (claimUntil *time.Time, updatedAt time.Time) {
+	t.Helper()
+	if err := f.env.AdminPool(t, migrations.PF).QueryRow(context.Background(), `SELECT claim_until, updated_at FROM pf_reports.dispatch
+	  WHERE tenant_id = $1 AND id::text = $2`, f.tenant, did).Scan(&claimUntil, &updatedAt); err != nil {
+		t.Fatal(err)
+	}
+	return claimUntil, updatedAt
+}
+
+// TestP0WorkerReports_ResendStateMatchesServer — review #128 (nút "Gửi lại" web): DTO đọc lần gửi có can_resend +
+// resumable_at do máy chủ tính, đúng điều kiện SendDispatch dùng: chưa ai nhận → updated_at + hạn; worker giữ rồi chết →
+// claim_until. Trước mốc: can_resend=false và POST 409 reports.dispatch_sending; sau mốc: can_resend=true, POST 202 tiếp
+// tục cùng lượt (người đã nhận không nhận lần hai); xong → can_resend=true, resumable_at=null.
+func TestP0WorkerReports_ResendStateMatchesServer(t *testing.T) {
+	c := setupCycle(t)
+	f := c.f
+	did, rids := dispatchWithTwoRecipients(t, c)
+	m := &countMailer{n: map[string]int{}, crashOn: claimAddr2}
+	f.rep.UseMailer(m)
+	lease := 15 * time.Minute // dispatch.DefaultSendLease — fixture không đặt hạn riêng.
+
+	if can, at := resendState(t, c, did); !can || at != "" {
+		t.Fatalf("chưa gửi: can_resend=true, resumable_at=null; nhận %v %q", can, at)
+	}
+	sent := c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusAccepted, "gửi email")
+	if d := obj(sent.body, "dispatch"); d["can_resend"] != false || str(d, "resumable_at") == "" {
+		t.Fatalf("202 vừa xếp gửi: can_resend=false kèm mốc; nhận %v", d)
+	}
+
+	// Chưa worker nào nhận: mốc = updated_at + hạn.
+	claim, upd := dispatchTimes(t, f, did)
+	if claim != nil {
+		t.Fatal("chưa ai nhận việc")
+	}
+	can, at := resendState(t, c, did)
+	if want := upd.Add(lease); can || !sameInstant(at, want) {
+		t.Fatalf("chưa nhận việc: muốn false/%s, nhận %v/%s", want, can, at)
+	}
+
+	// Worker nhận việc, gửi người 1 rồi chết: mốc = claim_until.
+	evs := f.events(repport.EventDispatchRequested)
+	ev := evs[len(evs)-1]
+	func() {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatal("muốn worker chết giữa lượt")
+			}
+		}()
+		_ = deliver(f, ev)
+	}()
+	claim, _ = dispatchTimes(t, f, did)
+	if claim == nil {
+		t.Fatal("worker phải đang giữ việc")
+	}
+	can, at = resendState(t, c, did)
+	if want := *claim; can || !sameInstant(at, want) {
+		t.Fatalf("worker giữ: muốn false/%s, nhận %v/%s", want, can, at)
+	}
+	c.tinh.fail(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusConflict,
+		"reports.dispatch_sending", "gửi lại khi còn hạn")
+
+	// Đúng mốc (claim_until <= now): máy chủ mở — DTO và POST cùng kết luận.
+	f.setClock(*claim)
+	if can, at = resendState(t, c, did); !can || !sameInstant(at, *claim) {
+		t.Fatalf("quá hạn: muốn can_resend=true giữ mốc, nhận %v/%s", can, at)
+	}
+	res := c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusAccepted, "gửi lại sau hạn")
+	if d := obj(res.body, "dispatch"); d["can_resend"] != false || num(d, "attempts") != 1 || !sameInstant(str(d, "resumable_at"), f.clk.Now().Add(lease)) {
+		t.Fatalf("tiếp tục cùng lượt 1, khóa lại tới now + hạn (nhả claim cũ): %v", d)
+	}
+	if claim, _ = dispatchTimes(t, f, did); claim != nil {
+		t.Fatal("Gửi lại phải nhả việc quá hạn")
+	}
+	c.tinh.fail(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusConflict,
+		"reports.dispatch_sending", "bấm Gửi lại lần hai ngay sau khi tiếp tục")
+	evs = f.events(repport.EventDispatchRequested)
+	if err := deliver(f, evs[len(evs)-1]); err != nil {
+		t.Fatal(err)
+	}
+	if m.count(claimAddr1) != 1 || m.count(claimAddr2) != 1 {
+		t.Fatalf("người 1 không nhận lần hai: %v", m.n)
+	}
+	if can, at = resendState(t, c, did); !can || at != "" {
+		t.Fatalf("đã gửi: can_resend=true, resumable_at=null; nhận %v %q", can, at)
 	}
 }

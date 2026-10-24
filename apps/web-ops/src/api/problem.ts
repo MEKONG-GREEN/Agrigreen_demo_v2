@@ -332,7 +332,8 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "reports.dispatch_recipient_duplicate": "Địa chỉ đã có trong danh bạ người nhận.",
   "reports.dispatch_no_data": "Kỳ chưa có dữ liệu tổng hợp — bấm “Cập nhật” ở Báo cáo tổng hợp các xã trước.",
   "reports.gsheet_disabled": "Tạo link Google Sheet đang tắt (ADR-0026 chưa được chấp nhận) — dùng Excel/PDF.",
-  "reports.dispatch_sending": "Đang gửi — chờ kết quả rồi mới gửi lại.",
+  "reports.dispatch_sending":
+    "Lượt gửi vẫn đang được máy chủ xử lý (chưa quá hạn nhận việc) — chờ kết quả rồi bấm “Làm mới trạng thái”. Nút “Gửi lại” chỉ mở khi lượt gửi bị kẹt quá hạn.",
   "reports.dispatch_no_recipients": "Chưa chọn người nhận Chi cục và chưa có người nhận mặc định.",
   "reports.gsheet_valve_blocked": "Van chặn: mẫu có trường không được phép đưa ra ngoài lãnh thổ.",
   // pf/geo G2 (ranh giới HTX, kho/Hub, sức chứa, đường bộ)

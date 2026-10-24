@@ -4,7 +4,7 @@
 // thay đổi chờ cập nhật, nhật ký, ô thay đổi), Báo cáo TW tuần/tháng/vụ/năm chỉ xem (FN-TW-01.02), Báo cáo Chi cục
 // (FN-TI-02.06 — xuất Excel/PDF, gửi email 202 + trạng thái, tải; Google Sheet tắt theo ADR-0026).
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { DetailLayout, LogPanel } from "@/components/patterns/detail";
@@ -449,6 +449,16 @@ export function DispatchScreen() {
   const to = (recips.data?.items ?? []).filter((r) => r.kind === "to" && r.is_default);
   const cc = (recips.data?.items ?? []).filter((r) => r.kind === "cc" && r.is_default);
   const label = bp.period?.label ?? "";
+  // Review #128: "Đang gửi" kẹt (worker chết) được "Gửi lại" — tiếp tục cùng lượt — khi máy chủ báo đã quá hạn nhận việc
+  // (can_resend). Còn hạn: khóa nút, hiện mốc mở (resumable_at) và tự làm mới đúng mốc đó.
+  const disp = view.data?.dispatch;
+  const stuck = disp?.status === "sending" && disp.can_resend;
+  const lockedUntil = disp?.status === "sending" && !disp.can_resend ? disp.resumable_at : null;
+  useEffect(() => {
+    if (!lockedUntil) return;
+    const t = setTimeout(() => setNonce((n) => n + 1), Math.min(Math.max(Date.parse(lockedUntil) - Date.now() + 1000, 5000), 2_000_000_000));
+    return () => clearTimeout(t);
+  }, [lockedUntil, view.data]);
   return (
     <>
       <PageHeader title={`Gửi báo cáo Chi cục${label ? ` · ${label}` : ""}`} />
@@ -547,14 +557,30 @@ export function DispatchScreen() {
               <button
                 type="button"
                 className="btn btn-p"
-                disabled={!view.data || act.busy || view.data.dispatch.status === "sending"}
-                onClick={() => void act.run(() => cycleApi.send(view.data!.dispatch.id, { subject, body }), "Đã xếp gửi email (202) — trạng thái cập nhật khi máy chủ gửi xong.").then(() => setTimeout(() => setNonce((n) => n + 1), 2000))}
+                disabled={!disp || act.busy || !disp.can_resend}
+                onClick={() =>
+                  void act
+                    .run(
+                      () => cycleApi.send(disp!.id, { subject, body }),
+                      stuck ? "Đã xếp gửi lại (202) — tiếp tục lượt đang kẹt, người đã nhận không bị gửi lại." : "Đã xếp gửi email (202) — trạng thái cập nhật khi máy chủ gửi xong.",
+                    )
+                    .then(() => setTimeout(() => setNonce((n) => n + 1), 2000))
+                }
               >
-                <Icon name="send" size={15} /> {view.data?.dispatch.status === "failed" ? "Gửi lại" : "Gửi email"}
+                <Icon name="send" size={15} /> {stuck ? "Gửi lại (tiếp tục lượt đang kẹt)" : disp?.status === "failed" ? "Gửi lại" : "Gửi email"}
               </button>
               <button type="button" className="btn btn-o btn-sm" style={{ marginLeft: 8 }} onClick={() => setNonce((n) => n + 1)}>
                 Làm mới trạng thái
               </button>
+              {lockedUntil ? (
+                <p className="small mute" data-testid="dispatch-resend-hint">
+                  Máy chủ đang gửi lượt này. Nếu lượt gửi bị kẹt, nút “Gửi lại” mở từ {dt(lockedUntil)}.
+                </p>
+              ) : stuck ? (
+                <p className="small" data-testid="dispatch-resend-hint">
+                  Lượt gửi đã quá hạn xử lý mà chưa xong — có thể bấm “Gửi lại” để tiếp tục; người đã nhận email không bị gửi lại.
+                </p>
+              ) : null}
             </section>
           </>
         }
