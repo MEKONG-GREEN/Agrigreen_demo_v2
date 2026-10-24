@@ -58,7 +58,7 @@ for f in agrigreen-realm.json agrigreen-kn-admin-realm.json; do
 done
 # Keycloak trong container chạy bằng uid khác → phải đọc được (realm không chứa bí mật,
 # chỉ placeholder ${AG_KC_CLIENT_SECRET}; umask 077 ở trên chỉ dành cho .env).
-chmod 755 "$root/deploy/compose/.vps" "$out"
+chmod 755 "$root/deploy/compose/.vps" "$out" "$root/deploy/compose/.vps/notify"
 chmod 644 "$out/agrigreen-realm.json" "$out/agrigreen-kn-admin-realm.json"
 
 echo "Xong: $envf (đã thêm biến VPS), $out/agrigreen-realm.json, $out/agrigreen-kn-admin-realm.json"

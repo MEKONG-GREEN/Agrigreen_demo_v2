@@ -71,7 +71,7 @@ func TestKNWebClientCodePKCEAndClaims_KNSPLIT3(t *testing.T) {
 				t.Errorf("kn-web %s=%q, want %q", key, c.Attributes[key], want)
 			}
 		}
-		wantScopes := []string{"basic", "roles", "web-origins", "agrigreen-claims"}
+		wantScopes := []string{"basic", "roles", "web-origins", "profile", "agrigreen-claims"}
 		if !slices.Equal(c.DefaultScopes, wantScopes) || len(c.OptionalScopes) != 0 {
 			t.Errorf("kn-web scopes=%v optional=%v, need shared subject/roles/claims without offline access", c.DefaultScopes, c.OptionalScopes)
 		}
