@@ -53,7 +53,7 @@ type nativeBeginProbe struct {
 type directNativeTx struct{ pgx.Tx }
 
 func (tx directNativeTx) BeginTx(ctx context.Context, _ pgx.TxOptions) (pgx.Tx, error) {
-	return tx.Tx.Begin(ctx)
+	return tx.Begin(ctx)
 }
 
 func (b *nativeBeginProbe) BeginTx(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, error) {

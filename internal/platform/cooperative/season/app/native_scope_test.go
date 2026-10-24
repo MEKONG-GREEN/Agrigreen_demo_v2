@@ -52,7 +52,7 @@ func (tx *nativeScopeTxFake) Rollback(context.Context) error { tx.b.active = fal
 type nativeScopeReusableTx struct{ pgx.Tx }
 
 func (tx nativeScopeReusableTx) BeginTx(ctx context.Context, _ pgx.TxOptions) (pgx.Tx, error) {
-	return tx.Tx.Begin(ctx)
+	return tx.Begin(ctx)
 }
 
 func nativeScopeContext(p authz.Principal) context.Context {
