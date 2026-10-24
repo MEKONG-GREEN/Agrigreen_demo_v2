@@ -83,6 +83,7 @@ func newFixture(t *testing.T) *fixture {
 	f := &fixture{t: t, iss: iss, pool: pool, clk: clock.NewFixed(startTime), tenant: ids.New(), mkg: ids.New(), share: porttest.New(),
 		coopA: ids.New(), coopB: ids.New(), knA: ids.New(), h1: ids.New(), h2: ids.New(), h3: ids.New(), h4: ids.New(),
 		p1: ids.New(), p2: ids.New(), p3: ids.New(), p4: ids.New(), p5: ids.New()}
+	f.seedSourceOrgs()
 	sc := &fakeScope{scopes: map[uuid.UUID]authz.Scope{f.knA: {Units: []string{"31117"}}}}
 	f.plots = &fakePlots{plots: map[uuid.UUID]port.Plot{}, dist: map[uuid.UUID]decimal.Decimal{}}
 	area := decimal.RequireFromString("1.5000")
