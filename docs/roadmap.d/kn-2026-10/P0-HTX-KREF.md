@@ -1,0 +1,1 @@
+- [ ] P0-HTX-KREF (#130): tạo Nút và k_ref cùng giao dịch, RLS đóng khi projection thiếu; đang kiểm PG riêng và chờ review chéo.

@@ -257,6 +257,13 @@ func units(u []string) []string {
 	return u
 }
 
+// LockOrgIdempotency serializes concurrent retries before reading the ledger.
+// Tenant and operation namespace are part of the lock; it ends with the tx.
+func LockOrgIdempotency(ctx context.Context, tx pgx.Tx, key string) error {
+	_, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('pf_party.org.idem:' || shared.current_tenant()::text || ':' || $1, 0))", key)
+	return err
+}
+
 // LockCooperativeName tuần tự hóa việc tạo HTX cùng tên (không phân biệt hoa thường)
 // trong giao dịch hiện tại — khóa tư vấn tự nhả khi giao dịch kết thúc.
 func LockCooperativeName(ctx context.Context, tx pgx.Tx, name string) error {
