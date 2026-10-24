@@ -2,7 +2,7 @@ package kn77_test
 
 // W11.50 — Chiến dịch điều tra mở rộng CNTS (BRD CNTS v3.7 FN-21, UR-TINH-26, UR-XA-14; D4 CN10) trên module THẬT qua
 // HTTP và PostgreSQL: pf/forms (kỳ native kn_cnts loại `adhoc`) + pf/extension (/v1/extension/cnts/campaigns*, sổ pf
-// 20261020174704). Kiểm vòng đời Nháp → Đang thu thập → Đã đóng → mở lại (Lãnh đạo phòng), và số liệu đợt KHÔNG vào lũy
+// 20261024091058). Kiểm vòng đời Nháp → Đang thu thập → Đã đóng → mở lại (Lãnh đạo phòng), và số liệu đợt KHÔNG vào lũy
 // kế Phụ lục 2 (BM-18) dù đợt dùng cùng biểu BM-17, KHÔNG vào bộ đọc/quy đổi số đã chốt của KHTC (closedfig).
 
 import (

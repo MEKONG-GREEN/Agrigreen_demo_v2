@@ -1,4 +1,4 @@
-// Package store: SQL của Chiến dịch điều tra CNTS (pf 20261020174704 — pf_extension.cnts_campaign, cnts_campaign_event) trên
+// Package store: SQL của Chiến dịch điều tra CNTS (pf 20261024091058 — pf_extension.cnts_campaign, cnts_campaign_event) trên
 // pool vai của pf/extension, luôn trong giao dịch có ngữ cảnh tenant (RLS). Hai sổ chỉ ghi thêm (shared.apply_ledger).
 package store
 

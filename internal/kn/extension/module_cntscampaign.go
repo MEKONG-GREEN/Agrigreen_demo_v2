@@ -1,7 +1,7 @@
 package extension
 
 // Nối Chiến dịch điều tra mở rộng CNTS (W11.50 — D4 CN10, extension/cntscampaign): đợt = kỳ native cap/forms profile
-// kn_cnts loại kỳ `adhoc` + sổ riêng của đợt (pf 20261020174704). Route /v1/extension/cnts/campaigns* luôn gắn; thiếu
+// kn_cnts loại kỳ `adhoc` + sổ riêng của đợt (pf 20261024091058). Route /v1/extension/cnts/campaigns* luôn gắn; thiếu
 // cap/forms → 503 extension.dependency_unavailable. Gốc lắp ráp gọi UseCNTSCampaigns sau khi dựng pf/forms.
 
 import (
