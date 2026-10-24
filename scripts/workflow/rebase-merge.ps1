@@ -2,17 +2,20 @@
     [Parameter(Mandatory)][Alias('Pkg')][string]$Worktree,   # thư mục dưới AG_WORKTREE_ROOT
     [Parameter(Mandatory)][string]$Ticket,                     # mã gói, vd P0-WEB-IDEMKEY -> nhánh PR pr/<Ticket>
     [Parameter(Mandatory)][int]$Issue,
-    [Parameter(Mandatory)][ValidateSet('claude', 'codex')][string]$Agent,   # bên gộp; cần Review OK của bên kia
+    [Parameter(Mandatory)][ValidateSet('claude', 'codex')][string]$Agent,   # bên chạy gộp (chỉ để ghi log)
+    [Parameter(Mandatory)][ValidateSet('claude', 'codex')][string]$Owner,   # chủ gói (nhãn agent:<x>); cần Review OK của bên kia
     [string]$IssueTitle = '',
     [string[]]$Tests = @(),
     [string]$GateRun = 'SchemaIsolation|RLSExplain|ModuleGroup|LoginRoles|NoCrossModule|LedgerAddColumn',
     [int]$ChecksTimeoutMin = 0,          # 0 -> AG_PR_CHECKS_TIMEOUT_MIN hoặc 90
-    [string]$AllowFailingChecks = '',    # regex tên check được phép đỏ khi repo CHƯA có check bắt buộc (chỉ cảnh báo)
+    [string[]]$AllowFailingCheck = @(),  # TÊN CHÍNH XÁC check không bắt buộc được miễn khi dev CHƯA có check bắt buộc (ghi vào PR/issue)
+    [switch]$NoChecksOk,                 # chỉ trước khi có CI: cho gộp khi PR không có check nào (ghi vào PR/issue)
     [switch]$DryRun
 )
 # Rebase nhánh gói lên origin/dev, gỡ xung đột tài liệu (giữ cả hai) và tệp sinh (lấy dev rồi sinh lại), kiểm cổng review
 # chéo, chạy cổng + kiểm thử, rồi đẩy pr/<Ticket>, tạo/dùng lại PR vào dev, chờ check, gộp bằng merge commit đúng SHA đầu.
-# Không còn đường push thẳng dev. Mã thoát: 0 gộp xong; 1 cổng/kiểm thử/regen; 2 xung đột mã; 4 review; 5 check PR; 6 gộp PR.
+# Không còn đường push thẳng dev. Mã thoát: 0 gộp xong; 1 cổng/kiểm thử/regen/toolchain; 2 xung đột mã; 4 review; 5 check PR;
+# 6 gộp PR. CI fail-closed: chỉ gộp khi mọi check (bắt buộc, hoặc mọi check báo về khi chưa bật bảo vệ nhánh) là 'pass'.
 # -DryRun: rebase thử trong worktree tạm (không đụng nhánh gói), chạy thật cổng review (chỉ đọc), in mọi lệnh còn lại.
 $ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
@@ -22,6 +25,12 @@ $script:AgDryRun = [bool]$DryRun
 if (-not $DryRun -and -not $env:AG_INTEGRATION_LOCK) { throw 'Run through scripts/workflow/ticket.ps1 merge (holds origin lock/integration); direct runs are refused' }
 $ctx = Get-AgContext $sp
 $gh = $ctx.GhRepo
+$AllowFailingCheck = @($AllowFailingCheck | Where-Object { "$_" -ne '' })
+Assert-AgCheckWaivers $AllowFailingCheck
+$waiverNote = @()
+if ($AllowFailingCheck.Count) { $waiverNote += "WAIVER REQUESTED: -AllowFailingCheck $(($AllowFailingCheck | ForEach-Object { "'$_'" }) -join ', ') (exact names; only while dev has no required checks)" }
+if ($NoChecksOk) { $waiverNote += 'WAIVER REQUESTED: -NoChecksOk (merge allowed without any CI check; only before CI exists on dev)' }
+$waiverNote
 $w = Join-Path $ctx.WorktreeRoot $Worktree
 $agBranch = git -C $w symbolic-ref --short HEAD
 if ($LASTEXITCODE -ne 0 -or -not $agBranch -or $agBranch -in @('main', 'dev')) { throw 'Expected a package branch, refusing main/dev or detached HEAD' }
@@ -32,6 +41,23 @@ if (git -C $w status --porcelain) { throw 'Worktree has uncommitted changes; res
 $oldHead = "$(git -C $w rev-parse HEAD)".Trim()
 $prBranch = "pr/$Ticket"
 "package $Ticket (#$Issue) branch $agBranch head $($oldHead.Substring(0,12)) -> PR head $prBranch, base dev $("$(git -C $w rev-parse --short origin/dev)".Trim())"
+
+# Toolchain Go chuẩn (AG_GO_TOOLCHAIN > GOTOOLCHAIN=goX.Y.Z > go.mod toolchain): đặt GOTOOLCHAIN đúng bản đó cho sinh lại và
+# cổng cục bộ, in `go version`, dừng nếu Go đang chạy khác bản chuẩn (không để SDK máy mới hơn tạo golden/regression giả).
+$goModText = if (Test-Path -LiteralPath (Join-Path $w 'go.mod')) { [IO.File]::ReadAllText((Join-Path $w 'go.mod')) } else { '' }
+$tc = Resolve-AgGoToolchain $env:AG_GO_TOOLCHAIN $env:GOTOOLCHAIN $goModText
+if (-not $tc) { 'TOOLCHAIN UNKNOWN: set AG_GO_TOOLCHAIN=goX.Y.Z (or GOTOOLCHAIN) to the CI toolchain'; if (-not $DryRun) { exit 1 } }
+$goVersionLine = '(dry-run: not executed)'
+if ($tc) {
+    "go toolchain: $($tc.Version) (from $($tc.Source))"
+    if ($DryRun) { "[dry-run] GOTOOLCHAIN=$($tc.Version); go version must report $($tc.Version)" }
+    else {
+        $env:GOTOOLCHAIN = $tc.Version
+        $goVersionLine = "$(go version 2>&1)".Trim()
+        "go version: $goVersionLine"
+        if ($goVersionLine -notmatch ('^go version ' + [regex]::Escape($tc.Version) + ' ')) { "TOOLCHAIN MISMATCH: expected $($tc.Version)"; exit 1 }
+    }
+}
 
 $dryWt = $null
 $dryBlocked = $false
@@ -105,10 +131,10 @@ try {
     "PR head after rebase/regeneration: $head"
 
     # --- Cổng review chéo: trước mọi cổng tốn thời gian và mọi thao tác từ xa -------------------------------------------
-    $openPr = Get-AgOpenPr $gh $prBranch
-    $comments = Get-AgThreadComments $gh $Issue $(if ($openPr) { "$($openPr.number)" } else { '' })
-    $verdicts = @(Get-AgReviewVerdicts $comments)
-    $gate = Resolve-AgReviewGate $verdicts $Agent $head $w 'origin/dev' $Ticket
+    $openPr = $null
+    try { $openPr = Get-AgOpenPr $gh $prBranch } catch { "REVIEW READ ERROR: $_"; if (-not $DryRun) { exit 4 }; $dryBlocked = $true }
+    "package owner: $Owner (review required from $(Get-AgOtherAgent $Owner)); merging agent: $Agent"
+    $gate = Get-AgLiveReviewGate $gh $Issue $(if ($openPr) { "$($openPr.number)" } else { '' }) $Owner $head $w 'origin/dev' $Ticket
     $gate.Message
     if (-not $gate.Ok) {
         if ($DryRun) { $dryBlocked = $true; '[dry-run] a real merge would STOP here (exit 4); continuing to print the plan' } else { exit 4 }
@@ -165,7 +191,9 @@ try {
         "Gói **$Ticket** — nhánh ``$agBranch`` rebase lên ``origin/dev``, đầu PR ``$head``.", '',
         '### Cổng cục bộ (scripts/workflow/rebase-merge.ps1)', '', '```', $gateLine) + $testSummary + @('```', '',
         '### Review chéo', '',
-        $(if ($gate.Review) { "$($gate.Review.Line) — $($gate.Review.Url) (khớp: $($gate.Mode))" } else { '(chưa có — dry-run)' }), '',
+        $(if ($gate.Review -and $gate.Ok) { "Chủ gói: $Owner. ``$($gate.Review.Line)`` — $($gate.Review.Url) (khớp: $($gate.Mode))" } else { '(chưa có — dry-run)' }), '',
+        '### Ngoại lệ CI', '', $(if ($waiverNote.Count) { $waiverNote -join "`n" } else { 'Không có (mọi check phải pass).' }), '',
+        "Go: $goVersionLine", '',
         '_PR do `ticket.ps1 merge` tạo; gộp bằng merge commit với `--match-head-commit`. Issue được script đóng sau khi gộp._')
     $bodyFile = Join-Path $env:TEMP "agwf-pr-$Worktree.md"
     [IO.File]::WriteAllText($bodyFile, ($body -join "`n"), (New-Object System.Text.UTF8Encoding($false)))
@@ -182,51 +210,34 @@ try {
     }
     "PR #$pr ($prBranch -> dev)"
 
-    # --- Chờ check ------------------------------------------------------------------------------------------------------
+    # --- Chờ check (fail-closed) -----------------------------------------------------------------------------------------
     if (-not $ChecksTimeoutMin) { $ChecksTimeoutMin = if ($env:AG_PR_CHECKS_TIMEOUT_MIN) { [int]$env:AG_PR_CHECKS_TIMEOUT_MIN } else { 90 } }
-    $required = @()
-    $j = Invoke-AgRead gh @('api', "repos/$gh/branches/dev/protection/required_status_checks", '--jq', '[(.contexts // [])[], ((.checks // [])[] | .context)] | unique | .[]')
-    if ($LASTEXITCODE -eq 0) { $required += @($j | Where-Object { $_ }) }
-    $j = Invoke-AgRead gh @('api', "repos/$gh/rules/branches/dev", '--jq', '.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context')
-    if ($LASTEXITCODE -eq 0) { $required += @($j | Where-Object { $_ }) }
-    $required = @($required | Sort-Object -Unique)
-    if ($required.Count) { "required checks on dev: $($required -join ', ')" } else { 'no required checks on dev (branch protection not enabled yet): waiting for all checks reported on the head commit' }
+    $graceSec = if ($env:AG_PR_CHECKS_GRACE_SEC) { [int]$env:AG_PR_CHECKS_GRACE_SEC } else { 180 }
+    $req = Get-AgRequiredChecks $gh 'dev'
+    if (-not $req.Ok) { "PR CHECKS FAIL: cannot read required checks of dev ($($req.Error)) - PR #$pr left open"; if ($DryRun) { $dryBlocked = $true } else { exit 5 } }
+    $required = @($req.Names)
+    if ($required.Count) { "required checks on dev: $($required -join ', ')" } else { 'no required checks on dev (branch protection not enabled yet): every reported check must pass' }
+    if ($required.Count -and $AllowFailingCheck.Count) { 'PR CHECKS FAIL: -AllowFailingCheck is refused while dev has required checks'; if ($DryRun) { $dryBlocked = $true } else { exit 5 } }
     if ($DryRun) {
-        if ($required.Count) { "[dry-run] poll: gh pr checks $pr -R $gh --required --json name,bucket (timeout ${ChecksTimeoutMin}m)" }
-        else { "[dry-run] poll: gh pr checks $pr -R $gh --json name,bucket (timeout ${ChecksTimeoutMin}m; none after grace -> warn and continue)" }
+        "[dry-run] poll: gh pr checks $pr -R $gh$(if ($required.Count) { ' --required' }) --json name,bucket,state (timeout ${ChecksTimeoutMin}m, grace ${graceSec}s; only bucket=pass is green; none after grace -> $(if ($NoChecksOk) { 'NO-CHECKS-OK (explicit)' } else { 'FAIL' }))"
     } else {
-        $deadline = (Get-Date).AddMinutes($ChecksTimeoutMin)
-        $grace = (Get-Date).AddSeconds($(if ($env:AG_PR_CHECKS_GRACE_SEC) { [int]$env:AG_PR_CHECKS_GRACE_SEC } else { 180 }))
-        $result = $null
-        while (-not $result) {
-            $prHead = "$(gh pr view $pr -R $gh --json headRefOid -q .headRefOid 2>$null)".Trim()
-            $checks = @()
-            if ($prHead -eq $head) {
-                $a = @('pr', 'checks', $pr, '-R', $gh, '--json', 'name,bucket,state'); if ($required.Count) { $a += '--required' }
-                $raw = (& gh @a 2>$null | Out-String).Trim()
-                if ($raw.StartsWith('[')) { $checks = @($raw | ConvertFrom-Json | ForEach-Object { $_ }) }
-            }
-            $fail = @($checks | Where-Object { $_.bucket -in @('fail', 'cancel') })
-            $pending = @($checks | Where-Object { $_.bucket -eq 'pending' })
-            if ($required.Count) {
-                $missing = @($required | Where-Object { $_ -notin @($checks | ForEach-Object { $_.name }) })
-                if ($fail.Count) { $result = "FAIL: $(($fail | ForEach-Object { $_.name }) -join '; ')" }
-                elseif (-not $pending.Count -and -not $missing.Count -and $prHead -eq $head) { $result = 'OK' }
-            } else {
-                $hard = @($fail | Where-Object { -not $AllowFailingChecks -or $_.name -notmatch $AllowFailingChecks })
-                if ($hard.Count) { $result = "FAIL: $(($hard | ForEach-Object { $_.name }) -join '; ')" }
-                elseif ($prHead -eq $head -and $checks.Count -and -not $pending.Count) {
-                    if ($fail.Count) { "WARNING: allowed failing checks: $(($fail | ForEach-Object { $_.name }) -join '; ')" }
-                    $result = 'OK'
-                } elseif ($prHead -eq $head -and -not $checks.Count -and (Get-Date) -gt $grace) {
-                    'WARNING: no checks reported on the PR head; continuing without CI (enable CI on dev, ticket #132)'; $result = 'OK'
-                }
-            }
-            if (-not $result -and (Get-Date) -gt $deadline) { $result = "TIMEOUT after ${ChecksTimeoutMin}m (pending: $(($pending | ForEach-Object { $_.name }) -join '; '))" }
-            if (-not $result) { Start-Sleep -Seconds 30 }
+        $ck = Wait-AgPrChecks $gh $pr $head $required ($ChecksTimeoutMin * 60) $graceSec 30 ([bool]$NoChecksOk) $AllowFailingCheck
+        "checks: $($ck.Result) - $($ck.Message) ($(@($ck.Checks).Count) reported)"
+        if ($ck.Result -ne 'OK') { "PR CHECKS FAIL - PR #$pr left open, worktree retained"; exit 5 }
+        $ciNote = @()
+        if (@($ck.Waived).Count) { $ciNote += "WAIVED failing checks (explicit -AllowFailingCheck): $(@($ck.Waived) -join '; ')" }
+        if ($ck.NoChecks) { $ciNote += 'NO-CHECKS-OK: merged without any CI check (explicit -NoChecksOk)' }
+        if ($ciNote.Count) {
+            $ciNote
+            Invoke-AgMut gh @('pr', 'comment', $pr, '-R', $gh, '--body', ("Ngoại lệ CI khi gộp (head ``$head``):`n" + (($ciNote | ForEach-Object { "- $_" }) -join "`n")))
         }
-        "checks: $result ($($checks.Count) reported)"
-        if ($result -ne 'OK') { "PR CHECKS $result - PR #$pr left open, worktree retained"; exit 5 }
+    }
+
+    # --- Cổng review lần 2, sát trước khi gộp: phán quyết có thể đã đổi trong lúc chờ cổng cục bộ/CI ----------------------
+    $gate2 = Get-AgLiveReviewGate $gh $Issue $(if ($pr -match '^\d+$') { $pr } else { '' }) $Owner $head $w 'origin/dev' $Ticket
+    "final review re-check: $($gate2.Message)"
+    if (-not $gate2.Ok) {
+        if ($DryRun) { $dryBlocked = $true } else { "REVIEW CHANGED before merge - PR #$pr left open"; exit 4 }
     }
 
     # --- Gộp PR ---------------------------------------------------------------------------------------------------------
@@ -234,7 +245,7 @@ try {
     if ($LASTEXITCODE -ne 0) { "PR MERGE FAIL - PR #$pr left open"; exit 6 }
     if ($DryRun) {
         "[dry-run] verify: git fetch origin dev; git merge-base --is-ancestor $head origin/dev"
-        if ($dryBlocked) { "DRY-RUN BLOCKED - review gate: a real merge exits 4 before the local gates (head $head)"; exit 4 }
+        if ($dryBlocked) { "DRY-RUN BLOCKED - a real merge would stop (review gate exit 4 / checks exit 5; see above) (head $head)"; exit 4 }
         "DRY-RUN OK - would merge via PR (head $head)"
         exit 0
     }

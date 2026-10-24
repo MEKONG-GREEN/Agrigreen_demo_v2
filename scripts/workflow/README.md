@@ -8,10 +8,10 @@ bước cuối của `ticket.ps1 merge` **tạo Pull Request vào `dev`** và g�
 |---|---|
 | `ticket.ps1` | `list`, `claim`, `ready`, `review`, `release`, `merge`, `lock-status` (khóa `claim/<PKG>`, `lock/integration` tạo-chỉ-một-lần như cũ) |
 | `rebase-merge.ps1` | chỉ chạy qua `ticket.ps1 merge`: rebase lên `origin/dev`, gỡ xung đột `.md` (union) và tệp sinh (lấy dev rồi sinh lại), cổng review chéo, cổng cục bộ, PR, chờ check, gộp |
-| `workflow-lib.ps1` | hàm dùng chung (phân tích bình luận review, so SHA, quyết định cổng review, ngữ cảnh máy, lệnh in-ở-dry-run) |
+| `workflow-lib.ps1` | hàm dùng chung (phân tích bình luận review, so SHA, quyết định cổng review, đánh giá check CI fail-closed, toolchain Go, ngữ cảnh máy, lệnh in-ở-dry-run) |
 | `union.ps1` | gỡ xung đột tài liệu kiểu giữ cả hai bên |
 | `progress-report.sh` | báo cáo tiến độ 6 giờ/lần lên issue theo dõi |
-| `selftest.ps1` | tự kiểm hàm thuần (không cần Pester, không gọi GitHub): `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\workflow\selftest.ps1` |
+| `selftest.ps1` | tự kiểm (không cần Pester, không gọi GitHub — `gh` được thay bằng hàm giả; repo git tạm cho cổng review): `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\workflow\selftest.ps1` |
 
 ## Không còn đường dẫn cứng
 
@@ -22,31 +22,47 @@ bước cuối của `ticket.ps1 merge` **tạo Pull Request vào `dev`** và g�
 | Repo GitHub | `gh repo view --json nameWithOwner` | `AG_GH_REPO` |
 | Log gộp, báo cáo, `prototype-coverage.tsv` | `<cha repo>\kn-handoff` (nếu có), không thì `%TEMP%\ag-workflow` | `AG_HANDOFF_DIR` |
 | Thời gian chờ check PR | 90 phút | `-ChecksTimeoutMin`, `AG_PR_CHECKS_TIMEOUT_MIN` |
-| Thời gian chờ check xuất hiện trước khi coi là "không có CI" | 180 giây | `AG_PR_CHECKS_GRACE_SEC` |
+| Thời gian chờ check xuất hiện trước khi kết luận "không có CI" (→ dừng, trừ `-NoChecksOk`) | 180 giây | `AG_PR_CHECKS_GRACE_SEC` |
+| Toolchain Go cho sinh lại và cổng cục bộ | chỉ thị `toolchain` trong `go.mod` | `AG_GO_TOOLCHAIN`, hoặc `GOTOOLCHAIN=goX.Y.Z` đặt rõ (`auto`/`local` không tính) |
 | Issue theo dõi tiến độ | #65 | `AG_TRACK_ISSUE` |
 
 ## Luồng `merge`
 
 ```
-ticket.ps1 merge -Pkg P -Agent <bên gộp> [-Worktree w] [-Tests a,b] [-DryRun]
+ticket.ps1 merge -Pkg P -Agent <bên chạy gộp> [-Worktree w] [-Tests a,b] [-AllowFailingCheck "tên chính xác,..."] [-NoChecksOk] [-DryRun]
 ```
 
-1. Kiểm sơ bộ (trước khi lấy khóa): phán quyết mới nhất của bên kia trên issue/PR phải là `Review OK` (SHA nào cũng được).
+0. **Chủ gói** = nhãn `agent:<x>` duy nhất trên issue (do `claim` gắn). Không có hoặc có cả hai nhãn → dừng (mã 4).
+   Bên review bắt buộc = bên **khác chủ gói**, không phụ thuộc ai chạy `merge` (bên review được phép tự gộp gói đã review).
+1. Kiểm sơ bộ (trước khi lấy khóa): phán quyết mới nhất của bên review trên issue/PR phải là `Review OK` (SHA nào cũng được).
 2. Lấy khóa `lock/integration` (tạo-chỉ-một-lần), nhãn `st:review` → `st:merging`.
-3. `rebase-merge.ps1`: rebase, gỡ xung đột `.md`/tệp sinh, sinh lại (modgen, `npm run gen:api`, `AG_UPDATE_WEB_FIXTURES=1 TestWebMenuFixture`) — y như cũ.
+3. `rebase-merge.ps1`: chọn toolchain Go chuẩn (bảng trên), đặt `GOTOOLCHAIN` đúng bản đó, in `go version` và dừng (mã 1)
+   nếu khác — không để SDK máy mới hơn sinh golden/regression giả. Rồi rebase, gỡ xung đột `.md`/tệp sinh, sinh lại (modgen,
+   `npm run gen:api`, `AG_UPDATE_WEB_FIXTURES=1 TestWebMenuFixture`) — y như cũ. Tệp sinh chỉ gồm tệp do công cụ ghi lại
+   toàn bộ; tệp nguồn sửa tay (vd `internal/platform/party/domain/menu_departments.go`) xung đột thì dừng (mã 2).
 4. **Cổng review chéo** trên SHA đầu PR cuối cùng (HEAD sau rebase/sinh lại) — trước mọi cổng tốn thời gian và mọi thao tác từ xa. Quy tắc ở dưới.
 5. Cổng cục bộ y như cũ: build, vet, `modgen -check`, migratecheck, archlint, knboundary, `-Tests`, cổng migration DB.
 6. Đẩy `HEAD` lên `refs/heads/pr/<PKG>` với `--force-with-lease=refs/heads/pr/<PKG>:<giá trị hiện tại>`.
 7. `gh pr create --base dev --head pr/<PKG>` (hoặc `gh pr edit` PR đang mở cùng head): tiêu đề `[<PKG>] <tiêu đề issue>`,
    thân có `Refs #n` (KHÔNG `Closes` — script tự đóng issue sau khi gộp), kết quả cổng và dòng Review OK đã dùng.
-8. Chờ check: nếu `dev` có check bắt buộc (bảo vệ nhánh hoặc ruleset) → chờ đủ các check đó xanh; nếu chưa có → chờ mọi
-   check báo trên commit đầu; không có check nào sau thời gian ân hạn → cảnh báo và đi tiếp. Check đỏ → dừng (mã 5), PR để mở.
-   Khi `dev` chưa có check bắt buộc, `-AllowFailingChecks '<regex tên check>'` hạ các check đỏ khớp regex thành cảnh báo.
-9. `gh pr merge <pr> --merge --match-head-commit <sha> --delete-branch` — merge commit giữ nguyên SHA của gói, nên nhánh
+8. Chờ check — **fail-closed**, chỉ bucket `pass` là xanh (`skipping`, `cancel`, `fail`, rỗng, giá trị lạ đều không xanh):
+   - đọc check bắt buộc của `dev` (bảo vệ nhánh + ruleset); chỉ phản hồi "Branch not protected"/"Required status checks not
+     enabled" mới là "không có"; lỗi đọc khác → dừng (mã 5);
+   - có check bắt buộc → mỗi tên phải có mặt và mọi lần chạy cùng tên đều `pass`; thiếu/pending → chờ tới hạn rồi dừng;
+   - chưa có check bắt buộc → **mọi** check báo trên đầu PR phải `pass`; không có check nào sau thời gian ân hạn → dừng;
+   - lỗi đọc `gh pr checks`/`gh pr view` không bao giờ được hiểu là "không có check": đọc lại tới hạn rồi dừng; đầu PR đổi → dừng ngay;
+   - ngoại lệ (chỉ khi `dev` CHƯA có check bắt buộc, có check bắt buộc thì bị từ chối):
+     `-AllowFailingCheck "tên chính xác"` (nhiều tên ngăn bằng dấu phẩy; không regex/ký tự đại diện; vẫn phải còn ít nhất một
+     check không miễn `pass`) và `-NoChecksOk` (chỉ dùng trước khi có CI). Cả hai được ghi vào thân PR (mục "Ngoại lệ CI"),
+     một bình luận PR khi thực sự được dùng (`WAIVED …`/`NO-CHECKS-OK …`) và bình luận "Đã gộp" trên issue.
+   Check không đạt → dừng (mã 5), PR để mở.
+9. **Đọc lại cổng review** ngay trước khi gộp (phán quyết có thể đổi trong lúc chờ cổng cục bộ/CI): `CHANGES` mới, lỗi đọc
+   hay OK không còn phủ đầu PR → dừng (mã 4), PR để mở.
+10. `gh pr merge <pr> --merge --match-head-commit <sha> --delete-branch` — merge commit giữ nguyên SHA của gói, nên nhánh
    xếp chồng vẫn `git rebase --onto origin/dev <sha cũ>` được. Nhánh `pr/<PKG>` bị xóa sau khi gộp; nhánh gói và worktree giữ lại.
-10. Kiểm `origin/dev` chứa SHA đầu; xóa `claim/<PKG>`, nhãn `st:done`, bình luận, đóng issue — như cũ. Khóa luôn được trả (finally).
+11. Kiểm `origin/dev` chứa SHA đầu; xóa `claim/<PKG>`, nhãn `st:done`, bình luận, đóng issue — như cũ. Khóa luôn được trả (finally).
 
-Mã thoát `rebase-merge.ps1`: 0 gộp xong; 1 cổng/kiểm thử/sinh lại; 2 xung đột mã; 4 review; 5 check PR; 6 gộp PR.
+Mã thoát `rebase-merge.ps1`: 0 gộp xong; 1 cổng/kiểm thử/sinh lại/toolchain; 2 xung đột mã; 4 review; 5 check PR; 6 gộp PR.
 Mọi mã khác 0 → `ticket.ps1` trả nhãn `st:review` và bình luận đuôi log như cũ.
 
 `-DryRun`: không lấy khóa từ xa, không đổi nhãn, không push/PR/gộp/bình luận — in từng lệnh `git`/`gh` có tác dụng phụ
@@ -65,20 +81,25 @@ Review CHANGES — Claude (review chéo tại 1a2b3c4d)
 Dùng `ticket.ps1 review -Pkg P -Agent <bên review> -Sha <sha> -Ok|-Changes [-Note "…"]` để đăng đúng định dạng
 (script từ chối tự review khi issue mang nhãn `agent:<bên review>`).
 
-- `-Agent claude` gộp cần review của **Codex** và ngược lại; bên review nhận từ chữ trong bình luận (`— Codex` / `— Claude`).
-  Bình luận của chính bên gộp bị bỏ qua.
-- Dòng phải đứng đầu dòng (cho phép `**`/`_`); câu giữa dòng hay dòng trích dẫn `>` không tính. Gạch nối `—`, `–`, `-`, `--` đều nhận.
+- Gói của Claude (nhãn `agent:claude`) cần review của **Codex** và ngược lại, bất kể ai chạy `merge`; bên review nhận từ chữ
+  trong bình luận (`— Codex` / `— Claude`). Bình luận đứng tên chủ gói (tự review) bị bỏ qua.
+- Dòng phải đứng đầu dòng (cho phép `**`/`_`, thụt tối đa 3 dấu cách); câu giữa dòng, dòng trích dẫn `>`, dòng thụt từ 4 dấu
+  cách/tab, nội dung trong khối code rào (```` ``` ````/`~~~`) và chú thích HTML không tính — ví dụ mẫu không phải phán quyết.
+  Gạch nối `—`, `–`, `-`, `--` đều nhận.
+- Mẫu yêu cầu sửa cũ còn trên issue (`Codex review — cần sửa trước Review OK (<sha>).` và các dòng bắt đầu `<Bên> review …`
+  có "cần sửa"/"changes requested") được tính là `CHANGES`. Mẫu cũ **không bao giờ** được tính là OK: phê duyệt phải dùng dòng chuẩn.
 - SHA: 7–64 ký tự hex, khớp khi là tiền tố của SHA đầy đủ (không phân biệt hoa thường).
 - Phán quyết `CHANGES` mới nhất của bên review vô hiệu mọi `OK` cũ hơn nó.
 - Một `OK` (sau `CHANGES` cuối) **phủ** SHA đầu PR khi:
   - **exact** — SHA review là SHA đầu PR (ngắn hoặc đầy đủ); hoặc
-  - **equivalent** — rebase/sinh lại không đổi nội dung ngoài tệp sinh: so `git diff -U0 merge-base(R, origin/dev)..R` với
-    `git diff -U0 merge-base(H, origin/dev)..H`, bỏ tệp sinh (cùng regex với bước gỡ xung đột), bỏ dòng `index`/`@@`
-    (phụ thuộc base và số dòng), tệp nhị phân so bằng SHA blob sau. Giống hệt từng ký tự → phủ.
+  - **equivalent** — so **nội dung tệp**, không so diff: P = các tệp không sinh mà gói đổi (so với merge-base với
+    `origin/dev`) ở R hoặc ở H. Phủ khi (1) `dev` không đổi tệp nào trong P giữa hai merge-base, và (2) mọi tệp trong P giống
+    hệt (blob và mode) giữa R và H. Khi đó H = base mới + đúng các tệp đã review.
 - Không phủ → dừng (mã 4) với thông điệp yêu cầu review lại ở SHA mới và lệnh `ticket.ps1 review … -Sha <đầu mới>` cần chạy.
 
-Hệ quả: review ở SHA đầu nhánh trước khi gộp vẫn dùng được khi `dev` chỉ chạy thêm ở tệp khác, ở dòng xa, hoặc ở tệp sinh;
-còn nếu rebase phải gỡ xung đột `.md` làm đổi dòng thêm/bớt của gói, hoặc gói có commit mới, thì phải review lại.
+Hệ quả: review ở SHA đầu nhánh trước khi gộp vẫn dùng được khi `dev` chỉ chạy thêm ở tệp gói không đụng hoặc ở tệp sinh.
+Nếu `dev` cũng sửa một tệp của gói (kể cả dòng xa, rebase sạch), rebase gỡ xung đột `.md` của gói, hoặc gói có commit mới đổi
+tệp nguồn — kể cả đổi khác nghĩa nhưng cùng dòng `+`/`-` ở chỗ khác trong tệp — thì phải review lại.
 
 ## Chuyển từ `kn-handoff/` sang bản trong repo
 

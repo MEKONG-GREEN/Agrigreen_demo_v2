@@ -10,7 +10,8 @@
     [switch]$Ok,                # review: approve
     [switch]$Changes,           # review: request changes
     [int]$ChecksTimeoutMin = 0, # merge: wait for PR checks (default AG_PR_CHECKS_TIMEOUT_MIN or 90)
-    [string]$AllowFailingChecks = '',  # merge: regex of non-required check names allowed to fail while dev has no required checks
+    [string]$AllowFailingCheck = '',   # merge: comma-separated EXACT names of non-required checks waived while dev has no required checks (recorded on PR + issue)
+    [switch]$NoChecksOk,               # merge: only before CI exists - allow a PR with no checks at all (recorded on PR + issue)
     [switch]$DryRun             # merge/review/claim/ready/release: print git/gh side effects instead of running them
 )
 # Ticket workflow shared by Claude Code and Codex (scripts/workflow/README.md, kn-handoff/TWO-AGENT.md).
@@ -19,10 +20,12 @@
 #   ready  -Pkg P [-Note "checks..."]             st:claimed -> st:review (+ comment)
 #   review -Pkg P -Agent A -Sha S -Ok|-Changes [-Note ...]   reviewer A posts "Review OK|CHANGES — A (review chéo tại S)"
 #   release -Pkg P [-Note why]                    delete claim/P -> st:ready
-#   merge  -Pkg P -Agent A [-Worktree w] [-Tests a,b] [-DryRun]
+#   merge  -Pkg P -Agent A [-Worktree w] [-Tests a,b] [-AllowFailingCheck "exact name,..."] [-NoChecksOk] [-DryRun]
+#                                                 A = agent running the merge (owner or reviewer). The review must come from
+#                                                 the agent OTHER than the package owner (issue label agent:<owner>).
 #                                                 review pre-check -> atomic lock/integration -> rebase-merge.ps1
-#                                                 (rebase, regen, review gate, gates, PR pr/P -> dev, checks, merge)
-#                                                 -> st:done + close, always unlock
+#                                                 (rebase, regen, review gate, gates, PR pr/P -> dev, fail-closed checks,
+#                                                 review re-check, merge) -> st:done + close, always unlock
 #   lock-status                                   who holds lock/integration
 $ErrorActionPreference = 'Stop'
 $env:GIT_TERMINAL_PROMPT = '0'; $env:GCM_INTERACTIVE = 'never'   # never block on a credential dialog
@@ -119,18 +122,28 @@ switch ($Cmd) {
     }
     'lock-status' { git -C $repo ls-remote --heads origin 'lock/integration' }
     'merge' {
-        if (-not $Pkg -or -not $Agent) { throw 'merge needs -Pkg and -Agent (the merging agent; the other agent must have posted Review OK)' }
+        if (-not $Pkg -or -not $Agent) { throw 'merge needs -Pkg and -Agent (the agent running the merge)' }
         $iss = IssueObj $Pkg; $n = $iss.number
+        # Owner from the claim label, never from who runs the merge (CODEX-MERGE: Codex reviews then merges Claude packages).
+        try { $owner = Resolve-AgOwner @($iss.labels | ForEach-Object { $_.name }) } catch { "OWNER UNKNOWN on #${n}: $_"; exit 4 }
+        $reviewer = Get-AgOtherAgent $owner
+        $waive = @($AllowFailingCheck -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        Assert-AgCheckWaivers $waive
         if (-not $Worktree) { $Worktree = ($Pkg.ToLower() -replace '[^a-z0-9]', '') }
         git -C $repo fetch -q origin +refs/heads/dev:refs/remotes/origin/dev
-        # Pre-check before taking the lock: the latest verdict of the other agent must be OK (any SHA). The exact SHA rule
-        # is enforced by rebase-merge.ps1 once the PR head (after rebase/regeneration) is known.
-        $openPr = Get-AgOpenPr $gh "pr/$Pkg"
-        $mine = @(Get-AgReviewVerdicts (Get-AgThreadComments $gh $n $(if ($openPr) { "$($openPr.number)" } else { '' }))) | Where-Object { $_.Reviewer -eq (Get-AgOtherAgent $Agent) }
-        $last = @($mine) | Select-Object -Last 1
-        if (-not $last -or $last.Verdict -ne 'OK') {
-            $m = if ($last) { "latest verdict is $($last.Verdict) at $($last.Sha)" } else { 'no review comment' }
-            "REVIEW PRE-CHECK FAIL: $m from $(Get-AgOtherAgent $Agent) on #$n. Expected: $(Format-AgReviewLine OK (Get-AgOtherAgent $Agent) '<sha>')"
+        # Pre-check before taking the lock: the latest verdict of the reviewer (other than the owner) must be OK (any SHA).
+        # The exact SHA rule is enforced by rebase-merge.ps1 once the PR head (after rebase/regeneration) is known, and
+        # re-checked right before gh pr merge.
+        "owner: $owner (label agent:$owner); reviewer: $reviewer; merging agent: $Agent"
+        $last = $null; $readErr = ''
+        try {
+            $openPr = Get-AgOpenPr $gh "pr/$Pkg"
+            $mine = @(Get-AgReviewVerdicts (Get-AgThreadComments $gh $n $(if ($openPr) { "$($openPr.number)" } else { '' }))) | Where-Object { $_.Reviewer -eq $reviewer }
+            $last = @($mine) | Select-Object -Last 1
+        } catch { $readErr = "$_" }
+        if ($readErr -or -not $last -or $last.Verdict -ne 'OK') {
+            $m = if ($readErr) { "cannot read review comments ($readErr)" } elseif ($last) { "latest verdict is $($last.Verdict) at $($last.Sha)" } else { 'no review comment' }
+            "REVIEW PRE-CHECK FAIL: $m from $reviewer on #$n. Expected: $(Format-AgReviewLine OK $reviewer '<sha>')"
             if (-not $DryRun) { exit 4 }
         } else { "review pre-check: $($last.Line) ($($last.Url))" }
         $holder = "$Agent/$Pkg"
@@ -142,8 +155,8 @@ switch ($Cmd) {
             Labels $n @('st:merging') @('st:review')
             if (-not $DryRun) { $env:AG_INTEGRATION_LOCK = $Pkg }
             $t = @($Tests -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-            $rm = @{ Worktree = $Worktree; Ticket = $Pkg; Issue = $n; Agent = $Agent; IssueTitle = $iss.title; Tests = $t
-                ChecksTimeoutMin = $ChecksTimeoutMin; AllowFailingChecks = $AllowFailingChecks; DryRun = [bool]$DryRun }
+            $rm = @{ Worktree = $Worktree; Ticket = $Pkg; Issue = $n; Agent = $Agent; Owner = $owner; IssueTitle = $iss.title; Tests = $t
+                ChecksTimeoutMin = $ChecksTimeoutMin; AllowFailingCheck = $waive; NoChecksOk = [bool]$NoChecksOk; DryRun = [bool]$DryRun }
             $global:LASTEXITCODE = 1
             try {
                 & "$sp\rebase-merge.ps1" @rm *>&1 | Tee-Object -FilePath $log | Select-Object -Last $(if ($DryRun) { 500 } else { 25 })
@@ -157,6 +170,9 @@ switch ($Cmd) {
         }
         $text = Get-Content $log -Encoding UTF8
         $tail = ($text | Select-Object -Last 15) -join "`n"
+        # Exceptions and evidence that must appear on the issue even when they scrolled out of the tail.
+        $evidence = @($text | Where-Object { "$_" -match '^(WAIVER REQUESTED|WAIVED|NO-CHECKS-OK|checks: |go version: |go toolchain: |REVIEW OK|final review re-check: )' }) -join "`n"
+        if ($evidence) { $tail = "$evidence`n...`n$tail" }
         $merged = $text | Select-String '^(MERGED via PR #(\d+)|DRY-RUN OK)' | Select-Object -Last 1
         if ($rc -eq 0 -and $merged) {
             $prNo = if ($merged.Matches[0].Groups[2].Success) { $merged.Matches[0].Groups[2].Value } else { '<new>' }
