@@ -17,3 +17,11 @@ RUN sed -i -E 's#(https?://)apt\.postgresql\.org#\1apt-archive.postgresql.org#g'
  && test -f /usr/share/postgresql/17/extension/pgrouting.control \
  && install -d -o postgres -g postgres -m 0750 /var/lib/pgbackrest /var/log/pgbackrest /var/spool/pgbackrest /tmp/pgbackrest
 COPY pgbackrest.conf /etc/pgbackrest/pgbackrest.conf
+
+# Named volumes mới kế thừa ownership này; volume cũ phải đã thuộc postgres.
+# Entrypoint chính thức vẫn khởi tạo DB nhưng không cần quyền root/chown lúc chạy.
+RUN install -d -o postgres -g postgres -m 0700 /var/lib/postgresql/data \
+ && install -d -o postgres -g postgres -m 3775 /var/run/postgresql
+USER postgres:postgres
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=6 \
+  CMD pg_isready -q -h 127.0.0.1 -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-${POSTGRES_USER:-postgres}}" || exit 1

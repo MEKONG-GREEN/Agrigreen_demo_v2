@@ -1,0 +1,39 @@
+name: postgres-image-security
+
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - deploy/compose/postgres/**
+      - deploy/compose/backup/**
+      - scripts/test-postgres-images.sh
+      - .github/workflows/postgres-images.yml
+  push:
+    branches: [main, dev]
+    paths:
+      - deploy/compose/postgres/**
+      - deploy/compose/backup/**
+      - scripts/test-postgres-images.sh
+      - .github/workflows/postgres-images.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: postgres-image-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-images:
+    name: Nonroot, health, persist and backup (${{ matrix.variant }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [postgres, backup]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Real image build, initialization, health and restore
+        run: sh scripts/test-postgres-images.sh '${{ matrix.variant }}'
