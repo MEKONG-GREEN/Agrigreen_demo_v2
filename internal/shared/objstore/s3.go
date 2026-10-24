@@ -20,24 +20,30 @@ import (
 
 // S3Config là cấu hình kho S3 tương thích (MinIO, S3 trong lãnh thổ — RB-7).
 type S3Config struct {
-	Endpoint  string // host:port, không có scheme
-	Bucket    string
-	AccessKey string
-	SecretKey string
-	UseTLS    bool
-	Region    string
+	Endpoint string // host:port, không có scheme
+	// PublicEndpoint chỉ dùng để KÝ URL tải; I/O và kiểm bucket vẫn qua Endpoint nội bộ.
+	PublicEndpoint string
+	PublicUseTLS   bool
+	Bucket         string
+	AccessKey      string
+	SecretKey      string
+	UseTLS         bool
+	Region         string
 }
 
 // S3ConfigFromEnv đọc AG_S3_ENDPOINT, AG_S3_BUCKET, AG_S3_ACCESS_KEY,
-// AG_S3_SECRET_KEY, AG_S3_USE_TLS (mặc định true), AG_S3_REGION (tùy chọn).
+// AG_S3_SECRET_KEY, AG_S3_USE_TLS (mặc định true), AG_S3_REGION (tùy chọn),
+// AG_S3_PUBLIC_ENDPOINT và AG_S3_PUBLIC_USE_TLS (mặc định true).
 func S3ConfigFromEnv() (S3Config, error) {
 	c := S3Config{
-		Endpoint:  os.Getenv("AG_S3_ENDPOINT"),
-		Bucket:    os.Getenv("AG_S3_BUCKET"),
-		AccessKey: os.Getenv("AG_S3_ACCESS_KEY"),
-		SecretKey: os.Getenv("AG_S3_SECRET_KEY"),
-		UseTLS:    true,
-		Region:    os.Getenv("AG_S3_REGION"),
+		Endpoint:       os.Getenv("AG_S3_ENDPOINT"),
+		PublicEndpoint: os.Getenv("AG_S3_PUBLIC_ENDPOINT"),
+		PublicUseTLS:   true,
+		Bucket:         os.Getenv("AG_S3_BUCKET"),
+		AccessKey:      os.Getenv("AG_S3_ACCESS_KEY"),
+		SecretKey:      os.Getenv("AG_S3_SECRET_KEY"),
+		UseTLS:         true,
+		Region:         os.Getenv("AG_S3_REGION"),
 	}
 	if v := os.Getenv("AG_S3_USE_TLS"); v != "" {
 		b, err := strconv.ParseBool(v)
@@ -45,6 +51,13 @@ func S3ConfigFromEnv() (S3Config, error) {
 			return c, fmt.Errorf("objstore: AG_S3_USE_TLS không hợp lệ: %w", err)
 		}
 		c.UseTLS = b
+	}
+	if v := os.Getenv("AG_S3_PUBLIC_USE_TLS"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return c, fmt.Errorf("objstore: AG_S3_PUBLIC_USE_TLS không hợp lệ: %w", err)
+		}
+		c.PublicUseTLS = b
 	}
 	if c.Endpoint == "" || c.Bucket == "" || c.AccessKey == "" || c.SecretKey == "" {
 		return c, errors.New("objstore: thiếu AG_S3_ENDPOINT, AG_S3_BUCKET, AG_S3_ACCESS_KEY hoặc AG_S3_SECRET_KEY")
@@ -59,6 +72,7 @@ func S3ConfigFromEnv() (S3Config, error) {
 // ứng dụng chỉ có s3:PutObject, s3:GetObject — không có s3:DeleteObject.
 type S3 struct {
 	c      *minio.Client
+	signer *minio.Client
 	bucket string
 }
 
@@ -86,7 +100,26 @@ func NewS3(ctx context.Context, cfg S3Config) (*S3, error) {
 	if !ok {
 		return nil, fmt.Errorf("objstore: bucket %q không tồn tại", cfg.Bucket)
 	}
-	return &S3{c: c, bucket: cfg.Bucket}, nil
+	signer := c
+	if cfg.PublicEndpoint != "" {
+		// Region is resolved through the internal client, never through the public
+		// endpoint. The latter may be unreachable from the container network.
+		region := cfg.Region
+		if region == "" {
+			region, err = c.GetBucketLocation(ctx, cfg.Bucket)
+			if err != nil {
+				return nil, fmt.Errorf("objstore: đọc vùng bucket để ký URL: %w", err)
+			}
+		}
+		signer, err = minio.New(cfg.PublicEndpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+			Secure: cfg.PublicUseTLS, Region: region, BucketLookup: minio.BucketLookupPath,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("objstore: tạo client ký URL công khai: %w", err)
+		}
+	}
+	return &S3{c: c, signer: signer, bucket: cfg.Bucket}, nil
 }
 
 // Put gửi kèm x-amz-checksum-sha256 để máy chủ tự từ chối nội dung sai băm
@@ -201,7 +234,7 @@ func (s *S3) PresignGet(ctx context.Context, key string, ttl time.Duration) (str
 	if _, err := s.Head(ctx, key); err != nil {
 		return "", err
 	}
-	u, err := s.c.PresignedGetObject(ctx, s.bucket, key, ttl, nil)
+	u, err := s.signer.PresignedGetObject(ctx, s.bucket, key, ttl, nil)
 	if err != nil {
 		return "", fmt.Errorf("objstore: presign: %w", err)
 	}
