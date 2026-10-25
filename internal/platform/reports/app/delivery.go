@@ -64,24 +64,31 @@ func (s *Service) HandleExportCompleted(ctx context.Context, tx pgx.Tx, env outb
 		return err
 	}
 	lg := s.log().With("event", "reports.schedule.deliver", "tenant_id", j.TenantID, "schedule_id", sch.ID, "job_id", j.ID, "slot", run.SlotKey)
-	mark := func(status, note string, sent int) error {
-		return store.MarkDelivered(ctx, tx, sch.ID, run.SlotKey, status, note, sent, s.now())
+	// mark ghi kết quả CHỈ khi lần chạy chưa có kết quả và nhận việc là của mình (token; uuid.Nil — nhánh không gửi: chưa ai
+	// nhận hoặc nhận đã hết hạn). Mất nhận việc (worker khác đã nhận lại sau khi hạn hết) → không ghi đè, không xóa nhận
+	// của worker kia (review #143 C2); worker kia ghi kết quả.
+	mark := func(status, note string, sent int, token uuid.UUID) error {
+		ok, err := store.MarkDelivered(ctx, tx, sch.ID, run.SlotKey, status, note, sent, s.now(), token)
+		if err == nil && !ok {
+			lg.Warn("không ghi kết quả gửi: nhận việc gửi đã thuộc worker khác", "outcome", "claim_lost")
+		}
+		return err
 	}
 	// A source enabled after an old scheduled job completed must not deliver
 	// its pending artifact without the unsupported per-run owner authorization.
 	if _, enabled := s.Builders.jobPolicy(j.Def.Source); enabled || j.SourceArgs != nil {
-		return mark(DeliverySkipped, "nguồn báo cáo chưa hỗ trợ lịch gửi", 0)
+		return mark(DeliverySkipped, "nguồn báo cáo chưa hỗ trợ lịch gửi", 0, uuid.Nil)
 	}
 	switch {
 	case s.Directory == nil:
 		lg.Warn("bỏ gửi email: chưa nối danh bạ email (pf/accounts)", "outcome", "skipped")
-		return mark(DeliverySkipped, "chưa nối danh bạ email của tài khoản (pf/accounts)", 0)
+		return mark(DeliverySkipped, "chưa nối danh bạ email của tài khoản (pf/accounts)", 0, uuid.Nil)
 	case s.Mailer == nil:
 		lg.Warn("bỏ gửi email: chưa cấu hình SMTP (AG_SMTP_*)", "outcome", "skipped")
-		return mark(DeliverySkipped, "chưa cấu hình máy chủ thư (AG_SMTP_*)", 0)
+		return mark(DeliverySkipped, "chưa cấu hình máy chủ thư (AG_SMTP_*)", 0, uuid.Nil)
 	case s.Store == nil || j.ObjectKey == nil:
 		lg.Warn("bỏ gửi email: chưa cấu hình kho đối tượng", "outcome", "skipped")
-		return mark(DeliverySkipped, "chưa cấu hình kho đối tượng", 0)
+		return mark(DeliverySkipped, "chưa cấu hình kho đối tượng", 0, uuid.Nil)
 	}
 	job, recipients := *j, slices.Clone(sch.Recipients)
 	res, err := txdeps.Get(ctx, "reports.delivery:"+j.ID.String(), func(ctx context.Context) (deliveryResult, error) {
@@ -102,18 +109,26 @@ func (s *Service) HandleExportCompleted(ctx context.Context, tx pgx.Tx, env outb
 	if res.sent == 0 {
 		status = DeliverySkipped
 	}
-	return mark(status, note, res.sent)
+	return mark(status, note, res.sent, res.token)
 }
 
 // deliveryResult là kết quả gửi email của một lần chạy lịch (ngoài giao dịch).
 type deliveryResult struct {
 	sent, missing int
-	delivered     bool // lần chạy đã có kết quả gửi (worker khác) — không gửi
+	delivered     bool      // lần chạy đã có kết quả gửi (worker khác) — không gửi
+	token         uuid.UUID // nhận việc của lượt gửi này (mark chỉ ghi khi còn là của mình)
 }
 
-// deliveryLease là hạn nhận việc gửi email lịch: ngắn hơn hạn xử lý một thông điệp (inbox.DefaultHandlerTimeout 2 phút)
-// để worker nhận lại (giao lại sau khi worker giữ chết) kịp chờ hết hạn rồi gửi trong hạn của chính nó.
-const deliveryLease = time.Minute
+// DefaultDeliveryLease là hạn nhận việc gửi email lịch: ngắn hơn hạn xử lý một thông điệp (inbox.DefaultHandlerTimeout 2
+// phút) để worker nhận lại (giao lại sau khi worker giữ chết) kịp chờ hết hạn rồi gửi trong hạn của chính nó.
+const DefaultDeliveryLease = time.Minute
+
+func (s *Service) deliveryLease() time.Duration {
+	if s.DeliveryLease > 0 {
+		return s.DeliveryLease
+	}
+	return DefaultDeliveryLease
+}
 
 // deliveryPoll là chu kỳ chờ khi worker khác đang giữ việc gửi còn hạn.
 const deliveryPoll = 500 * time.Millisecond
@@ -122,12 +137,16 @@ const deliveryPoll = 500 * time.Millisecond
 // Worker khác đang giữ còn hạn → chờ (tới khi có kết quả gửi hoặc hết hạn giữ). Gửi lỗi → trả nhận.
 func (s *Service) deliver(ctx context.Context, j domain.Job, recipients []uuid.UUID) (deliveryResult, error) {
 	token := ids.New()
+	lease := s.deliveryLease()
 	for {
+		// Hạn lời gọi ra ngoài tính từ TRƯỚC giao dịch nhận (cùng mốc với delivery_claim_until = now + lease), không từ lúc
+		// giao dịch nhận commit — giao dịch nhận chờ kết nối/khóa lâu vẫn không đẩy SMTP quá hạn giữ (review #143 C2).
+		sendBy := time.Now().Add(lease - dispatch.SendMargin(lease))
 		now := s.now()
 		var c store.DeliveryClaim
 		if err := s.tx(ctx, j.TenantID, func(tx pgx.Tx) error {
 			var err error
-			c, err = store.ClaimDelivery(ctx, tx, j.ID, token, now, now.Add(deliveryLease))
+			c, err = store.ClaimDelivery(ctx, tx, j.ID, token, now, now.Add(lease))
 			return err
 		}); err != nil {
 			return deliveryResult{}, err
@@ -139,7 +158,7 @@ func (s *Service) deliver(ctx context.Context, j domain.Job, recipients []uuid.U
 			return deliveryResult{}, fmt.Errorf("reports: không thấy lần chạy lịch của việc xuất %s", j.ID)
 		case c.Claimed:
 			// Hạn của các lời gọi ra ngoài: hết trước hạn giữ một biên — worker khác chỉ nhận lại sau khi lượt này đã dừng.
-			sctx, cancel := context.WithTimeout(ctx, deliveryLease-dispatch.SendMargin(deliveryLease))
+			sctx, cancel := context.WithDeadline(ctx, sendBy)
 			res, err := s.sendDelivery(sctx, j, recipients)
 			cancel()
 			if err != nil {
@@ -150,6 +169,7 @@ func (s *Service) deliver(ctx context.Context, j domain.Job, recipients []uuid.U
 				}
 				return deliveryResult{}, err
 			}
+			res.token = token
 			return res, nil
 		}
 		select {

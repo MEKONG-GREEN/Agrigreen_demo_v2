@@ -394,12 +394,25 @@ func RunsOf(ctx context.Context, tx pgx.Tx, schedule uuid.UUID) ([]Run, error) {
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Run, error) { return scanRun(r) })
 }
 
-// MarkDelivered ghi kết quả gửi email của lần chạy (và bỏ nhận việc gửi, nếu có).
-func MarkDelivered(ctx context.Context, tx pgx.Tx, schedule uuid.UUID, slot, status, note string, sent int, at time.Time) error {
-	_, err := tx.Exec(ctx, `UPDATE pf_reports.schedule_run SET delivery_status = $3, delivery_note = $4, sent_count = $5, delivered_at = $6,
+// MarkDelivered ghi kết quả gửi email của lần chạy và bỏ nhận việc gửi — CHỈ khi lần chạy chưa có kết quả và nhận việc là
+// của token (token = uuid.Nil: nhánh không gửi — chỉ khi chưa ai nhận hoặc nhận đã hết hạn tại at). ok=false: không ghi
+// (nhận việc đã thuộc worker khác / đã có kết quả) — không xóa nhận của worker khác (review #143 C2).
+func MarkDelivered(ctx context.Context, tx pgx.Tx, schedule uuid.UUID, slot, status, note string, sent int, at time.Time, token uuid.UUID) (ok bool, err error) {
+	q := `UPDATE pf_reports.schedule_run SET delivery_status = $3, delivery_note = $4, sent_count = $5, delivered_at = $6,
 	    delivery_claim_id = NULL, delivery_claim_until = NULL
-	  WHERE schedule_id = $1 AND slot_key = $2`, schedule, slot, status, nilIfEmpty(note), sent, at.UTC())
-	return err
+	  WHERE schedule_id = $1 AND slot_key = $2 AND delivery_status IS NULL`
+	args := []any{schedule, slot, status, nilIfEmpty(note), sent, at.UTC()}
+	if token == uuid.Nil {
+		q += ` AND (delivery_claim_id IS NULL OR delivery_claim_until <= $6)`
+	} else {
+		q += ` AND delivery_claim_id = $7`
+		args = append(args, token)
+	}
+	tag, err := tx.Exec(ctx, q, args...)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
 }
 
 // DeliveryClaim là kết quả nhận việc gửi email của lần chạy (P0-POOL-SHARED-2, #143).

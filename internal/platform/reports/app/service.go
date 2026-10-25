@@ -104,6 +104,8 @@ type Service struct {
 	// DispatchLease (P0-WORKER-REPORTS #128): hạn nhận việc gửi báo cáo Chi cục của một worker (gia hạn sau mỗi người
 	// nhận). Quá hạn khi còn "Đang gửi" → được nhận lại / "Gửi lại" tiếp tục cùng lượt. ≤ 0 → dispatch.DefaultSendLease.
 	DispatchLease time.Duration
+	// DeliveryLease (P0-POOL-SHARED-2): hạn nhận việc gửi email lịch báo cáo; ≤ 0 → DefaultDeliveryLease (kiểm thử đặt ngắn).
+	DeliveryLease time.Duration
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

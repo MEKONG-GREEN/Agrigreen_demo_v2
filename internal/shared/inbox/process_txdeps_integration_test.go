@@ -7,6 +7,8 @@ package inbox_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -55,5 +57,29 @@ func TestProcessRunsExternalIOOutsideInboxTx(t *testing.T) {
 	}
 	if processed, err := inbox.Process(ctx, sized, "txdeps.consumer", e, h); err != nil || processed || loads != 1 {
 		t.Fatalf("giao lặp: processed=%v err=%v loads=%d", processed, err, loads)
+	}
+}
+
+// Review #143 N6(c): handler đòi khóa mới mỗi lần chạy → sau inbox.MaxTxAttempts lần trả txdeps.ErrExhausted (NACK, giao
+// lại), không ghi dòng inbox, không vòng lặp vô hạn.
+func TestProcessExhaustedAfterMaxAttempts(t *testing.T) {
+	sized := pgtest.Get(t).SizedPool(t, migrations.PF, "worker_platform", 1)
+	e := outbox.Envelope{EventID: ids.New(), TenantID: ids.New(), EventType: "pf.party.consent.recorded", Payload: json.RawMessage(`{}`)}
+	runs := 0
+	h := func(ctx context.Context, _ pgx.Tx, _ outbox.Envelope) error {
+		runs++
+		_, err := txdeps.Get(ctx, fmt.Sprint("khoa-", runs), func(context.Context) (int, error) { return runs, nil })
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	processed, err := inbox.Process(ctx, sized, "txdeps.exhaust", e, h)
+	if !errors.Is(err, txdeps.ErrExhausted) || processed || runs != inbox.MaxTxAttempts {
+		t.Fatalf("processed=%v err=%v runs=%d (muốn %d)", processed, err, runs, inbox.MaxTxAttempts)
+	}
+	// Không có dòng inbox: giao lại xử lý lại từ đầu.
+	runs = 0
+	if _, err := inbox.Process(ctx, sized, "txdeps.exhaust", e, h); !errors.Is(err, txdeps.ErrExhausted) || runs != inbox.MaxTxAttempts {
+		t.Fatalf("giao lại: err=%v runs=%d", err, runs)
 	}
 }

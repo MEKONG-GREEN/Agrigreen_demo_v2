@@ -165,6 +165,9 @@ func (m *Module) UseMailer(ml port.Mailer) { m.svc.Mailer = ml }
 // SendLeaseFromEnv/ValidateSendLease).
 func (m *Module) UseDispatchLease(d time.Duration) { m.svc.DispatchLease = d }
 
+// UseDeliveryLease đặt hạn nhận việc gửi email lịch báo cáo (kiểm thử hạn ngắn; vận hành dùng mặc định 1 phút).
+func (m *Module) UseDeliveryLease(d time.Duration) { m.svc.DeliveryLease = d }
+
 // DispatchHandler là inbox.Handler cho pf.reports.dispatch.requested (consumer port.DispatchConsumer).
 func (m *Module) DispatchHandler() inbox.Handler { return m.svc.HandleDispatchRequested }
 

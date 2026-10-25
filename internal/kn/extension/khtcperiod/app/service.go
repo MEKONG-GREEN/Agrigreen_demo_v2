@@ -45,9 +45,12 @@ var (
 	ErrNotCancellable = problem.New(http.StatusConflict, "extension.khtc_period_not_cancellable", "Kỳ không hủy được")
 	ErrTerminal       = problem.New(http.StatusConflict, "extension.khtc_period_terminal", "Kỳ đã đóng hoặc đã hủy")
 	ErrCancelling     = problem.New(http.StatusConflict, "extension.khtc_period_cancelling", "Kỳ đang được hủy — thử lại sau")
-	ErrDependency     = problem.New(http.StatusServiceUnavailable, "extension.dependency_unavailable", "Dịch vụ phụ thuộc chưa sẵn sàng")
-	errNotKHTC        = problem.Forbidden.WithDetail("Kỳ KHTC chỉ dành cho Phòng Kế hoạch – Tài chính (Cấp Tỉnh) và Admin xem")
-	errNotKHTCWriter  = problem.Forbidden.WithDetail("chỉ Cấp Tỉnh Phòng Kế hoạch – Tài chính mở, sửa hạn, đóng, hủy kỳ")
+	// ErrCancelInterrupted (review #143 C1): kỳ native ở cap/forms đã hủy nhưng ý định hủy hết hạn và báo cáo đã có Bản
+	// cuối trong lúc đó — không ghi được sự kiện hủy; cần đối soát (log cảnh báo extension.khtc.cancel_intent_lost).
+	ErrCancelInterrupted = problem.New(http.StatusConflict, "extension.khtc_period_cancel_interrupted", "Hủy kỳ bị gián đoạn — cần đối soát")
+	ErrDependency        = problem.New(http.StatusServiceUnavailable, "extension.dependency_unavailable", "Dịch vụ phụ thuộc chưa sẵn sàng")
+	errNotKHTC           = problem.Forbidden.WithDetail("Kỳ KHTC chỉ dành cho Phòng Kế hoạch – Tài chính (Cấp Tỉnh) và Admin xem")
+	errNotKHTCWriter     = problem.Forbidden.WithDetail("chỉ Cấp Tỉnh Phòng Kế hoạch – Tài chính mở, sửa hạn, đóng, hủy kỳ")
 )
 
 // Tham số (pf/masterdata, giá trị số có hiệu lực tại ngày mở/đóng kỳ). Vắng → mặc định.
@@ -64,11 +67,13 @@ const DefaultCloseLateDays = 3
 var deptRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)
 
 // CancelGuard chặn Bản cuối và đóng kỳ trong lúc hủy kỳ bằng ý định hủy bền (khtcreport; P0-POOL-SHARED-2, #143 — thay
-// GuardCancel giữ giao dịch khóa quanh lời gọi cap/forms). BeginCancel: domain.ErrHasFinal / domain.ErrCancelling.
+// GuardCancel giữ giao dịch khóa quanh lời gọi cap/forms). BeginCancel: domain.ErrHasFinal / domain.ErrCancelling; trả
+// hạn lời gọi cap/forms (trước hạn ý định một biên). FinishCancel: domain.ErrCancelLost khi ý định đã hết hạn/mất.
 type CancelGuard interface {
-	BeginCancel(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
+	BeginCancel(ctx context.Context, id uuid.UUID) (token uuid.UUID, deadline time.Time, err error)
 	FinishCancel(ctx context.Context, id, token uuid.UUID, fn func(pgx.Tx) error) error
 	AbortCancel(ctx context.Context, id, token uuid.UUID) error
+	CancelPending(ctx context.Context, id uuid.UUID) (bool, error)
 }
 
 // Service là use case Kỳ KHTC.

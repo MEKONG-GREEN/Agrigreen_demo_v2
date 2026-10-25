@@ -54,7 +54,10 @@ type kfFx struct {
 	planBody map[string]any
 }
 
-func newKHTCFormFx(t *testing.T) *kfFx {
+func newKHTCFormFx(t *testing.T) *kfFx { return newKHTCFormFxWith(t, nil) }
+
+// newKHTCFormFxWith: wrapControl khác nil bọc cổng điều khiển kỳ native cap/forms (P0-POOL-SHARED-2: chặn/làm chậm CancelPeriod).
+func newKHTCFormFxWith(t *testing.T, wrapControl func(formsport.PeriodControl) formsport.PeriodControl) *kfFx {
 	env := pgtest.Get(t)
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	ops := env.Pool(t, migrations.PF, "platform_api")
@@ -66,7 +69,11 @@ func newKHTCFormFx(t *testing.T) *kfFx {
 		t.Fatal(err)
 	}
 	cw := &crosswalk{closed: true}
-	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), Entry: fm.Entry(), Crosswalk: cw,
+	var control formsport.PeriodControl = fm.Control()
+	if wrapControl != nil {
+		control = wrapControl(control)
+	}
+	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: control, Entry: fm.Entry(), Crosswalk: cw,
 		MaxSubmissions: platformasm.KNKHTCProfile.MaxSubmissions})
 	base := &khtcFx{t: t, clk: clk, cw: cw, tid: ids.New(), node: ids.New()}
 	base.eng = httpx.NewEngine(slog.New(slog.NewTextHandler(io.MultiWriter(io.Discard, tlog{t}), nil)), 8<<20)

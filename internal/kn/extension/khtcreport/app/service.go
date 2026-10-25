@@ -50,6 +50,8 @@ type Service struct {
 	EgressMode meter.Mode
 	// Exporter: pf/export (`cap/export`, W10.17) — xuất Word từ bản Excel đã đóng băng; nil → 503.
 	Exporter exportport.Exporter
+	// CancelLease: hạn ý định hủy kỳ (giây nguyên); 0 → DefaultCancelLease (kiểm thử đặt ngắn).
+	CancelLease time.Duration
 }
 type caller struct {
 	principal authz.Principal
@@ -141,21 +143,37 @@ func (s *Service) HasFinal(ctx context.Context, id string) (bool, error) {
 	return found, err
 }
 
-// cancelLease là hạn ý định hủy kỳ: đủ cho lời gọi cap/forms CancelPeriod của một yêu cầu HTTP; tiến trình chết giữa chừng
-// → hết hạn thì Bản cuối/đóng kỳ chạy lại được.
-const cancelLease = 2 * time.Minute
+// DefaultCancelLease là hạn ý định hủy kỳ: đủ cho lời gọi cap/forms CancelPeriod của một yêu cầu HTTP; tiến trình chết
+// giữa chừng → hết hạn thì Bản cuối/đóng kỳ chạy lại được.
+const DefaultCancelLease = 2 * time.Minute
+
+// maxCancelMargin: biên an toàn tối đa giữa hạn lời gọi cap/forms và hạn ý định hủy.
+const maxCancelMargin = 15 * time.Second
+
+func (s *Service) cancelLease() time.Duration {
+	if s.CancelLease >= time.Second {
+		return s.CancelLease.Truncate(time.Second) // hạn DB tính bằng giây nguyên
+	}
+	return DefaultCancelLease
+}
 
 // BeginCancel (P0-POOL-SHARED-2, #143 — thay GuardCancel): giao dịch NGẮN giữ khóa khtc_snapshot, kỳ chưa có Bản cuối →
 // ghi ý định hủy (khtc_cancel_intent) rồi commit. Trong lúc ý định còn hạn, trigger chặn Bản cuối và đóng kỳ — nên bên gọi
 // hủy kỳ native ở cap/forms NGOÀI giao dịch mà Bản cuối vẫn không chen vào được. Đã có Bản cuối → period.ErrHasFinal; ý
 // định khác còn hạn → period.ErrCancelling.
-func (s *Service) BeginCancel(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+//
+// deadline (review #143 C1): hạn lời gọi cap/forms = thời điểm TRƯỚC giao dịch nhận + hạn − biên (¼ hạn, tối đa 15 s).
+// Ý định hết hạn (giờ DB) không sớm hơn lúc giao dịch nhận bắt đầu + hạn, nên lời gọi bị cắt trước khi ý định hết dù
+// giao dịch nhận phải chờ kết nối/khóa lâu.
+func (s *Service) BeginCancel(ctx context.Context, id uuid.UUID) (token uuid.UUID, deadline time.Time, err error) {
 	p, ok := authz.FromContext(ctx)
 	if !ok {
-		return uuid.Nil, problem.Unauthenticated
+		return uuid.Nil, time.Time{}, problem.Unauthenticated
 	}
-	token := ids.New()
-	err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+	lease := s.cancelLease()
+	start := time.Now()
+	token = ids.New()
+	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		if err := store.Lock(ctx, tx, p.TenantID, id); err != nil {
 			return err
 		}
@@ -166,7 +184,7 @@ func (s *Service) BeginCancel(ctx context.Context, id uuid.UUID) (uuid.UUID, err
 		if f != nil {
 			return period.ErrHasFinal
 		}
-		claimed, err := store.ClaimCancel(ctx, tx, p.TenantID, id, token, cancelLease)
+		claimed, err := store.ClaimCancel(ctx, tx, p.TenantID, id, token, lease)
 		if err != nil {
 			return err
 		}
@@ -175,11 +193,12 @@ func (s *Service) BeginCancel(ctx context.Context, id uuid.UUID) (uuid.UUID, err
 		}
 		return nil
 	})
-	return token, err
+	return token, start.Add(lease - min(lease/4, maxCancelMargin)), err
 }
 
 // FinishCancel ghi kết quả hủy kỳ (fn — sự kiện 'cancelled' trong giao dịch này, trigger lấy lại khóa an toàn) và bỏ ý
-// định hủy, trong một giao dịch ngắn giữ khóa khtc_snapshot.
+// định hủy, trong một giao dịch ngắn giữ khóa khtc_snapshot. Token phải CÒN giữ ý định CÒN HẠN (kiểm trước khi ghi sự kiện,
+// dưới khóa) — không thì period.ErrCancelLost, không ghi gì (review #143 C1).
 func (s *Service) FinishCancel(ctx context.Context, id, token uuid.UUID, fn func(pgx.Tx) error) error {
 	p, ok := authz.FromContext(ctx)
 	if !ok {
@@ -189,20 +208,43 @@ func (s *Service) FinishCancel(ctx context.Context, id, token uuid.UUID, fn func
 		if err := store.Lock(ctx, tx, p.TenantID, id); err != nil {
 			return err
 		}
-		if err := fn(tx); err != nil {
+		released, err := store.ReleaseCancel(ctx, tx, p.TenantID, id, token, true)
+		if err != nil {
 			return err
 		}
-		return store.ReleaseCancel(ctx, tx, p.TenantID, id, token)
+		if !released {
+			return period.ErrCancelLost
+		}
+		return fn(tx)
 	})
 }
 
-// AbortCancel bỏ ý định hủy (hủy ở cap/forms lỗi, hoặc ghi sự kiện hủy lỗi).
+// AbortCancel bỏ ý định hủy (hủy ở cap/forms lỗi, hoặc ghi sự kiện hủy lỗi). Token không còn giữ ý định (đã hết hạn / người
+// khác nhận) → không có gì để bỏ, không lỗi.
 func (s *Service) AbortCancel(ctx context.Context, id, token uuid.UUID) error {
 	p, ok := authz.FromContext(ctx)
 	if !ok {
 		return problem.Unauthenticated
 	}
-	return s.tx(ctx, p.TenantID, func(tx pgx.Tx) error { return store.ReleaseCancel(ctx, tx, p.TenantID, id, token) })
+	return s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		_, err := store.ReleaseCancel(ctx, tx, p.TenantID, id, token, false)
+		return err
+	})
+}
+
+// CancelPending: kỳ đang có ý định hủy còn hạn ("Đóng kỳ" kiểm trước khi chốt kỳ native ở cap/forms).
+func (s *Service) CancelPending(ctx context.Context, id uuid.UUID) (bool, error) {
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return false, problem.Unauthenticated
+	}
+	pending := false
+	err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		var err error
+		pending, err = store.CancelPending(ctx, tx, p.TenantID, id)
+		return err
+	})
+	return pending, err
 }
 
 type Detail struct {

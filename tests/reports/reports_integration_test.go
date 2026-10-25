@@ -66,6 +66,11 @@ type fixture struct {
 }
 
 func newFixture(t *testing.T, withDirectory bool) *fixture {
+	return newFixtureWith(t, withDirectory, nil)
+}
+
+// newFixtureWith: modPool khác nil → pool của module pf/reports (P0-POOL-SHARED-2: pool cỡ nhỏ để làm chậm giao dịch riêng).
+func newFixtureWith(t *testing.T, withDirectory bool, modPool *pgxpool.Pool) *fixture {
 	env := pgtest.Get(t)
 	f := &fixture{t: t, env: env, iss: authztest.New(t), clk: clock.NewFixed(t0), params: &fakeParams{v: map[string]decimal.Decimal{}},
 		org: newOrgTree(), ext: &fakeExt{}, mailer: &fakeMailer{}, tenant: ids.New(), storeDir: t.TempDir()}
@@ -85,7 +90,10 @@ func newFixture(t *testing.T, withDirectory bool) *fixture {
 	if withDirectory {
 		deps.Directory, deps.Recipients = f.dir, f.dir
 	}
-	f.mod = reports.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, deps)
+	if modPool == nil {
+		modPool = pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform)
+	}
+	f.mod = reports.New(modPool, f.clk, deps)
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 1<<20)
 	appEng.Use(logErrors(t))

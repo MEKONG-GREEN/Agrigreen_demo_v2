@@ -65,11 +65,28 @@ func ClaimCancel(ctx context.Context, tx pgx.Tx, tid, period, token uuid.UUID, l
 	return ok, err
 }
 
-// ReleaseCancel bỏ ý định hủy của token (hủy xong hoặc hủy ở cap/forms lỗi).
-func ReleaseCancel(ctx context.Context, tx pgx.Tx, tid, period, token uuid.UUID) error {
-	_, err := tx.Exec(ctx, `UPDATE pf_extension.khtc_cancel_intent SET claim_id = NULL, claim_until = NULL, updated_at = now()
-	  WHERE tenant_id = $1 AND period_id = $2 AND claim_id = $3`, tid, period, token)
-	return err
+// ReleaseCancel bỏ ý định hủy của token (hủy xong hoặc hủy ở cap/forms lỗi). live → chỉ khi ý định CÒN HẠN (giờ DB).
+// released=false: token không còn giữ ý định (hết hạn / người khác đã nhận) — bên gọi quyết định đó có phải lỗi
+// (FinishCancel: có — review #143 C1; AbortCancel: không, ý định đã tự hết).
+func ReleaseCancel(ctx context.Context, tx pgx.Tx, tid, period, token uuid.UUID, live bool) (released bool, err error) {
+	q := `UPDATE pf_extension.khtc_cancel_intent SET claim_id = NULL, claim_until = NULL, updated_at = now()
+	  WHERE tenant_id = $1 AND period_id = $2 AND claim_id = $3`
+	if live {
+		q += ` AND claim_until > now()`
+	}
+	tag, err := tx.Exec(ctx, q, tid, period, token)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// CancelPending: kỳ có ý định hủy còn hạn (giờ DB).
+func CancelPending(ctx context.Context, tx pgx.Tx, tid, period uuid.UUID) (bool, error) {
+	var ok bool
+	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pf_extension.khtc_cancel_intent
+	  WHERE tenant_id = $1 AND period_id = $2 AND claim_until > now())`, tid, period).Scan(&ok)
+	return ok, err
 }
 
 const draftCols = `id, period_id, seq, action, payload, input_hash, actor_ref, event_time`
