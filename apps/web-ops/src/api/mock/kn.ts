@@ -2576,6 +2576,24 @@ export function mockKnLogin(identifier: string, password: string, now = Date.now
   return { ok: true, personaId: account.id };
 }
 
+/**
+ * ADMIN-UNLOCK (#42/#61): mốc tự mở (ISO) nếu một trong các định danh (email/SĐT) của tài khoản đang bị khóa tạm do
+ * đăng nhập sai — như Keycloak khóa theo người dùng chứ không theo chuỗi đã gõ. Không khóa / khóa đã hết → null.
+ */
+export function mockKnLoginLockedUntil(identifiers: readonly string[], now = Date.now()): string | null {
+  let until: number | null = null;
+  for (const id of identifiers) {
+    const t = ATTEMPTS.get(id.trim().toLowerCase())?.lockedUntil;
+    if (t && t > now && (until === null || t > until)) until = t;
+  }
+  return until === null ? null : new Date(until).toISOString();
+}
+
+/** Admin mở khóa (POST /v1/accounts/users/{id}/unlock): xóa bộ đếm và khóa của mọi định danh của tài khoản. */
+export function clearMockKnLoginLock(identifiers: readonly string[]): void {
+  for (const id of identifiers) ATTEMPTS.delete(id.trim().toLowerCase());
+}
+
 /** Cho kiểm thử: xóa bộ đếm sai mật khẩu. */
 export function resetMockLoginAttempts(): void {
   ATTEMPTS.clear();
