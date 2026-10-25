@@ -396,6 +396,10 @@ func (s *Service) knCreateAttrs(ctx context.Context, c knCaller, in KNCreateInpu
 	if err != nil {
 		return nil, err
 	}
+	// R-A1 (#113): kiểm số khai báo trước khi ghi tên chủ hộ vào kho định danh (lỗi không để lại bản ghi định danh).
+	if in.DeclaredAreaHa != nil && !in.DeclaredAreaHa.IsPositive() {
+		return nil, problem.Validation.WithField("declared_area_ha", "phải dương")
+	}
 	dept, err := c.writeDept(in.Department)
 	if err != nil {
 		return nil, err

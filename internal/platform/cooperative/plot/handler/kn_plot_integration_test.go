@@ -441,3 +441,65 @@ func TestTT11_FarmerRequiredCreateAndUpdate(t *testing.T) {
 		t.Fatalf("rejected update changed farmer reference: %s", current.raw)
 	}
 }
+
+// R-A1/TT-11 (#113): số âm/0 và trường bắt buộc bị chặn ở máy chủ khi tạo và sửa thửa KN — 422 theo trường, không ghi
+// thửa, không ghi sổ, thửa hiện có giữ nguyên. Diện tích hình vẫn tính từ geometry; declared_area_ha chỉ là số khai
+// báo phụ. Cây trồng thuộc hồ sơ KN riêng (#119, /v1/kn/plot-profiles), không phải trường của thửa nền.
+func TestTT11_NumericAndRequiredGuards(t *testing.T) {
+	f := newKNFix(t)
+	xa := f.user(f.tenant, authz.KNXa, knDept, "31117")
+	fieldIs := func(r resp, field string) {
+		t.Helper()
+		errs := list(r.body, "errors")
+		if len(errs) != 1 || str(errs[0], "field") != field {
+			t.Fatalf("muốn lỗi trường %s: %s", field, r.raw)
+		}
+	}
+	for _, tc := range []struct {
+		mutate func(map[string]any)
+		field  string
+		what   string
+	}{
+		{func(b map[string]any) { b["declared_area_ha"] = "-1" }, "declared_area_ha", "diện tích khai báo âm"},
+		{func(b map[string]any) { b["declared_area_ha"] = "0" }, "declared_area_ha", "diện tích khai báo 0"},
+		{func(b map[string]any) { b["lot_name"] = "  " }, "lot_name", "tên thửa rỗng"},
+		{func(b map[string]any) { delete(b, "lot_name") }, "lot_name", "thiếu tên thửa"},
+		{func(b map[string]any) { b["commune_code"] = "" }, "commune_code", "thiếu xã"},
+	} {
+		body := knPlotBody("31117", rect(0, 0, 100, 100))
+		tc.mutate(body)
+		r := xa.post("/v1/kn/plots", body)
+		wantCode(t, r, http.StatusUnprocessableEntity, "validation_failed", tc.what)
+		fieldIs(r, tc.field)
+	}
+	if got := xa.get("/v1/kn/plots"); len(list(got.body, "items")) != 0 {
+		t.Fatalf("lần tạo bị từ chối đã ghi thửa: %s", got.raw)
+	}
+	created := xa.post("/v1/kn/plots", knPlotBody("31117", rect(0, 0, 100, 100)))
+	wantCode(t, created, http.StatusCreated, "", "thửa hợp lệ")
+	path := "/v1/kn/plots/" + str(created.body, "ref")
+	before := xa.get(path + "/log")
+	wantCode(t, before, http.StatusOK, "", "lịch sử trước")
+	for _, tc := range []struct {
+		body  map[string]any
+		field string
+		what  string
+	}{
+		{map[string]any{"declared_area_ha": "-0.5"}, "declared_area_ha", "sửa diện tích âm"},
+		{map[string]any{"declared_area_ha": "0"}, "declared_area_ha", "sửa diện tích 0"},
+		{map[string]any{"lot_name": ""}, "lot_name", "xóa tên thửa"},
+	} {
+		r := xa.req(http.MethodPut, path, key(), tc.body)
+		wantCode(t, r, http.StatusUnprocessableEntity, "validation_failed", tc.what)
+		fieldIs(r, tc.field)
+	}
+	after := xa.get(path + "/log")
+	if len(list(before.body, "items")) != len(list(after.body, "items")) {
+		t.Fatalf("sửa bị từ chối đã ghi sổ: trước=%s sau=%s", before.raw, after.raw)
+	}
+	current := xa.get(path)
+	if str(current.body, "lot_name") != str(created.body, "lot_name") || str(current.body, "declared_area_ha") != str(created.body, "declared_area_ha") ||
+		str(current.body, "area_ha") != str(created.body, "area_ha") {
+		t.Fatalf("thửa đổi sau lỗi: %s", current.raw)
+	}
+}

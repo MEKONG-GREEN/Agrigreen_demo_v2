@@ -690,9 +690,9 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 	s.want(xa1.post("/v1/kn/plots", map[string]any{"commune_code": agC1, "lot_name": "Lô bờ kênh", "farmer_name": "Võ Văn Em", "note": "Lúa OM18",
 		"declared_area_ha": "1.0", "shape": "square", "geometry": sq(0)}), http.StatusCreated, "vẽ thửa")
 	s.pii = append(s.pii, "Võ Văn Em")
-	s.wantCode(xa1.post("/v1/kn/plots", map[string]any{"commune_code": agC1, "lot_name": "Lô chồng", "declared_area_ha": "1.0", "shape": "square", "geometry": sq(0.0004)}),
+	s.wantCode(xa1.post("/v1/kn/plots", map[string]any{"commune_code": agC1, "lot_name": "Lô chồng", "farmer_name": "Võ Văn Em", "declared_area_ha": "1.0", "shape": "square", "geometry": sq(0.0004)}),
 		http.StatusConflict, "geo.plot_overlap", "thửa chồng lấn")
-	s.wantCode(xa1.post("/v1/kn/plots", map[string]any{"commune_code": agC3, "lot_name": "Lô xã khác", "declared_area_ha": "1.0", "shape": "square", "geometry": sq(0.01)}),
+	s.wantCode(xa1.post("/v1/kn/plots", map[string]any{"commune_code": agC3, "lot_name": "Lô xã khác", "farmer_name": "Võ Văn Em", "declared_area_ha": "1.0", "shape": "square", "geometry": sq(0.01)}),
 		http.StatusForbidden, "geo.out_of_scope", "thửa xã ngoài phạm vi")
 	s.want(xa1.post("/v1/kn/materials", map[string]any{"commune_code": agC1, "recorded_on": "2026-09-02", "lines": []any{map[string]any{"material_code": "PHAN_URE", "quantity": "120.5"}}}),
 		http.StatusCreated, "vật tư")
