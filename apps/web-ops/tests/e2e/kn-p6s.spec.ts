@@ -196,7 +196,8 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
     await expect(page).toHaveURL(/\/kn\/nhiem-vu\/cong-viec$/);
     await accountMenu(page).click();
     await page.getByRole("menuitem", { name: "Cấp Tỉnh · Phòng Trồng trọt" }).click();
-    await expect(page).toHaveURL(/\/kn\/dashboard$/);
+    // Trang vào Cấp Tỉnh phòng chuyên môn = "Báo cáo cho KHTC" (#44, internal/kn/extension/menus/navigation.json).
+    await expect(page).toHaveURL(/\/kn\/bao-cao-khtc$/);
     await expect(accountMenu(page)).toContainText("Cấp Tỉnh · Trồng trọt");
   });
 });

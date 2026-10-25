@@ -84,7 +84,8 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(page).toHaveURL(/\/chon-vai-tro/);
     await page.getByRole("button", { name: /^Cấp Tỉnh/ }).click();
     await page.getByRole("button", { name: /Phòng Trồng trọt — Vào hệ thống/ }).click();
-    await expect(page).toHaveURL(/\/kn\/dashboard$/);
+    // Trang vào Cấp Tỉnh phòng chuyên môn = "Báo cáo cho KHTC" (#44, internal/kn/extension/menus/navigation.json).
+    await expect(page).toHaveURL(/\/kn\/bao-cao-khtc$/);
     const nav = menuNav(page);
     await expect(nav.getByRole("button", { name: /Nhiệm vụ/ })).toHaveAttribute("aria-expanded", "false");
     await nav.getByRole("button", { name: /Nhiệm vụ/ }).click();
