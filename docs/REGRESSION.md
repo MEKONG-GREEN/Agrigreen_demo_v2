@@ -1208,3 +1208,11 @@ Propagation rule: production quyền/profile đổi → bắt buộc cả ba ngu
 Lịch công tác giải phiên owner trước resolver/realm; follower/manager không vay legacy. Lưu/sao chép/duyệt/check-in chỉ xem bị chặn trước I/O. Kiểm tra app policy, toàn handler lịch có dữ liệu, HTTP public root chín trạng thái phiên và contextdata/KN77/API. Không đổi SQL/ACL/OpenAPI/golden hay hành vi GPS. Đang chờ kết quả thực.
 
 KNSPLIT-2-CONTEXT-J: source35581/static65527/pure95493/currentstatic40610/full5-28682 đều actual0, chín HTTP cases PASS/noSKIP. Readonly hint guard99409f32 kiểm cả levels/follower. Hai cụm PG riêng đã dọn; 35 golden/DDL/ACL/API không đổi. Chờ review/ticket merge; log gốc mixed-encoding được giữ, normalized chỉ dùng xác minh marker ASCII.
+
+
+## PRICE-SURVEY-PII-NAME — cờ has_phone của phiếu điều tra giá thành (#150, nền dev 3a885de1)
+
+Downstream consumers: tests/e2e G1 bước 14 (`piiColumnQuery`) và ORG-PII-GUARD-001 dùng chung truy vấn; không đổi Go nghiệp vụ, DDL, ACL, OpenAPI, web.
+Dependency evidence: `rg -n 'has_phone|HasPhone' internal/kn/price migrations/pf` — chỉ `survey_import.go` (ghi/đọc cờ), `store/survey.go`, migration pf 20261024091116; `has_phone` của accounts là trường API, không phải cột.
+Regression acceptance command: `scripts/pg-ephemeral.ps1 run go test -v -count=1 -p 1 -timeout 55m ./tests/e2e ./internal/kn/price/... ./internal/vault/... ./migrations`.
+Propagation rule: miễn đúng `pf_price.survey_form` + partition qua pg_partition_tree, cột `has_phone`, kiểu boolean; quét giá trị PII vẫn gồm survey_form. PRICE-SURVEY-PII-GUARD-001 thêm `farmer_phone`, bảng `survey_form_probe.has_phone` và đổi has_phone sang text trong giao dịch rollback để chứng minh ngoại lệ không che PII khác. Không đổi tên cột (bảng sổ, ADR-0012) và không sửa migration đã áp (R-24).
