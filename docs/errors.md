@@ -231,6 +231,12 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `extension.material_unknown` | pf/extension KN v7.7: vật tư không có / đã ngừng dùng trong danh mục masterdata `material`, hoặc mục danh mục thiếu `attrs.unit` (lỗi theo trường `lines.<i>.material_code`) |
 | 422 | `extension.material_quantity_invalid` | pf/extension KN v7.7: số lượng sai theo ĐVT — âm, > 1 000 000 000, ĐVT đếm được (`bao, cái, chai, gói, con, chiếc, cây, hộp`) mà không nguyên, hoặc > 4 chữ số lẻ (tạm, chờ khách); lỗi theo trường `lines.<i>.quantity` / `quantity` |
 | 409 | `extension.material_superseded` | pf/extension KN v7.7: sửa (`POST /v1/kn/materials/{id}/correct`) một bản ghi đã bị bản bù khác thay — hãy sửa bản hiện hành |
+| 404 | `extension.kn_attrs_cooperative_not_found` | pf/extension BF-SRV-KN-ATTRS (TT-10): HTX không có, không phải HTX, của tenant khác hoặc ngoài xã phụ trách (`/v1/kn/machine-profiles/{cooperative_ref}`) |
+| 404 | `extension.kn_attrs_plot_not_found` | pf/extension BF-SRV-KN-ATTRS (TT-11): thửa không có, của tenant khác hoặc ngoài xã phụ trách (`/v1/kn/plot-profiles/{plot_ref}`) |
+| 409 | `extension.kn_attrs_plot_retired` | pf/extension BF-SRV-KN-ATTRS (TT-11): đặt cây trồng cho thửa đã ngừng dùng |
+| 422 | `extension.kn_attrs_year_invalid` | pf/extension BF-SRV-KN-ATTRS (TT-10): năm sản xuất không phải số nguyên hoặc ngoài 1900 – năm hiện tại (giờ Việt Nam); lỗi theo trường `lines.<loại máy>.year_made` |
+| 422 | `extension.kn_attrs_machine_type_unknown` | pf/extension BF-SRV-KN-ATTRS (TT-10): loại máy không có / đã ngừng dùng trong danh mục masterdata `machine_type` (trường `lines.<loại máy>.machine_type`) |
+| 422 | `extension.kn_attrs_crop_unknown` | pf/extension BF-SRV-KN-ATTRS (TT-11): cây trồng không có / đã ngừng dùng trong danh mục masterdata `crop` (trường `crop_code`) |
 | 403 | `self_approval_forbidden` | pf/extension (P4): người đã nhập thay bản nộp (on_behalf_of) tự rà soát/xác nhận/chốt kỳ có bản đó (gap §4.6) |
 
 Vật tư KN v7.7 dùng lại `extension.read_only` (Cấp Quốc gia ghi vật tư), `extension.out_of_scope`, `extension.support_reason_required`, `extension.dependency_unavailable` (chưa nối danh mục vật tư / đơn vị hành chính).

@@ -2,6 +2,8 @@ package port
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
@@ -33,3 +35,20 @@ type HTXData interface {
 	HTXConfirmations
 	HTXConfirmationHistory
 }
+
+// PlotDirectory tra vị trí một thửa qua publication pf_cooperative_pub.plots/v1 (BF-SRV-KN-ATTRS, #119): chỉ xã,
+// HTX, trạng thái — không hình học, tên, hộ. Thửa ngoài phạm vi RLS của người gọi coi như không có (ok = false).
+type PlotDirectory interface {
+	PlotLocation(ctx context.Context, plotRef uuid.UUID) (PlotLocation, bool, error)
+}
+
+// PlotLocation là vị trí công bố của một thửa.
+type PlotLocation struct {
+	PlotRef        uuid.UUID
+	CommuneCode    string
+	CooperativeRef uuid.UUID // Nil = thửa chưa gán HTX
+	Status         string    // draft | active | retired
+}
+
+// PlotRetired là trạng thái thửa đã ngừng dùng trong publication.
+const PlotRetired = "retired"

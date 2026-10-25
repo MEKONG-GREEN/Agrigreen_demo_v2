@@ -14032,6 +14032,137 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/kn/machine-profiles/{cooperative_ref}:
+    get:
+      summary: "TT-10 (BF-SRV-KN-ATTRS): hồ sơ KN riêng — năm sản xuất theo loại máy của HTX (mọi vai KN trong phạm vi)"
+      description: |
+        Hồ sơ thuộc KN (pf_extension), tách theo phòng ban; số lượng máy vẫn khai báo ở /v1/kn/machine-counts (pf/mechanization).
+        HTX đọc qua publication pf_party_pub.v1_org_tree; HTX ngoài xã phụ trách, tổ chức không phải HTX, tenant khác → 404.
+      operationId: knGetMachineProfile
+      tags: [extension]
+      parameters:
+        - {name: cooperative_ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin: phòng ban (mặc định trong_trot)"}
+      responses:
+        "200":
+          description: Hồ sơ hiện hành
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNMachineProfile"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: extension.kn_attrs_cooperative_not_found, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+    put:
+      summary: "TT-10: thay toàn bộ năm sản xuất theo loại máy (Cấp Xã, Admin); loại vắng = bỏ khỏi hồ sơ; không đổi → không ghi"
+      description: |
+        Năm sản xuất bắt buộc, số nguyên, 1900 ≤ năm ≤ năm hiện tại (giờ Việt Nam). Loại máy thuộc danh mục machine_type đang dùng,
+        không trùng. Lỗi bất kỳ → không ghi dòng nào. PUT lặp cùng thân là idempotent theo trạng thái.
+      operationId: knPutMachineProfile
+      tags: [extension]
+      parameters:
+        - {name: cooperative_ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin: phòng ban ghi (mặc định trong_trot)"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                lines:
+                  type: array
+                  maxItems: 200
+                  items:
+                    type: object
+                    required: [machine_type, year_made]
+                    properties:
+                      machine_type: {type: string, description: "Danh mục masterdata machine_type (đang dùng)"}
+                      year_made: {type: integer, minimum: 1900, description: "≤ năm hiện tại (giờ VN)"}
+      responses:
+        "200":
+          description: Hồ sơ sau khi lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNMachineProfile"}
+        "403": {description: "extension.read_only | forbidden | extension.support_reason_required", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.kn_attrs_cooperative_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.kn_attrs_year_invalid | extension.kn_attrs_machine_type_unknown", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/kn/plot-profiles:
+    get:
+      summary: "TT-11 (BF-SRV-KN-ATTRS): cây trồng hiện hành của các thửa trong phạm vi + phòng ban (cột Cây trồng của danh sách thửa)"
+      operationId: knListPlotProfiles
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}}
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin (mặc định trong_trot)"}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
+      responses:
+        "200":
+          description: Một trang, theo plot_ref tăng dần
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KNPlotCrop"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {description: extension.out_of_scope, $ref: "#/components/responses/Problem"}
+  /v1/kn/plot-profiles/{plot_ref}:
+    get:
+      summary: "TT-11: cây trồng hiện hành của một thửa (crop_code null = chưa khai báo)"
+      description: |
+        Thửa đọc qua publication pf_cooperative_pub.v1_plots (xã, HTX, trạng thái); ngoài phạm vi/tenant khác → 404.
+        Hình, diện tích, tên thửa, chủ hộ vẫn ở /v1/kn/plots (pf/cooperative).
+      operationId: knGetPlotProfile
+      tags: [extension]
+      parameters:
+        - {name: plot_ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin (mặc định trong_trot)"}
+      responses:
+        "200":
+          description: Hồ sơ thửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNPlotProfile"}
+        "404": {description: extension.kn_attrs_plot_not_found, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+    put:
+      summary: "TT-11: đặt cây trồng (bắt buộc, danh mục crop đang dùng) cho thửa — Cấp Xã, Admin; cùng cây → không ghi"
+      operationId: knPutPlotProfile
+      tags: [extension]
+      parameters:
+        - {name: plot_ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin: phòng ban ghi (mặc định trong_trot)"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [crop_code]
+              properties:
+                crop_code: {type: string, minLength: 1, maxLength: 60, description: "Danh mục masterdata crop (đang dùng)"}
+      responses:
+        "200":
+          description: Hồ sơ thửa sau khi lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNPlotProfile"}
+        "403": {description: "extension.read_only | forbidden | extension.support_reason_required", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.kn_attrs_plot_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.kn_attrs_plot_retired, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.kn_attrs_crop_unknown", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
   /v1/extension/cnts/campaigns:
     get:
       summary: "Danh sách đợt điều tra CNTS (W11.50 — FN-21) kèm tiến độ"
@@ -24461,6 +24592,47 @@ components:
     DeptDocList: {"type": "object", "properties": {"department_code": {"type": "string"}, "can_write": {"type": "boolean"}, "can_manage": {"type": "boolean"}, "total": {"type": "integer"}, "kinds": {"type": "array", "items": {"type": "string"}}, "extensions": {"type": "array", "items": {"type": "string"}}, "max_bytes": {"type": "integer"}, "items": {"type": "array", "items": {"$ref": "#/components/schemas/DeptDoc"}}}, "required": ["department_code", "can_write", "can_manage", "total", "kinds", "extensions", "max_bytes", "items"], "additionalProperties": false}
     DeptDocInput: {"type": "object", "properties": {"folder_ref": {"type": ["string", "null"], "format": "uuid"}, "title": {"type": "string"}, "kind": {"type": "string", "enum": ["quy_trinh_ky_thuat", "van_ban_phap_quy", "van_ban_chi_dao", "ke_hoach", "mau_bieu", "tai_lieu_tap_huan", "khac"]}, "field": {"type": "string"}, "number": {"type": "string"}, "issuer": {"type": "string"}, "summary": {"type": "string"}, "issued_on": {"type": "string", "description": "YYYY-MM-DD hoặc rỗng"}, "effective_from": {"type": "string"}, "effective_to": {"type": "string"}, "audience": {"type": "array", "items": {"type": "string", "enum": ["xa", "nong_ho"]}}, "base_version": {"type": "integer", "description": "Bắt buộc khi sửa (khóa lạc quan)"}}, "required": ["title", "kind"], "additionalProperties": false}
     DeptDocHide: {"type": "object", "properties": {"reason": {"type": "string"}, "base_version": {"type": "integer"}}, "required": ["reason", "base_version"], "additionalProperties": false}
+    KNMachineProfile:
+      type: object
+      required: [cooperative_ref, commune_code, department_code, items]
+      properties:
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        department_code: {type: string}
+        items:
+          type: array
+          items:
+            type: object
+            required: [machine_type, machine_type_name, year_made, updated_at, actor_ref]
+            properties:
+              machine_type: {type: string}
+              machine_type_name: {type: string}
+              year_made: {type: integer}
+              updated_at: {type: string, format: date-time}
+              actor_ref: {type: string, format: uuid}
+    KNPlotCrop:
+      type: object
+      required: [plot_ref, commune_code, department_code, crop_code, crop_name, updated_at, actor_ref]
+      properties:
+        plot_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        department_code: {type: string}
+        crop_code: {type: string}
+        crop_name: {type: string}
+        updated_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+    KNPlotProfile:
+      type: object
+      required: [plot_ref, commune_code, department_code, status, crop_code, crop_name, updated_at, actor_ref]
+      properties:
+        plot_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        department_code: {type: string}
+        status: {type: string, enum: [draft, active, retired]}
+        crop_code: {type: [string, "null"]}
+        crop_name: {type: [string, "null"]}
+        updated_at: {type: [string, "null"], format: date-time}
+        actor_ref: {type: [string, "null"], format: uuid}
     CNTSCampaignInput: {"type":"object","required":["name","field","template_code","scope_mode","from_date","to_date","due_at"],"properties":{"name":{"type":"string","minLength":1,"maxLength":200},"goal":{"type":"string","maxLength":2000},"field":{"type":"string","enum":["chan_nuoi","thu_y","thuy_san","khac"]},"template_code":{"type":"string"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"owner_ref":{"type":"string","format":"uuid"},"remind_before_hours":{"type":"integer","minimum":0,"maximum":168}},"additionalProperties":false}
     CNTSPoint: {"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"source":{"type":"string","enum":["gps","map"]}},"required":["lat","lng","source"],"additionalProperties":false}
     CNTSCampaignDueInput: {"type":"object","required":["due_at","reason"],"properties":{"due_at":{"type":"string","format":"date-time"},"reason":{"type":"string","minLength":10,"maxLength":500}},"additionalProperties":false}

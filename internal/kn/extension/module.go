@@ -30,6 +30,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/handler"
 	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/app"
 	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/handler"
+	kaapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knattrs/app"
 	matapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/app"
 	mathandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/handler"
 	obapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/app"
@@ -107,10 +108,13 @@ type Module struct {
 	home *dhapp.Service
 	// W11.50 (D4 CN10): chiến dịch điều tra mở rộng (extension/cntscampaign, module_cntscampaign.go).
 	campaigns *campaignService
+	// BF-SRV-KN-ATTRS (#119): hồ sơ KN riêng — năm sản xuất máy (TT-10), cây trồng thửa (TT-11) (module_knattrs.go).
+	attrs *kaapp.Service
 }
 
 // New tạo module với pool của vai extension_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
+	pool := db
 	db = forModule(db)
 	m := &Module{svc: &app.Service{
 		DB: db, Clock: clk, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
@@ -128,6 +132,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.zmap = &zmapapp.Service{DB: db, Clock: clk, Units: d.Units, Plots: d.Plots, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.home = m.newDeptHome()
+	m.attrs = newKNAttrs(pool, db, clk, d.Catalogs)
 	return m
 }
 
@@ -202,6 +207,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	zmaphandler.Handler{Svc: m.zmap}.RegisterApp(rg)   // W11.52
 	m.registerDeptHome(rg)                             // W11.54
 	m.registerCNTSCampaigns(rg)                        // W11.50
+	m.registerKNAttrs(rg)                              // BF-SRV-KN-ATTRS
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham

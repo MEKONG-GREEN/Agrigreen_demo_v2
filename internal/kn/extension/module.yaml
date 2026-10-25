@@ -41,6 +41,7 @@ provides:
     - KHTCSourceCrosswalk
     - KHTCSources
     - OrganizationData
+    - PlotDirectory
     - PlotStatistics
     - ReportData
     - TablePDF

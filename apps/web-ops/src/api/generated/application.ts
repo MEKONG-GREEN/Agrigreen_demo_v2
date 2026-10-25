@@ -9952,6 +9952,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/kn/machine-profiles/{cooperative_ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * TT-10 (BF-SRV-KN-ATTRS): hồ sơ KN riêng — năm sản xuất theo loại máy của HTX (mọi vai KN trong phạm vi)
+         * @description Hồ sơ thuộc KN (pf_extension), tách theo phòng ban; số lượng máy vẫn khai báo ở /v1/kn/machine-counts (pf/mechanization).
+         *     HTX đọc qua publication pf_party_pub.v1_org_tree; HTX ngoài xã phụ trách, tổ chức không phải HTX, tenant khác → 404.
+         */
+        get: operations["knGetMachineProfile"];
+        /**
+         * TT-10: thay toàn bộ năm sản xuất theo loại máy (Cấp Xã, Admin); loại vắng = bỏ khỏi hồ sơ; không đổi → không ghi
+         * @description Năm sản xuất bắt buộc, số nguyên, 1900 ≤ năm ≤ năm hiện tại (giờ Việt Nam). Loại máy thuộc danh mục machine_type đang dùng,
+         *     không trùng. Lỗi bất kỳ → không ghi dòng nào. PUT lặp cùng thân là idempotent theo trạng thái.
+         */
+        put: operations["knPutMachineProfile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/plot-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** TT-11 (BF-SRV-KN-ATTRS): cây trồng hiện hành của các thửa trong phạm vi + phòng ban (cột Cây trồng của danh sách thửa) */
+        get: operations["knListPlotProfiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/plot-profiles/{plot_ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * TT-11: cây trồng hiện hành của một thửa (crop_code null = chưa khai báo)
+         * @description Thửa đọc qua publication pf_cooperative_pub.v1_plots (xã, HTX, trạng thái); ngoài phạm vi/tenant khác → 404.
+         *     Hình, diện tích, tên thửa, chủ hộ vẫn ở /v1/kn/plots (pf/cooperative).
+         */
+        get: operations["knGetPlotProfile"];
+        /** TT-11: đặt cây trồng (bắt buộc, danh mục crop đang dùng) cho thửa — Cấp Xã, Admin; cùng cây → không ghi */
+        put: operations["knPutPlotProfile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/campaigns": {
         parameters: {
             query?: never;
@@ -21542,6 +21607,47 @@ export interface components {
         DeptDocHide: {
             reason: string;
             base_version: number;
+        };
+        KNMachineProfile: {
+            /** Format: uuid */
+            cooperative_ref: string;
+            commune_code: string;
+            department_code: string;
+            items: {
+                machine_type: string;
+                machine_type_name: string;
+                year_made: number;
+                /** Format: date-time */
+                updated_at: string;
+                /** Format: uuid */
+                actor_ref: string;
+            }[];
+        };
+        KNPlotCrop: {
+            /** Format: uuid */
+            plot_ref: string;
+            commune_code: string;
+            department_code: string;
+            crop_code: string;
+            crop_name: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        KNPlotProfile: {
+            /** Format: uuid */
+            plot_ref: string;
+            commune_code: string;
+            department_code: string;
+            /** @enum {string} */
+            status: "draft" | "active" | "retired";
+            crop_code: string | null;
+            crop_name: string | null;
+            /** Format: date-time */
+            updated_at: string | null;
+            /** Format: uuid */
+            actor_ref: string | null;
         };
         CNTSCampaignInput: {
             name: string;
@@ -43744,6 +43850,193 @@ export interface operations {
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    knGetMachineProfile: {
+        parameters: {
+            query?: {
+                /** @description Chỉ Admin: phòng ban (mặc định trong_trot) */
+                department?: string;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                cooperative_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hồ sơ hiện hành */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNMachineProfile"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description extension.kn_attrs_cooperative_not_found */
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    knPutMachineProfile: {
+        parameters: {
+            query?: {
+                /** @description Chỉ Admin: phòng ban ghi (mặc định trong_trot) */
+                department?: string;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                cooperative_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    lines: {
+                        /** @description Danh mục masterdata machine_type (đang dùng) */
+                        machine_type: string;
+                        /** @description ≤ năm hiện tại (giờ VN) */
+                        year_made: number;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Hồ sơ sau khi lưu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNMachineProfile"];
+                };
+            };
+            /** @description extension.read_only | forbidden | extension.support_reason_required */
+            403: components["responses"]["Problem"];
+            /** @description extension.kn_attrs_cooperative_not_found */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | extension.kn_attrs_year_invalid | extension.kn_attrs_machine_type_unknown */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    knListPlotProfiles: {
+        parameters: {
+            query?: {
+                commune?: string;
+                /** @description Chỉ Admin (mặc định trong_trot) */
+                department?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang, theo plot_ref tăng dần */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KNPlotCrop"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description extension.out_of_scope */
+            403: components["responses"]["Problem"];
+        };
+    };
+    knGetPlotProfile: {
+        parameters: {
+            query?: {
+                /** @description Chỉ Admin (mặc định trong_trot) */
+                department?: string;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                plot_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hồ sơ thửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNPlotProfile"];
+                };
+            };
+            /** @description extension.kn_attrs_plot_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    knPutPlotProfile: {
+        parameters: {
+            query?: {
+                /** @description Chỉ Admin: phòng ban ghi (mặc định trong_trot) */
+                department?: string;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                plot_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Danh mục masterdata crop (đang dùng) */
+                    crop_code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Hồ sơ thửa sau khi lưu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNPlotProfile"];
+                };
+            };
+            /** @description extension.read_only | forbidden | extension.support_reason_required */
+            403: components["responses"]["Problem"];
+            /** @description extension.kn_attrs_plot_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.kn_attrs_plot_retired */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.kn_attrs_crop_unknown */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
             503: components["responses"]["Problem"];
         };
     };
