@@ -23,6 +23,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // PackageURLTTL là thời hạn URL tải gói (≤ objstore.MaxPresignTTL).
@@ -211,6 +212,9 @@ func (s *Service) VerifyExport(ctx context.Context, id uuid.UUID) (Verification,
 // HandleExportRequested là inbox.Handler của worker cho pf.mrv.export.requested.
 // Chạy trong giao dịch tenant do inbox.Process mở (pool vai mrv_app), nên kết
 // quả + inbox + outbox commit cùng nhau (R-61). Job đã xong → không làm gì.
+//
+// P0-POOL-SHARED-2 (#143): ghi gói vào kho đối tượng NGOÀI giao dịch inbox (txdeps.Get — inbox.Process hủy giao dịch,
+// ghi, chạy lại handler). Lần chạy lại dựng lại ảnh chụp tại as_of (tất định) và chỉ ghi sổ khi gói cùng băm đã ghi.
 func (s *Service) HandleExportRequested(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 	var pl port.ExportRequestedV1
 	if err := json.Unmarshal(env.Payload, &pl); err != nil {
@@ -240,7 +244,9 @@ func (s *Service) HandleExportRequested(ctx context.Context, tx pgx.Tx, env outb
 	}
 	pkgSHA := objstore.SHA256Hex(body)
 	key := domain.ObjectKey(j.TenantID, j.ID)
-	if _, err := s.Store.Put(ctx, key, bytes.NewReader(body), int64(len(body)), pkgSHA, "application/json"); err != nil {
+	if _, err := txdeps.Get(ctx, "mrv.export.put:"+key+":"+pkgSHA, func(ctx context.Context) (objstore.Info, error) {
+		return s.Store.Put(ctx, key, bytes.NewReader(body), int64(len(body)), pkgSHA, "application/json")
+	}); err != nil {
 		if errors.Is(err, objstore.ErrExists) {
 			// Đã có gói khác nội dung dưới cùng khóa (dữ liệu tại as_of đổi giữa hai lần giao) — không ghi đè.
 			return store.FailJob(ctx, tx, j.ID, "package_conflict")

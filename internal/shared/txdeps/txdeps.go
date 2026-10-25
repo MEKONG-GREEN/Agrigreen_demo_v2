@@ -1,5 +1,6 @@
-// Package txdeps: dữ liệu module khác của MỘT thao tác KN đọc NGOÀI giao dịch (P0-POOL-KN-2, #139 — tổng quát hóa cơ chế
-// reportcycle/app/deps.go của #125).
+// Package txdeps: dữ liệu module khác (và I/O ngoài) của MỘT thao tác đọc/thực hiện NGOÀI giao dịch (P0-POOL-KN-2, #139 —
+// tổng quát hóa cơ chế reportcycle/app/deps.go của #125; P0-POOL-SHARED-2, #143 — chuyển từ internal/kn/extension/txdeps
+// sang shared để inbox.Process dùng cho mọi consumer: lời gọi port module khác, ghi/đọc kho đối tượng, gửi thư).
 //
 // Gốc lắp ráp mở MỘT pool cho mọi module (ADR-0028); port của module khác (pf/party, pf/masterdata, pf/accounts, cổng nội bộ
 // KN như KHTCPrograms) mở giao dịch RIÊNG trên pool đó. Gọi port bên trong giao dịch KN thì thao tác giữ một kết nối trong
@@ -14,6 +15,10 @@
 // Ngữ nghĩa giữ nguyên: giá trị đọc lúc thao tác như trước (trước đây port cũng đọc ở giao dịch riêng, không cùng ảnh chụp
 // với giao dịch KN); lỗi của port chỉ trả cho thân giao dịch khi thân thực sự cần giá trị đó (lỗi được nhớ cùng khóa).
 // Thân giao dịch phải đặt lại mọi kết quả ra ngoài ở đầu mỗi lần chạy và không có tác dụng phụ ngoài DB.
+//
+// Tác dụng phụ ngoài (ghi kho đối tượng, gửi thư — #143): đặt trong load của Get với khóa của thao tác (vd mã việc xuất).
+// load chạy ngoài giao dịch, đúng MỘT lần cho mỗi bộ nhớ (kết quả/lỗi được nhớ); thân giao dịch chạy lại chỉ GHI NHẬN kết
+// quả đã có. Giao lại sự kiện (bộ nhớ mới) có thể chạy lại load — load phải idempotent hoặc chấp nhận ít-nhất-một-lần.
 package txdeps
 
 import (
@@ -100,7 +105,7 @@ func (d *Set) Pending() bool { return d != nil && len(d.want) > 0 }
 func (d *Set) fill(ctx context.Context) {
 	for _, k := range d.order {
 		if load, ok := d.want[k]; ok {
-			v, err := load(detach(ctx))
+			v, err := safeLoad(detach(ctx), load)
 			d.vals[k] = entry{v: v, err: err}
 		}
 	}
@@ -108,15 +113,41 @@ func (d *Set) fill(ctx context.Context) {
 	d.order = nil
 }
 
+// safeLoad gọi load; panic (vd thư viện SMTP) thành lỗi của khóa — thân giao dịch chạy lại nhận lỗi đó như lỗi của port
+// (consumer inbox: NACK, lùi, DLQ — P0-WORKER-REPORTS #128), không làm sập tiến trình khi load chạy ngoài thân handler.
+func safeLoad(ctx context.Context, load func(context.Context) (any, error)) (v any, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			v, err = nil, fmt.Errorf("txdeps: load panic: %v", r)
+		}
+	}()
+	return load(ctx)
+}
+
 // Run chạy body bằng runTx (mở MỘT giao dịch và gọi body với giao dịch đó) với bộ nhớ của ctx niêm phong; thiếu dữ liệu →
 // hủy, nạp ngoài giao dịch, chạy lại. ctx không mang bộ nhớ → chạy một lần như cũ.
 func Run[X any](ctx context.Context, runTx func(body func(X) error) error, body func(X) error) error {
+	return RunMax(ctx, MaxAttempts, runTx, body)
+}
+
+// RunMax như Run với số lần chạy tối đa attempts (consumer inbox — thân có nhiều tầng đọc phụ thuộc nhau, #143).
+func RunMax[X any](ctx context.Context, attempts int, runTx func(body func(X) error) error, body func(X) error) error {
 	d := From(ctx)
 	if d == nil {
 		return runTx(body)
 	}
 	if d.sealed {
-		return fmt.Errorf("txdeps: Run lồng trong giao dịch đang niêm phong")
+		// Run lồng trong thân giao dịch đang niêm phong (vd consumer inbox gọi use case tự mở giao dịch): chạy MỘT lần,
+		// dùng chung bộ nhớ — Get thiếu khóa ghi nhận vào bộ nhớ chung, ErrNeed lan lên Run ngoài cùng (hủy, nạp, chạy lại).
+		return runTx(func(x X) error {
+			if err := body(x); err != nil {
+				return err
+			}
+			if d.Pending() {
+				return ErrNeed
+			}
+			return nil
+		})
 	}
 	for attempt := 1; ; attempt++ {
 		d.sealed = true
@@ -136,7 +167,7 @@ func Run[X any](ctx context.Context, runTx func(body func(X) error) error, body 
 			}
 			return err
 		}
-		if attempt >= MaxAttempts {
+		if attempt >= attempts {
 			return ErrExhausted
 		}
 		if ctx.Err() != nil {

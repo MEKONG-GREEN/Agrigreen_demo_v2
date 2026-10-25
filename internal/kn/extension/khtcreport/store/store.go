@@ -8,6 +8,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"strconv"
 	"time"
 )
 
@@ -46,6 +47,28 @@ type Final struct {
 
 func Lock(ctx context.Context, tx pgx.Tx, tid, period uuid.UUID) error {
 	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('khtc_snapshot:' || $1::uuid::text || ':' || $2::uuid::text, 0))`, tid, period)
+	return err
+}
+
+// ClaimCancel ghi ý định hủy kỳ (P0-POOL-SHARED-2, #143) hạn lease tính bằng giờ DB; ý định khác còn hạn → false.
+// Gọi trong giao dịch đã giữ Lock.
+func ClaimCancel(ctx context.Context, tx pgx.Tx, tid, period, token uuid.UUID, lease time.Duration) (bool, error) {
+	var ok bool
+	err := tx.QueryRow(ctx, `INSERT INTO pf_extension.khtc_cancel_intent (tenant_id, period_id, claim_id, claim_until, updated_at)
+	  VALUES ($1, $2, $3, now() + $4::interval, now())
+	  ON CONFLICT (tenant_id, period_id) DO UPDATE SET claim_id = EXCLUDED.claim_id, claim_until = EXCLUDED.claim_until, updated_at = now()
+	  WHERE khtc_cancel_intent.claim_until IS NULL OR khtc_cancel_intent.claim_until <= now()
+	  RETURNING true`, tid, period, token, strconv.FormatInt(int64(lease/time.Second), 10)+" seconds").Scan(&ok)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return ok, err
+}
+
+// ReleaseCancel bỏ ý định hủy của token (hủy xong hoặc hủy ở cap/forms lỗi).
+func ReleaseCancel(ctx context.Context, tx pgx.Tx, tid, period, token uuid.UUID) error {
+	_, err := tx.Exec(ctx, `UPDATE pf_extension.khtc_cancel_intent SET claim_id = NULL, claim_until = NULL, updated_at = now()
+	  WHERE tenant_id = $1 AND period_id = $2 AND claim_id = $3`, tid, period, token)
 	return err
 }
 

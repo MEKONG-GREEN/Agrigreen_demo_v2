@@ -18,6 +18,7 @@ import (
 	party "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -35,6 +36,8 @@ var (
 	ErrInvalid     = problem.New(http.StatusUnprocessableEntity, "extension.khtc_report_invalid", "Nội dung bản soạn không hợp lệ")
 	ErrDependency  = problem.New(http.StatusServiceUnavailable, "extension.dependency_unavailable", "Dịch vụ phụ thuộc chưa sẵn sàng")
 	ErrCancelled   = problem.New(http.StatusConflict, "extension.khtc_period_terminal", "Kỳ báo cáo đã hủy")
+	// ErrCancelling: kỳ đang được hủy (ý định hủy còn hạn — DB khtc_report_cancelling; P0-POOL-SHARED-2).
+	ErrCancelling = problem.New(http.StatusConflict, "extension.khtc_period_cancelling", "Kỳ đang được hủy — thử lại sau")
 )
 
 type Service struct {
@@ -112,6 +115,8 @@ func classify(err error) error {
 			return ErrFinal
 		case "khtc_report_cancelled":
 			return ErrCancelled
+		case "khtc_report_cancelling":
+			return ErrCancelling
 		case "khtc_report_export_draft":
 			return ErrVersion
 		case "khtc_report_final_export":
@@ -136,9 +141,46 @@ func (s *Service) HasFinal(ctx context.Context, id string) (bool, error) {
 	return found, err
 }
 
-// GuardCancel serializes the entire cancellation workflow, including the cap/forms side effect.
-// The cancellation event uses this transaction so its trigger can reacquire the lock safely.
-func (s *Service) GuardCancel(ctx context.Context, id uuid.UUID, fn func(pgx.Tx) error) error {
+// cancelLease là hạn ý định hủy kỳ: đủ cho lời gọi cap/forms CancelPeriod của một yêu cầu HTTP; tiến trình chết giữa chừng
+// → hết hạn thì Bản cuối/đóng kỳ chạy lại được.
+const cancelLease = 2 * time.Minute
+
+// BeginCancel (P0-POOL-SHARED-2, #143 — thay GuardCancel): giao dịch NGẮN giữ khóa khtc_snapshot, kỳ chưa có Bản cuối →
+// ghi ý định hủy (khtc_cancel_intent) rồi commit. Trong lúc ý định còn hạn, trigger chặn Bản cuối và đóng kỳ — nên bên gọi
+// hủy kỳ native ở cap/forms NGOÀI giao dịch mà Bản cuối vẫn không chen vào được. Đã có Bản cuối → period.ErrHasFinal; ý
+// định khác còn hạn → period.ErrCancelling.
+func (s *Service) BeginCancel(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return uuid.Nil, problem.Unauthenticated
+	}
+	token := ids.New()
+	err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		if err := store.Lock(ctx, tx, p.TenantID, id); err != nil {
+			return err
+		}
+		f, err := store.GetFinal(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if f != nil {
+			return period.ErrHasFinal
+		}
+		claimed, err := store.ClaimCancel(ctx, tx, p.TenantID, id, token, cancelLease)
+		if err != nil {
+			return err
+		}
+		if !claimed {
+			return period.ErrCancelling
+		}
+		return nil
+	})
+	return token, err
+}
+
+// FinishCancel ghi kết quả hủy kỳ (fn — sự kiện 'cancelled' trong giao dịch này, trigger lấy lại khóa an toàn) và bỏ ý
+// định hủy, trong một giao dịch ngắn giữ khóa khtc_snapshot.
+func (s *Service) FinishCancel(ctx context.Context, id, token uuid.UUID, fn func(pgx.Tx) error) error {
 	p, ok := authz.FromContext(ctx)
 	if !ok {
 		return problem.Unauthenticated
@@ -147,8 +189,20 @@ func (s *Service) GuardCancel(ctx context.Context, id uuid.UUID, fn func(pgx.Tx)
 		if err := store.Lock(ctx, tx, p.TenantID, id); err != nil {
 			return err
 		}
-		return fn(tx)
+		if err := fn(tx); err != nil {
+			return err
+		}
+		return store.ReleaseCancel(ctx, tx, p.TenantID, id, token)
 	})
+}
+
+// AbortCancel bỏ ý định hủy (hủy ở cap/forms lỗi, hoặc ghi sự kiện hủy lỗi).
+func (s *Service) AbortCancel(ctx context.Context, id, token uuid.UUID) error {
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return problem.Unauthenticated
+	}
+	return s.tx(ctx, p.TenantID, func(tx pgx.Tx) error { return store.ReleaseCancel(ctx, tx, p.TenantID, id, token) })
 }
 
 type Detail struct {

@@ -29,6 +29,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // ExportRequest là yêu cầu xuất đã kiểm quyền ở api-public.
@@ -131,6 +132,11 @@ const pageSize = 500
 
 // HandleExportRequested là inbox.Handler của consumer pf.apiclient.export (pool vai apiclient_app,
 // tenant = đơn vị vận hành). Giao lặp an toàn: job đã xử lý → bỏ qua.
+//
+// P0-POOL-SHARED-2 (#143): đọc nguồn của module chủ dữ liệu (port tự mở giao dịch trên cùng pool) và ghi kho đối tượng
+// chạy NGOÀI giao dịch inbox qua txdeps.Get (inbox.Process hủy giao dịch, nạp, chạy lại handler). Lần chạy lại chỉ ghi
+// tệp + hoàn tất job khi phần tử và tệp đã có; ghi kho lỗi → không ghi gì (giao lại). Khóa đối tượng theo mã job, cùng
+// nội dung → ghi lặp an toàn; khác nội dung → apiclient.export_conflict như trước.
 func (s *Service) HandleExportRequested(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 	var pl port.ExportRequestedV1
 	if err := json.Unmarshal(env.Payload, &pl); err != nil {
@@ -158,7 +164,10 @@ func (s *Service) HandleExportRequested(ctx context.Context, tx pgx.Tx, env outb
 	if s.Collection == nil || s.Store == nil {
 		return ErrDependencyUnavailable // giao lại → DLQ (R-62); không mất yêu cầu
 	}
-	items, err := s.collectAll(ctx, *j)
+	job := *j
+	items, err := txdeps.Get(ctx, "apiclient.export.collect:"+j.ID.String(), func(ctx context.Context) ([]port.CollectionVolumeV1, error) {
+		return s.collectAll(ctx, job)
+	})
 	if err != nil {
 		var p *problem.Problem
 		if errors.As(err, &p) && (p.Code == port.ErrExportTooLarge.Code || p.Code == port.ErrContractViolation.Code) {
@@ -173,14 +182,17 @@ func (s *Service) HandleExportRequested(ctx context.Context, tx pgx.Tx, env outb
 	}
 	sha := objstore.SHA256Hex(body)
 	key := ObjectKey(j.TenantID, j.ID, j.Format)
-	if _, err := s.Store.Put(ctx, key, bytes.NewReader(body), int64(len(body)), sha, ContentType(j.Format)); err != nil {
+	ct := ContentType(j.Format)
+	if _, err := txdeps.Get(ctx, "apiclient.export.put:"+key+":"+sha, func(ctx context.Context) (objstore.Info, error) {
+		return s.Store.Put(ctx, key, bytes.NewReader(body), int64(len(body)), sha, ct)
+	}); err != nil {
 		if errors.Is(err, objstore.ErrExists) {
 			return store.FailJob(ctx, tx, j.ID, "apiclient.export_conflict", now)
 		}
 		return err
 	}
 	if err := store.InsertFile(ctx, tx, store.ExportFile{TenantID: j.TenantID, JobID: j.ID, ObjectKey: key, SHA256: sha, SizeBytes: int64(len(body)),
-		Rows: int64(len(items)), ContentType: ContentType(j.Format)}); err != nil {
+		Rows: int64(len(items)), ContentType: ct}); err != nil {
 		return err
 	}
 	return store.CompleteJob(ctx, tx, j.ID, int64(len(items)), sha, now)

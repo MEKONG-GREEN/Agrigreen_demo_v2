@@ -3,6 +3,10 @@ package app
 // Consumer port.CNTSAlertConsumer: quy tắc liên biểu + cảnh báo tự động sau commit (FN-13 AC-01 "cảnh báo tạo trong
 // 1 phút sau khi dữ liệu đồng bộ"). Chạy trong giao dịch inbox của vai extension_app; số liệu bài nộp đọc qua
 // formsport.SubmissionFeed (giao dịch riêng của pf/forms).
+//
+// P0-POOL-SHARED-2 (#143, bàn giao từ #139): mọi lời gọi port module khác (bài nộp cap/forms, tham số masterdata, đơn
+// vị hành chính, danh bạ cán bộ) đi qua txdeps.Get — inbox.Process gắn bộ nhớ txdeps nên chúng chạy NGOÀI giao dịch
+// inbox (hủy, nạp, chạy lại thân); handler chỉ ghi cảnh báo/sự kiện trong giao dịch.
 
 import (
 	"context"
@@ -16,10 +20,10 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // Events là sự kiện consumer port.CNTSAlertConsumer đăng ký.
@@ -44,7 +48,10 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 		if err != nil {
 			return nil
 		}
-		sub, err := s.Feed.Recorded(ctx, env.TenantID, id)
+		sub, err := txdeps.Get(ctx, "feed.recorded:"+env.TenantID.String()+":"+id.String(),
+			func(ctx context.Context) (*formsport.RecordedSubmission, error) {
+				return s.Feed.Recorded(ctx, env.TenantID, id)
+			})
 		if err != nil || sub == nil {
 			return err
 		}
@@ -62,8 +69,11 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 // threshold đọc tham số có phiên bản tại at; chưa có → def.
 func (s *Service) threshold(ctx context.Context, key string, at time.Time, def int64) decimal.Decimal {
 	if s.Params != nil {
-		if v, err := s.Params.At(ctx, key, at); err == nil {
-			return v.Value
+		if v, err := txdeps.Get(ctx, "param:"+key+"@"+at.UTC().Format(time.RFC3339Nano), func(ctx context.Context) (decimal.Decimal, error) {
+			pv, err := s.Params.At(ctx, key, at)
+			return pv.Value, err
+		}); err == nil {
+			return v
 		}
 	}
 	return decimal.NewFromInt(def)
@@ -118,6 +128,17 @@ func (r *resolver) resolve(ctx context.Context, roles []string, commune string, 
 		}
 	}
 	return dedupRefs(out)
+}
+
+// latest đọc bài nộp cuối qua cap/forms bằng txdeps (ngoài giao dịch inbox — P0-POOL-SHARED-2).
+func (s *Service) latest(ctx context.Context, tid uuid.UUID, q formsport.SubmissionQuery) ([]formsport.RecordedSubmission, error) {
+	k, err := json.Marshal(q)
+	if err != nil {
+		return nil, err
+	}
+	return txdeps.Get(ctx, "feed.latest:"+tid.String()+":"+string(k), func(ctx context.Context) ([]formsport.RecordedSubmission, error) {
+		return s.Feed.Latest(ctx, tid, q)
+	})
 }
 
 // periodAdhoc là loại kỳ native của đợt điều tra CNTS (W11.50 — extension/cntscampaign).
@@ -249,7 +270,7 @@ func (s *Service) previous(ctx context.Context, tid uuid.UUID, sub formsport.Rec
 	span := int(sub.To.Sub(*sub.From).Hours()/24) + 1
 	from := sub.From.AddDate(0, 0, -span*int(n))
 	to := sub.From.AddDate(0, 0, -1)
-	rs, err := s.Feed.Latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: sub.TemplateCode, Units: []string{sub.Unit},
+	rs, err := s.latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: sub.TemplateCode, Units: []string{sub.Unit},
 		From: &from, To: &to, Limit: int(n) + 1, ExcludePeriodKinds: []string{periodAdhoc}})
 	rs = regular(rs)
 	if err != nil || len(rs) == 0 {
@@ -264,7 +285,7 @@ func (s *Service) spikeCheck(ctx context.Context, tx pgx.Tx, tid uuid.UUID, sub 
 		return nil
 	}
 	from, to := sub.From.AddDate(0, 0, -28), sub.From.AddDate(0, 0, -1)
-	hs, err := s.Feed.Latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: domain.FormBM01, Units: []string{sub.Unit},
+	hs, err := s.latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: domain.FormBM01, Units: []string{sub.Unit},
 		From: &from, To: &to, Limit: 60, ExcludePeriodKinds: []string{periodAdhoc}})
 	if err != nil {
 		return err
@@ -287,7 +308,7 @@ func (s *Service) ksgmCheck(ctx context.Context, tx pgx.Tx, tid uuid.UUID, bm04 
 	if bm04.From == nil || bm04.To == nil {
 		return nil
 	}
-	ds, err := s.Feed.Latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: domain.FormBM01, Parents: []string{bm04.Unit},
+	ds, err := s.latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: domain.FormBM01, Parents: []string{bm04.Unit},
 		From: bm04.From, To: bm04.To, Limit: 1000, ExcludePeriodKinds: []string{periodAdhoc}})
 	if err != nil {
 		return err
@@ -310,7 +331,7 @@ func (s *Service) bm01ChangedWeek(ctx context.Context, tx pgx.Tx, tid uuid.UUID,
 	}
 	day := *bm01.From
 	from := day.AddDate(0, 0, -6)
-	ws, err := s.Feed.Latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: domain.FormBM04, Units: []string{bm01.Parent},
+	ws, err := s.latest(ctx, tid, formsport.SubmissionQuery{Profile: ProfileCNTS, TemplateCode: domain.FormBM04, Units: []string{bm01.Parent},
 		From: &from, To: &day, Limit: 7, ExcludePeriodKinds: []string{periodAdhoc}})
 	if err != nil {
 		return err

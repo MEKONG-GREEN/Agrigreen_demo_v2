@@ -73,6 +73,8 @@ var (
 	ErrNotCancellable = errors.New("chỉ hủy được kỳ Đã mở, Đang thu thập, Trễ hạn, Đủ dữ liệu")
 	ErrHasFinal       = errors.New("báo cáo của kỳ đã có Bản cuối — không hủy được kỳ")
 	ErrTerminal       = errors.New("kỳ đã đóng hoặc đã hủy")
+	// ErrCancelling: kỳ đang được hủy (ý định hủy còn hạn — P0-POOL-SHARED-2, #143).
+	ErrCancelling = errors.New("kỳ đang được hủy")
 )
 
 // CloseDecision là kết quả kiểm "Đóng kỳ".

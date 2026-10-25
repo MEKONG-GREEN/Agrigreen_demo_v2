@@ -278,9 +278,19 @@ func (f fakeDirectory) EmailOf(_ context.Context, _ uuid.UUID, actor uuid.UUID) 
 type fakeMailer struct {
 	mu   sync.Mutex
 	sent []port.Message
+	// before (P0-POOL-SHARED-2) chạy trước mỗi lần gửi, ngoài khóa (chặn/tiêm lỗi); nil → gửi ngay.
+	before func(port.Message) error
 }
 
 func (f *fakeMailer) Send(_ context.Context, m port.Message) error {
+	f.mu.Lock()
+	before := f.before
+	f.mu.Unlock()
+	if before != nil {
+		if err := before(m); err != nil {
+			return err
+		}
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sent = append(f.sent, m)

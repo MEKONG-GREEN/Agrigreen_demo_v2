@@ -344,18 +344,12 @@ func (s *Service) Close(ctx context.Context, id uuid.UUID, reason, idem string) 
 // Cancel "Hủy kỳ" (BR-DL-18): kỳ Đã mở/Đang thu thập/Trễ hạn/Đủ dữ liệu, báo cáo chưa có Bản cuối, lý do bắt buộc. Hủy kỳ
 // native (phiếu gỡ khỏi module các phòng, số liệu không vào ảnh chụp) rồi ghi sự kiện hủy. Kỳ đã hủy không tính khi
 // kiểm mở trùng — mở lại đúng kỳ đó được.
+//
+// P0-POOL-SHARED-2 (#143, bàn giao từ #139): KHÔNG giữ giao dịch quanh lời gọi module khác. Đọc kỳ, Bản cuối và kiểm điều
+// kiện ngoài giao dịch; CancelGuard (khtcreport) ghi Ý ĐỊNH HỦY bền trong giao dịch ngắn giữ khóa khtc_snapshot (trigger chặn
+// Bản cuối/đóng kỳ trong lúc còn hạn), hủy kỳ native ở cap/forms NGOÀI giao dịch, rồi ghi sự kiện hủy + bỏ ý định trong
+// giao dịch ngắn thứ hai. cap/forms lỗi → bỏ ý định, không ghi gì ở sổ KHTC.
 func (s *Service) Cancel(ctx context.Context, id uuid.UUID, reason, idem string) (Detail, error) {
-	if s.GuardCancel != nil {
-		err := s.GuardCancel(ctx, id, func(tx pgx.Tx) error { _, e := s.cancel(ctx, id, reason, idem, tx); return e })
-		if err != nil {
-			return Detail{}, err
-		}
-		return s.Get(ctx, id)
-	}
-	return s.cancel(ctx, id, reason, idem, nil)
-}
-
-func (s *Service) cancel(ctx context.Context, id uuid.UUID, reason, idem string, protected pgx.Tx) (Detail, error) {
 	c, err := s.writer(ctx)
 	if err != nil {
 		return Detail{}, err
@@ -379,16 +373,43 @@ func (s *Service) cancel(ctx context.Context, id uuid.UUID, reason, idem string,
 	case err != nil:
 		return Detail{}, ErrNotCancellable.WithDetail(err.Error())
 	}
+	var token uuid.UUID
+	if s.CancelGuard != nil {
+		token, err = s.CancelGuard.BeginCancel(ctx, id)
+		switch {
+		case errors.Is(err, domain.ErrHasFinal):
+			return Detail{}, ErrNotCancellable.WithDetail(err.Error())
+		case errors.Is(err, domain.ErrCancelling):
+			return Detail{}, ErrCancelling
+		case err != nil:
+			return Detail{}, err
+		}
+	}
+	abort := func(cause error) error {
+		if s.CancelGuard == nil {
+			return cause
+		}
+		actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		if aerr := s.CancelGuard.AbortCancel(actx, id, token); aerr != nil {
+			return errors.Join(cause, aerr)
+		}
+		return cause
+	}
 	if err := s.Control.CancelPeriod(ctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, why, eventIdem(idem, "forms-cancel", id)); err != nil &&
 		!errors.Is(err, formsport.ErrPeriodCancelled) {
-		return Detail{}, err
+		return Detail{}, abort(err)
 	}
 	st := d.State
 	event := store.Event{PeriodID: id, Action: store.ActionCancelled, Reason: &why, State: &st}
-	if protected != nil {
+	if s.CancelGuard != nil {
 		event.ID, event.ActorRef, event.EventTime = ids.New(), c.p.ActorRef, s.now()
-		err := store.InsertEvent(ctx, protected, c.p.TenantID, &event, eventIdem(idem, "cancel", id))
-		return Detail{}, classify(err)
+		if err := s.CancelGuard.FinishCancel(ctx, id, token, func(tx pgx.Tx) error {
+			return store.InsertEvent(ctx, tx, c.p.TenantID, &event, eventIdem(idem, "cancel", id))
+		}); err != nil {
+			return Detail{}, abort(classify(err))
+		}
+		return s.Get(ctx, id)
 	}
 	if err := s.appendEvent(ctx, c, event, eventIdem(idem, "cancel", id)); err != nil {
 		return Detail{}, err

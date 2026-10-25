@@ -13,6 +13,7 @@ import (
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // HandleGpsLog là inbox.Handler của consumer port.GpsLogConsumer (HTX US-GPS-03, mục
@@ -20,6 +21,9 @@ import (
 // (trong giao dịch inbox của vai extension_app) và ghi log qua geo/port.GpsLog (giao dịch
 // riêng của pf/geo). Khóa chống trùng "extension:support_request:<id>"; yêu cầu thiếu
 // vị trí không có gì để ghi; lỗi kiểm dữ liệu của geo bỏ qua, lỗi khác giao lại.
+//
+// P0-POOL-SHARED-2 (#143, bàn giao từ #139): ghi log qua pf/geo (giao dịch riêng trên cùng pool) chạy NGOÀI giao dịch
+// inbox qua txdeps.Get — inbox.Process hủy giao dịch, ghi (lũy đẳng theo IdemKey), chạy lại handler để commit inbox.
 func (s *Service) HandleGpsLog(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 	if env.EventType != port.EventSupportRequestSubmitted {
 		return nil
@@ -42,7 +46,9 @@ func (s *Service) HandleGpsLog(ctx context.Context, tx pgx.Tx, env outbox.Envelo
 	if r.DeviceID != nil {
 		fix.DeviceID = *r.DeviceID
 	}
-	_, err = s.GpsLog.RecordFix(tenant.WithID(ctx, env.TenantID), fix)
+	_, err = txdeps.Get(ctx, "geo.gps_fix:"+fix.IdemKey, func(ctx context.Context) (geoport.GpsFixReceipt, error) {
+		return s.GpsLog.RecordFix(tenant.WithID(ctx, env.TenantID), fix)
+	})
 	if errors.Is(err, geoport.ErrGpsFixInvalid) {
 		return nil
 	}

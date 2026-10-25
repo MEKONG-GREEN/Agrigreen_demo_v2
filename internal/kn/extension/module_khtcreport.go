@@ -15,7 +15,7 @@ func (m *Module) khtcReportSvc() *reportapp.Service {
 		if periods.Reports == nil {
 			periods.Reports = m.khtcReports
 		}
-		periods.GuardCancel = m.khtcReports.GuardCancel
+		periods.CancelGuard = m.khtcReports
 		m.khtcSourceSvc().Finals = m.khtcReports
 	}
 	return m.khtcReports

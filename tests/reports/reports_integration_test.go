@@ -58,6 +58,7 @@ type fixture struct {
 	mech     *fakeMech
 	cc       *fakeCC
 	store    *objstore.Local
+	hook     *storeHook // P0-POOL-SHARED-2: bọc kho của module (chặn/tiêm lỗi Put); mặc định đi thẳng
 	storeDir string
 	mailer   *fakeMailer
 	dir      fakeDirectory
@@ -77,8 +78,9 @@ func newFixture(t *testing.T, withDirectory bool) *fixture {
 		t.Fatal(err)
 	}
 	f.store = st
+	f.hook = &storeHook{Store: st}
 	f.dir = fakeDirectory{emails: map[uuid.UUID]string{}, members: map[uuid.UUID]uuid.UUID{}}
-	deps := reports.Deps{FormSeeds: []port.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: f.ext, Orgs: f.org, Units: newFakeUnits(), Catalogs: fakeCatalogs{}, Clock: f.clk}), Catalog: []port.CatalogRegistration{extension.ReportCatalog()}, Policies: []port.Policy{extension.ReportPolicy()}, Scope: f.org, Orgs: f.org, Units: newFakeUnits(), Params: f.params, Catalogs: fakeCatalogs{}, Store: st,
+	deps := reports.Deps{FormSeeds: []port.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: f.ext, Orgs: f.org, Units: newFakeUnits(), Catalogs: fakeCatalogs{}, Clock: f.clk}), Catalog: []port.CatalogRegistration{extension.ReportCatalog()}, Policies: []port.Policy{extension.ReportPolicy()}, Scope: f.org, Orgs: f.org, Units: newFakeUnits(), Params: f.params, Catalogs: fakeCatalogs{}, Store: f.hook,
 		Mechanization: f.mech, CropCycle: f.cc, Mailer: f.mailer, LinkBase: "https://ops.test"}
 	if withDirectory {
 		deps.Directory, deps.Recipients = f.dir, f.dir

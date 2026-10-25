@@ -44,6 +44,7 @@ var (
 	ErrNotClosable    = problem.New(http.StatusConflict, "extension.khtc_period_not_closable", "Kỳ chưa đóng được")
 	ErrNotCancellable = problem.New(http.StatusConflict, "extension.khtc_period_not_cancellable", "Kỳ không hủy được")
 	ErrTerminal       = problem.New(http.StatusConflict, "extension.khtc_period_terminal", "Kỳ đã đóng hoặc đã hủy")
+	ErrCancelling     = problem.New(http.StatusConflict, "extension.khtc_period_cancelling", "Kỳ đang được hủy — thử lại sau")
 	ErrDependency     = problem.New(http.StatusServiceUnavailable, "extension.dependency_unavailable", "Dịch vụ phụ thuộc chưa sẵn sàng")
 	errNotKHTC        = problem.Forbidden.WithDetail("Kỳ KHTC chỉ dành cho Phòng Kế hoạch – Tài chính (Cấp Tỉnh) và Admin xem")
 	errNotKHTCWriter  = problem.Forbidden.WithDetail("chỉ Cấp Tỉnh Phòng Kế hoạch – Tài chính mở, sửa hạn, đóng, hủy kỳ")
@@ -62,6 +63,14 @@ const DefaultCloseLateDays = 3
 
 var deptRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)
 
+// CancelGuard chặn Bản cuối và đóng kỳ trong lúc hủy kỳ bằng ý định hủy bền (khtcreport; P0-POOL-SHARED-2, #143 — thay
+// GuardCancel giữ giao dịch khóa quanh lời gọi cap/forms). BeginCancel: domain.ErrHasFinal / domain.ErrCancelling.
+type CancelGuard interface {
+	BeginCancel(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
+	FinishCancel(ctx context.Context, id, token uuid.UUID, fn func(pgx.Tx) error) error
+	AbortCancel(ctx context.Context, id, token uuid.UUID) error
+}
+
 // Service là use case Kỳ KHTC.
 type Service struct {
 	DB     tenant.Beginner // pool của pf/extension (db.ForModule — r_extension)
@@ -73,10 +82,11 @@ type Service struct {
 	// Departments: phòng ban đang áp dụng của đơn vị (mặc định phòng tham gia, tên phòng). Tùy chọn.
 	Departments partyport.Departments
 	// Crosswalk (gói PFPUB), Plan (W11.61), Reports (KH6): tùy chọn — xem extension/port/khtc.go.
-	Crosswalk   extport.KHTCSourceCrosswalk
-	Plan        extport.KHTCPlanDepartments
-	Reports     extport.KHTCReportStates
-	GuardCancel func(context.Context, uuid.UUID, func(pgx.Tx) error) error
+	Crosswalk extport.KHTCSourceCrosswalk
+	Plan      extport.KHTCPlanDepartments
+	Reports   extport.KHTCReportStates
+	// CancelGuard (khtcreport, tùy chọn): ý định hủy bền chặn Bản cuối/đóng kỳ trong lúc hủy kỳ (P0-POOL-SHARED-2).
+	CancelGuard CancelGuard
 	// MaxSubmissions: số lần gửi tối đa mặc định (gốc lắp ráp đặt = KNKHTCProfile.MaxSubmissions).
 	MaxSubmissions int
 	// Drafts (tùy chọn, W11.63 nối): phòng đã "Lưu nháp" phiếu ở máy chủ, kèm số lần gửi đã thấy khi lưu — nháp sau lần gửi
@@ -407,6 +417,8 @@ func classify(err error) error {
 		return ErrDuplicate.WithCause(err)
 	case "khtc_period_event_terminal":
 		return ErrTerminal.WithCause(err)
+	case "khtc_period_cancelling":
+		return ErrCancelling.WithCause(err)
 	}
 	if pg.Code == "23505" {
 		return problem.Conflict.WithCause(err)

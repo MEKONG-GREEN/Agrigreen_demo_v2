@@ -394,10 +394,50 @@ func RunsOf(ctx context.Context, tx pgx.Tx, schedule uuid.UUID) ([]Run, error) {
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Run, error) { return scanRun(r) })
 }
 
-// MarkDelivered ghi kết quả gửi email của lần chạy.
+// MarkDelivered ghi kết quả gửi email của lần chạy (và bỏ nhận việc gửi, nếu có).
 func MarkDelivered(ctx context.Context, tx pgx.Tx, schedule uuid.UUID, slot, status, note string, sent int, at time.Time) error {
-	_, err := tx.Exec(ctx, `UPDATE pf_reports.schedule_run SET delivery_status = $3, delivery_note = $4, sent_count = $5, delivered_at = $6
+	_, err := tx.Exec(ctx, `UPDATE pf_reports.schedule_run SET delivery_status = $3, delivery_note = $4, sent_count = $5, delivered_at = $6,
+	    delivery_claim_id = NULL, delivery_claim_until = NULL
 	  WHERE schedule_id = $1 AND slot_key = $2`, schedule, slot, status, nilIfEmpty(note), sent, at.UTC())
+	return err
+}
+
+// DeliveryClaim là kết quả nhận việc gửi email của lần chạy (P0-POOL-SHARED-2, #143).
+type DeliveryClaim struct {
+	Claimed   bool // vừa nhận (claim_id = token, hạn = until)
+	Delivered bool // lần chạy đã có kết quả gửi — không gửi
+	Missing   bool // không có lần chạy của việc xuất
+}
+
+// ClaimDelivery nhận việc gửi email của lần chạy (theo việc xuất job) khi chưa có kết quả gửi và chưa ai giữ còn hạn
+// (giao dịch riêng, commit TRƯỚC khi gửi — giao lặp đồng thời không gửi song song).
+func ClaimDelivery(ctx context.Context, tx pgx.Tx, job, token uuid.UUID, now, until time.Time) (DeliveryClaim, error) {
+	var status *string
+	var holder *uuid.UUID
+	var held *time.Time
+	err := tx.QueryRow(ctx, `SELECT delivery_status, delivery_claim_id, delivery_claim_until FROM pf_reports.schedule_run
+	  WHERE job_id = $1 FOR UPDATE`, job).Scan(&status, &holder, &held)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return DeliveryClaim{Missing: true}, nil
+	}
+	if err != nil {
+		return DeliveryClaim{}, err
+	}
+	if status != nil {
+		return DeliveryClaim{Delivered: true}, nil
+	}
+	if holder != nil && held != nil && held.After(now) {
+		return DeliveryClaim{}, nil
+	}
+	_, err = tx.Exec(ctx, `UPDATE pf_reports.schedule_run SET delivery_claim_id = $2, delivery_claim_until = $3 WHERE job_id = $1`,
+		job, token, until.UTC())
+	return DeliveryClaim{Claimed: err == nil}, err
+}
+
+// ReleaseDelivery trả việc gửi đã nhận bằng token (gửi lỗi — giao lại gửi lại).
+func ReleaseDelivery(ctx context.Context, tx pgx.Tx, job, token uuid.UUID) error {
+	_, err := tx.Exec(ctx, `UPDATE pf_reports.schedule_run SET delivery_claim_id = NULL, delivery_claim_until = NULL
+	  WHERE job_id = $1 AND delivery_claim_id = $2`, job, token)
 	return err
 }
 
