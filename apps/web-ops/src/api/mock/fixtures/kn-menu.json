@@ -89,7 +89,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -512,7 +512,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -803,7 +803,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -1235,7 +1235,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -1535,7 +1535,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -1642,7 +1642,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -2079,7 +2079,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -2277,7 +2277,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -2380,7 +2380,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -2609,7 +2609,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -2711,7 +2711,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -2839,7 +2839,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -3143,7 +3143,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -3305,7 +3305,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -3397,7 +3397,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -3692,7 +3692,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -3820,7 +3820,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   },
@@ -4588,7 +4588,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v6",
+    "menu_version": "kn.menu/v7",
     "org_ref": null
    }
   }
@@ -4631,5 +4631,5 @@
    "menu_profile": "hanh_chinh_tong_hop"
   }
  ],
- "menu_version": "kn.menu/v6"
+ "menu_version": "kn.menu/v7"
 }

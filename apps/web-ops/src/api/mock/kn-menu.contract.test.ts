@@ -89,7 +89,7 @@ describe("fromKnMenu — trình bày Hình 3c", () => {
   });
 });
 
-describe("kn.menu/v6 (BF-MENU #98, R-A6): menu theo Update prototype và hình khách gửi", () => {
+describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): menu theo Update prototype và hình khách gửi", () => {
   type Tree = string | [string, Tree[]];
   /** Cây nhãn của nhóm; "*" = Sắp có. */
   const tree = (items: KnMenu["groups"][number]["items"]): Tree[] =>

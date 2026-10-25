@@ -11705,7 +11705,7 @@
  ],
  "results": {
   "009407d63db61b35": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/hanh_chinh_tong_hop/theo-doi-nop",
    "groups": [
     {
@@ -11816,7 +11816,7 @@
    ]
   },
   "01f745025b24441f": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/nhan-su/dashboard",
    "groups": [
     {
@@ -12000,7 +12000,7 @@
    ]
   },
   "022710317c2d2a2a": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
    "groups": [
     {
@@ -12905,7 +12905,7 @@
    ]
   },
   "03c4d8133e3b05a7": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/thong_tin_truyen_thong/theo-doi-nop",
    "groups": [
     {
@@ -13016,7 +13016,7 @@
    ]
   },
   "08ac3ce3e00e6d34": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/nhiem-vu/cong-viec",
    "groups": [
     {
@@ -13146,7 +13146,7 @@
    ]
   },
   "0ae638ad896408ad": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -13644,7 +13644,7 @@
    ]
   },
   "0b760110cc5ab322": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/hanh_chinh_tong_hop/theo-doi-nop",
    "groups": [
     {
@@ -13744,7 +13744,7 @@
    ]
   },
   "0bc29e9aa7fb27f5": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/trong_trot/theo-doi-nop",
    "groups": [
     {
@@ -13866,7 +13866,7 @@
    ]
   },
   "0c1e759383672260": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/ke_hoach_tai_chinh/mau-bao-cao",
    "groups": [
     {
@@ -13911,7 +13911,7 @@
    ]
   },
   "0d561d9bc5f744d0": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
    "groups": [
     {
@@ -14730,7 +14730,7 @@
    ]
   },
   "11263290272be304": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -15059,7 +15059,7 @@
    ]
   },
   "12adb30cad345f71": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/dung-chung/contact",
    "groups": [
     {
@@ -15082,7 +15082,7 @@
    ]
   },
   "155f633ca1ed8397": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
    "groups": [
     {
@@ -15767,7 +15767,7 @@
    ]
   },
   "17501c842af0deac": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/thong_tin_truyen_thong/mau-bao-cao",
    "groups": [
     {
@@ -15790,7 +15790,7 @@
    ]
   },
   "17da3da2923f3238": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/dashboard",
    "groups": [
     {
@@ -15903,7 +15903,7 @@
    ]
   },
   "1a052a67939aecea": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
    "groups": [
     {
@@ -16326,7 +16326,7 @@
    ]
   },
   "1e8b01ef9d3dab5f": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/dung-chung/contact",
    "groups": [
     {
@@ -16393,7 +16393,7 @@
    ]
   },
   "216957210a3bbd41": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/dashboard",
    "groups": [
     {
@@ -16517,7 +16517,7 @@
    ]
   },
   "2d68af1efc6894cf": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/nhiem-vu/cong-viec",
    "groups": [
     {
@@ -16647,7 +16647,7 @@
    ]
   },
   "2d6e4a872d16d505": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/phong_ban_cu/theo-doi-nop",
    "groups": [
     {
@@ -16736,7 +16736,7 @@
    ]
   },
   "2dfc0b7d012afe70": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/chan_nuoi_thuy_san/theo-doi-nop",
    "groups": [
     {
@@ -16880,7 +16880,7 @@
    ]
   },
   "2ede9fc65962b180": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/dashboard",
    "groups": [
     {
@@ -17014,7 +17014,7 @@
    ]
   },
   "2ef8d6e5119a4148": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/chan_nuoi_thuy_san/danh-muc",
    "groups": [
     {
@@ -17070,7 +17070,7 @@
    ]
   },
   "38fd7f48bfeb6875": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/dashboard",
    "groups": [
     {
@@ -17177,7 +17177,7 @@
    ]
   },
   "3a35dc9cd0dc5f48": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/ke_hoach_tai_chinh/theo-doi-nop",
    "groups": [
     {
@@ -17277,7 +17277,7 @@
    ]
   },
   "3cef356b08617912": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/hanh_chinh_tong_hop/danh-muc",
    "groups": [
     {
@@ -17344,7 +17344,7 @@
    ]
   },
   "4169ce0b4a76c6d9": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -17831,7 +17831,7 @@
    ]
   },
   "447cc4e2df07325a": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/dashboard",
    "groups": [
     {
@@ -17988,7 +17988,7 @@
    ]
   },
   "448a56e66ee48d5b": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/hanh_chinh_tong_hop/mau-bao-cao",
    "groups": [
     {
@@ -18011,7 +18011,7 @@
    ]
   },
   "448c8e913de7427d": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/trong_trot/danh-muc",
    "groups": [
     {
@@ -18045,7 +18045,7 @@
    ]
   },
   "45492b80b821b44c": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/cnts/bao-cao-ky",
    "groups": [
     {
@@ -18263,7 +18263,7 @@
    ]
   },
   "477811f4976ffc16": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/dashboard",
    "groups": [
     {
@@ -18364,7 +18364,7 @@
    ]
   },
   "486ddbd70ef0c07a": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/ke_hoach_tai_chinh/theo-doi-nop",
    "groups": [
     {
@@ -18464,7 +18464,7 @@
    ]
   },
   "4adc9c8b9ae973f0": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/phong_ban_cu/danh-muc",
    "groups": [
     {
@@ -18498,7 +18498,7 @@
    ]
   },
   "4b71109837ea7dc8": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/nhiem-vu/cong-viec",
    "groups": [
     {
@@ -18611,7 +18611,7 @@
    ]
   },
   "4d48f1368e2cee42": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/khtc/ky-bao-cao",
    "groups": [
     {
@@ -18873,7 +18873,7 @@
    ]
   },
   "4e539db575a524bf": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/thong_tin_truyen_thong/danh-muc",
    "groups": [
     {
@@ -18940,7 +18940,7 @@
    ]
   },
   "55760fde1fe46fe3": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/trong_trot/theo-doi-nop",
    "groups": [
     {
@@ -19040,7 +19040,7 @@
    ]
   },
   "56dbb9be9cb06089": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -19505,7 +19505,7 @@
    ]
   },
   "584f05af3e632166": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/nhiem-vu/cong-viec",
    "groups": [
     {
@@ -19825,7 +19825,7 @@
    ]
   },
   "58a79e6b34cda9b1": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-gia/nhap",
    "groups": [
     {
@@ -19921,7 +19921,7 @@
    ]
   },
   "58be1530e1efcee5": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/hanh_chinh_tong_hop/theo-doi-nop",
    "groups": [
     {
@@ -20021,7 +20021,7 @@
    ]
   },
   "5910be2f3b4686ff": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/phong_moi/mau-bao-cao",
    "groups": [
     {
@@ -20044,7 +20044,7 @@
    ]
   },
   "5db6f76a59c64d2d": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/khtc/ky-bao-cao",
    "groups": [
     {
@@ -20295,7 +20295,7 @@
    ]
   },
   "60f170c485e3499f": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/nhiem-vu/cong-viec",
    "groups": [
     {
@@ -20397,7 +20397,7 @@
    ]
   },
   "627436a48dbfe9a5": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/nhiem-vu/cong-viec",
    "groups": [
     {
@@ -20538,7 +20538,7 @@
    ]
   },
   "676b0d779d7fb060": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/ke_hoach_tai_chinh/danh-muc",
    "groups": [
     {
@@ -20594,7 +20594,7 @@
    ]
   },
   "6793aead6d1a18c0": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -20890,7 +20890,7 @@
    ]
   },
   "6ea6d1e5e4a96017": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/ke_hoach_tai_chinh/mau-bao-cao",
    "groups": [
     {
@@ -20935,7 +20935,7 @@
    ]
   },
   "6ea94c0e1f121114": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/phong_moi/theo-doi-nop",
    "groups": [
     {
@@ -21002,7 +21002,7 @@
    ]
   },
   "6f1d25e814cf918a": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -21298,7 +21298,7 @@
    ]
   },
   "6fe5fa190272558f": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/chan_nuoi_thuy_san/mau-bao-cao",
    "groups": [
     {
@@ -21332,7 +21332,7 @@
    ]
   },
   "71d4e58bf7f2eed3": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-gia/bang-gia",
    "groups": [
     {
@@ -21405,7 +21405,7 @@
    ]
   },
   "7cec75c0c0833fb8": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/nhiem-vu/cong-viec",
    "groups": [
     {
@@ -21736,7 +21736,7 @@
    ]
   },
   "7d10f6b2b270b204": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/phong_moi/theo-doi-nop",
    "groups": [
     {
@@ -21825,7 +21825,7 @@
    ]
   },
   "8135cab2a06996d2": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/hanh_chinh_tong_hop/theo-doi-nop",
    "groups": [
     {
@@ -21958,7 +21958,7 @@
    ]
   },
   "8329d998d797f05b": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/dashboard",
    "groups": [
     {
@@ -22126,7 +22126,7 @@
    ]
   },
   "84fdb17e815b19f4": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/nhiem-vu/cong-viec",
    "groups": [
     {
@@ -22300,7 +22300,7 @@
    ]
   },
   "8a852b7b08acdcbe": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/thong_tin_truyen_thong/danh-muc",
    "groups": [
     {
@@ -22367,7 +22367,7 @@
    ]
   },
   "8aa8b7dad025f5a6": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -22564,7 +22564,7 @@
    ]
   },
   "8d94a36d1a122018": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/phong_ban_cu/mau-bao-cao",
    "groups": [
     {
@@ -22587,7 +22587,7 @@
    ]
   },
   "8f9f7e5eb19dc6e9": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/nhiem-vu/cong-viec",
    "groups": [
     {
@@ -22929,7 +22929,7 @@
    ]
   },
   "90be22f8d6f04eb8": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/trong_trot/mau-bao-cao",
    "groups": [
     {
@@ -22952,7 +22952,7 @@
    ]
   },
   "981df0fba04673a7": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/dung-chung/contact",
    "groups": [
     {
@@ -22992,7 +22992,7 @@
    ]
   },
   "99c182d9e79a11fa": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
    "groups": [
     {
@@ -23864,7 +23864,7 @@
    ]
   },
   "99c4df51d2f5635f": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao/chi-cuc",
    "groups": [
     {
@@ -23955,7 +23955,7 @@
    ]
   },
   "a14e768503ef8cb0": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
    "groups": [
     {
@@ -24554,7 +24554,7 @@
    ]
   },
   "a439cb056f88e12a": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/hanh_chinh_tong_hop/theo-doi-nop",
    "groups": [
     {
@@ -24665,7 +24665,7 @@
    ]
   },
   "a5caabe6e5963f5f": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/chan_nuoi_thuy_san/mau-bao-cao",
    "groups": [
     {
@@ -24699,7 +24699,7 @@
    ]
   },
   "b41edf4e26769e50": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
    "groups": [
     {
@@ -25571,7 +25571,7 @@
    ]
   },
   "b6d9229f48c34227": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/hanh_chinh_tong_hop/theo-doi-nop",
    "groups": [
     {
@@ -25704,7 +25704,7 @@
    ]
   },
   "b86039676d64e105": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/thong_tin_truyen_thong/theo-doi-nop",
    "groups": [
     {
@@ -25837,7 +25837,7 @@
    ]
   },
   "b864e0b72d5a21bb": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/ke_hoach_tai_chinh/theo-doi-nop",
    "groups": [
     {
@@ -25937,7 +25937,7 @@
    ]
   },
   "b8a5c1dc22efe4e9": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -26380,7 +26380,7 @@
    ]
   },
   "b9cee0d9bf46ff55": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/ke_hoach_tai_chinh/mau-bao-cao",
    "groups": [
     {
@@ -26425,7 +26425,7 @@
    ]
   },
   "ba4d60fe73527659": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/khtc/ky-bao-cao",
    "groups": [
     {
@@ -26632,7 +26632,7 @@
    ]
   },
   "bbab4a4fab7b1207": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
    "groups": [
     {
@@ -27163,7 +27163,7 @@
    ]
   },
   "bc1e4b36694f303d": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
    "groups": [
     {
@@ -28246,7 +28246,7 @@
    ]
   },
   "bf6ad89313cdec8c": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/thong_tin_truyen_thong/mau-bao-cao",
    "groups": [
     {
@@ -28269,7 +28269,7 @@
    ]
   },
   "c1e96570fde4b77d": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -28554,7 +28554,7 @@
    ]
   },
   "c51aa937d2a43770": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -28894,7 +28894,7 @@
    ]
   },
   "c60d49caa7dd4b7b": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao/chi-cuc",
    "groups": [
     {
@@ -29029,7 +29029,7 @@
    ]
   },
   "c689b3ca66ed9fbc": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/ke_hoach_tai_chinh/theo-doi-nop",
    "groups": [
     {
@@ -29151,7 +29151,7 @@
    ]
   },
   "c6c13333e8624b05": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/du-lieu/htx",
    "groups": [
     {
@@ -29225,7 +29225,7 @@
    ]
   },
   "c6cf116ca8c6824b": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/chan_nuoi_thuy_san/danh-muc",
    "groups": [
     {
@@ -29281,7 +29281,7 @@
    ]
   },
   "cac070b8629c1b78": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/chan_nuoi_thuy_san/theo-doi-nop",
    "groups": [
     {
@@ -29392,7 +29392,7 @@
    ]
   },
   "cb6d3bd04bf972f9": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/chan_nuoi_thuy_san/theo-doi-nop",
    "groups": [
     {
@@ -29503,7 +29503,7 @@
    ]
   },
   "cbbc196db1ed9d6f": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/thong_tin_truyen_thong/theo-doi-nop",
    "groups": [
     {
@@ -29603,7 +29603,7 @@
    ]
   },
   "d235d80952482114": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
    "groups": [
     {
@@ -30653,7 +30653,7 @@
    ]
   },
   "d67f530c7b584893": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/ke_hoach_tai_chinh/theo-doi-nop",
    "groups": [
     {
@@ -30775,7 +30775,7 @@
    ]
   },
   "d7c2ad41ebdc97f0": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -31115,7 +31115,7 @@
    ]
   },
   "d921b5c24ea86a36": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/ke_hoach_tai_chinh/theo-doi-nop",
    "groups": [
     {
@@ -31237,7 +31237,7 @@
    ]
   },
   "d930f2003ce7bfc8": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/chan_nuoi_thuy_san/theo-doi-nop",
    "groups": [
     {
@@ -31381,7 +31381,7 @@
    ]
   },
   "da29f2ce576b04a6": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/phong_ban_cu/theo-doi-nop",
    "groups": [
     {
@@ -31448,7 +31448,7 @@
    ]
   },
   "db963a64800c3ebc": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -31755,7 +31755,7 @@
    ]
   },
   "dd8cd7e274ffaf96": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -32209,7 +32209,7 @@
    ]
   },
   "dd99212a4b2ba21a": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-gia/tien-do",
    "groups": [
     {
@@ -32404,7 +32404,7 @@
    ]
   },
   "e2d4f4783dfac94b": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/thong_tin_truyen_thong/theo-doi-nop",
    "groups": [
     {
@@ -32515,7 +32515,7 @@
    ]
   },
   "e333b205cd33b7ff": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/khtc/ky-bao-cao",
    "groups": [
     {
@@ -32733,7 +32733,7 @@
    ]
   },
   "e3957181d52ec4d2": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -33018,7 +33018,7 @@
    ]
   },
   "e485dbd72af36d8a": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -33369,7 +33369,7 @@
    ]
   },
   "e68279bc45530a05": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/thong_tin_truyen_thong/theo-doi-nop",
    "groups": [
     {
@@ -33469,7 +33469,7 @@
    ]
   },
   "ece8fe4a6a226fd4": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -33710,7 +33710,7 @@
    ]
   },
   "ee05a9a7c7b08c2e": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/nhiem-vu/cong-viec",
    "groups": [
     {
@@ -33895,7 +33895,7 @@
    ]
   },
   "ee12f840f61fde66": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/hanh_chinh_tong_hop/mau-bao-cao",
    "groups": [
     {
@@ -33918,7 +33918,7 @@
    ]
   },
   "ef49f8639f8e37f3": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/ke_hoach_tai_chinh/danh-muc",
    "groups": [
     {
@@ -33974,7 +33974,7 @@
    ]
   },
   "ef611e91fc1372c0": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
    "groups": [
     {
@@ -34351,7 +34351,7 @@
    ]
   },
   "f0d2ae2d3f07372f": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -34794,7 +34794,7 @@
    ]
   },
   "f1fbf1451114bfea": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/dashboard",
    "groups": [
     {
@@ -34884,7 +34884,7 @@
    ]
   },
   "f2491ce761fd7016": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/hanh_chinh_tong_hop/danh-muc",
    "groups": [
     {
@@ -34951,7 +34951,7 @@
    ]
   },
   "f34196a80f733121": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -35438,7 +35438,7 @@
    ]
   },
   "f45210e2ed29dff0": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/ke_hoach_tai_chinh/danh-muc",
    "groups": [
     {
@@ -35494,7 +35494,7 @@
    ]
   },
   "f59f34ffdd618f72": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
    "groups": [
     {
@@ -36544,7 +36544,7 @@
    ]
   },
   "f847beb5c83cc3c7": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/bao-cao-khtc",
    "groups": [
     {
@@ -36840,7 +36840,7 @@
    ]
   },
   "fcae54a70a87ee7c": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/phong_moi/danh-muc",
    "groups": [
     {
@@ -36874,7 +36874,7 @@
    ]
   },
   "ff13ab2ed4d0991c": {
-   "menu_version": "kn.menu/v6",
+   "menu_version": "kn.menu/v7",
    "default_route": "/kn/phong-ban/thong_tin_truyen_thong/theo-doi-nop",
    "groups": [
     {
@@ -37008,5 +37008,5 @@
   }
  },
  "unit": "7d1c2a4e-0000-4000-8000-00000000aa01",
- "version": "kn.menu/v6"
+ "version": "kn.menu/v7"
 }

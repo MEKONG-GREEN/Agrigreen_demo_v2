@@ -1,0 +1,1 @@
+- [x] MENU-V7 (#146, 25/10/2026): nâng phiên bản menu KN lên `kn.menu/v7` sau chồng gói W; chỉ đổi chuỗi phiên bản, ca vàng và ảnh chụp compatibility sinh lại. [Giả định](../../kn/gia-dinh/MENU-V7.md).
