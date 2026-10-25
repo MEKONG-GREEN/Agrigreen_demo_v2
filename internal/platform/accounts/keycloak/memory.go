@@ -36,8 +36,10 @@ type memUser struct {
 	u     port.User
 	roles []string
 	otp   bool
-	// bruteForce: khóa do đăng nhập sai nhiều lần (realm permanentLockout) — enabled vẫn true.
-	bruteForce bool
+	// bruteForce: khóa do đăng nhập sai nhiều lần — enabled vẫn true. Khóa tạm (P0-VPS-OPS #131):
+	// tự hết ở bruteForceUntil theo đồng hồ m.now.
+	bruteForce      bool
+	bruteForceUntil time.Time
 }
 
 // SentEmail là một lần gửi liên kết hành động (không chứa địa chỉ email).
@@ -452,27 +454,42 @@ func (m *Memory) Logout(_ context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// LockByBruteForce giả lập Keycloak khóa vĩnh viễn tài khoản sau 5 lần sai (kiểm thử GIS US-LOG-01).
+// LockByBruteForce giả lập Keycloak khóa tạm tài khoản sau 5 lần sai (kiểm thử GIS US-LOG-01): khóa tự
+// hết sau DefaultLockoutWait (15 phút, realm P0-VPS-OPS #131) tính theo đồng hồ của bản trong bộ nhớ.
 func (m *Memory) LockByBruteForce(id uuid.UUID) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if u, err := m.get(id); err == nil {
-		u.bruteForce = true
+		u.bruteForce, u.bruteForceUntil = true, m.now().Add(DefaultLockoutWait)
 	}
+}
+
+func (m *Memory) loginLock(op string, id uuid.UUID) (port.LoginLock, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.fail(op); err != nil {
+		return port.LoginLock{}, err
+	}
+	u, err := m.get(id)
+	if err != nil {
+		return port.LoginLock{}, err
+	}
+	if !u.bruteForce || !m.now().Before(u.bruteForceUntil) {
+		return port.LoginLock{}, nil
+	}
+	until := u.bruteForceUntil.UTC()
+	return port.LoginLock{Locked: true, Until: &until}, nil
 }
 
 // BruteForceLocked thực hiện port.Directory.
 func (m *Memory) BruteForceLocked(_ context.Context, id uuid.UUID) (bool, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if err := m.fail("BruteForceLocked"); err != nil {
-		return false, err
-	}
-	u, err := m.get(id)
-	if err != nil {
-		return false, err
-	}
-	return u.bruteForce, nil
+	st, err := m.loginLock("BruteForceLocked", id)
+	return st.Locked, err
+}
+
+// LoginLockStatus thực hiện port.Directory.
+func (m *Memory) LoginLockStatus(_ context.Context, id uuid.UUID) (port.LoginLock, error) {
+	return m.loginLock("LoginLockStatus", id)
 }
 
 // ClearBruteForce thực hiện port.Directory.

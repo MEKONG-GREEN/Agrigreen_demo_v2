@@ -74,6 +74,8 @@ type userDTO struct {
 	MFA *mfaDTO `json:"mfa,omitempty"`
 	// LoginLocked is present only on account detail; false is a verified unlocked state.
 	LoginLocked *bool `json:"login_locked,omitempty"`
+	// LoginLockedUntil: mốc khóa tạm tự hết (RFC 3339, chỉ khi login_locked=true và suy được).
+	LoginLockedUntil *string `json:"login_locked_until,omitempty"`
 }
 
 type mfaDTO struct {
@@ -111,6 +113,10 @@ func toUserDTO(v app.UserView) userDTO {
 	if !u.CreatedAt.IsZero() {
 		s := u.CreatedAt.UTC().Format(time.RFC3339)
 		d.CreatedAt = &s
+	}
+	if v.LoginLockedUntil != nil {
+		s := v.LoginLockedUntil.UTC().Format(time.RFC3339)
+		d.LoginLockedUntil = &s
 	}
 	if v.MFA != nil {
 		d.MFA = &mfaDTO{Required: v.MFA.Required, Configured: v.MFA.Configured, EnrollmentPending: v.MFA.EnrollmentPending}
