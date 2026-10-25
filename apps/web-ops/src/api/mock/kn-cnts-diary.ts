@@ -6,6 +6,7 @@ import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 import { cntsMockHousehold } from "./kn-cnts-model";
+import { vnDate } from "@/kn/schedule/week";
 
 type S = components["schemas"];
 type CycleCore = Omit<S["CNTSDiaryCycle"], "status" | "site_name" | "project_code" | "owner_label" | "can_edit" | "suggest" | "updated_by_display">;
@@ -38,7 +39,8 @@ export function resetCntsDiary() {
 }
 
 const now = () => new Date().toISOString();
-const today = () => now().slice(0, 10);
+/** Hôm nay theo lịch VN (now() là chuỗi UTC "Z") — KN-VN-DATE #149. */
+const today = () => vnDate(Date.now());
 const last = <T>(m: Map<string, T[]>, ref: string) => m.get(ref)?.at(-1);
 const push = <T>(m: Map<string, T[]>, ref: string, v: T) => m.set(ref, [...(m.get(ref) ?? []), v]);
 const meta = (actor: string, version: number) => ({
@@ -690,7 +692,7 @@ export const cntsDiaryRoutes: Route[] = [
       if (!c || !a) return cycleNF();
       if (!a.keeper) return problem(403, "forbidden", "chỉ cán bộ theo dõi điểm / người ghi nhật ký của hộ ghi nhật ký");
       if (c.event === "closed") return problem(409, "extension.cnts_diary_cycle_closed", "Lứa đã kết thúc (đã hạch toán) — mở lại trước khi ghi");
-      const day = b.entry_date ?? (b.captured_at ?? now()).slice(0, 10);
+      const day = b.entry_date ?? (b.captured_at ? vnDate(Date.parse(b.captured_at)) : today());
       if (c.form !== "BM-19" && [...ENTRIES.values()].some((v) => v.at(-1)!.cycle_ref === c.ref && v.at(-1)!.entry_date === day))
         return problem(409, "extension.cnts_diary_entry_day_taken", "Lứa đã có lần ghi của ngày này");
       const fix = b.location ?? null;

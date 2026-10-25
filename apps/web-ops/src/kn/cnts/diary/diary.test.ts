@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsDiary } from "@/api/mock/kn-cnts-diary";
@@ -146,5 +146,26 @@ describe("giả lập nhật ký nuôi", () => {
     expect(done.status).toBe("closed");
     expect(done.accounting.profit).toBe("23800000");
     expect((await dapi.cycles({ site_ref: c.site_ref })).avg_profit).toBe("23800000");
+  });
+});
+
+// KN-VN-DATE (#149): ngày ghi mặc định và hạn sửa 7 ngày theo ngày lịch VN (00:00–07:00 VN ngày UTC còn là hôm qua).
+describe("nhật ký nuôi theo ngày VN", () => {
+  const dapi = createCntsDiaryApi(
+    createApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.setter", getContextId: () => null, fetch: mockFetchNoDelay }),
+  );
+  const HH = "0190f1c4-7d3e-7000-8000-0000000c7301";
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.parse("2026-10-25T17:30:00Z") }); // Thứ Hai 26/10 00:30 VN
+    resetCntsModel();
+    resetCntsDiary();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("Thứ Hai 00:30 VN: lần ghi không kèm ngày mang ngày hôm nay theo giờ VN", async () => {
+    const c = (await dapi.cycles({ household_ref: HH })).items[0]!;
+    const e = await dapi.createEntry({ cycle_ref: c.ref, entry_kind: "daily", metrics: { alive: "495", dead: "0", feed_kg: "12" } });
+    expect(e.entry_date).toBe("2026-10-26");
+    expect(e.editable_until).toBe("2026-11-02");
   });
 });

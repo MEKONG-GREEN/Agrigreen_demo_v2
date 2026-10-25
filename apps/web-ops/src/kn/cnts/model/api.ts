@@ -99,12 +99,12 @@ export function parseLatLng(s: string): { lat: number; lng: number } | null | "i
   return lat < 5 || lat > 25 || lng < 100 || lng > 118 ? "invalid" : { lat, lng };
 }
 
-/** Lỗi phía máy khách của biểu cấp quyền theo vai (FN-14). */
 /** Ngày hiệu lực mặc định của ô "Hiệu lực từ" khi cấp quyền mới. */
 export function defaultGrantValidFrom(nowMs: number = Date.now()): string {
   return vnDate(nowMs); // ngày lịch VN — ngày UTC còn là hôm qua lúc 00:00–07:00 VN (KN-VN-DATE #149)
 }
 
+/** Lỗi phía máy khách của biểu cấp quyền theo vai (FN-14). */
 export function grantErrors(g: Partial<GrantSave>): Record<string, string> {
   const e: Record<string, string> = {};
   if (!g.grantee_ref) e.grantee_ref = "Chọn tài khoản";

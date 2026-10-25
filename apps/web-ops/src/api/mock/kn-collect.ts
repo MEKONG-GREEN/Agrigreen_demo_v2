@@ -8,6 +8,7 @@ import { uuidv7 } from "../idempotency";
 import { json, problem, type Ctx, type Route } from "./http";
 import { KN_COOPS } from "./kn-schedules";
 import { callerOf, isErr, type Caller } from "./kn-reports/store";
+import { vnDate } from "@/kn/schedule/week";
 
 interface Coop {
   ref: string;
@@ -73,6 +74,8 @@ export const MATERIALS: Record<string, { name: string; unit: string; countable: 
 };
 
 const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+/** Hôm nay theo lịch VN (now() là chuỗi UTC "Z") — KN-VN-DATE #149. */
+const todayVN = () => vnDate(Date.now());
 const mask = (p: string) => `${p.slice(0, 4)}•••${p.slice(-3)}`;
 const shortName = (full: string) => {
   const parts = full.trim().split(/\s+/);
@@ -233,7 +236,7 @@ export const knCollectRoutes: Route[] = [
       if (!b.holder?.full_name || !/^0\d{9}$/.test(phone)) return fieldErr("holder", "họ tên và SĐT 10 chữ số bắt buộc");
       // BF-SWEEP-TT: diện tích canh tác như area_ha của HTX — decimal ≥ 0, tối đa 4 chữ số lẻ (R-A1, máy chủ cũng chặn).
       if (b.cultivated_area_ha !== undefined && b.cultivated_area_ha !== null && b.cultivated_area_ha !== "" && !/^\d+(\.\d{1,4})?$/.test(String(b.cultivated_area_ha))) return fieldErr("cultivated_area_ha", "decimal ≥ 0, tối đa 4 chữ số lẻ");
-      const h: Household = { ref: uuidv7(), coop: x.ref, holder: { label: shortName(b.holder.full_name), masked_phone: mask(phone) }, cultivated_area_ha: b.cultivated_area_ha ?? null, active: true, since_date: now().slice(0, 10) };
+      const h: Household = { ref: uuidv7(), coop: x.ref, holder: { label: shortName(b.holder.full_name), masked_phone: mask(phone) }, cultivated_area_ha: b.cultivated_area_ha ?? null, active: true, since_date: todayVN() };
       HH.push(h);
       return json(hhWire(h), 201);
     }),
@@ -331,7 +334,7 @@ export const knCollectRoutes: Route[] = [
       if (deny) return deny;
       const b = (body ?? {}) as { commune_code?: string; recorded_on?: string; lines?: { material_code: string; quantity: string; note?: string }[] };
       if (!b.commune_code || !inScope(c, b.commune_code)) return problem(403, "extension.out_of_scope", "Ngoài phạm vi phụ trách");
-      if (!b.recorded_on || b.recorded_on > now().slice(0, 10)) return fieldErr("recorded_on", "bắt buộc, không ở tương lai");
+      if (!b.recorded_on || b.recorded_on > todayVN()) return fieldErr("recorded_on", "bắt buộc, không ở tương lai");
       const lines = b.lines ?? [];
       if (!lines.length || lines.length > 200) return fieldErr("lines", "1–200 dòng");
       const out: Material[] = [];

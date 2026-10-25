@@ -1,6 +1,6 @@
 // Thu thập dữ liệu Cấp Xã (P7 /v1/kn/*) qua client web (src/kn/cycle/api.ts) trên backend giả lập:
 // phạm vi xã phụ trách, SĐT che, vô hiệu hóa thay xóa, máy nguyên ≥ 0 không trùng loại, tổng xã = Σ HTX, vật tư + tổng hợp.
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiProblem } from "@/api/problem";
 import { createCollectApi } from "@/kn/cycle/api";
 import { mockFetchNoDelay } from "./handler";
@@ -61,5 +61,29 @@ describe("thu thập dữ liệu Cấp Xã giả lập (P7)", () => {
       ["91301", "bay_den", "10"],
     ]);
     expect((await xa.plots()).items.every((p) => ["91301", "91302"].includes(p.commune_code))).toBe(true);
+  });
+});
+
+// KN-VN-DATE (#149): ngày vào HTX và "không ở tương lai" của vật tư theo ngày lịch VN (00:00–07:00 VN ngày UTC còn là hôm qua).
+describe("thu thập Cấp Xã theo ngày VN", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("Thứ Hai 00:30 VN: hộ mới vào HTX từ hôm nay; vật tư ghi hôm nay hợp lệ, ngày mai bị chặn", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.parse("2026-10-25T17:30:00Z") });
+    const xa = await clientFor("kn-an", "asg-an-xa");
+    const coop = (await xa.cooperatives({ commune: "91301" })).items[0]!;
+    const h = await xa.addHousehold(coop.ref, { holder: { full_name: "Lê Thị Năm", phone: "0987000222" } });
+    expect(h.since_date).toBe("2026-10-26");
+    const line = [{ material_code: "phan_ure", quantity: "1" }];
+    expect(await code(xa.recordMaterials({ commune_code: "91301", recorded_on: "2026-10-26", lines: line }))).toBe("ok");
+    expect(await code(xa.recordMaterials({ commune_code: "91301", recorded_on: "2026-10-27", lines: line }))).toBe("422 validation_failed");
+  });
+
+  it("Chủ Nhật 23:59 VN: vật tư ghi Thứ Hai còn ở tương lai", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.parse("2026-10-25T16:59:00Z") });
+    const xa = await clientFor("kn-an", "asg-an-xa");
+    const line = [{ material_code: "phan_ure", quantity: "1" }];
+    expect(await code(xa.recordMaterials({ commune_code: "91301", recorded_on: "2026-10-26", lines: line }))).toBe("422 validation_failed");
+    expect(await code(xa.recordMaterials({ commune_code: "91301", recorded_on: "2026-10-25", lines: line }))).toBe("ok");
   });
 });
