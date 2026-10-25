@@ -1,6 +1,8 @@
 module github.com/MEKONG-GREEN/Agrigreen_demo_v2
 
-go 1.26.10
+go 1.26.0
+
+toolchain go1.26.10
 
 require (
 	github.com/coreos/go-oidc/v3 v3.21.0
