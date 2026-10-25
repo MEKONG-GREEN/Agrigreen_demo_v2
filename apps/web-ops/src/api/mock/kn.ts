@@ -2149,12 +2149,6 @@ const ADMIN_SYSTEM: Group = {
           "icon": "param"
         },
         {
-          "key": "admin.qt.cong_cu.tai_khoan",
-          "label": "Tài khoản cán bộ (G1)",
-          "route": "/quan-tri/tai-khoan",
-          "icon": "user"
-        },
-        {
           "key": "admin.qt.cong_cu.to_chuc",
           "label": "Cây tổ chức (G1)",
           "route": "/quan-tri/to-chuc",

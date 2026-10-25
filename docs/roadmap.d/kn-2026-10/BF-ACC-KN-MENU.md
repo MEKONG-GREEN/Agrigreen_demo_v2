@@ -1,0 +1,1 @@
+- [x] BF-ACC-KN-MENU (#120, 26/10/2026, con của #114 TT-13): bỏ mục "Tài khoản cán bộ (G1)" (`/quan-tri/tai-khoan`) khỏi menu Admin KN; Admin KN dùng `/kn/quan-tri/nguoi-dung`; màn/API native giữ nguyên theo vai realm. Sinh lại menu, ca vàng và ảnh chụp compatibility; giữ `kn.menu/v7`. [Giả định](../../kn/gia-dinh/BF-ACC-KN-MENU.md).

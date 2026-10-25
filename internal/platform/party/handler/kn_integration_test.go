@@ -110,6 +110,16 @@ func menuKeys(r resp) []string {
 	return out
 }
 
+// mustJSON tuần tự thân trả về thành chuỗi JSON (kiểm có/không có route ở mọi tầng menu).
+func mustJSON(t *testing.T, body map[string]any) string {
+	t.Helper()
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
 // adminDeptItem trả mục phòng ban code trong nhóm "Phòng ban" của menu Admin.
 func adminDeptItem(t *testing.T, r resp, code string) map[string]any {
 	t.Helper()
@@ -378,6 +388,11 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	r = root.appDo(http.MethodGet, "/v1/menu?org_ref="+tr.p89.String(), nil)
 	if r.status != http.StatusOK || !slices.Equal(groupKeys(r), []string{"dieu_hanh", "phong_ban", "quan_tri", "dung_chung"}) || str(r.body, "default_route") != "/kn/tong-quan" {
 		t.Fatalf("menu Admin: %v", r.body)
+	}
+	// BF-ACC-KN-MENU (#120, TT-13): Admin KN không còn liên kết màn tài khoản native cũ; vẫn có Người dùng KN mới.
+	if keys, raw := menuKeys(r), mustJSON(t, r.body); slices.Contains(keys, "admin.qt.cong_cu.tai_khoan") ||
+		strings.Contains(raw, `"/quan-tri/tai-khoan`) || !slices.Contains(keys, "admin.qt.nguoi_dung") || !strings.Contains(raw, `"/kn/quan-tri/nguoi-dung"`) {
+		t.Fatalf("menu Admin KN còn /quan-tri/tai-khoan hoặc mất /kn/quan-tri/nguoi-dung: %v", keys)
 	}
 	if it := adminDeptItem(t, r, "trong_trot"); it["enabled"] != true ||
 		!hasMenuChildren(it, []string{"admin.pb.theo_doi_nop", "admin.pb.tong_hop", "admin.pb.du_lieu_bao_cao", "admin.pb.thu_thap", "admin.pb.lich_cong_tac", "admin.pb.danh_muc", "admin.pb.mau_bao_cao", "admin.pb.bao_cao_khtc"}) ||

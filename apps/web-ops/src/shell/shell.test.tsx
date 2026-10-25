@@ -56,7 +56,12 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
       ["2 phòng khác", "not_open"],
     ]);
     const hrefs = menuLinks(admin).map((l) => l.node.href);
-    expect(hrefs).toEqual(expect.arrayContaining(["/kn/tong-quan", "/kn/quan-tri/co-cau-to-chuc", "/kn/quan-tri/nguoi-dung", "/quan-tri/to-chuc", "/quan-tri/tai-khoan", "/kn/phong-ban/trong_trot/danh-muc", "/quan-tri/mau-bao-cao"]));
+    expect(hrefs).toEqual(expect.arrayContaining(["/kn/tong-quan", "/kn/quan-tri/co-cau-to-chuc", "/kn/quan-tri/nguoi-dung", "/quan-tri/to-chuc", "/kn/phong-ban/trong_trot/danh-muc", "/quan-tri/mau-bao-cao"]));
+    // BF-ACC-KN-MENU (#120, TT-13): Admin KN quản lý người dùng qua /kn/quan-tri/nguoi-dung; bỏ liên kết native cũ.
+    expect(hrefs).not.toContain("/quan-tri/tai-khoan");
+    expect(menuLinks(admin).map((l) => l.node.label)).not.toContain("Tài khoản cán bộ (G1)");
+    expect(menuAllows(admin, "/kn/quan-tri/nguoi-dung")).toBe(true);
+    expect(menuAllows(admin, "/quan-tri/tai-khoan")).toBe(false);
   });
 
   it("khớp tiền tố dài nhất, breadcrumb mục cha / mục, kiểm đường dẫn theo menu", () => {

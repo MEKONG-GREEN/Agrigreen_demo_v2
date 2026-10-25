@@ -122,6 +122,11 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(menuNav(page).getByRole("link", { name: /Chăn nuôi/ })).toHaveCount(0);
     await menuNav(page).getByRole("button", { name: /Phòng Trồng trọt/ }).click();
     await expect(menuNav(page).getByRole("link", { name: "Mẫu báo cáo" })).toBeVisible();
+    // BF-ACC-KN-MENU (#120, TT-13): Công cụ nền tảng không còn liên kết màn tài khoản native cũ.
+    await menuNav(page).getByRole("button", { name: /Công cụ nền tảng/ }).click();
+    await expect(menuNav(page).getByRole("link", { name: "Tham số & phê duyệt" })).toBeVisible();
+    await expect(menuNav(page).getByRole("link", { name: /Tài khoản cán bộ/ })).toHaveCount(0);
+    await expect(menuNav(page).locator('a[href="/quan-tri/tai-khoan"]')).toHaveCount(0);
     await menuNav(page).getByRole("link", { name: "Người dùng" }).click();
     await expect(page).toHaveURL(/\/kn\/quan-tri\/nguoi-dung$/);
     await expect(page.getByRole("heading", { level: 1, name: "Người dùng" })).toBeVisible();
