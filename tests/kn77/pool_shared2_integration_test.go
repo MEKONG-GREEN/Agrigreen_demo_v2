@@ -9,11 +9,14 @@ package kn77_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -23,7 +26,10 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
 // gateMailer chặn mọi lần gửi tới khi test mở; đếm theo địa chỉ.
@@ -146,4 +152,118 @@ func TestP0PoolShared2_KHTCCancelNoNestedTx(t *testing.T) {
 			t.Fatalf("kỳ %s sau hủy: %s / %s", p.ID, got.State, got.FormsStatus)
 		}
 	}
+}
+
+// gateStore chặn Store.Get (khi armed) tới khi test mở.
+type gateStore struct {
+	objstore.Store
+	armed   atomic.Bool
+	entered chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (s *gateStore) open() { s.once.Do(func() { close(s.release) }) }
+
+func (s *gateStore) Get(ctx context.Context, key string) (io.ReadCloser, objstore.Info, error) {
+	if s.armed.Load() {
+		s.entered <- struct{}{}
+		select {
+		case <-s.release:
+		case <-ctx.Done():
+			return nil, objstore.Info{}, ctx.Err()
+		}
+	}
+	return s.Store.Get(ctx, key)
+}
+
+// TestP0PoolShared2_DispatchLinkStoreGetOutsideTx: mở liên kết tải Chi cục (A4) đọc tệp ở kho đối tượng NGOÀI giao dịch —
+// pool chung cỡ 2 không có kết nối nào bị mượn trong lúc kho treo; xong vẫn ghi sổ "served" đúng một lần.
+func TestP0PoolShared2_DispatchLinkStoreGetOutsideTx(t *testing.T) {
+	gs := &gateStore{entered: make(chan struct{}, 4), release: make(chan struct{})}
+	t.Cleanup(gs.open)
+	defer gs.open() // trước Cleanup đóng máy chủ httptest (đang chờ lời gọi bị chặn) khi test hỏng
+	c := setupCycleWith(t, fixtureOpts{sharedPool: 2, wrapStore: func(s objstore.Store) objstore.Store { gs.Store = s; return gs }})
+	f := c.f
+	pool := f.repPool.(*pgxpool.Pool)
+	did, rids := dispatchWithTwoRecipients(t, c)
+	f.repParams.set("reports.dispatch_attachment_limit_mb", "0") // chỉ gửi liên kết
+	c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{"recipient_ids": rids}), http.StatusAccepted, "gửi email")
+	evs := f.events(repport.EventDispatchRequested)
+	if _, err := inbox.Process(context.Background(), db.ForModule(pool, reports.DBModule), repport.DispatchConsumer, evs[len(evs)-1], f.rep.DispatchHandler()); err != nil {
+		t.Fatal(err)
+	}
+	ms := f.mail.all()
+	if len(ms) == 0 {
+		t.Fatal("không có email liên kết")
+	}
+	m := linkRe.FindStringSubmatch(ms[0].Text)
+	if m == nil {
+		t.Fatalf("liên kết tải: %q", ms[0].Text)
+	}
+	gs.armed.Store(true)
+	done := make(chan int, 1)
+	go func() {
+		r, err := http.Get(m[1])
+		if err != nil {
+			done <- -1
+			return
+		}
+		_, _ = io.Copy(io.Discard, r.Body)
+		_ = r.Body.Close()
+		done <- r.StatusCode
+	}()
+	select {
+	case <-gs.entered:
+	case <-time.After(30 * time.Second):
+		t.Fatal("Store.Get không được gọi")
+	}
+	if n := pool.Stat().AcquiredConns(); n != 0 {
+		t.Fatalf("P0-POOL-SHARED-2: đọc kho đối tượng của liên kết tải trong lúc giữ %d kết nối pool (giao dịch mở)", n)
+	}
+	gs.open()
+	if st := <-done; st != http.StatusOK {
+		t.Fatalf("tải qua liên kết: %d", st)
+	}
+	if n := f.count(`SELECT count(*) FROM pf_reports.dispatch_link_access WHERE tenant_id = $1 AND outcome = 'served'`, f.tenant); n != 1 {
+		t.Fatalf("sổ served: %d", n)
+	}
+}
+
+// TestP0PoolShared2_KHTCCancelIntentBlocksFinal: ý định hủy kỳ còn hạn (bước 1 của "Hủy kỳ", trước lời gọi cap/forms ngoài
+// giao dịch) chặn "Bản cuối" và một lần hủy khác (409 extension.khtc_period_cancelling, cap/forms không bị gọi); hết hạn ý
+// định (tiến trình hủy chết giữa chừng) → Bản cuối chạy lại được, sau đó hủy kỳ bị từ chối như trước.
+func TestP0PoolShared2_KHTCCancelIntentBlocksFinal(t *testing.T) {
+	f := newReportFx(t)
+	p := f.open(41, dTT, dTTTT)
+	f.submit(p.ID, "10")
+	d := f.refresh(p.ID, 0)
+	x := f.export(p.ID, d.Version, false)
+	adm := pgtest.Get(t).AdminPool(t, migrations.PF)
+	exec := func(q string) {
+		t.Helper()
+		if err := tenant.WithTenantTx(context.Background(), adm, f.tid, func(tx pgx.Tx) error {
+			_, err := tx.Exec(context.Background(), q, f.tid, p.ID)
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`INSERT INTO pf_extension.khtc_cancel_intent (tenant_id, period_id, claim_id, claim_until)
+	  VALUES ($1, $2::uuid, gen_random_uuid(), now() + interval '1 minute')`)
+	c, b := f.call(http.MethodPost, p.ID, "/exports/"+x.ID+"/final", map[string]any{})
+	f.fail(c, b, "extension.khtc_period_cancelling")
+	c, b = f.khtc(http.MethodPost, "/periods/"+p.ID+"/cancel", f.khtcUser, "", map[string]any{"reason": "Hủy trong lúc lần hủy khác đang chạy"})
+	f.fail(c, b, "extension.khtc_period_cancelling")
+	if st := f.get(p.ID); st.State == "cancelled" || st.FormsStatus == "cancelled" {
+		t.Fatalf("hủy kỳ chạy khi ý định khác còn hạn: %+v", st)
+	}
+	exec(`UPDATE pf_extension.khtc_cancel_intent SET claim_until = now() - interval '1 second' WHERE tenant_id = $1 AND period_id = $2::uuid`)
+	c, b = f.call(http.MethodPost, p.ID, "/exports/"+x.ID+"/final", map[string]any{})
+	f.ok(c, b, &d)
+	if d.Final == nil {
+		t.Fatalf("Bản cuối sau khi ý định hết hạn: %+v", d)
+	}
+	c, b = f.khtc(http.MethodPost, "/periods/"+p.ID+"/cancel", f.khtcUser, "", map[string]any{"reason": "Hủy sau khi có bản cuối"})
+	f.fail(c, b, "extension.khtc_period_not_cancellable")
 }

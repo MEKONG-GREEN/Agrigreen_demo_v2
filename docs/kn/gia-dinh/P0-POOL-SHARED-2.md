@@ -41,9 +41,15 @@ XANH sau sửa:
 | `mrv/handler` `TestExportPutOutsideInboxTx_P0PoolShared2` | đỏ: `Put` khi giữ 1 kết nối | đạt |
 | `tests/reports` `TestP0PoolShared2_ExportPutOutsideInboxTx` | đỏ: `Put` khi giữ 1 kết nối | đạt |
 | `tests/reports` `TestP0PoolShared2_DeliverySMTPOutsideInboxTx` | đỏ: SMTP khi giữ 1 kết nối | đạt |
-| `tests/reports` `TestP0PoolShared2_DeliverySMTPErrorReleasesClaim`, `…DeliveryConcurrentRedeliverySendsOnce` | đỏ (chưa có cột nhận việc) | đạt |
+| `tests/reports` `TestP0PoolShared2_DeliverySMTPErrorReleasesClaim`, `…DeliveryConcurrentRedeliverySendsOnce` | đỏ (chưa có cột nhận việc); với mã dev + migration mới thì đạt — đây là test ngữ nghĩa, không phải test tái hiện | đạt |
 | kn77 `TestP0PoolShared2_DispatchSendOutsideInboxTx` (pool chung cỡ 2) | đỏ: SMTP khi giữ 1 kết nối | đạt |
 | kn77 `TestP0PoolShared2_KHTCCancelNoNestedTx` (4 hủy song song, pool chung cỡ 2, hạn 10 s) | đỏ: 4/4 treo tới hết hạn | đạt |
 | `cntsalert/handler` `TestCNTSAlertPortsOutsideInboxTx_P0PoolShared2` | đỏ: port gọi khi giữ 1 kết nối | đạt |
 | `extension/handler` `TestSupportRequestGpsLogOutsideInboxTx_P0PoolShared2` | đỏ: `RecordFix` khi giữ 1 kết nối | đạt |
-| `shared/inbox` `TestProcessRunsExternalIOOutsideInboxTx` (port mở giao dịch trên CÙNG pool cỡ 1) | — (cơ chế mới) | đạt |
+| `shared/inbox` `TestProcessRunsExternalIOOutsideInboxTx` (port mở giao dịch trên CÙNG pool cỡ 1) | đỏ: hết hạn 15 s (khóa chết pool cỡ 1) | đạt |
+| kn77 `TestP0PoolShared2_DispatchLinkStoreGetOutsideTx` (liên kết tải A4, pool chung cỡ 2, `Store.Get` treo) | đỏ: `Store.Get` khi giữ 1 kết nối | đạt |
+| kn77 `TestP0PoolShared2_KHTCCancelIntentBlocksFinal` (ý định hủy còn hạn chặn Bản cuối + hủy lần hai 409 `extension.khtc_period_cancelling`; hết hạn → Bản cuối chạy được, hủy bị từ chối) | đỏ (chưa có ý định hủy) | đạt |
+
+Kiểm lại 26/10/2026 (phiên Claude thứ hai, dev 5396bb64): chạy lại các test tái hiện với mã sản phẩm của dev (bản sao tạm, giữ
+migration + hàm store mới, chỉ đổi tệp nguồn của các điểm sửa về dev) — tất cả đỏ như bảng; bổ sung hai test kn77 cuối bảng (liên
+kết tải chưa có test tái hiện; ngữ nghĩa ý định hủy chưa có test xác định). Bộ đầy đủ xanh trên nhánh.
