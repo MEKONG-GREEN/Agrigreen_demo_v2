@@ -1,2 +1,1 @@
-- [ ] BF-ACC-VERIFY (TT-13, #114): bổ sung regression vai/composite realm và403 CRUD tài khoản xã với phiên tỉnh hợp lệ; không đổi production/API/DDL; phần menu KN còn chờ owner #120.
-
+- [x] BF-ACC-VERIFY (TT-13, #114, 26/10/2026): bổ sung regression vai/composite realm và 403 CRUD tài khoản xã với phiên tỉnh hợp lệ; không đổi production/API/DDL; menu Admin KN bỏ liên kết `/quan-tri/tai-khoan` ở #120 (BF-ACC-KN-MENU). [Ghi chú](../../dev/bf-account-admin-verification.md).
