@@ -13,6 +13,7 @@ import { DataTable, FilterBar, FilterChip, PageHeader, StatusPill, type Column }
 import { formLayout } from "@/kn/forms/api";
 import type { FormDefinition } from "@/kn/forms/types";
 import { FormGrid, communeRows } from "@/kn/grid";
+import { vnDate } from "@/kn/schedule/week";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
 import { RawFile, type RcBatchInput, type RcFormItem, type RcPreview, type RcProvincialImport, type RcStatusItem, type RcTask } from "../api";
 import {
@@ -566,9 +567,10 @@ export function useBatchPeriod(initialBatch?: string | null, reportType?: string
   const active = batchId ?? batches.data?.items.find((b) => b.status === "issued")?.id ?? null;
   const detail = useLoad(active ? () => cycleApi.batch(active) : null, [active]);
   const [periodId, setPeriodId] = useState<string | null>(null);
-  const [now] = useState(() => Date.now());
+  // from_date là ngày lịch Việt Nam: so theo ngày VN (đầu tuần 00:00–07:00 giờ VN vẫn chọn kỳ hiện tại).
+  const [today] = useState(() => vnDate(Date.now()));
   const periods = detail.data?.periods ?? [];
-  const defPeriod = [...periods].reverse().find((p) => Date.parse(p.from_date) <= now) ?? periods[0];
+  const defPeriod = [...periods].reverse().find((p) => p.from_date <= today) ?? periods[0];
   const period = periods.find((p) => p.id === periodId) ?? defPeriod ?? null;
   return { batches, active, setBatchId: (id: string) => (setBatchId(id), setPeriodId(null)), detail, period, setPeriodId };
 }

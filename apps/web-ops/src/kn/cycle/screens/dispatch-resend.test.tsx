@@ -8,6 +8,7 @@ import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetMockForms } from "@/api/mock/forms/routes";
 import { MOCK_SEND_LEASE_MS, dispatchOf, resetReportCycle, stallDispatch } from "@/api/mock/kn-reports/store";
 import { ApiProblem } from "@/api/problem";
+import { vnDate } from "@/kn/schedule/week";
 import { createCycleApi } from "../api";
 import { DispatchScreen } from "./ReportScreens";
 
@@ -52,7 +53,9 @@ const code = async (p: Promise<unknown>) => {
 async function stuckDispatch(cycle: CycleApi) {
   const batch = (await cycle.batches()).items.find((b) => b.status === "issued")!;
   const { periods } = await cycle.batch(batch.id);
-  const period = [...periods].reverse().find((p) => Date.parse(p.from_date) <= Date.now()) ?? periods[0]!;
+  // Cùng quy tắc kỳ mặc định của màn (useBatchPeriod): from_date so theo ngày lịch VN.
+  const today = vnDate(Date.now());
+  const period = [...periods].reverse().find((p) => p.from_date <= today) ?? periods[0]!;
   await cycle.consolidate(period.id);
   const exp = await cycle.exportDispatch({ period_id: period.id, formats: ["xlsx"] });
   const sent = await cycle.send(exp.dispatch.id, {});
