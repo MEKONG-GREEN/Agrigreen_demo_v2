@@ -84,6 +84,14 @@ func BusinessDate(t time.Time) Date {
 	return Date{Year: y, Month: m, Day: d}
 }
 
+// BusinessDay trả ngày nghiệp vụ (giờ Việt Nam) của t dưới dạng 00:00 UTC của ngày đó — cùng dạng pgx quét cột DATE.
+// Dùng khi so cột DATE với thời điểm hiện tại: so trực tiếp `from.After(now)` coi ngày D bắt đầu lúc 07:00 VN thay vì
+// 00:00 VN (KN-VN-DATE #149). Ví dụ 2026-10-25T17:30:00Z (00:30 Thứ Hai VN) → 2026-10-26T00:00:00Z.
+func BusinessDay(t time.Time) time.Time {
+	d := BusinessDate(t)
+	return time.Date(d.Year, d.Month, d.Day, 0, 0, 0, 0, time.UTC)
+}
+
 // StartOfBusinessDate trả về thời điểm UTC bắt đầu ngày nghiệp vụ d.
 func StartOfBusinessDate(d Date) time.Time {
 	return time.Date(d.Year, d.Month, d.Day, 0, 0, 0, 0, Zone()).UTC()

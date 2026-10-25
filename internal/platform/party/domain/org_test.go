@@ -1,7 +1,9 @@
 package domain
 
 import (
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/shopspring/decimal"
 
@@ -70,5 +72,38 @@ func TestValidArea(t *testing.T) {
 		if got := ValidArea(decimal.RequireFromString(s)); got != want {
 			t.Errorf("%s: %v", s, got)
 		}
+	}
+}
+
+// KN-VN-DATE (#149): established_on là ngày lịch VN (DATE, 00:00 UTC). Nhập ngày hôm nay lúc 00:00–07:00 VN không được bị
+// coi là "ở tương lai"; ngày mai vẫn bị từ chối.
+func TestEstablishedOnFutureCheckUsesVietnamDate(t *testing.T) {
+	day := func(d int) *time.Time {
+		v := time.Date(2026, 10, d, 0, 0, 0, 0, time.UTC)
+		return &v
+	}
+	monday0030 := time.Date(2026, 10, 25, 17, 30, 0, 0, time.UTC) // Thứ Hai 26/10 00:30 VN
+	sunday2359 := time.Date(2026, 10, 25, 16, 59, 0, 0, time.UTC) // Chủ Nhật 25/10 23:59 VN
+	for _, tc := range []struct {
+		name string
+		now  time.Time
+		on   *time.Time
+		ok   bool
+	}{
+		{"Thứ Hai 00:30 VN, thành lập hôm nay", monday0030, day(26), true},
+		{"Thứ Hai 00:30 VN, thành lập ngày mai", monday0030, day(27), false},
+		{"Chủ Nhật 23:59 VN, thành lập Thứ Hai", sunday2359, day(26), false},
+		{"Chủ Nhật 23:59 VN, thành lập Chủ Nhật", sunday2359, day(25), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := CooperativeProfile{EstablishedOn: tc.on}.Validate(tc.now)
+			var fe FieldError
+			switch {
+			case tc.ok && err != nil:
+				t.Fatalf("muốn hợp lệ, nhận %v", err)
+			case !tc.ok && (!errors.As(err, &fe) || fe.Field != "cooperative.established_on"):
+				t.Fatalf("muốn lỗi cooperative.established_on, nhận %v", err)
+			}
+		})
 	}
 }

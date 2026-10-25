@@ -1,6 +1,7 @@
 // Định tuyến HTTP giả lập của vòng đời báo cáo KN v7.7 (application.yaml: /v1/extension/report-*, kn-periods,
 // consolidations, kn-dashboard, report-badges, commune-reports; /v1/reports/dispatch*). Quy tắc ở store.ts.
 import type { FormReportType } from "@/kn/forms/types";
+import { vnDate } from "@/kn/schedule/week";
 import { mockAssignedForms } from "../forms/routes";
 import { json, problem, type Ctx, type Route } from "../http";
 import { reason as checkReason } from "./domain";
@@ -69,7 +70,7 @@ export const reportCycleAppRoutes: Route[] = [
       const rt = q(ctx, "report_type");
       if (!rt) return st.fieldErr("report_type", "bắt buộc");
       const dept = c.dept ?? st.AG_DEPARTMENT;
-      const at = q(ctx, "from_date") ?? new Date(st.nowMs()).toISOString().slice(0, 10);
+      const at = q(ctx, "from_date") ?? vnDate(st.nowMs());
       const items = formsFor(dept, rt, at);
       return json({ items });
     }),
@@ -458,7 +459,7 @@ function provincialImport(ctx: Ctx, c: st.Caller): Response {
   const rt = q(ctx, "report_type") ?? "";
   const ids = (q(ctx, "template_ids") ?? "").split(",").filter(Boolean);
   if (!ids.length) return st.fieldErr("template_ids", "chọn ít nhất một biểu");
-  const at = q(ctx, "from_date") ?? new Date(st.nowMs()).toISOString().slice(0, 10);
+  const at = q(ctx, "from_date") ?? vnDate(st.nowMs());
   const forms = formsFor(c.dept ?? st.AG_DEPARTMENT, rt, at).filter((f) => ids.includes(f.template_id));
   if (forms.length !== ids.length) return problem(422, "extension.form_not_assigned", "Mẫu chưa được gán cho loại báo cáo của phòng ban");
   if (typeof ctx.body !== "string") return invalid("Giả lập chỉ đọc CSV UTF-8 — máy chủ thật đọc cả .xlsx");

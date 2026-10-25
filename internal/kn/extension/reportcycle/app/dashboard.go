@@ -15,6 +15,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -110,6 +111,33 @@ type Dashboard struct {
 	Versions     map[string]string
 }
 
+// periodStarted: kỳ đã bắt đầu tại now — from_date (ngày lịch VN, cột DATE = 00:00 UTC) ≤ ngày VN của now. Khớp truy
+// vấn số đếm menu store/task.go (`p.from_date <= (now AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`). So thẳng p.From với now
+// làm kỳ tuần mới chỉ bắt đầu lúc 07:00 VN Thứ Hai (KN-VN-DATE #149).
+func periodStarted(p store.Period, now time.Time) bool { return !p.From.After(clock.BusinessDay(now)) }
+
+// defaultDashboardPeriod chọn kỳ mặc định của dashboard: kỳ tuần gần nhất đã bắt đầu và có lần tổng hợp; không có →
+// kỳ gần nhất đã bắt đầu; không kỳ nào đã bắt đầu → nil. ps theo thứ tự ListPeriods (mới trước).
+func defaultDashboardPeriod(ps []store.Period, now time.Time, consolidated func(uuid.UUID) (bool, error)) (*store.Period, error) {
+	var cur *store.Period
+	for i := range ps {
+		if !periodStarted(ps[i], now) {
+			continue
+		}
+		ok, err := consolidated(ps[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			return &ps[i], nil
+		}
+		if cur == nil {
+			cur = &ps[i]
+		}
+	}
+	return cur, nil
+}
+
 // KNDashboard dựng dashboard từ bảng chỉ số dựng sẵn khi "Cập nhật" (consolidation_metric) + trạng thái nộp —
 // 6–8 truy vấn theo chỉ mục, không quét bài nộp (mục tiêu < 5 s, xem docs/runbooks/kn-report-cycle-load.md).
 func (s *Service) KNDashboard(ctx context.Context, q DashboardQuery) (Dashboard, error) {
@@ -146,22 +174,12 @@ func (s *Service) KNDashboard(ctx context.Context, q DashboardQuery) (Dashboard,
 				return ErrPeriodNotFound
 			}
 		} else {
-			// Kỳ tuần gần nhất đã bắt đầu và có lần tổng hợp; không có → kỳ gần nhất đã bắt đầu.
-			for i := range ps {
-				if ps[i].From.After(now) {
-					continue
-				}
-				l, err := store.LatestOfPeriod(ctx, tx, ps[i].ID)
-				if err != nil {
-					return err
-				}
-				if len(l) > 0 {
-					cur = &ps[i]
-					break
-				}
-				if cur == nil {
-					cur = &ps[i]
-				}
+			cur, err = defaultDashboardPeriod(ps, now, func(id uuid.UUID) (bool, error) {
+				l, err := store.LatestOfPeriod(ctx, tx, id)
+				return len(l) > 0, err
+			})
+			if err != nil {
+				return err
 			}
 		}
 		if cur == nil {

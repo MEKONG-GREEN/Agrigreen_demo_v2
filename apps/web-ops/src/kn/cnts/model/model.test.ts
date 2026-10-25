@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsModel } from "@/api/mock/kn-cnts-model";
-import { SCALE_RULE, createCntsModelApi, decimalValue, grantErrors, money, parseLatLng, projectErrors, scaleError, scaleErrors, toggle } from "./api";
+import { SCALE_RULE, createCntsModelApi, decimalValue, defaultGrantValidFrom, grantErrors, money, parseLatLng, projectErrors, scaleError, scaleErrors, toggle } from "./api";
 
 const A = "0190f1c4-7d3e-7000-8000-0000000000a1";
 
@@ -75,5 +75,34 @@ describe("giả lập CT/DA, điểm, hộ, quyền", () => {
     expect(r.status).toBe("revoked");
     const list = await mapi.grants();
     expect(list.items.find((x) => x.grantee_ref === heir)?.status).toBe("active");
+  });
+});
+
+// KN-VN-DATE (#149): ngày hiệu lực mặc định và trạng thái quyền theo ngày lịch VN (00:00–07:00 VN ngày UTC còn là hôm qua).
+describe("cấp quyền CNTS theo ngày VN", () => {
+  const mapi = createCntsModelApi(createApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.setter", getContextId: () => null, fetch: mockFetchNoDelay }));
+  const MON_0030_VN = Date.parse("2026-10-25T17:30:00Z");
+  const SUN_2359_VN = Date.parse("2026-10-25T16:59:00Z");
+  beforeEach(() => resetCntsModel());
+  afterEach(() => vi.useRealTimers());
+
+  it("ô valid_from của màn mặc định là hôm nay theo giờ VN", () => {
+    expect(defaultGrantValidFrom(MON_0030_VN)).toBe("2026-10-26");
+    expect(defaultGrantValidFrom(SUN_2359_VN)).toBe("2026-10-25");
+  });
+
+  it("Thứ Hai 00:30 VN: valid_from mặc định là hôm nay, quyền từ hôm nay đang hiệu lực", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: MON_0030_VN });
+    const g = await mapi.createGrant({ grantee_ref: A, role: "ksgm", commune_codes: ["91301"] });
+    expect(g.valid_from).toBe("2026-10-26");
+    expect(g.status).toBe("active");
+    const g2 = await mapi.createGrant({ grantee_ref: "0190f1c4-7d3e-7000-8000-0000000000c3", role: "ksgm", commune_codes: ["91301"], valid_from: "2026-10-26" });
+    expect(g2.status).toBe("active");
+  });
+
+  it("Chủ Nhật 23:59 VN: quyền từ Thứ Hai còn chờ hiệu lực", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: SUN_2359_VN });
+    const g = await mapi.createGrant({ grantee_ref: A, role: "ksgm", commune_codes: ["91301"], valid_from: "2026-10-26" });
+    expect(g.status).toBe("pending");
   });
 });

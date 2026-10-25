@@ -113,7 +113,8 @@ func (r *Report) Validate(now time.Time, zone *time.Location) error {
 		if err := areaOK("sown_area_ha", r.SownAreaHa, true); err != nil {
 			return err
 		}
-		if r.SownOn != nil && r.SownOn.After(now) {
+		// sown_on là ngày lịch VN (00:00 UTC): so với ngày VN của now, không với now (KN-VN-DATE #149).
+		if r.SownOn != nil && r.SownOn.After(civil(now, zone)) {
 			return fieldErr("sown_on", "không ở tương lai")
 		}
 		r.GrowthStage, r.PestCode, r.Severity, r.AffectedAreaHa = "", "", "", nil

@@ -13,6 +13,7 @@ const scaleBad = (b: { scale?: string | null; scale_unit?: string | null }) =>
   (!!b.scale !== !!b.scale_unit && "nhập cả quy mô và đơn vị") || (!!b.scale && !(/^\d{1,12}(\.\d+)?$/.test(b.scale) && Number(b.scale) > 0) && "phải dương") || null;
 import { knContext, personaForContext } from "./kn";
 import { AG_COMMUNES } from "./kn-reports/store";
+import { vnDate } from "@/kn/schedule/week";
 
 type S = components["schemas"];
 type ProjectCore = Omit<S["CNTSProjectVersion"], "actor_display">;
@@ -51,6 +52,8 @@ function who(ctx: Ctx) {
 type Who = ReturnType<typeof who>;
 
 const now = () => new Date().toISOString();
+/** Hôm nay theo lịch VN (valid_from/valid_to là ngày lịch VN; now() là chuỗi UTC "Z") — KN-VN-DATE #149. */
+const todayVN = () => vnDate(Date.now());
 const meta = (w: Who, version: number) => ({ version, updated_at: now(), updated_by: w.actor });
 const last = <T,>(m: Map<string, T[]>, ref: string) => m.get(ref)?.at(-1);
 const push = <T,>(m: Map<string, T[]>, ref: string, v: T) => m.set(ref, [...(m.get(ref) ?? []), v]);
@@ -87,7 +90,7 @@ function householdView(w: Who, h: HouseholdCore): S["CNTSHousehold"] {
     keeper_display: h.keeper_ref ? NAMES[h.keeper_ref] ?? null : null };
 }
 function grantStatus(g: GrantCore): S["CNTSGrant"]["status"] {
-  const today = now().slice(0, 10);
+  const today = todayVN();
   if (g.event === "revoked") return "revoked";
   if (today < g.valid_from) return "pending";
   if (g.valid_to && today > g.valid_to) return "expired";
@@ -377,7 +380,7 @@ export const cntsModelRoutes: Route[] = [
       const ref = uuidv7();
       GRANTS.set(ref, [{ ref, event: "granted", grantee_ref: b.grantee_ref, role: b.role!, province_code: "91", commune_codes: [...b.commune_codes].sort(),
         facility_refs: b.facility_refs ?? [], site_refs: b.site_refs ?? [], household_refs: b.household_refs ?? [],
-        forms: (b.forms ?? []).map((f) => f.toUpperCase()).sort(), valid_from: b.valid_from ?? now().slice(0, 10), valid_to: b.valid_to ?? null,
+        forms: (b.forms ?? []).map((f) => f.toUpperCase()).sort(), valid_from: b.valid_from ?? todayVN(), valid_to: b.valid_to ?? null,
         successor_ref: null, successor_grant_ref: null, reason: null, ...meta(w, 1) }]);
       return json(grantDetail(w, ref), 201);
     },
@@ -404,7 +407,7 @@ export const cntsModelRoutes: Route[] = [
         if (b.successor_ref) {
           succGrant = uuidv7();
           GRANTS.set(succGrant, [{ ...cur, ref: succGrant, event: "granted", grantee_ref: b.successor_ref, reason: `Nhận việc khi thu hồi quyền ${cur.ref}`,
-            valid_from: now().slice(0, 10), successor_ref: null, successor_grant_ref: null, ...meta(w, 1) }]);
+            valid_from: todayVN(), successor_ref: null, successor_grant_ref: null, ...meta(w, 1) }]);
         }
         push(GRANTS, cur.ref, { ...cur, event: "revoked", reason: b.reason, successor_ref: b.successor_ref ?? null, successor_grant_ref: succGrant, ...meta(w, cur.version + 1) });
       } else {

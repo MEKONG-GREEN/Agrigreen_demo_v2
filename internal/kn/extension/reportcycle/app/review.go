@@ -549,7 +549,7 @@ func (s *Service) Status(ctx context.Context, batchID uuid.UUID, periodID, templ
 func currentPeriod(ps []store.Period, now time.Time) store.Period {
 	cur := ps[0]
 	for _, p := range ps {
-		if !p.From.After(now) {
+		if periodStarted(p, now) {
 			cur = p
 		}
 	}

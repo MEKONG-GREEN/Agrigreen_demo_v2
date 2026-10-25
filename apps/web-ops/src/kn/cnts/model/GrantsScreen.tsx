@@ -16,6 +16,7 @@ import {
   GRANT_TONE,
   ROLE_LABEL,
   createCntsModelApi,
+  defaultGrantValidFrom,
   dmy,
   grantErrors,
   toggle,
@@ -146,7 +147,7 @@ function GrantForm({
     site_refs: grant?.site_refs ?? [],
     household_refs: grant?.household_refs ?? [],
     forms: grant?.forms ?? [],
-    valid_from: grant?.valid_from ?? new Date().toISOString().slice(0, 10),
+    valid_from: grant?.valid_from ?? defaultGrantValidFrom(),
     valid_to: grant?.valid_to ?? null,
   });
   const act = useAction();
