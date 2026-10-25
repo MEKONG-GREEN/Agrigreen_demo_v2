@@ -44,7 +44,7 @@ func newSurveyEnv(t *testing.T) *surveyEnv {
 	t.Helper()
 	env := pgtest.Get(t)
 	clk := clock.NewFixed(time.Date(2026, 7, 20, 1, 0, 0, 0, time.UTC)) // Thứ Hai 20/07/2026 08:00 giờ VN
-	prof := port.Profile{Name: "kn", Department: "thong_tin_truyen_thong", Roles: map[string]string{"kn_tinh": "TINH", "kn_xa": "XA",
+	prof := port.Profile{Session: testOwnerSession, Name: "kn", Department: "thong_tin_truyen_thong", Roles: map[string]string{"kn_tinh": "TINH", "kn_xa": "XA",
 		"kn_tw": "TW"}, ManageBy: []string{"admin"}, StewardDuty: authz.DutyPriceAdmin}
 	svc, err := app.NewService(db.ForModule(env.Pool(t, migrations.PF, dbadmin.AppPlatform), app.DBModule), clk, []port.Profile{prof})
 	if err != nil {
@@ -66,7 +66,7 @@ func newSurveyEnv(t *testing.T) *surveyEnv {
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
 		if p, ok := who[c.GetHeader("X-Test-As")]; ok {
-			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
+			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindTestSession(t, p)))
 		}
 		c.Next()
 		for _, err := range c.Errors {
