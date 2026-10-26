@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -397,7 +398,7 @@ func TestHRMPromotionHTTP_W1125(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, pii := range []string{"Trần Văn An", "Lê Thị Bé", "1980", "0913000001"} {
-		if strings.Contains(dump, pii) {
+		if containsPII(dump, pii) {
 			t.Fatalf("PII %q trong sổ nâng bậc", pii)
 		}
 	}
@@ -405,3 +406,18 @@ func TestHRMPromotionHTTP_W1125(t *testing.T) {
 		t.Fatalf("tenant khác: %v", xs)
 	}
 }
+
+// containsPII: dump chứa giá trị PII x? Bỏ UUID trước khi so; giá trị toàn chữ số (năm sinh, SĐT) chỉ tính khi
+// đứng riêng — không nằm giữa chữ/số, tránh trúng ngẫu nhiên trong mã hex (UUID, băm) của dòng.
+func containsPII(dump, x string) bool {
+	dump = uuidRe.ReplaceAllString(dump, "")
+	if !digitsRe.MatchString(x) {
+		return strings.Contains(dump, x)
+	}
+	return regexp.MustCompile(`(^|[^0-9A-Za-z])` + x + `([^0-9A-Za-z]|$)`).MatchString(dump)
+}
+
+var (
+	uuidRe   = regexp.MustCompile(`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`)
+	digitsRe = regexp.MustCompile(`^[0-9]+$`)
+)
