@@ -83,7 +83,9 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	farmers := assembly.AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}
 	ownedDesk := knprice.NewNotificationDirectory(acc.RoleHolders(), assembly.PriceProfiles())
 	d.Kinds, d.Digests = assembly.NotificationKinds(), assembly.NotificationDigests()
-	d.Builders = assembly.NotificationBuilders(ownedDesk, kn.Staff(), knUnits)
+	// NOTIFY-HCTH (#48): người nhận HCTH của pf/hrm — vai trên lần gán + lãnh đạo đơn vị nội bộ tại Nút (pf_accounts, chỉ đọc).
+	hrmDir := assembly.KNHRMNotifyDirectory{Holders: acc.RoleHolders(), Managers: acc.UnitManagers()}
+	d.Builders = assembly.NotificationBuilders(ownedDesk, kn.Staff(), knUnits, hrmDir)
 	d.Consumers, d.Renderers = assembly.NotificationConsumers(), assembly.NotificationRenderers()
 	d.Staff, d.Units, d.Farmers = kn.Staff(), md.AdminUnits(), farmers
 	d.Log, d.LinkBase = log, ch.LinkBase
@@ -100,7 +102,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 func notifyConsumers(log *slog.Logger) []consumer {
 	lazy := &notifyLazy{log: log}
 	// Danh sách consumer và sự kiện lấy từ module (không cần DB để liệt kê).
-	specs := notify.New(nil, clock.System{}, notify.Deps{Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Kinds: assembly.NotificationKinds(), Digests: assembly.NotificationDigests(), Builders: assembly.NotificationBuilders(nil, nil, nil)}).Consumers()
+	specs := notify.New(nil, clock.System{}, notify.Deps{Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Kinds: assembly.NotificationKinds(), Digests: assembly.NotificationDigests(), Builders: assembly.NotificationBuilders(nil, nil, nil, nil)}).Consumers()
 	out := make([]consumer, 0, len(specs))
 	for i := range specs {
 		sp := specs[i]
