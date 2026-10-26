@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-4B-TRANSFER-CORE (#55): generic dual-context intent/manifest/idmap/batches/receipts/recovery-gates/release đã có mã và PG native/static/lint đạt; chờ Claude Review OK và tích hợp. Typed owner importers/inventory #89, identity #56 và rehearsal #58 còn chờ; chưa chuyển dữ liệu/cutover/đạt5boundarygates.

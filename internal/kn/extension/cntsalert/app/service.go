@@ -9,7 +9,7 @@
 //     buộc); quá hạn xử lý → Quá hạn, báo Lãnh đạo phòng (job).
 //   - Cấu hình nhắc nộp theo biểu (UR-TINH-08) và job nhắc trước hạn / khi trễ / nhắc lặp, trễ liên tiếp (FN-13 AC-06).
 //
-// Quyền theo ngữ cảnh phiên KN (authz.RequireKN), phòng CNTS: Cấp Tỉnh xem, giao, đóng, cấu hình; Cấp Xã xem cảnh báo
+// Quyền theo ngữ cảnh phiên KN (port.RequireSession), phòng CNTS: Cấp Tỉnh xem, giao, đóng, cấu hình; Cấp Xã xem cảnh báo
 // của các xã phụ trách và xử lý cảnh báo được giao; Admin toàn quyền; nhóm chỉ xem chỉ đọc.
 package app
 
@@ -27,6 +27,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -91,8 +92,14 @@ type Service struct {
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
 
+// tx chạy fn trong giao dịch tenant. P0-POOL-KN-2 (#139): ctx mang txdeps (job nhắc nộp, quá hạn xử lý) → đơn vị hành chính
+// và danh bạ người nhận (port module khác) chỉ đọc NGOÀI giao dịch; thiếu thì hủy, nạp, chạy lại fn.
 func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {
-	return tenant.WithTenantTx(ctx, s.DB, tid, fn)
+	err := txdeps.Run(ctx, func(body func(pgx.Tx) error) error { return tenant.WithTenantTx(ctx, s.DB, tid, body) }, fn)
+	if errors.Is(err, txdeps.ErrExhausted) {
+		return ErrDependency.WithDetail("đơn vị hành chính hoặc danh bạ cán bộ thay đổi liên tục — thử lại").WithCause(err)
+	}
+	return err
 }
 
 func dup(err error) bool { return errors.Is(ledger.Classify(err), ledger.ErrDuplicate) }
@@ -101,11 +108,11 @@ func newID() uuid.UUID { return ids.New() }
 
 type caller struct {
 	p authz.Principal
-	k authz.KNContext
+	k port.SessionContext
 }
 
-func (c caller) admin() bool { return c.k.Role == authz.KNAdmin }
-func (c caller) tinh() bool  { return c.k.Role == authz.KNTinh }
+func (c caller) admin() bool { return c.k.Role == port.SessionRoleAdmin }
+func (c caller) tinh() bool  { return c.k.Role == port.SessionRoleProvince }
 
 // sees cho biết người gọi thấy cảnh báo a: Admin; Cấp Tỉnh trong phạm vi Nút (cảnh báo không gắn xã — mọi Cấp Tỉnh của
 // phòng và đúng tỉnh); Cấp Xã: cảnh báo của các xã phụ trách hoặc được giao cho mình.
@@ -125,14 +132,14 @@ func (c caller) sees(a store.Alert) bool {
 
 // reader: Admin; Cấp Tỉnh, Cấp Xã của phòng Chăn nuôi – Thủy sản (ma trận FN-13).
 func (s *Service) reader(ctx context.Context) (caller, error) {
-	p, k, err := authz.RequireKN(ctx)
+	p, k, err := port.RequireSession(ctx)
 	if err != nil {
 		return caller{}, err
 	}
 	c := caller{p: p, k: k}
 	switch {
-	case k.Role == authz.KNAdmin:
-	case (k.Role == authz.KNTinh || k.Role == authz.KNXa) && k.AllowsDepartment(DeptCNTS):
+	case k.Role == port.SessionRoleAdmin:
+	case (k.Role == port.SessionRoleProvince || k.Role == port.SessionRoleCommune) && k.AllowsDepartment(DeptCNTS):
 	default:
 		return c, problem.Forbidden.WithDetail("Cảnh báo CNTS thuộc phòng Chăn nuôi – Thủy sản (Admin, Cấp Tỉnh, Cấp Xã)")
 	}
@@ -212,7 +219,9 @@ func (s *Service) provinceOf(ctx context.Context, commune string, at time.Time) 
 	if s.Units == nil || commune == "" {
 		return ""
 	}
-	u, err := s.Units.Get(ctx, commune, at)
+	u, err := txdeps.Get(ctx, "unit:"+commune+"@"+at.UTC().Format(time.RFC3339Nano), func(ctx context.Context) (partyport.AdminUnit, error) {
+		return s.Units.Get(ctx, commune, at)
+	})
 	if err != nil {
 		return ""
 	}

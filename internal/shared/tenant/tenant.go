@@ -10,6 +10,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -45,6 +47,45 @@ type Beginner interface {
 
 var _ Beginner = (*pgxpool.Pool)(nil)
 
+// DefaultAcquireTimeout là thời gian chờ tối đa để MỞ giao dịch (lấy kết nối từ pool + BEGIN) khi tiến trình
+// chưa đặt khác (P0-POOL-SHARED, #126): pool cạn thì request/job nhận lỗi rõ ràng thay vì treo tới hạn của ctx
+// (hoặc vô hạn với ctx không hạn). Ghi đè bằng AG_DB_ACQUIRE_TIMEOUT (db.OptionsFromEnv → db.Open).
+const DefaultAcquireTimeout = 30 * time.Second
+
+// ErrAcquireTimeout: hết AcquireTimeout mà chưa lấy được kết nối/mở được giao dịch (pool cạn hoặc DB chậm).
+var ErrAcquireTimeout = errors.New("tenant: hết thời gian chờ kết nối DB để mở giao dịch")
+
+var acquireTimeout atomic.Int64
+
+func init() { acquireTimeout.Store(int64(DefaultAcquireTimeout)) }
+
+// SetAcquireTimeout đặt thời gian chờ mở giao dịch cho MỌI pool của tiến trình (d ≤ 0 = không giới hạn, chỉ theo ctx).
+func SetAcquireTimeout(d time.Duration) {
+	if d < 0 {
+		d = 0
+	}
+	acquireTimeout.Store(int64(d))
+}
+
+// AcquireTimeout trả thời gian chờ mở giao dịch hiện hành (0 = không giới hạn).
+func AcquireTimeout() time.Duration { return time.Duration(acquireTimeout.Load()) }
+
+// beginBounded mở giao dịch với hạn chờ AcquireTimeout (chỉ cho bước lấy kết nối + BEGIN; thân giao dịch chạy
+// theo ctx của người gọi). Hạn của ctx người gọi ngắn hơn thì hạn đó thắng.
+func beginBounded(ctx context.Context, db Beginner, opts pgx.TxOptions) (pgx.Tx, error) {
+	d := AcquireTimeout()
+	if d <= 0 {
+		return db.BeginTx(ctx, opts)
+	}
+	bctx, cancel := context.WithTimeout(ctx, d)
+	defer cancel()
+	tx, err := db.BeginTx(bctx, opts)
+	if err != nil && ctx.Err() == nil && errors.Is(bctx.Err(), context.DeadlineExceeded) {
+		return nil, fmt.Errorf("%w (%s): %w", ErrAcquireTimeout, d, err)
+	}
+	return tx, err
+}
+
 // WithTenantTx mở giao dịch, đặt app.tenant_id bằng SET LOCAL, chạy fn.
 // fn trả lỗi → rollback. Không có đường nào khác để chạm bảng nghiệp vụ.
 func WithTenantTx(ctx context.Context, db Beginner, tid uuid.UUID, fn func(pgx.Tx) error) error {
@@ -56,7 +97,7 @@ func WithTenantTxOptions(ctx context.Context, db Beginner, tid uuid.UUID, opts p
 	if tid == uuid.Nil {
 		return ErrMissing
 	}
-	tx, err := db.BeginTx(ctx, opts)
+	tx, err := beginBounded(ctx, db, opts)
 	if err != nil {
 		return fmt.Errorf("tenant: mở giao dịch: %w", err)
 	}

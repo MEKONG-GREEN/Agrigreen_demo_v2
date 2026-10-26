@@ -28,7 +28,8 @@ import (
 // notifyLazy dựng module pf/notify cho worker ở sự kiện đầu tiên: pool notify_app
 // (ghi kết quả gửi đẩy bằng giao dịch riêng), danh bạ cán bộ (extension_app),
 // đơn vị hành chính (masterdata_app) — mỗi module một vai (R-05) — và kênh đẩy từ
-// môi trường (AG_FCM_* → FCM HTTP v1; không đặt → chỉ ghi log).
+// môi trường (notify.ChannelsFromEnv: AG_FCM_* → FCM HTTP v1, AG_SMTP_* → SMTP; thiếu → kênh TẮT, bản gửi ghi
+// "dropped" — P0-NOTIFY-FAILCLOSED).
 type notifyLazy struct {
 	log  *slog.Logger
 	once sync.Once
@@ -46,6 +47,14 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	if base == "" {
 		return nil, errors.New("thiếu AG_DB_URL")
 	}
+	ch, err := notify.ChannelsFromEnv(log)
+	if err != nil {
+		return nil, err
+	}
+	d, err := notifyDeliveryDeps(ch)
+	if err != nil {
+		return nil, err
+	}
 	// W2.6: một pool vai app_worker; mỗi module tự bọc db.ForModule (r_<module>).
 	dsn, err := dbadmin.RoleURL(base, migrations.PF, "", dbadmin.AppWorker)
 	if err != nil {
@@ -57,14 +66,11 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	}
 	keep(pool)
 	nPool, extPool, mdPool, coopPool, accPool := pool, pool, pool, pool, pool
-	ch, err := notify.ChannelsFromEnv(log)
-	if err != nil {
-		return nil, err
-	}
 	clk := clock.System{}
 	md := masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
-	kn := extension.New(extPool, clk, extension.Deps{Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs()})
-	log.Info("kênh thông báo", "event", "startup", "push", ch.Pusher.Name(), "email", ch.Mailer != nil, "outcome", "ok")
+	knUnits := extension.NewPublishedAdminUnits(extPool)
+	kn := extension.New(extPool, clk, extension.Deps{Units: knUnits, Params: md.Params(), Catalogs: md.Catalogs()})
+	ch.LogStartup(log)
 	// pf/cooperative (W3.3): nông hộ có thửa theo xã (schema pf_coop, r_cooperative).
 	coop := cooperative.New(coopPool, clk, cooperative.Deps{})
 	// Gói NOTIF: email theo người nhận tra địa chỉ qua pf/accounts (Keycloak, AG_KC_*) lúc gửi; người nhận Cấp Tỉnh của
@@ -76,9 +82,11 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	acc := accounts.New(accPool, clk, accounts.Deps{Directory: kc})
 	farmers := assembly.AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}
 	ownedDesk := knprice.NewNotificationDirectory(acc.RoleHolders(), assembly.PriceProfiles())
-	d := notify.Deps{Kinds: assembly.NotificationKinds(), Digests: assembly.NotificationDigests(), Builders: assembly.NotificationBuilders(ownedDesk, kn.Staff(), md.AdminUnits()), Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
-		EmailMailer: ch.EmailMailer, DigestTo: ch.DigestTo, Log: log, LinkBase: os.Getenv("AG_WEB_OPS_URL"),
-	}
+	d.Kinds, d.Digests = assembly.NotificationKinds(), assembly.NotificationDigests()
+	d.Builders = assembly.NotificationBuilders(ownedDesk, kn.Staff(), knUnits)
+	d.Consumers, d.Renderers = assembly.NotificationConsumers(), assembly.NotificationRenderers()
+	d.Staff, d.Units, d.Farmers = kn.Staff(), md.AdminUnits(), farmers
+	d.Log, d.LinkBase = log, ch.LinkBase
 	if dir := acc.MailDirectory(); dir != nil {
 		d.Emails = assembly.NotifyEmails{Dir: dir}
 	} else {
@@ -114,4 +122,16 @@ func notifyConsumers(log *slog.Logger) []consumer {
 		})
 	}
 	return out
+}
+
+// notifyDeliveryDeps is shared by both lazy consumers and the scheduled digest
+// builder. The currently registered digest source belongs to KN; recipients are
+// always resolved by KN, even when the startup mapping is empty.
+func notifyDeliveryDeps(ch notify.Channels) (notify.Deps, error) {
+	recipients, err := extension.NewDigestRecipients(os.Getenv("AG_KN_DIGEST_RECIPIENTS_JSON"))
+	if err != nil {
+		return notify.Deps{}, err
+	}
+	return notify.Deps{Pusher: ch.Pusher, Mailer: ch.Mailer, EmailMailer: ch.EmailMailer,
+		DigestTo: ch.DigestTo, DigestRecipients: recipients}, nil
 }

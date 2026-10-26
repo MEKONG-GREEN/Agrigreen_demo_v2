@@ -46,6 +46,10 @@ type Config struct {
 	// {user_id, grant_id, actions, lifespan, client_id, redirect_uri} → {link}; phần mở
 	// rộng gắn token với grant_id và từ chối token của lượt cũ (port.ActionLinks).
 	ActionLinkURL string
+	// LockoutWait: thời gian khóa tạm sau lần sai thứ 5 — phải bằng waitIncrementSeconds =
+	// maxFailureWaitSeconds của realm (P0-VPS-OPS #131: 900 giây). Dùng để báo lúc khóa tự hết;
+	// 0 → DefaultLockoutWait. Đọc AG_KC_LOCKOUT_WAIT (vd 15m).
+	LockoutWait time.Duration
 	// HTTP thay http.Client mặc định (kiểm thử).
 	HTTP *http.Client
 	// Now thay đồng hồ hệ thống khi tính hạn token (kiểm thử).
@@ -53,7 +57,7 @@ type Config struct {
 }
 
 // ConfigFromEnv đọc AG_KC_ADMIN_URL, AG_KC_REALM, AG_KC_CLIENT_ID, AG_KC_CLIENT_SECRET
-// (bắt buộc cùng nhau), AG_KC_TIMEOUT (vd 10s), AG_KC_ACTIONS_CLIENT_ID,
+// (bắt buộc cùng nhau), AG_KC_TIMEOUT (vd 10s), AG_KC_LOCKOUT_WAIT (vd 15m), AG_KC_ACTIONS_CLIENT_ID,
 // AG_KC_ACTIONS_REDIRECT_URI, AG_KC_ACTION_LINK_URL. ok=false khi không đặt AG_KC_ADMIN_URL.
 func ConfigFromEnv() (cfg Config, ok bool, err error) {
 	cfg = Config{
@@ -68,6 +72,13 @@ func ConfigFromEnv() (cfg Config, ok bool, err error) {
 	if cfg.Realm == "" || cfg.ClientID == "" || cfg.ClientSecret == "" {
 		return cfg, false, errors.New("keycloak: đặt AG_KC_ADMIN_URL thì phải đặt đủ AG_KC_REALM, AG_KC_CLIENT_ID, AG_KC_CLIENT_SECRET")
 	}
+	if s := os.Getenv("AG_KC_LOCKOUT_WAIT"); s != "" {
+		d, perr := time.ParseDuration(s)
+		if perr != nil || d <= 0 {
+			return cfg, false, errors.New("keycloak: AG_KC_LOCKOUT_WAIT phải là khoảng thời gian dương, vd 15m")
+		}
+		cfg.LockoutWait = d
+	}
 	if s := os.Getenv("AG_KC_TIMEOUT"); s != "" {
 		d, perr := time.ParseDuration(s)
 		if perr != nil || d <= 0 {
@@ -77,6 +88,10 @@ func ConfigFromEnv() (cfg Config, ok bool, err error) {
 	}
 	return cfg, true, nil
 }
+
+// DefaultLockoutWait là thời gian khóa tạm của realm (P0-VPS-OPS #131: waitIncrementSeconds =
+// maxFailureWaitSeconds = 900); cmd/api-platform realm_test và lockout_test giữ hai nơi khớp nhau.
+const DefaultLockoutWait = 15 * time.Minute
 
 // Client là Directory qua HTTP. An toàn khi dùng đồng thời.
 type Client struct {
@@ -108,6 +123,9 @@ func New(cfg Config) (*Client, error) {
 	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now
+	}
+	if cfg.LockoutWait <= 0 {
+		cfg.LockoutWait = DefaultLockoutWait
 	}
 	hc := cfg.HTTP
 	if hc == nil {
@@ -634,11 +652,30 @@ func bruteForcePath(id uuid.UUID) string { return "/attack-detection/brute-force
 
 // BruteForceLocked đọc GET /attack-detection/brute-force/users/{id} (trường "disabled").
 func (c *Client) BruteForceLocked(ctx context.Context, id uuid.UUID) (bool, error) {
+	st, err := c.LoginLockStatus(ctx, id)
+	return st.Locked, err
+}
+
+// LoginLockStatus đọc GET /attack-detection/brute-force/users/{id}: "disabled" là đang khóa; "lastFailure"
+// (mili giây epoch) + LockoutWait là thời điểm khóa tạm tự hết (realm MULTIPLE, waitIncrementSeconds =
+// maxFailureWaitSeconds — lần sai trong lúc đang khóa không được tính nên lần sai cuối là lần gây khóa).
+// Không suy được (lastFailure 0, mốc đã qua mà Keycloak vẫn báo khóa) → Until nil, không đoán.
+func (c *Client) LoginLockStatus(ctx context.Context, id uuid.UUID) (port.LoginLock, error) {
 	var st struct {
-		Disabled bool `json:"disabled"`
+		Disabled    bool  `json:"disabled"`
+		LastFailure int64 `json:"lastFailure"`
 	}
-	_, err := c.do(ctx, "đọc trạng thái khóa đăng nhập sai", http.MethodGet, bruteForcePath(id), nil, nil, &st)
-	return st.Disabled, err
+	if _, err := c.do(ctx, "đọc trạng thái khóa đăng nhập sai", http.MethodGet, bruteForcePath(id), nil, nil, &st); err != nil {
+		return port.LoginLock{}, err
+	}
+	out := port.LoginLock{Locked: st.Disabled}
+	if st.Disabled && st.LastFailure > 0 && c.cfg.LockoutWait > 0 {
+		until := time.UnixMilli(st.LastFailure).Add(c.cfg.LockoutWait).UTC()
+		if until.After(c.cfg.Now()) {
+			out.Until = &until
+		}
+	}
+	return out, nil
 }
 
 // ClearBruteForce gọi DELETE /attack-detection/brute-force/users/{id} (Admin mở khóa).

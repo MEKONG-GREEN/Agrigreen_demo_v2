@@ -3,7 +3,7 @@
 # Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
 name: pf/party
 aka: [k/orgtree, k/access]
-hosts: [cap/export, cap/import]
+hosts: [cap/import]
 kind: kernel
 zones: [pf]
 version: 2.0.0
@@ -41,6 +41,8 @@ provides:
     - ScopeResolver
     - SeasonActivity
     - SessionContext
+    - TenantTransfers
+    - TransferTokenVerifier
     - ValveGrants
     - grantlookup.CoopLocations
   events:

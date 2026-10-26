@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { unwrap } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
 import { ApiProblem } from "@/api/problem";
+import { IdempotentOperation, withIdempotentOperation } from "@/api/idempotency";
 import { Icon } from "@/components/Icon";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Loading } from "@/components/ui";
@@ -137,17 +138,34 @@ export function LoadState<T>({ s, children }: { s: Loaded<T>; children: (d: T) =
   return <>{children(s.data)}</>;
 }
 
-/** Thao tác có trạng thái chờ + lỗi + thông báo. */
+/** Bọc lời gọi ghi vào phiên thao tác của useAction (dùng cho lời gọi nằm sau một await khác). */
+export type IdemScope = <U>(g: () => Promise<U>) => Promise<U>;
+
+/**
+ * Thao tác có trạng thái chờ + lỗi + thông báo.
+ * P0-WEB-IDEMKEY (#129): mỗi useAction giữ một phiên thao tác — lời gọi ghi trong run(f) dùng khóa Idempotency-Key theo
+ * dấu vân tay yêu cầu: bấm lại cùng dữ liệu sau lỗi mạng/5xx → cùng khóa (máy chủ phát lại, không tạo bản ghi mới);
+ * cả f thành công → lần sau khóa mới (bước lỗi nghiệp vụ 4xx → bỏ khóa bước đó); đổi dữ liệu → khóa mới. Lời gọi ghi
+ * đứng SAU một await khác trong f phải bọc bằng tham số `idem` của f (KHÔNG dùng act.idem — đó là lượt riêng).
+ */
 export function useAction() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<ApiProblem | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  const run = useCallback(async <T,>(f: () => Promise<T>, ok?: string | ((r: T) => string)): Promise<T | null> => {
+  const [op] = useState(() => new IdempotentOperation());
+  // act.idem gọi ngoài run: một lượt riêng (thành công → nhả khóa).
+  const idem = useCallback<IdemScope>((g) => withIdempotentOperation(op, g), [op]);
+  const run = useCallback(async <T,>(f: (idem: IdemScope) => Promise<T>, ok?: string | ((r: T) => string)): Promise<T | null> => {
     setBusy(true);
     setProblem(null);
     setNote(null);
+    // #129 P1: một lần bấm = một lượt; `idem` truyền cho f gắn với ĐÚNG lượt này, nên các lệnh nối tiếp (A rồi B) giữ khóa
+    // tới khi CẢ f thành công. B mất phản hồi → bấm lại phát lại A bằng khóa cũ (máy chủ trả kết quả cũ), không ghi A lần hai.
+    const turn = op.begin();
+    const scoped: IdemScope = (g) => withIdempotentOperation(turn, g);
     try {
-      const r = await f();
+      const r = await withIdempotentOperation(turn, () => f(scoped));
+      turn.complete();
       if (ok) setNote(typeof ok === "function" ? ok(r) : ok);
       return r;
     } catch (e) {
@@ -156,7 +174,7 @@ export function useAction() {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [op]);
   const view = (
     <>
       {problem ? <ProblemAlert problem={problem} /> : null}
@@ -168,7 +186,7 @@ export function useAction() {
       ) : null}
     </>
   );
-  return { busy, problem, note, run, view, setNote };
+  return { busy, problem, note, run, view, setNote, idem, resetIdempotency: () => op.reset() };
 }
 
 export function ReadOnlyNotice({ children }: { children?: ReactNode }) {

@@ -31,9 +31,19 @@ Map<String, Object?> _item(
   'conflict': false,
 };
 
+final _todayApproved = _item(
+  'i-today',
+  '2026-10-14',
+  commune: '30001',
+  place: {'lat': 10.0, 'lon': 105.0, 'source': 'map'},
+);
+
 Map<String, Object?> _mine({
   required String status,
   List<Object?> checkins = const [],
+  int? approvedVersion,
+  List<Object?>? items,
+  List<Object?> approvedItems = const [],
 }) => {
   'week_start': '2026-10-12',
   'submit_due_at': '2026-10-09T10:00:00Z',
@@ -47,19 +57,17 @@ Map<String, Object?> _mine({
       'id': _sid,
       'status': status,
       'version': 2,
+      'approved_version': approvedVersion,
       'commune_codes': ['30001'],
     },
-    'items': [
-      _item(
-        'i-today',
-        '2026-10-14',
-        commune: '30001',
-        place: {'lat': 10.0, 'lon': 105.0, 'source': 'map'},
-      ),
-      _item('i-office', '2026-10-14'),
-      _item('i-tomorrow', '2026-10-15', commune: '30001'),
-    ],
-    'approved_items': <Object?>[],
+    'items':
+        items ??
+        [
+          _todayApproved,
+          _item('i-office', '2026-10-14'),
+          _item('i-tomorrow', '2026-10-15', commune: '30001'),
+        ],
+    'approved_items': approvedItems,
     'warnings': <Object?>[],
     'can': {'edit': true, 'submit': true},
     'checkin_enabled': true,
@@ -71,14 +79,23 @@ void main() {
   late Harness h;
   late ActionQueue actions;
   late WorkScheduleService svc;
-  var status = 'pending';
+  var status = 'approved';
   var checkins = <Object?>[];
+  int? approvedVersion;
+  List<Object?>? items;
+  var approvedItems = <Object?>[];
 
   setUp(() async {
     h = await Harness.create(now: _now);
     h.fake.onGet = (path, q) async =>
         path == '/v1/extension/work-schedules/mine'
-        ? _mine(status: status, checkins: checkins)
+        ? _mine(
+            status: status,
+            checkins: checkins,
+            approvedVersion: approvedVersion,
+            items: items,
+            approvedItems: approvedItems,
+          )
         : null;
     actions = ActionQueue(
       db: h.db,
@@ -100,8 +117,91 @@ void main() {
         ),
       ),
     );
-    status = 'pending';
+    status = 'approved';
     checkins = [];
+    approvedVersion = null;
+    items = null;
+    approvedItems = [];
+  });
+
+  test('log bug TT-07/CN-06: chỉ check-in theo lịch đã duyệt; điều chỉnh chờ duyệt còn bản đã duyệt thì vẫn được', () async {
+    status = 'pending';
+    var v = await svc.load(_week, refresh: true);
+    final today = v.items.firstWhere((i) => i.id == 'i-today');
+    expect(
+      v.canCheckin(today, _now),
+      isFalse,
+      reason: 'gửi duyệt nhưng chưa được duyệt',
+    );
+    expect(
+      v.checkinBlockedReason(today, _now),
+      contains('lịch chưa được duyệt'),
+    );
+    approvedVersion = 1;
+    approvedItems = [_todayApproved];
+    v = await svc.load(_week, refresh: true);
+    expect(
+      v.canCheckin(v.items.firstWhere((i) => i.id == 'i-today'), _now),
+      isTrue,
+      reason: 'bản đã duyệt v1 còn hiệu lực trong lúc điều chỉnh chờ duyệt',
+    );
+  });
+
+  test('R-B3 (review #99): mục chỉ có ở bản điều chỉnh chờ duyệt KHÔNG check-in được, báo lý do; máy không xếp lệnh', () async {
+    status = 'pending';
+    approvedVersion = 1;
+    approvedItems = [_todayApproved];
+    items = [_todayApproved, _item('i-new', '2026-10-14', commune: '30001')];
+    final v = await svc.load(_week, refresh: true);
+    final added = v.items.firstWhere((i) => i.id == 'i-new');
+    expect(added.fieldWork, isTrue);
+    expect(v.canCheckin(added, _now), isFalse);
+    expect(v.checkinBlockedReason(added, _now), contains('điều chỉnh'));
+    expect(
+      v.canCheckin(v.items.firstWhere((i) => i.id == 'i-today'), _now),
+      isTrue,
+      reason: 'mục có trong bản đã duyệt vẫn check-in được',
+    );
+    await expectLater(
+      svc.checkin(_week, added),
+      throwsA(isA<WorkScheduleError>()),
+    );
+    expect(await actions.ofKind(CntsActionKind.workScheduleCheckin), isEmpty);
+  });
+
+  test('R-B3 (review #99): điều chỉnh đổi ngày/địa điểm — xét theo bản ĐÃ DUYỆT như máy chủ', () async {
+    status = 'pending';
+    approvedVersion = 1;
+    // Bản đã duyệt: A hôm nay ngoài cơ quan, B ngày mai. Bản điều chỉnh: A dời sang ngày mai, B dời về hôm nay.
+    approvedItems = [
+      _todayApproved,
+      _item('i-b', '2026-10-15', commune: '30001'),
+    ];
+    items = [
+      _item('i-today', '2026-10-15', commune: '30001'),
+      _item('i-b', '2026-10-14', commune: '30001'),
+    ];
+    var v = await svc.load(_week, refresh: true);
+    expect(
+      v.canCheckin(v.items.firstWhere((i) => i.id == 'i-today'), _now),
+      isTrue,
+      reason: 'bản đã duyệt: A là hôm nay',
+    );
+    final b = v.items.firstWhere((i) => i.id == 'i-b');
+    expect(
+      v.canCheckin(b, _now),
+      isFalse,
+      reason: 'bản đã duyệt: B là ngày mai',
+    );
+    expect(v.checkinBlockedReason(b, _now), contains('bản đã duyệt'));
+    // Bản đã duyệt: C hôm nay nhưng tại cơ quan; điều chỉnh thêm địa điểm → vẫn chưa check-in được.
+    approvedItems = [_item('i-office', '2026-10-14')];
+    items = [_item('i-office', '2026-10-14', commune: '30001')];
+    v = await svc.load(_week, refresh: true);
+    expect(
+      v.canCheckin(v.items.firstWhere((i) => i.id == 'i-office'), _now),
+      isFalse,
+    );
   });
   tearDown(() => h.dispose());
 

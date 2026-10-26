@@ -13,6 +13,7 @@ depends:
 provides:
   ports:
     - ActionLinks
+    - AssignmentRules
     - Assignments
     - Directory
     - FarmerAccounts
@@ -26,6 +27,7 @@ provides:
     - ProfileUpdater
     - RecipientDirectory
     - RoleHolders
+    - ScopedDutyHolders
     - SessionReader
     - StaffContacts
     - XaScopes

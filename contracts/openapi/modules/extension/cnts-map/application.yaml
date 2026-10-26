@@ -1,0 +1,260 @@
+paths:
+# @ag-order: 21100
+  /v1/extension/cnts/map/layers:
+    get:
+      summary: "Lớp bản đồ vùng nuôi, vùng dịch theo ngày: vùng, ổ dịch BM-10, điểm/hộ mô hình có tọa độ, thống kê thửa HTX theo xã (FN-18, W11.52)"
+      operationId: extensionCntsMapLayers
+      tags: [extension]
+      parameters:
+        - {name: date, in: query, required: false, description: "Ngày xem YYYY-MM-DD (mặc định hôm nay, giờ Việt Nam)", schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapLayers"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21101
+  /v1/extension/cnts/map/zones:
+    get:
+      summary: "Vùng trên bản đồ tại một ngày (phiên bản mới nhất có ngày áp dụng ≤ ngày xem — FN-18 BR-01, AC-03)"
+      operationId: extensionCntsMapZoneList
+      tags: [extension]
+      parameters:
+        - {name: date, in: query, required: false, description: "Ngày xem YYYY-MM-DD (mặc định hôm nay, giờ Việt Nam)", schema: {type: string, format: date}}
+        - {name: kind, in: query, required: false, schema: {type: string, enum: [vung_chan_nuoi, vung_thuy_san, vung_dich, vung_uy_hiep, vung_dem, huong_di_chuyen]}}
+        - {name: outbreak_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: with_retired, in: query, required: false, schema: {type: string, enum: ["true", "false"]}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZoneList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Vẽ vùng (đa giác, theo bán kính, hướng di chuyển) — cán bộ phụ trách dịch Cấp Tỉnh, Admin"
+      operationId: extensionCntsMapZoneCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSMapZoneSave"}
+      responses:
+        "200":
+          description: Gọi lặp (Idempotency-Key) — trả bản đã ghi
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZone"}
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZone"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21102
+  /v1/extension/cnts/map/zones/from-outbreak:
+    post:
+      summary: "Khoanh vùng dịch, vùng bị uy hiếp, vùng đệm theo bán kính quanh ổ dịch BM-10 (mặc định 500 m / 3 km / 10 km)"
+      operationId: extensionCntsMapZoneFromOutbreak
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSMapFromOutbreak"}
+      responses:
+        "200":
+          description: Gọi lặp (Idempotency-Key) — trả các vùng đã tạo
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZoneItems"}
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZoneItems"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21103
+  /v1/extension/cnts/map/zones/{ref}:
+    get:
+      summary: "Vùng hiện hành và lịch sử phiên bản (mới nhất trước)"
+      operationId: extensionCntsMapZoneGet
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZoneDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Sửa vùng — phiên bản mới (base_version, lý do, ngày áp dụng không sớm hơn bản trước)"
+      operationId: extensionCntsMapZoneUpdate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSMapZoneSave"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZone"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21104
+  /v1/extension/cnts/map/zones/{ref}/retire:
+    post:
+      summary: "Ngưng hiển thị vùng từ ngày áp dụng (phiên bản retired có lý do — không xóa)"
+      operationId: extensionCntsMapZoneRetire
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSMapZoneStatus"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZone"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21105
+  /v1/extension/cnts/map/zones/{ref}/restore:
+    post:
+      summary: "Khôi phục vùng đã ngưng (phiên bản restored có lý do)"
+      operationId: extensionCntsMapZoneRestore
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSMapZoneStatus"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZone"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21106
+  /v1/extension/cnts/map/zones/{ref}/contents:
+    get:
+      summary: "Điểm trình diễn, hộ mô hình, ổ dịch nằm trong vùng ở ngày xem (vùng đệm 3 km/10 km), kèm khoảng cách tới tâm"
+      operationId: extensionCntsMapZoneContents
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: date, in: query, required: false, description: "Ngày xem YYYY-MM-DD (mặc định hôm nay, giờ Việt Nam)", schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSMapZoneContents"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_zone_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_zone_version_conflict | extension.cnts_zone_retired", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_zone_invalid", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 31100
+    CNTSMapLatLng: {"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"}},"required":["lat","lng"],"additionalProperties":false}
+# @ag-order: 31101
+    CNTSMapGeometry: {"type":"object","description":"GeoJSON Polygon | MultiPolygon | LineString (WGS84, EPSG:4326)","properties":{"type":{"type":"string","enum":["Polygon","MultiPolygon","LineString"]},"coordinates":{"type":"array","items":{}}},"required":["type","coordinates"]}
+# @ag-order: 31102
+    CNTSMapZoneVersion: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"version":{"type":"integer"},"event":{"type":"string","enum":["created","updated","retired","restored"]},"status":{"type":"string","enum":["active","retired"]},"province_code":{"type":"string"},"communes":{"type":"array","items":{"type":"string"}},"kind":{"type":"string","enum":["vung_chan_nuoi","vung_thuy_san","vung_dich","vung_uy_hiep","vung_dem","huong_di_chuyen"]},"kind_label":{"type":"string"},"name":{"type":"string"},"draw_mode":{"type":"string","enum":["polygon","radius","line"]},"geometry":{"$ref":"#/components/schemas/CNTSMapGeometry"},"center":{"anyOf":[{"$ref":"#/components/schemas/CNTSMapLatLng"},{"type":"null"}]},"radius_m":{"type":["number","null"]},"area_ha":{"type":["string","null"]},"outbreak_ref":{"type":["string","null"],"format":"uuid"},"parent_zone_ref":{"type":["string","null"],"format":"uuid"},"species_code":{"type":["string","null"]},"disease_code":{"type":["string","null"]},"effective_on":{"type":"string","format":"date"},"note":{"type":["string","null"]},"reason":{"type":["string","null"]},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"actor_display":{"type":["string","null"]}},"required":["ref","version","event","status","province_code","communes","kind","kind_label","name","draw_mode","geometry","center","radius_m","area_ha","outbreak_ref","parent_zone_ref","species_code","disease_code","effective_on","note","reason","updated_at","updated_by","actor_display"],"additionalProperties":false}
+# @ag-order: 31103
+    CNTSMapZone: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"version":{"type":"integer"},"event":{"type":"string","enum":["created","updated","retired","restored"]},"status":{"type":"string","enum":["active","retired"]},"province_code":{"type":"string"},"communes":{"type":"array","items":{"type":"string"}},"kind":{"type":"string","enum":["vung_chan_nuoi","vung_thuy_san","vung_dich","vung_uy_hiep","vung_dem","huong_di_chuyen"]},"kind_label":{"type":"string"},"name":{"type":"string"},"draw_mode":{"type":"string","enum":["polygon","radius","line"]},"geometry":{"$ref":"#/components/schemas/CNTSMapGeometry"},"center":{"anyOf":[{"$ref":"#/components/schemas/CNTSMapLatLng"},{"type":"null"}]},"radius_m":{"type":["number","null"]},"area_ha":{"type":["string","null"]},"outbreak_ref":{"type":["string","null"],"format":"uuid"},"parent_zone_ref":{"type":["string","null"],"format":"uuid"},"species_code":{"type":["string","null"]},"disease_code":{"type":["string","null"]},"effective_on":{"type":"string","format":"date"},"note":{"type":["string","null"]},"reason":{"type":["string","null"]},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"can_edit":{"type":"boolean"},"warnings":{"type":"array","items":{"type":"string","enum":["outside_communes"]}}},"required":["ref","version","event","status","province_code","communes","kind","kind_label","name","draw_mode","geometry","center","radius_m","area_ha","outbreak_ref","parent_zone_ref","species_code","disease_code","effective_on","note","reason","updated_at","updated_by","can_edit","warnings"],"additionalProperties":false}
+# @ag-order: 31104
+    CNTSMapZoneDetail: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"version":{"type":"integer"},"event":{"type":"string","enum":["created","updated","retired","restored"]},"status":{"type":"string","enum":["active","retired"]},"province_code":{"type":"string"},"communes":{"type":"array","items":{"type":"string"}},"kind":{"type":"string","enum":["vung_chan_nuoi","vung_thuy_san","vung_dich","vung_uy_hiep","vung_dem","huong_di_chuyen"]},"kind_label":{"type":"string"},"name":{"type":"string"},"draw_mode":{"type":"string","enum":["polygon","radius","line"]},"geometry":{"$ref":"#/components/schemas/CNTSMapGeometry"},"center":{"anyOf":[{"$ref":"#/components/schemas/CNTSMapLatLng"},{"type":"null"}]},"radius_m":{"type":["number","null"]},"area_ha":{"type":["string","null"]},"outbreak_ref":{"type":["string","null"],"format":"uuid"},"parent_zone_ref":{"type":["string","null"],"format":"uuid"},"species_code":{"type":["string","null"]},"disease_code":{"type":["string","null"]},"effective_on":{"type":"string","format":"date"},"note":{"type":["string","null"]},"reason":{"type":["string","null"]},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"can_edit":{"type":"boolean"},"warnings":{"type":"array","items":{"type":"string","enum":["outside_communes"]}},"versions":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapZoneVersion"}}},"required":["ref","version","event","status","province_code","communes","kind","kind_label","name","draw_mode","geometry","center","radius_m","area_ha","outbreak_ref","parent_zone_ref","species_code","disease_code","effective_on","note","reason","updated_at","updated_by","can_edit","warnings","versions"],"additionalProperties":false}
+# @ag-order: 31105
+    CNTSMapZoneList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapZone"}},"can_draw":{"type":"boolean"}},"required":["items","can_draw"],"additionalProperties":false}
+# @ag-order: 31106
+    CNTSMapZoneSave: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"base_version":{"type":"integer"},"reason":{"type":"string"},"province_code":{"type":["string","null"]},"kind":{"type":"string","enum":["vung_chan_nuoi","vung_thuy_san","vung_dich","vung_uy_hiep","vung_dem","huong_di_chuyen"]},"name":{"type":"string"},"communes":{"type":"array","items":{"type":"string"}},"draw_mode":{"type":"string","enum":["polygon","radius","line"]},"geometry":{"anyOf":[{"$ref":"#/components/schemas/CNTSMapGeometry"},{"type":"null"}]},"center":{"anyOf":[{"$ref":"#/components/schemas/CNTSMapLatLng"},{"type":"null"}]},"radius_m":{"type":["number","null"]},"outbreak_ref":{"type":["string","null"],"format":"uuid"},"parent_zone_ref":{"type":["string","null"],"format":"uuid"},"species_code":{"type":["string","null"]},"disease_code":{"type":["string","null"]},"effective_on":{"type":["string","null"],"format":"date"},"note":{"type":["string","null"]}},"required":["kind","name","communes","draw_mode"],"additionalProperties":false}
+# @ag-order: 31107
+    CNTSMapZoneStatus: {"type":"object","properties":{"base_version":{"type":"integer"},"reason":{"type":"string"},"effective_on":{"type":"string","format":"date"}},"required":["base_version","reason"],"additionalProperties":false}
+# @ag-order: 31108
+    CNTSMapFromOutbreak: {"type":"object","properties":{"outbreak_ref":{"type":"string","format":"uuid"},"radii":{"type":"object","properties":{"vung_dich":{"type":"number"},"vung_uy_hiep":{"type":"number"},"vung_dem":{"type":"number"}},"additionalProperties":false},"effective_on":{"type":"string","format":"date"},"note":{"type":["string","null"]}},"required":["outbreak_ref"],"additionalProperties":false}
+# @ag-order: 31109
+    CNTSMapZoneItems: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapZone"}}},"required":["items"],"additionalProperties":false}
+# @ag-order: 31110
+    CNTSMapOutbreak: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"version":{"type":"integer"},"status":{"type":"string","enum":["reported","monitoring","closed"]},"commune_code":{"type":"string"},"disease_code":{"type":"string"},"disease_name":{"type":["string","null"]},"species_code":{"type":"string"},"species_name":{"type":["string","null"]},"lat":{"type":"number"},"lng":{"type":"number"},"as_of":{"type":"string","format":"date"},"herd_size":{"type":"integer"},"dead":{"type":"integer"},"distance_m":{"type":"number"}},"required":["ref","version","status","commune_code","disease_code","disease_name","species_code","species_name","lat","lng","as_of","herd_size","dead"],"additionalProperties":false}
+# @ag-order: 31111
+    CNTSMapPlace: {"type":"object","properties":{"kind":{"type":"string","enum":["site","household"]},"ref":{"type":"string","format":"uuid"},"site_ref":{"type":"string","format":"uuid"},"project_ref":{"type":"string","format":"uuid"},"project_name":{"type":["string","null"]},"commune_code":{"type":"string"},"name":{"type":"string"},"model_type_code":{"type":"string"},"model_type_name":{"type":["string","null"]},"scale":{"type":["string","null"]},"scale_unit":{"type":["string","null"]},"lat":{"type":"number"},"lng":{"type":"number"},"distance_m":{"type":"number"}},"required":["kind","ref","site_ref","project_ref","project_name","commune_code","name","model_type_code","model_type_name","scale","scale_unit","lat","lng"],"additionalProperties":false}
+# @ag-order: 31112
+    CNTSMapPlotStat: {"type":"object","properties":{"commune_code":{"type":"string"},"plots":{"type":"integer"},"area_ha":{"type":"string"}},"required":["commune_code","plots","area_ha"],"additionalProperties":false}
+# @ag-order: 31113
+    CNTSMapLayers: {"type":"object","properties":{"date":{"type":"string","format":"date"},"can_draw":{"type":"boolean"},"zones":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapZone"}},"outbreaks":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapOutbreak"}},"places":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapPlace"}},"plot_stats":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapPlotStat"}},"plots_ready":{"type":"boolean"}},"required":["date","can_draw","zones","outbreaks","places","plot_stats","plots_ready"],"additionalProperties":false}
+# @ag-order: 31114
+    CNTSMapZoneContents: {"type":"object","properties":{"date":{"type":"string","format":"date"},"zone":{"$ref":"#/components/schemas/CNTSMapZone"},"places":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapPlace"}},"outbreaks":{"type":"array","items":{"$ref":"#/components/schemas/CNTSMapOutbreak"}},"site_count":{"type":"integer"},"household_count":{"type":"integer"},"outbreak_count":{"type":"integer"}},"required":["date","zone","places","outbreaks","site_count","household_count","outbreak_count"],"additionalProperties":false}

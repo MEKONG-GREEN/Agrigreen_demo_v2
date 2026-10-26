@@ -129,7 +129,7 @@ Ký hiệu nguồn: `D1 §2.1#4` = bản D1, mục 2.1, dòng 4. `v4.3 §21.1`, 
 | W10.14 | Thông báo vi phạm (RV-18, K-10) | Runbook P1 hai nghĩa vụ, thời hạn, đầu mối, mẫu thông báo; diễn tập có biên bản | D1 W10.16 | W10.00 | S | — | Chặn Q-007 | 2 | |
 | W10.15 | Rà dữ liệu ra nước ngoài (RV-15) | Kiểm kê MRV, phòng dữ liệu VFT, GitHub CI, FCM, Google Sheets, theo dõi lỗi; cổng CI cấm đích ngoài danh mục RB-7 | D1 W10.18 | W10.09 | S | — | Mã được, bật chờ Q-006, Q-026 | 2 | |
 | W10.16 | Gói bằng chứng hồ sơ cấp độ | Sinh tự động từ repo: danh mục tài sản (SBOM + `module.yaml`), ma trận luồng, cổng CI W9.1, kết quả diễn tập | D1 W10.19 | W10.00, CI chạy lại | M | — | Chặn Q-013; mẫu hồ sơ NĐ 331 | 2 | |
-| W10.17 | `pf/export` + ghi .docx (ADR-0050) | Tách `cap/export` (điều kiện W6.6 (i)). Mẫu văn bản có phiên bản, biến, khuôn câu, lặp, lần xuất có băm; bộ ghi .docx dùng chung cho KHTC Mẫu 1–5, CNTS BM-11, MS05/06 HCTH, Mẫu KNQG | D4 X7 · D3 H8 (.docx), Q-HC-11 · D4 Q26 | W10.00 | XL | pf 000155 | Mã được, bật chờ Q-062 | 2 | |
+| W10.17 | `pf/export` + ghi .docx (ADR-0051) | Tách `cap/export` (điều kiện W6.6 (i)). Mẫu văn bản có phiên bản, biến, khuôn câu, lặp, lần xuất có băm; bộ ghi .docx dùng chung cho KHTC Mẫu 1–5, CNTS BM-11, MS05/06 HCTH, Mẫu KNQG | D4 X7 · D3 H8 (.docx), Q-HC-11 · D4 Q26 | W10.00 | XL | pf 20261024090957 | **Đã làm 20/10/2026** (nhánh `w1017`): module + Word KHTC Mẫu 1–5; bật chờ Q-062; BM-11, MS05/06, KNQG nối port ở gói của chúng | 2 | |
 | W10.18 | Liên kết khách có OTP (ADR-0048) | Token một chủ thể, hạn = khóa bước, OTP 6 số, giới hạn thử, nhật ký mỗi lần mở (theo mẫu `dispatch_link`). Email trước, SMS sau | D3 §2.5, H6 | W10.06 (SMS), W10.03 | M | có thể 1 số pf (cấp lúc gộp) | Mã được, bật chờ Q-021, Q-005 | 2 | |
 | W10.19 | Hạ tầng nghiệm thu KN | Kiểm tải 500 người dùng trên staging, FCM thật < 1 phút, Android 3G, nhật ký truy cập ≥ 1 năm, diễn tập RPO/RTO | D3 T5 | cụm staging (G-2) | M | — | Chặn G-2, Q-009 | 1–2 | |
 
@@ -166,7 +166,7 @@ Ký hiệu nguồn: `D1 §2.1#4` = bản D1, mục 2.1, dòng 4. `v4.3 §21.1`, 
 | W11.27 | Kế hoạch nhân lực (FN-11) | Profile `hrm_plan` của `cap/forms` (lá = đơn vị nội bộ) | D3 H7 | W11.05, W11.22 | M | pf 000154 | Mã được | 3 | |
 | W11.28 | Báo cáo Sở NS01–06 + Dashboard | As-of tại ngày chốt, quy tắc kiểm chéo, nhấn ô xem người, lưu tệp + lịch sử xuất, nhật ký trường nhạy cảm; dashboard < 5 s | D3 H8 (trừ .docx → W10.17) | W11.21, W11.22 | L | pf 000151 | Mã được | 2 | |
 | W11.29 | web-ops HCTH | ~30 màn + Contact cho mọi vai; giả lập `src/api/mock/hrm*`; Playwright `hc-*.spec.ts` | D3 H9 | OpenAPI của W11.22–W11.28 | L | — | Mã được (theo hợp đồng) | 2–3 | |
-| W11.30 | Chuyển đổi dữ liệu HCTH | Công cụ một lần đọc Excel qua `shared/tabular`, chuẩn hóa, báo cáo dòng lỗi | D3 H10 | W11.21, W11.22 | M | — | Chặn Q-069 (cột nguồn) | 3 | |
+| W11.30 | Chuyển đổi dữ liệu HCTH | Công cụ một lần đọc Excel qua `shared/tabular`, chuẩn hóa, báo cáo dòng lỗi | D3 H10 | W11.21, W11.22 | M | — | Mã được (`cmd/hrmimport`, ánh xạ cột cấu hình được); nạp thật chờ tệp nguồn Q-069 | 3 | |
 | W11.31 | Nghiệm thu HCTH | `docs/uat/hc-v3.0-acceptance.md`, E2E `tests/hc30`, tải 500 lượt nộp/ngày | D3 H11 | tất cả | M | — | Mã được | 3 | |
 
 **Chăn nuôi – Thủy sản** (CN11 → W11.11)
@@ -179,13 +179,13 @@ Ký hiệu nguồn: `D1 §2.1#4` = bản D1, mục 2.1, dòng 4. `v4.3 §21.1`, 
 | W11.44 | Tổng hợp BM-02, BM-18, lũy kế | Dòng điều chỉnh, file Chi cục có phiên bản, Phụ lục 2 | D4 CN4 | W11.42, W11.10 | L | pf 000162 | Chờ Q-078, Q-079 | 2 | |
 | W11.45 | Báo cáo phòng BM-11 | Soạn tự động + phần viết, LĐ duyệt, gửi theo nơi nhận, phiên bản | D4 CN5 | W11.44, W10.17 | L | pf 000166 | Chặn Q-046 | 3 | |
 | W11.46 | Lịch trực, lịch tiêm, lịch công tác + check-in GPS | BM-03, BM-07, BM-05/06 | D4 CN6 | W11.41, W11.07 | L | pf 000163 | Chờ Q-057 | 2 | |
-| W11.47 | Hộ mô hình, điểm, CT/DA, cấp quyền | `pf_coop` site/batch + `pf_extension` CT/DA | D4 CN7 | W10.13, W11.61 | L | pf 000167 | Chặn Q-023, Q-076, Q-061 | 3 | |
-| W11.48 | Nhật ký BM-08/09/19 | Lứa, lần ghi có chỉ số, GPS bất biến + 200 m + phát hiện giả lập, ảnh, offline, xác thực, hạch toán NC-15 | D4 CN8 | W11.47, W11.43 | XL | pf 000168 | Chặn Q-005, Q-077 (phần thủy sản) | 3 | |
+| W11.47 | Hộ mô hình, điểm, CT/DA, cấp quyền | ~~`pf_coop` site/batch~~ → bản ghi KN `pf_extension` (CT/DA, điểm, hộ mô hình, quyền CNTS; ADR-0055, Q-KNS-04: không ghi HTX) | D4 CN7 | W10.13, W11.61 | L | pf 20261020161323 | Đã làm 20/10/2026 — giả định tạm Q-023, Q-076, Q-061 ([gia-dinh/W11.47](gia-dinh/W11.47.md)) | 3 | |
+| W11.48 | Nhật ký BM-08/09/19 | Lứa, lần ghi có chỉ số, GPS bất biến + 200 m + phát hiện giả lập, ảnh, offline, xác thực, hạch toán NC-15 | D4 CN8 | W11.47, W11.43 | XL | pf 20261024090937 | Đã làm 21/10/2026 — giả định tạm Q-005, Q-077 ([gia-dinh/W11.48](gia-dinh/W11.48.md)); App xã ngoại tuyến chưa | 3 | |
 | W11.49 | Dịch bệnh BM-10 | Ổ dịch có phiên bản diễn biến + báo nghi dịch | D4 CN9 | W11.41, W11.07 | M | pf 000164 | Mã được | 2 | |
-| W11.50 | Chiến dịch điều tra | Đợt trên kỳ `adhoc`, tách khỏi lũy kế | D4 CN10 | W11.42 | M | pf 000165 | Chờ Q-058 | 2 | |
-| W11.52 | Bản đồ vùng nuôi/dịch (GĐ2) | Vẽ vùng, bán kính, hướng di chuyển, theo ngày | D4 CN12 | W11.49, W11.47 | L | pf 000177 | GĐ2 | 4 | |
+| W11.50 | Chiến dịch điều tra | Đợt trên kỳ `adhoc`, tách khỏi lũy kế | D4 CN10 | W11.42 | M | pf 20261024091058 | Đã làm (giả định tạm Q-058 — [W11.50](gia-dinh/W11.50.md)) | 2 | |
+| W11.52 | Bản đồ vùng nuôi/dịch (GĐ2) | Vẽ vùng, bán kính, hướng di chuyển, theo ngày | D4 CN12 | W11.49, W11.47 | L | pf 20261024090947 | Đã làm 21/10/2026 (kéo vào G1) — giả định bán kính 500 m/3 km/10 km ([gia-dinh/W11.52](gia-dinh/W11.52.md)) | 4 | |
 | W11.53 | Dự án KNQG Mẫu 01–07 (GĐ2) | Ký scan, TW xác nhận | D4 CN13 | W11.47, W11.48, W10.17 | L | pf 000178 | GĐ2; chờ Q-055, Q-027 | 4 | |
-| W11.54 | Trang chủ phòng + kho văn bản (GĐ2) | `pf/content`, `_pub` | D4 CN14 | W11.44, W11.10 | M | `_pub` | GĐ2 | 4 | |
+| W11.54 | Trang chủ phòng + kho văn bản (GĐ2) | `pf/content`, `_pub` | D4 CN14 | W11.44, W11.10 | M | `_pub` | GĐ2 | 4 | Kéo vào G1: làm trong `pf/extension` (`extension/depthome`), pf 20261024091009 — [giả định](gia-dinh/W11.54.md) |
 | W11.55 | Nông hộ Mobile (GĐ2) | OTP SMS, nhật ký hộ, lịch tiêm + nhắc, báo nghi dịch | D4 CN15 | W11.48, W11.49, W10.06 | L | pf 000179 | GĐ2; Chặn Q-020, Q-080 | 4 | |
 
 **Kế hoạch – Tài chính**
@@ -213,9 +213,9 @@ Ký hiệu nguồn: `D1 §2.1#4` = bản D1, mục 2.1, dòng 4. `v4.3 §21.1`, 
 | W11.75 | Nhập báo giá + xác minh | Web responsive, cảnh báo tạm tính, xác minh hai chiều, nhập thay, hiệu chỉnh/xóa mềm, in File 2 | D4 BG5 | W11.72–W11.74 | L | pf 000144 | Mã được | 1 | |
 | W11.76 | Duyệt/mở duyệt bảng giá | Phiên bản, khóa "đang duyệt", `price.published` | D4 BG6 | W11.75 | M | pf 000145 | Mã được | 1 | |
 | W11.77 | Báo cáo giá | Tiến độ, bảng giá tổng hợp, biến động, dashboard vùng, thống kê phiếu CTV | D4 BG7 | W11.76 | M | `_pub` | Mã được; phần Đợt 2 BRD ở đợt 4 | 2 | |
-| W11.78 | Điều tra giá thành | Đợt, nhập file hai bước (có thể kích hoạt tách `cap/import`), PII → vault, chống trùng, CT-05/06 | D4 BG8 | W11.71, W11.73 | XL | pf 000176 | Chờ Q-083, Q-005 | 2 | |
+| W11.78 | Điều tra giá thành | Đợt, nhập file hai bước (có thể kích hoạt tách `cap/import`), PII → vault, chống trùng, CT-05/06 | D4 BG8 | W11.71, W11.73 | XL | pf 20261024091116 | **Mã xong (21/10/2026, giả định tạm Q-083, Q-005 — [W11.78.md](gia-dinh/W11.78.md)):** đợt + xã, chỉ tiêu, cán bộ điều tra; nhập tệp xem trước → ghi nhận, chống trùng SĐT + mặt hàng; rà soát CT-06, chốt / mở lại; báo cáo giá thành CT-05; PII ở kho định danh (`price.cost_survey`, cổng `AG_PRICE_SURVEY_PII`); chưa tách `cap/import` | 2 | |
 | W11.79 | Chuyển dữ liệu báo giá cũ | ≥ 3 tháng + Hè Thu 2026 | D4 BG9 | W11.75, W11.78 | M | — | Chờ dữ liệu khách (A5) | 2 | |
-| W11.81 | Website (Đợt 2 BRD) | Tập dữ liệu `price_board_daily` qua cổng tích hợp | D4 BG11 | W11.76 | M | hợp đồng `contracts/integration` | Chờ A2 (khách) | 4 | |
+| W11.81 | Website (Đợt 2 BRD) | Tập dữ liệu `price_board_daily` qua cổng tích hợp | D4 BG11 | W11.76 | M | hợp đồng `contracts/integration` | Chờ A2 (khách) | 4 | **Xong phía nền tảng (21/10/2026, kéo vào G1)**: hợp đồng `price_board_daily.v1` `proposed`, nguồn `pf/price` chỉ bảng giá đã duyệt, job dựng feed; kênh website/trạng thái đăng chờ A2 ([giả định](gia-dinh/W11.81.md)) |
 
 #### W12 — Vùng nội bộ MKG
 

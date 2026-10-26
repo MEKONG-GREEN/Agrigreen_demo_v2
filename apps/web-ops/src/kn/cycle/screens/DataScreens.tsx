@@ -3,12 +3,15 @@
 // Cấp Xã › Dữ liệu (FN-XA-03.03..03.06) trên API P7 /v1/kn/*: HTX & nông hộ (thêm, vô hiệu hóa thay xóa, SĐT che),
 // máy móc theo HTX (khai báo thay toàn bộ, tổng xã = Σ HTX), thửa ruộng (danh sách; vẽ ở field-app), vật tư (ghi nhận,
 // tổng hợp theo xã). Cấp Tỉnh/Quốc gia chỉ xem (useCycleReadOnly + máy chủ 403 *.read_only).
-import { useParams } from "next/navigation";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { fieldErrorMap } from "@/api/problem";
 import { useAuth } from "@/auth/AuthProvider";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/Icon";
-import { ActionBar, BackLink, DetailLayout, LabelValueBlock, LogPanel, RelatedTabs } from "@/components/patterns/detail";
+import { NumberField, SelectField, TextField, parseNumberInput, validateForm } from "@/components/form";
+import { ActionBar, BackLink, DetailLayout, DetailPage, LabelValueBlock, LogPanel, RelatedTabs } from "@/components/patterns/detail";
 import { DataTable, FilterBar, FilterChip, PageHeader, RowActions, SearchBox, StatusPill, type Column } from "@/components/patterns/list";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
 import type { KnCooperative, KnPlot, MaterialRecord } from "../api";
@@ -41,10 +44,7 @@ export function CoopsScreen() {
   const [status, setStatus] = useState<"active" | "inactive" | "all">("active");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
-  const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ name: "", commune_code: "", area_ha: "", rep: "", phone: "" });
-  const act = useAction();
-  const s = useLoad(() => collectApi.cooperatives({ commune: f.commune || undefined, status, q: q || undefined }), [f.commune, status, q, act.note]);
+  const s = useLoad(() => collectApi.cooperatives({ commune: f.commune || undefined, status, q: q || undefined }), [f.commune, status, q]);
   const name = useCommuneNames(s.data?.items.map((c) => c.commune_code) ?? []);
   const columns: Column<KnCooperative>[] = [
     { key: "name", header: "Tên HTX", cell: (c) => c.name },
@@ -62,13 +62,12 @@ export function CoopsScreen() {
         title="Danh sách HTX"
         actions={
           readOnly ? null : (
-            <button type="button" className="btn btn-p" onClick={() => (setForm({ ...form, commune_code: f.communes[0]?.code ?? "" }), setAdding(true))}>
+            <Link className="btn btn-p" href="/kn/du-lieu/htx/them-moi">
               Thêm HTX
-            </button>
+            </Link>
           )
         }
       />
-      {act.view}
       <FilterBar onReset={() => (setStatus("active"), setQ(""), setPage(1))}>
         {f.chip}
         <FilterChip
@@ -87,60 +86,6 @@ export function CoopsScreen() {
       <LoadState s={s}>
         {(d) => <DataTable caption="Danh sách HTX" columns={columns} rows={d.items.slice((page - 1) * 10, page * 10)} rowKey={(c) => c.ref} page={page} pageSize={10} total={d.items.length} onPage={setPage} empty="Xã phụ trách chưa có HTX." />}
       </LoadState>
-      {adding ? (
-        <Dialog
-          title="Thêm HTX"
-          onClose={() => setAdding(false)}
-          actions={
-            <button
-              type="button"
-              className="btn btn-p"
-              onClick={async () => {
-                const r = await act.run(
-                  () =>
-                    collectApi.createCooperative({
-                      name: form.name,
-                      commune_code: form.commune_code,
-                      ...(form.area_ha ? { area_ha: form.area_ha.replace(",", ".") } : {}),
-                      ...(form.rep && form.phone ? { representative: { full_name: form.rep, phone: form.phone } } : {}),
-                    }),
-                  (x) => `Đã thêm ${x.name} (${x.code}).`,
-                );
-                if (r) setAdding(false);
-              }}
-            >
-              Lưu
-            </button>
-          }
-        >
-          <label className="field">
-            <span>Tên HTX*</span>
-            <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </label>
-          <label className="field">
-            <span>Xã/phường*</span>
-            <select className="input" value={form.commune_code} onChange={(e) => setForm({ ...form, commune_code: e.target.value })}>
-              {f.communes.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Diện tích (ha)</span>
-            <input className="input" inputMode="decimal" value={form.area_ha} onChange={(e) => setForm({ ...form, area_ha: e.target.value })} />
-          </label>
-          <label className="field">
-            <span>Người đại diện</span>
-            <input className="input" value={form.rep} onChange={(e) => setForm({ ...form, rep: e.target.value })} />
-          </label>
-          <label className="field">
-            <span>SĐT người đại diện (lưu ở kho định danh, hiển thị che)</span>
-            <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          </label>
-        </Dialog>
-      ) : null}
     </>
   );
 }
@@ -155,9 +100,9 @@ export function CoopDetailScreen() {
     const [c, hh, mm, pl] = await Promise.all([collectApi.cooperative(id), collectApi.households(id), collectApi.coopMachines(id).catch(() => null), collectApi.plots({ cooperative_ref: id }).catch(() => null)]);
     return { c, hh: hh.items, mm, pl: pl?.items ?? [] };
   }, [id, act.note]);
-  const [dlg, setDlg] = useState<"hh" | "off" | null>(null);
-  const [hh, setHh] = useState({ full_name: "", phone: "", area: "" });
+  const [off, setOff] = useState(false);
   const [reason, setReason] = useState("");
+  const [reasonErr, setReasonErr] = useState<string | undefined>();
   useBreadcrumbTail(s.data ? [{ label: s.data.c.name }] : []);
   const name = useCommuneNames(s.data ? [s.data.c.commune_code] : []);
   return (
@@ -169,10 +114,10 @@ export function CoopDetailScreen() {
             <PageHeader title={c.name} badge={<StatusPill tone={c.active ? "ok" : "neutral"}>{c.active ? "Hoạt động" : "Ngừng hoạt động"}</StatusPill>} />
             {readOnly || !c.active ? null : (
               <ActionBar>
-                <button type="button" className="btn btn-p btn-sm" onClick={() => setDlg("hh")}>
+                <Link className="btn btn-p btn-sm" href={`/kn/du-lieu/htx/${id}/them-nong-ho`}>
                   Thêm nông hộ
-                </button>
-                <button type="button" className="btn btn-o btn-sm" onClick={() => setDlg("off")}>
+                </Link>
+                <button type="button" className="btn btn-o btn-sm" onClick={() => setOff(true)}>
                   Vô hiệu hóa
                 </button>
               </ActionBar>
@@ -206,46 +151,29 @@ export function CoopDetailScreen() {
               }
               log={<LogPanel entries={[{ event: "Cập nhật hồ sơ", actor_display: "—", at: c.updated_at }]} />}
             />
-            {dlg === "hh" ? (
-              <Dialog
-                title="Thêm nông hộ"
-                onClose={() => setDlg(null)}
-                actions={
-                  <button type="button" className="btn btn-p" onClick={async () => (await act.run(() => collectApi.addHousehold(id, { holder: { full_name: hh.full_name, phone: hh.phone }, ...(hh.area ? { cultivated_area_ha: hh.area } : {}) }), "Đã thêm nông hộ.")) && setDlg(null)}>
-                    Lưu
-                  </button>
-                }
-              >
-                <label className="field">
-                  <span>Chủ hộ*</span>
-                  <input className="input" value={hh.full_name} onChange={(e) => setHh({ ...hh, full_name: e.target.value })} />
-                </label>
-                <label className="field">
-                  <span>SĐT*</span>
-                  <input className="input" value={hh.phone} onChange={(e) => setHh({ ...hh, phone: e.target.value })} />
-                </label>
-                <label className="field">
-                  <span>Diện tích canh tác (ha)</span>
-                  <input className="input" value={hh.area} onChange={(e) => setHh({ ...hh, area: e.target.value })} />
-                </label>
-              </Dialog>
-            ) : null}
-            {dlg === "off" ? (
+            {off ? (
               <Dialog
                 title="Vô hiệu hóa HTX"
-                onClose={() => setDlg(null)}
+                onClose={() => setOff(false)}
                 actions={
-                  <button type="button" className="btn btn-p" onClick={async () => (await act.run(() => collectApi.deactivate(id, reason), (r) => `Đã vô hiệu hóa (không xóa). Liên kết: ${r.warnings.households} nông hộ, ${r.warnings.machines ?? 0} máy.`)) && setDlg(null)}>
+                  <button
+                    type="button"
+                    className="btn btn-p"
+                    disabled={act.busy}
+                    onClick={async () => {
+                      // Nhập lý do ngắn là việc còn được làm trong pop-up (ui-kit.md). Máy chủ cũng kiểm ≥ 20 ký tự.
+                      const err = reason.trim() === "" ? "Bắt buộc nhập." : reason.trim().length < 20 ? "Tối thiểu 20 ký tự." : undefined;
+                      setReasonErr(err);
+                      if (err) return;
+                      if (await act.run(() => collectApi.deactivate(id, reason.trim()), (r) => `Đã vô hiệu hóa (không xóa). Liên kết: ${r.warnings.households} nông hộ, ${r.warnings.machines ?? 0} máy.`)) setOff(false);
+                    }}
+                  >
                     Vô hiệu hóa
                   </button>
                 }
               >
                 <p className="small">HTX có nông hộ, máy, thửa liên kết vẫn giữ dữ liệu — vô hiệu hóa thay xóa.</p>
-                <label className="field">
-                  <span>Lý do* (≥ 20 ký tự)</span>
-                  <textarea className="textarea" value={reason} onChange={(e) => setReason(e.target.value)} />
-                  <PiiHint text={reason} />
-                </label>
+                <TextField label="Lý do (≥ 20 ký tự)" required multiline value={reason} onChange={setReason} error={reasonErr} hint={<PiiHint text={reason} />} />
               </Dialog>
             ) : null}
           </>
@@ -254,6 +182,125 @@ export function CoopDetailScreen() {
     </>
   );
 }
+
+type CoopForm = { name: string; commune_code: string; area_ha: string; rep: string; phone: string };
+
+/**
+ * FN-XA-03.03 Thêm HTX trên trang riêng (R-A2, thay pop-up cũ). Bắt buộc theo TT-08: Xã/phường, Tên, Người đại diện, Điện thoại.
+ * TODO(#102): trường "Loại" (HTX / Nông hộ / Tổ hợp tác) chưa có trong form và API — gói #102 bổ sung.
+ */
+export function CoopCreateScreen() {
+  const { collectApi } = useAuth();
+  const router = useRouter();
+  const readOnly = useCycleReadOnly();
+  const { communes } = useCommuneFilter();
+  const act = useAction();
+  const [form, setForm] = useState<CoopForm>(() => ({ name: "", commune_code: communes.length === 1 ? communes[0]!.code : "", area_ha: "", rep: "", phone: "" }));
+  const [errors, setErrors] = useState<Partial<Record<keyof CoopForm, string>>>({});
+  const server = act.problem ? fieldErrorMap(act.problem) : {};
+  const set = (k: keyof CoopForm) => (v: string) => setForm((x) => ({ ...x, [k]: v }));
+  const save = async () => {
+    const v = validateForm(form, {
+      name: { kind: "text", required: true, maxLength: 200 },
+      commune_code: { kind: "text", required: true },
+      area_ha: { kind: "number", maxDecimals: 4 },
+      rep: { kind: "text", required: true, maxLength: 120 },
+      phone: { kind: "text", required: true, maxLength: 20 },
+    });
+    setErrors(v.errors);
+    if (!v.valid) return;
+    const b = v.values;
+    const r = await act.run(() =>
+      collectApi.createCooperative({
+        name: b.name.trim(),
+        commune_code: b.commune_code,
+        ...(b.area_ha ? { area_ha: b.area_ha } : {}),
+        representative: { full_name: b.rep.trim(), phone: b.phone.trim() },
+      }),
+    );
+    if (r) router.push(`/kn/du-lieu/htx/${r.ref}`);
+  };
+  return (
+    <DetailPage
+      back={{ href: "/kn/du-lieu/htx", label: "Danh sách HTX" }}
+      title="Thêm HTX"
+      actions={
+        <>
+          <Link className="btn btn-o" href="/kn/du-lieu/htx">
+            Hủy
+          </Link>
+          <button type="button" className="btn btn-p" disabled={readOnly || act.busy} onClick={() => void save()}>
+            Lưu
+          </button>
+        </>
+      }
+    >
+      {act.view}
+      <div className="grid2">
+        <TextField label="Tên HTX" required value={form.name} onChange={set("name")} error={errors.name ?? server.name} maxLength={200} />
+        <SelectField label="Xã/phường" required value={form.commune_code} onChange={set("commune_code")} error={errors.commune_code ?? server.commune_code} options={communes.map((c) => ({ value: c.code, label: c.name }))} />
+        <NumberField label="Diện tích" unit="ha" value={form.area_ha} onChange={set("area_ha")} rule={{ maxDecimals: 4 }} error={errors.area_ha ?? server.area_ha} onBlurError={(e) => setErrors((x) => ({ ...x, area_ha: e }))} />
+        <TextField label="Người đại diện" required value={form.rep} onChange={set("rep")} error={errors.rep ?? server["representative.full_name"]} maxLength={120} />
+        <TextField label="Điện thoại người đại diện" required value={form.phone} onChange={set("phone")} error={errors.phone ?? server["representative.phone"]} maxLength={20} hint="Lưu ở kho định danh, hiển thị che." />
+      </div>
+    </DetailPage>
+  );
+}
+
+type HouseholdForm = { full_name: string; phone: string; area: string };
+
+/** FN-XA-03.03 Thêm nông hộ vào HTX trên trang riêng (R-A2, thay pop-up cũ). */
+export function HouseholdCreateScreen() {
+  const { id } = useParams<{ id: string }>();
+  const { collectApi } = useAuth();
+  const router = useRouter();
+  const readOnly = useCycleReadOnly();
+  const act = useAction();
+  const coop = useLoad(() => collectApi.cooperative(id), [id]);
+  const [form, setForm] = useState<HouseholdForm>({ full_name: "", phone: "", area: "" });
+  const [errors, setErrors] = useState<Partial<Record<keyof HouseholdForm, string>>>({});
+  const server = act.problem ? fieldErrorMap(act.problem) : {};
+  const back = `/kn/du-lieu/htx/${id}`;
+  const set = (k: keyof HouseholdForm) => (v: string) => setForm((x) => ({ ...x, [k]: v }));
+  const save = async () => {
+    const v = validateForm(form, {
+      full_name: { kind: "text", required: true, maxLength: 120 },
+      phone: { kind: "text", required: true, maxLength: 20 },
+      area: { kind: "number", maxDecimals: 4 },
+    });
+    setErrors(v.errors);
+    if (!v.valid) return;
+    const b = v.values;
+    const r = await act.run(() => collectApi.addHousehold(id, { holder: { full_name: b.full_name.trim(), phone: b.phone.trim() }, ...(b.area ? { cultivated_area_ha: b.area } : {}) }));
+    if (r) router.push(back);
+  };
+  const coopName = coop.data?.name ?? "HTX";
+  return (
+    <DetailPage
+      back={{ href: back, label: coopName }}
+      title="Thêm nông hộ"
+      actions={
+        <>
+          <Link className="btn btn-o" href={back}>
+            Hủy
+          </Link>
+          <button type="button" className="btn btn-p" disabled={readOnly || act.busy || coop.data?.active === false} onClick={() => void save()}>
+            Lưu
+          </button>
+        </>
+      }
+    >
+      {act.view}
+      <div className="grid2">
+        <TextField label="Chủ hộ" required value={form.full_name} onChange={set("full_name")} error={errors.full_name ?? server.holder} maxLength={120} />
+        <TextField label="Số điện thoại" required value={form.phone} onChange={set("phone")} error={errors.phone ?? server.holder} maxLength={20} />
+        <NumberField label="Diện tích canh tác" unit="ha" value={form.area} onChange={set("area")} rule={{ maxDecimals: 4 }} error={errors.area ?? server.cultivated_area_ha} onBlurError={(e) => setErrors((x) => ({ ...x, area: e }))} />
+      </div>
+    </DetailPage>
+  );
+}
+
+type MachineLine = { machine_type: string; quantity: string; note: string };
 
 /** FN-XA-03.04 Máy móc HTX: trái danh sách HTX + tổng xã theo loại; phải bảng khai báo của HTX đã chọn. */
 export function MachinesScreen() {
@@ -265,7 +312,7 @@ export function MachinesScreen() {
   const overview = useLoad(() => collectApi.machines(f.commune || undefined), [f.commune, act.note]);
   const [ref, setRef] = useState("");
   const cur = useLoad(ref ? () => collectApi.coopMachines(ref) : null, [ref, act.note]);
-  const [lines, setLines] = useState<{ machine_type: string; quantity: string; note: string }[] | null>(null);
+  const [lines, setLines] = useState<MachineLine[] | null>(null);
   const rows = lines ?? (cur.data?.lines ?? []).map((l) => ({ machine_type: l.machine_type, quantity: String(l.quantity), note: l.note ?? "" }));
   const name = useCommuneNames(overview.data?.commune_totals.map((t) => t.commune_code) ?? []);
   const TYPES = [
@@ -277,12 +324,84 @@ export function MachinesScreen() {
     ["may_gat", "Máy gặt đập liên hợp"],
     ["may_say", "Máy sấy"],
   ];
+  // TT-10: Số lượng là số nguyên > 0 (R-A1). TODO(#103): Năm sản xuất (≤ năm hiện tại) và HTX/Chủ sở hữu bắt buộc — gói #103 thêm trường.
+  const [qtyErr, setQtyErr] = useState<Record<number, string>>({});
+  const QTY_RULE = { required: true, integer: true, positive: true } as const;
+  const setRow = (i: number, patch: Partial<MachineLine>) => setLines(rows.map((x, k) => (k === i ? { ...x, ...patch } : x)));
+  const saveMachines = async () => {
+    const errs: Record<number, string> = {};
+    const out = rows.map((l, i) => {
+      const p = parseNumberInput(l.quantity, QTY_RULE);
+      if (!p.ok) errs[i] = p.error;
+      return { machine_type: l.machine_type, quantity: p.ok ? Number(p.value) : 0, note: l.note.trim() || null };
+    });
+    setQtyErr(errs);
+    if (Object.keys(errs).length) return;
+    if (await act.run(() => collectApi.putMachines(ref, out), (r) => `Đã lưu khai báo máy (${r.total} máy).`)) setLines(null);
+  };
+  const machineCols: Column<MachineLine & { i: number }>[] = [
+    {
+      key: "type",
+      header: "Loại máy",
+      cell: (l) => (
+        <select className="select" aria-label={`Loại máy dòng ${l.i + 1}`} disabled={readOnly} value={l.machine_type} onChange={(e) => setRow(l.i, { machine_type: e.target.value })}>
+          {TYPES.map(([v, t]) => (
+            <option key={v} value={v}>
+              {t}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      key: "qty",
+      header: "Số lượng",
+      cell: (l) => (
+        <>
+          <input
+            className="input"
+            aria-label={`Số lượng dòng ${l.i + 1}`}
+            aria-invalid={qtyErr[l.i] ? true : undefined}
+            disabled={readOnly}
+            inputMode="numeric"
+            value={l.quantity}
+            onChange={(e) => setRow(l.i, { quantity: e.target.value })}
+            onBlur={() => {
+              const p = parseNumberInput(l.quantity, QTY_RULE);
+              setQtyErr((x) => {
+                const next = { ...x };
+                if (p.ok) delete next[l.i];
+                else next[l.i] = p.error;
+                return next;
+              });
+            }}
+          />
+          {qtyErr[l.i] ? (
+            <span className="err" role="alert">
+              {qtyErr[l.i]}
+            </span>
+          ) : null}
+        </>
+      ),
+    },
+    { key: "note", header: "Ghi chú", cell: (l) => <input className="input" aria-label={`Ghi chú dòng ${l.i + 1}`} disabled={readOnly} value={l.note} onChange={(e) => setRow(l.i, { note: e.target.value })} /> },
+    {
+      key: "del",
+      header: "",
+      cell: (l) =>
+        readOnly ? null : (
+          <button type="button" className="btn btn-o btn-sm" aria-label={`Xóa dòng ${l.i + 1}`} onClick={() => (setLines(rows.filter((_, k) => k !== l.i)), setQtyErr({}))}>
+            Xóa
+          </button>
+        ),
+    },
+  ];
   return (
     <>
       <PageHeader title="Máy móc HTX" />
       <FilterBar>
         {f.chip}
-        <FilterChip label="HTX" value={ref} onChange={(v) => (setRef(v), setLines(null))} options={[{ value: "", label: "Chọn HTX" }, ...(coops.data?.items ?? []).map((c) => ({ value: c.ref, label: c.name }))]} />
+        <FilterChip label="HTX" value={ref} onChange={(v) => (setRef(v), setLines(null), setQtyErr({}))} options={[{ value: "", label: "Chọn HTX" }, ...(coops.data?.items ?? []).map((c) => ({ value: c.ref, label: c.name }))]} />
       </FilterBar>
       {act.view}
       <DetailLayout
@@ -292,50 +411,13 @@ export function MachinesScreen() {
               {(m) => (
                 <>
                   <h2>{m.name}</h2>
-                  <table className="dt" aria-label="Khai báo máy">
-                    <thead>
-                      <tr>
-                        <th scope="col">Loại máy</th>
-                        <th scope="col">Số lượng</th>
-                        <th scope="col">Ghi chú</th>
-                        <th scope="col" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((l, i) => (
-                        <tr key={i}>
-                          <td>
-                            <select className="input" aria-label={`Loại máy dòng ${i + 1}`} disabled={readOnly} value={l.machine_type} onChange={(e) => setLines(rows.map((x, k) => (k === i ? { ...x, machine_type: e.target.value } : x)))}>
-                              {TYPES.map(([v, t]) => (
-                                <option key={v} value={v}>
-                                  {t}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td>
-                            <input className="input" aria-label={`Số lượng dòng ${i + 1}`} disabled={readOnly} inputMode="numeric" value={l.quantity} onChange={(e) => setLines(rows.map((x, k) => (k === i ? { ...x, quantity: e.target.value } : x)))} />
-                          </td>
-                          <td>
-                            <input className="input" disabled={readOnly} value={l.note} onChange={(e) => setLines(rows.map((x, k) => (k === i ? { ...x, note: e.target.value } : x)))} />
-                          </td>
-                          <td>{readOnly ? null : <button type="button" className="btn btn-o btn-sm" aria-label={`Xóa dòng ${i + 1}`} onClick={() => setLines(rows.filter((_, k) => k !== i))}>Xóa</button>}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <DataTable caption="Khai báo máy" columns={machineCols} rows={rows.map((l, i) => ({ ...l, i }))} rowKey={(l) => String(l.i)} empty="HTX chưa khai báo máy." />
                   {readOnly ? null : (
                     <div className="row" style={{ gap: 8, marginTop: 8 }}>
                       <button type="button" className="btn btn-o btn-sm" onClick={() => setLines([...rows, { machine_type: "may_cay", quantity: "1", note: "" }])}>
                         + Thêm dòng
                       </button>
-                      <button
-                        type="button"
-                        className="btn btn-p btn-sm"
-                        onClick={async () =>
-                          (await act.run(() => collectApi.putMachines(ref, rows.map((l) => ({ machine_type: l.machine_type, quantity: Number(l.quantity), note: l.note || null }))), (r) => `Đã lưu khai báo máy (${r.total} máy).`)) && setLines(null)
-                        }
-                      >
+                      <button type="button" className="btn btn-p btn-sm" disabled={act.busy} onClick={() => void saveMachines()}>
                         Lưu
                       </button>
                     </div>
@@ -365,6 +447,7 @@ export function MachinesScreen() {
 }
 
 /** FN-XA-03.05 Vẽ thửa ruộng — danh sách thửa v7.7 (diện tích tự tính so với khai báo); vẽ trên bản đồ ở field-app. */
+// TODO(#104): sửa thửa, bắt buộc Tên thửa/Chủ hộ/Xã/Cây trồng, chặn chồng lấn (TT-11) — màn này hiện chỉ có danh sách, không có ô nhập.
 export function PlotsScreen() {
   const { collectApi } = useAuth();
   const f = useCommuneFilter();
@@ -391,7 +474,7 @@ export function PlotsScreen() {
   );
 }
 
-const MATERIAL_OPTIONS = [
+const MATERIAL_OPTIONS: [string, string][] = [
   ["phan_ure", "Phân urê (tấn)"],
   ["phan_npk", "Phân NPK (tấn)"],
   ["thuoc_bvtv", "Thuốc BVTV (lít)"],
@@ -411,6 +494,24 @@ export function MaterialsScreen() {
   const sum = useLoad(() => collectApi.materialSummary(f.commune || undefined), [f.commune, act.note]);
   const name = useCommuneNames([...(list.data?.items.map((m) => m.commune_code) ?? []), ...(sum.data?.items.map((m) => m.commune_code) ?? [])]);
   const commune = f.commune || f.communes[0]?.code || "";
+  // R-A1: số lượng ≥ 0, tối đa 4 chữ số lẻ; vật tư đếm được (bẫy đèn – cái) chỉ nhận số nguyên như máy chủ.
+  // TODO(#105): làm lại dạng bảng nhập nhiều dòng (lọc Xã + Thời điểm, ĐVT tự điền, Nạp Excel, Lịch sử) theo TT-12.
+  const qtyRule = { maxDecimals: 4, integer: line.material_code === "bay_den" };
+  const [errors, setErrors] = useState<Partial<Record<"day" | "material_code" | "quantity", string>>>({});
+  const dayErr = errors.day ?? (act.problem ? fieldErrorMap(act.problem).recorded_on : undefined);
+  const saveMaterial = async () => {
+    const v = validateForm(
+      { day, material_code: line.material_code, quantity: line.quantity },
+      { day: { kind: "text", required: true }, material_code: { kind: "text", required: true }, quantity: { kind: "number", required: true, ...qtyRule } },
+    );
+    setErrors(v.errors);
+    if (!v.valid) return;
+    const ok = await act.run(
+      () => collectApi.recordMaterials({ commune_code: commune, recorded_on: day, lines: [{ material_code: line.material_code, quantity: v.values.quantity, ...(line.note.trim() ? { note: line.note.trim() } : {}) }] }),
+      `Đã ghi nhận vật tư cho ${name(commune)}.`,
+    );
+    if (ok) setLine({ ...line, quantity: "", note: "" });
+  };
   const columns: Column<MaterialRecord>[] = [
     { key: "on", header: "Ngày ghi nhận", cell: (m) => m.recorded_on },
     { key: "commune", header: "Xã", cell: (m) => name(m.commune_code) },
@@ -425,36 +526,25 @@ export function MaterialsScreen() {
       <FilterBar>{f.chip}</FilterBar>
       {act.view}
       {readOnly ? null : (
-        <section className="card sec row" style={{ gap: 8, flexWrap: "wrap", marginBottom: 12 }} aria-label="Ghi nhận vật tư">
-          <label className="field">
-            <span>Thời điểm ghi nhận</span>
-            <input className="input" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>Loại vật tư</span>
-            <select className="input" value={line.material_code} onChange={(e) => setLine({ ...line, material_code: e.target.value })}>
-              {MATERIAL_OPTIONS.map(([v, t]) => (
-                <option key={v} value={v}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Số lượng</span>
-            <input className="input" inputMode="decimal" value={line.quantity} onChange={(e) => setLine({ ...line, quantity: e.target.value })} />
-          </label>
-          <label className="field">
-            <span>Ghi chú</span>
-            <input className="input" value={line.note} onChange={(e) => setLine({ ...line, note: e.target.value })} />
-            <PiiHint text={line.note} />
-          </label>
-          <button
-            type="button"
-            className="btn btn-p btn-sm"
-            disabled={!commune || !line.quantity}
-            onClick={() => void act.run(() => collectApi.recordMaterials({ commune_code: commune, recorded_on: day, lines: [{ material_code: line.material_code, quantity: line.quantity.replace(",", "."), ...(line.note ? { note: line.note } : {}) }] }), `Đã ghi nhận vật tư cho ${name(commune)}.`)}
-          >
+        <section className="card sec row" style={{ gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "flex-start" }} aria-label="Ghi nhận vật tư">
+          <div className="field">
+            <label htmlFor="mat-day">
+              Thời điểm ghi nhận
+              <span className="req" aria-hidden="true">
+                {" "}*
+              </span>
+            </label>
+            <input id="mat-day" className="input" type="date" aria-required value={day} onChange={(e) => setDay(e.target.value)} aria-invalid={dayErr ? true : undefined} />
+            {dayErr ? (
+              <span className="err" role="alert">
+                {dayErr}
+              </span>
+            ) : null}
+          </div>
+          <SelectField label="Loại vật tư" required value={line.material_code} onChange={(v) => setLine({ ...line, material_code: v })} error={errors.material_code} options={MATERIAL_OPTIONS.map(([value, label]) => ({ value, label }))} />
+          <NumberField label="Số lượng" required value={line.quantity} onChange={(v) => setLine({ ...line, quantity: v })} rule={qtyRule} error={errors.quantity} onBlurError={(e) => setErrors((x) => ({ ...x, quantity: e }))} />
+          <TextField label="Ghi chú" value={line.note} onChange={(v) => setLine({ ...line, note: v })} maxLength={500} hint={<PiiHint text={line.note} />} />
+          <button type="button" className="btn btn-p btn-sm" style={{ alignSelf: "flex-end" }} disabled={!commune || act.busy} onClick={() => void saveMaterial()}>
             Lưu
           </button>
         </section>

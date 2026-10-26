@@ -11,8 +11,11 @@ package reports
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -35,6 +38,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -73,6 +77,20 @@ type Deps struct {
 	// trường của cờ Google Sheet (nil → TẮT; ADR-0026 "Đề xuất").
 	Consolidations port.Consolidations
 	Getenv         func(string) string
+	// DispatchLease (P0-WORKER-REPORTS #128): hạn nhận việc gửi email Chi cục (AG_REPORT_DISPATCH_LEASE qua
+	// SendLeaseFromEnv); 0 → mặc định 15 phút.
+	DispatchLease time.Duration
+}
+
+// ValidateSendLease kiểm hạn nhận việc gửi Chi cục so với hạn xử lý thông điệp của consumer (lease ≥ hạn + biên) —
+// worker gọi lúc khởi động với inbox.DefaultHandlerTimeout (review #128).
+func ValidateSendLease(lease, handlerTimeout time.Duration) error {
+	return dispatch.ValidateSendLease(lease, handlerTimeout)
+}
+
+// SendLeaseFromEnv đọc hạn nhận việc gửi báo cáo Chi cục (AG_REPORT_DISPATCH_LEASE, mặc định 15m).
+func SendLeaseFromEnv(getenv func(string) string) (time.Duration, error) {
+	return dispatch.SendLeaseFromEnv(getenv)
 }
 
 // Module là pf/reports đã nối.
@@ -86,7 +104,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		ResolveSession: d.ResolveSession,
 		DB:             db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
 		Store: d.Store, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,
-		LinkBase: d.LinkBase, LinkDownloadBase: d.LinkDownloadBase, Consolidations: d.Consolidations,
+		LinkBase: d.LinkBase, LinkDownloadBase: d.LinkDownloadBase, Consolidations: d.Consolidations, DispatchLease: d.DispatchLease,
 	}
 	if d.FormSeeds != nil {
 		svc.FormSeeds = app.NewFormSeedRegistry(d.FormSeeds...)
@@ -106,6 +124,31 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return &Module{svc: svc}
 }
 
+// RequireWorkerDeps (P0-WORKER-REPORTS #128) kiểm phụ thuộc bắt buộc của consumer worker (dựng tệp, gửi email lịch,
+// gửi báo cáo Chi cục): thiếu → lỗi KHỞI ĐỘNG thay vì panic giữa lúc gửi email (worker cũ dựng reports.New(nil, …)).
+func (m *Module) RequireWorkerDeps() error {
+	var miss []string
+	if m == nil || m.svc == nil {
+		return errors.New("pf/reports: module chưa dựng")
+	}
+	if m.svc.DB == nil {
+		miss = append(miss, "DB")
+	}
+	if m.svc.Clock == nil {
+		miss = append(miss, "Clock")
+	}
+	if m.svc.Store == nil {
+		miss = append(miss, "Store")
+	}
+	if m.svc.Params == nil {
+		miss = append(miss, "Params")
+	}
+	if len(miss) > 0 {
+		return fmt.Errorf("pf/reports: thiếu phụ thuộc bắt buộc của worker: %s", strings.Join(miss, ", "))
+	}
+	return nil
+}
+
 // UseConsolidations nối cổng lần tổng hợp của pf/extension (báo cáo Chi cục, KN v7.7 P4).
 func (m *Module) UseConsolidations(c port.Consolidations) { m.svc.Consolidations = c }
 
@@ -117,6 +160,10 @@ func (m *Module) RegisterPublic(rg *gin.RouterGroup) { handler.Handler{Svc: m.sv
 
 // UseMailer nối bộ gửi SMTP (worker: consumer báo cáo Chi cục).
 func (m *Module) UseMailer(ml port.Mailer) { m.svc.Mailer = ml }
+
+// UseDispatchLease đặt hạn nhận việc gửi Chi cục sau khi dựng (kiểm thử hạn ngắn; vận hành dùng Deps.DispatchLease đã qua
+// SendLeaseFromEnv/ValidateSendLease).
+func (m *Module) UseDispatchLease(d time.Duration) { m.svc.DispatchLease = d }
 
 // DispatchHandler là inbox.Handler cho pf.reports.dispatch.requested (consumer port.DispatchConsumer).
 func (m *Module) DispatchHandler() inbox.Handler { return m.svc.HandleDispatchRequested }
@@ -141,6 +188,12 @@ func (m *Module) DepartmentUsage() partyport.DepartmentUsage { return app.Depart
 // report_export) sau điểm kiểm soát cục bộ ở ba lối (yêu cầu, lịch, tải). cp nil → hành vi cũ.
 func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode) {
 	m.svc.Egress, m.svc.EgressMode = cp, mode
+}
+
+// Middleware reauthorizes policy-enabled export replays before the common HTTP
+// idempotency cache. The assembly orders all module middleware before that cache.
+func (m *Module) Middleware() gin.HandlerFunc {
+	return handler.Handler{Svc: m.svc}.ExportAuthorization()
 }
 
 // RegisterApp gắn route Application API.
@@ -202,14 +255,51 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 	}}
 }
 
-// SMTPFromEnv dựng bộ gửi email từ AG_SMTP_*; chưa cấu hình → nil (bỏ gửi kèm cảnh báo).
-func SMTPFromEnv(clk clock.Clock) (port.Mailer, error) {
-	cfg, err := mail.ConfigFromEnv()
-	if errors.Is(err, mail.ErrNotConfigured) {
+// SMTPFromEnv dựng bộ gửi email từ AG_MAILER + AG_SMTP_* (SMTPFromEnvWith(os.Getenv, …)).
+func SMTPFromEnv(clk clock.Clock) (port.Mailer, error) { return SMTPFromEnvWith(os.Getenv, clk) }
+
+// SMTPFromEnvWith (P0-NOTIFY-FAILCLOSED): kênh email chưa cấu hình → nil, và app ghi lượt gửi là "Bỏ gửi"/"Gửi lỗi"
+// kèm lý do (không bao giờ "Đã gửi"). AG_MAILER: ""(tự chọn theo AG_SMTP_HOST) | smtp (bắt buộc AG_SMTP_HOST) | log
+// (chỉ máy phát triển; pf/reports không có bộ gửi giả → nil) | disabled (nil). Giá trị khác, hoặc log ngoài máy phát
+// triển → lỗi, worker từ chối dựng module.
+func SMTPFromEnvWith(getenv func(string) string, clk clock.Clock) (port.Mailer, error) {
+	switch m := strings.ToLower(strings.TrimSpace(getenv("AG_MAILER"))); m {
+	case "disabled":
 		return nil, nil
+	case "log":
+		if !residency.LocalDev(getenv) {
+			return nil, errors.New("reports: AG_MAILER=log chỉ dùng trên máy phát triển (AG_ENV=development|dev|local|test)")
+		}
+		return nil, nil
+	case "", "smtp":
+		cfg, err := mail.ConfigFrom(getenv)
+		if errors.Is(err, mail.ErrNotConfigured) {
+			if m == "smtp" {
+				return nil, errors.New("reports: AG_MAILER=smtp nhưng chưa đặt AG_SMTP_HOST")
+			}
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		return &mail.SMTP{Cfg: cfg, Clock: clk}, nil
+	default:
+		return nil, fmt.Errorf("reports: AG_MAILER=%q — chỉ nhận smtp, log, disabled", m)
 	}
+}
+
+// LinkBasesFromEnv đọc URL gốc cho liên kết trong email báo cáo: web = AG_WEB_OPS_URL (dòng "đăng nhập để tải lại"),
+// download = AG_REPORT_LINK_BASE (liên kết tải Chi cục). Ngoài máy phát triển, giá trị thiếu/không tuyệt đối/localhost
+// → "" (fail closed: email lịch bỏ dòng tải lại; gửi Chi cục kiểu liên kết → "Gửi lỗi" nêu AG_REPORT_LINK_BASE) và lỗi
+// trong errs để worker cảnh báo lúc khởi động.
+func LinkBasesFromEnv(getenv func(string) string) (web, download string, errs []error) {
+	web, err := residency.PublicBaseURL(getenv, "AG_WEB_OPS_URL")
 	if err != nil {
-		return nil, err
+		errs = append(errs, err)
 	}
-	return &mail.SMTP{Cfg: cfg, Clock: clk}, nil
+	download, err = residency.PublicBaseURL(getenv, "AG_REPORT_LINK_BASE")
+	if err != nil {
+		errs = append(errs, err)
+	}
+	return web, download, errs
 }

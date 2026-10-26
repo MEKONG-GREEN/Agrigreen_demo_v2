@@ -1,0 +1,19 @@
+## KNSPLIT-2-HTX-READERS-B — Gắn bộ đọc riêng, gỡ import HTX trực tiếp
+
+Nền dev945ec7b1. Deps/service của KN dùng CooperativeStatistics và PlotStatistics do KN sở hữu. Cổng xác nhận và hai hằng trạng thái trở thành khai báo KN giữ nguyên chuỗi wire. API assembly nối NewPublishedHTXData thay ba cổng native HTX. Extension.New vẫn giữ ý nghĩa tùy chọn nil của Deps cho worker/fixture không dùng dashboard; không tự đổi sources hay thực hiện truy vấn mới tại mọi chỗ tạo module. Không đổi native HTX/MKG, hợp đồng HTTP/menu/mobile hay DDL/quyền.
+
+Kiểm giữ38native/111platform và33golden nền945. Reader dùng nguyên SQL/role/ACL đã đạt ở A; không thêm view hay quyền. Test HTTP đi qua reader thật như DI production: HTX đang dùng/không hồ sơ/ngừng, hộ active/đóng, thửa nháp/ngừng, quốc gia/tỉnh/xã/ngoài phạm vi/tenant trống và dữ liệu tenant khác. Đối chiếu native↔pub với k_ref node closure thật, realm-role và phiên KN (xã/tỉnh/admin, nút chưa có bản chiếu), không dựa nhánh tenant chưa dựng bản chiếu. Chưa chạy tại mốc viết mã.
+
+Chỉ giảm baseline theo import đã gỡ bằng -prune, không sửa quy tắc/alias. Dự kiến kn-import-htx=0 sau bốn import bị bỏ; tổng phải giảm thực tế. Điều này chưa hoàn tất KN độc lập: reports còn đường sản lượng gián tiếp native, Units/Orgs còn cổng nền tảng, authz/accounts/party/routes/tenant/client/KHTC reminder còn. Giữ các quyết định PO về mỗi Trung tâm tỉnh/tenant, MRV HTX-MKG, D2 chỉ hồ sơ KN trong G1, mẫu nạp sẵn và M1–M7. Lịch tự tiếp tục còn hoạt động.
+
+
+Lượt prune ban đầu đã giảm đúng318→314 do gỡ4import, nhưng từ chối5SQL foreign mới trong fixture HTTP đặt dưới internal/kn/extension/handler. Không thêm baseline hay ngoại lệ: chuyển test HTTP sang tests/htxdata, nơi dựng dữ liệu đối chứng/lắp ráp; gọi gốc module và port, giữ ranh giới mã KN. Reader và wiring không đổi. Test ngoài dùng dữ liệu HTX native đã khóa38kết quả, danh mục đơn vị thật và HTTP có token xác thực; không ghi bảng ngoại từ mã KN.
+
+
+Source đầu79279 exit1: tests/htxdata chưa dựng được vì test HTTP import nhầm shared/authztest; package có sẵn ở shared/authz/authztest. Sửa đúng đường dẫn, không cài thư viện hay đổi go.mod/go.sum. Handler cùng lượt đã PASS180.980s, nhưng toàn lệnh đỏ nên không báo source xanh; cụm64248/a5e1637cb22b đã dọn. Static83732 exit1 ở vet cùng lỗi import, fullwait1540 exit1 trước PG. Giữ mọi log/exit cũ. Principal của ca RLS bổ sung TenantID trùng context cho dữ liệu người dùng đầy đủ. Phải chạy source-pg-verified cả hai gói và static-verified; pure0 trước đó trên mã production không đổi còn giá trị.
+
+
+Source xác minh51601 exit0: HTX10PASS158.238s (HTTP0.58s, 120 đối chiếu scope0.94s), handler toàn bộ124.707s; không FAIL/SKIP, cụm63017/223e865fd9e7 đã dọn/Go0. Cổng static-verified57508 chỉ còn errcheck ở lệnh đóng response của test HTTP; sửa riêng defer sang hàm bỏ qua lỗi Close một cách tường minh, giữ nguyên việc đóng cùng response/cùng lúc, không đổi request/assertion/logic/SQL/wiring hay metadata. Không cần lặp lại lệnh PG đã đạt chỉ vì cleanup giữ cùng ngữ nghĩa; helper bắt buộc chạy lại HTX10/handler trên mã cuối. Pure83732=0 trên mã production không đổi. Static-final vẫn phải qua đầy đủ cổng, formatter; fullwait23871 exit1 trước PG do staticverified1. Giữ logs cũ, chưa tích hợp.
+
+
+Full5 PostgreSQL xác minh86206 exit0, không FAIL/SKIP: dbadmin0.855s, metrics107.683s, KN77/KHTC427.138s, API assembly134.817s, worker2.870s; cụm64848/f67cf3022caf đã dọn/Go0. Mã hiện tại c9aa03c8, phần cleanup test chỉ tường minh bỏ qua CloseError cùng ngữ nghĩa; phần production đã được đối chiếu source51601 exit0/HTX10-158.238s/handler124.707s. Staticfinal27940 exit0/lint0/boundary314/gofmt2old; pure83732 exit0. Giữ33golden nền945 và quyền26flags/58SELECT/23membership không đổi. Fetchdev vẫn945, không rebase mã mới. Chờ helper11, có HTX10/handler/platform4 PG thật trên mã cuối trước dev.

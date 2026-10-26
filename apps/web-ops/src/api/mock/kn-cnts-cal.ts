@@ -169,6 +169,12 @@ export const cntsCalRoutes: Route[] = [
       const w = who(ctx);
       if (w.role === "kn_xa" || w.readOnly) return problem(403, "forbidden", "chỉ chủ nhiệm chương trình Cấp Tỉnh (hoặc Admin) lập lịch tiêm phòng");
       const b = (ctx.body ?? {}) as S["CNTSVaccinationBatchCreate"];
+      // Như máy chủ (cntscal/domain): tuổi lúc nhận nguyên 0–3650, số con nguyên ≥ 1 (BF-SWEEP-CNTS).
+      const numErrs = [
+        !(Number.isInteger(b.age_at_receipt) && b.age_at_receipt >= 0 && b.age_at_receipt <= 3650) && { field: "age_at_receipt", reason: "0–3650 ngày" },
+        b.head_count !== undefined && b.head_count !== null && !(Number.isInteger(b.head_count) && b.head_count >= 1) && { field: "head_count", reason: "số con ≥ 1" },
+      ].filter(Boolean) as { field: string; reason: string }[];
+      if (numErrs.length) return validation(numErrs);
       const sc = CATALOGS.cnts_vaccination_schedule.find((x) => x.attrs.model_type === b.model_type_code);
       if (!sc) return problem(422, "extension.cnts_vaccination_no_procedure", "Không có quy trình tiêm cho loại mô hình/giống tại ngày nhận giống");
       const doses = (sc.attrs.doses ?? "")

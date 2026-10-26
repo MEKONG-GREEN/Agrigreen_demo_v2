@@ -6,7 +6,7 @@ import { createCycleApi } from "@/kn/cycle/api";
 import { ApiProblem } from "@/api/problem";
 import { mockFetchNoDelay } from "../handler";
 import { resetMockForms } from "../forms/routes";
-import { KSGM_WEEK_STARTS, resetReportCycle } from "./store";
+import { KSGM_WEEK_STARTS, defaultPeriod, resetReportCycle } from "./store";
 
 // Thứ Sáu 02/10/2026 10:00 giờ Việt Nam.
 let now = Date.parse("2026-10-02T03:00:00Z");
@@ -59,6 +59,32 @@ describe("vòng đời báo cáo giả lập (P4)", () => {
     const todo = await xa.tasks({ status: "" as never });
     expect(todo.items.every((t) => ["91301", "91302"].includes(t.commune_code))).toBe(true);
     expect(todo.counts.todo).toBeGreaterThan(0);
+  });
+
+  it("đầu tuần 00:00–07:00 giờ VN: kỳ tuần mới đã bắt đầu theo ngày VN (badge 'cần làm' và kỳ mặc định không lùi về tuần trước)", async () => {
+    const badges = async () => {
+      const ctxRes = await mockFetchNoDelay(
+        new Request("http://mock/v1/me/context", {
+          method: "POST",
+          headers: { Authorization: "Bearer mock.kn-an", "Content-Type": "application/json", "Idempotency-Key": `ctx-an-${Math.random()}` },
+          body: JSON.stringify({ assignment_id: "asg-an-xa", department_code: "trong_trot" }),
+        }),
+      );
+      const { context_id } = (await ctxRes.json()) as { context_id: string };
+      const res = await mockFetchNoDelay(new Request("http://mock/v1/me/menu-badges", { headers: { Authorization: "Bearer mock.kn-an", "X-AG-Context": context_id } }));
+      return ((await res.json()) as { counts: Record<string, number> }).counts["extension.report_tasks.todo"];
+    };
+    // Thứ Hai 26/10/2026 10:00 giờ VN: tuần hiện tại 26/10–01/11, 2 xã còn T04 (nháp / chưa nhập).
+    now = Date.parse("2026-10-26T03:00:00Z");
+    resetReportCycle(() => now);
+    expect(await badges()).toBe(2);
+    // Thứ Hai 26/10/2026 01:00 giờ VN (= Chủ Nhật 25/10 18:00 UTC): kỳ đã bắt đầu, số đếm phải như trên.
+    now = Date.parse("2026-10-25T18:00:00Z");
+    resetReportCycle(() => now);
+    expect(await badges()).toBe(2);
+    const tinh = await clientFor("kn-binh", "asg-binh-tinh");
+    const batch = (await tinh.batches()).items[0]!;
+    expect(defaultPeriod(batch.id, now)?.from_date).toBe("2026-10-26");
   });
 
   it("FN-TI-02.02 → 02.05 → TW: phát hành, nhập 2 xã, điều chỉnh, gửi lại, Cập nhật có nhật ký ô, chốt, TW chỉ xem", async () => {

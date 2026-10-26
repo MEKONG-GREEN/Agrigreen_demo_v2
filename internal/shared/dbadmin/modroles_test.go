@@ -103,8 +103,8 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	groups := ModuleGroups()
 	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + pf/evidence + pf/cooperative (W3.3) + pf/price (W11.71) + pf/hrm (W11.21)
 	// + 7 mkg có vai cũ + mkg/engine (W8.2, không vai cũ) + vault/identity; pf/extdata không schema.
-	if len(groups) != 34 || len(legacyGroups()) != 25 {
-		t.Errorf("số vai nhóm: %d (muốn 34 — thêm pf/contact W11.23, 25 có vai cũ): %v", len(groups), groups)
+	if len(groups) != 35 || len(legacyGroups()) != 25 {
+		t.Errorf("số vai nhóm: %d (muốn 35 — thêm pf/contact W11.23, pf/export W10.17, 25 có vai cũ): %v", len(groups), groups)
 	}
 	if slices.ContainsFunc(groups, func(g ModuleGroup) bool { return g.Module == "pf/extdata" }) {
 		t.Error("pf/extdata không có schema — không có vai nhóm")
@@ -213,6 +213,10 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	// W11.23: api-platform ghép pf/contact (cap/directory) — app_platform là thành viên r_contact.
 	if !slices.Contains(plat.MemberOf, "r_contact") {
 		t.Errorf("r_contact: app_platform %v", plat.MemberOf)
+	}
+	// W10.17: api-platform ghép pf/export (cap/export, ADR-0051) — app_platform là thành viên r_export.
+	if !slices.Contains(plat.MemberOf, "r_export") {
+		t.Errorf("r_export: app_platform %v", plat.MemberOf)
 	}
 	// W8.2: api-internal ghép mkg/engine (job engine_observation_feed) — app_internal là thành viên r_engine (chỉ cụm mkg).
 	if in, _ := roleByName(t, AppInternal); !slices.Contains(in.MemberOf, "r_engine") {
@@ -426,6 +430,7 @@ var laterGroups = map[string]string{
 	"pf/price":       "pf/000138_pf_price.up.sql",                     // W11.71 (ADR-0049): khung cap/price
 	"pf/hrm":         "pf/000147_pf_hrm_catalog.up.sql",               // W11.21 (ADR-0050): dom/hrm, danh mục nhân sự
 	"pf/contact":     "pf/20261013230912_pf_contact_directory.up.sql", // W11.23: cap/directory, Contact (FN-13)
+	"pf/export":      "pf/20261024090957_pf_export_docx.up.sql",       // W10.17 (ADR-0051): cap/export, mẫu văn bản + .docx
 }
 
 // pf 000092 (W2.5) cấp SELECT k_ref.* cho MỌI r_* của module pf lúc đó (R-DB-05) — danh sách ghi tay khớp
@@ -475,18 +480,18 @@ func pubReader(reader, pub string) bool {
 }
 
 // ADR-0053 §4 (PFPUB): KHTC trong pf/extension đọc họ hợp đồng closed_figures/v1 của hai nguồn — r_extension là thành
-// viên r_extension_pub, r_forms_pub, r_price_pub (tạo trước r_extension), không thành viên vai _pub nào khác; khai báo chỉ trỏ
+// viên các chủ công bố đã duyệt: closed figures/giá và HTX/cây tổ chức; khai báo chỉ trỏ
 // module có schema _pub.
 func TestPubReaders_PFPUB(t *testing.T) {
 	r, ri := roleByName(t, "r_extension")
-	for _, pub := range []string{"r_extension_pub", "r_forms_pub", "r_price_pub"} {
+	for _, pub := range []string{"r_cooperative_pub", "r_extension_pub", "r_forms_pub", "r_masterdata_pub", "r_party_pub", "r_price_pub"} {
 		p, pi := roleByName(t, pub)
 		if !slices.Contains(r.MemberOf, pub) || pi > ri || p.BypassRLS {
 			t.Errorf("r_extension phải là thành viên %s (tạo trước): %+v", pub, r.MemberOf)
 		}
 	}
 	for _, m := range r.MemberOf {
-		if m != SharedUser && m != "r_extension_pub" && m != "r_forms_pub" && m != "r_price_pub" {
+		if m != SharedUser && m != "r_extension_pub" && m != "r_forms_pub" && m != "r_price_pub" && m != "r_cooperative_pub" && m != "r_party_pub" && m != "r_masterdata_pub" {
 			t.Errorf("r_extension thành viên thừa %s", m)
 		}
 	}

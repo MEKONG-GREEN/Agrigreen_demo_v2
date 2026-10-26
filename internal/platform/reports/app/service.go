@@ -101,6 +101,9 @@ type Service struct {
 	// gọi NGAY SAU điểm kiểm soát cục bộ egress ở cả ba lối. Nil → hành vi cũ.
 	Egress     meter.Checkpoint
 	EgressMode meter.Mode
+	// DispatchLease (P0-WORKER-REPORTS #128): hạn nhận việc gửi báo cáo Chi cục của một worker (gia hạn sau mỗi người
+	// nhận). Quá hạn khi còn "Đang gửi" → được nhận lại / "Gửi lại" tiếp tục cùng lượt. ≤ 0 → dispatch.DefaultSendLease.
+	DispatchLease time.Duration
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
@@ -113,6 +116,9 @@ func (s *Service) log() *slog.Logger {
 }
 
 func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {
+	if s.DB == nil { // P0-WORKER-REPORTS (#128): thiếu pool → lỗi 503, không panic giữa lúc gửi email
+		return ErrDependency.WithDetail("chưa nối pool DB của pf/reports")
+	}
 	return tenant.WithTenantTx(ctx, s.DB, tid, fn)
 }
 

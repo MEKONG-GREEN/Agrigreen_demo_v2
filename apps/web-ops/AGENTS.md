@@ -7,3 +7,5 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+Quy trình, quy ước và cổng chung của repo: [AGENTS.md ở gốc repo](../../AGENTS.md). Ghi chú trên chỉ áp riêng cho Next.js trong thư mục này.

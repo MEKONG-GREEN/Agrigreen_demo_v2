@@ -17,6 +17,7 @@ Tất cả ở trạng thái **`proposed`**: ADR-0033/0034/0035 chờ MKG ký (A
 | [`plot_directory`](feeds/plot_directory.v1.json) (W5.5) | feed | licensed | `partner` / `plot_directory`, theo bên cấp (v1 không hình học) | `plot_ref` | PT6H | A7 | `GET /v1/partner/plots` |
 | [`waterway_routes`](feeds/waterway_routes.v1.json) | feed | reference | `reference` | `network_version_ref` | PT1H | A7 | — (đồ thị ở ảnh chụp) |
 | [`admin_units`](feeds/admin_units.v1.json) | feed | reference, có hiệu lực theo thời gian + kế thừa | `reference` | `code:valid_from` | P1D | A7, **C-9** | — |
+| [`price_board_daily`](feeds/price_board_daily.v1.json) (W11.81) | feed | reference | `reference` | `province_code:board_date:item_code` | PT1H | **A2**, PO | API công khai `/api/public/prices/latest` của prototype |
 | [`collection_schedule`](ingest/collection_schedule.v1.json) | nạp | **bilateral** (MKG ghi) | `bilateral` | `schedule_ref` | PT15M | A7, **C-12** | van `collection_schedule` (lược đồ dùng nguyên) |
 | [`roll_count_statement`](ingest/roll_count_statement.v1.json) | nạp | **bilateral** (MKG ghi) | `bilateral` | `statement_ref` | PT15M | A7, **C-12** | van `htx_collection_statement` (X-04) |
 | [`htx_roll_confirmation`](ingest/htx_roll_confirmation.v1.json) | nạp | **bilateral** (HTX ghi) | `bilateral` | `confirmation_ref` | PT1H | A7, **C-12** | `GET /v1/partner/htx-collection/responses` |

@@ -20,7 +20,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -127,7 +126,7 @@ func slotsOf(def repport.FormDefinition) int {
 
 // PreviewBatch dựng khung xem trước (không ghi gì).
 func (s *Service) PreviewBatch(ctx context.Context, in BatchInput) (Preview, error) {
-	a, err := s.writer(ctx, authz.KNTinh)
+	a, err := s.writer(ctx, port.SessionRoleProvince)
 	if err != nil {
 		return Preview{}, err
 	}
@@ -265,7 +264,7 @@ func (s *Service) preview(ctx context.Context, a actor, in BatchInput, strict bo
 		return x.CommuneCode < y.CommuneCode
 	})
 	// Cán bộ xã phụ trách CÙNG phòng ban (FN-TI-02.02 quy tắc); xã chưa có → cảnh báo.
-	asg, err := s.Assignments.ActiveAssignments(ctx, authz.KNXa, a.k.Department)
+	asg, err := s.Assignments.ActiveAssignments(ctx, port.SessionRoleCommune, a.k.Department)
 	if err != nil {
 		return pv, err
 	}
@@ -307,7 +306,7 @@ type IssueResult struct {
 
 // IssueBatch phát hành đợt: sinh công việc = mẫu × xã × kỳ, giá trị Tỉnh giao, thông báo (FN-TI-02.02).
 func (s *Service) IssueBatch(ctx context.Context, in BatchInput, idem string) (IssueResult, error) {
-	a, err := s.writer(ctx, authz.KNTinh)
+	a, err := s.writer(ctx, port.SessionRoleProvince)
 	if err != nil {
 		return IssueResult{}, err
 	}
@@ -529,7 +528,7 @@ func provincialRows(pv Preview, in BatchInput) ([]store.ProvincialValue, error) 
 
 // ListBatches trả đợt đã phát hành của phạm vi (Cấp Tỉnh, TW, Admin).
 func (s *Service) ListBatches(ctx context.Context, province, reportType string, before *uuid.UUID, limit int) ([]store.Batch, *uuid.UUID, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -569,7 +568,7 @@ func clampLimit(n int) int {
 
 // GetBatch trả đợt kèm kỳ.
 func (s *Service) GetBatch(ctx context.Context, id uuid.UUID) (BatchView, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return BatchView{}, err
 	}
@@ -599,7 +598,7 @@ func (s *Service) batchInScope(ctx context.Context, tx pgx.Tx, a actor, id uuid.
 
 // WithdrawBatch thu hồi đợt chưa có xã nào nộp (sự kiện bù, lý do bắt buộc).
 func (s *Service) WithdrawBatch(ctx context.Context, id uuid.UUID, reason, idem string) (store.Batch, error) {
-	a, err := s.writer(ctx, authz.KNTinh)
+	a, err := s.writer(ctx, port.SessionRoleProvince)
 	if err != nil {
 		return store.Batch{}, err
 	}
@@ -666,7 +665,7 @@ type DeadlineChange struct {
 
 // ChangeDeadline sửa hạn nộp — CHỈ áp cho kỳ chưa đến hạn (FN-TI-02.02 luồng phụ); sự kiện deadline_changed.
 func (s *Service) ChangeDeadline(ctx context.Context, id uuid.UUID, in DeadlineInput, idem string) ([]DeadlineChange, error) {
-	a, err := s.writer(ctx, authz.KNTinh)
+	a, err := s.writer(ctx, port.SessionRoleProvince)
 	if err != nil {
 		return nil, err
 	}
@@ -757,7 +756,7 @@ func (s *Service) ProvincialValuesOf(ctx context.Context, batchID uuid.UUID, tem
 	if err != nil {
 		return nil, err
 	}
-	if a.k.Role == authz.KNXa {
+	if a.k.Role == port.SessionRoleCommune {
 		for tpl, m := range out {
 			for c := range m {
 				if !slices.Contains(a.k.Communes, c) {
@@ -771,7 +770,7 @@ func (s *Service) ProvincialValuesOf(ctx context.Context, batchID uuid.UUID, tem
 
 // BatchLog trả nhật ký đợt (Detail Log).
 func (s *Service) BatchLog(ctx context.Context, id uuid.UUID) ([]LogEntry, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return nil, err
 	}

@@ -18,11 +18,12 @@ func TestW1106_MenuViewComingSoonAndAlias(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v.Version != "kn.menu/v4" || len(v.Groups) < 2 || v.Groups[1].Key != domain.GroupNghiepVu {
+	// BF-MENU (#98, kn.menu/v6): mục nghiệp vụ HCTH nằm trong nhóm Điều hành (Đánh giá), không còn nhóm "Nghiệp vụ".
+	if v.Version != "kn.menu/v7" || len(v.Groups) < 2 || v.Groups[0].Key != "dieu_hanh" || v.Groups[1].Key != domain.GroupBaoCao {
 		t.Fatalf("menu HCTH: %+v", v.Groups)
 	}
 	var it MenuItemView
-	for _, item := range v.Groups[1].Items {
+	for _, item := range v.Groups[0].Items {
 		if item.Key == "tinh.hcth.danh_gia" {
 			it = item
 		}

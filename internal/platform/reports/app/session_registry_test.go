@@ -112,3 +112,41 @@ func TestReportSessionRequiresRegistration(t *testing.T) {
 		})
 	}
 }
+
+// Even a native administrator role cannot override a selected application denial.
+func TestRegisteredFormSessionPrecedesRealmPrivileges(t *testing.T) {
+	p := authz.Principal{ActorRef: uuid.New(), TenantID: uuid.New(), Roles: []string{authz.RolePlatformAdmin, port.RoleReportsAdmin}}
+	ctx := authz.WithPrincipal(context.Background(), p)
+	sentinel := errors.New("owner payload invalid")
+	for _, tc := range []struct {
+		name  string
+		actor port.SessionActor
+		err   error
+		want  error
+	}{
+		{name: "owner error", err: sentinel, want: sentinel},
+		{name: "explicit denial", want: problem.Forbidden},
+		{name: "missing scope", actor: port.SessionActor{Allowed: true}, want: problem.Forbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := Service{ResolveSession: func(context.Context, authz.Principal, string) (port.SessionActor, bool, error) {
+				return tc.actor, true, tc.err
+			}}
+			if _, _, err := svc.formReader(ctx); !errors.Is(err, tc.want) {
+				t.Fatalf("realm bypassed selected owner: %v", err)
+			}
+		})
+	}
+	calls := 0
+	svc := Service{ResolveSession: func(_ context.Context, got authz.Principal, op string) (port.SessionActor, bool, error) {
+		calls++
+		if got.ActorRef != p.ActorRef || got.TenantID != p.TenantID || !got.Has(authz.RolePlatformAdmin) || op != port.SessionReadForms {
+			t.Fatal("identity or operation changed")
+		}
+		return port.SessionActor{Allowed: true, Department: "selected", AllowsDepartment: func(d string) bool { return d == "selected" }}, true, nil
+	}}
+	got, scope, err := svc.formReader(ctx)
+	if err != nil || calls != 1 || got.ActorRef != p.ActorRef || scope == nil || !formDeptAllows(scope, "selected") || formDeptAllows(scope, "other") {
+		t.Fatalf("selected scope lost: %+v %v", scope, err)
+	}
+}

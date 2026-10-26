@@ -73,7 +73,11 @@ type Service struct {
 	Grantors       port.PartnerGrantors
 	// Bilateral: sổ song phương pf/cooperative (W5.6, ADR-0034) — nguồn feed của cặp (BuildBilateral).
 	Bilateral port.BilateralLedger
-	Log       *slog.Logger
+	// PublishedSources / Publishers (W11.81): nguồn feed tham chiếu của dữ liệu đã công bố theo tên feed (pf/price
+	// price_board_daily) và các đơn vị công bố của từng feed (EnvPricePublishers) — BuildPublished.
+	PublishedSources map[string]port.PublishedSource
+	Publishers       map[string][]port.Publisher
+	Log              *slog.Logger
 }
 
 func (s *Service) log() *slog.Logger {

@@ -39,6 +39,10 @@ type Service struct {
 	Rep ReportsConfig
 	// Docs: kho tài liệu nhân sự (W11.24, docs.go) — nil cho tới UseDocs.
 	Docs *DocStore
+	// Promo: nâng bậc W11.25 (promotion*.go) — thông báo job, cổng ghi Word (W10.17).
+	Promo PromotionConfig
+	// Plans: kế hoạch nhân lực năm (W11.27, plan.go) — cổng cap/forms; nil cho tới UsePlans.
+	Plans *PlanDeps
 }
 
 var _ port.Catalog = (*Service)(nil)
@@ -71,11 +75,15 @@ func (s *Service) resolve(ctx context.Context, write bool) (caller, error) {
 	}
 	c := caller{ref: p.ActorRef, tenant: p.TenantID}
 	read := false
-	if p.KN != nil {
-		r := p.KN.Role
-		c.manage = slices.Contains(s.Access.ManageBy, r) && !p.KN.ReadOnly()
+	if s.Access.Session != nil {
+		k, err := s.Access.Session(ctx)
+		if err != nil {
+			return c, err
+		}
+		r := k.Role
+		c.manage = slices.Contains(s.Access.ManageBy, r) && !k.ReadOnly
 		read = c.manage || slices.Contains(s.Access.ManageBy, r) ||
-			(slices.Contains(s.Access.ReadBy, r) && (s.Access.Department == "" || p.KN.Department == s.Access.Department))
+			(slices.Contains(s.Access.ReadBy, r) && (s.Access.Department == "" || k.Department == s.Access.Department))
 	} else {
 		for _, r := range p.Roles {
 			if slices.Contains(s.Access.ManageBy, r) {
@@ -675,6 +683,12 @@ func (s *Service) RuleAt(ctx context.Context, key string, at time.Time) (port.Ru
 }
 
 // classify đổi lỗi DB của pf_hrm sang mã lỗi chung.
+// isUnique: lỗi trùng khóa (23505) — vd chạy lại job cùng ngày.
+func isUnique(err error) bool {
+	var pg *pgconn.PgError
+	return errors.As(err, &pg) && pg.Code == "23505"
+}
+
 func classify(err error) error {
 	var pg *pgconn.PgError
 	if errors.As(err, &pg) && pg.Code == "23505" {

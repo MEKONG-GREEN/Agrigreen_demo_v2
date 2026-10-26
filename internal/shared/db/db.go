@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // Options điều chỉnh pool.
@@ -30,6 +31,10 @@ type Options struct {
 	// — nên ViaPgBouncer = true thì trường này không có tác dụng; giới hạn phía đó đặt ở mức vai DB
 	// (ALTER ROLE … SET statement_timeout) hoặc SET LOCAL trong giao dịch.
 	StatementTimeout time.Duration
+	// AcquireTimeout: hạn chờ lấy kết nối + BEGIN của mọi giao dịch qua tenant.WithTenantTx (P0-POOL-SHARED, #126).
+	// Thiết lập MỨC TIẾN TRÌNH (tenant.SetAcquireTimeout), áp khi Open: 0 = giữ thiết lập hiện hành (mặc định
+	// tenant.DefaultAcquireTimeout); > 0 = đặt; < 0 = không giới hạn (chỉ theo ctx).
+	AcquireTimeout time.Duration
 
 	envErr error // lỗi cú pháp biến môi trường của OptionsFromEnv — Open trả lại (lỗi khởi động rõ ràng)
 }
@@ -42,7 +47,8 @@ const DefaultStatementTimeout = 2 * time.Minute
 // mỗi đơn vị, trần ĐTK 2 cụm pf 4 vai × 20). Ghi đè bằng AG_DB_MAX_CONNS.
 const DefaultUnitMaxConns = 20
 
-// OptionsFromEnv đọc AG_DB_VIA_PGBOUNCER, AG_DB_MAX_CONNS (mặc định DefaultUnitMaxConns — W2.6: mọi module của
+// OptionsFromEnv đọc AG_DB_ACQUIRE_TIMEOUT (Go duration hạn chờ lấy kết nối pool để mở giao dịch; "0" = không giới
+// hạn; chưa đặt = tenant.DefaultAcquireTimeout 30s), AG_DB_VIA_PGBOUNCER, AG_DB_MAX_CONNS (mặc định DefaultUnitMaxConns — W2.6: mọi module của
 // đơn vị dùng chung MỘT pool vai app_<đơn vị>) và AG_DB_STATEMENT_TIMEOUT (Go duration, vd 30s, 2m; "0" = không
 // đặt; chưa đặt = DefaultStatementTimeout). Giá trị sai cú pháp → db.Open trả lỗi nêu tên biến.
 func OptionsFromEnv(appName string) Options {
@@ -51,7 +57,26 @@ func OptionsFromEnv(appName string) Options {
 		o.MaxConns = int32(n) //nolint:gosec // đã chặn khoảng
 	}
 	o.StatementTimeout, o.envErr = statementTimeoutFromEnv(os.Getenv("AG_DB_STATEMENT_TIMEOUT"))
+	if o.envErr == nil {
+		o.AcquireTimeout, o.envErr = acquireTimeoutFromEnv(os.Getenv("AG_DB_ACQUIRE_TIMEOUT"))
+	}
 	return o
+}
+
+// acquireTimeoutFromEnv: "" → 0 (giữ mặc định tenant.DefaultAcquireTimeout), "0" → -1 (không giới hạn), còn lại Go duration > 0.
+func acquireTimeoutFromEnv(v string) (time.Duration, error) {
+	v = strings.TrimSpace(v)
+	switch v {
+	case "":
+		return 0, nil
+	case "0":
+		return -1, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d <= 0 {
+		return 0, fmt.Errorf("db: AG_DB_ACQUIRE_TIMEOUT không hợp lệ (%q): cần Go duration > 0 hoặc \"0\" (không giới hạn), vd 10s, 1m", v)
+	}
+	return d, nil
 }
 
 func statementTimeoutFromEnv(v string) (time.Duration, error) {
@@ -77,6 +102,9 @@ func Open(ctx context.Context, dsn string, o Options) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("db: DSN không hợp lệ: %w", err)
+	}
+	if o.AcquireTimeout != 0 {
+		tenant.SetAcquireTimeout(o.AcquireTimeout) // < 0 → không giới hạn
 	}
 	if o.ViaPgBouncer {
 		cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec

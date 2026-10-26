@@ -73,15 +73,21 @@
 //	AG_DB_MAX_CONNS                    (tùy chọn) cỡ pool vai đơn vị, mặc định 20
 //	AG_DB_PASSWORD_APP_AGG             (chỉ -agg-run) vai đăng nhập riêng app_agg của job tổng hợp (ADR-0031 §3, gói FC) —
 //	                                   pool 2 kết nối, trên AG_DB_REPLICA_URL khi có; AG_AGG_GOVERNANCE_TENANT: tenant quản trị
-//	AG_FCM_PROJECT_ID, AG_FCM_CREDENTIALS_FILE  FCM HTTP v1 (không đặt → kênh đẩy chỉ ghi log); AG_FCM_ENDPOINT, AG_FCM_TOKEN_URL tùy chọn
-//	AG_SMTP_HOST, AG_SMTP_PORT, AG_SMTP_USERNAME, AG_SMTP_PASSWORD, AG_SMTP_FROM, AG_SMTP_DIGEST_TO  email tóm tắt (SMTP trong lãnh thổ)
+//	AG_FCM_PROJECT_ID, AG_FCM_CREDENTIALS_FILE  FCM HTTP v1 (không đặt → kênh đẩy TẮT: bản gửi "dropped", không "sent" —
+//	                                   P0-NOTIFY-FAILCLOSED); AG_FCM_ENDPOINT, AG_FCM_TOKEN_URL tùy chọn
+//	AG_MAILER, AG_PUSHER               rỗng (tự chọn) | smtp/fcm | disabled | log (CHỈ AG_ENV=development|dev|local|test)
+//	AG_SMTP_HOST, AG_SMTP_PORT, AG_SMTP_USERNAME, AG_SMTP_PASSWORD, AG_SMTP_FROM  email (SMTP trong lãnh thổ)
+//	AG_KN_DIGEST_RECIPIENTS_JSON  hộp thư công vụ theo tenant KN; thiếu ánh xạ giữ nguyên hàng chờ, không dùng AG_SMTP_DIGEST_TO
 //	AG_ANCHOR_SIGNING_KEY              Ed25519 (base64 seed 32 byte) — bắt buộc khi có job anchor
 //	AG_ANCHOR_KEY_ID                   (tùy chọn) mã khóa ghi vào manifest
 //	AG_S3_* hoặc AG_OBJSTORE_DIR       kho manifest, tệp báo cáo (shared/objstore)
 //	AG_SMTP_HOST/PORT/USERNAME/PASSWORD/FROM/TLS  (tùy chọn) email lịch gửi báo cáo; thiếu → bỏ gửi kèm cảnh báo
-//	AG_WEB_OPS_URL                     (tùy chọn) URL web-ops cho liên kết tải lại trong email
+//	AG_WEB_OPS_URL                     URL web-ops cho liên kết trong email; ngoài máy phát triển thiếu/localhost → email
+//	                                   thông báo theo người nhận TẮT, email báo cáo bỏ dòng tải lại
 //	AG_REPORT_LINK_BASE                URL gốc công khai api-platform (vd https://api.<domain>) cho liên kết tải
 //	                                   báo cáo Chi cục 7 ngày (A4); thiếu → email vượt giới hạn đính kèm ghi "Gửi lỗi"
+//	AG_REPORT_DISPATCH_LEASE           (tùy chọn) hạn nhận việc gửi báo cáo Chi cục, 3m–24h, mặc định 15m (P0-WORKER-REPORTS):
+//	                                   quá hạn khi còn "Đang gửi" → "Gửi lại" tiếp tục cùng lượt, không gửi lại người đã nhận
 //	AG_RABBITMQ_MGMT_URL               (tùy chọn) management API cho metric độ sâu DLQ
 //	AG_INTEGRATION_CONTRIBUTORS        (W5.3) tenant đóng góp tập tổng hợp của feed cổng tích hợp (job apiclient_feed_build);
 //	AG_INTEGRATION_BUILD_INTERVAL      chu kỳ dựng (mặc định 15m); job apiclient_feed_retention dọn feed quá 30 ngày
@@ -90,6 +96,9 @@
 //	AG_OTLP_ENDPOINT, ...              OpenTelemetry (shared/telemetry)
 //	AG_HEALTH_ADDR                     /healthz, /readyz (pool ping + kết nối RabbitMQ) — mặc định :8087, chỉ mạng nội bộ
 //
+// RabbitMQ mất kết nối → worker không thoát: kết nối lại có độ lùi (1s·2^n, trần 30s), khai báo lại hàng đợi và đăng ký
+// lại mọi consumer (amqp_reconnect.go, P0-WORKER-REPORTS #128).
+//
 // `worker -healthcheck <url>`: GET url, thoát 0 khi 200 — healthcheck Docker (distroless).
 package main
 
@@ -97,6 +106,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"log/slog"
@@ -109,13 +119,13 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/healthsrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
 	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
@@ -145,6 +155,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -156,6 +167,8 @@ type consumer struct {
 	module  db.ModuleID
 	events  []string
 	handler inbox.Handler
+	// prepare (tùy chọn, P0-WORKER-REPORTS #128) dựng + kiểm phụ thuộc của handler lúc khởi động; lỗi → worker không chạy.
+	prepare func(ctx context.Context) error
 }
 
 func consumers(log *slog.Logger) []consumer {
@@ -295,16 +308,23 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 	if amqpURL == "" {
 		return 0, func() {}, errors.New("thiếu AG_AMQP_URL (hoặc chạy -modules=none)")
 	}
-	conn, err := amqp.Dial(amqpURL)
-	if err != nil {
-		return 0, func() {}, err
+	var sel []consumer
+	for _, c := range allConsumers(log) {
+		if !selected(mods, c.name) {
+			continue
+		}
+		if c.cluster != migrations.PF || !c.module.Valid() {
+			return 0, func() {}, errors.New("worker: consumer " + c.name + " thiếu module (ADR-0028) hoặc không ở cụm pf")
+		}
+		sel = append(sel, c)
 	}
 	var pools []*pgxpool.Pool
+	cur := &currentConn{}
 	closeFn := func() {
 		for _, p := range pools {
 			p.Close()
 		}
-		_ = conn.Close()
+		cur.close()
 	}
 	// W2.6 (ADR-0028): MỘT pool vai đăng nhập app_worker cho mọi consumer; mỗi consumer chạy giao dịch inbox
 	// dưới vai nhóm của module nhận (db.ForModule). GIS US-SYNC-01/02: mọi lần xử lý thất bại ghi vào
@@ -321,7 +341,7 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 		return 0, func() {}, err
 	}
 	pools = append(pools, pool)
-	hs.Add("amqp", healthsrv.Closed(conn.IsClosed))
+	hs.Add("amqp", healthsrv.Closed(cur.isClosed))
 	hs.Add("db", healthsrv.Pools(func() []*pgxpool.Pool { return pools }))
 	// Ghi lần thất bại trên pool riêng (cùng vai app_worker): không tranh kết nối với giao dịch inbox đang mở.
 	recPool, err := db.Open(ctx, dsn, db.Options{AppName: "worker-sync-monitor", MaxConns: 2, ViaPgBouncer: db.OptionsFromEnv("").ViaPgBouncer})
@@ -331,29 +351,41 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 	}
 	pools = append(pools, recPool)
 	rec := syncmod.FailureRecorder(recPool, clock.System{})
-	started := 0
-	for _, c := range allConsumers(log) {
-		if !selected(mods, c.name) {
+	// P0-WORKER-REPORTS (#128): dựng + kiểm phụ thuộc của handler (vd pf/reports cần pool DB thật) TRƯỚC khi nhận
+	// thông điệp — thiếu → không khởi động, thay vì panic giữa lúc xử lý.
+	for _, c := range sel {
+		if c.prepare == nil {
 			continue
 		}
-		if c.cluster != migrations.PF || !c.module.Valid() {
+		if err := c.prepare(ctx); err != nil {
 			closeFn()
-			return 0, func() {}, errors.New("worker: consumer " + c.name + " thiếu module (ADR-0028) hoặc không ở cụm pf")
+			return 0, func() {}, fmt.Errorf("worker: consumer %s chưa sẵn sàng: %w", c.name, err)
 		}
-		ch, err := conn.Channel()
-		if err != nil {
-			closeFn()
-			return 0, func() {}, err
-		}
-		if err := inbox.DeclareQueue(ch, c.name, c.events); err != nil {
-			closeFn()
-			return 0, func() {}, err
-		}
-		started++
-		b := db.ForModule(pool, c.module)
-		go func(c consumer) { errc <- inbox.ConsumeWith(ctx, ch, b, c.name, c.handler, log, rec) }(c)
 	}
-	return started, closeFn, nil
+	dbFor := func(c consumer) tenant.Beginner { return db.ForModule(pool, c.module) }
+	// Lần quay số đầu: lỗi → không khởi động (cấu hình sai lộ ngay). Sau đó mất kết nối → kết nối lại, không thoát.
+	first, err := dialSession(amqpURL, sel, dbFor)
+	if err != nil {
+		closeFn()
+		return 0, func() {}, err
+	}
+	cur.set(first.conn)
+	loop := amqpLoop[*amqpSession]{
+		connect: func(context.Context) (*amqpSession, error) {
+			s, err := dialSession(amqpURL, sel, dbFor)
+			if err == nil {
+				cur.set(s.conn)
+			}
+			return s, err
+		},
+		serve:   func(ctx context.Context, s *amqpSession) error { return serveSession(ctx, s, log, rec) },
+		close:   func(s *amqpSession) { _ = s.conn.Close() },
+		backoff: amqpBackoff,
+		sleep:   sleepCtx,
+		log:     log,
+	}
+	go func() { errc <- loop.run(ctx, first) }()
+	return len(sel), closeFn, nil
 }
 
 type opsSchedule struct {
@@ -473,7 +505,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		md := masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 		pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits()})
 		kn := extension.New(extPool, clk, extension.Deps{
-			Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
+			Scope: pty.ScopeResolver(), Orgs: extension.NewPublishedOrganizations(extPool), Units: extension.NewPublishedAdminUnits(extPool), Params: md.Params(), Catalogs: md.Catalogs(),
 		})
 		if selected(jobs, extension.JobEscalation) {
 			js = append(js, kn.Jobs(extension.OverdueTenants(out.pools[migrations.PF]), log)...)
@@ -630,6 +662,23 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		js = append(js, mods.Extension.ReportCycleJobs(extension.ReportCycleTenants(out.pools[migrations.PF]), log)...)
 	}
+	if selected(jobs, hrm.JobPromotionScan) {
+		// W11.25 (BRD HCTH v3.0 FN-09 bước 1): tính mốc NLTX/TNVK hằng ngày → sổ pf_hrm.promotion_scan (+ thông báo khi nối);
+		// dựng pf/hrm qua assembly.Build (r_hrm); tìm tenant bằng ag_ops_jobs (cột tenant_id của pf_hrm.staff).
+		mods, mpools, err := buildPlatform(ctx, direct)
+		prevClose := closeFn
+		closeFn = func() {
+			for _, p := range mpools {
+				p.Close()
+			}
+			prevClose()
+		}
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		js = append(js, mods.HRM.PromotionJobs(hrm.PromotionTenants(out.pools[migrations.PF]), log)...)
+	}
 	if selected(jobs, apiclientport.JobKeyExpiry) && os.Getenv(apiclientport.EnvOperatorTenant) != "" {
 		// G5 (ADR-0022 mục 4, RB-1): khóa API quá hạn → sự kiện expired ở sổ api_key_event của tenant đơn vị
 		// vận hành (AG_PUBLIC_OPERATOR_TENANT; không đặt — ĐTK 1 — thì không có job), r_apiclient.
@@ -702,7 +751,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			extport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot +
 			", " + mrvport.JobReviewEscalator + ", " + extension.JobReportCycle + ", " + extension.JobCNTSAlert +
 			", " + apiclientport.JobKeyExpiry + ", " + apiclientport.JobFeedBuild + ", " + apiclientport.JobFeedRetention + ", " + apiclientport.JobWebhookDispatch +
-			", " + priceport.JobCalendar + ")")
+			", " + priceport.JobCalendar + ", " + hrm.JobPromotionScan + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil

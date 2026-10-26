@@ -56,3 +56,16 @@ auth.{$AG_DOMAIN} {
 	respond @kcadmin 403
 	reverse_proxy keycloak:8080
 }
+
+# SigV4 bao gồm Host: giữ host công khai khi chuyển tới S3 nội bộ.
+# Bucket không công khai: chỉ GET/HEAD có chữ ký, không mở thao tác quản trị/ghi.
+files.{$AG_DOMAIN} {
+ import common
+ @read method GET HEAD
+ handle @read {
+  reverse_proxy seaweedfs:9000 {
+   header_up Host {http.request.host}
+  }
+ }
+ respond 405
+}

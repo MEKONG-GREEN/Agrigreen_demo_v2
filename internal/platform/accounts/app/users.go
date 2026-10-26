@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -47,7 +48,7 @@ func (s *Service) prepare(ctx context.Context, a *actor, in CreateInput) (prepar
 	if err != nil {
 		return prepared{}, fieldProblem(err)
 	}
-	roles, err := domain.NormalizeRoles(in.Roles)
+	roles, err := domain.NormalizeRolesWithCatalog(in.Roles, s.RoleCatalog())
 	if err != nil {
 		return prepared{}, fieldProblem(err)
 	}
@@ -61,7 +62,7 @@ func (s *Service) prepare(ctx context.Context, a *actor, in CreateInput) (prepar
 	if err != nil {
 		return prepared{}, err
 	}
-	if err := domain.RolesFitOrg(roles, string(o.Kind)); err != nil {
+	if err := domain.RolesFitOrgWithCatalog(roles, string(o.Kind), s.RoleCatalog()); err != nil {
 		return prepared{}, fieldProblem(err)
 	}
 	return prepared{prof: prof, roles: roles, org: o.Ref}, nil
@@ -108,7 +109,7 @@ func (s *Service) create(ctx context.Context, a *actor, in CreateInput) (Result,
 	if err := s.checkUnique(ctx, a, pr.prof); err != nil {
 		return Result{}, err
 	}
-	acts := domain.RequiredActions(pr.roles)
+	acts := domain.RequiredActionsWithCatalog(pr.roles, s.RoleCatalog())
 	id, err := s.Dir.CreateUser(ctx, port.NewUser{
 		Username: pr.prof.Username, Email: pr.prof.Email, FirstName: pr.prof.FirstName, LastName: pr.prof.LastName,
 		Phone: pr.prof.Phone, TenantID: a.p.TenantID, OrgRef: pr.org, RequiredActions: acts,
@@ -266,8 +267,8 @@ func (s *Service) unlock(ctx context.Context, a *actor, in LockInput) (Result, e
 		return Result{}, err
 	}
 	cur := t.state()
-	// GIS US-LOG-01 AC-3: khóa do đăng nhập sai 5 lần/15 phút (realm permanentLockout) chỉ mở
-	// khi Admin mở khóa — Keycloak giữ enabled = true nên phải hỏi trạng thái chống dò riêng.
+	// GIS US-LOG-01 AC-3: khóa do đăng nhập sai 5 lần là khóa tạm 15 phút rồi tự mở (P0-VPS-OPS #131);
+	// Admin vẫn mở sớm được — Keycloak giữ enabled = true nên phải hỏi trạng thái chống dò riêng.
 	bruteForce, err := s.Dir.BruteForceLocked(ctx, t.user.ID)
 	if err != nil {
 		return Result{}, dirErr(err)
@@ -388,7 +389,7 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (Result, error) {
 	}
 	newRoles := t.roles
 	if in.Roles != nil {
-		if newRoles, err = domain.NormalizeRoles(in.Roles); err != nil {
+		if newRoles, err = domain.NormalizeRolesWithCatalog(in.Roles, s.RoleCatalog()); err != nil {
 			return Result{}, fieldProblem(err)
 		}
 		if err := a.checkGrant(newRoles); err != nil {
@@ -413,7 +414,7 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := domain.RolesFitOrg(newRoles, string(o.Kind)); err != nil {
+	if err := domain.RolesFitOrgWithCatalog(newRoles, string(o.Kind), s.RoleCatalog()); err != nil {
 		return Result{}, fieldProblem(err)
 	}
 	if orgRef != t.user.OrgRef {
@@ -440,7 +441,7 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (Result, error) {
 	}
 	totp := false
 	// D24: cấp thêm vai bắt TOTP lúc đăng nhập (vai [MFA] hoặc cán bộ KN) mà chưa có TOTP → đăng ký ở lần sau.
-	if port.NeedsLoginTOTP(newRoles) && !port.NeedsLoginTOTP(t.roles) {
+	if s.RoleCatalog().NeedsLoginTOTP(newRoles) && !s.RoleCatalog().NeedsLoginTOTP(t.roles) {
 		has, err := s.Dir.HasOTP(ctx, t.user.ID)
 		if err != nil {
 			return Result{}, dirErr(err)
@@ -477,6 +478,12 @@ type UserView struct {
 	Tracked   bool // có trong pf_accounts (tạo hoặc thao tác qua nền tảng)
 	// MFA: trạng thái TOTP (chỉ ở Get — đọc thêm Keycloak; D24).
 	MFA *MFAStatus
+	// LoginLocked is runtime Keycloak lockout, queried only for the authorized detail view.
+	// Nil means not queried (list/create); it is distinct from administratively disabled.
+	LoginLocked *bool
+	// LoginLockedUntil: khóa tạm 15 phút (P0-VPS-OPS #131) dự kiến tự hết lúc này; nil khi không khóa
+	// hoặc không suy được. Admin vẫn mở khóa sớm được.
+	LoginLockedUntil *time.Time
 }
 
 // Get đọc một tài khoản trong phạm vi.
@@ -504,6 +511,11 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (UserView, error) {
 		return UserView{}, err
 	}
 	v.MFA = &m
+	lock, err := s.Dir.LoginLockStatus(ctx, id)
+	if err != nil {
+		return UserView{}, dirErr(err)
+	}
+	v.LoginLocked, v.LoginLockedUntil = &lock.Locked, lock.Until
 	return v, nil
 }
 

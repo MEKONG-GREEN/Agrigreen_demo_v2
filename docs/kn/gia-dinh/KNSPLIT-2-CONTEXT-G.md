@@ -1,0 +1,9 @@
+## KNSPLIT-2-CONTEXT-G — Phiên KN cho cảnh báo, lịch CNTS và vòng đời báo cáo
+
+Nền dev a4dbc7e2 đã tích hợp CONTEXT-F. Chuyển caller và hằng quyền ở cntsalert/cntscal/reportcycle sang port.SessionContext/RequireSession. Đồng bộ đọc owner qua ReadSessionContext, giữ401 thiếu danh tính và403 thiếu ngữ cảnh để thiết bị cũ đồng bộ entity khác. Phạm vi đồng bộ là giao giữa xã owner và scope thiết bị, loại trùng, không lấy legacy/realm mở rộng. Giữ vai/phòng/nhóm/quyền chỉ xem/hỗ trợ/actor/tenant/MFA, lịch D8, M1–M7 và sổ chỉ ghi thêm.
+
+Hai signed-JWT/PG modulefixtures nối registry thực; KN77 đã nối ởD. TEST-CTX-014:27HTTPcase qua3reader thật, kiểm deny trướcTX và owneradmin quaPG khi legacycommune/nil;11ca đồng bộ kiểm failclosed/giao xã/rawidentity. ExistingKN77p7 bảo vệ vòngđời đồngbộ códữliệu; không đổi35goldens/DDL/ACL/API. Ranh giới baseline314 chỉ giảm. Không xóa sharedlegacy/accounts/party hay chuyển tenant ở gói này.
+
+Cổng Go1.26.9/privatePG/noSKIP: source cntsalert-handler/cntscal-handler/reportcycle-app/contextdata; staticfull/lint/boundary/gofmt2old; full5dbadmin/metrics/KN77/APIassembly/worker; helper9migrationhardACL+2handler/reportcycle-app/contextdata/APIassembly. Package sources freeze riêngtree trongmọi Go/test/static/helper; cácagenttreeđộc lập theooverride72h cóthể chạy. Chỉrootgộpdevtuầntự/giữmain-worktrees.
+
+Trước tích hợp: source31484actual0/noFAILSKIP cntsalert-handler144.781s/cntscal-handler74.059s/reportcycle-app1.225s(11sync case)/contextdata64.021s; private56568/e7068de08c76 dọn. Static-verified44299actual0/lint0/boundary314/fmt2old; initial1367 chỉdocscheckFroadmap vàfullguard90686 trướcPG giữlog, fix08532612 chỉMarkdown. Full5-verified5891actual0/noFAILSKIP, đủ27newHTTPcase vàKN77p7/populatedflows; private51845/309fb455e3eb dọn. Toàn35goldens/migrations/contracts giữ nền a4; chờ helper9 và2handlers/reportcycle-app/contextdata/APIassembly trêndevmới2e82 trướcclaimtíchhợp. Không lặp sourceđãPASS.

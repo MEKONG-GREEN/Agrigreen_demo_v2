@@ -8,7 +8,7 @@ import { fromKnMenu } from "@/kn/menuAdapter";
 import { menuLinks } from "@/shell/menu";
 import fixture from "./fixtures/kn-menu.json";
 import { mockFetchNoDelay } from "./handler";
-import { DEFAULT_ROUTE, knMenu, MENU_VERSION } from "./kn";
+import { DEFAULT_ROUTE, knMenu, MENU_VERSION, navigationRoute } from "./kn";
 import { KN_DEPARTMENTS, KN_MENU_PROFILE } from "./kn-accounts";
 import { mockToken } from "./personas";
 
@@ -75,7 +75,7 @@ describe("fromKnMenu — trình bày Hình 3c", () => {
     const admin = cases.find((c) => c.name === "admin")!.menu;
     const pb = fromKnMenu(admin).groups.find((g) => g.key === "phong_ban")!;
     expect(pb.items.map((i) => [i.label, i.status ?? "active", i.children?.length ?? 0])).toEqual([
-      ["Phòng Trồng trọt", "active", 8], // W11.11: + Báo cáo cho KHTC
+      ["Phòng Trồng trọt", "active", 10], // W11.11: + Báo cáo cho KHTC; W11.54: + Trang chủ phòng, Quy trình, văn bản
       ["Chăn nuôi - TS", "not_open", 0],
       ["Kế hoạch - TC", "not_open", 0],
       ["2 phòng khác", "not_open", 0],
@@ -89,34 +89,109 @@ describe("fromKnMenu — trình bày Hình 3c", () => {
   });
 });
 
-describe("kn.menu/v3 (W11.06): khuôn theo phòng ban + Dùng chung", () => {
-  it("phòng ban khác Trồng trọt: Điều hành / Nghiệp vụ (Sắp có) / Báo cáo / Dùng chung; mục Sắp có không bấm được", () => {
-    for (const code of ["chan_nuoi_thuy_san", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) {
-      const m = cases.find((c) => c.name === `kn_tinh/${code}`)!.menu;
-      expect(m.groups.map((g) => g.key)).toEqual(["dieu_hanh", "nghiep_vu", "bao_cao", "dung_chung"]);
-      const tree = fromKnMenu(m);
-      const biz = tree.groups.find((g) => g.key === "nghiep_vu")!;
-      // Mục đã có màn bấm được (W11.72 Cấu hình báo giá QTNV, W11.41 Danh mục CNTS, W11.21 Danh mục nhân sự, W11.75 Kiểm duyệt & công bố,
-      // W11.42 Biểu mẫu & cấp quyền, W11.49 Báo cáo dịch bệnh, W11.43 Cảnh báo, W11.22 Hồ sơ nhân sự, W11.77 báo cáo giá, W11.44 KSGM tuần, tháng + Thủy sản (Phụ lục 2)); còn lại "Sắp có".
-      const open = new Set(["tinh.bao_gia.cau_hinh", "tinh.bao_gia.kiem_duyet", "tinh.bao_gia.tien_do", "tinh.bao_gia.bang_gia",
-        "tinh.bao_gia.bien_dong", "tinh.bao_gia.dashboard", "tinh.bao_gia.thong_ke", "tinh.cnts.danh_muc", "tinh.cnts.bieu_mau", "tinh.cnts.dich_benh", "tinh.cnts.canh_bao", "tinh.hcth.danh_muc", "tinh.hcth.ho_so",
-        "tinh.cnts.ksgm", "tinh.cnts.phu_luc_2", "tinh.hcth.dashboard", "tinh.hcth.bao_cao_so", "tinh.hcth.kho_tai_lieu", "tinh.cnts.lich", "tinh.cnts.lich_tiem", "tinh.cnts.lich_cong_tac"]);
-      expect(biz.items.filter((i) => !open.has(i.key)).every((i) => i.status === "coming_soon")).toBe(true);
-      const links = menuLinks(tree).map((l) => l.node.key);
-      expect(links).toContain("tinh.dashboard"); // khung chung vẫn chạy
-      expect(links.filter((k) => biz.items.some((i) => i.key === k))).toEqual(
-        code === "thong_tin_truyen_thong"
-          ? ["tinh.bao_gia.tien_do", "tinh.bao_gia.kiem_duyet", "tinh.bao_gia.bang_gia", "tinh.bao_gia.bien_dong", "tinh.bao_gia.dashboard",
-              "tinh.bao_gia.thong_ke", "tinh.bao_gia.cau_hinh"]
-          : code === "chan_nuoi_thuy_san"
-            ? ["tinh.cnts.canh_bao", "tinh.cnts.bieu_mau", "tinh.cnts.dich_benh", "tinh.cnts.ksgm", "tinh.cnts.phu_luc_2", "tinh.cnts.lich", "tinh.cnts.lich_tiem", "tinh.cnts.lich_cong_tac", "tinh.cnts.danh_muc"]
-            : code === "hanh_chinh_tong_hop"
-              ? ["tinh.hcth.dashboard", "tinh.hcth.ho_so", "tinh.hcth.bao_cao_so", "tinh.hcth.kho_tai_lieu", "tinh.hcth.danh_muc"]
-              : [],
-      );
+describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): menu theo Update prototype và hình khách gửi", () => {
+  type Tree = string | [string, Tree[]];
+  /** Cây nhãn của nhóm; "*" = Sắp có. */
+  const tree = (items: KnMenu["groups"][number]["items"]): Tree[] =>
+    items.map((i) => (i.children.length ? [i.label, tree(i.children)] : i.status === "coming_soon" ? `${i.label}*` : i.label));
+  const menuOf = (name: string) => cases.find((c) => c.name === name)!.menu;
+  const groupsOf = (name: string) => Object.fromEntries(menuOf(name).groups.map((g) => [g.label, tree(g.items)]));
+  const KHTC: Tree = ["Báo cáo cho KHTC", ["Phiếu kỳ này", "Phiếu đã gửi", "Tiến độ các CT của phòng*", "Báo cáo KHTC đã xuất*"]];
+  const T = (t02: boolean) =>
+    ["T01 · Tiến độ XG", ...(t02 ? ["T02 · Lúa mùa"] : []), "T03 · Phân trà", "T04 · Rau màu", "T05 · Sâu bệnh lúa", "T06 · Sâu bệnh khác", "T07 · Thu hoạch"];
+  const V = ["V01 · 3G3T", "V02 · 1P5G", "V03 · CGH", "V04 · CCG", "V05 · Lượng giống", "V06 · Mô hình"];
+
+  it("mọi phòng ban: Điều hành / Báo cáo / Dữ liệu / Dùng chung, không còn nhóm Nghiệp vụ", () => {
+    for (const c of cases.filter((x) => x.audience !== "admin")) expect(c.menu.groups.map((g) => g.key)).not.toContain("nghiep_vu");
+    for (const code of ["trong_trot", "chan_nuoi_thuy_san", "ke_hoach_tai_chinh", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) {
+      expect(menuOf(`kn_tinh/${code}`).groups.map((g) => g.key)).toEqual(["dieu_hanh", "bao_cao", "du_lieu", "dung_chung"]);
     }
     // KHTC: Cấp Xã không có menu KHTC.
-    expect(cases.find((c) => c.name === "kn_xa/ke_hoach_tai_chinh")!.menu.groups.map((g) => g.key)).toEqual(["dieu_hanh", "bao_cao", "dung_chung"]);
+    expect(menuOf("kn_xa/ke_hoach_tai_chinh").groups.map((g) => g.key)).toEqual(["dieu_hanh", "bao_cao", "dung_chung"]);
+  });
+
+  it("UP-01 Trồng trọt Cấp Xã đúng hình file v1", () => {
+    expect(groupsOf("kn_xa/trong_trot")).toEqual({
+      "Điều hành": [["Nhiệm vụ", ["Công việc cần làm", "Lịch công tác"]]],
+      "Báo cáo": [["Báo cáo tuần", T(true)], "Báo cáo tháng", ["Báo cáo hàng vụ", V], "Báo cáo của xã"],
+      "Dữ liệu": [["Thu thập dữ liệu", ["Danh sách HTX", "Máy móc HTX", "Vẽ thửa ruộng", "Vật tư"]], "Quy trình, văn bản"], // W11.54
+      "Dùng chung": ["Contact"],
+    });
+  });
+
+  it("UP-02 Trồng trọt Cấp Tỉnh đúng hình file v2 (3 cấp)", () => {
+    const g = groupsOf("kn_tinh/trong_trot");
+    expect(g["Điều hành"]).toEqual(["Trang chủ phòng", "Dashboard", ["Nhiệm vụ", ["Phát hành biểu mẫu", "Trạng thái nộp", "Rà soát & chốt kỳ", "Lịch công tác"]]]);
+    expect(g["Báo cáo"]).toEqual([
+      ["Báo cáo tổng hợp các xã", [["Báo cáo tuần", T(false)], "Báo cáo tháng", ["Báo cáo hàng vụ", V], "Báo cáo năm"]],
+      "Báo cáo Chi cục",
+      KHTC,
+    ]);
+    expect(g["Dữ liệu"]).toEqual([["Thu thập dữ liệu", ["Danh sách HTX", "Máy móc HTX", "Thửa ruộng", "Vật tư"]], "Quy trình, văn bản"]); // W11.54
+  });
+
+  it("UP-03 CNTS Cấp Xã đúng hình file v1", () => {
+    expect(groupsOf("kn_xa/chan_nuoi_thuy_san")).toEqual({
+      "Điều hành": ["Việc cần làm", "Lịch trực KSGM của tôi", "Lịch công tác"],
+      "Báo cáo": ["KSGM hằng ngày", "Nhập liệu tuần chăn nuôi", "Khai thác thủy sản tuần", "Báo cáo công việc tuần", "Báo cáo dịch bệnh"],
+      "Dữ liệu": ["Hộ mô hình", ["Nhật ký sản xuất", ["Thủy sản", "Chăn nuôi"]], "Lịch tiêm phòng", "Bản đồ vùng dịch", "Điểm trình diễn", "Quy trình, văn bản"],
+      "Dùng chung": ["Contact"],
+    });
+    expect(menuOf("kn_xa/chan_nuoi_thuy_san").default_route).toBe("/kn/cnts/bao-cao-ky");
+  });
+
+  it("UP-10 CNTS Cấp Tỉnh đúng hình khách gửi 23/10", () => {
+    const g = groupsOf("kn_tinh/chan_nuoi_thuy_san");
+    expect(g["Điều hành"]).toEqual([
+      "Trang chủ phòng", // W11.54: trang chủ phòng (FN-17); "Trang chủ" theo hình giữ Dashboard
+      "Trang chủ",
+      "Cảnh báo",
+      ["Biểu mẫu", ["Thiết kế biểu mẫu*", "Phát hành, theo dõi nộp", "Cấu hình nhắc nhở", "Rà soát nhật ký", "Cấp quyền"]],
+      ["Lịch", ["Lịch trực KSGM", "Lịch tiêm phòng", "Lịch công tác cán bộ xã", "Lịch công tác phòng"]],
+      ["Chiến dịch điều tra", ["Quản lý chiến dịch", "Tạo chiến dịch*"]],
+    ]);
+    expect(g["Báo cáo"]).toEqual(["Báo cáo định kỳ*", "KSGM tuần, tháng", "Thủy sản (Phụ lục 2)", "Báo cáo dịch bệnh", KHTC]);
+    expect(g["Dữ liệu"]).toEqual([
+      ["Số liệu cấp xã", ["Nhập liệu tuần*", "Khai thác thủy sản*", "Nhật ký sản xuất*", "Lịch tiêm (thực tế)"]],
+      "Bản đồ vùng dịch",
+      ["Dự án KNQG", ["Dự án, điểm trình diễn", "Mẫu biểu dự án*"]],
+      "Quy trình, văn bản",
+    ]);
+    // Số đếm lịch chờ duyệt giữ ở "Lịch công tác cán bộ xã".
+    const lich = menuOf("kn_tinh/chan_nuoi_thuy_san").groups[0]!.items.find((i) => i.label === "Lịch")!;
+    expect(lich.children.find((i) => i.label === "Lịch công tác cán bộ xã")!.badge_source).toBe("extension.work_schedules.pending");
+  });
+
+  it("KHTC, Báo giá, HCTH: mục nghiệp vụ trong 3 nhóm; mục chưa có màn là Sắp có, mục khác bấm được", () => {
+    const leaves = (name: string) => menuLinks(fromKnMenu(menuOf(name))).map((l) => `${l.group.key}:${l.node.key}`);
+    expect(leaves("kn_tinh/ke_hoach_tai_chinh")).toEqual(
+      expect.arrayContaining(["dieu_hanh:tinh.khtc.ky_bao_cao", "dieu_hanh:tinh.khtc.ke_hoach_nam", "bao_cao:tinh.khtc.bao_cao", "bao_cao:tinh.khtc.tien_do", "bao_cao:tinh.khtc.da_xuat"]),
+    );
+    expect(leaves("kn_tinh/thong_tin_truyen_thong")).toEqual(
+      expect.arrayContaining(["dieu_hanh:tinh.bao_gia.tien_do", "dieu_hanh:tinh.bao_gia.kiem_duyet", "dieu_hanh:tinh.bao_gia.cau_hinh", "bao_cao:tinh.bao_gia.bang_gia",
+        "bao_cao:tinh.bao_gia.bien_dong", "bao_cao:tinh.bao_gia.gia_thanh" /* W11.78 */, "bao_cao:tinh.bao_gia.dashboard", "bao_cao:tinh.bao_gia.thong_ke",
+        "du_lieu:tinh.bao_gia.dieu_tra" /* W11.78 */]),
+    );
+    expect(leaves("kn_xa/thong_tin_truyen_thong")).toEqual(
+      expect.arrayContaining(["dieu_hanh:xa.bao_gia.nhap", "dieu_hanh:xa.bao_gia.xac_minh", "bao_cao:xa.bao_gia.bang_gia", "du_lieu:xa.bao_gia.lich_su"]),
+    );
+    expect(leaves("kn_tw/thong_tin_truyen_thong")).toContain("bao_cao:tw.bao_gia.gia_thanh"); // W11.78: Giá thành sản xuất (TW) có màn
+    expect(leaves("kn_tinh/hanh_chinh_tong_hop")).toEqual(
+      expect.arrayContaining(["dieu_hanh:tinh.hcth.dashboard", "dieu_hanh:tinh.hcth.nang_bac", "dieu_hanh:tinh.hcth.quyet_dinh_nang_bac", "dieu_hanh:tinh.hcth.ke_hoach" /* W11.27 */, "bao_cao:tinh.hcth.bao_cao_so",
+        "du_lieu:tinh.hcth.ho_so", "du_lieu:tinh.hcth.kho_tai_lieu", "du_lieu:tinh.hcth.danh_muc"]),
+    );
+    expect(groupsOf("kn_tinh/ke_hoach_tai_chinh")["Dữ liệu"]).toEqual(["Số liệu nguồn ngoài*", "Quy trình, văn bản"]);
+    expect(groupsOf("kn_tinh/thong_tin_truyen_thong")["Dữ liệu"]).toEqual(["Điều tra giá thành", "Mặt hàng*", "Quy trình, văn bản"]); // W11.78: Điều tra giá thành có màn
+    expect(groupsOf("kn_tw/chan_nuoi_thuy_san")["Dữ liệu"]).toEqual(["Dự án KNQG"]);
+    // W11.54: Trang chủ phòng đầu Điều hành Cấp Tỉnh mọi phòng; Quy trình, văn bản (/kn/van-ban) cuối Dữ liệu; Cấp Xã/TW không có Trang chủ phòng.
+    for (const code of ["trong_trot", "chan_nuoi_thuy_san", "ke_hoach_tai_chinh", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) {
+      expect(leaves(`kn_tinh/${code}`)[0]).toBe("dieu_hanh:tinh.trang_chu");
+      expect(leaves(`kn_xa/${code}`)).not.toContain("dieu_hanh:tinh.trang_chu");
+      expect(leaves(`kn_tw/${code}`)).not.toContain("dieu_hanh:tinh.trang_chu");
+    }
+    expect(leaves("kn_tinh/hanh_chinh_tong_hop").filter((l) => l.startsWith("du_lieu:")).at(-1)).toBe("du_lieu:tinh.van_ban");
+    for (const code of ["trong_trot", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) expect(leaves(`kn_xa/${code}`).filter((l) => l.startsWith("du_lieu:")).at(-1)).toBe("du_lieu:xa.van_ban");
+    expect(menuOf("kn_xa/chan_nuoi_thuy_san").groups.find((g) => g.key === "du_lieu")!.items.find((i) => i.key === "xa.cnts.quy_trinh")!.route).toBe("/kn/van-ban");
   });
 
   it("W11.11: Báo cáo cho KHTC cuối nhóm Báo cáo của Cấp Tỉnh 4 phòng chuyên môn; không ở KHTC, Cấp Xã", () => {
@@ -143,5 +218,43 @@ describe("kn.menu/v3 (W11.06): khuôn theo phòng ban + Dùng chung", () => {
     );
     expect(res.status).toBe(200);
     expect(((await res.json()) as KnMenu).department?.code).toBe("hanh_chinh_tong_hop");
+  });
+});
+
+
+describe("KHTC default navigation uses registered owner menu policy",()=>{
+  it("KHTC and professional profile contexts land on their enabled pages",()=>{
+    for(const [department,expected] of [["ke_hoach_tai_chinh","/kn/khtc/ky-bao-cao"],["trong_trot","/kn/bao-cao-khtc"],["chan_nuoi_thuy_san","/kn/bao-cao-khtc"],["thong_tin_truyen_thong","/kn/bao-cao-khtc"],["hanh_chinh_tong_hop","/kn/bao-cao-khtc"]] as const){
+      const menu=knMenu("kn_tinh",department);
+      expect(menu.default_route).toBe(expected);
+      expect(menuLinks(fromKnMenu(menu)).some((item)=>item.node.href===expected)).toBe(true);
+    }
+  });
+  it("disabled and parent routes cannot become landing pages",()=>{
+    const groups:KnMenu["groups"]=[{key:"test",label:"test",items:[
+      {key:"closed",label:"closed",route:"/kn/khtc/ky-bao-cao",icon:"",badge_source:null,enabled:false,children:[]},
+      {key:"parent",label:"parent",route:"/parent",icon:"",badge_source:null,enabled:true,children:[{key:"leaf",label:"leaf",route:"/enabled",icon:"",badge_source:null,enabled:true,children:[]}]},
+    ]}];
+    expect(navigationRoute("kn_tinh","ke_hoach_tai_chinh",groups)).toBe("/enabled");
+    expect(()=>navigationRoute("kn_tinh","ke_hoach_tai_chinh",[])).toThrow("no enabled");
+  });
+  it("select, current context and menu return the same canonical route",async()=>{
+    let id:string|null=null;
+    const api=createKnApi({baseUrl:"http://x",getAccessToken:()=>mockToken("kn-an"),getContextId:()=>id,fetch:mockFetchNoDelay});
+    const selected=await api.selectContext({assignment_id:"asg-an-tinh",department_code:"trong_trot"});
+    id=selected.context_id;
+    const response=await mockFetchNoDelay(new Request("http://x/v1/me/context",{headers:{Authorization:`Bearer ${mockToken("kn-an")}`,"X-AG-Context":id!}}));
+    expect(response.status).toBe(200);
+    const current=await response.json() as {default_route:string};
+    const menu=await api.menu();
+    expect(current.default_route).toBe(selected.default_route);
+    expect(selected.default_route).toBe("/kn/bao-cao-khtc");
+    expect(menu.default_route).toBe(selected.default_route);
+    for (const [token, context, status] of [[mockToken("kn-an"), null, 428], [mockToken("kn-admin"), id, 403]] as const) {
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (context) headers["X-AG-Context"] = context;
+      const denied = await mockFetchNoDelay(new Request("http://x/v1/me/context", { headers }));
+      expect(denied.status).toBe(status);
+    }
   });
 });

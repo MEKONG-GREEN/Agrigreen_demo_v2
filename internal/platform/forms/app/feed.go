@@ -52,7 +52,7 @@ func (f Feed) Latest(ctx context.Context, tid uuid.UUID, q port.SubmissionQuery)
 	}
 	var out []port.RecordedSubmission
 	err := f.Svc.tx(ctx, tid, func(tx pgx.Tx) error {
-		rs, err := store.FeedLatest(ctx, tx, q.Profile, q.TemplateCode, q.Units, q.Parents, q.From, q.To, limit)
+		rs, err := store.FeedLatest(ctx, tx, q.Profile, q.TemplateCode, q.Units, q.Parents, q.From, q.To, limit, q.ExcludePeriodKinds)
 		for _, r := range rs {
 			out = append(out, recorded(r))
 		}

@@ -172,15 +172,18 @@ export interface Column<T> {
   className?: string;
 }
 
-/** Bảng danh sách có cột STT (đánh số theo trang) và phân trang số trang. */
+/**
+ * Bảng danh sách có cột STT do hệ thống đánh (R-A5, theo trang) và phân trang số trang.
+ * Không truyền `onPage` → bảng không phân trang (STT từ 1), dùng thay `<table className="dt">` tự viết.
+ */
 export function DataTable<T>({
   caption,
   columns,
   rows,
   rowKey,
-  page,
-  pageSize,
-  total,
+  page = 1,
+  pageSize = rows.length,
+  total = rows.length,
   onPage,
   empty = "Không có dữ liệu phù hợp bộ lọc.",
 }: {
@@ -188,10 +191,10 @@ export function DataTable<T>({
   columns: Column<T>[];
   rows: T[];
   rowKey: (row: T) => string;
-  page: number;
-  pageSize: number;
-  total: number;
-  onPage: (p: number) => void;
+  page?: number;
+  pageSize?: number;
+  total?: number;
+  onPage?: (p: number) => void;
   empty?: ReactNode;
 }) {
   return (
@@ -231,7 +234,7 @@ export function DataTable<T>({
           </tbody>
         </table>
       </div>
-      <Pagination page={page} pageSize={pageSize} total={total} onPage={onPage} />
+      {onPage ? <Pagination page={page} pageSize={pageSize} total={total} onPage={onPage} /> : null}
     </div>
   );
 }

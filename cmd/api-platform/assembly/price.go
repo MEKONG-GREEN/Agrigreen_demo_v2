@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
 	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/port"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
@@ -28,6 +29,7 @@ import (
 // (W11.07 qtnv_bao_gia) cấu hình lịch, ngưỡng, mặt hàng (W11.72).
 // Department là giả định (mã phòng ban của tenant chưa chốt — Q-02; docs/kn/gia-dinh-brd-2026-10.md).
 var KNPriceProfile = priceport.Profile{
+	Session:    extension.PriceSession,
 	Name:       "kn",
 	Department: "thong_tin_truyen_thong",
 	Roles:      map[string]string{authz.KNTW: "TW", authz.KNTinh: "TINH", authz.KNXa: "XA"},

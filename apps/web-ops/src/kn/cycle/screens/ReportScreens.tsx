@@ -4,12 +4,12 @@
 // thay đổi chờ cập nhật, nhật ký, ô thay đổi), Báo cáo TW tuần/tháng/vụ/năm chỉ xem (FN-TW-01.02), Báo cáo Chi cục
 // (FN-TI-02.06 — xuất Excel/PDF, gửi email 202 + trạng thái, tải; Google Sheet tắt theo ADR-0026).
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { DetailLayout, LogPanel } from "@/components/patterns/detail";
 import { AlertList, HotMetric, ProgressList, SectionTitle, type DashboardAlert } from "@/components/patterns/dashboard";
-import { FilterBar, FilterChip, PageHeader, StatusPill } from "@/components/patterns/list";
+import { DataTable, FilterBar, FilterChip, PageHeader, StatusPill } from "@/components/patterns/list";
 import { formLayout } from "@/kn/forms/api";
 import type { FormDefinition } from "@/kn/forms/types";
 import { FormGrid, allCommuneRows, computedCells, type GridCommune } from "@/kn/grid";
@@ -198,36 +198,28 @@ export function ConsolidationScreen({ title = "Báo cáo tổng hợp các xã",
           </button>
         </div>
         {tab === "runs" ? (
-          <table className="dt" aria-label="Các lần cập nhật">
-            <thead>
-              <tr>
-                <th scope="col">Lần cập nhật</th>
-                <th scope="col">Người bấm</th>
-                <th scope="col">Số xã có dữ liệu</th>
-                <th scope="col">Số xã thay đổi</th>
-                <th scope="col">Số ô thay đổi</th>
-                <th scope="col" />
-              </tr>
-            </thead>
-            <tbody>
-              {(runs.data?.items ?? []).map((r) => (
-                <tr key={r.id} className={r.id === selRun ? "hl" : undefined}>
-                  <td>{dt(r.at)}</td>
-                  <td>{r.trigger === "system" ? "Hệ thống (tự động)" : (r as { actor_display?: string }).actor_display}</td>
-                  <td>
-                    {r.communes_with_data} / {r.communes_total}
-                  </td>
-                  <td>{r.communes_changed}</td>
-                  <td>{r.cells_changed}</td>
-                  <td>
-                    <button type="button" className="btn btn-o btn-sm" onClick={() => setRunSel(r.id)}>
-                      Xem chi tiết
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            caption="Các lần cập nhật"
+            rows={runs.data?.items ?? []}
+            rowKey={(r) => r.id}
+            empty="Chưa có lần cập nhật nào."
+            columns={[
+              { key: "at", header: "Lần cập nhật", cell: (r) => (r.id === selRun ? <b>{dt(r.at)}</b> : dt(r.at)) },
+              { key: "by", header: "Người bấm", cell: (r) => (r.trigger === "system" ? "Hệ thống (tự động)" : (r as { actor_display?: string }).actor_display) },
+              { key: "with", header: "Số xã có dữ liệu", cell: (r) => `${r.communes_with_data} / ${r.communes_total}` },
+              { key: "changed", header: "Số xã thay đổi", cell: (r) => r.communes_changed, className: "num" },
+              { key: "cells", header: "Số ô thay đổi", cell: (r) => r.cells_changed, className: "num" },
+              {
+                key: "act",
+                header: "Thao tác",
+                cell: (r) => (
+                  <button type="button" className="btn btn-o btn-sm" aria-pressed={r.id === selRun} onClick={() => setRunSel(r.id)}>
+                    Xem chi tiết
+                  </button>
+                ),
+              },
+            ]}
+          />
         ) : (
           <ul className="list-plain">
             {((view.data?.v.pending.items ?? []) as unknown as PendingItem[]).map((p) => (
@@ -241,43 +233,28 @@ export function ConsolidationScreen({ title = "Báo cáo tổng hợp các xã",
         {changes.data ? (
           <>
             <h3 style={{ marginTop: 12 }}>Chi tiết lần cập nhật {dt(changes.data.run.at)}</h3>
-            <table className="dt" aria-label="Chi tiết lần cập nhật">
-              <thead>
-                <tr>
-                  <th scope="col">Thời điểm xã gửi</th>
-                  <th scope="col">Xã/phường</th>
-                  <th scope="col">Biểu · cột</th>
-                  <th scope="col">Giá trị cũ → mới</th>
-                  <th scope="col">Người sửa</th>
-                  <th scope="col">Loại thay đổi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {changes.data.items.map((c) => (
-                  <tr key={c.id}>
-                    <td>{ddmm(c.submitted_at)}</td>
-                    <td>{name(c.commune_code)}</td>
-                    <td>
-                      {changes.data!.run.form_code} · {c.letter}
-                    </td>
-                    <td>
+            <DataTable
+              caption="Chi tiết lần cập nhật"
+              rows={changes.data.items}
+              rowKey={(c) => c.id}
+              empty="Lần này không có ô thay đổi."
+              columns={[
+                { key: "at", header: "Thời điểm xã gửi", cell: (c) => ddmm(c.submitted_at) },
+                { key: "commune", header: "Xã/phường", cell: (c) => name(c.commune_code) },
+                { key: "col", header: "Biểu · cột", cell: (c) => `${changes.data!.run.form_code} · ${c.letter}` },
+                {
+                  key: "val",
+                  header: "Giá trị cũ → mới",
+                  cell: (c) => (
+                    <>
                       {num(c.old)} → <b>{num(c.new)}</b>
-                    </td>
-                    <td>{c.kind === "computed" ? "(công thức)" : c.changed_by_display}</td>
-                    <td>
-                      <StatusPill tone={KIND_TONE[c.kind]}>{KIND_LABEL[c.kind]}</StatusPill>
-                    </td>
-                  </tr>
-                ))}
-                {!changes.data.items.length ? (
-                  <tr>
-                    <td colSpan={6} className="empty">
-                      Lần này không có ô thay đổi.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                    </>
+                  ),
+                },
+                { key: "by", header: "Người sửa", cell: (c) => (c.kind === "computed" ? "(công thức)" : c.changed_by_display) },
+                { key: "kind", header: "Loại thay đổi", cell: (c) => <StatusPill tone={KIND_TONE[c.kind]}>{KIND_LABEL[c.kind]}</StatusPill> },
+              ]}
+            />
           </>
         ) : null}
       </section>
@@ -449,6 +426,16 @@ export function DispatchScreen() {
   const to = (recips.data?.items ?? []).filter((r) => r.kind === "to" && r.is_default);
   const cc = (recips.data?.items ?? []).filter((r) => r.kind === "cc" && r.is_default);
   const label = bp.period?.label ?? "";
+  // Review #128: "Đang gửi" kẹt (worker chết) được "Gửi lại" — tiếp tục cùng lượt — khi máy chủ báo đã quá hạn nhận việc
+  // (can_resend). Còn hạn: khóa nút, hiện mốc mở (resumable_at) và tự làm mới đúng mốc đó.
+  const disp = view.data?.dispatch;
+  const stuck = disp?.status === "sending" && disp.can_resend;
+  const lockedUntil = disp?.status === "sending" && !disp.can_resend ? disp.resumable_at : null;
+  useEffect(() => {
+    if (!lockedUntil) return;
+    const t = setTimeout(() => setNonce((n) => n + 1), Math.min(Math.max(Date.parse(lockedUntil) - Date.now() + 1000, 5000), 2_000_000_000));
+    return () => clearTimeout(t);
+  }, [lockedUntil, view.data]);
   return (
     <>
       <PageHeader title={`Gửi báo cáo Chi cục${label ? ` · ${label}` : ""}`} />
@@ -547,14 +534,30 @@ export function DispatchScreen() {
               <button
                 type="button"
                 className="btn btn-p"
-                disabled={!view.data || act.busy || view.data.dispatch.status === "sending"}
-                onClick={() => void act.run(() => cycleApi.send(view.data!.dispatch.id, { subject, body }), "Đã xếp gửi email (202) — trạng thái cập nhật khi máy chủ gửi xong.").then(() => setTimeout(() => setNonce((n) => n + 1), 2000))}
+                disabled={!disp || act.busy || !disp.can_resend}
+                onClick={() =>
+                  void act
+                    .run(
+                      () => cycleApi.send(disp!.id, { subject, body }),
+                      stuck ? "Đã xếp gửi lại (202) — tiếp tục lượt đang kẹt, người đã nhận không bị gửi lại." : "Đã xếp gửi email (202) — trạng thái cập nhật khi máy chủ gửi xong.",
+                    )
+                    .then(() => setTimeout(() => setNonce((n) => n + 1), 2000))
+                }
               >
-                <Icon name="send" size={15} /> {view.data?.dispatch.status === "failed" ? "Gửi lại" : "Gửi email"}
+                <Icon name="send" size={15} /> {stuck ? "Gửi lại (tiếp tục lượt đang kẹt)" : disp?.status === "failed" ? "Gửi lại" : "Gửi email"}
               </button>
               <button type="button" className="btn btn-o btn-sm" style={{ marginLeft: 8 }} onClick={() => setNonce((n) => n + 1)}>
                 Làm mới trạng thái
               </button>
+              {lockedUntil ? (
+                <p className="small mute" data-testid="dispatch-resend-hint">
+                  Máy chủ đang gửi lượt này. Nếu lượt gửi bị kẹt, nút “Gửi lại” mở từ {dt(lockedUntil)}.
+                </p>
+              ) : stuck ? (
+                <p className="small" data-testid="dispatch-resend-hint">
+                  Lượt gửi đã quá hạn xử lý mà chưa xong — có thể bấm “Gửi lại” để tiếp tục; người đã nhận email không bị gửi lại.
+                </p>
+              ) : null}
             </section>
           </>
         }

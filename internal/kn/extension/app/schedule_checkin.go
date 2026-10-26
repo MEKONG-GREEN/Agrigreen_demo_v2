@@ -31,6 +31,7 @@ var (
 	ErrCheckinDisabled      = problem.New(http.StatusConflict, "extension.checkin_disabled", "Phòng ban không dùng check-in lịch công tác")
 	ErrCheckinExists        = problem.New(http.StatusConflict, "extension.checkin_exists", "Mục công tác đã check-in (check-in không sửa được)")
 	ErrCheckinNotRegistered = problem.New(http.StatusConflict, "extension.checkin_not_registered", "Lịch chưa gửi duyệt — gửi lịch trước khi check-in")
+	ErrCheckinNotApproved   = problem.New(http.StatusConflict, "extension.checkin_not_approved", "Lịch chưa được duyệt — chỉ check-in theo lịch đã duyệt")
 	ErrScheduleItemNotFound = problem.New(http.StatusNotFound, "extension.schedule_item_not_found", "Không có mục công tác trong lịch hiện hành")
 )
 
@@ -89,7 +90,7 @@ func (s *Service) Checkin(ctx context.Context, in CheckinRequest) (CheckinResult
 	if err := a.registrant(); err != nil {
 		return CheckinResult{}, err
 	}
-	if a.KN != nil && a.KN.ReadOnly() {
+	if a.ReadOnly {
 		return CheckinResult{}, problem.Forbidden.WithDetail("ngữ cảnh chỉ xem")
 	}
 	if strings.TrimSpace(in.IdemKey) == "" {
@@ -128,6 +129,15 @@ func (s *Service) Checkin(ctx context.Context, in CheckinRequest) (CheckinResult
 	if sched.Status == domain.ScheduleDraft {
 		return CheckinResult{}, ErrCheckinNotRegistered
 	}
+	// Chỉ check-in theo lịch ĐÃ DUYỆT (log bug TT-07/CN-06). Đang có điều chỉnh chờ duyệt lại thì bản đã duyệt
+	// trước đó vẫn hiệu lực: check-in đối chiếu mục của bản đó. Chưa có bản nào được duyệt → từ chối.
+	version := sched.Version
+	if sched.Status != domain.ScheduleApproved {
+		if sched.ApprovedVersion == 0 {
+			return CheckinResult{}, ErrCheckinNotApproved
+		}
+		version = sched.ApprovedVersion
+	}
 	st, err := s.scheduleSettings(ctx, sched.Department, sched.ProvinceCode, now)
 	if err != nil {
 		return CheckinResult{}, err
@@ -136,7 +146,7 @@ func (s *Service) Checkin(ctx context.Context, in CheckinRequest) (CheckinResult
 		return CheckinResult{}, ErrCheckinDisabled
 	}
 	err = tenant.WithTenantTx(ctx, s.DB, a.TenantID, func(tx pgx.Tx) error {
-		items, err := store.ScheduleItems(ctx, tx, sched.ID, sched.Version)
+		items, err := store.ScheduleItems(ctx, tx, sched.ID, version)
 		if err != nil {
 			return err
 		}
@@ -162,7 +172,7 @@ func (s *Service) Checkin(ctx context.Context, in CheckinRequest) (CheckinResult
 		if err != nil {
 			return fieldProblem(err)
 		}
-		c := store.Checkin{ID: ids.New(), ScheduleID: sched.ID, ItemID: item.ItemID, ItemVersion: sched.Version, OwnerRef: sched.OwnerRef,
+		c := store.Checkin{ID: ids.New(), ScheduleID: sched.ID, ItemID: item.ItemID, ItemVersion: version, OwnerRef: sched.OwnerRef,
 			Department: sched.Department, Day: item.Day, CapturedAt: in.CapturedAt.UTC(), AccuracyM: in.AccuracyM, DistanceM: ev.DistanceM,
 			Far: ev.Far, WeakAccuracy: ev.WeakAccuracy, Mock: in.Mock, DeviceID: in.DeviceID, EventTime: now, RecordedAt: now,
 			IdemKey: idemCheckin(in.IdemKey)}

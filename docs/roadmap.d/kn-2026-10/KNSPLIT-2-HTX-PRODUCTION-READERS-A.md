@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-HTX-PRODUCTION-READERS-A: devcaa824d2; helper83825actual0/11migration473.766s/HTX14-130.928s/platform4-125.144s, noSKIP/FAIL; source/pure/static/full5PG đạt;33goldens/ACL giữ. A chưa wiring reports.

@@ -1,0 +1,64 @@
+{
+  "id": "extension-dept-home",
+  "order": 300,
+  "tables": {
+    "adminDeptItems": {
+      "generic": [
+        {
+          "Key": "admin.pb.trang_chu",
+          "Label": "Trang chủ phòng",
+          "Route": "/kn/phong-ban/{department}/trang-chu",
+          "Icon": "dashboard",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "admin.pb.van_ban",
+          "Label": "Quy trình, văn bản",
+          "Route": "/kn/phong-ban/{department}/van-ban",
+          "Icon": "library",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        }
+      ],
+      "trong_trot": [
+        {
+          "Key": "admin.pb.trang_chu",
+          "Label": "Trang chủ phòng",
+          "Route": "/kn/phong-ban/{department}/trang-chu",
+          "Icon": "dashboard",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "admin.pb.van_ban",
+          "Label": "Quy trình, văn bản",
+          "Route": "/kn/phong-ban/{department}/van-ban",
+          "Icon": "library",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        }
+      ]
+    },
+    "menuModules": {
+      "/kn/trang-chu": "pf/extension",
+      "/kn/van-ban": "pf/extension"
+    },
+    "menuDeptModules": {
+      "/trang-chu": "pf/extension",
+      "/van-ban": "pf/extension"
+    }
+  }
+}

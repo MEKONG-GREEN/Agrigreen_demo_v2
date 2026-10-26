@@ -33,8 +33,10 @@ type cycle struct {
 	p1, p2               string
 }
 
-func setupCycle(t *testing.T) *cycle {
-	f := newFixture(t, fixtureOpts{})
+func setupCycle(t *testing.T) *cycle { return setupCycleWith(t, fixtureOpts{}) }
+
+func setupCycleWith(t *testing.T, o fixtureOpts) *cycle {
+	f := newFixture(t, o)
 	c := &cycle{f: f, forms: f.publishForms("T01", "T05"), admin: ids.New(), xa1User: ids.New(), xa2User: ids.New()}
 	c1, c2, c3 := f.communes89[0], f.communes89[1], f.communes89[2]
 	f.asg.l = []accport.Assignment{

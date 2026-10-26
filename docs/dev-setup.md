@@ -47,7 +47,9 @@ Ghi chú:
 - Dọn toàn bộ, kể cả dữ liệu: `docker compose -f deploy/compose/docker-compose.yml down -v`.
 - **Sao lưu và diễn tập phục hồi:** tệp chồng `deploy/compose/docker-compose.backup.yml` (pgBackRest + WAL, kho S3 thứ hai với danh tính `backup-writer`/`restore-reader`, profile `backup`/`restore`). Xem [runbooks/backup.md](runbooks/backup.md) và [runbooks/restore-drill.md](runbooks/restore-drill.md).
 
-> **Stack Compose chưa được chạy trên máy dựng** (Windows, không có Docker). Tệp đã được kiểm cú pháp và soát kỹ. Job CI `compose-smoke` (`.github/workflows/ci.yml`) là nơi kiểm chứng: dựng toàn bộ bằng `up --wait`, gọi `/healthz`, `/readyz` của `api-platform`, `identity-vault` và trang web, rồi `down -v`.
+> Windows không có Docker không thể chứng minh stack chạy. Job `compose-smoke` và workflow riêng `vps-p0-smoke.yml` là các lượt kiểm thật trên Linux; chỉ ghi nhận sau khi run tương ứng PASS. Không dùng `config --quiet` để thay bằng chứng `up --wait`.
+
+**Tenant mới (P0-VPS-OPS):** sau tạo Admin có TOTP, dùng `deploy/vps/bootstrap.py` theo [runbook VPS](runbooks/vps-deploy.md#51-nền-dữ-liệu-khi-dựng-tenant-mới) để nạp danh mục, cây tổ chức và ranh giới được cung cấp. Script chỉ dùng masterdata/party/geo APIs; không tạo HTX từ KN. Không gắn tài khoản vào org_ref ngẫu nhiên/chưa tồn tại. Realm mới đã có `profile` và AMR theo execution; realm cũ cần cập nhật scopes/references, SMTP/reset và khóa tạm theo mục 3 của runbook, không tắt MFA. Kiểm bootstrap cục bộ: `python -m unittest discover -s deploy/vps -p test_bootstrap.py -v`.
 
 ## Cách 2: Windows không Docker (cách đã dùng để dựng G0)
 

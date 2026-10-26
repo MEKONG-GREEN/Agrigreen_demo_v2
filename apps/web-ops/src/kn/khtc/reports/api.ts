@@ -9,6 +9,7 @@ export type ReportExport = S["KHTCReportExport"];
 export type ReportSave = S["KHTCReportSave"];
 export type ReportFilter = S["KHTCReportFilter"];
 export type ReportRow = S["KHTCReportRow"];
+export type ReportWord = S["KHTCReportWord"];
 const header = () => ({ "Idempotency-Key": newIdempotencyKey() });
 export function createReportApi(api: ApiClient) {
     return {
@@ -23,6 +24,15 @@ export function createReportApi(api: ApiClient) {
             if (!res.response.ok || !res.data)
                 throw await parseProblemResponse(res.response);
             return { blob: res.data as unknown as Blob, name: filenameFromDisposition(res.response.headers.get("Content-Disposition"), "bao-cao-khtc.xlsx") };
+        },
+        /** W10.17: Word (.docx) từ nội dung đóng băng của bản Excel, qua `cap/export` (số {n}/BC-TTKN tự cấp khi ô số trống). */
+        word: (id: string, exportID: string) => unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/exports/{exportID}/word", { params: { path: { id, exportID }, header: header() }, body: {} })),
+        words: async (id: string) => (await unwrap(api.GET("/v1/extension/khtc/periods/{id}/report/words", { params: { path: { id } } }))).items,
+        async downloadWord(id: string, runID: string) {
+            const res = await api.GET("/v1/extension/khtc/periods/{id}/report/words/{runID}/download", { params: { path: { id, runID } }, parseAs: "blob" });
+            if (!res.response.ok || !res.data)
+                throw await parseProblemResponse(res.response);
+            return { blob: res.data as unknown as Blob, name: filenameFromDisposition(res.response.headers.get("Content-Disposition"), "bao-cao-khtc.docx") };
         },
     };
 }

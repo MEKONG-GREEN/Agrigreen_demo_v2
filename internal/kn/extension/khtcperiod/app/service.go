@@ -92,7 +92,7 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 
 type caller struct {
 	p authz.Principal
-	k authz.KNContext
+	k extport.SessionContext
 }
 
 // reader: Admin KN, hoặc phiên Cấp Tỉnh/TW của Phòng KHTC (kể cả chỉ xem).
@@ -100,11 +100,11 @@ func (s *Service) reader(ctx context.Context) (caller, error) {
 	if s.DB == nil || s.Forms == nil || s.Control == nil {
 		return caller{}, ErrDependency.WithDetail("chưa nối cap/forms cho Kỳ KHTC")
 	}
-	p, k, err := authz.RequireKN(ctx)
+	p, k, err := extport.RequireSession(ctx)
 	if err != nil {
 		return caller{}, err
 	}
-	if k.Role == authz.KNAdmin || (k.Department == partyport.DeptKeHoachTaiChinh && (k.Role == authz.KNTinh || k.Role == authz.KNTW)) {
+	if k.Role == extport.SessionRoleAdmin || (k.Department == partyport.DeptKeHoachTaiChinh && (k.Role == extport.SessionRoleProvince || k.Role == extport.SessionRoleNational)) {
 		return caller{p: p, k: k}, nil
 	}
 	return caller{}, errNotKHTC
@@ -116,7 +116,7 @@ func (s *Service) writer(ctx context.Context) (caller, error) {
 	if err != nil {
 		return c, err
 	}
-	if c.k.Role != authz.KNTinh || c.k.Department != partyport.DeptKeHoachTaiChinh || c.k.ReadOnly() {
+	if c.k.Role != extport.SessionRoleProvince || c.k.Department != partyport.DeptKeHoachTaiChinh || c.k.ReadOnly() {
 		return c, errNotKHTCWriter
 	}
 	return c, nil
@@ -181,7 +181,7 @@ func inputErr(err error) error {
 	return err
 }
 
-func (s *Service) unitDepartments(ctx context.Context, k authz.KNContext) (map[string]string, []string, bool) {
+func (s *Service) unitDepartments(ctx context.Context, k extport.SessionContext) (map[string]string, []string, bool) {
 	names := map[string]string{}
 	var order []string
 	if s.Departments == nil || k.UnitRef == uuid.Nil {

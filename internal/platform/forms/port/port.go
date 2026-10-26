@@ -27,6 +27,8 @@ type ResolvedActor struct {
 	Scope        authz.Scope
 	Node         uuid.UUID
 	AllowsTarget func(unitKind string, ref uuid.UUID) bool
+	// AllowsTemplate is a server-owned code filter. Nil preserves the legacy profile.
+	AllowsTemplate func(code string) bool
 }
 
 // ActorResolver returns handled=false only when no application session applies.
@@ -66,6 +68,9 @@ type Profile struct {
 	MaxSubmissions int
 	// RequireLateReason: gửi sau hạn nộp của kỳ phải có giải trình/lý do trễ (CNTS H05, H09 — W11.42).
 	RequireLateReason bool
+	// NoReopen: kỳ đã chốt KHÔNG mở lại được (W11.27 HCTH BR-02 — sau chốt chỉ điều chỉnh qua sổ riêng của bên dùng, ảnh
+	// chụp đóng băng là bản chính thức). Mặc định false giữ hành vi mở lại của các profile khác.
+	NoReopen bool
 }
 
 // Loại đơn vị lá (W11.05). Đơn vị = người và luồng nhiều bước (HCTH, D3 §2.5) CHỪA CHỖ: hằng số có, cấu hình và

@@ -4,11 +4,12 @@ package modreg
 
 var assembly = map[string][]string{
 	"api-internal":        {"mkg/acctbridge", "mkg/costing", "mkg/engine", "mkg/fieldops", "mkg/hub", "mkg/logistics", "mkg/measurement", "mkg/orders"},
-	"api-platform":        {"pf/accounts", "pf/apiclient", "pf/contact", "pf/content", "pf/cooperative", "pf/cropcycle", "pf/evidence", "pf/extdata", "pf/extension", "pf/forms", "pf/geo", "pf/hrm", "pf/masterdata", "pf/mechanization", "pf/metering", "pf/metrics", "pf/mrv", "pf/notify", "pf/party", "pf/price", "pf/reports", "pf/simulation", "pf/sync", "pf/waterway", "pf/workflow"},
+	"api-platform":        {"pf/accounts", "pf/apiclient", "pf/contact", "pf/content", "pf/cooperative", "pf/cropcycle", "pf/evidence", "pf/export", "pf/extdata", "pf/extension", "pf/forms", "pf/geo", "pf/hrm", "pf/masterdata", "pf/mechanization", "pf/metering", "pf/metrics", "pf/mrv", "pf/notify", "pf/party", "pf/price", "pf/reports", "pf/simulation", "pf/sync", "pf/waterway", "pf/workflow"},
 	"api-public":          {"pf/apiclient", "pf/cooperative", "pf/cropcycle", "pf/geo", "pf/masterdata", "pf/metering", "pf/mrv"},
 	"drill":               {"pf/kref", "pf/masterdata", "pf/mechanization", "pf/party"},
 	"edge-agent":          {},
 	"formimport":          {"pf/extension", "pf/reports"},
+	"hrmimport":           {},
 	"identity-vault":      {"vault/identity"},
 	"ingest":              {"mkg/measurement"},
 	"integration-gateway": {"pf/apiclient", "pf/cooperative", "pf/cropcycle", "pf/geo", "pf/masterdata", "pf/metering", "pf/mrv"},
@@ -17,6 +18,6 @@ var assembly = map[string][]string{
 	"outbox-publisher":    {},
 	"rebuilddrill":        {"mkg/acctbridge", "mkg/costing", "mkg/fieldops", "mkg/hub", "mkg/logistics", "mkg/measurement", "mkg/orders"},
 	"seed-synthetic":      {},
-	"worker":              {"pf/accounts", "pf/apiclient", "pf/cooperative", "pf/cropcycle", "pf/extension", "pf/kref", "pf/masterdata", "pf/mechanization", "pf/metering", "pf/metrics", "pf/mrv", "pf/notify", "pf/party", "pf/price", "pf/reports", "pf/sync", "pf/waterway"},
+	"worker":              {"pf/accounts", "pf/apiclient", "pf/cooperative", "pf/cropcycle", "pf/extension", "pf/hrm", "pf/kref", "pf/masterdata", "pf/mechanization", "pf/metering", "pf/metrics", "pf/mrv", "pf/notify", "pf/party", "pf/price", "pf/reports", "pf/sync", "pf/waterway"},
 	"worker-internal":     {"mkg/acctbridge", "mkg/costing", "mkg/fieldops", "mkg/hub", "mkg/logistics", "mkg/measurement", "mkg/orders"},
 }

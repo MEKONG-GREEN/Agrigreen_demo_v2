@@ -981,3 +981,230 @@ Propagation rule: thay source/RLS/ACL nội bộ, cổng native hoặc wiring th
 
 
 Xác minh trước tích hợp ngày 18/10/2026: pure và static phiên 66447 đều exit 0. Build/vet/modgen/migratecheck/archlint/contractcheck/docscheck/MFA/knboundary đạt; baseline 318, lint 0, định dạng chỉ còn đúng hai fixture archlint có sẵn. Hồi quy PostgreSQL phiên 35799 exit 0, không FAIL/SKIP: dbadmin 1.137s, metrics/handler 163.375s (22 view), KN77 456.533s, API assembly 113.334s, worker 2.100s. Lượt nguồn/view 73356 đã đạt 4 ca trên cùng Go/SQL/metadata; chỉ bổ sung bằng chứng tài liệu sau đó. Helper còn phải chạy hai bộ tests/platformdata và tests/htxdata trên PostgreSQL thật cùng 11 cổng migration, gồm so ACL chính xác 26 cờ vai, 53 SELECT và 21 membership. Chưa tích hợp tại mốc này.
+
+
+PLATFORM-DATA-A tích hợp dev b0eeae1180c0afc8c0a001ebdc41e03ae079064b: helper71135 exit0, 11migrationPASS586.768s, platformdata4PASS166.433s/111native, htxdata5PASS151.703s, khôngFAIL/SKIP. Private61075/929bb698f2da đã dọn/Go0. Main27afd593 sạch, worktrees giữ. Full5PG35799/static66447 đều0, 30oldgoldens giữ. Không lặp gói.
+
+## KNSPLIT-2-HTX-READERS-A
+Downstream consumers: extension/dashboard và closedfig/KHTC (đường hiện hành chưa chuyển), dbadmin/pubreaders/catalog, metrics/handler, nguồn HTX/platform, KN77, API assembly và worker.
+Dependency evidence: rg -n 'Coops|Plots|HTXConfirmations' internal/kn/extension cmd/api-platform/assembly; rg -n 'PubReadOwners|pubReaderRoles|r_forms_pub' internal/shared/dbadmin tests/pubreaders; rg -n 'Published.*Privileges' tests/htxdata tests/platformdata.
+Regression acceptance command (private PostgreSQL17/PostGIS, không shared5432/SMTP): go test -v -count=1 -p 1 -timeout 55m ./tests/htxdata ./tests/platformdata; go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker.
+Propagation rule: metadata quyền công bố đổi phải chạy exact ACL/role unit và migration gates11, hai bộ nguồn+view với RLS, full downstream5. Native HTTP routes được miễn trong A vì không đổi HTX private/Go/port hoặc wiring; bước B phải chạy handler/dashboard/closedfig/report consumers thực tế. Không lặp source batch đã actualgreen trên cùng Go/SQL/metadata; helper vẫn bắt buộc chạy lại cả hai bộ nguồn. Thực thi các lệnh này trong phạm vi đã được PO cho hoàn thiện G1, fail-on-SKIP, timeout55m; không gọi bên ngoài ngoài Git dev integration đã được phép.
+
+
+Static ban đầu66162 exit1 đã phát hiện đúng R-02: test gốc lắp ráp import gói riêng. Sửa bằng NewPublishedHTXData ở gốc module, trả cổng KN HTXData; test dùng API này. Giữ Reader SQL và catalog runtime, không thêm ngoại lệ. Source ban đầu69177 exit0: HTX8PASS217.377s/platform4PASS154.445s, không SKIP; cụm54143/933dbcefa9c7 đã dọn. Full waiter43070 exit1 trước PG vì static1. Giữ log cũ; phải xác minh HTX qua API gốc và static-verified mới.
+
+
+Xác minh sau sửa ranh giới: source HTX phiên17571 exit0, đủ8ca185.455s qua NewPublishedHTXData ở gốc module, không SKIP/FAIL. Ba ca mới thực hiện42 đối chiếu thống kê và45 đối chiếu xác nhận trên3tenant, cùng mất nguồn/thiếu tenant; giữ38native. Cụm50785/8f4065869c27 đã dọn. Platform4ca của69177 đạt154.445s trên cùng SQL/catalog quyền; root API chỉ thêm cổng công khai trong manifest, không đổi runtime catalog.
+
+Pure-verified và static-verified phiên70605 đều exit0: build/vet/modgen/migratecheck/archlint/contractcheck/docscheck/MFA/knboundary đạt, ranh giới318, lint0, chỉ đúng2fixture archlint cũ chưa định dạng. Full5PG phiên32600 đang chạy trên cụm58658/52c1d3f07b4d; DBadmin2.052s đã PASS. Chưa tích hợp. Các log lỗi R-02 và guard bị dừng trước PG giữ nguyên; không sửa quy tắc hay golden.
+
+
+Full5 PostgreSQL phiên32600 đã đạt, exit0, không FAIL/SKIP: DBadmin2.052s, metrics163.043s, KN77/KHTC510.999s, API assembly152.724s, worker3.234s. Cụm58658/52c1d3f07b4d đã dọn, Go0 trước hoàn thiện tài liệu. Giữ32golden trên nền b0eeae11, chỉ thêm tệp quyền5SELECT/2membership đã nêu. Source root API17571/8ca185.455s, platform69177/4ca154.445s, pure/staticverified70605 đều0, boundary318/lint0/đúng2fixture cũ. Fetchdev vẫn b0eeae11, không rebase mã tại mốc kiểm thử. Chờ helper11 và exactACL58SELECT/23membership/26flags; chưa tích hợp tại mốc này.
+
+
+HTX-READERS-A đã tích hợp dev945ec7b11160041f0670b079848168e6183f3158. Helper19007 exit0/11migration601.692s; HTX8PASS165.118s/platform4PASS152.794s, exactACL26flags58SELECT23membership, khôngFAIL/SKIP. Cụm65383/81c59652625a đã dọn/Go0; 32oldgoldens giữ. Main27afd593 nguyên sạch, worktrees giữ. Không lặp gói.
+
+## KNSPLIT-2-HTX-READERS-B
+Downstream consumers: extension/handler dashboard; closedfig và KHTC; HTX/publication reader conformance; metrics, KN77, API assembly và worker; modgen/pubreaders/catalog và migration11.
+Dependency evidence: rg -n 'Coops|Plots|UseHTXConfirmations|NewPublishedHTXData' internal/kn/extension cmd/api-platform/assembly cmd/worker; rg -n 'internal/platform/(cooperative|cropcycle|mechanization)' internal/kn; go run ./tools/knboundary -list.
+Regression acceptance commands: go test -v -count=1 -p 1 -timeout 55m ./tests/htxdata ./internal/kn/extension/handler; go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker.
+Propagation rule: wiring đổi phải chạy handler/KHTC/assembly/worker thực sự trên PostgreSQL17/PostGIS private. Native HTX HTTP routes miễn vì HTX source Go/DDL/RLS/private grants và cổng còn nguyên; HTX conformance giữ38nguồn và đối chiếu với người dùng/nút. Không thêm quyền nên snapshot33goldens/ACL58-23 phải bất biến. No shared5432/SMTP; timeout55m/p1/fail-on-SKIP; phạm vi lệnh nằm trong ủy quyền G1 hiện hành. Helper vẫn chạy lại nguồn/handler và đủ11migration trước dev.
+
+
+Lượt prune ban đầu đã giảm đúng318→314 do gỡ4import, nhưng từ chối5SQL foreign mới trong fixture HTTP đặt dưới internal/kn/extension/handler. Không thêm baseline hay ngoại lệ: chuyển test HTTP sang tests/htxdata, nơi dựng dữ liệu đối chứng/lắp ráp; gọi gốc module và port, giữ ranh giới mã KN. Reader và wiring không đổi. Test ngoài dùng dữ liệu HTX native đã khóa38kết quả, danh mục đơn vị thật và HTTP có token xác thực; không ghi bảng ngoại từ mã KN.
+
+
+Source đầu79279 exit1: tests/htxdata chưa dựng được vì test HTTP import nhầm shared/authztest; package có sẵn ở shared/authz/authztest. Sửa đúng đường dẫn, không cài thư viện hay đổi go.mod/go.sum. Handler cùng lượt đã PASS180.980s, nhưng toàn lệnh đỏ nên không báo source xanh; cụm64248/a5e1637cb22b đã dọn. Static83732 exit1 ở vet cùng lỗi import, fullwait1540 exit1 trước PG. Giữ mọi log/exit cũ. Principal của ca RLS bổ sung TenantID trùng context cho dữ liệu người dùng đầy đủ. Phải chạy source-pg-verified cả hai gói và static-verified; pure0 trước đó trên mã production không đổi còn giá trị.
+
+
+Source xác minh51601 exit0: HTX10PASS158.238s (HTTP0.58s, 120 đối chiếu scope0.94s), handler toàn bộ124.707s; không FAIL/SKIP, cụm63017/223e865fd9e7 đã dọn/Go0. Cổng static-verified57508 chỉ còn errcheck ở lệnh đóng response của test HTTP; sửa riêng defer sang hàm bỏ qua lỗi Close một cách tường minh, giữ nguyên việc đóng cùng response/cùng lúc, không đổi request/assertion/logic/SQL/wiring hay metadata. Không cần lặp lại lệnh PG đã đạt chỉ vì cleanup giữ cùng ngữ nghĩa; helper bắt buộc chạy lại HTX10/handler trên mã cuối. Pure83732=0 trên mã production không đổi. Static-final vẫn phải qua đầy đủ cổng, formatter; fullwait23871 exit1 trước PG do staticverified1. Giữ logs cũ, chưa tích hợp.
+
+
+Full5 PostgreSQL xác minh86206 exit0, không FAIL/SKIP: dbadmin0.855s, metrics107.683s, KN77/KHTC427.138s, API assembly134.817s, worker2.870s; cụm64848/f67cf3022caf đã dọn/Go0. Mã hiện tại c9aa03c8, phần cleanup test chỉ tường minh bỏ qua CloseError cùng ngữ nghĩa; phần production đã được đối chiếu source51601 exit0/HTX10-158.238s/handler124.707s. Staticfinal27940 exit0/lint0/boundary314/gofmt2old; pure83732 exit0. Giữ33golden nền945 và quyền26flags/58SELECT/23membership không đổi. Fetchdev vẫn945, không rebase mã mới. Chờ helper11, có HTX10/handler/platform4 PG thật trên mã cuối trước dev.
+
+
+HTX-READERS-B đã tích hợp dev880ba924b04a0559c4ff431d723d4df11d65722a. Helper99344 exit0:11migration509.204s, HTX10-137.047s/platform4-130.606s/handler151.165s, noFAIL/SKIP; private59761/aaf57a313ebd removed/Go0;33oldgoldens và main27afd593 sạch nguyên. Không lặp gói.
+
+## KNSPLIT-2-HTX-PRODUCTION-READERS-A
+Downstream consumers: tests/htxdata (root published reader), platformdata/ACL/catalog, extension hiện hành, metrics, KN77, API assembly và worker; reports chưa nối reader mới trong A.
+Dependency evidence: rg -n 'NewPublishedHTXData|ReportData|CropCycle|Production' internal/kn/extension cmd internal/platform/reports tests/htxdata; rg -n 'readpubview|PubReadOwners' internal/kn/extension/port internal/shared/modreg.
+Regression acceptance command: privatePG go test -v -count=1 -p 1 -timeout 55m ./tests/htxdata ./tests/platformdata; pure metadata/pubreader/closedfig/extension; staticfull; privatePG go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker; helper11 migration có exact ACL26flags58SELECT23membership.
+Propagation rule: A additive chưa đổi runtime wiring nên native HTX HTTP và reports full miễn ở bước này; native38 và reconciliation production vẫn chạy thật, nguồn HTX/private/Go giữ nguyên. B wiring phải chạy reports + HTTP/export + worker theo đường job thật. Không đổi HTTP/OpenAPI/web/mobile nên miễn web/mobile. Lệnh trong ủy quyền hoàn thiện G1, privatePG/không shared5432/SMTP, timeout55m/p1/fail-on-SKIP; GoALLfreeze trong mọi job. Evidence chưa chạy ở mốc viết.
+
+
+Cổng static ban đầu86890: pure0, build/vet/modgen/migratecheck/archlint/contractcheck đạt; docscheck từ chối mức tiêu đề của đặc tả mới (# thay vì ## theo convention). Chỉ sửa Markdown, giữ nguyên Go/SQL/catalog/test/golden; nguồn PG76851 vẫn chạy. Giữ static.log/.exit1. Cần static-verified chạy từ docscheck trở đi (MFA/boundary/lint/gofmt/diff); các cổng đầu đã đạt trên cùng nguồn. Full waiter ban đầu sẽ dừng trước PG vì static1; lượt full verified phải dùng static-verified0.
+
+
+Bằng chứng trước tích hợp: core d5a98bcd giữ nguyên Go/SQL/metadata sau kiểm nguồn. Source76851 exit0/HTX14-187.005s/platform4-143.537s, không SKIP/FAIL;432query+152projection+288RLS so native, cùng fixed totals/NULL/zero/precision,38native/111platform giữ. Cụm64881/a60e4d253f1a đã dọn. Pure86890exit0; static đầu dừng ở mức tiêu đề Markdown, các cổng build/vet/modgen/migratecheck/archlint/contract đã đạt; docs/MFA/boundary314/lint0/gofmt2old/diff của26138 đạt. Full verified99796 exit0: {"internal/shared/dbadmin": 1.781, "internal/platform/metrics/handler": 131.26, "tests/kn77": 425.962, "cmd/api-platform/assembly": 122.487, "cmd/worker": 2.97}; không SKIP/FAIL, private55210/e11135000682 đã dọn/Go0.33golden nền880 giữ theoGitblob; ACL26flags58SELECT23membership nguyên. Fetchdev vẫn880, main27afd593 giữ. Chờ helper11 và xác minh remote; A chưa nối runtime reports.
+
+
+HTX-PRODUCTION-READERS-A đã tích hợp devcaa824d261ef66059e1d6b79ea82596753f0e5ae. Helper83825actual0/11migration473.766s/HTX14-130.928s/platform4-125.144s, noFAIL/SKIP; private62556/0e4ab2f2b85aremoved/Go0;33oldgoldens giữ/main27clean. Source14/4, pure/static/docs, full5PG1.781/131.260/425.962/122.487/2.970s đạt. Không lặp gói.
+
+## KNSPLIT-2-PLATFORM-READERS-A
+Downstream consumers: platformdata reader/root contract, dbadmin/catalog/pubreaders/migrations, HTXpub conformance, metrics, KN77/KHTC, API assembly, worker. A chưa nối factory vào runtime.
+Dependency evidence: rg -n '\.(Orgs|Units|RepresentativeRef)\b' internal/kn -g '*.go'; rg -n 'AdminUnits|OrgDirectory|PubReadOwners|pubReaderRoles' internal/kn/extension internal/platform/party/port internal/shared/dbadmin; source port owns Get/Descendants/Current/Children/Get/ByCode/bulk kind. Scan truy cập trường .RepresentativeRef trong mã nghiệp vụ KN không có, dữ liệu này không thuộc pubcontract.
+Regression acceptance command: privatePG go test -v -count=1 -p 1 -timeout 55m ./tests/platformdata ./tests/htxdata; pure modreg/modgen/pubreaders/contracts/extension/closedfig/notifyconsumers và dbadminroles; staticfull; privatePG full5 ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker; helper11migration có ACL26flags59SELECT24membership.
+Propagation rule: ACL đổi phải chạy mọi privileges/snapshot, native111/38/old33goldens giữ; thêm only readpubview, không nguồnDDL/RLS/privategrant. Native MD/party HTTP/full reports miễn trong A vì code nguồn và wiring không đổi; B phải chạy KN HTTP/metadata consumers thật khi nối mới. Không HTTP/web/mobile đổi nên miễn web/mobile. Phạm vi lệnh đã được G1 ủy quyền, private PG/fake senders/no shared5432, timeout55m/p1/noSKIP, GoALLfreeze. Bằng chứng chưa chạy ở mốc viết.
+
+
+Nguồn11419 actualexit0: platformdata9PASS118.483s (330 địa bàn+294tổ chức, public errors/VN boundaries/1001children/67node successor bound/representative canary), HTX14PASS227.518s; native111/38 giữ, không FAIL/SKIP, private62505/4c8275c8c978 đã dọn. Pure/static59214actual0: build/vet/modgen/migratecheck/archlint/contracts/docs/MFA/boundary314/lint0/diff và đúng2fixture gofmt cũ. Verify đầu chưa khởi chạy vì auto-review hết thời gian; retry đúng một lần được duyệt, không thay quyền hay cách thực thi. Full5PG15863 đang private63236/10a38f24261f; dbadmin2.214sPASS, chưa coi full hay helper đã đạt. GoALLfreeze. ACL expected thêm đúng1/1 tại tệp riêng; hardACL11 còn phải đạt59/24 trước dev.
+
+
+Bằng chứng trước tích hợp: Source11419 actual0/platform9-118.483s/HTX14-227.518s;624đối chiếu và native111/38 giữ, noSKIP/FAIL. Pure/static59214actual0/lint0/boundary314/fmt đúng2fixture cũ. Full5PG15863 actual0: {"internal/shared/dbadmin": 2.214, "internal/platform/metrics/handler": 123.336, "tests/kn77": 354.14, "cmd/api-platform/assembly": 124.944, "cmd/worker": 3.081}; noSKIP/FAIL. Private62505/4c8275c8c978 và63236/10a38f24261f đã dọn/Go0. Coreb159b0a2 không đổi;33golden nềncaa nguyên, chỉ thêm file ACL1/1 đã rà soát; không native Go/SQLDDL/RLS/private grant thay đổi. Fetchdev vẫncaa, main27 sạch. Chờ helper11 với hardACL59/24 trước khi claimdev; A chưa wiring.
+
+
+PLATFORM-READERS-A đã tích hợp deve6a54bcc8cd50b894b76d2c1cc9e1512e52674bb. Helper64116exit0/11migration535.139s/platform9-115.399s/HTX14-208.161s/noFAIL/SKIP; exactACL26flags59SELECT24membership; private49301/566fc3c3d827 removed/Go0; main27clean. Old33goldens giữ, chỉ thêm reviewedACL1/1; không lặp A.
+
+## KNSPLIT-2-PLATFORM-READERS-B
+Downstream consumers: extension handler/dashboard và report-cycle/KHTC; reports owned builder/session; notification captured directive builder; Contact labels; API assembly và worker; platform/HTX source conformance, dbadmin/pubreaders/migration11.
+Dependency evidence: rg -n 'extension\.(New|ReportBuilders|ReportSessionResolver)|NotificationBuilders|KNContactLabels|NewPublishedAdminUnits|NewPublishedOrganizations' cmd -g '*.go'. Chỉ thay deps/application callbacks KN, các cổng generic native HTX/MKG giữ.
+Regression acceptance command: privatePG go test -v -count=1 -p 1 -timeout 55m ./tests/platformdata ./tests/htxdata ./internal/kn/extension/handler ./tests/reports ./tests/notify; pure modreg/modgen/pubreaders/contracts/extension/closedfig/notifyconsumers và dbadminroles; staticfull; privatePG full5 ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker; helper11migration+source/consumerrealPG.
+Propagation rule: wiring đổi phải chạy các nguồn/caller và downstream thật. Native MD/party HTTP miễn vì source/private/publicQuery/roles không đổi; shared metadata native được giữ và reports/notify suites bao phủ phần còn dùng chung. No API/web/mobile đổi nên miễn web/mobile. Timeout55m/p1/fail-on-SKIP, fake SMTP/privatePG/no shared5432, GoALLfreeze; toàn bộ trong ủy quyền G1.34goldens/ACL59-24/boundary314 phải nguyên. Evidence chưa chạy.
+
+
+Source5 thực tế24160 exit0, noFAIL/SKIP: platformdata11-161.256s, HTX14/dashboard106.502s, extension handlerfull91.123s, reportsfull79.924s, notifyfull80.548s.180session decisions và4nguyênSourceData/label comparisons mới đạt;624metadata/native111/38 và34goldens vẫn phải nguyên. Private59175/b9356f983d25 đã dọn. Pure/static90002=0/lint0/boundary314/gofmt2old. Full5wait59989 được phép bắt đầu sau source0; chưa kết luận full/helper/dev. GoALLfreeze.
+
+
+Bằng chứng trước tích hợp: coreabaa48f1 giữ nguyên Go/SQL/metadata sau source5 actual0 (platform11-161.256s/HTX14-106.502s/handler91.123s/reports79.924s/notify80.548s). Pure/static90002=0/lint0/boundary314/fmt2old. Full5PG59989actual0: {"internal/shared/dbadmin": 1.188, "internal/platform/metrics/handler": 90.465, "tests/kn77": 217.393, "cmd/api-platform/assembly": 89.406, "cmd/worker": 2.01}; khôngFAIL/SKIP. Cụm59175/b9356f983d25 và51244/53c7445190f3 đã dọn/Go0.34golden nền e6a nguyên theoGitdiff, ACL26flags59SELECT24membership không đổi; khôngDDL/RLS/query/DTO/API mới. Fetchdev vẫn e6a, main27 sạch. Chờhelper11 với latestplatform/HTX/handler; reports/notify full đã actual0 trên cùng nguồn và khôngrebasecode, không cần lặp trừ source/upstream đổi.
+
+
+PLATFORM-READERS-B đã tích hợp e895c4d9129869e0c84f8f0145be7ee5197b7b63. Helper63113actual0/11migration443.993s/platform11-87.956s/HTX14-125.970s/handler124.337s; noFAIL/SKIP/private61781-69904dd7f60a removed/Go0.34goldens nền e6a giữ, main27 sạch.
+
+## G1-DEV-SYNC-20261018
+Downstream consumers: dbadmin migration runner/role setup, migrator, notify owned contracts/golden, realm validation and published KN readers.
+Dependency evidence: git diff --name-only e895c4d9 a724411e; git diff e895c4d9 a724411e -- internal/shared/dbadmin tests/golden cmd/api-platform/realm_test.go. Code/goldens này do PR15 nguồn khác, không phải các thay đổi wire KN.
+Regression acceptance command: privatePG go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./tests/notifyconsumers ./cmd/api-platform ./internal/shared/migrator ./tests/platformdata ./tests/htxdata; staticfull.
+Propagation rule: chỉ nhận baseline mới khi kiểm thực sự, không tái ghi goldens để né sai lệch runtime. Nếu sửa mã mới phải thêm affected consumer/full gates/helper trước dev. Không claim web/mobile của upstream đã chạy trong audit Go này; không sửa main/worktree. Scope được G1 cho phép, privatePG/fail-on-SKIP/GoALLfreeze.
+
+
+Bằng chứng audit Go trên toolchain CI go1.26.9: source6 actualexit0, không FAIL/SKIP; dbadmin5.439s (RepairMainPF151 và đủ nhánh metadata main/dev/dirty/newer/older/no-ledger), notifyconsumers1.486s, cmd/api-platform154.556s, migrator268.187s, platformdata11-115.132s, HTX14-126.033s. Cụm private60714/a9e18c6e24b1 đã dọn; Go0. Static actualexit0: build/vet/modgen/migratecheck/archlint/contract/docs/MFA/boundary314/lint0, đúng hai fixture gofmt cũ. Không sửa nguồn/golden; 34goldens theo nền a724 giữ nguyên, kể cả bốn chuỗi lỗi UUID của upstream. Bản source audit khớp Go được khai báo trong CI; không đổi runtime toàn máy.
+
+Phạm vi kết luận là backend/contract và cổng tĩnh nêu trên, không tuyên bố đã chạy web/mobile/compose/VPS của PR15. Các phần upstream này không đổi mã nghiệp vụ KN trong gói audit. Full5 gói wiring B trên e895 là bằng chứng lịch sử, không ghi lại thành kết quả trên a724. Gói này chỉ thêm tài liệu, vì vậy helper kiểm lại dbadmin/notifyconsumers cùng migration11; các source suite còn lại đã đạt trên cùng nguồn a724 và không cần lặp khi chỉ sửa Markdown. Chỉ tích hợp dev sau helper đạt, giữ main/worktree/lịch. Authz/context, routes/own records, production binding, tenant/client và KHTC reminder vẫn còn.
+
+
+## KNSPLIT-2-CONTEXT-A
+Downstream consumers: shared/db ForModule, native W24/FD module transactions và published HTX scope RLS; các owner adapters sau phải đối chiếu golden db-context-native.json.
+Dependency evidence: rg -n 'ContextVarsFrom|RequiresNode|checkNodeScope|setLocalContext' internal/shared/db; rg -n 'ContextVars|PrincipalScopes' tests/htxdata internal/shared/db -g '*_test.go'. Gói chỉ thêm test/fixture, production không thay đổi.
+Regression acceptance command: privatePG go test -v -count=1 -p 1 -timeout 55m ./tests/contextdata ./tests/htxdata; privatePG go test -v -count=1 -p 1 -timeout 55m ./internal/shared/db -run 'ContextVars|CtxFunctions|CtxFunctionGrants|RequiresNode|NodeBoundRolesDeclared|WithContextTxSetsLocalRole'; staticfull; helper11migration+contextdata. TEST-CTX-001/002/003 ở gia-dinh gói.
+Propagation rule: native code chưa sửa, không tự coi golden mới là proof cho generic API chưa viết; các refactor sau phải dùng golden immutable và thêm caller/consumer ứng với wiring mới. Miễn full5/web/mobile vì production/API/DBDDL không thay đổi. PrivatePG/Go1.26.9/fail-on-SKIP/GoALLfreeze; main/worktrees giữ. Evidence chưa chạy.
+
+
+Source3 thực tế5404exit0, không FAIL/SKIP: context4test197.598s (268vectors×hai chế độ×commit/rollback =1072giao dịch,948accepted/124denied; không rò pool, savepoint và identity đạt), native shared/db W24/FD/context/functions/grants/T4 selective130.091s, HTX14-132.530s gồm 288 đối chiếu real-node RLS và432 đối chiếu production; không chạy lại platformdata trong gói test-only này. Private52812/dacd3fbe1bf5 đã dọn/Go0 trước sửa lint. Core capture7f624ee9 giữ nguyên268fixture, sửa hai dòng test tại d842f3f5: promote Begin và fmt.Errorf %w. Không sửa production hay expected; static đầu exit1 giữ log, static-verified19729exit0/lint0/boundary314/đúng2fixture gofmt cũ.
+
+Lượt PG kiểm lại đầu dừng trước Go test vì PowerShell flatten array một phần tử, không phải lỗi contract. Giữ log/exit2 và dọn private58265/3bb1d89d94ed; script final dùng lệnh đơn trực tiếp. Context PG final24018 đang chạy; chưa kết luận đã đạt trên hai dòng test cuối hay helper/dev. Những suite shared/db và HTX đã đạt vẫn áp dụng vì source native và caller của chúng không thay đổi.34oldgoldens nền5d5 và frozen268 tại7f624 giữ theo Git diff. Main không đổi, chưa helperqueued.
+
+
+Context PG final24018 actualexit0/noFAIL-SKIP trên d842f3f5: cả4testPASS124.309s, 268vectors/1072transactions và savepoint/identity đều đạt, private64436/49817b171d5e đã dọn/Go0. Static-verified0; sharedDB/HTX source3 đã0 trên production nguyên. Source/golden bắt đầu7f624 giữ; chỉ teststyle hai dòng đã kiểm lại. Chờ helper11migration+contextdata trước khi claimdev; main/worktrees/lịch giữ. Genericprojection/registry và chuyển owner KN chưa thực hiện ở gói capture này.
+
+
+## KNSPLIT-2-CONTEXT-B
+Downstream consumers: authz Principal/session port; shared/db ForModule; context native+owner conformance; HTX published RLS; APIassembly/worker/metrics/KN77 due shared context infrastructure.
+Dependency evidence: rg -n 'SelectedSession|ContextVarsFrom|RequiresNode|ForModule' internal/shared internal/kn/extension/module_session_projection.go cmd -g '*.go'. Runtime owner registration chưa nối middleware; native fallback giữ.
+Regression acceptance command: authz unit và exact context pure allowlist; privatePG full tests/contextdata + shared/db W24/FD/T4 + tests/htxdata; staticfull; privatePG full5 ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker; helper11migration+authz/contextdata. TEST-CTX-004/005/006 trong gia-dinh.
+Propagation rule: production shared authz/db đổi nên full5 thật trước dev, không suy pure xanh thành PG xanh.35goldens/ACL26-59-24/boundary314 nguyên; noHTTP/web/mobile/DDL nên miễn các client suites. Lượt pure-first regex rộng có SKIP phải giữ và không tính đạt; các ca đó phải PASS trong PGfull. PrivatePG/Go1.26.9/fail-on-SKIP/GoALLfreeze.
+
+
+Source4 thực tế18788exit0/noFAILSKIP: authz1.392s/context8tests211.253s (native268 và owner238selected+30job/unselected giữ fallback, tổng2144giao dịch ma trận; invalidzero session/owner errors PASS), sharedDB W24/FD/T4 121.537s, HTX14-130.695s. Private65368/609f209ccbd6 đã dọn. Pure-verified0/authz0.922s/contextpure1.929s; static12500exit0/lint0/boundary314/gofmt đúng2fixture cũ. Core62dfecfd chưa thay đổi nguồn. Full5guard8100 đã được mở sau đủ các cổng thật, private57405/689cdba8ad75 đang chạy: dbadmin4.325s đã PASS, chưa kết luận các phần còn lại/helper/dev. Không thêm Principal giả cho job, không thay các35goldens/ACL/DDL/API. GoALLfreeze đến full5end+Go0, rồi chốt docs/fetchremote/helper11.
+
+
+Bằng chứng trước tích hợp: full5PG8100actualexit0/noFAILSKIP trên core62dfecfd: dbadmin4.325s, metrics128.793s, KN77/KHTC295.762s, APIassembly124.347s, worker2.311s. Private57405/689cdba8ad75 đã dọn/Go0; source4 actual0 giữ (authz1.392/context211.253/sharedDB121.537/HTX130.695s), pure-verified0/static12500exit0/lint0/boundary314/gofmt2old. Không đổi nguồn sau khi kiểm;35goldens nguyên nền d96. Chờ helper11migration+authz/context/HTX trước dev; B vẫn chưa wiring runtime và không coi G1 hoàn tất.
+
+
+## KNSPLIT-2-CONTEXT-C
+Downstream consumers: accounts HTTP context/MFA/support/idempotency; API assembly owner registration; ForModule projection; KN77/KHTC/metrics/worker default-context behavior; HTX published scopes.
+Dependency evidence: rg -n 'Sessions|ResolveSelected|SelectedSession|SessionProjection|WithAuthorizationScope' internal/platform/accounts cmd/api-platform/assembly -g '*.go'. TEST-CTX-007/008 in gia-dinh.
+Regression acceptance command: privatePG authz/accounts-handler-full/APIassembly-new-root-HTTP-target/contextdata-full/HTX14; staticfull; privatePG full5 dbadmin/metrics/KN77/APIassembly-full/worker; helper authz/accounts-handler/APIassembly/contextdata + default migration gates/LegacyPublishedReaderAccessContract.
+Propagation rule: runtime context binding changed, so must prove signed JWT->server resolve->owner->actualPG and full existing account lifecycle/support/MFA/idempotency. Compile-only is not behavioral evidence. No SQL/ACL/golden changes; catalog/notify upgrade gates already PASS on unchanged SQL inB and need not rerun inC.35goldens/boundary314 immutable, no web/mobile/API schema change. PrivatePG/Go1.26.9/noSMTP/GoALLfreeze/main and worktrees retained.
+
+
+Source5 thực tế92958actualexit0/noFAILSKIP: authz2.671s/accounts-handler-full176.649s/rootHTTP-target121.049s/contextdata8-121.368s/HTX14-134.251s. Account lifecycle/MFA/support/idempotency và5newfailed-provider HTTPcases đạt; root Build+JWT+actualPG profilekn/adminNoTokenOrgFallback/rawActorTenantHasMFA/foreignActorTenantMissingMFA đềuPASS. APIassembly trong source chỉ chạy test mới, không ghi thành proof fullsuite. Private50778/c9fbb3fa50d8 đã dọn. Static92402exit0/build-vet-modgen-migratecheck-archlint-contract-docs-MFA-boundary314/lint0/gofmt2old. Core6b63cd0d không đổi. Full5guard95230 đã được mở sau các điều kiện, private60070/0a42205ce8bd đang chạy, dbadmin4.858s đã PASS. Chưa kết luận full5/helper/dev; giữ GoALLfreeze.35goldens/SQL/ACL nguyên và không tạo Principal cho job.
+
+
+Bằng chứng trước tích hợp: full5PG95230 actualexit0/noFAILSKIP trên core6b63cd0d, dbadmin4.858s/metrics120.778s/KN77-KHTC295.380s/APIassembly-full123.544s/worker2.365s. RootHTTP mới cũng PASS trong assemblyfull, không chỉ targeted source. Private60070/0a42205ce8bd đã dọn/Go0; source5 và static0/lint0/boundary314/gofmt2old giữ. Nguồn không đổi sau core,35goldens không đổi, noDDL/ACL/API mới. Chờ helper9migration+authz/accounts-handler/APIassembly/contextdata trước khi claimdev. Owner projection đã nối request trong C nhưng các sharedKNtypes/legacy fallback/route ownership/ownrecords/productionbinding/tenant/client/reminders vẫn chưa hoàn tất; không coi G1 đạt.
+
+
+## KNSPLIT-2-CONTEXT-D — owner session payload / KHTC source
+Downstream consumers: owner KN projection, khtcsource reader, API assembly, accounts middleware, contextdata RLS, KN77/KHTC, HTX readers; shared dbadmin/metrics/worker full5 guards.
+Dependency evidence: `rg -n 'SessionProjection|SelectedSession|RequireKN|RequireSession|khtcsource|UseKHTCSourceReader' internal cmd tests -g '*.go'` và diff nền66d88069.
+Regression acceptance command: private PostgreSQL + Go1.26.9 `go test -v -count=1 -p 1 -timeout 55m ./internal/shared/authz ./tests/contextdata ./internal/kn/extension/port ./internal/kn/extension/khtcsource/domain ./internal/platform/accounts/handler ./tests/htxdata`; full5 `go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker` và static đầy đủ.
+Propagation rule: owner projection đổi → source và tất cả full5, không dùng compile-only/skip làm bằng chứng; SQL/ACL/API/35goldens không đổi → helper scoped9 migrations, không lặp upgradecatalog/notify đã kiểm ởB. TEST-CTX-009/010/011 trong gia-dinh; giữ policy legacy ở consumer chưa chuyển, không đổi D2 hay tenant bằngpayload.
+
+CONTEXT-D bằng chứng: source5808 actual0 (authz1.016/handler307.650/domain1.089/contextdata195.011/HTX223.112; port chỉcompile). Static-final13881 actual0/lint0/boundary314/fmt2old; pure-current37585 actual0. Full5-final38165 actual0: dbadmin3.173/metrics87.432/KN77-KHTC201.984/APIassembly72.697/worker1.655s, đủ8 HTTP owner cases PASS. KhôngFAIL/SKIP, privatePG đã dọn/Go0;35goldens/SQL/ACL/HTTPcontract nguyên. Source production80d47555 chưa đổi sau đó,2testfix kiểm lại bằngstatic/pure/full5; giữlogfailed archlint+SA9005, không tính guardblocked làPGproof. Chờhelper9 trướcdev.
+
+
+## KNSPLIT-2-CONTEXT-E — KHTC owner context consumers
+Downstream consumers: KHTC handler/caller (catalog-plan, period-inbox, form, report), KN77, API/worker, contextdata matrix; source codec/kernel/views/ACL unchanged from3cd332a5.
+Dependency evidence: `rg -n 'authz.RequireKN|authz.KNContext|RequireSession|WithPrincipal' internal/kn/extension/khtc internal/kn/extension/khtcperiod internal/kn/extension/khtcform internal/kn/extension/khtcreport tests -g '*.go'` và diff nền3cd332a5.
+Regression acceptance command: privatePG/Go1.26.9 `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/extension/khtc/handler ./tests/contextdata ./internal/kn/extension/khtc/domain ./internal/kn/extension/khtcperiod/domain ./internal/kn/extension/khtcform/domain ./internal/kn/extension/khtcreport/domain`; full5 `go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker`.
+Propagation rule: changed owner reader→all KHTC/KN77/API/worker/contextdata; no interface/SQL/codec/kernel/HTX changes→accounts/HTX source verifiedD exempt, full5 still protects root consumers. TEST-CTX-01245cases via module roots only, no helper-import backedges. Full static/goldens/ACL unchanged; helper9 plus KHTChandler/contextdata/API. Must actualPASS/noSKIP+cleanup, then dev only.
+
+CONTEXT-E rerun scope: initial full5 exit1 chỉdo9catalog testcase mới gọiGETsaiURL/405,36owner cases khác+luồngcũPASS; dbadmin4.426/metrics112.782/API110.365/worker2.086s actualPASS. Sửa1URLtest theo route hiệnhành, khôngproductionđổi: rerun fullKN77+static-verified, giữ4siblingPASS trêncùngproduction và original failedlog; helpergate cần composite từngpackageactual0, không ghi aggregatefull5 đầu thànhPASS.
+
+CONTEXT-E accepted pre-helper: source35625 actual0; static-verified55017 codegatesactual0/lint0/boundary314+gofmt2old(GitblobunchangedLFfix). KN77-final34216 actual0/261.174s/noSKIP,45casesPASS. Full5 composite giữ4siblings actualPASS ởcore8def7127 vàKN77rerun0 sau1URLtestfixf415; khôngproductiondiff và35goldens/SQL/contracts giữ. PrivatePG đã dọn/Go0, originalfailedlog giữ. Helper9 cònphải đạttrướctíchtợp.
+
+
+## KNSPLIT-2-CONTEXT-F — material/outbreak owner consumers
+Downstream consumers: two module handlers, CNTS aggregate +KN77/KHTC, API/worker, contextdata. Sourcecodec/kernel/views/contracts unchanged base2f55c6a6.
+Dependency evidence: `rg -n 'authz.KN|RequireKN|WithPrincipal|outbreak|material' internal/kn/extension/material internal/kn/extension/outbreak tests/kn77 -g '*.go'` vàdiff.
+Regression acceptance command: privatePG/Go1.26.9 `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/extension/material/handler ./internal/kn/extension/outbreak/handler ./tests/contextdata`; full5 `go test -v -count=1 -p 1 -timeout 55m ./internal/shared/dbadmin ./internal/platform/metrics/handler ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker`.
+Propagation rule: changed security caller→all listed; unchanged KHTC/kernel/accounts/HTX source E/D exempt, full5 still root consumer guard. TEST-CTX-01312no-ownerHTTPcases; positive lifecycle existingPGsuite. Helper9+2handlers/contextdata/APIassembly; actualexit/noSKIP/clustercleanup/Go0/frozen35goldens required beforedev.
+
+CONTEXT-F evidence: source33537 actual0 (material158.938/outbreak112.050/contextdata116.132s), static74885actual0/lint0/boundary314/fmt2old. Full5 96495actual0/noSKIP: dbadmin5.169/metrics128.331/KN77-KHTC260.063/API80.553/worker2.072s,12ownernegativecases+positiveflowsPASS. PrivatePGremoved/Go0,35goldens/SQL/contracts nguyên/nguồn4df6a592 giữ; chờhelper9 trướcdev.
+
+## KNSPLIT-3-CLIENT — client KN giữ xác thực D24
+
+Downstream consumers: realm import/Keycloak26.3, web-ops OIDC, API authz claim reader; không thay các consumer này hoặc default client của bản web đang triển khai.
+Dependency evidence: `rg -n 'clientId|browserFlow|clientScopes' deploy/compose/keycloak/agrigreen-realm.json` và `rg -n 'NEXT_PUBLIC_OIDC_CLIENT_ID|client_id' apps/web-ops deploy/compose/docker-compose.yml`; diff chỉ thêm một client và kiểm cấu hình/runbook.
+Regression acceptance command: Go1.26.9/privatePG `go test -v -count=1 -p 1 -timeout 55m ./cmd/api-platform` (toàn package: cấu hình realm/D24, đăng nhập/MFA, role/tenant API hiện hữu; noFAIL/SKIP/INFRA). Hai test mới `TestKNWebClientCodePKCEAndClaims_KNSPLIT3`, `TestKNWebClientInheritsLoginTOTP_KNSPLIT3` nối đúng client vào claims/shared MFA, không chỉ tìm mapper ở scope không được gán. Kiểm semantic bỏ kn-web khôi phục nguyên realm nền a4dbc7e2, giữ tất cả client khác/realm quản trị, 35goldens/SQL/contracts không diff.
+Propagation rule: không đổi Go production/DDL/interfaces/API/role policy nên không lặp full5/broad build-vet-lint; cmd/api-platform kiểm consumer trực tiếp và root helper cổng dev. Config/static docscheck/contractcheck/modgen -check/mfaflagcheck/knboundary314/gofmt/diff-check phải đạt. Test cấu hình không thay cho live Keycloak PKCE/TOTP/refresh/logout: [runbook](runbooks/kn-web-client.md) dành cho môi trường được duyệt; UAT vận hành còn chờ. Chỉ dev/giữ worktree/main.
+
+KNSPLIT-3-CLIENT pre-helper: core b5f9c898; full cmd/api-platform privatePG exit0/85.069s, 22 top-level PASS/không FAIL-SKIP-INFRA, gồm2kn-web+realm/D24/Admin/API. Cluster56492/b0810725964d đã dọn. Config semantic0/static8919exit0 và5tool0/boundary314/gofmt2fixturecũ/diff0; frozen35goldens/SQL/contracts nguyên. PrefixTEMP agrigreen-codex-knsplit3client-*. Chờ helper dev; chưa chạy login Keycloak live.
+KNSPLIT-2-CONTEXT-G: owner context của cntsalert/cntscal/reportcycle; TEST-CTX-014 gồm TestCNTSAndReportCycleRequireOwnedSessionThroughHTTP (27ca qua publicroot/PG), TestReportSyncOwnedScopeIntersection (11ca), toàn2handlers/KN77p7/contextdata/full5 và9migrationACL. `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/extension/cntsalert/handler ./internal/kn/extension/cntscal/handler ./internal/kn/extension/reportcycle/app ./tests/contextdata ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker`; phải privatePG thật/noSKIP,35goldens nguyên.
+## KNSPLIT-4B-NOTIFY — Phân giải người nhận digest theo tenant
+
+Downstream consumers: notify digest → module deps → worker consumer/job; KN cung cấp resolver qua notify/port. Không thêm bộ lọc KN trong platform.
+Dependency evidence: `rg -n 'DigestTo|DigestRecipients|RunEmailDigest|buildNotify' internal/platform/notify internal/kn/extension/module_digest_recipients.go cmd/worker`; nguồn queue thuộc extension.NotificationDigest.
+Regression acceptance command: privatePG/Go1.26.9 `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/extension ./internal/platform/notify/... ./tests/notify ./cmd/worker ./tests/notifyconsumers`. Bao gồm parser, factory/config validation của worker, actual PG hai tenant/recipient/body, thiếu mapping, SMTP retry, trang201, cấu hình nil resolver và notify goldens.
+Propagation rule: thay generic deps/digest và worker nên kiểm các suite trên; nguồn CNTS/KHTC/price/HRM/RLS/HTX không đổi, không lặp suite nghiệp vụ riêng. Build/vet/static/lint kiểm toàn repo; không SMTP/deployment thật. Thiếu mapping giữ pending và không global fallback; địa chỉ chỉ từ cấu hình tin cậy. Source của tree giữ nguyên trong kiểm tra; helper dev do root chạy.
+
+Kết quả trước helper: source29769 actual0/noFAIL-SKIP-INFRA, tests/notify275.218s (5 ca PG mới), worker3.444s (2 ca nối resolver mới), extension4.790s, notify4.219/app5.166/channel9.461/domain4.436s, notifyconsumers4.660s. Private63740/510fe7991467 đã dọn. Static14530 actual0, lint3088 actual0/0issues, boundary314, formatter chỉ 2 fixture cũ; 35goldens/migrations/contracts không đổi. Production core07d904fc giữ nguyên. PrefixTEMP agrigreen-codex-knsplit4bnotify-*. Chờ helper dev; chưa hoàn tất tenant move/G1.
+
+## KNSPLIT-2-CONTEXT-H — capability owner session
+Downstream consumers: extension FormProfiles/ReportSessionResolver, native cap/forms app+handler, cap/reports app+handler, CNTS PFPUB closedfigures, KN77, APIassembly/worker, full5 guards.
+Dependency evidence: `rg -n 'ResolveActor|ResolveSession|formReader|RequireSession' internal/kn/extension internal/platform/forms internal/platform/reports -g '*.go'` and diff base a4dbc7e2.
+Regression acceptance command: privatePG/Go1.26.9 `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/extension ./internal/platform/forms/app ./internal/platform/forms/handler ./internal/platform/reports/app ./internal/platform/reports/handler`; privatePG `go test -v -count=1 -p 1 -timeout 55m ./tests/kn77 -run 'TestCapabilitiesRequireOwnedSessionThroughHTTP|TestPFPUB_ClosedFigures'`; full5 by root before integration.
+Propagation rule: resolver precedence changed, native and registered authorization plus populated CNTS forms must pass. TEST-CTX-015 preserves deny-before-TX with broad rawroles. No kernel/codec/DDL/ACL/API/golden change; contextdata/HTX underlying projection verifiedD/F. Full static/helper9 required; no compile-only/SKIP evidence. Worktree source frozen while its checks run.
+
+
+CONTEXT-H actual evidence: source-composite0 preserves originalsourceaggregate1/roothelpercompilefailure plus verifiedKN77target1/2missing-provinceURL test cases. Unchangedproduction3f6: forms/app225.029 +forms/handler150.397 realPG, reports/app3.023 unit, extensionroot4.191, PFPUBClosedFigures11.38 actualPASS; reports/handler compile-only. Final45HTTP22885 actual0/211.732s/noSKIP aftersingleURLliteralfixda0f2c1d, privatePG removed. Fullstatic40421actual0/lint27006actual0/boundary314; currentKN77vet84710actual0+gofmt2old aftertestliteralfix. Full5 29844actual0/noFAILSKIP: dbadmin9.040/metrics208.548/KN77627.503/API212.962/worker3.977s, private51870/9c67707125be removed/GoH0.35goldens/SQL/contracts unchanged; helper9+extensionroot/reportsapp/fullKN77 still required beforedev. Do not replay passedsource/full5 solelyforquota interruption.
+
+## KHTC-REMINDER-PORT — cổng forms cho job không Principal
+
+Downstream consumers: forms Control/Feed/Publisher/Entry/Freezer; KHTC source và KN77 (profile KN, nháp/gửi/duyệt); module root/catalog sinh bởi modgen. Chưa có consumer job nhắc hạn mới.
+Dependency evidence: `rg -n 'progressOf|SystemProgress|OwnerRef|ActorRef|DuePeriods' internal/platform/forms internal/kn/extension tests/kn77 -g '*.go'`; stored OwnerRef là publisher node, khác ActorRef người phát hành.
+Regression acceptance command: privatePG/Go1.26.9 `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/forms/... ./internal/kn/extension/khtcsource/... ./tests/kn77`; full static/build/vet/archlint/contract/docs/MFA/boundary/lint/gofmt. TEST-KHTC-SYSTEM-001/002 đối chiếu user Control.Progress với job context không Principal, SQL role/read-only, vòng đời/hạn/owner node, clone và tenant/profile/identity isolation; existing user gate không đổi.
+Propagation rule: cổng mới chỉ Go/server và phép chiếu dùng chung không đổi → kiểm forms nguồn và toàn bộ KN77 trực tiếp; không thêm route, DDL/ACL/hợp đồng HTTP/goldens. Native chưa gửi = not_submitted, nháp KN vẫn ở khtc_form_sheet. Job/reminders và phân trang vượt DuePeriods2000 còn mở; không coi cổng nền là nghiệm thu nhắc hạn. Root helper dev tuần tự, giữ main/worktrees.
+
+Bằng chứng trước helper: source session64862 actualexit0 trên Go1.26.9/privatePG, 73test cấp đầu PASS và không FAIL/SKIP/INFRA; forms/app216.708s, forms/domain0.841s, forms/handler134.488s, khtcsource/domain0.674s, toàn KN77/KHTC467.460s. Hai test mới đối chiếu lifecycle/owner/read-only6.98s và isolation0.15s đều PASS; KN77 gồm nháp/phiếu/phòng/kỳ/hạn/đóng/hủy và các luồng cũ. Các package không có test chỉ được tính biên dịch. Cluster53211/3211b9f0a6d2 đã dọn, session kết thúc0. Static59503 actualexit0, đủ build/vet/modgen/migrate/archlint/contract/docs/MFA/boundary314/lint0issues, formatter đúng hai fixture archlint cũ và diff-check0. Không đổi Go sau637fd033; 35goldens, migrations và contracts không diff so2e82dfb2. Prefix proof ngoài repo `%TEMP%\agrigreen-codex-khtcreminderport-*` gồm source-pg/static và log/exit từng cổng. Chờ root helper forms/app + toàn KN77 + chín cổng migration, không tự rebase/push; chưa tích hợp dev hay hiện thực job nhắc hạn.
+
+
+## KHTC-DEFAULT-NAV — context navigation owned by application profile
+Downstream consumers: accounts selected/current-context and middleware, party live menu/module filter, owner policy registration, APIassembly, KN77, mock context/support/menu, web login shell consumers (existing default_route only).
+Dependency evidence: `rg -n 'NavigationPolicy|ContextNavigation|NavigationRequest|default_route|DefaultRoute' internal/platform/accounts internal/platform/party internal/kn/extension cmd/api-platform/assembly apps/web-ops/src/api/mock -g '*.go' -g '*.ts'` against base2bfb471c.
+Regression acceptance command: Go1.26.9 pure navigation/registration tests; privatePG generate requiredwebmenu fixture then `go test -v -count=1 -p 1 -timeout 55m ./tests/kn77 -run '^TestKH_FN_CH_00_01_DefaultRouteKHTC$'`; source full accounts/party handlers +root/pure packages, staticall, full5 dbadmin/metrics/KN77/APIassembly/worker; web tsc/vitest/buildmock. Roothelper migration9 beforedev.
+Propagation rule: redirect policy affects auth context and menu; must prove signedJWT select→GETcontext→menu, customcode/profile, readonly/support, disablemodule and denial/nativecompat. Regenerated web fixture is featurebehavior contract, all35DBgoldens/migrations/ACL/OpenAPI unchanged. No success claim from compilation orSKIP. Own tree frozen whileGo/webchecks run. Evidence pending.
+
+## KNSPLIT-2-CONTEXT-I — Báo giá, HCTH, Contact
+
+Downstream consumers: API assembly (KN config và Contact→HRM), KN77/KHTC, worker price calendar; callback chỉ áp dụng đường request, job không tạo principal giả.
+Dependency evidence: `rg -n 'kn/(price|hrm|contact)|KNPriceProfile|KNHRMAccess|KNContactAccess' cmd tests/kn77 internal/kn` và `go run ./tools/modgen -check`.
+Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/price/... ./internal/kn/hrm/... ./internal/kn/contact/... ./tests/contextdata ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker` với PostgreSQL riêng thực.
+Propagation rule: production quyền/profile đổi → bắt buộc cả ba nguồn và các consumer trên; root chạy full5 và migration gate/helper sau rebase. Thiếu exit thật hoặc có SKIP không được coi xanh. Không đổi 35 golden/DDL/ACL/API.
+
+
+## KNSPLIT-2-CONTEXT-J
+
+Lịch công tác giải phiên owner trước resolver/realm; follower/manager không vay legacy. Lưu/sao chép/duyệt/check-in chỉ xem bị chặn trước I/O. Kiểm tra app policy, toàn handler lịch có dữ liệu, HTTP public root chín trạng thái phiên và contextdata/KN77/API. Không đổi SQL/ACL/OpenAPI/golden hay hành vi GPS. Đang chờ kết quả thực.
+
+KNSPLIT-2-CONTEXT-J: source35581/static65527/pure95493/currentstatic40610/full5-28682 đều actual0, chín HTTP cases PASS/noSKIP. Readonly hint guard99409f32 kiểm cả levels/follower. Hai cụm PG riêng đã dọn; 35 golden/DDL/ACL/API không đổi. Chờ review/ticket merge; log gốc mixed-encoding được giữ, normalized chỉ dùng xác minh marker ASCII.

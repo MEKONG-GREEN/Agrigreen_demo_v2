@@ -4,6 +4,8 @@ import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
 import { newIdempotencyKey } from "@/api/idempotency";
 import { parseProblemResponse } from "@/api/problem";
+import { parseNumberInput, type NumberRule } from "@/components/form";
+import { compareDecimal } from "@/lib/decimal";
 
 type S = components["schemas"];
 export type CntsBM02 = S["CntsBM02"];
@@ -54,25 +56,45 @@ export function createCntsAggApi(api: ApiClient) {
 
 export type CntsAggApi = ReturnType<typeof createCntsAggApi>;
 
+/** Số điều chỉnh: được âm vì dòng điều chỉnh cộng/trừ vào số tự cộng từ BM-01 (nghiệp vụ có nghĩa âm), tối đa 3 số lẻ. */
+export const DELTA_RULE: NumberRule = { allowNegative: true, maxDecimals: 3 };
+/** Ô nuôi trồng (diện tích, sản lượng): không âm, tối đa 4 số lẻ (R-A1). */
+export const AQUA_RULE: NumberRule = { maxDecimals: 4 };
+
 /** Kiểm dòng điều chỉnh phía máy khách (máy chủ kiểm lại): có ít nhất một số khác 0, số hợp lệ, lý do 10–500 ký tự. */
 export function adjustmentErrors(deltas: Record<string, string>, reason: string): Record<string, string> {
   const errs: Record<string, string> = {};
   let any = false;
   for (const [k, v] of Object.entries(deltas)) {
-    const t = v.trim();
-    if (!t) continue;
-    if (!/^-?\d{1,12}(\.\d{1,3})?$/.test(t)) errs[k] = "Số (có thể âm, dấu chấm)";
-    else if (Number(t) !== 0) any = true;
+    if (!v.trim()) continue;
+    const p = parseNumberInput(v, DELTA_RULE);
+    if (!p.ok) errs[k] = p.error;
+    else if (compareDecimal(p.value, "0") !== 0) any = true;
   }
-  if (!any && Object.keys(errs).length === 0) errs.deltas = "Nhập ít nhất một số khác 0";
-  const r = reason.trim().length;
-  if (r < 10 || r > 500) errs.reason = "Lý do 10–500 ký tự";
+  if (!any && Object.keys(errs).length === 0) errs.deltas = "Nhập ít nhất một số khác 0.";
+  const r = [...reason.trim()].length;
+  if (r < 10 || r > 500) errs.reason = "Lý do 10–500 ký tự.";
   return errs;
+}
+
+/** Số điều chỉnh đã chuẩn hóa để gửi (bỏ ô trống). Gọi sau `adjustmentErrors`. */
+export function normalizeDeltas(deltas: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(deltas)) {
+    const p = v.trim() ? parseNumberInput(v, DELTA_RULE) : null;
+    if (p?.ok) out[k] = p.value;
+  }
+  return out;
 }
 
 /** Ô nuôi trồng: rỗng hoặc số không âm (tối đa 4 chữ số thập phân). */
 export function aquaValueError(v: string): string | null {
-  const t = v.trim();
-  if (!t) return null;
-  return /^\d{1,12}(\.\d{1,4})?$/.test(t) ? null : "Số không âm (dấu chấm)";
+  const p = parseNumberInput(v, AQUA_RULE);
+  return p.ok ? null : p.error;
+}
+
+/** Giá trị ô nuôi trồng đã chuẩn hóa ("7,25" → "7.25"); rỗng → null. */
+export function aquaValue(v: string): string | null {
+  const p = parseNumberInput(v, AQUA_RULE);
+  return p.ok && p.value !== "" ? p.value : null;
 }

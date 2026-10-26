@@ -1,12 +1,13 @@
 // Package app: use case "Nhập thông tin vật tư" KN v7.7 (FN-XA-03.06, gói P7) — Cấp Xã ghi nhận vật tư theo danh mục
 // masterdata "material" (ĐVT = attrs.unit), sửa bằng bản ghi bù; Cấp Tỉnh/Quốc gia xem, tổng hợp theo xã. Quyền theo
-// ngữ cảnh phiên KN (authz.RequireKN), không theo vai realm.
+// ngữ cảnh phiên KN (port.RequireSession), không theo vai realm.
 package app
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"net/http"
 	"regexp"
 	"strings"
@@ -65,11 +66,11 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 
 type caller struct {
 	p authz.Principal
-	k authz.KNContext
+	k port.SessionContext
 }
 
 func (s *Service) reader(ctx context.Context) (caller, error) {
-	p, k, err := authz.RequireKN(ctx)
+	p, k, err := port.RequireSession(ctx)
 	return caller{p: p, k: k}, err
 }
 
@@ -81,7 +82,7 @@ func (s *Service) writer(ctx context.Context) (caller, error) {
 	switch {
 	case c.k.ReadOnly():
 		return c, ErrReadOnly
-	case c.k.Role != authz.KNXa && c.k.Role != authz.KNAdmin:
+	case c.k.Role != port.SessionRoleCommune && c.k.Role != port.SessionRoleAdmin:
 		return c, errWriterForbidden
 	case c.k.Support != nil && utf8.RuneCountInString(strings.TrimSpace(c.k.Support.Reason)) < 10:
 		return c, ErrSupportReason
@@ -91,7 +92,7 @@ func (s *Service) writer(ctx context.Context) (caller, error) {
 
 // readDept: Admin đọc mọi phòng ban (hoặc phòng ban chọn), vai khác phòng ban của phiên.
 func (c caller) readDept(param string) string {
-	if c.k.Role == authz.KNAdmin {
+	if c.k.Role == port.SessionRoleAdmin {
 		return strings.TrimSpace(param)
 	}
 	if c.k.Department == "" {
@@ -101,7 +102,7 @@ func (c caller) readDept(param string) string {
 }
 
 func (c caller) writeDept(param string) (string, error) {
-	if c.k.Role != authz.KNAdmin {
+	if c.k.Role != port.SessionRoleAdmin {
 		if c.k.Department == "" {
 			return "", problem.Forbidden.WithDetail("ngữ cảnh phiên chưa có phòng ban")
 		}

@@ -15,7 +15,7 @@ import type { DepartmentRef, KnRole, RoleAssignment, SessionContext } from "@/kn
 import { NATIONAL_REF, provinceOrgRef } from "./data";
 import { hasRole, json, problem, problemOf, type Ctx, type Route } from "./http";
 import { findKnAccount, KN_ACCOUNTS, KN_DEPARTMENTS, KN_MENU_PROFILE, type MockKnAccount } from "./kn-accounts";
-import { dropSupportContexts, knStoredContext, registerKnContext, DEFAULT_ROUTE } from "./kn";
+import { clearMockKnLoginLock, dropSupportContexts, knStoredContext, mockKnLoginLockedUntil, registerKnContext, knMenu } from "./kn";
 import { stableUuid } from "./kn-schedules";
 import { AG_COMMUNES, AG_PROVINCE, AG_REGIONS, communeName, regionName } from "./kn-reports/store";
 
@@ -231,6 +231,15 @@ function userWire(a: MockKnAccount) {
   };
 }
 
+/**
+ * ADMIN-UNLOCK (#42/#61): GET chi tiết thêm login_locked (+ login_locked_until) đọc từ bộ đếm đăng nhập giả lập
+ * (mockKnLogin: sai 5 lần → khóa tạm 15 phút). Danh sách/tạo dùng userWire — bỏ field như máy chủ (không N+1).
+ */
+function userDetailWire(a: MockKnAccount) {
+  const until = mockKnLoginLockedUntil(a.identifiers);
+  return { ...userWire(a), login_locked: until !== null, ...(until ? { login_locked_until: until } : {}) };
+}
+
 function assignmentWire(a: MockKnAccount, x: RoleAssignment) {
   const p = profileOf(a);
   const rv = p.revoked.get(x.assignment_id);
@@ -390,7 +399,7 @@ function startSupport(ctx: Ctx): Response {
     org_ref: asg.org_ref,
     org_name: asg.org_name,
     communes: asg.communes,
-    default_route: DEFAULT_ROUTE[asg.role],
+    default_route: knMenu(asg.role, dept.code, { orgRef: asg.org_ref }).default_route,
     expires_at: new Date(Date.now() + 4 * 3_600_000).toISOString(),
     support_session_id: sessionId,
     on_behalf_of: target ? userId(target) : null,
@@ -644,7 +653,7 @@ export const knAdminRoutes: Route[] = [
     match: knAdminContext,
     handler: (ctx) => (isKnAdmin(ctx) ? json({ items: KN_ACCOUNTS.map(userWire), next_cursor: null }) : deny()),
   },
-  { method: "GET", pattern: re("/v1/accounts/users/{id}"), match: knAdminContext, handler: (ctx) => withAccount(ctx, (a) => json(userWire(a))) },
+  { method: "GET", pattern: re("/v1/accounts/users/{id}"), match: knAdminContext, handler: (ctx) => withAccount(ctx, (a) => json(userDetailWire(a))) },
   {
     method: "POST",
     pattern: re("/v1/accounts/kn-users"),
@@ -806,9 +815,13 @@ export const knAdminRoutes: Route[] = [
           const r = reasonOk(ctx.body, 20);
           if (!r) return errField("reason", "bắt buộc, ít nhất 20 ký tự");
           const p = profileOf(a);
-          if (p.enabled === (op === "unlock")) return problem(409, "accounts.state_conflict", "Trạng thái tài khoản không đổi");
+          // Như máy chủ: mở khóa cả khi enabled=true mà đang khóa do đăng nhập sai; không còn gì để mở → 409.
+          const bruteForce = op === "unlock" && mockKnLoginLockedUntil(a.identifiers) !== null;
+          if (p.enabled === (op === "unlock") && !bruteForce) return problem(409, "accounts.state_conflict", "Trạng thái tài khoản không đổi");
+          if (op === "unlock") clearMockKnLoginLock(a.identifiers);
+          const was = op === "lock" ? "Hoạt động" : p.enabled ? "Khóa do đăng nhập sai" : "Đang khóa";
           p.enabled = op === "unlock";
-          log(a, { event: op === "lock" ? "account.locked" : "account.unlocked", entity_ref: null, actor_ref: ADMIN_REF, changes: [{ field: "Trạng thái", old: op === "lock" ? "Hoạt động" : "Đang khóa", new: op === "lock" ? "Đang khóa" : "Hoạt động" }], reason: r });
+          log(a, { event: op === "lock" ? "account.locked" : "account.unlocked", entity_ref: null, actor_ref: ADMIN_REF, changes: [{ field: "Trạng thái", old: was, new: op === "lock" ? "Đang khóa" : "Hoạt động" }], reason: r });
           return json({ user_ref: userId(a), org_ref: userWire(a).org_ref, roles: ["kn_user"], enabled: p.enabled, lock_cause: p.enabled ? null : "manual" });
         }),
     }),
@@ -1035,31 +1048,40 @@ import { knAppRoutes as route0 } from "./kn";
 import { cntsAggregateRoutes as route2 } from "./kn-cnts-aggregate";
 import { cntsAlertRoutes as route3 } from "./kn-cnts-alert";
 import { cntsCalRoutes as route4 } from "./kn-cnts-cal";
-import { cntsCatalogAppRoutes as route5 } from "./kn-cnts-catalogs";
-import { cntsCatalogAdminRoutes as route6 } from "./kn-cnts-catalogs";
-import { cntsOutbreakRoutes as route7 } from "./kn-cnts-outbreak";
-import { cntsPeriodRoutes as route8 } from "./kn-cnts-periods";
-import { knCollectRoutes as route9 } from "./kn-collect";
-import { contactRoutes as route10 } from "./kn-contact";
-import { hrmRoutes as route11 } from "./kn-hrm";
-import { hrmDocRoutes as route12 } from "./kn-hrm-docs";
-import { hrmReportRoutes as route13 } from "./kn-hrm-reports";
-import { hrmStaffRoutes as route14 } from "./kn-hrm-staff";
-import { khtcRoutes as route15 } from "./kn-khtc";
-import { khtcFormRoutes as route16 } from "./kn-khtc-forms";
-import { khtcPeriodRoutes as route17 } from "./kn-khtc-periods";
-import { khtcReportRoutes as route18 } from "./kn-khtc-reports";
-import { khtcSourceRoutes as route19 } from "./kn-khtc-sources";
-import { appRoutes28 as route20 } from "./kn-legacy-extension";
-import { appRoutes29 as route21 } from "./kn-legacy-extension";
-import { priceConfigRoutes as route22 } from "./kn-price";
-import { priceBoardRoutes as route23 } from "./kn-price-boards";
-import { priceItemRoutes as route24 } from "./kn-price-items";
-import { pricePointRoutes as route25 } from "./kn-price-points";
-import { priceReportRoutes as route26 } from "./kn-price-reports";
-import { priceTicketRoutes as route27 } from "./kn-price-tickets";
-import { reportCycleAppRoutes as route28 } from "./kn-reports/routes";
-import { workScheduleAppRoutes as route29 } from "./kn-schedules";
+import { cntsCampaignRoutes as route5 } from "./kn-cnts-campaign";
+import { cntsCatalogAppRoutes as route6 } from "./kn-cnts-catalogs";
+import { cntsCatalogAdminRoutes as route7 } from "./kn-cnts-catalogs";
+import { cntsDiaryRoutes as route8 } from "./kn-cnts-diary";
+import { cntsMapRoutes as route9 } from "./kn-cnts-map";
+import { cntsModelRoutes as route10 } from "./kn-cnts-model";
+import { cntsOutbreakRoutes as route11 } from "./kn-cnts-outbreak";
+import { cntsPeriodRoutes as route12 } from "./kn-cnts-periods";
+import { knCollectRoutes as route13 } from "./kn-collect";
+import { contactRoutes as route14 } from "./kn-contact";
+import { deptHomeRoutes as route15 } from "./kn-dept-home";
+import { hrmRoutes as route16 } from "./kn-hrm";
+import { hrmDocRoutes as route17 } from "./kn-hrm-docs";
+import { hrmPlanRoutes as route18 } from "./kn-hrm-plans";
+import { hrmPromotionRoutes as route19 } from "./kn-hrm-promotion";
+import { hrmReportRoutes as route20 } from "./kn-hrm-reports";
+import { hrmStaffRoutes as route21 } from "./kn-hrm-staff";
+import { khtcRoutes as route22 } from "./kn-khtc";
+import { khtcFormRoutes as route23 } from "./kn-khtc-forms";
+import { khtcPeriodRoutes as route24 } from "./kn-khtc-periods";
+import { khtcReportRoutes as route25 } from "./kn-khtc-reports";
+import { khtcSourceRoutes as route26 } from "./kn-khtc-sources";
+import { khtcWordRoutes as route27 } from "./kn-khtc-words";
+import { appRoutes28 as route28 } from "./kn-legacy-extension";
+import { appRoutes29 as route29 } from "./kn-legacy-extension";
+import { priceConfigRoutes as route30 } from "./kn-price";
+import { priceBoardRoutes as route31 } from "./kn-price-boards";
+import { priceItemRoutes as route32 } from "./kn-price-items";
+import { pricePointRoutes as route33 } from "./kn-price-points";
+import { priceReportRoutes as route34 } from "./kn-price-reports";
+import { priceSurveyRoutes as route35 } from "./kn-price-surveys";
+import { priceTicketRoutes as route36 } from "./kn-price-tickets";
+import { reportCycleAppRoutes as route37 } from "./kn-reports/routes";
+import { workScheduleAppRoutes as route38 } from "./kn-schedules";
 
 export function registeredKnRoutes(): RouteRegistration[] {
   return [
@@ -1068,31 +1090,40 @@ export function registeredKnRoutes(): RouteRegistration[] {
   { surface: "app", order: 15, routes: route2 },
   { surface: "app", order: 21, routes: route3 },
   { surface: "app", order: 17, routes: route4 },
-  { surface: "app", order: 10, routes: route5 },
-  { surface: "admin", order: 2, routes: route6 },
-  { surface: "app", order: 18, routes: route7 },
-  { surface: "app", order: 14, routes: route8 },
-  { surface: "app", order: 7, routes: route9 },
-  { surface: "app", order: 23, routes: route10 },
-  { surface: "app", order: 11, routes: route11 },
-  { surface: "app", order: 25, routes: route12 },
-  { surface: "app", order: 24, routes: route13 },
-  { surface: "app", order: 22, routes: route14 },
-  { surface: "app", order: 12, routes: route15 },
-  { surface: "app", order: 20, routes: route16 },
-  { surface: "app", order: 16, routes: route17 },
-  { surface: "app", order: 1000, routes: route18 },
-  { surface: "app", order: 19, routes: route19 },
-  { surface: "app", order: 28, routes: route20 },
-  { surface: "app", order: 29, routes: route21 },
-  { surface: "app", order: 5, routes: route22 },
-  { surface: "app", order: 26, routes: route23 },
-  { surface: "app", order: 8, routes: route24 },
-  { surface: "app", order: 9, routes: route25 },
-  { surface: "app", order: 27, routes: route26 },
-  { surface: "app", order: 13, routes: route27 },
-  { surface: "app", order: 6, routes: route28 },
-  { surface: "app", order: 4, routes: route29 },
+  { surface: "app", order: 61, routes: route5 },
+  { surface: "app", order: 10, routes: route6 },
+  { surface: "admin", order: 2, routes: route7 },
+  { surface: "app", order: 1048, routes: route8 },
+  { surface: "app", order: 1049, routes: route9 },
+  { surface: "app", order: 1047, routes: route10 },
+  { surface: "app", order: 18, routes: route11 },
+  { surface: "app", order: 14, routes: route12 },
+  { surface: "app", order: 7, routes: route13 },
+  { surface: "app", order: 23, routes: route14 },
+  { surface: "app", order: 58, routes: route15 },
+  { surface: "app", order: 11, routes: route16 },
+  { surface: "app", order: 25, routes: route17 },
+  { surface: "app", order: 60, routes: route18 },
+  { surface: "app", order: 125, routes: route19 },
+  { surface: "app", order: 24, routes: route20 },
+  { surface: "app", order: 22, routes: route21 },
+  { surface: "app", order: 12, routes: route22 },
+  { surface: "app", order: 20, routes: route23 },
+  { surface: "app", order: 16, routes: route24 },
+  { surface: "app", order: 1000, routes: route25 },
+  { surface: "app", order: 19, routes: route26 },
+  { surface: "app", order: 1002, routes: route27 },
+  { surface: "app", order: 28, routes: route28 },
+  { surface: "app", order: 29, routes: route29 },
+  { surface: "app", order: 5, routes: route30 },
+  { surface: "app", order: 26, routes: route31 },
+  { surface: "app", order: 8, routes: route32 },
+  { surface: "app", order: 9, routes: route33 },
+  { surface: "app", order: 27, routes: route34 },
+  { surface: "app", order: 78, routes: route35 },
+  { surface: "app", order: 13, routes: route36 },
+  { surface: "app", order: 6, routes: route37 },
+  { surface: "app", order: 4, routes: route38 },
   ];
 }
 // END GENERATED MOCK ROUTES

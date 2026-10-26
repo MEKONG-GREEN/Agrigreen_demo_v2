@@ -31,6 +31,8 @@ describe("thu thập dữ liệu Cấp Xã giả lập (P7)", () => {
     const c = await xa.createCooperative({ name: "HTX Mới Bình Đức", commune_code: "91302", area_ha: "12.5", representative: { full_name: "Nguyễn Văn Tư", phone: "0912000111" } });
     expect(c.representative).toEqual({ label: "Nguyễn V. T.", masked_phone: "0912•••111" });
     expect(await code(xa.createCooperative({ name: "htx mới bình đức", commune_code: "91302" }))).toBe("409 party.cooperative_name_taken");
+    expect(await code(xa.createCooperative({ name: "HTX Âm", commune_code: "91302", area_ha: "-1" }))).toBe("422 validation_failed");
+    expect(await code(xa.addHousehold(c.ref, { holder: { full_name: "Lê Thị Năm", phone: "0987000222" }, cultivated_area_ha: "-2" }))).toBe("422 validation_failed"); // BF-SWEEP-TT: số âm bị chặn ở máy chủ giả lập
     await xa.addHousehold(c.ref, { holder: { full_name: "Lê Thị Năm", phone: "0987000222" } });
     expect(await code(xa.deactivate(c.ref, "ngắn"))).toBe("422 validation_failed");
     const off = await xa.deactivate(c.ref, "HTX giải thể theo nghị quyết đại hội");

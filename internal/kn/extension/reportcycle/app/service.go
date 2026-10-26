@@ -1,6 +1,6 @@
 // Package app: use case vòng đời báo cáo KN v7.7 (gói P4) — phát hành biểu, công việc, bài nộp có phiên bản,
 // rà soát, chốt/mở lại kỳ, tổng hợp các xã, dashboard Tỉnh/TW, báo cáo của xã. Quyền theo ngữ cảnh phiên KN
-// (authz.RequireKN: vai, phòng ban, phạm vi Nút/xã phụ trách — P1), không theo vai realm.
+// (port.RequireSession: vai, phòng ban, phạm vi Nút/xã phụ trách — P1), không theo vai realm.
 package app
 
 import (
@@ -91,12 +91,12 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 // actor là người gọi trong ngữ cảnh phiên KN.
 type actor struct {
 	p        authz.Principal
-	k        authz.KNContext
+	k        port.SessionContext
 	province string // mã tỉnh của Nút (Cấp Tỉnh/Xã); rỗng = mọi tỉnh (Cấp Quốc gia, Admin)
 }
 
 func (a actor) dept() string {
-	if a.k.Role == authz.KNAdmin {
+	if a.k.Role == port.SessionRoleAdmin {
 		return ""
 	}
 	return a.k.Department
@@ -125,12 +125,12 @@ func (a actor) supportInfo() (*uuid.UUID, *string, error) {
 
 // knActor kiểm vai trong ngữ cảnh phiên (rỗng = mọi vai) và tìm tỉnh của Nút.
 func (s *Service) knActor(ctx context.Context, roles ...string) (actor, error) {
-	p, k, err := authz.RequireKN(ctx, roles...)
+	p, k, err := port.RequireSession(ctx, roles...)
 	if err != nil {
 		return actor{}, err
 	}
 	a := actor{p: p, k: k}
-	if k.Role == authz.KNTW || k.Role == authz.KNAdmin || k.OrgRef == uuid.Nil {
+	if k.Role == port.SessionRoleNational || k.Role == port.SessionRoleAdmin || k.OrgRef == uuid.Nil {
 		return a, nil
 	}
 	if s.Orgs == nil {
@@ -183,7 +183,7 @@ func (a actor) allowsTask(t store.Task) bool {
 	if !a.allowsProvince(t.ProvinceCode, t.DepartmentCode) {
 		return false
 	}
-	if a.k.Role == authz.KNXa {
+	if a.k.Role == port.SessionRoleCommune {
 		return slices.Contains(a.k.Communes, t.CommuneCode)
 	}
 	return true

@@ -5,13 +5,15 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { canResetTotp, MFA_STATE, mfaState } from "@/admin/accounts";
+import { canResetTotp, lockOperation, loginLockText, MFA_STATE, mfaState } from "@/admin/accounts";
 import { unwrap } from "@/api/client";
+import { fieldErrorMap } from "@/api/problem";
 import { useAuth } from "@/auth/AuthProvider";
 import { Dialog } from "@/components/Dialog";
+import { SelectField, TextField, validateForm } from "@/components/form";
 import { Icon } from "@/components/Icon";
 import { AlertList, SectionTitle, type DashboardAlert } from "@/components/patterns/dashboard";
-import { ActionBar, BackLink, DetailLayout, LabelValueBlock, LogPanel, RelatedTabs } from "@/components/patterns/detail";
+import { ActionBar, BackLink, DetailLayout, DetailPage, LabelValueBlock, LogPanel, RelatedTabs } from "@/components/patterns/detail";
 import { DataTable, FilterBar, FilterChip, PageHeader, SearchBox, StatusPill, type Column } from "@/components/patterns/list";
 import { KN_ROLE_LABEL, type KnRole } from "@/kn/contract";
 import { listForms } from "@/kn/forms/api";
@@ -327,12 +329,10 @@ function useOrgRefs() {
 /** FN-AD-04.04 Danh sách tài khoản (Hình 25a) + Tạo tài khoản. */
 export function UsersScreen() {
   const { knAdminApi } = useAuth();
-  const router = useRouter();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [role, setRole] = useState("");
   const [page, setPage] = useState(1);
-  const [creating, setCreating] = useState(false);
   const act = useAction();
   const refs = useOrgRefs();
   const s = useLoad(async () => {
@@ -340,8 +340,6 @@ export function UsersScreen() {
     const asg = await Promise.all(users.items.map((u) => knAdminApi.assignments(u.id).then((a) => [u.id, a.items] as const)));
     return { users: users.items, asg: Object.fromEntries(asg) as Record<string, KnAssignment[]> };
   }, [act.note]);
-  const [form, setForm] = useState({ full_name: "", email: "", phone: "" });
-  const [drafts, setDrafts] = useState<AsgDraft[]>([emptyDraft()]);
   const [imported, setImported] = useState<KnUserImport | null>(null);
   return (
     <>
@@ -350,9 +348,15 @@ export function UsersScreen() {
         actions={
           <>
             <ImportUsersButton onDone={(r) => (setImported(r), act.setNote(`Đã tạo ${r.accounts_created} tài khoản (${r.created} vai trò), ${r.rejected} dòng lỗi.`))} disabled={!refs.province} />
-            <button type="button" className="btn btn-p" disabled={!refs.province} title={!refs.province ? "Cần khai báo cơ cấu tổ chức và phòng ban trước" : undefined} onClick={() => setCreating(true)}>
-              <Icon name="user" size={15} /> Tạo tài khoản
-            </button>
+            {refs.province ? (
+              <Link className="btn btn-p" href="/kn/quan-tri/nguoi-dung/them-moi">
+                <Icon name="user" size={15} /> Tạo tài khoản
+              </Link>
+            ) : (
+              <button type="button" className="btn btn-p" disabled title="Cần khai báo cơ cấu tổ chức và phòng ban trước">
+                <Icon name="user" size={15} /> Tạo tài khoản
+              </button>
+            )}
           </>
         }
       />
@@ -400,61 +404,199 @@ export function UsersScreen() {
           return <DataTable caption="Danh sách tài khoản" columns={columns} rows={rows.slice((page - 1) * 20, page * 20)} rowKey={(u) => u.id} page={page} pageSize={20} total={rows.length} onPage={setPage} />;
         }}
       </LoadState>
-      {creating ? (
-        <Dialog
-          title="Tạo tài khoản"
-          onClose={() => setCreating(false)}
-          actions={
-            <button
-              type="button"
-              className="btn btn-p"
-              disabled={act.busy}
-              onClick={async () => {
-                const r = await act.run(
-                  () => knAdminApi.createKnUser({ ...form, ...(form.phone ? {} : { phone: undefined }), assignments: drafts.map((x) => toInput(x, refs)) }),
-                  (x) => `Đã tạo tài khoản ${form.full_name} (${x.assignments.length} vai trò), đã gửi liên kết kích hoạt.${x.warnings.length ? ` Cảnh báo: ${x.warnings.map((w) => w.message).join("; ")}` : ""}`,
-                );
-                if (r) {
-                  setCreating(false);
-                  router.push(`/kn/quan-tri/nguoi-dung/${r.user.id}`);
-                }
-              }}
-            >
-              Tạo tài khoản
-            </button>
-          }
-        >
-          {act.problem ? act.view : null}
-          <label className="field">
-            <span>Họ tên*</span>
-            <input className="input" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-          </label>
-          <label className="field">
-            <span>Email*</span>
-            <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          </label>
-          <label className="field">
-            <span>Số điện thoại (tên đăng nhập)</span>
-            <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          </label>
-          {drafts.map((d, i) => (
-            <fieldset key={i} className="card sec" style={{ marginTop: 8 }}>
-              <legend>Vai trò {i + 1}</legend>
-              <AssignmentEditor value={d} orgRefs={{}} onChange={(v) => setDrafts(drafts.map((x, k) => (k === i ? v : x)))} />
-              {drafts.length > 1 ? (
-                <button type="button" className="btn btn-o btn-sm" onClick={() => setDrafts(drafts.filter((_, k) => k !== i))}>
-                  Bỏ vai trò này
-                </button>
-              ) : null}
-            </fieldset>
-          ))}
-          <button type="button" className="btn btn-o btn-sm" onClick={() => setDrafts([...drafts, { ...emptyDraft(), role: "kn_tinh" }])}>
-            + Thêm vai trò
-          </button>
-          <p className="small mute">Tài khoản mới nhận liên kết kích hoạt; lần đầu đăng nhập bắt buộc đặt mật khẩu (không mật khẩu tạm).</p>
-        </Dialog>
-      ) : null}
     </>
+  );
+}
+
+type ProfileForm = { full_name: string; email: string; phone: string };
+const PROFILE_RULES = {
+  full_name: { kind: "text", required: true, maxLength: 120 },
+  email: { kind: "text", required: true, maxLength: 254 },
+  phone: { kind: "text", maxLength: 20 },
+} as const;
+
+/** Lỗi trường từ máy chủ (errors[].field) gắn vào ô tương ứng (R-A4). */
+function useServerErrors(problem: Parameters<typeof fieldErrorMap>[0] | null): Record<string, string> {
+  return problem ? fieldErrorMap(problem) : {};
+}
+
+/** FN-AD-04.04 Tạo tài khoản trên trang riêng (R-A2, thay pop-up cũ). */
+export function UserCreateScreen() {
+  const { knAdminApi } = useAuth();
+  const router = useRouter();
+  const act = useAction();
+  const refs = useOrgRefs();
+  const [form, setForm] = useState<ProfileForm>({ full_name: "", email: "", phone: "" });
+  const [errors, setErrors] = useState<Partial<Record<keyof ProfileForm | "roles", string>>>({});
+  const [drafts, setDrafts] = useState<AsgDraft[]>([emptyDraft()]);
+  const server = useServerErrors(act.problem);
+  const set = (k: keyof ProfileForm) => (v: string) => setForm((x) => ({ ...x, [k]: v }));
+  const save = async () => {
+    const v = validateForm(form, PROFILE_RULES);
+    const errs: typeof errors = { ...v.errors };
+    if (drafts.some((d) => !d.departments.length)) errs.roles = "Mỗi vai trò phải chọn ít nhất một phòng ban.";
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+    const b = v.values;
+    const r = await act.run(
+      () => knAdminApi.createKnUser({ full_name: b.full_name.trim(), email: b.email.trim(), ...(b.phone.trim() ? { phone: b.phone.trim() } : {}), assignments: drafts.map((x) => toInput(x, refs)) }),
+      (x) => `Đã tạo tài khoản ${b.full_name} (${x.assignments.length} vai trò), đã gửi liên kết kích hoạt.${x.warnings.length ? ` Cảnh báo: ${x.warnings.map((w) => w.message).join("; ")}` : ""}`,
+    );
+    if (r) router.push(`/kn/quan-tri/nguoi-dung/${r.user.id}`);
+  };
+  return (
+    <DetailPage
+      back={{ href: "/kn/quan-tri/nguoi-dung", label: "Danh sách tài khoản" }}
+      title="Tạo tài khoản"
+      actions={
+        <>
+          <Link className="btn btn-o" href="/kn/quan-tri/nguoi-dung">
+            Hủy
+          </Link>
+          <button type="button" className="btn btn-p" disabled={act.busy || !refs.province} onClick={() => void save()}>
+            Lưu
+          </button>
+        </>
+      }
+    >
+      {act.view}
+      <div className="grid2">
+        <TextField label="Họ tên" required value={form.full_name} onChange={set("full_name")} error={errors.full_name ?? server.full_name} maxLength={120} />
+        <TextField label="Email" required value={form.email} onChange={set("email")} error={errors.email ?? server.email} maxLength={254} />
+        <TextField label="Số điện thoại (tên đăng nhập)" value={form.phone} onChange={set("phone")} error={errors.phone ?? server.phone} maxLength={20} />
+      </div>
+      <h2 style={{ marginTop: 14 }}>Vai trò</h2>
+      {errors.roles ? (
+        <p className="err" role="alert">
+          {errors.roles}
+        </p>
+      ) : null}
+      {drafts.map((d, i) => (
+        <fieldset key={i} className="card sec" style={{ marginTop: 8 }}>
+          <legend>Vai trò {i + 1}</legend>
+          <AssignmentEditor value={d} orgRefs={{}} onChange={(v) => setDrafts(drafts.map((x, k) => (k === i ? v : x)))} />
+          {drafts.length > 1 ? (
+            <button type="button" className="btn btn-o btn-sm" onClick={() => setDrafts(drafts.filter((_, k) => k !== i))}>
+              Bỏ vai trò này
+            </button>
+          ) : null}
+        </fieldset>
+      ))}
+      <button type="button" className="btn btn-o btn-sm" style={{ marginTop: 8 }} onClick={() => setDrafts([...drafts, { ...emptyDraft(), role: "kn_tinh" }])}>
+        + Thêm vai trò
+      </button>
+      <p className="small mute">Tài khoản mới nhận liên kết kích hoạt; lần đầu đăng nhập bắt buộc đặt mật khẩu (không mật khẩu tạm).</p>
+    </DetailPage>
+  );
+}
+
+/** FN-AD-04.04 Thêm / sửa một vai trò của tài khoản trên trang riêng (R-A2, thay pop-up cũ). Không có `aid` → thêm mới. */
+export function AssignmentEditScreen() {
+  const { id, aid } = useParams<{ id: string; aid?: string }>();
+  const { knAdminApi } = useAuth();
+  const router = useRouter();
+  const act = useAction();
+  const refs = useOrgRefs();
+  const s = useLoad(async () => {
+    const [user, asg] = await Promise.all([knAdminApi.user(id), aid ? knAdminApi.assignments(id) : Promise.resolve({ items: [] as KnAssignment[] })]);
+    return { user, a: aid ? asg.items.find((x) => x.assignment_id === aid) ?? null : null };
+  }, [id, aid]);
+  const [draft, setDraft] = useState<AsgDraft | null>(null);
+  const [err, setErr] = useState<string | undefined>();
+  const back = `/kn/quan-tri/nguoi-dung/${id}`;
+  const loaded = s.data?.a;
+  const value: AsgDraft =
+    draft ?? (loaded && loaded.role !== "admin" ? { role: loaded.role as AsgDraft["role"], departments: loaded.departments.map((x) => x.code), mgmt: loaded.mgmt_level_code ?? "chuyen_vien", communes: loaded.communes.map((c) => c.code) } : emptyDraft());
+  const save = async () => {
+    const e = value.departments.length ? undefined : "Chọn ít nhất một phòng ban.";
+    setErr(e);
+    if (e) return;
+    const input = toInput(value, refs);
+    const r = await act.run(() => (aid ? knAdminApi.changeAssignment(id, aid, input) : knAdminApi.grant(id, input)));
+    if (r) router.push(back);
+  };
+  const title = aid ? "Sửa vai trò" : "Thêm vai trò";
+  return (
+    <DetailPage
+      back={{ href: back, label: s.data ? fullName(s.data.user) : "Chi tiết tài khoản" }}
+      title={title}
+      actions={
+        <>
+          <Link className="btn btn-o" href={back}>
+            Hủy
+          </Link>
+          <button type="button" className="btn btn-p" disabled={act.busy || !s.data || (Boolean(aid) && !loaded)} onClick={() => void save()}>
+            Lưu
+          </button>
+        </>
+      }
+    >
+      {act.view}
+      <LoadState s={s}>
+        {(d) =>
+          aid && !d.a ? (
+            <p className="mute">Không tìm thấy vai trò này của tài khoản.</p>
+          ) : (
+            <>
+              <AssignmentEditor value={value} orgRefs={{}} onChange={setDraft} />
+              {err ? (
+                <p className="err" role="alert">
+                  {err}
+                </p>
+              ) : null}
+            </>
+          )
+        }
+      </LoadState>
+    </DetailPage>
+  );
+}
+
+/** W11.07 Phân quyền trong vai trên trang riêng (R-A2, thay pop-up cũ). */
+export function AttrsEditScreen() {
+  const { id, aid } = useParams<{ id: string; aid: string }>();
+  const { knAdminApi } = useAuth();
+  const router = useRouter();
+  const act = useAction();
+  const s = useLoad(async () => {
+    const [user, asg, units] = await Promise.all([knAdminApi.user(id), knAdminApi.assignments(id), knAdminApi.internalUnits().catch(() => ({ items: [] as InternalUnit[] }))]);
+    return { user, a: asg.items.find((x) => x.assignment_id === aid) ?? null, units: units.items };
+  }, [id, aid]);
+  const [draft, setDraft] = useState<AttrsDraft | null>(null);
+  const back = `/kn/quan-tri/nguoi-dung/${id}`;
+  const value = draft ?? (s.data?.a ? attrsDraftOf(s.data.a) : null);
+  const save = async () => {
+    if (!value) return;
+    const d = value;
+    const r = await act.run(
+      () =>
+        knAdminApi.setAttrs(id, d.aid, {
+          ...(d.role === "kn_tinh" ? { province_group: d.province_group, duties: d.duties } : {}),
+          internal_unit_code: d.internal_unit_code,
+          ...(d.role === "kn_xa" ? { facility_refs: refLines(d.facility_refs), household_refs: refLines(d.household_refs) } : {}),
+          ...(d.reason.trim() ? { reason: d.reason.trim() } : {}),
+        }),
+    );
+    if (r) router.push(back);
+  };
+  return (
+    <DetailPage
+      back={{ href: back, label: s.data ? fullName(s.data.user) : "Chi tiết tài khoản" }}
+      title={s.data?.a ? `Phân quyền trong vai ${KN_ROLE_LABEL[s.data.a.role]}` : "Phân quyền trong vai"}
+      actions={
+        <>
+          <Link className="btn btn-o" href={back}>
+            Hủy
+          </Link>
+          <button type="button" className="btn btn-p" disabled={act.busy || !value} onClick={() => void save()}>
+            Lưu
+          </button>
+        </>
+      }
+    >
+      {act.view}
+      <LoadState s={s}>{(d) => (d.a && value ? <AttrsEditor value={value} units={d.units} onChange={setDraft} /> : <p className="mute">Không tìm thấy vai trò này của tài khoản.</p>)}</LoadState>
+    </DetailPage>
   );
 }
 
@@ -484,7 +626,6 @@ export function UserDetailScreen() {
   const { id } = useParams<{ id: string }>();
   const { knAdminApi } = useAuth();
   const act = useAction();
-  const refs = useOrgRefs();
   const s = useLoad(async () => {
     const [user, asg, log, units, delegs] = await Promise.all([
       knAdminApi.user(id),
@@ -495,12 +636,64 @@ export function UserDetailScreen() {
     ]);
     return { user, asg: asg.items, log: log.items, units: units.items, delegs: delegs.items };
   }, [id, act.note]);
-  const [attrsDlg, setAttrsDlg] = useState<AttrsDraft | null>(null);
-  const [edit, setEdit] = useState<{ full_name: string; email: string; phone: string } | null>(null);
-  const [asgDlg, setAsgDlg] = useState<{ aid: string | null; draft: AsgDraft } | null>(null);
+  const [edit, setEdit] = useState<ProfileForm | null>(null);
+  const [editErr, setEditErr] = useState<Partial<Record<keyof ProfileForm, string>>>({});
   const [reasonDlg, setReasonDlg] = useState<{ kind: "lock" | "unlock" | "revoke" | "deleg" | "totp"; aid?: string } | null>(null);
   const [reason, setReason] = useState("");
+  const [reasonErr, setReasonErr] = useState<string | undefined>();
+  const server = useServerErrors(act.problem);
+  const saveProfile = async () => {
+    if (!edit) return;
+    const v = validateForm(edit, PROFILE_RULES);
+    setEditErr(v.errors);
+    if (!v.valid) return;
+    const b = { full_name: v.values.full_name.trim(), email: v.values.email.trim(), phone: v.values.phone.trim() };
+    if (await act.run(() => knAdminApi.profile(id, b), (r) => `Đã lưu thay đổi (${r.changed_fields.join(", ")}).`)) setEdit(null);
+  };
   useBreadcrumbTail(s.data ? [{ label: fullName(s.data.user) }] : []);
+  const asgCols = (units: InternalUnit[]): Column<KnAssignment>[] => [
+    { key: "role", header: "Vai trò", cell: (a) => <b>{KN_ROLE_LABEL[a.role]}</b> },
+    { key: "org", header: "Nút", cell: (a) => a.org_name },
+    { key: "dept", header: "Phòng ban", cell: (a) => (a.role === "admin" ? "Tất cả" : a.departments.map((x) => x.name.replace(/^Phòng /, "")).join(", ")) },
+    { key: "mgmt", header: "Cấp quản lý", cell: (a) => a.mgmt_level ?? "—" },
+    { key: "communes", header: "Xã/phường phụ trách", cell: (a) => (a.role === "kn_xa" ? a.communes.map((c) => c.name).join(", ") || <StatusPill tone="warn">Chưa gán xã</StatusPill> : "—") },
+    { key: "attrs", header: "Phân quyền trong vai", className: "small", cell: (a) => (a.role === "admin" ? "—" : attrsSummary(a, units)) },
+    {
+      key: "act",
+      header: "Thao tác",
+      cell: (a) =>
+        a.role === "admin" ? null : (
+          <span className="row-acts">
+            <Link href={`/kn/quan-tri/nguoi-dung/${id}/vai-tro/${a.assignment_id}/phan-quyen`} aria-label={`Phân quyền trong vai ${KN_ROLE_LABEL[a.role]}`} title="Phân quyền trong vai">
+              <Icon name="shield" size={16} />
+            </Link>
+            <Link href={`/kn/quan-tri/nguoi-dung/${id}/vai-tro/${a.assignment_id}/sua`} aria-label={`Sửa vai trò ${KN_ROLE_LABEL[a.role]}`} title="Sửa">
+              <Icon name="edit" size={16} />
+            </Link>
+            <button type="button" className="del" aria-label={`Xóa vai trò ${KN_ROLE_LABEL[a.role]}`} title="Xóa" onClick={() => (setReason(""), setReasonErr(undefined), setReasonDlg({ kind: "revoke", aid: a.assignment_id }))}>
+              <Icon name="trash" size={16} />
+            </button>
+          </span>
+        ),
+    },
+  ];
+  const delegCols: Column<KnDelegation>[] = [
+    { key: "power", header: "Quyền", cell: (d) => d.power_label },
+    { key: "dir", header: "Chiều", cell: (d) => (d.grantor_ref === id ? "Đã giao" : "Được nhận") },
+    { key: "dept", header: "Phòng ban", cell: (d) => d.department_code },
+    { key: "valid", header: "Hiệu lực", cell: (d) => `${dt(d.valid_from)} → ${dt(d.valid_to)}` },
+    { key: "st", header: "Trạng thái", cell: (d) => <StatusPill tone={d.status === "active" ? "ok" : d.status === "scheduled" ? "warn" : "neutral"}>{DELEG_STATUS[d.status] ?? d.status}</StatusPill> },
+    {
+      key: "act",
+      header: "Thao tác",
+      cell: (d) =>
+        d.status === "active" || d.status === "scheduled" ? (
+          <button type="button" className="btn btn-o btn-sm" aria-label={`Thu hồi ủy quyền ${d.power_label}`} onClick={() => (setReason(""), setReasonErr(undefined), setReasonDlg({ kind: "deleg", aid: d.delegation_id }))}>
+            Thu hồi
+          </button>
+        ) : null,
+    },
+  ];
   return (
     <>
       <BackLink href="/kn/quan-tri/nguoi-dung">Danh sách tài khoản</BackLink>
@@ -511,22 +704,23 @@ export function UserDetailScreen() {
             <>
               <PageHeader title={fullName(user)} />
               <ActionBar>
-                <button type="button" className="btn btn-p btn-sm" disabled={!edit || act.busy} onClick={() => void act.run(() => knAdminApi.profile(id, edit!), (r) => `Đã lưu thay đổi (${r.changed_fields.join(", ")}).`).then(() => setEdit(null))}>
+                <button type="button" className="btn btn-p btn-sm" disabled={!edit || act.busy} onClick={() => void saveProfile()}>
                   <Icon name="check" size={15} /> Lưu thay đổi
                 </button>
-                <button type="button" className="btn btn-o btn-sm" disabled={!edit} onClick={() => setEdit(null)}>
+                <button type="button" className="btn btn-o btn-sm" disabled={!edit} onClick={() => (setEdit(null), setEditErr({}))}>
                   Hủy
                 </button>
                 <button type="button" className="btn btn-o btn-sm" onClick={() => void act.run(() => knAdminApi.resend(id), "Đã gửi lại liên kết đặt mật khẩu.")}>
                   <Icon name="send" size={15} /> Gửi lại mật khẩu
                 </button>
                 {canResetTotp(user) ? (
-                  <button type="button" className="btn btn-o btn-sm" onClick={() => (setReason(""), setReasonDlg({ kind: "totp" }))}>
+                  <button type="button" className="btn btn-o btn-sm" onClick={() => (setReason(""), setReasonErr(undefined), setReasonDlg({ kind: "totp" }))}>
                     <Icon name="lock" size={15} /> Đặt lại TOTP
                   </button>
                 ) : null}
-                <button type="button" className="btn btn-d btn-sm" onClick={() => (setReason(""), setReasonDlg({ kind: user.enabled ? "lock" : "unlock" }))}>
-                  <Icon name={user.enabled ? "lock" : "unlock"} size={15} /> {user.enabled ? "Khóa tài khoản" : "Mở khóa"}
+                {/* ADMIN-UNLOCK (#61): enabled=true nhưng khóa do đăng nhập sai → thao tác là Mở khóa. */}
+                <button type="button" className="btn btn-d btn-sm" onClick={() => (setReason(""), setReasonErr(undefined), setReasonDlg({ kind: lockOperation(user) }))}>
+                  <Icon name={lockOperation(user)} size={15} /> {lockOperation(user) === "lock" ? "Khóa tài khoản" : "Mở khóa"}
                 </button>
               </ActionBar>
               {act.view}
@@ -536,109 +730,31 @@ export function UserDetailScreen() {
                     <section className="lv-block">
                       <h2>Thông tin tài khoản</h2>
                       <div className="grid2">
-                        <label className="field">
-                          <span>Họ tên*</span>
-                          <input className="input" value={f.full_name} onChange={(e) => setEdit({ ...f, full_name: e.target.value })} />
-                        </label>
+                        <TextField label="Họ tên" required value={f.full_name} onChange={(v) => setEdit({ ...f, full_name: v })} error={editErr.full_name ?? server.full_name} maxLength={120} />
                         <div className="field">
                           <span>Trạng thái</span>
                           <StatusPill tone={user.enabled ? "ok" : "bad"}>{user.enabled ? "Hoạt động" : "Đang khóa"}</StatusPill>
+                          {loginLockText(user) ? (
+                            <span data-testid="login-lock">
+                              <StatusPill tone="bad">{loginLockText(user)}</StatusPill>
+                            </span>
+                          ) : null}
                         </div>
-                        <label className="field">
-                          <span>Email*</span>
-                          <input className="input" value={f.email} onChange={(e) => setEdit({ ...f, email: e.target.value })} />
-                        </label>
-                        <label className="field">
-                          <span>Số điện thoại</span>
-                          <input className="input" value={f.phone} onChange={(e) => setEdit({ ...f, phone: e.target.value })} />
-                        </label>
+                        <TextField label="Email" required value={f.email} onChange={(v) => setEdit({ ...f, email: v })} error={editErr.email ?? server.email} maxLength={254} />
+                        <TextField label="Số điện thoại" value={f.phone} onChange={(v) => setEdit({ ...f, phone: v })} error={editErr.phone ?? server.phone} maxLength={20} />
                       </div>
                     </section>
                     <div className="row" style={{ justifyContent: "space-between", marginTop: 14 }}>
                       <h2>Vai trò và phạm vi</h2>
-                      <button type="button" className="btn btn-o btn-sm" onClick={() => setAsgDlg({ aid: null, draft: emptyDraft() })}>
+                      <Link className="btn btn-o btn-sm" href={`/kn/quan-tri/nguoi-dung/${id}/vai-tro/them-moi`}>
                         + Thêm vai trò
-                      </button>
+                      </Link>
                     </div>
-                    <table className="dt" aria-label="Vai trò và phạm vi">
-                      <thead>
-                        <tr>
-                          <th scope="col">Vai trò</th>
-                          <th scope="col">Nút</th>
-                          <th scope="col">Phòng ban</th>
-                          <th scope="col">Cấp quản lý</th>
-                          <th scope="col">Xã/phường phụ trách</th>
-                          <th scope="col">Phân quyền trong vai</th>
-                          <th scope="col">Thao tác</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {asg.map((a) => (
-                          <tr key={a.assignment_id}>
-                            <td>
-                              <b>{KN_ROLE_LABEL[a.role]}</b>
-                            </td>
-                            <td>{a.org_name}</td>
-                            <td>{a.role === "admin" ? "Tất cả" : a.departments.map((x) => x.name.replace(/^Phòng /, "")).join(", ")}</td>
-                            <td>{a.mgmt_level ?? "—"}</td>
-                            <td>{a.role === "kn_xa" ? a.communes.map((c) => c.name).join(", ") || <StatusPill tone="warn">Chưa gán xã</StatusPill> : "—"}</td>
-                            <td className="small">{a.role === "admin" ? "—" : attrsSummary(a, units)}</td>
-                            <td>
-                              {a.role === "admin" ? null : (
-                                <span className="row-acts">
-                                  <button type="button" aria-label={`Phân quyền trong vai ${KN_ROLE_LABEL[a.role]}`} onClick={() => setAttrsDlg(attrsDraftOf(a))}>
-                                    <Icon name="shield" size={16} />
-                                  </button>
-                                  <button type="button" aria-label={`Sửa vai trò ${KN_ROLE_LABEL[a.role]}`} onClick={() => setAsgDlg({ aid: a.assignment_id, draft: { role: a.role as AsgDraft["role"], departments: a.departments.map((x) => x.code), mgmt: a.mgmt_level_code ?? "chuyen_vien", communes: a.communes.map((c) => c.code) } })}>
-                                    <Icon name="edit" size={16} />
-                                  </button>
-                                  <button type="button" className="del" aria-label={`Xóa vai trò ${KN_ROLE_LABEL[a.role]}`} onClick={() => (setReason(""), setReasonDlg({ kind: "revoke", aid: a.assignment_id }))}>
-                                    <Icon name="trash" size={16} />
-                                  </button>
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <DataTable caption="Vai trò và phạm vi" columns={asgCols(units)} rows={asg} rowKey={(a) => a.assignment_id} empty="Tài khoản chưa có vai trò." />
                     <p className="small mute">Một tài khoản có thể có nhiều vai trò, phòng ban; mỗi xã phụ trách là một tab khi nhập báo cáo.</p>
                     <h2 style={{ marginTop: 14 }}>Ủy quyền có hạn</h2>
                     {delegs.length ? (
-                      <table className="dt" aria-label="Ủy quyền có hạn">
-                        <thead>
-                          <tr>
-                            <th scope="col">Quyền</th>
-                            <th scope="col">Chiều</th>
-                            <th scope="col">Phòng ban</th>
-                            <th scope="col">Hiệu lực</th>
-                            <th scope="col">Trạng thái</th>
-                            <th scope="col">Thao tác</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {delegs.map((d) => (
-                            <tr key={d.delegation_id}>
-                              <td>{d.power_label}</td>
-                              <td>{d.grantor_ref === id ? "Đã giao" : "Được nhận"}</td>
-                              <td>{d.department_code}</td>
-                              <td>
-                                {dt(d.valid_from)} → {dt(d.valid_to)}
-                              </td>
-                              <td>
-                                <StatusPill tone={d.status === "active" ? "ok" : d.status === "scheduled" ? "warn" : "neutral"}>{DELEG_STATUS[d.status] ?? d.status}</StatusPill>
-                              </td>
-                              <td>
-                                {d.status === "active" || d.status === "scheduled" ? (
-                                  <button type="button" className="btn btn-o btn-sm" aria-label={`Thu hồi ủy quyền ${d.power_label}`} onClick={() => (setReason(""), setReasonDlg({ kind: "deleg", aid: d.delegation_id }))}>
-                                    Thu hồi
-                                  </button>
-                                ) : null}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <DataTable caption="Ủy quyền có hạn" columns={delegCols} rows={delegs} rowKey={(d) => d.delegation_id} />
                     ) : (
                       <p className="small mute">Chưa có ủy quyền. Lãnh đạo phòng tự ủy quyền trong phiên làm việc (tối đa 30 ngày); Admin xem và thu hồi ở đây.</p>
                     )}
@@ -657,57 +773,6 @@ export function UserDetailScreen() {
                 }
                 log={<LogPanel title="Log chỉnh sửa" entries={log.map((l) => ({ event: LOG_EVENT[l.event] ?? l.event, actor_display: l.actor_display ?? "—", at: l.at, changes: l.changes, reason: l.reason }))} />}
               />
-              {asgDlg ? (
-                <Dialog
-                  title={asgDlg.aid ? "Sửa vai trò" : "Thêm vai trò"}
-                  onClose={() => setAsgDlg(null)}
-                  actions={
-                    <button
-                      type="button"
-                      className="btn btn-p"
-                      onClick={async () => {
-                        const input = toInput(asgDlg.draft, refs);
-                        const r = await act.run(() => (asgDlg.aid ? knAdminApi.changeAssignment(id, asgDlg.aid, input) : knAdminApi.grant(id, input)), asgDlg.aid ? "Đã sửa vai trò." : "Đã thêm vai trò.");
-                        if (r) setAsgDlg(null);
-                      }}
-                    >
-                      Lưu
-                    </button>
-                  }
-                >
-                  <AssignmentEditor value={asgDlg.draft} orgRefs={{}} onChange={(v) => setAsgDlg({ ...asgDlg, draft: v })} />
-                </Dialog>
-              ) : null}
-              {attrsDlg ? (
-                <Dialog
-                  title="Phân quyền trong vai"
-                  onClose={() => setAttrsDlg(null)}
-                  actions={
-                    <button
-                      type="button"
-                      className="btn btn-p"
-                      onClick={async () => {
-                        const d = attrsDlg;
-                        const r = await act.run(
-                          () =>
-                            knAdminApi.setAttrs(id, d.aid, {
-                              ...(d.role === "kn_tinh" ? { province_group: d.province_group, duties: d.duties } : {}),
-                              internal_unit_code: d.internal_unit_code,
-                              ...(d.role === "kn_xa" ? { facility_refs: refLines(d.facility_refs), household_refs: refLines(d.household_refs) } : {}),
-                              ...(d.reason.trim() ? { reason: d.reason.trim() } : {}),
-                            }),
-                          "Đã lưu phân quyền trong vai (có hiệu lực ở request kế tiếp).",
-                        );
-                        if (r) setAttrsDlg(null);
-                      }}
-                    >
-                      Lưu
-                    </button>
-                  }
-                >
-                  <AttrsEditor value={attrsDlg} units={units} onChange={setAttrsDlg} />
-                </Dialog>
-              ) : null}
               {reasonDlg ? (
                 <Dialog
                   title={reasonDlg.kind === "lock" ? "Khóa tài khoản" : reasonDlg.kind === "unlock" ? "Mở khóa tài khoản" : reasonDlg.kind === "deleg" ? "Thu hồi ủy quyền" : reasonDlg.kind === "totp" ? "Đặt lại TOTP" : "Xóa vai trò"}
@@ -717,6 +782,11 @@ export function UserDetailScreen() {
                       type="button"
                       className="btn btn-p"
                       onClick={async () => {
+                        // Lý do ngắn vẫn nhập trong pop-up (ui-kit.md); độ dài tối thiểu như máy chủ.
+                        const min = reasonDlg.kind === "revoke" || reasonDlg.kind === "deleg" ? 10 : 20;
+                        const e = reason.trim() === "" ? "Bắt buộc nhập." : reason.trim().length < min ? `Tối thiểu ${min} ký tự.` : undefined;
+                        setReasonErr(e);
+                        if (e) return;
                         const r = await act.run(
                           () =>
                             reasonDlg.kind === "revoke"
@@ -745,13 +815,11 @@ export function UserDetailScreen() {
                     </button>
                   }
                 >
-                  <label className="field">
-                    <span>
-                      Lý do* ({reasonDlg.kind === "revoke" || reasonDlg.kind === "deleg" ? "≥ 10" : "≥ 20"} ký tự)
-                      {reasonDlg.kind === "totp" ? " — mã TOTP cũ bị xóa, mọi phiên bị thu hồi, cán bộ đăng ký lại ở lần đăng nhập tới." : ""}
-                    </span>
-                    <textarea className="textarea" value={reason} onChange={(e) => setReason(e.target.value)} />
-                  </label>
+                  {reasonDlg.kind === "unlock" && user.login_locked === true ? (
+                    <p className="small">Tài khoản đang khóa tạm do đăng nhập sai (tự mở sau 15 phút). Mở khóa ngay để cán bộ đăng nhập lại được.</p>
+                  ) : null}
+                  {reasonDlg.kind === "totp" ? <p className="small">Mã TOTP cũ bị xóa, mọi phiên bị thu hồi, cán bộ đăng ký lại ở lần đăng nhập tới.</p> : null}
+                  <TextField label={`Lý do (${reasonDlg.kind === "revoke" || reasonDlg.kind === "deleg" ? "≥ 10" : "≥ 20"} ký tự)`} required multiline value={reason} onChange={setReason} error={reasonErr} />
                 </Dialog>
               ) : null}
             </>
@@ -770,6 +838,7 @@ export function MenuLevelsScreen() {
   const [role, setRole] = useState<"kn_xa" | "kn_tinh" | "kn_tw">("kn_xa");
   const [target, setTarget] = useState("");
   const [reason, setReason] = useState("");
+  const [reasonErr, setReasonErr] = useState<string | undefined>();
   const refs = useOrgRefs();
   const s = useLoad(async () => {
     const users = await knAdminApi.users();
@@ -805,16 +874,16 @@ export function MenuLevelsScreen() {
               ))}
             </select>
           </label>
-          <label className="field">
-            <span>Lý do hỗ trợ*</span>
-            <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} />
-          </label>
+          <TextField label="Lý do hỗ trợ" required value={reason} onChange={setReason} error={reasonErr} />
         </div>
         <button
           type="button"
           className="btn btn-p"
           disabled={act.busy}
           onClick={async () => {
+            const e = reason.trim() ? undefined : "Bắt buộc nhập.";
+            setReasonErr(e);
+            if (e) return;
             const picked = options.find((x) => x.a.assignment_id === target);
             const ctx = await act.run(() =>
               knAdminApi.startSupport(
@@ -912,50 +981,32 @@ function SessionsTab({ userId, view }: { userId: string; view: "active" | "histo
           <p className="mute">Máy chủ chưa nối đọc phiên Keycloak.</p>
         ) : view === "active" ? (
           d.active.length ? (
-            <table className="dt">
-              <thead>
-                <tr>
-                  <th scope="col">Bắt đầu</th>
-                  <th scope="col">Truy cập gần nhất</th>
-                  <th scope="col">Địa chỉ IP</th>
-                  <th scope="col">Ứng dụng</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.active.map((x) => (
-                  <tr key={x.id}>
-                    <td>{x.started_at ? dt(x.started_at) : "—"}</td>
-                    <td>{x.last_access_at ? dt(x.last_access_at) : "—"}</td>
-                    <td>{x.ip_address || "—"}</td>
-                    <td>{x.clients.join(", ") || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              caption="Phiên đang hoạt động"
+              rows={d.active}
+              rowKey={(x) => x.id}
+              columns={[
+                { key: "start", header: "Bắt đầu", cell: (x) => (x.started_at ? dt(x.started_at) : "—") },
+                { key: "last", header: "Truy cập gần nhất", cell: (x) => (x.last_access_at ? dt(x.last_access_at) : "—") },
+                { key: "ip", header: "Địa chỉ IP", cell: (x) => x.ip_address || "—" },
+                { key: "app", header: "Ứng dụng", cell: (x) => x.clients.join(", ") || "—" },
+              ]}
+            />
           ) : (
             <p className="mute">Không có phiên đang hoạt động.</p>
           )
         ) : d.history.length ? (
-          <table className="dt">
-            <thead>
-              <tr>
-                <th scope="col">Thời điểm</th>
-                <th scope="col">Sự kiện</th>
-                <th scope="col">Địa chỉ IP</th>
-                <th scope="col">Ứng dụng</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.history.map((x, i) => (
-                <tr key={`${x.at}-${i}`}>
-                  <td>{x.at ? dt(x.at) : "—"}</td>
-                  <td>{LOGIN_EVENT_LABEL[x.type] ?? x.type}{x.error ? ` (${x.error})` : ""}</td>
-                  <td>{x.ip_address || "—"}</td>
-                  <td>{x.client || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            caption="Lịch sử đăng nhập"
+            rows={d.history.map((x, i) => ({ ...x, k: `${x.at}-${i}` }))}
+            rowKey={(x) => x.k}
+            columns={[
+              { key: "at", header: "Thời điểm", cell: (x) => (x.at ? dt(x.at) : "—") },
+              { key: "ev", header: "Sự kiện", cell: (x) => `${LOGIN_EVENT_LABEL[x.type] ?? x.type}${x.error ? ` (${x.error})` : ""}` },
+              { key: "ip", header: "Địa chỉ IP", cell: (x) => x.ip_address || "—" },
+              { key: "app", header: "Ứng dụng", cell: (x) => x.client || "—" },
+            ]}
+          />
         ) : (
           <p className="mute">Chưa có lịch sử đăng nhập (realm cần bật lưu sự kiện).</p>
         )
@@ -1085,16 +1136,15 @@ export function OrgStructureScreen() {
                 <h3 style={{ marginTop: 12 }}>Ảnh hưởng</h3>
                 <LoadState s={impact}>
                   {(im) => (
-                    <table className="dt">
-                      <tbody>
-                        {(im.rows as { label: string; count: number | null }[]).map((r) => (
-                          <tr key={r.label}>
-                            <td>{r.label}</td>
-                            <td>{r.count ?? "chưa nối nguồn"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <DataTable
+                      caption="Ảnh hưởng"
+                      rows={im.rows as { label: string; count: number | null }[]}
+                      rowKey={(r) => r.label}
+                      columns={[
+                        { key: "label", header: "Hạng mục", cell: (r) => r.label },
+                        { key: "count", header: "Số lượng", cell: (r) => r.count ?? "chưa nối nguồn" },
+                      ]}
+                    />
                   )}
                 </LoadState>
               </>
@@ -1172,6 +1222,7 @@ function InternalUnitsBlock({ orgRef, departments }: { orgRef: string; departmen
   const act = useAction();
   const s = useLoad(() => knAdminApi.internalUnits(true), [act.note]);
   const [form, setForm] = useState({ code: "", kind: "tram", name: "", department_code: "" });
+  const [errors, setErrors] = useState<Partial<Record<"code" | "name" | "kind", string>>>({});
   return (
     <section className="lv-block" style={{ marginTop: 16 }} aria-label="Đơn vị nội bộ">
       <div className="row" style={{ justifyContent: "space-between" }}>
@@ -1184,63 +1235,40 @@ function InternalUnitsBlock({ orgRef, departments }: { orgRef: string; departmen
       <LoadState s={s}>
         {(u) => (
           <>
-            <table className="dt" aria-label="Danh mục đơn vị nội bộ">
-              <thead>
-                <tr>
-                  <th scope="col">Mã</th>
-                  <th scope="col">Tên</th>
-                  <th scope="col">Loại</th>
-                  <th scope="col">Phòng ban</th>
-                  <th scope="col">Trạng thái</th>
-                  <th scope="col">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {u.items.map((x) => (
-                  <tr key={x.id}>
-                    <td>{x.code}</td>
-                    <td>{x.name}</td>
-                    <td>{x.kind_label}</td>
-                    <td>{x.department_code ?? "—"}</td>
-                    <td>
-                      <StatusPill tone={x.active ? "ok" : "neutral"}>{x.active ? "Đang dùng" : "Đã ngừng"}</StatusPill>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-o btn-sm"
-                        onClick={() => {
-                          const reason = x.active ? (window.prompt("Lý do ngừng (≥ 10 ký tự):") ?? "") : undefined;
-                          void act.run(() => knAdminApi.setInternalUnitActive(x.id, !x.active, reason), x.active ? `Đã ngừng “${x.name}”.` : `Đã dùng lại “${x.name}”.`);
-                        }}
-                      >
-                        {x.active ? "Ngừng" : "Dùng lại"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              caption="Danh mục đơn vị nội bộ"
+              rows={u.items}
+              rowKey={(x) => x.id}
+              empty="Chưa có đơn vị nội bộ."
+              columns={[
+                { key: "code", header: "Mã", cell: (x) => x.code },
+                { key: "name", header: "Tên", cell: (x) => x.name },
+                { key: "kind", header: "Loại", cell: (x) => x.kind_label },
+                { key: "dept", header: "Phòng ban", cell: (x) => x.department_code ?? "—" },
+                { key: "st", header: "Trạng thái", cell: (x) => <StatusPill tone={x.active ? "ok" : "neutral"}>{x.active ? "Đang dùng" : "Đã ngừng"}</StatusPill> },
+                {
+                  key: "act",
+                  header: "Thao tác",
+                  cell: (x) => (
+                    <button
+                      type="button"
+                      className="btn btn-o btn-sm"
+                      onClick={() => {
+                        const reason = x.active ? (window.prompt("Lý do ngừng (≥ 10 ký tự):") ?? "") : undefined;
+                        void act.run(() => knAdminApi.setInternalUnitActive(x.id, !x.active, reason), x.active ? `Đã ngừng “${x.name}”.` : `Đã dùng lại “${x.name}”.`);
+                      }}
+                    >
+                      {x.active ? "Ngừng" : "Dùng lại"}
+                    </button>
+                  ),
+                },
+              ]}
+            />
             {u.items.length === 0 ? <p className="small mute">Chưa có đơn vị nội bộ — bấm “Nạp mặc định” (Ban Giám đốc + 5 phòng), rồi thêm trạm, trại.</p> : null}
             <div className="grid2" role="group" aria-label="Thêm đơn vị nội bộ">
-              <label className="field">
-                <span>Mã*</span>
-                <input className="input" aria-label="Mã đơn vị nội bộ" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-              </label>
-              <label className="field">
-                <span>Tên*</span>
-                <input className="input" aria-label="Tên đơn vị nội bộ" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </label>
-              <label className="field">
-                <span>Loại*</span>
-                <select className="input" aria-label="Loại đơn vị nội bộ" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value, department_code: e.target.value === "phong" ? form.department_code : "" })}>
-                  {u.kinds.map((k) => (
-                    <option key={k.code} value={k.code}>
-                      {k.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <TextField label="Mã đơn vị nội bộ" required value={form.code} onChange={(v) => setForm({ ...form, code: v })} error={errors.code} maxLength={40} />
+              <TextField label="Tên đơn vị nội bộ" required value={form.name} onChange={(v) => setForm({ ...form, name: v })} error={errors.name} maxLength={200} />
+              <SelectField label="Loại đơn vị nội bộ" required value={form.kind} onChange={(v) => setForm({ ...form, kind: v, department_code: v === "phong" ? form.department_code : "" })} error={errors.kind} options={u.kinds.map((k) => ({ value: k.code, label: k.label }))} />
               <label className="field">
                 <span>Phòng ban (chỉ loại Phòng)</span>
                 <select className="input" aria-label="Phòng ban của đơn vị" disabled={form.kind !== "phong"} value={form.department_code} onChange={(e) => setForm({ ...form, department_code: e.target.value })}>
@@ -1256,12 +1284,15 @@ function InternalUnitsBlock({ orgRef, departments }: { orgRef: string; departmen
             <button
               type="button"
               className="btn btn-p btn-sm"
-              disabled={act.busy || !form.code || !form.name}
-              onClick={() =>
+              disabled={act.busy}
+              onClick={() => {
+                const v = validateForm(form, { code: { kind: "text", required: true, maxLength: 40 }, name: { kind: "text", required: true, maxLength: 200 }, kind: { kind: "text", required: true } });
+                setErrors(v.errors);
+                if (!v.valid) return;
                 void act
                   .run(() => knAdminApi.createInternalUnit({ org_ref: orgRef, code: form.code.trim(), kind: form.kind, name: form.name.trim(), ...(form.department_code ? { department_code: form.department_code } : {}) }), (r) => `Đã thêm đơn vị “${r.name}”.`)
-                  .then((r) => (r ? setForm({ code: "", kind: "tram", name: "", department_code: "" }) : undefined))
-              }
+                  .then((r) => (r ? setForm({ code: "", kind: "tram", name: "", department_code: "" }) : undefined));
+              }}
             >
               + Thêm đơn vị nội bộ
             </button>

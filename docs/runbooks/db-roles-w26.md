@@ -60,3 +60,5 @@ Các module của đơn vị dùng chung pool này. Nếu chờ kết nối kéo
 
 - tăng `AG_DB_MAX_CONNS`;
 - tăng `default_pool_size` của Pooler cho vai đó.
+
+Hạn chờ mở giao dịch (P0-POOL-SHARED, #126): `AG_DB_ACQUIRE_TIMEOUT` (Go duration, mặc định `30s`; `0` = không giới hạn, chỉ theo ctx) giới hạn bước lấy kết nối + `BEGIN` của mọi giao dịch qua `tenant.WithTenantTx`. Pool cạn thì lời gọi nhận lỗi `tenant.ErrAcquireTimeout` thay vì treo. Mã không gọi dịch vụ ngoài (SMTP, kho đối tượng, KMS, HTTP) khi đang giữ giao dịch — xem `docs/kn/gia-dinh/P0-POOL-SHARED.md`.

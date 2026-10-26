@@ -36,7 +36,14 @@ describe("Báo cáo dịch bệnh BM-10 — hàm phía máy khách", () => {
     expect(formErrors(filled({ dead: "121" })).dead).toMatch(/DB-07 > DB-06/);
     expect(formErrors(filled({ culled_head: "200" })).culled_head).toMatch(/DB-10 > DB-06/);
     expect(formErrors(filled({ lat: "0", lon: "0" })).location).toMatch(/ngoài lãnh thổ/);
-    expect(formErrors(filled({ culled_kg: "1,5" })).culled_kg).toBeDefined();
+    expect(formErrors(filled({ culled_kg: "1,5" })).culled_kg).toBeUndefined(); // dấu phẩy thập phân vi-VN
+    expect(formErrors(filled({ culled_kg: "1,23456" })).culled_kg).toBe("Tối đa 3 chữ số thập phân.");
+    expect(formErrors(filled({ herd_size: "0" })).herd_size).toBe("Phải lớn hơn 0.");
+    expect(formErrors(filled({ herd_size: "-5" })).herd_size).toBe("Không được nhập số âm.");
+    expect(formErrors(filled({ dead: "-1" })).dead).toBe("Không được nhập số âm.");
+    expect(formErrors(filled({ herd_age_days: "1,5" })).herd_age_days).toBe("Chỉ nhập số nguyên.");
+    expect(formErrors(filled({ chemical_liters: "-2" })).chemical_liters).toBe("Không được nhập số âm.");
+    expect(payload(filled({ culled_kg: "1.234,5" })).culled_kg).toBe("1234.5");
     const p = payload(filled({ culled_head: "", chemical_liters: "20.5" }), 3);
     expect(p).toMatchObject({ base_version: 3, herd_size: 120, dead: 5, culled_head: null, chemical_liters: "20.5", location: { lat: "10.25341", source: "gps" } });
   });

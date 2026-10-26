@@ -1,0 +1,30 @@
+﻿Dòng,Mã cũ,Trạng thái,Mã hồ sơ,Mức,Cột,Nội dung
+2,HC-01,Hợp lệ,,,,
+3,HC-02,Hợp lệ,,Cảnh báo,Họ và tên,Đã bỏ ghi chú/số trong họ tên (BR-05) — kiểm lại họ tên
+3,HC-02,Hợp lệ,,Cảnh báo,SĐT,Đã thêm số 0 đầu (Excel bỏ khi lưu dạng số)
+3,HC-02,Hợp lệ,,Cảnh báo,Bậc,"Ô bậc bị Excel đổi thành ngày (2026-09-03) — đã đọc là bậc 3/9, cần đối chiếu"
+3,HC-02,Hợp lệ,,Cảnh báo,Thời điểm được xếp,Thiếu ngày xếp bậc — tạm dùng ngày chốt; cần bổ sung để tính mốc nâng bậc (Q-069)
+4,HC-03,Lỗi,,Lỗi,Ngày sinh,"Ngày không đọc được — dùng dd/mm/yyyy, mm/yyyy hoặc yyyy"
+4,HC-03,Lỗi,,Lỗi,Ngày bổ nhiệm,"Chức vụ lãnh đạo ""pho_giam_doc"" phải có ngày bổ nhiệm (HS-20)"
+4,HC-03,Lỗi,,Cảnh báo,Bậc,Thiếu bậc — đã suy ra bậc 2 từ hệ số 2.67
+4,HC-03,Lỗi,,Cảnh báo,Thời điểm được xếp,Thiếu ngày xếp bậc — tạm dùng ngày chốt; cần bổ sung để tính mốc nâng bậc (Q-069)
+5,XA-01,Hợp lệ,,Cảnh báo,Dân tộc,Cán bộ khuyến nông cấp xã không có thẻ Thống kê BC Sở — bỏ qua các cột TK
+6,HC-04,Hợp lệ,,Cảnh báo,Thời điểm được xếp,Thiếu ngày xếp bậc — tạm dùng ngày chốt; cần bổ sung để tính mốc nâng bậc (Q-069)
+7,HC-05,Lỗi,,Lỗi,SĐT,Trùng số điện thoại với dòng 2
+7,HC-05,Lỗi,,Lỗi,Phòng,"Đơn vị ""da_ngung"" đã ngừng"
+7,HC-05,Lỗi,,Lỗi,Chức vụ,"Giá trị ""Kế toán trưởng"" không có trong danh mục position — sửa ô hoặc khai báo values.position trong tệp ánh xạ"
+7,HC-05,Lỗi,,Lỗi,Bậc,Bậc 12 vượt số bậc của ngạch 01.003 (9)
+8,HC-06,Lỗi,,Lỗi,Loại,"Loại nhân sự ""Thực tập sinh"" — cần Viên chức, Hợp đồng lao động hoặc Cán bộ khuyến nông cấp xã"
+8,HC-06,Lỗi,,Lỗi,Giới tính,Giới tính phải là Nam hoặc Nữ
+8,HC-06,Lỗi,,Lỗi,Ngày sinh,Thiếu ngày sinh
+8,HC-06,Lỗi,,Lỗi,SĐT,"Số điện thoại không hợp lệ — cần 10 số, bắt đầu bằng 0"
+8,HC-06,Lỗi,,Lỗi,Email,Email sai định dạng (HS-35)
+8,HC-06,Lỗi,,Cảnh báo,Ngày TGCM,"Thiếu ngày vào làm — hồ sơ ở trạng thái Chưa vào làm, không vào NS01"
+8,HC-06,Lỗi,,Lỗi,Chức vụ,Thiếu chức vụ (HS-17) — hoặc đặt defaults.position
+8,HC-06,Lỗi,,Lỗi,Ngạch,Có bậc/hệ số nhưng thiếu ngạch
+9,HC-07,Lỗi,,Cảnh báo,Họ và tên,Trùng họ tên và ngày sinh với dòng 2 — kiểm tra có phải một người
+9,HC-07,Lỗi,,Lỗi,Ngày nghỉ,Ngày nghỉ việc trước ngày vào làm (FN-08)
+9,HC-07,Lỗi,,Lỗi,Hệ số,Hệ số 3.33 không khớp bậc 3 của ngạch 01.003 (bảng: 3.00)
+10,HC-08,Hợp lệ,,Cảnh báo,Ngày TGCM,"Ô ngày lưu dạng số của Excel — đã đổi thành ngày ""2020-01-01"", cần đối chiếu"
+10,HC-08,Hợp lệ,,Cảnh báo,Thời điểm được xếp,Thiếu ngày xếp bậc — tạm dùng ngày chốt; cần bổ sung để tính mốc nâng bậc (Q-069)
+11,'=1+1,Lỗi,,Lỗi,Lý do nghỉ,Có ngày nghỉ việc nhưng thiếu lý do nghỉ việc

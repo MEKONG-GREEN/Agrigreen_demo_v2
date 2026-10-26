@@ -1,0 +1,10 @@
+## KNSPLIT-2-CONTEXT-F — Vật tư và dịch bệnh dùng context thuộc KN
+
+Nền dev2f55c6a6 đã tích hợp KHTC owner consumers. Chuyển material/app và outbreak/app caller/Require/role constants sang port.SessionContext/RequireSession. Giữ đầy đủ quyền xã/tỉnh/admin, scopexã/phòng/cơsở/hộ, chỉxem/hỗtrợ, bùsổ/idempotence/sốthậpphân/CNTS vàactor/tenant/rawroles/MFA. Không đổi Sessioncodec/kernel/DDL/ACL/35goldens/API/routes/tenant/D2/MRV/M1–M7.
+
+Hai signed-JWT/PG fixture của module nối actualowner registry sau server-state giả lập. KN77 CNTS aggregate fixture cũng bind bằng helper D, IDsynthetic chỉtest khilegacyfixture thiếuID; không thêmPrincipal worker hayfallbackproduction. TEST-CTX-013:12HTTPcase trên material/log và outbreak/get thật, noidentity401/legacyadmin428/zero-wrongowner-missing-malformed403, tấtcảtrướcTX dùrealmrolesrộng; positive workflows dùngexisting actualmodule PG suites +fullKN77, không thêmtestmirrorimplementation.
+
+Cổng Go1.26.9/privatePG/noSKIP: source materialhandler/outbreakhandler/contextdata; staticfull/lint/boundary/gofmt2old; full5dbadmin/metrics/KN77/APIassembly/worker (bao gồm12newcases vàCNTSaggregate/KHTC45cũ). Helper9migration/hardACL+2handler/contextdata/APIassembly; khônglặpcatalog/notifyupgrade vìSQL/metadata khôngđổi. KHTCsource/apps vàkernel E khôngđổi, khônglặpsourceKHTChandler/accounts/HTX đãđạt, full5bao phủrootconsumers. GoALLfreeze/onlydev/giữmain-worktrees-lịch. G1còn nhiều phần; khôngxóalegacyp.KNtoàncục.
+
+
+Trước helper: source33537 actualexit0/noFAILSKIP materialhandler158.938s/outbreakhandler112.050s/contextdata116.132s, private51570/b350d4e26c28 dọn. Static74885actual0/lint0/boundary314/gofmt2old. Full5 96495 actualexit0/noFAILSKIP: dbadmin5.169s/metrics128.331s/KN77-KHTC260.063s/APIassembly80.553s/worker2.072s; đủ12ownerHTTPnegativecasePASS vàpositive module/CNTSaggregate/KHTC45old không đổi. Private55834/59313e6d8560 dọn/Go0. Production4df6a592 không đổi,35goldens/migrations/contracts nguyên nền2f55. Chờ docs-final vàhelper9+2handler/contextdata/APIassembly trướcdev. Không claimG1hoànthành.

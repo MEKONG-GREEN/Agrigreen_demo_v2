@@ -69,7 +69,7 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 // Vai người gọi đối với một phiếu.
 type caller struct {
 	p      authz.Principal
-	k      authz.KNContext
+	k      extport.SessionContext
 	member bool // Cấp Tỉnh của phòng được giao
 	writer bool // member và không chỉ xem
 	khtc   bool // Phòng KHTC (Cấp Tỉnh/TW) hoặc Admin — xem mọi phiếu
@@ -80,18 +80,18 @@ func (s *Service) caller(ctx context.Context, dept string) (caller, error) {
 	if s.DB == nil || s.Entry == nil {
 		return caller{}, ErrDependency.WithDetail("chưa nối cap/forms cho phiếu KHTC")
 	}
-	p, k, err := authz.RequireKN(ctx)
+	p, k, err := extport.RequireSession(ctx)
 	if err != nil {
 		return caller{}, err
 	}
 	c := caller{p: p, k: k}
 	switch {
-	case k.Role == authz.KNAdmin:
+	case k.Role == extport.SessionRoleAdmin:
 		c.khtc = true
-	case k.Department == partyport.DeptKeHoachTaiChinh && (k.Role == authz.KNTinh || k.Role == authz.KNTW):
+	case k.Department == partyport.DeptKeHoachTaiChinh && (k.Role == extport.SessionRoleProvince || k.Role == extport.SessionRoleNational):
 		c.khtc = true
-		c.review = k.Role == authz.KNTinh && !k.ReadOnly()
-	case k.Role == authz.KNTinh && dept != "" && k.Department == dept:
+		c.review = k.Role == extport.SessionRoleProvince && !k.ReadOnly()
+	case k.Role == extport.SessionRoleProvince && dept != "" && k.Department == dept:
 		c.member = true
 		c.writer = !k.ReadOnly()
 	default:

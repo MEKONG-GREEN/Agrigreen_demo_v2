@@ -14,6 +14,7 @@ package notify
 import (
 	"context"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +38,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -62,11 +64,12 @@ type Deps struct {
 	Staff     port.StaffDirectory
 	Units     partyport.AdminUnits
 	// Farmers (tùy chọn): nông dân có thửa trong địa bàn cảnh báo khẩn (HTX US-NEWS-03).
-	Farmers  port.AreaFarmers
-	Pusher   channel.Pusher
-	Mailer   channel.Mailer
-	DigestTo []string
-	Log      *slog.Logger
+	Farmers          port.AreaFarmers
+	Pusher           channel.Pusher
+	Mailer           channel.Mailer
+	DigestTo         []string
+	DigestRecipients port.DigestRecipients
+	Log              *slog.Logger
 	// NudgeCooldown, NudgeHourly: giới hạn đồng bộ ngay (mặc định 5 phút/đích, 30 lần/giờ/người).
 	NudgeCooldown time.Duration
 	NudgeHourly   int
@@ -80,33 +83,72 @@ type Deps struct {
 	LinkBase string
 }
 
-// Channels là kênh gửi ra ngoài đọc từ môi trường (cho cmd/worker).
+// Channels là kênh gửi ra ngoài đọc từ môi trường (cho cmd/worker). P0-NOTIFY-FAILCLOSED (#127): kênh thiếu cấu
+// hình là kênh TẮT (channel.DisabledMailer/DisabledPusher) — bản gửi ghi "dropped" kèm lý do, không bao giờ "sent";
+// LogMailer/LogPusher chỉ khi đặt rõ AG_MAILER=log / AG_PUSHER=log trên máy phát triển.
 type Channels struct {
-	Pusher   channel.Pusher
-	Mailer   channel.Mailer // nil khi chưa đặt AG_SMTP_HOST
+	Pusher channel.Pusher // không bao giờ nil (FCM | log | tắt)
+	// Mailer: email tóm tắt chỉ đạo khẩn — CHỈ SMTP thật; nil khi kênh email tắt hoặc log (job tóm tắt không chạy,
+	// mục giữ nguyên hàng chờ).
+	Mailer   channel.Mailer
 	DigestTo []string
-	// EmailMailer (gói NOTIF): kênh email theo người nhận — SMTP khi đặt AG_SMTP_HOST, không thì LogMailer (chỉ ghi log
-	// số người nhận + tiêu đề, Local/Dev). Bên gọi còn phải nối Deps.Emails thì mới gửi.
+	// EmailMailer (gói NOTIF): kênh email theo người nhận — SMTP | log | tắt (smtp_not_configured, link_base_missing,
+	// disabled_by_config); không bao giờ nil. Bên gọi còn phải nối Deps.Emails thì mới xếp bản gửi.
 	EmailMailer channel.Mailer
+	// LinkBase: AG_WEB_OPS_URL đã kiểm (residency.PublicBaseURL) — rỗng chỉ ở máy phát triển.
+	LinkBase string
+	// Email, Push: chế độ + lý do tắt (log khởi động, kiểm thử).
+	Email, Push channel.Status
 }
 
-// ChannelsFromEnv: AG_FCM_* → FCM HTTP v1 (không đặt → chỉ ghi log);
-// AG_SMTP_* → email tóm tắt qua SMTP trong lãnh thổ (ADR-0015).
-func ChannelsFromEnv(log *slog.Logger) (Channels, error) {
-	p, err := channel.PusherFromEnv(log)
+// EnvWebOpsURL là URL gốc web-ops cho liên kết trong email thông báo.
+const EnvWebOpsURL = "AG_WEB_OPS_URL"
+
+// ChannelsFromEnv đọc kênh từ môi trường tiến trình (ChannelsFromEnvWith(os.Getenv, …)).
+func ChannelsFromEnv(log *slog.Logger) (Channels, error) { return ChannelsFromEnvWith(os.Getenv, log) }
+
+// ChannelsFromEnvWith: AG_PUSHER + AG_FCM_* → kênh đẩy (channel.PusherFromEnvWith); AG_MAILER + AG_SMTP_* → kênh email
+// (channel.MailerFromEnv); AG_WEB_OPS_URL → gốc liên kết. Ngoài máy phát triển (residency.LocalDev) AG_WEB_OPS_URL
+// thiếu/không tuyệt đối/localhost → kênh email theo người nhận TẮT (link_base_missing) thay vì gửi liên kết hỏng.
+// Cấu hình sai (AG_MAILER=log ngoài máy phát triển, AG_MAILER=smtp thiếu host, giá trị lạ) → lỗi, worker từ chối dựng.
+func ChannelsFromEnvWith(getenv func(string) string, log *slog.Logger) (Channels, error) {
+	p, ps, err := channel.PusherFromEnvWith(getenv, log)
 	if err != nil {
 		return Channels{}, err
 	}
-	out := Channels{Pusher: p, DigestTo: channel.DigestRecipientsFromEnv()}
-	m, err := channel.SMTPFromEnv()
+	m, ms, err := channel.MailerFromEnv(getenv, log)
 	if err != nil {
 		return Channels{}, err
 	}
-	out.EmailMailer = channel.LogMailer{Log: log}
-	if m != nil {
-		out.Mailer, out.EmailMailer = m, m
+	out := Channels{Pusher: p, EmailMailer: m, Email: ms, Push: ps, DigestTo: channel.DigestRecipientsFromEnv()}
+	if ms.Mode == channel.ModeSMTP {
+		out.Mailer = m
+	}
+	link, lerr := residency.PublicBaseURL(getenv, EnvWebOpsURL)
+	out.LinkBase = link
+	if lerr != nil && !ms.Disabled() {
+		out.EmailMailer = channel.DisabledMailer{Reason: channel.ReasonLinkBaseMissing}
+		out.Email = channel.Status{Mode: channel.ModeDisabled, Reason: channel.ReasonLinkBaseMissing}
 	}
 	return out, nil
+}
+
+// LogStartup ghi chế độ kênh lúc khởi động; kênh TẮT → cảnh báo rõ (bản gửi ghi "dropped" channel_disabled:<lý do>,
+// không phải đã gửi — P0-NOTIFY-FAILCLOSED).
+func (c Channels) LogStartup(log *slog.Logger) {
+	if log == nil {
+		return
+	}
+	log.Info("kênh thông báo", "event", "startup", "push", c.Push.Mode, "email", c.Email.Mode, "digest", c.Mailer != nil, "outcome", "ok")
+	for _, x := range []struct {
+		name string
+		st   channel.Status
+	}{{"email", c.Email}, {"push", c.Push}} {
+		if x.st.Disabled() {
+			log.Warn("kênh "+x.name+" TẮT — thông báo chỉ trong ứng dụng, bản gửi ghi là bị bỏ (không phải đã gửi)", "event", "startup",
+				"channel", x.name, "reason", x.st.Reason, "outcome", "disabled")
+		}
+	}
 }
 
 // Module là pf/notify đã nối.
@@ -120,7 +162,7 @@ type Module struct {
 func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m := &Module{svc: app.NewService(db.ForModule(b, DBModule), clk, app.Deps{
 		Scope: d.Scope, Devices: d.Devices, Staff: d.Staff, Units: d.Units, Farmers: d.Farmers, Pusher: d.Pusher, Mailer: d.Mailer,
-		DigestTo: d.DigestTo, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
+		DigestTo: d.DigestTo, DigestRecipients: d.DigestRecipients, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
 		SyncEntities: d.SyncEntities, Emails: d.Emails, EmailMailer: d.EmailMailer, LinkBase: d.LinkBase,
 	})}
 	m.svc.RegisterKinds(d.Kinds, nativeNotificationKinds())

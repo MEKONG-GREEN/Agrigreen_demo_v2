@@ -13,6 +13,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -777,9 +778,24 @@ func (s *TicketService) Movement(ctx context.Context, profile string, f Movement
 	day := s.dayOrToday(f.Day)
 	v := MovementView{Period: f.Period, CanExport: reviewer(c)}
 	sc := scope{Region: f.Region, Point: f.Point, Group: f.Group}
+	// P0-POOL-KN-2 (#139): kỳ tuần tra lịch kỳ hệ thống (Weeks — pf/extension qua gốc lắp ráp, giao dịch riêng trên CHUNG pool)
+	// NGOÀI giao dịch đọc báo cáo. Kỳ chỉ phụ thuộc ngày và loại kỳ.
+	var trend []Period
+	if f.Period != PeriodDay {
+		p, err := s.periodOf(ctx, f.Period, day)
+		if err != nil {
+			return MovementView{}, err
+		}
+		for i := 0; i < trendPeriods; i++ {
+			trend = append([]Period{p}, trend...)
+			if p, err = s.periodOf(ctx, f.Period, p.From.AddDate(0, 0, -1)); err != nil {
+				return MovementView{}, err
+			}
+		}
+	}
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
 		// Kỳ hiện tại và các kỳ trước (xu hướng).
-		var periods []Period
+		periods := slices.Clone(trend)
 		if f.Period == PeriodDay {
 			bs, err := s.lastPublished(ctx, tx, prof, day, trendPeriods)
 			if err != nil {
@@ -787,17 +803,6 @@ func (s *TicketService) Movement(ctx context.Context, profile string, f Movement
 			}
 			for _, d := range bs {
 				periods = append(periods, Period{From: d, To: d, Label: d.Format("02/01/2006")})
-			}
-		} else {
-			p, err := s.periodOf(ctx, f.Period, day)
-			if err != nil {
-				return err
-			}
-			for i := 0; i < trendPeriods; i++ {
-				periods = append([]Period{p}, periods...)
-				if p, err = s.periodOf(ctx, f.Period, p.From.AddDate(0, 0, -1)); err != nil {
-					return err
-				}
 			}
 		}
 		rcDay := day

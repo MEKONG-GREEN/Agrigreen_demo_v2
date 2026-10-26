@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-PLATFORM-READERS-A: deve6a54bcc; helper64116exit0/11migration535.139s/platform9-115.399s/HTX14-208.161s/noSKIP/FAIL; source/static/full5PG đạt; old33goldens nguyên +reviewedACL1/1, actual26flags59SELECT24membership.

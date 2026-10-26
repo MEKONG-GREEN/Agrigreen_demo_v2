@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { ApiClient } from "@/api/client";
 import type { ApiProblem } from "@/api/problem";
+import { withIdempotentOperation } from "@/api/idempotency";
+import { useIdempotentAction } from "@/api/useIdempotentAction";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/Icon";
 import { ProblemAlert } from "@/components/ProblemAlert";
@@ -56,6 +58,7 @@ export function ApproveSchedules({ ws, api, readOnly = false }: { ws: WorkSchedu
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialog, setDialog] = useState<"reason" | "bulk" | null>(null);
   const [busy, setBusy] = useState(false);
+  const idem = useIdempotentAction(); // P0-WEB-IDEMKEY: duyệt/yêu cầu sửa bấm lại sau lỗi mạng → cùng khóa
   const [problem, setProblem] = useState<ApiProblem | null>(null);
   const [notice, setNotice] = useState<{ tone: "info" | "warn"; lines: string[] } | null>(null);
 
@@ -125,15 +128,19 @@ export function ApproveSchedules({ ws, api, readOnly = false }: { ws: WorkSchedu
     setNotice(null);
     const okNames: string[] = [];
     const failed: string[] = [];
+    // #129 P1: cả lượt duyệt nhiều dòng là MỘT thao tác — chỉ nhả khóa khi mọi dòng thành công; bấm lại sau lỗi giữa
+    // chừng phát lại dòng đã xong bằng khóa cũ thay vì gửi lệnh mới.
+    const turn = idem.begin();
     for (const r of selectedRows) {
       try {
-        await fn(r);
+        await withIdempotentOperation(turn, () => fn(r));
         okNames.push(r.owner_display ?? r.id);
       } catch (e) {
         const p = toApiProblem(e);
         failed.push(`${r.owner_display ?? r.id}: ${SKIP_LABEL[p.code] ?? p.message}`);
       }
     }
+    if (!failed.length) turn.complete();
     setBusy(false);
     setDialog(null);
     setNotice({ tone: failed.length ? "warn" : "info", lines: [`${label} ${okNames.length} lịch${okNames.length ? `: ${okNames.join(", ")}` : ""}.`, ...failed.map((f) => `Không thực hiện được — ${f}`)] });
@@ -148,7 +155,7 @@ export function ApproveSchedules({ ws, api, readOnly = false }: { ws: WorkSchedu
     setProblem(null);
     setNotice(null);
     try {
-      const res = await ws.bulkApprove(pendingRows.map((r) => r.id));
+      const res = await idem.run(() => ws.bulkApprove(pendingRows.map((r) => r.id)));
       const lines = [`Đã duyệt hàng loạt ${res.approved.length} lịch.`];
       for (const s of res.skipped) lines.push(`Bỏ qua ${ownerOf(s.id)}: ${SKIP_LABEL[s.code] ?? s.code}`);
       setNotice({ tone: res.skipped.length ? "warn" : "info", lines });
@@ -296,7 +303,7 @@ export function ApproveSchedules({ ws, api, readOnly = false }: { ws: WorkSchedu
       ) : null}
 
       {view === "mine" ? (
-        <RegisterSchedule ws={ws} api={api} communes={[]} level="province" embedded week={week} onWeekChange={changeWeek} onChanged={() => setReloadKey((k) => k + 1)} />
+        <RegisterSchedule ws={ws} api={api} communes={[]} embedded week={week} onWeekChange={changeWeek} onChanged={() => setReloadKey((k) => k + 1)} />
       ) : err ? (
         <ProblemAlert problem={err} onRetry={reload} />
       ) : !shown ? (

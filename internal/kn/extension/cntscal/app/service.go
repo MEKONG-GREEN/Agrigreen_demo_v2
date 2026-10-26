@@ -1,7 +1,7 @@
 // Package app: use case lịch trực KSGM (BM-03) và lịch tiêm phòng (BM-07) — W11.46, D4 CN6, BRD CNTS v3.7 FN-15,
 // UR-TINH-10, UR-TINH-11, UR-XA-03.
 //
-// Quyền theo ngữ cảnh phiên KN (authz.RequireKN), phòng Chăn nuôi – Thủy sản (ma trận FN-15: Admin CRUD, Cấp Tỉnh
+// Quyền theo ngữ cảnh phiên KN (knport.RequireSession), phòng Chăn nuôi – Thủy sản (ma trận FN-15: Admin CRUD, Cấp Tỉnh
 // CRUD, Cấp Xã R + ghi ngày tiêm thực tế; Cấp TW không có). Trong Cấp Tỉnh (ma trận theo nhóm): cán bộ tổng hợp lập
 // lịch trực, chủ nhiệm lập lịch tiêm; viên chức, lãnh đạo phòng chỉ xem; Ban Giám đốc (chỉ xem) không ghi. Lần gán
 // Cấp Tỉnh CHƯA đặt nhóm (dữ liệu trước W11.07) được ghi cả hai — tạm, chờ Admin gán nhóm.
@@ -88,24 +88,24 @@ type caller struct {
 	province     string // lịch trực tách theo tỉnh, suy từ Scope ở server
 	legacyRoster bool   // chỉ Admin đọc lịch chung cũ
 	p            authz.Principal
-	k            authz.KNContext
+	k            knport.SessionContext
 }
 
-func (c caller) admin() bool { return c.k.Role == authz.KNAdmin }
+func (c caller) admin() bool { return c.k.Role == knport.SessionRoleAdmin }
 
 // sees cho biết người gọi thấy dữ liệu của xã code.
 func (c caller) sees(code string) bool { return c.admin() || c.k.Scope.Allows(code) }
 
 // reader: Admin; Cấp Tỉnh, Cấp Xã phòng Chăn nuôi – Thủy sản (FN-15).
 func (s *Service) reader(ctx context.Context) (caller, error) {
-	p, k, err := authz.RequireKN(ctx)
+	p, k, err := knport.RequireSession(ctx)
 	if err != nil {
 		return caller{}, err
 	}
 	c := caller{p: p, k: k}
 	switch {
-	case k.Role == authz.KNAdmin:
-	case (k.Role == authz.KNTinh || k.Role == authz.KNXa) && k.AllowsDepartment(DeptCNTS):
+	case k.Role == knport.SessionRoleAdmin:
+	case (k.Role == knport.SessionRoleProvince || k.Role == knport.SessionRoleCommune) && k.AllowsDepartment(DeptCNTS):
 	default:
 		return c, problem.Forbidden.WithDetail("Lịch trực KSGM, lịch tiêm phòng thuộc phòng Chăn nuôi – Thủy sản (Admin, Cấp Tỉnh, Cấp Xã)")
 	}
@@ -128,7 +128,7 @@ func (s *Service) planner(ctx context.Context, what string, groups ...string) (c
 	if err != nil {
 		return c, err
 	}
-	if !c.admin() && (c.k.Role != authz.KNTinh || (c.k.ProvinceGroup != "" && !slices.Contains(groups, c.k.ProvinceGroup))) {
+	if !c.admin() && (c.k.Role != knport.SessionRoleProvince || (c.k.ProvinceGroup != "" && !slices.Contains(groups, c.k.ProvinceGroup))) {
 		return c, problem.Forbidden.WithDetail(what)
 	}
 	if err := c.checkWrite(); err != nil {

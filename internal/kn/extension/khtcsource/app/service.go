@@ -65,18 +65,18 @@ type Service struct {
 
 type caller struct {
 	p authz.Principal
-	k authz.KNContext
+	k port.SessionContext
 }
 
 func (s *Service) reader(ctx context.Context) (caller, error) {
 	if s.DB == nil || s.Sources == nil {
 		return caller{}, ErrDependency.WithDetail("chưa nối port KHTCSources")
 	}
-	p, k, err := authz.RequireKN(ctx)
+	p, k, err := port.RequireSession(ctx)
 	if err != nil {
 		return caller{}, err
 	}
-	if k.Role == authz.KNAdmin || (k.Department == partyport.DeptKeHoachTaiChinh && (k.Role == authz.KNTinh || k.Role == authz.KNTW)) {
+	if k.Role == port.SessionRoleAdmin || (k.Department == partyport.DeptKeHoachTaiChinh && (k.Role == port.SessionRoleProvince || k.Role == port.SessionRoleNational)) {
 		return caller{p: p, k: k}, nil
 	}
 	return caller{}, errNotKHTC
@@ -84,7 +84,7 @@ func (s *Service) reader(ctx context.Context) (caller, error) {
 
 // canRefresh: Cấp Tỉnh Phòng KHTC, không chỉ xem, là người phụ trách kỳ (người mở kỳ — ⚑3 mặc định).
 func canRefresh(c caller, p pstore.Period) error {
-	if c.k.Role != authz.KNTinh || c.k.Department != partyport.DeptKeHoachTaiChinh || c.k.ReadOnly() {
+	if c.k.Role != port.SessionRoleProvince || c.k.Department != partyport.DeptKeHoachTaiChinh || c.k.ReadOnly() {
 		return errNotKHTCWriter
 	}
 	if c.p.ActorRef != p.ActorRef {

@@ -1,0 +1,11 @@
+{
+  "id": "kn-dept-home",
+  "source": "./kn-dept-home",
+  "app": [
+    {
+      "export": "deptHomeRoutes",
+      "order": 58
+    }
+  ],
+  "admin": []
+}

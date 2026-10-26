@@ -3,6 +3,7 @@ package app
 // W11.22 (vault 000004): phần mở rộng hồ sơ (client.Profiles) — sửa định danh và ngăn hồ sơ có khóa riêng.
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -55,8 +56,66 @@ func (s *Service) Amend(ctx context.Context, purpose client.Purpose, ref uuid.UU
 	if bad {
 		return v
 	}
+	var err2 error
+	for attempt := 1; attempt <= amendAttempts; attempt++ {
+		var result error
+		result, err2 = s.amendOnce(ctx, p, purpose, ref, name, phone, in.Address, blind)
+		if errors.Is(err2, errAmendKeyChanged) {
+			continue
+		}
+		if errors.Is(err2, errAmendRace) {
+			return client.ProblemDuplicate
+		}
+		if err2 != nil {
+			return err2
+		}
+		return result
+	}
+	return err2 // khóa đổi liên tục (errAmendKeyChanged)
+}
+
+// amendAttempts: số lần sửa tối đa khi khóa dữ liệu của chủ thể đổi giữa lúc mã hóa và lúc ghi.
+const amendAttempts = 2
+
+// errAmendKeyChanged: khóa dữ liệu đã bọc đổi giữa bước đọc và bước ghi — mã hóa lại.
+var errAmendKeyChanged = errors.New("vault: khóa dữ liệu của chủ thể đổi khi đang sửa")
+
+// amendOnce: P0-POOL-SHARED (#126) — giao dịch 1 chỉ đọc khóa đã bọc; KMS mở khóa + mã hóa trường mới NGOÀI giao
+// dịch; giao dịch 2 khóa chủ thể (FOR UPDATE), kiểm lại trạng thái + khóa không đổi, ghi định danh + chỉ mục mù + sổ.
+func (s *Service) amendOnce(ctx context.Context, p authz.Principal, purpose client.Purpose, ref uuid.UUID, name, phone, address string,
+	blind *store.Blind) (error, error) {
 	tid := p.TenantID
 	var result error
+	var key *store.Key
+	err := tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+		st, err := s.subjectState(ctx, tx, p, ref, domain.OpAmend, purpose, false)
+		if err != nil || st.fail != nil {
+			result = st.fail
+			return err
+		}
+		sealed, err := fetchIdentity(ctx, tx, ref)
+		key = sealed.key
+		return err
+	})
+	if err != nil || result != nil {
+		return result, err
+	}
+	// Ngoài giao dịch: KMS mở khóa dữ liệu, mã hóa họ tên / SĐT / địa chỉ mới.
+	dk, err := s.KMS.Unwrap(ctx, key.KEKID, key.WrappedDataKey, domain.AAD(useDataKey, tid, ref))
+	if err != nil {
+		return nil, err
+	}
+	defer clear(dk)
+	var row store.Identity
+	for _, f := range []struct {
+		dst   *[]byte
+		use   string
+		value string
+	}{{&row.FullNameCT, useName, name}, {&row.PhoneCT, usePhone, phone}, {&row.AddressCT, useAddress, address}} {
+		if *f.dst, err = sealField(s.rand(), dk, domain.AAD(f.use, tid, ref), f.value); err != nil {
+			return nil, err
+		}
+	}
 	err = tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
 		st, err := s.subjectState(ctx, tx, p, ref, domain.OpAmend, purpose, true)
 		if err != nil || st.fail != nil {
@@ -73,32 +132,15 @@ func (s *Service) Amend(ctx context.Context, purpose client.Purpose, ref uuid.UU
 				return s.logAccess(ctx, tx, p, &ref, true, domain.OpAmend, purpose, domain.OutcomeDuplicate)
 			}
 		}
-		k, err := store.GetKey(ctx, tx, ref)
+		now, err := fetchIdentity(ctx, tx, ref)
 		if err != nil {
 			return err
 		}
-		old, err := store.GetIdentity(ctx, tx, ref)
-		if err != nil {
-			return err
+		if now.key.KEKID != key.KEKID || !bytes.Equal(now.key.WrappedDataKey, key.WrappedDataKey) {
+			return errAmendKeyChanged
 		}
-		if k == nil || old == nil {
-			return errors.New("vault: chủ thể chưa xóa nhưng thiếu khóa hoặc định danh")
-		}
-		dk, err := s.KMS.Unwrap(ctx, k.KEKID, k.WrappedDataKey, domain.AAD(useDataKey, tid, ref))
-		if err != nil {
-			return err
-		}
-		defer clear(dk)
-		row := store.Identity{NationalIDCT: old.NationalIDCT}
-		for _, f := range []struct {
-			dst   *[]byte
-			use   string
-			value string
-		}{{&row.FullNameCT, useName, name}, {&row.PhoneCT, usePhone, phone}, {&row.AddressCT, useAddress, in.Address}} {
-			if *f.dst, err = sealField(s.rand(), dk, domain.AAD(f.use, tid, ref), f.value); err != nil {
-				return err
-			}
-		}
+		// CCCD giữ nguyên bản mã hiện hành (cùng khóa dữ liệu — đã kiểm ở trên).
+		row.NationalIDCT = now.row.NationalIDCT
 		if err := store.UpdateIdentity(ctx, tx, ref, row); err != nil {
 			return err
 		}
@@ -116,13 +158,7 @@ func (s *Service) Amend(ctx context.Context, purpose client.Purpose, ref uuid.UU
 		}
 		return s.logAccess(ctx, tx, p, &ref, true, domain.OpAmend, purpose, domain.OutcomeOK)
 	})
-	if errors.Is(err, errAmendRace) {
-		return client.ProblemDuplicate
-	}
-	if err != nil {
-		return err
-	}
-	return result
+	return result, err
 }
 
 // sectionBegin kiểm mục đích của thao tác op VÀ đúng mục đích của ngăn (ngăn gắn cứng một mục đích), rồi vai.
@@ -203,7 +239,7 @@ func (s *Service) GetSection(ctx context.Context, purpose client.Purpose, ref uu
 		return nil, err
 	}
 	tid := p.TenantID
-	out := client.Fields{}
+	var row *store.Section
 	var result error
 	err = tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
 		st, err := s.subjectState(ctx, tx, p, ref, domain.OpSectionRead, purpose, false)
@@ -211,25 +247,8 @@ func (s *Service) GetSection(ctx context.Context, purpose client.Purpose, ref uu
 			result = st.fail
 			return err
 		}
-		row, err := store.GetSection(ctx, tx, ref, section)
-		if err != nil {
-			return err
-		}
-		if row != nil {
-			key, err := s.KMS.Unwrap(ctx, row.KEKID, row.WrappedKey, domain.AAD(useSectionKey(section), tid, ref))
-			if err != nil {
-				return err
-			}
-			defer clear(key)
-			plain, err := openField(key, domain.AAD(useSectionData(section), tid, ref), row.PayloadCT)
-			if err != nil {
-				return err
-			}
-			if err := json.Unmarshal([]byte(plain), &out); err != nil {
-				return err
-			}
-		}
-		return s.logAccess(ctx, tx, p, &ref, true, domain.OpSectionRead, purpose, domain.OutcomeOK)
+		row, err = store.GetSection(ctx, tx, ref, section)
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -237,5 +256,13 @@ func (s *Service) GetSection(ctx context.Context, purpose client.Purpose, ref uu
 	if result != nil {
 		return nil, result
 	}
-	return out, nil
+	// Ngoài giao dịch: KMS + giải mã; trả ngăn chỉ sau khi dòng sổ đã commit (P0-POOL-SHARED).
+	fields, err := s.openSectionRow(ctx, tid, ref, section, row)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.logAccessTx(ctx, p, ref, domain.OpSectionRead, purpose, domain.OutcomeOK); err != nil {
+		return nil, err
+	}
+	return client.Fields(fields), nil
 }

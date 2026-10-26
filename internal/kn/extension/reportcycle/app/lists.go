@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,13 +11,12 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
 // AvailableForms trả mẫu đã gán cho loại báo cáo của phòng ban (cấp xã) với phiên bản áp dụng tại from (Bước 1).
 func (s *Service) AvailableForms(ctx context.Context, reportType, from string) ([]repport.FormVersion, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (s *Service) Badges(ctx context.Context) (map[string]int, error) {
 	}
 	out := map[string]int{BadgeReportTasksTodo: 0, BadgeSubmissionStatus: 0, BadgeReviewPending: 0, BadgeAdHocReportsOpen: 0, BadgeAdHocReportsStatus: 0}
 	var communes []string
-	if a.k.Role == authz.KNXa {
+	if a.k.Role == port.SessionRoleCommune {
 		communes = append([]string{}, a.k.Communes...)
 	}
 	now := s.now()
@@ -104,7 +104,7 @@ func (s *Service) Badges(ctx context.Context) (map[string]int, error) {
 			}
 			pending := domain.TaskState{Status: c.Status}.Pending()
 			switch a.k.Role {
-			case authz.KNXa:
+			case port.SessionRoleCommune:
 				if pending && c.Started {
 					if c.Adhoc {
 						out[BadgeAdHocReportsOpen] += c.N

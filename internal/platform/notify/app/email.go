@@ -2,7 +2,8 @@ package app
 
 // Email theo từng người nhận (gói NOTIF): thông báo cá nhân có cờ Email → một dòng pf_notify.email_delivery cùng giao
 // dịch với thông báo, phát pf.notify.email.requested; consumer pf.notify.email tra địa chỉ (port.EmailDirectory —
-// pf/accounts/Keycloak) lúc gửi, gửi qua channel.Mailer (SMTP trong lãnh thổ; Local/Dev: LogMailer). Không lưu địa chỉ,
+// pf/accounts/Keycloak) lúc gửi, gửi qua channel.Mailer (SMTP trong lãnh thổ; chỉ máy phát triển với AG_MAILER=log: LogMailer; chưa cấu hình: kênh tắt →
+// bản gửi "dropped" mã channel_disabled:<lý do>). Không lưu địa chỉ,
 // log chỉ ghi địa chỉ đã che. Idempotent: thông báo trùng không được ghi (chỉ mục sự kiện × người nhận), mỗi thông báo
 // tối đa một lần gửi (UNIQUE), lần đã gửi không gửi lại khi lô được giao lại.
 
@@ -42,7 +43,8 @@ func (s *Service) personalMailer() channel.Mailer {
 	return s.Mailer
 }
 
-// emailEnabled: có kênh gửi và danh bạ thư.
+// emailEnabled checks queue/consumer dependencies, not transport availability.
+// A non-nil disabled mailer must still reach the consumer's dropped audit (#127).
 func (s *Service) emailEnabled() bool { return s.personalMailer() != nil && s.Emails != nil }
 
 // queueEmail xếp email của thông báo n vừa ghi (cá nhân, cờ Email). Kênh email chưa cấu hình → bỏ qua (chỉ trong ứng dụng).
@@ -111,6 +113,13 @@ func (s *Service) HandleEmail(ctx context.Context, _ pgx.Tx, env outbox.Envelope
 
 func (s *Service) sendEmail(ctx context.Context, tid uuid.UUID, j domain.EmailJob) (string, *string) {
 	code := func(c string) *string { return &c }
+	// P0-NOTIFY-FAILCLOSED: kênh email tắt (chưa cấu hình SMTP / URL liên kết) → bỏ, ghi lý do; không tra địa chỉ, không
+	// thử lại, không bao giờ "sent".
+	if reason, off := channel.DisabledReason(s.personalMailer()); off {
+		s.Log.WarnContext(ctx, "kênh email chưa cấu hình — không gửi, chỉ trong ứng dụng", "event", "notify.email", "kind", j.Kind,
+			"delivery_id", j.ID.String(), "reason", reason, "outcome", "dropped")
+		return domain.DeliveryDropped, code(channel.DisabledCode(reason))
+	}
 	addr, err := s.Emails.EmailOf(ctx, tid, j.RecipientRef)
 	switch {
 	case errors.Is(err, port.ErrNoEmail) || (err == nil && addr == ""):
@@ -123,7 +132,9 @@ func (s *Service) sendEmail(ctx context.Context, tid uuid.UUID, j domain.EmailJo
 		return domain.DeliveryFailed, code(domain.EmailErrLookup)
 	}
 	subject, body := domain.EmailMessage(j, s.LinkBase)
-	if err := s.personalMailer().Send(ctx, []string{addr}, subject, body); err != nil {
+	if err := s.personalMailer().Send(ctx, []string{addr}, subject, body); errors.Is(err, channel.ErrChannelDisabled) {
+		return domain.DeliveryDropped, code(channel.CodeChannelDisabled)
+	} else if err != nil {
 		s.Log.WarnContext(ctx, "gửi email lỗi tạm thời", "event", "notify.email", "kind", j.Kind, "to", domain.MaskEmail(addr),
 			"delivery_id", j.ID.String(), "attempt", j.Attempts+1, "outcome", "retry")
 		return domain.DeliveryFailed, code(domain.EmailErrSend)

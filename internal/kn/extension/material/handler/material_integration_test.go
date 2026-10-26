@@ -106,6 +106,10 @@ func newFix(t *testing.T) *fix {
 }
 
 func (f *fix) knMiddleware() gin.HandlerFunc {
+	registry, err := authz.NewSessionRegistry(extension.SessionProjection())
+	if err != nil {
+		f.t.Fatal(err)
+	}
 	return func(c *gin.Context) {
 		raw := c.GetHeader(authz.ContextHeader)
 		if raw == "" {
@@ -123,6 +127,13 @@ func (f *fix) knMiddleware() gin.HandlerFunc {
 		}
 		cp := *kc
 		p.KN = &cp
+		selected, err := registry.ResolveSelected(c.Request.Context(), p)
+		if err != nil {
+			f.t.Errorf("owner session projection: %v", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		p.SelectedSession = &selected
 		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
 		c.Next()
 	}

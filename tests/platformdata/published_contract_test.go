@@ -143,7 +143,7 @@ func TestPublishedPlatformPrivileges(t *testing.T) {
 	for _, module := range []string{"pf/extension", "pf/price", "pf/hrm", "pf/contact", "pf/metrics"} {
 		pool := db.ForModule(env.Pool(t, migrations.PF, dbadmin.AppPlatform), db.Module(module))
 		queries := []string{"SELECT count(*) FROM pf_masterdata.admin_unit", "SELECT count(*) FROM pf_party.org", "INSERT INTO pf_masterdata_pub.v1_admin_units DEFAULT VALUES", "INSERT INTO pf_party_pub.v1_org_tree DEFAULT VALUES"}
-		if module != "pf/metrics" {
+		if module != "pf/metrics" && module != "pf/extension" {
 			queries = append(queries, "SELECT count(*) FROM pf_masterdata_pub.v1_admin_units", "SELECT count(*) FROM pf_party_pub.v1_org_tree")
 		}
 		for _, q := range queries {

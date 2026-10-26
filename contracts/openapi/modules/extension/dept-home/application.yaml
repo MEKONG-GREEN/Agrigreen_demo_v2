@@ -1,0 +1,468 @@
+paths:
+# @ag-order: 20100
+  /v1/extension/dept-home:
+    get:
+      summary: "Trang chủ phòng (FN-17): thẻ chỉ số, số liệu đã chốt, sơ đồ tổ chức, giới thiệu, văn bản mới"
+      operationId: extensionDeptHomeGet
+      tags: [extension]
+      parameters:
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptHome"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20101
+  /v1/extension/dept-home/profile:
+    post:
+      summary: "Lãnh đạo phòng lưu giới thiệu, chức năng nhiệm vụ (phiên bản mới, khóa lạc quan)"
+      operationId: extensionDeptHomeProfileSave
+      tags: [extension]
+      parameters:
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/DeptProfileInput"}
+      responses:
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptProfile"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20102
+  /v1/extension/dept-home/profile/history:
+    get:
+      summary: "Lịch sử giới thiệu phòng (mới nhất trước)"
+      operationId: extensionDeptHomeProfileHistory
+      tags: [extension]
+      parameters:
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptProfileList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20103
+  /v1/extension/dept-docs/folders:
+    get:
+      summary: "Thư mục kho văn bản phòng"
+      operationId: extensionDeptDocFolders
+      tags: [extension]
+      parameters:
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - {name: include_hidden, in: query, required: false, schema: {type: string, enum: ["1"]}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptDocFolderList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Tạo thư mục (Cấp Tỉnh, Admin)"
+      operationId: extensionDeptDocFolderCreate
+      tags: [extension]
+      parameters:
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/DeptDocFolderInput"}
+      responses:
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptDocFolder"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20104
+  /v1/extension/dept-docs/folders/{ref}/rename:
+    post:
+      summary: "Đổi tên thư mục"
+      operationId: extensionDeptDocFolderRename
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/DeptDocFolderChange"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptDocFolder"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20105
+  /v1/extension/dept-docs/folders/{ref}/hide:
+    post:
+      summary: "Ẩn thư mục rỗng (Lãnh đạo phòng, có lý do)"
+      operationId: extensionDeptDocFolderHide
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/DeptDocFolderChange"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptDocFolder"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20106
+  /v1/extension/dept-docs/folders/{ref}/restore:
+    post:
+      summary: "Hiện lại thư mục (Lãnh đạo phòng)"
+      operationId: extensionDeptDocFolderRestore
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/DeptDocFolderChange"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptDocFolder"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20107
+  /v1/extension/dept-docs:
+    get:
+      summary: "Văn bản của phòng (FN-20: lọc, tìm; hết hiệu lực vẫn có, nhãn validity)"
+      operationId: extensionDeptDocList
+      tags: [extension]
+      parameters:
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - {name: folder, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: q, in: query, required: false, description: "Tìm trong tên, số hiệu, cơ quan ban hành, lĩnh vực, trích yếu", schema: {type: string}}
+        - {name: kind, in: query, required: false, schema: {type: string}}
+        - {name: validity, in: query, required: false, schema: {type: string, enum: [active, pending, expired]}}
+        - {name: include_hidden, in: query, required: false, schema: {type: string, enum: ["1"]}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptDocList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Thêm văn bản: multipart meta (JSON DeptDocInput) + file (PDF, DOCX, XLSX ≤ 20 MB)"
+      operationId: extensionDeptDocCreate
+      tags: [extension]
+      parameters:
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [meta, file]
+              properties:
+                meta: {type: string, description: "JSON của DeptDocInput"}
+                file: {type: string, format: binary}
+      responses:
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptDoc"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20108
+  /v1/extension/dept-docs/{ref}:
+    get:
+      summary: "Chi tiết văn bản và mọi phiên bản"
+      operationId: extensionDeptDocGet
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptDoc"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20109
+  /v1/extension/dept-docs/{ref}/update:
+    post:
+      summary: "Sửa thuộc tính, chuyển thư mục (giữ tệp)"
+      operationId: extensionDeptDocUpdate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/DeptDocInput"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptDoc"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20110
+  /v1/extension/dept-docs/{ref}/file:
+    post:
+      summary: "Tải tệp mới (phiên bản tệp + 1; tệp cũ vẫn tải được)"
+      operationId: extensionDeptDocReplaceFile
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, base_version]
+              properties:
+                file: {type: string, format: binary}
+                base_version: {type: string, description: "Phiên bản hiện hành (khóa lạc quan)"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptDoc"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20111
+  /v1/extension/dept-docs/{ref}/hide:
+    post:
+      summary: "Ẩn (xóa) văn bản — Lãnh đạo phòng, có lý do"
+      operationId: extensionDeptDocHide
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/DeptDocHide"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptDoc"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20112
+  /v1/extension/dept-docs/{ref}/restore:
+    post:
+      summary: "Hiện lại văn bản — Lãnh đạo phòng"
+      operationId: extensionDeptDocRestore
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/DeptDocHide"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/DeptDoc"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20113
+  /v1/extension/dept-docs/{ref}/content:
+    get:
+      summary: "Nội dung tệp (xem/tải; version = phiên bản văn bản)"
+      operationId: extensionDeptDocContent
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, required: false, description: "Mã phòng ban — bắt buộc với Admin; vai khác chỉ được bằng phòng của ngữ cảnh", schema: {type: string}}
+        - {name: version, in: query, required: false, schema: {type: integer, minimum: 1}}
+        - {name: download, in: query, required: false, schema: {type: string, enum: ["1"]}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/pdf:
+              schema: {type: string, format: binary}
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: {type: string, format: binary}
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 30100
+    DeptActor: {"type": "object", "properties": {"ref": {"type": "string", "format": "uuid"}, "display": {"type": ["string", "null"]}}, "required": ["ref", "display"], "additionalProperties": false}
+# @ag-order: 30101
+    DeptProfile: {"type": "object", "properties": {"department_code": {"type": "string"}, "intro": {"type": "string"}, "duties": {"type": "string"}, "version": {"type": "integer"}, "recorded_at": {"type": "string", "format": "date-time"}, "actor": {"$ref": "#/components/schemas/DeptActor"}}, "required": ["department_code", "intro", "duties", "version", "recorded_at", "actor"], "additionalProperties": false}
+# @ag-order: 30102
+    DeptProfileInput: {"type": "object", "properties": {"intro": {"type": "string"}, "duties": {"type": "string"}, "base_version": {"type": "integer", "description": "0 khi chưa có bản nào"}}, "required": ["base_version"], "additionalProperties": false}
+# @ag-order: 30103
+    DeptProfileList: {"type": "object", "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/DeptProfile"}}}, "required": ["items"], "additionalProperties": false}
+# @ag-order: 30104
+    DeptKPI: {"type": "object", "properties": {"key": {"type": "string"}, "label": {"type": "string"}, "value": {"type": "integer"}, "tone": {"type": "string", "enum": ["neutral", "ok", "warn", "bad", "info"]}}, "required": ["key", "label", "value", "tone"], "additionalProperties": false}
+# @ag-order: 30105
+    DeptClosedPeriod: {"type": "object", "properties": {"form_code": {"type": "string"}, "period_type": {"type": "string"}, "period_key": {"type": "string"}, "period_label": {"type": "string"}, "period_to": {"type": ["string", "null"], "format": "date"}, "units_total": {"type": ["integer", "null"]}, "units_with_data": {"type": ["integer", "null"]}, "closed": {"type": "boolean"}, "closed_at": {"type": ["string", "null"], "format": "date-time"}}, "required": ["form_code", "period_type", "period_key", "period_label", "period_to", "units_total", "units_with_data", "closed", "closed_at"], "additionalProperties": false}
+# @ag-order: 30106
+    DeptOfficer: {"type": "object", "properties": {"actor": {"$ref": "#/components/schemas/DeptActor"}, "mgmt_level": {"type": ["string", "null"]}, "leader": {"type": "boolean"}}, "required": ["actor", "mgmt_level", "leader"], "additionalProperties": false}
+# @ag-order: 30107
+    DeptPrice: {"type": "object", "properties": {"board_date": {"type": ["string", "null"], "format": "date"}, "items": {"type": "integer"}, "week_key": {"type": ["string", "null"]}, "tickets": {"type": "integer"}, "week_days_approved": {"type": "integer"}}, "required": ["board_date", "items", "week_key", "tickets", "week_days_approved"], "additionalProperties": false}
+# @ag-order: 30108
+    DeptLibraryStats: {"type": "object", "properties": {"total": {"type": "integer"}, "expired": {"type": "integer"}, "new_30d": {"type": "integer"}}, "required": ["total", "expired", "new_30d"], "additionalProperties": false}
+# @ag-order: 30109
+    DeptHome: {"type": "object", "properties": {"department_code": {"type": "string"}, "as_of": {"type": "string", "format": "date-time"}, "manager": {"type": "boolean"}, "read_only": {"type": "boolean"}, "can_edit_profile": {"type": "boolean"}, "profile": {"anyOf": [{"$ref": "#/components/schemas/DeptProfile"}, {"type": "null"}]}, "kpis": {"type": "array", "items": {"$ref": "#/components/schemas/DeptKPI"}}, "closed_periods": {"type": "array", "items": {"$ref": "#/components/schemas/DeptClosedPeriod"}}, "price": {"anyOf": [{"$ref": "#/components/schemas/DeptPrice"}, {"type": "null"}]}, "officers": {"type": "array", "items": {"$ref": "#/components/schemas/DeptOfficer"}}, "library": {"$ref": "#/components/schemas/DeptLibraryStats"}, "latest_docs": {"type": "array", "items": {"$ref": "#/components/schemas/DeptDoc"}}}, "required": ["department_code", "as_of", "manager", "read_only", "can_edit_profile", "profile", "kpis", "closed_periods", "price", "officers", "library", "latest_docs"], "additionalProperties": false}
+# @ag-order: 30110
+    DeptDocFolder: {"type": "object", "properties": {"ref": {"type": "string", "format": "uuid"}, "department_code": {"type": "string"}, "parent_ref": {"type": ["string", "null"], "format": "uuid"}, "name": {"type": "string"}, "path": {"type": "array", "items": {"type": "string"}}, "hidden": {"type": "boolean"}, "status_reason": {"type": ["string", "null"]}, "docs": {"type": "integer"}, "version": {"type": "integer"}, "event": {"type": "string", "enum": ["created", "renamed", "hidden", "restored"]}, "recorded_at": {"type": "string", "format": "date-time"}}, "required": ["ref", "department_code", "parent_ref", "name", "path", "hidden", "status_reason", "docs", "version", "event", "recorded_at"], "additionalProperties": false}
+# @ag-order: 30111
+    DeptDocFolderList: {"type": "object", "properties": {"department_code": {"type": "string"}, "can_write": {"type": "boolean"}, "can_manage": {"type": "boolean"}, "items": {"type": "array", "items": {"$ref": "#/components/schemas/DeptDocFolder"}}}, "required": ["department_code", "can_write", "can_manage", "items"], "additionalProperties": false}
+# @ag-order: 30112
+    DeptDocFolderInput: {"type": "object", "properties": {"parent_ref": {"type": ["string", "null"], "format": "uuid"}, "name": {"type": "string"}}, "required": ["name"], "additionalProperties": false}
+# @ag-order: 30113
+    DeptDocFolderChange: {"type": "object", "properties": {"name": {"type": "string"}, "reason": {"type": "string"}, "base_version": {"type": "integer"}}, "required": ["base_version"], "additionalProperties": false}
+# @ag-order: 30114
+    DeptDocFile: {"type": "object", "properties": {"version": {"type": "integer"}, "name": {"type": "string"}, "content_type": {"type": "string"}, "size_bytes": {"type": "integer"}, "sha256": {"type": "string"}}, "required": ["version", "name", "content_type", "size_bytes", "sha256"], "additionalProperties": false}
+# @ag-order: 30115
+    DeptDocVersion: {"type": "object", "properties": {"ref": {"type": "string", "format": "uuid"}, "version": {"type": "integer"}, "event": {"type": "string", "enum": ["created", "updated", "file_replaced", "hidden", "restored"]}, "department_code": {"type": "string"}, "folder_ref": {"type": ["string", "null"], "format": "uuid"}, "title": {"type": "string"}, "kind": {"type": "string", "enum": ["quy_trinh_ky_thuat", "van_ban_phap_quy", "van_ban_chi_dao", "ke_hoach", "mau_bieu", "tai_lieu_tap_huan", "khac"]}, "field": {"type": ["string", "null"]}, "number": {"type": ["string", "null"]}, "issuer": {"type": ["string", "null"]}, "summary": {"type": ["string", "null"]}, "issued_on": {"type": ["string", "null"], "format": "date"}, "effective_from": {"type": ["string", "null"], "format": "date"}, "effective_to": {"type": ["string", "null"], "format": "date"}, "audience": {"type": "array", "items": {"type": "string", "enum": ["xa", "nong_ho"]}}, "file": {"$ref": "#/components/schemas/DeptDocFile"}, "hidden": {"type": "boolean"}, "status_reason": {"type": ["string", "null"]}, "recorded_at": {"type": "string", "format": "date-time"}, "actor": {"$ref": "#/components/schemas/DeptActor"}}, "required": ["ref", "version", "event", "department_code", "folder_ref", "title", "kind", "field", "number", "issuer", "summary", "issued_on", "effective_from", "effective_to", "audience", "file", "hidden", "status_reason", "recorded_at", "actor"], "additionalProperties": false}
+# @ag-order: 30116
+    DeptDoc: {"type": "object", "properties": {"ref": {"type": "string", "format": "uuid"}, "version": {"type": "integer"}, "event": {"type": "string", "enum": ["created", "updated", "file_replaced", "hidden", "restored"]}, "department_code": {"type": "string"}, "folder_ref": {"type": ["string", "null"], "format": "uuid"}, "title": {"type": "string"}, "kind": {"type": "string", "enum": ["quy_trinh_ky_thuat", "van_ban_phap_quy", "van_ban_chi_dao", "ke_hoach", "mau_bieu", "tai_lieu_tap_huan", "khac"]}, "field": {"type": ["string", "null"]}, "number": {"type": ["string", "null"]}, "issuer": {"type": ["string", "null"]}, "summary": {"type": ["string", "null"]}, "issued_on": {"type": ["string", "null"], "format": "date"}, "effective_from": {"type": ["string", "null"], "format": "date"}, "effective_to": {"type": ["string", "null"], "format": "date"}, "audience": {"type": "array", "items": {"type": "string", "enum": ["xa", "nong_ho"]}}, "file": {"$ref": "#/components/schemas/DeptDocFile"}, "hidden": {"type": "boolean"}, "status_reason": {"type": ["string", "null"]}, "recorded_at": {"type": "string", "format": "date-time"}, "actor": {"$ref": "#/components/schemas/DeptActor"}, "validity": {"type": "string", "enum": ["active", "pending", "expired"]}, "folder_path": {"type": "array", "items": {"type": "string"}}, "can_edit": {"type": "boolean"}, "can_manage": {"type": "boolean"}, "versions": {"type": "array", "items": {"$ref": "#/components/schemas/DeptDocVersion"}}}, "required": ["ref", "version", "event", "department_code", "folder_ref", "title", "kind", "field", "number", "issuer", "summary", "issued_on", "effective_from", "effective_to", "audience", "file", "hidden", "status_reason", "recorded_at", "actor", "validity", "folder_path", "can_edit", "can_manage"], "additionalProperties": false}
+# @ag-order: 30117
+    DeptDocList: {"type": "object", "properties": {"department_code": {"type": "string"}, "can_write": {"type": "boolean"}, "can_manage": {"type": "boolean"}, "total": {"type": "integer"}, "kinds": {"type": "array", "items": {"type": "string"}}, "extensions": {"type": "array", "items": {"type": "string"}}, "max_bytes": {"type": "integer"}, "items": {"type": "array", "items": {"$ref": "#/components/schemas/DeptDoc"}}}, "required": ["department_code", "can_write", "can_manage", "total", "kinds", "extensions", "max_bytes", "items"], "additionalProperties": false}
+# @ag-order: 30118
+    DeptDocInput: {"type": "object", "properties": {"folder_ref": {"type": ["string", "null"], "format": "uuid"}, "title": {"type": "string"}, "kind": {"type": "string", "enum": ["quy_trinh_ky_thuat", "van_ban_phap_quy", "van_ban_chi_dao", "ke_hoach", "mau_bieu", "tai_lieu_tap_huan", "khac"]}, "field": {"type": "string"}, "number": {"type": "string"}, "issuer": {"type": "string"}, "summary": {"type": "string"}, "issued_on": {"type": "string", "description": "YYYY-MM-DD hoặc rỗng"}, "effective_from": {"type": "string"}, "effective_to": {"type": "string"}, "audience": {"type": "array", "items": {"type": "string", "enum": ["xa", "nong_ho"]}}, "base_version": {"type": "integer", "description": "Bắt buộc khi sửa (khóa lạc quan)"}}, "required": ["title", "kind"], "additionalProperties": false}
+# @ag-order: 30119
+    DeptDocHide: {"type": "object", "properties": {"reason": {"type": "string"}, "base_version": {"type": "integer"}}, "required": ["reason", "base_version"], "additionalProperties": false}

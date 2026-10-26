@@ -15,7 +15,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -64,7 +63,7 @@ func (s *Service) ListTasks(ctx context.Context, q TaskQuery) (TaskList, error) 
 	}
 	f := store.TaskFilter{Department: a.dept(), Province: a.province, BatchID: q.BatchID, PeriodID: q.PeriodID, FormCode: q.FormCode,
 		PeriodType: q.PeriodType, OrderByDue: true, Limit: 5000}
-	if a.k.Role == authz.KNXa {
+	if a.k.Role == port.SessionRoleCommune {
 		f.Communes = slices.Clone(a.k.Communes)
 		if f.Communes == nil {
 			f.Communes = []string{}
@@ -115,7 +114,7 @@ func (s *Service) ListTasks(ctx context.Context, q TaskQuery) (TaskList, error) 
 			}
 			out.Items = append(out.Items, v)
 		}
-		if a.k.Role == authz.KNXa && len(a.k.Communes) > 0 {
+		if a.k.Role == port.SessionRoleCommune && len(a.k.Communes) > 0 {
 			out.LastReminder, err = store.LatestReminderFor(ctx, tx, a.k.Communes, a.k.Department)
 		}
 		return err
@@ -157,10 +156,18 @@ func (s *Service) GetTask(ctx context.Context, id uuid.UUID) (TaskDetail, error)
 	}
 	now := s.now()
 	var d TaskDetail
-	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+	// P0-POOL-KN: phiên bản mẫu (pf/reports) đọc NGOÀI giao dịch — lần đầu thiếu thì hủy, nạp, đọc lại công việc.
+	dp := s.newDeps(a.p.TenantID)
+	err = s.txDeps(ctx, a.p.TenantID, dp, func(tx pgx.Tx) error {
+		d = TaskDetail{}
 		t, err := s.taskInScope(ctx, tx, a, id, false)
 		if err != nil {
 			return err
+		}
+		if t.PeriodBlock {
+			if err := dp.want(ctx, []uuid.UUID{t.VersionID}, ""); err != nil {
+				return err
+			}
 		}
 		b, err := store.BatchByID(ctx, tx, t.BatchID, false)
 		if err != nil {
@@ -202,7 +209,7 @@ func (s *Service) GetTask(ctx context.Context, id uuid.UUID) (TaskDetail, error)
 			}
 		}
 		if t.PeriodBlock {
-			fi, err := s.forms(a.p.TenantID).get(ctx, t.VersionID)
+			fi, err := dp.form(ctx, t.VersionID)
 			if err != nil {
 				return err
 			}
@@ -235,7 +242,7 @@ type SubmissionResult struct {
 // Submit ghi một phiên bản bài nộp BẤT BIẾN (RB-1): "Lưu nháp" luôn ghi (kèm vấn đề), "Gửi báo cáo" chỉ ghi khi
 // đạt yêu cầu của mẫu; sau chốt kỳ → từ chối nếu chưa mở lại. Admin nhập thay mang on_behalf_of (FN-AD-04.07).
 func (s *Service) Submit(ctx context.Context, taskID uuid.UUID, in SubmissionInput, idem string) (SubmissionResult, error) {
-	a, err := s.writer(ctx, authz.KNXa)
+	a, err := s.writer(ctx, port.SessionRoleCommune)
 	if err != nil {
 		return SubmissionResult{}, err
 	}
@@ -265,8 +272,12 @@ func (s *Service) Submit(ctx context.Context, taskID uuid.UUID, in SubmissionInp
 		subID = *in.ID
 	}
 	var out SubmissionResult
-	fc := s.forms(a.p.TenantID)
-	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+	// P0-POOL-KN: phiên bản mẫu (pf/reports), khu vực + tên xã (pf/party) đọc NGOÀI giao dịch (txDeps).
+	dp := s.newDeps(a.p.TenantID)
+	rows0 := slices.Clone(in.Rows)
+	err = s.txDeps(ctx, a.p.TenantID, dp, func(tx pgx.Tx) error {
+		out = SubmissionResult{}
+		in.Rows = slices.Clone(rows0)
 		if in.ID != nil {
 			old, err := store.SubmissionByID(ctx, tx, subID)
 			if err != nil {
@@ -300,7 +311,10 @@ func (s *Service) Submit(ctx context.Context, taskID uuid.UUID, in SubmissionInp
 		if !st.Open(now) {
 			return ErrPeriodClosed
 		}
-		fi, err := fc.get(ctx, t.VersionID)
+		if err := dp.want(ctx, []uuid.UUID{t.VersionID}, t.ProvinceCode, t.CommuneCode); err != nil {
+			return err // hủy trước khi ghi; nạp ngoài giao dịch rồi chạy lại
+		}
+		fi, err := dp.form(ctx, t.VersionID)
 		if err != nil {
 			return err
 		}
@@ -314,7 +328,7 @@ func (s *Service) Submit(ctx context.Context, taskID uuid.UUID, in SubmissionInp
 		if err != nil {
 			return err
 		}
-		names, err := s.regionNames(ctx, t.ProvinceCode)
+		names, err := dp.book(ctx, t.ProvinceCode)
 		if err != nil {
 			return err
 		}

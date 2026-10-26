@@ -1,0 +1,251 @@
+# Lõi chuyển tenant (#55)
+
+Trạng thái hiện hành (23/10/2026): kernel Go party/port-app-store và migration 20261021160423_pf_party_tenant_transfer đã triển khai, đang sửa theo review Claude. Chưa có production importer/adapter KN (#89), diễn tập/rollback thật (#58) hoặc cutover. Các checkpoint bên dưới ghi lịch sử kiểm thử, không thay trạng thái hiện hành. Nền triển khai c6ce02b5. Đọc cùng ADR-0055, ADR-0020, ADR-0030, ADR-0052; quyết định D2 G1 chỉ hồ sơ KN trong ADR-0055 ưu tiên phần KN cũ của ADR-0052. G1 chưa đạt bởi thiết kế này.
+
+## Chủ module và bất biến
+
+Đặt hợp đồng generic ở party/port, điều phối ở party/app, lưu tại party/store và schema pf_party, wiring ở cmd/*/assembly. Party là kernel quản quan hệ bên tham gia/cấp phép; accounts đã phụ thuộc party nên không tạo cạnh vòng. Không tạo module/schema shared mới. Root đã duyệt phần thực thi generic party app/store trong lane shared; không mở rộng sang module riêng KN. Migration pf_party dùng tools/migratecheck -new, chỉ sau chốt thiết kế; modgen sinh lại.
+
+Core chỉ giữ metadata được kiểm: cặp tenant/phạm vi, approvals, manifest, hash/provenance, ID map, batch receipts và trạng thái. Không raw payload/PII, SQL/table name từ request, toàn bộ dữ liệu HTX/MRV/MKG hoặc luật phòng ban KN. Assembly đăng ký allowlist rõ từng owner/namespace/version; owner typed exporters lọc đúng dữ liệu riêng KN (kể cả dữ liệu KN nằm trong forms/reports). Không chuyển HTX/Nút cooperative/Neo MST, quyền đồng sở hữu D2 hoặc MRV. Tenant digest recipient map hiện có chỉ tenant→mailbox, không phải map Trung tâm→tenant.
+
+Mỗi binding giữ một SourceScopeRef (Trung tâm nguồn do owner xác nhận) và một TargetTenant/TargetScopeRef. Hai Trung tâm không dùng chung tenant đích; một nguồn lưu ký có thể có nhiều Trung tâm. ID map ghi rõ SourceTenant/namespace/source_ref→TargetTenant/namespace/target_ref, không sửa tenant_id hay hash của dòng nguồn. Mỗi phiên bản ledger mới ở đích có provenance gốc và chuỗi băm đích do shared.fn_chain tính lại.
+
+## Hai ngữ cảnh xác thực thật — v1 đã review
+
+Mọi operation và replay nhận TransferParticipants giữ HAI context đã được caller xác thực thật. Constructor kiểm hai Principal có tenant khác nhau, actor có thật, platform_admin + MFA; core gọi owner CurrentAuthority cho cả hai phía trên từng operation/replay, đúng source/target scope hiện hành. Không nhận contexts/token qua JSON. Adapter CLI xác thực hai token thật là việc owner sau này; v1 chưa có live CLI/job capability thì không tự bật worker import. Restart phải lấy lại hai authenticated contexts.
+
+Core mở hai giao dịch LOCAL riêng: Source luôn dưới source context/tenant, Target luôn dưới target context/tenant. Không cross-tenant query, không MintGrant/WithGrant/Within cho loại permission metadata mới, không secret ký offer. Đọc counterpart approvals/intent/fence/status bằng context thật của counterpart, không suy quyền từ UUID/ref/hash của offer. Không callback/approval hết hạn/thu hồi thì deny trước replay hoặc gọi importer. Không dựng Principal/SelectedSession/ScopeAll, không xóa Principal/WithoutNodeScope để vượt p_scope; importer dùng actual target context với đúng Nút đích.
+
+Handshake: TargetIntent chưa reserve global binding, chỉ lưu ứng viên ở actual target; Propose đọc intent bằng target context rồi ghi source plan bằng source context; FreezeTarget trên intent chạy actual target TRƯỚC source Seal, FreezeSource trên plan chạy actual source. Seal đọc/check cả hai durable fence epochs bằng hai contexts và bind cả hai vào manifest. Target Accept chỉ chốt binding unique sau source offer/current approval và target authority đều thật. Không dùng source context đóng target hoặc đòi Accept trước target fence gây vòng phụ thuộc.
+
+Offer chỉ là immutable refs/hash để review và đối chiếu, không authority. Mọi lần dùng phải re-read local metadata của hai bên dưới hai actual contexts. Không ngầm biến H4 share-grant đọc thành write grant. Hai local transactions không atomic xuyên tenant/module; saga/receipts xử lý khoảng crash, luôn fail closed trước cutover.
+
+## Hợp đồng port
+
+Các đoạn dưới đây mô tả hợp đồng; chữ ký hiện hành và implementation xem internal/platform/party/port/transfer*.go, app/transfer*.go và store/transfer*.go. IDs mới do core cấp là UUIDv7; source/actor/tenant/scope/basis refs lịch sử chỉ đòi UUID hợp lệ nonzero. Digest SHA-256 hex thường đúng64 ký tự, cursor bounded/opaque; không fields authority do HTTP body tự quyết. Copies sâu và registry immutable theo instance.
+
+```go
+type TransferScope struct {
+    SourceTenant, SourceScopeRef uuid.UUID
+    TargetTenant, TargetScopeRef uuid.UUID
+    IntentID, PlanID uuid.UUID
+    BindingHash Digest
+}
+type TransferKey struct { Namespace string; Ref uuid.UUID }
+type TransferHeader struct {
+    Key TransferKey
+    SourceRowHash, LogicalHash Digest
+    SourceSeq int64
+    References []TransferReference
+}
+type TransferReference struct {
+    Key TransferKey
+    External bool // owner khai và chứng minh external license; không tự copy
+    ExternalTenant uuid.UUID
+    BasisRef uuid.UUID
+}
+type TransferApproval struct {
+    Ref, ActorRef uuid.UUID
+    Epoch string
+    ValidUntil time.Time
+}
+type TransferFence struct {
+    Ref uuid.UUID
+    Epoch, HighWatermark string
+    HeaderRoot Digest
+}
+type TransferArtifact struct {
+    Ref uuid.UUID // owner-controlled immutable encrypted transport/evidence
+    Hash Digest
+    HeaderRoot Digest
+}
+type TransferReceipt struct {
+    Ref, PlanID, BatchID uuid.UUID
+    TargetTenant uuid.UUID
+    BindingHash, ManifestHash, MapHash, ArtifactHash, LogicalRoot Digest
+    Items []TransferAppliedRef
+    OwnerVersion string
+}
+```
+
+Registration gồm Module/Namespace/Version, namespace dependencies không vòng, maximum batch (≤500), Authority, FenceSource/FenceTarget/CheckFence, ScanHeaders, ExportBatch, ApplyBatch, ReadReceipt, VerifyBatch, CompensateBatch, ReadCompensationReceipt. Mỗi adapter sở hữu một module đã đăng ký; core không nhận arbitrary module/table lúc gọi. Authority/Fence/Scan/Apply/Receipt/Verify thiếu là deny, không fallback/no-op. Artifact authority và source data transport do owner, không có generic payload field.
+
+Facade party.Module.Transfers() dùng Participants trên mọi call; tenant IDs lấy từ hai Principal, không từ input. Các chữ ký tóm tắt (source Go là chuẩn hiện hành):
+
+```go
+type TransferParticipants struct { source, target context.Context }
+func NewTransferParticipants(source, target context.Context) (TransferParticipants, error)
+func (p TransferParticipants) Source() context.Context
+func (p TransferParticipants) Target() context.Context
+
+type TransferIntentInput struct {
+    OperationID, SourceScopeRef, TargetScopeRef uuid.UUID
+    Namespaces []string
+}
+type TransferRef struct { ID uuid.UUID }
+type TransferBatchRef struct { PlanID, BatchID uuid.UUID }
+type TenantTransfers interface {
+    TargetIntent(TransferParticipants, TransferIntentInput) (TransferIntent, error)
+    Propose(TransferParticipants, TransferRef) (TransferPlan, error)
+    DryRun(TransferParticipants, TransferRef) (TransferReport, error)
+    FreezeTarget(TransferParticipants, TransferRef) (TransferIntent, error)
+    FreezeSource(TransferParticipants, TransferRef) (TransferPlan, error)
+    ScanNext(TransferParticipants, TransferRef) (TransferPlan, error)
+    Seal(TransferParticipants, TransferRef) (TransferPlan, error)
+    Accept(TransferParticipants, TransferRef) (TransferPlan, error)
+    ReserveBatch(TransferParticipants, TransferRef, int) (TransferBatch, error)
+    ExportBatch(TransferParticipants, TransferBatchRef) (TransferArtifact, error)
+    ApplyBatch(TransferParticipants, TransferBatchRef) (TransferReceipt, error)
+    Verify(TransferParticipants, TransferRef) (TransferReport, error)
+    PrepareCutover(TransferParticipants, TransferRef) (TransferPlan, error)
+    Compensate(TransferParticipants, TransferBatchRef, uuid.UUID) (TransferReceipt, error)
+    Status(TransferParticipants, TransferRef) (TransferPlan, error)
+}
+```
+
+FreezeTarget ref là IntentID (chưa cần Accept); FreezeSource/ScanNext/Seal ref là PlanID. Mọi ref chỉ dùng lookup; counterpart đọc bằng actual counterpart context, current authority/fence/receipt phải kiểm trước replay. Source scan pages/resume lấy cursor từ metadata đã ghi, không nhận cursor tự chọn từ CLI.
+
+ApplyBatch nhận BatchID đã reserve, dùng artifact gắn batch đã xuất dưới actual source context. Owner đọc/giải mã artifact có cấp phép vận chuyển, không tự đọc DB nguồn với Principal đích. Nếu artifact thiếu hoặc không còn quyền thì deny/giữ checkpoint. Core không log artifact content, token hay lý do có PII. Chi tiết envelope/typed canonicalizer thuộc owner child trước triển khai.
+
+## Schema và khóa
+
+Tất cả metadata được RLS FORCE, tenant_id là tenant thực của participant (source hoặc target), không nhánh share cho writes; r_party SELECT/INSERT, không UPDATE/DELETE trên bản ghi bất biến. Không BYPASSRLS/SECURITY DEFINER và không cấp quyền r_party ghi schema owner. Không đổi shared/db để né scope.
+
+- transfer_intent: ứng viên target, cặp tenant/scope/actor refs/adapter-set hash; tạo dưới actual target, chưa giữ global source binding. Nhiều intent chưa được source chấp thuận không chiếm khóa Centre.
+- transfer_binding: chỉ append ở Accept sau đủ source/target approval hiện hành; unique source tenant/scope→target và unique target tenant→một Centre. Binding đã dùng không viết đè, thay đổi cần phiên bản/approval và compensation policy rõ ràng.
+- transfer_plan: immutable header, side source/target, IntentID/PlanID, BindingHash, adapter versions. PlanID nguồn được đích Accept cùng giá trị; tenant local khác nhau. Source sealed manifest được target copy đúng metadata/hash và kiểm lại.
+- transfer_event: shared.apply_ledger, stream transfer:<plan>; created/fenced/page_recorded/sealed/accepted/batch_reserved/batch_verified/verified/cutover_prepared/compensation_requested/compensated/aborted. Transition kiểm seq kỳ vọng; authoritative status lấy từ ledger, projection nếu thêm chỉ là cache.
+- transfer_item: immutable source header/provenance và hash, unique tenant/plan/namespace/source_ref. Header không chứa dữ liệu người. Source rows chỉ append, target copies giữ source row hash nguyên như evidence.
+- transfer_idmap: target tenant, source tenant, namespace, source_ref, target_ref, binding ref; unique source tuple→một target_ref, unique target tenant/namespace/target_ref. UUIDv7 do core cấp dưới actual target và lưu trước Apply. Độc lập shared.ledger_idem TTL30ngày; reserve lại sau thời gian dài vẫn cùng ID, hash khác thì conflict.
+- transfer_batch + transfer_batch_item: immutable member keys đã seal, BatchID, ManifestHash/MapHash/artifact ref+hash/fence epochs; unique mỗi item của plan chỉ thuộc một batch. Membership không được thay khi retry.
+- transfer_receipt: immutable owner receipt refs/hash, counts/target IDs/logical root, unique plan/batch/operation (apply/verify/compensate). Full authoritative owner receipt nằm ở owner schema cùng target ledger commit; core không nhận receipt giả từ request.
+
+Một transaction party local ghi reservation + idmap + batch + event. Advisory xact lock theo (local tenant, plan) và DB unique xử lý concurrent reserve; lock theo binding/target giữ cutover preparations không chạy song song hai plan. Ghi nhiều ledger streams luôn theo thứ tự ledger/stream byte order. Lock này không thay owner write fence.
+
+## Fence, manifest và checksum
+
+DryRun dùng source read-only, trả provisional count/root/exclusions/conflicts, không ghi/import/khóa hoặc xác nhận trạng thái cuối. Dữ liệu có thể đổi sau dry-run.
+
+Trước seal phải có durable fences cho tất cả namespace nguồn và đích đã đăng ký. FreezeTarget(intent) dùng target context trước Seal, FreezeSource(plan) dùng source context; không đợi target Accept mới fence. Owner Fence lấy khóa chung với mọi writer hiện hữu, đợi writer đang chạy kết thúc rồi append fence active; mọi HTTP/CLI/offline sync/job phải kiểm fence trong cùng giao dịch với ghi. Không thể chỉ giữ advisory lock trong coordinator hoặc chặn riêng route mới. Fence không tự mở khi coordinator crash/lease timeout. Thiếu bất kỳ owner producer integration nào thì Freeze/Seal/Apply/Cutover deny.
+
+Scan source khi fences active, theo watermark recorded_at/ledger seq đã chốt (không chỉ event_time vì nhập muộn). Mỗi page có ordinal/cursor digest/hash và replay key; page khác dữ liệu dưới cùng key thì conflict. Manifest root hash canonical có version: binding, adapter set, source/target fence epochs, sorted namespace+source_ref, source row hash, logical hash và sorted references. Chỉ primitives/length-prefixed encoding hoặc canonical struct versioned, không map tùy ý/float. Seal chỉ ghi khi scan complete, counts/root/chain verification khớp và fences vẫn active/current. Adapter version/authority/fence thay đổi thì dừng, không âm thầm sửa manifest cũ.
+
+Foreign ref nội bộ phải có trong manifest đúng owner/namespace và source tenant/Trung tâm; idmap không nhận key của Trung tâm khác. Dependency DAG import trước referrer. Chu kỳ giữa namespace chưa được owner chứng minh atomic import sẽ bị từ chối; aggregate có cycle nội bộ cần cùng batch và owner transaction/constraint proof. Ref HTX/MKG/vault ngoài transfer giữ ref gốc và license/basis thật do owner xác minh, không tự thêm vào idmap/copy dữ liệu đó.
+
+LogicalHash là canonical nội dung nghiệp vụ do owner có version, bỏ tenant/ID/chain metadata và thay refs bằng source-key chuẩn để so trước/sau; SourceRowHash giữ riêng bằng chứng bất biến. Core đối chiếu per-item receipts lẫn aggregate roots, không chỉ count hoặc phép cộng checksum. KHTC frozen snapshot/Bản cuối giữ nghĩa/hash nghiệp vụ, 35 goldens không sửa; owner child phải chứng minh.
+
+## Crash/resume và bù
+
+Không tuyên bố atomic transaction xuyên module hoặc Keycloak. Core không truyền raw pgx.Tx cho owner:
+
+1. Target reserve commit ID map/batch/event. Crash trước commit không có batch; sau commit retry dùng đúng IDs và hashes.
+2. Source export immutable artifact gắn batch/map/manifest, ghi durable owner export receipt. Crash sau export thì lookup trả lại artifact cũ, không chụp dữ liệu khác dưới cùng batch.
+3. Target owner Apply trong transaction r_owner thật, đúng target context, append target ledger + provenance + durable batch receipt/unique binding cùng commit. Owner outbox/side effects theo chuẩn module; không external side effect giả atomic.
+4. Core ReadReceipt + VerifyBatch đọc kết quả đã commit, đối chiếu actual target IDs/count/hash/owner version/fence/binding rồi ghi core receipt/event. Nếu core crash sau bước3, retry owner phải đọc đúng durable receipt theo BatchID+hash, không import lần hai (kể cả ngoài TTL ledger_idem). Receipt thiếu/sai/count lệch thì core không tiến checkpoint.
+5. Resume không tin cursor trong CLI: lấy batches/reservations/receipts từ metadata đã seal, recheck source/target approvals và fences hiện hành. Thu hồi ngay thì stop trước replay hoặc cấp artifact, không trả cached quyền cũ.
+
+Compensate tạo operation ID/receipt riêng, xác minh Apply receipt thật, giữ idmap ban đầu. Owner append bản ghi bù/supersedes theo luật module và receipt bù trong cùng transaction; không DELETE target rows hoặc sửa ledger/source tenant/hash. Crash/retry dùng operation ID lâu dài. Core chỉ ghi compensated sau owner lookup/verify; compensation chưa đủ điều kiện domain thì blocked với reason ref, không tự bỏ qua. Khôi phục định tuyến/session/grants thuộc #56 và rehearsal #58, không gộp vào thao tác dữ liệu giả.
+
+## Cutover và điểm bàn giao
+
+PrepareCutover đòi mọi item/batch verified, source/target fence current, counts/per-item provenance/root khớp và callbacks #56/#58 cung cấp proof hiện hành cho identity/session/grants, target readiness và compensation rehearsal. Nó chỉ append cutover_prepared + permit ref/hash có hạn; không đổi Keycloak, route traffic hoặc giải fence. Phần hoàn tất cutover phải nhận durable receipt từ owner thật, kiểm lại qua server callback; thiếu là pending/deny, không boolean caller tự đặt.
+
+Owner child (KN) cần đăng ký typed namespaces/exporter/importer/fence/receipt/compensation, artifact access và filters loại HTX/MRV/MKG; full producer fence matrix gồm CLI/offline/job; authority/binding lookup theo hai actual contexts. Shared forms/reports/accounts/notify có dữ liệu KN cần adapter thuộc owner phù hợp và field-level ID refs, không scan cả schema. #56 giữ actor identity/vault references, chuyển assignments/delegations/job khóa và revoke nguồn. #58 giữ snapshot counts/checksums/foreign refs, rollback đã diễn tập. Core tests với fake owner chỉ chứng minh protocol, không chứng minh production transfer, 5 boundary gates hay G1 hoàn tất.
+
+## Kế hoạch kiểm trước ready
+
+- Pure: canonical order/alias/two instances, unknown/duplicate namespace/version/dependency cycle, invalid hashes/IDs/refs, missing callbacks/fences/approvals, expired/revoked proofs, caller giả receipt, replay altered body.
+- PG r_party thật: source tenant S chứa hai scopes A/B, target TA/TB; intent/offer actor đúng tenant, A→TA/B→TB, A→TB/copy metadata/foreign source key/target-scope mismatch deny. RLS direct foreign SELECT/INSERT, UPDATE/DELETE/tenant_id changes bị từ chối, reused connection không giữ tenant/node/actor. Unique map/reservation sau30ngày, concurrent batches, hash conflict và crash trước/sau từng local commit.
+- Owner protocol PG fixture dùng module role thật riêng và actual target context: owner ledger+receipt atomic; injected failure trước receipt rollback; crash sau owner commit/core receipt chưa ghi thì replay không nhân đôi; malformed/missing receipt không tiến; duplicate compensation không nhân đôi. Fixture không giả production importer.
+- Fence tests: source writer đang chạy phải kết thúc trước fence ack; HTTP/CLI/offline/job write sau fence bị chặn; plan/advisory lock riêng không đủ; source mutation giữa scan/seal/verify buộc mismatch/deny, không lén cập nhật manifest.
+- Actual owner child tests: không có dòng HTX/MRV/MKG trong artifact, references/licensing/chain/provenance đúng, KHTC semantics/goldens giữ; transfer hai Trung tâm với real role/foreign refs. Rehearsal và5 boundary hard PASS thuộc tổng đợt4b, không được mock để đóng55.
+
+Root đã chốt module party app/store, hai actual contexts và saga/receipts. API chi tiết/owner artifact transport/fence producer integration còn cần kiểm qua implementation và review; không phát hành importer giả hoặc live CLI. Hiện chưa có migration, chưa chạy PG/test production, chưa release/claim ready, chưa cutover hoặc chuyển dữ liệu thật.
+## Bổ sung sau peer review
+
+Fence owner phải exclusive theo (actual tenant, actual scope, namespace), gắn IntentID/PlanID và BindingHash. Lặp đúng holder trả cùng epoch; intent khác bị từ chối. Release chỉ giải đúng fence holder với receipt lâu dài, không giải fence của plan mới sau retry.
+
+Abort/ReleaseFences cần đường recovery riêng: fresh dual authentication và RecoveryAuthority hiện hành trên cả hai scopes, reason/operation refs; không đòi approval cũ chưa thu hồi để bù. Normal import vẫn deny ngay khi approval cũ không còn hiệu lực. Chưa apply thì Abort có thể chốt không target writes; đã apply phải đối chiếu mọi durable compensation receipt và proof identity rollback #56 trước release. Owner release append receipt trong cùng transaction, retry sau crash không giải fence của holder khác. Không có recovery callbacks thì giữ fence và báo chưa sẵn sàng, không tự mở khi timeout.
+
+Owner reports checklist: frozen source args gắn JobID/TenantID/RequestedBy/RequestedAt/template/version/format. Khi chuyển phải dùng actual mapped IDs/envelope đích mới và giữ business args/as_of; không copy nguyên JSON private sang tenant khác hoặc UPDATE ledger cũ. ObjectKey, DLP, current actor, source version và queued outbox cần owner rehearsal riêng.
+
+Credential freshness v1: registry nhận TransferTokenVerifier hiện có từ API assembly, reverify authz.RawToken của cả hai actual contexts trên mỗi operation/replay. Fresh Principal phải platform_admin+MFA và khớp ActorRef/TenantID/OrgRef/native realm roles/MFA của context (roles theo canonical set); thiếu raw token/verifier, token hết hạn hoặc mismatch thì deny trước owner callbacks. Không log/persist/cache token, không thêm field Principal hay secret mới. Approval.ValidUntil không thay thế bước verifier này.
+
+
+## Checkpoint port trước runtime (21/10/2026)
+
+Manifest v1 bind normalized DependsOn của từng adapter; mọi internal ref sang namespace khác phải có cạnh dependency khai báo. Chu kỳ internal refs (kể cả cùng namespace) bị từ chối trong v1 vì chưa có owner atomic-group contract. Duplicate Reference.Key luôn bị từ chối dù external/basis khác; nil và empty collections cùng một canonical digest.
+
+TransferHeaderRoot là root versioned độc lập manifest cho toàn namespace/scope nguồn. SourceFence giữ HeaderRoot + HeaderCount; Seal phải so cả hai với full scan đã hoàn tất. Root target mô tả inventory target riêng, không so với source inventory. CheckFence active không thay bằng chứng scan đầy đủ.
+
+TransferBatchRequest có Mappings chỉ dành item của batch và DependencyMappings dành đúng referenced predecessor keys đã có authoritative idmap + verified owner receipts. TransferBatchMapDigest bind hai tập riêng; overlap/duplicate target IDs bị từ chối. Owner không đọc schema party trực tiếp và receipt chỉ được đếm primary items.
+
+Kiểm thử port thực tế: go1.26.9, `go test -count=1 -v ./internal/platform/party/port` đạt (0.980s), gồm raw-token expiry/native claims, registry immutable/dependency closure, cross-scope refs, complete frozen count/root, canonical empty collections, ambiguous key và dependency maps. Lần chạy đầu chỉ lỗi compile fixture (typed callback aliases/FakeIssuer), giữ log initial; sau sửa fixture suite đã chạy lại đạt. Chưa có runtime/DDL/PG; không suy diễn production cutover hoặc rehearsal từ pure tests.
+
+
+Checkpoint store/DDL: migration timestamp do `migratecheck -new pf_party_tenant_transfer` cấp là `20261021160423_pf_party_tenant_transfer.up.sql`. Metadata riêng pf_party gồm intent/plan/binding/item/idmap/batch/member/receipt, permanent operation reservations và transfer_event qua shared.apply_ledger. FORCE tenant RLS + restrictive selected-node policy, append-only triggers và r_party SELECT/INSERT; binding giữ unique toàn DB cho nguồn tenant/scope và target tenant. Source/target cùng PlanID có PK local tenant khác nhau. Không sửa ledger cũ hoặc schema owner.
+
+Store compile (`go test -run '^$' ./internal/platform/party/store`) và migratecheck module pf/party/base origin/dev đã exit0. Đây chỉ là compile/static; chưa chạy migration/DB tests hoặc runtime transfer. State snapshots nằm ở ledger event, không bảng projection mutable; expected seq + advisory local lock kiểm concurrent transitions. Permanent operation table giữ semantic key/input hash/OperationID để recovery không đổi operation sau crash.
+
+
+## Checkpoint engine stage 1
+
+Đã có generic Intent/Propose/FreezeTarget/FreezeSource/ScanNext/Seal/Accept/Status/DryRun và facade tùy chọn, chưa có HTTP/CLI/owner adapters được bật. Reserve/export/apply/verify/compensate/release/cutover vẫn explicit unavailable trong stage này; không coi stage 1 là giao xong #55. Compile app/store/handler đạt; integration tests đã viết nhưng chưa chạy PG tại checkpoint này.
+
+Target fence giữ immutable holder IntentID+BindingHash (PlanID nil) từ FreezeTarget trước Propose. Source plan có PlanID riêng ổn định theo intent, target Accept thêm local plan association cùng ID; manifest kết hợp PlanID và target fence ref/epoch. CheckTargetFence luôn đọc bằng exact intent holder, không đổi nil→PlanID giữa retry.
+
+Centre–tenant binding là permanent exact pair; các plan là association riêng. Accept lần sau cùng exact pair được tái dùng, khác pair bị DB global unique chặn kể cả metadata bên khác bị RLS ẩn. Stable idmap giữ created_plan_id làm provenance; new batch/new plan phải tái dùng TargetRef nguồn cũ. Owner fence độc quyền không cho plan mới tiến trước bù/release plan cũ. Owner phải hỗ trợ append-only reactivation/revision bằng cùng target entity, không tạo entity trùng dưới PlanID khác. Chưa triển khai/xác nhận test recovery vòng đầy đủ ở stage 1.
+
+Peer review bổ sung immutable transfer_entity registry và composite FK tenant/entity/scope cho mọi child metadata. Nhãn scope_ref không đủ để gắn item/event/operation của Centre A dưới selected scope B. Restrictive policy dùng tên p_scope theo migration gate hiện có; không nới gate. Các ledger child partitions phải không có direct r_party rights nếu chỉ giữ p_tenant; test privilege được thêm.
+
+Owner TOCTOU contract: Export/Apply/ReadReceipt/Compensate/Release phải tự kiểm current authority + exact fence trong cùng r_owner transaction với read/write/receipt. Core callbacks authority nằm ngoài party transaction, không thể thay atomic owner check và không truyền raw Tx. Test production owner revoke/fence race thuộc owner implementation, chưa được suy diễn từ fixture metadata.
+
+
+Stage 1 PG thật: lần đầu private PG chạy 2 test FAIL SQLSTATE22P02 do []byte JSON ở chế độ pgx Exec (package114.935s); commit a81ae62c đổi toàn bộ JSON args sang string(raw). Chạy lại trên private PG mới: 2/2 PASS (FreezeResumeSealAcceptAndRLS 0.29s, MissingInventoryCannotSeal 0.10s; package103.389s), exit0, không SKIP/INFRA. Đã thực thi migration và kiểm real r_party selected-scope/tenant RLS, composite FK relabel deny, partition direct-rights deny, freeze target trước propose/reconstruct facade, manifest thiếu inventory deny, revoke replay deny. Cluster56583/88bc84c48486 được xác minh datadir/port rồi stop/remove; source HEAD a81ae62c giữ nguyên suốt runner. Chưa kiểm stage2 owner ledger/receipts/recovery, không phải production KN transfer/rehearsal.
+
+
+Stage2 receipt contract: apply receipts giữ OperationID/ReasonRef/CompensatesRef nil. Compensation bắt buộc ba refs khớp permanent reserved request/Applied.Ref; SourceLogicalRoot = commitment gốc, còn LogicalRoot + per-item LogicalHash có thể là trạng thái business sau bù. Mandatory VerifyCompensation reread target rows và durable compensation receipt, kiểm chính xác inactive/correction/provenance; không dùng verifier của apply để giả chứng minh đã bù. FenceRelease thêm OperationID/ReasonRef và phải khớp exact recovery request/old holder; replay không mở holder mới. TransferLogicalRoot chuẩn hóa sorted source keys + owner business hashes, độc lập envelope/target IDs/ledger metadata.
+
+
+Stage2 batch/runtime WIP đã thêm reservation trả lại oldest in-flight batch, dependency layers (kể cả nội bộ namespace), permanent stable idmap theo source scope, owner export/read/apply/read/verify ngoài party transaction và core checkpoint riêng. Verify đối chiếu từng item/mapping/logical root với toàn sealed inventory, bao gồm namespace rỗng; PrepareCutover chỉ append prepared proof, không thực thi cutover. Chưa chạy stage2 PG. Compensation/release vẫn unavailable ở checkpoint này.
+
+Unknown owner errors được normalize thành fixed ErrTransferDependency, không log/wrap chi tiết và không bị coi là missing receipt để gọi Apply. DryRun chặn empty nonterminal pages, có finite page budget và kiểm context cancellation từng vòng. RecoveryCheck immutable tùy chọn (tối đa1 constructor argument), proof bind PlanID/ManifestHash/BindingHash/OperationID/ReasonRef/CompensationRoot + identity rollback/rehearsal receipt refs hiện hành. Thiếu proof thì Release sau apply/compensate/prepared bị chặn; core không làm thay identity owner.
+
+
+Recovery thêm mandatory ReadAppliedForRecovery(ctx,RecoveryRequest,ApplyRequest): fresh recovery authority/exact fence và immutable original apply receipt+provenance trong owner transaction, không đòi row còn active hoặc approval normal cũ. Core phải probe mọi reservation/export (kể cả owner commit nhưng core chưa checkpoint), không được lấy absence của core receipt làm chứng chưa nhập. Unknown read error giữ fence. Compensation phải durable mark recovering/reserve stable operation trước owner callback; normal Apply/Verify bị chặn sau marker. Owner compensation không được ngầm dùng normal ReadExport/source payload sau revoke; bù từ target ledger/provenance hoặc recovery-authorized source reader riêng.
+
+
+Stage compensation đã triển khai permanent operation + ledger witness và durable recovering marker trước owner callback; forward Apply/Verify bị chặn sau marker dù owner commit nhưng core checkpoint mất. ReadAppliedForRecovery đọc immutable apply/provenance dưới recovery rights, không dùng apply verifier trên inactive state; ReadCompensation/VerifyCompensation xác minh resulting compensated rows và exact operation/reason/ref. Callback errors opaque, retry không đổi operation hoặc IDs. Proof expiry được canonical UTC và so time.Equal để replay qua JSON/zone không conflict giả. Chưa stage2 PG; Abort/Release đầy đủ còn dở.
+
+
+Stage2 PG thật tại973520c3: 11 top-level tests +2 subtests đều PASS, package120.334s, exit0, không SKIP/INFRA. Gồm owner ledger/provenance/receipt atomic rollback, crash sau owner commit/core chưa checkpoint, reconstructed facade+owner replay, parent→child dependency map, normal revoke/recovery hợp lệ, VerifyNotReady không Apply lại, missing owner witness sau core checkpoint không gọi writer, privacy/empty scanner và r_party RLS. Private60896/06f7f7f2b83d đã xác minh port/datadir rồi stop/remove; HEAD không đổi trong runner. Đây chưa chứng minh gate drain/reverse compensation/Abort/Release hoặc production KN transfer.
+
+Peer phát hiện in-flight forward race: core recovering marker/CAS không đủ khi Apply/Export đã qua check trước marker. Owner bắt buộc EnterRecoveryGate/ReadRecoveryGate dưới actual side context, exclusive fence/writer lock đợi các forward transactions kết thúc, mode+durable receipt commit cùng transaction. Forward Apply/Export kiểm mode trong chính transaction; recovery probe/compensation/release chỉ tiến sau đủ gate receipts cho fences đang có. Original fence ref/epoch/root giữ nguyên manifest, receipt gate riêng bind operation/first reason/holder. Existing core gate proof nhưng owner witness mất thì deny, không gọi writer lại. Gate operation một lần mỗi plan; phase operations/reasons riêng. Chưa triển khai/xác nhận gate tests tại checkpoint port này.
+
+
+Core gate stage đã có stable recovery_gate operation/first reason + ledger witness, owner Enter/Read gate cho từng actual side/fence đang tồn tại, coreproof hash/ref/holder đối chiếu và unknown/missing witness deny trước writer. Compensate chờ toàn bộ gate receipts rồi probe; reverse namespace/key dependencies đòi dependent applied batches đã có compensation witness được owner xác minh. recoveryPair nhận PlanID hoặc target IntentID trước Propose, tạo recovery_only source association bằng fresh dual recovery authority; không normal Propose/Accept/global binding. Compile app/handler đạt, chưa chạy PG cho contract gate mới; Abort/Release còn dở.
+
+
+Abort/Release core đã triển khai (chưa PG stage3): source recovery-stop event cố định manifest/seq trước phase operation, chặn Scan/Seal cũ qua CAS. ReadFenceForRecovery probe mọi actual side/namespace, phát hiện owner Freeze đã commit nhưng core checkpoint mất; known-core/unknown-owner deny. Gate mọi scope kể cả expected Fence{}; zero receipt là durable absent tombstone dùng cùng acquisition lock, không skip. Nếu Freeze xuất hiện giữa read-absent và Enterzero thì owner phải Conflict để core rediscover/retry; late same-holder acquisition sau ack bị chặn.
+
+Abort chỉ ghi trạng thái aborted sau probe toàn bộ reserved/exported owner receipts và mọi apply đã có compensation witness hợp lệ; giữ fences. Release approve immutable compensation inventory trước callback, sau apply/prepared bắt buộc RecoveryCheck identity rollback/rehearsal proof hiện hành. Nil proof giữ pending. Sau khi release bắt đầu, retry đọc durable old release receipts trước active-fence/current-holder check, không mở gate hay ghi lại owner khi witness mất. Tất cả gates kể cả absent tombstone có release receipt; target hoàn tất trước source. Target-only trước Propose và partial source fence dùng recovery_only metadata association, không fake Accept/global binding/import.
+
+Checkpoint trước PG stage3: replay trạng thái released chỉ đọc lại các core/owner release witnesses đã commit; thiếu core proof phải deny trước writer. Gate map và core proof được commit cùng transaction, nên retained map nhưng thiếu proof cũng deny trước Enter. Port chốt Gate ALL sides/namespaces, zeroFence là absent tombstone với acquisition lock; NotReady của ReadFence chỉ xác nhận exact holder chưa từng được tạo. Historical release reader đọc receipt cũ trước active-holder check; writer kiểm recovery gate + exact active holder trong cùng owner transaction. Chưa xác nhận PG contract mới.
+
+Stage3 tại daf21599: 19 top-level tests +5 subtests PostgreSQL đều PASS, package112.278s. Wrapper exit1 do kiểm marker cleanup sai dạng text; đã xác minh marker62181/data-dir37a675443bc8 và stop/remove riêng, proof giữ exit1 không báo wrapper đạt. Sau drain, peer chốt Release phải đọc historical core gate proof cả replay (không active owner check) và refresh identity/rehearsal proof hiện hành + reverify dual credentials ngay trước từng pending owner release writer; không refresh cho historical outcomes đã release. Đang kiểm lại trên HEAD mới, chưa native/static/full ready.
+
+Stage3b tại01e7e0c3: targeted release114.767s exit0; full native party app1.992/domain0.653/handler129.621/port1.293s exit0, không SKIP/INFRA. API assembly109.549s exit0; integration-gateway assembly compile (không có tests). Private56246/4b5b679ea507 đã xác minh marker/port/datadir và stop/remove, HEAD giữ nguyên. Sau drain bỏ riêng upfront refresh trong release snapshot replay: mọi historical receipts đã commit có thể replay dù proof identity cũ hết hạn; chỉ pending writer mới đòi refresh/current credentials. Còn kiểm affected release và static cuối trên source mới.
+
+Final production source b89d2560: affected recovery/release PostgreSQL150.914s exit0, private54183/75619daf3f44 đã xác minh và stop/remove; không SKIP/INFRA. Build/vet/modgen/migratecheck/archlint/contractcheck/docscheck exit0, knboundary314 giữ baseline; gofmt chỉ hai fixture archlint cũ được quy trình loại trừ. Full lint lần đầu exit1 gồm ba errorlint trong tests và một tagged-switch suggestion; chỉ sửa test style, giữ errors.Is + fixed error message/private-marker assertions, không đổi production source hoặc hành vi tests. Đang chốt lại pure/compile/lint; không rerun native nặng đã đạt chỉ vì style tương đương.
+
+Checkpoint bàn giao shared core: production source b89d2560, test-style c3e3d41e. Pure app2.070s/port0.667s, handler compile2.529s, gofmt/docscheck và full golangci-lint lần2 đều exit0 (0 issues); giữ log lint lần1 exit1 và stage3 wrapper exit1. Full native party trên01e7e0c3 có93 top-level PASS, không FAIL/SKIP/INFRA; delta production sau đó chỉ bỏ upfront identity refresh và đã chạy lại affected recovery/release150.914s exit0. Build/vet/modgen/migratecheck/archlint/contractcheck/knboundary314 trên b89d2560 đều exit0. Không còn private PG/Go runner do gói này quản lý.
+
+Đây là generic protocol/metadata core và fixture r_forms/r_party thật trên PG tạm. Runtime mặc định không có registry/importer/cutover routes nên tiếp tục fail-closed. Production typed producers/importers + inventory filters/transport thuộc #89; identity receipts thuộc #56 và rehearsal/compensation thực thuộc #58. Chưa chuyển dữ liệu thật, chưa cutover, chưa xác nhận năm boundary gates và chưa tự ready/merge. Giữ roadmap unchecked đến review/tích hợp và bằng chứng owner tương ứng.
+
+## Bất biến bổ sung từ review 23/10
+
+Kernel từ chối namespace hoặc module owner có thành phần bắt đầu cooperative/htx/mrv/mkg, kể cả sau tiền tố owner hoặc khi namespace dùng alias khác; assembly allowlist không được vô hiệu hóa khóa này. Adapter vẫn phải kiểm inventory đúng dữ liệu KN.
+
+Apply có thể được gọi đồng thời cho cùng (plan_id, batch_id), kể cả hai process hoặc sau crash. Owner bắt buộc unique cặp này trong DB, kiểm request hash, dùng khóa transaction bền vững và ghi ledger + provenance + receipt trong cùng transaction. Không dùng mutex trong RAM làm bằng chứng. Regression PG dùng hai facade/owner độc lập cùng thấy receipt chưa tồn tại trước khi Apply, kiểm chỉ một ledger/provenance/receipt và replay giữ receipt cũ.
+
+Binding hiện là vĩnh viễn: UNIQUE(target_tenant) và UNIQUE(source_tenant, source_scope_ref), chỉ ghi thêm, chưa có binding_supersede. Gắn nhầm phải dừng trước cutover và xử lý có kiểm soát bởi ag_migrator theo runbook #58; không sửa tenant_id, không xóa ledger hay tự dùng API để đổi đích. #58 phải duyệt đối chiếu row-count/checksum, rollback và đúng Trung tâm/tenant trước mọi cutover thật. #89 chịu adapter mẫu/typed inventory và receipt transaction thực. Không lấy fixture này thay diễn tập hay adapter production.

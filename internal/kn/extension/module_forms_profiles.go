@@ -2,6 +2,8 @@ package extension
 
 import (
 	"context"
+
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"slices"
 
 	"github.com/google/uuid"
@@ -15,16 +17,16 @@ import (
 // FormProfiles returns fresh application-owned configuration for cap/forms.
 func FormProfiles() []formsport.Profile {
 	// KNProfile là cấu hình cap/forms của App Khuyến nông: TW → Tỉnh → Xã, Tỉnh phát hành, rà soát, chốt/mở lại; Xã nộp.
-	// Vai là vai ngữ cảnh phiên KN (authz.KN*); Admin KN và reports_admin định nghĩa biểu. Không cho biểu mẫu thử:
+	// Vai là vai ngữ cảnh phiên KN (port.SessionRole*); Admin KN và reports_admin định nghĩa biểu. Không cho biểu mẫu thử:
 	// 14 biểu thật (Q-01) phải được định nghĩa trước khi Tỉnh phát hành kỳ trên /v1/forms (bật production chờ Q-01).
 	base := formsport.Profile{
 		Name:      "kn",
 		Hierarchy: []string{"TW", "TINH", "XA"},
-		Roles:     map[string]string{authz.KNTW: "TW", authz.KNTinh: "TINH", authz.KNXa: "XA"},
+		Roles:     map[string]string{extport.SessionRoleNational: "TW", extport.SessionRoleProvince: "TINH", extport.SessionRoleCommune: "XA"},
 		PublishBy: "TINH",
 		CloseBy:   "TINH",
 		ReviewBy:  "TINH",
-		DefineBy:  []string{authz.KNAdmin, "reports_admin"},
+		DefineBy:  []string{extport.SessionRoleAdmin, "reports_admin"},
 	}
 
 	// KNCNTSProfile là cấu hình cap/forms của Phòng Chăn nuôi – Thủy sản (W11.05, BRD CNTS v3.7): Tỉnh phát hành, rà soát,
@@ -35,11 +37,11 @@ func FormProfiles() []formsport.Profile {
 	livestock := formsport.Profile{
 		Name:              "kn_cnts",
 		Hierarchy:         []string{"TW", "TINH", "XA"},
-		Roles:             map[string]string{authz.KNTW: "TW", authz.KNTinh: "TINH", authz.KNXa: "XA"},
+		Roles:             map[string]string{extport.SessionRoleNational: "TW", extport.SessionRoleProvince: "TINH", extport.SessionRoleCommune: "XA"},
 		PublishBy:         "TINH",
 		CloseBy:           "TINH",
 		ReviewBy:          "TINH",
-		DefineBy:          []string{authz.KNAdmin, "reports_admin"},
+		DefineBy:          []string{extport.SessionRoleAdmin, "reports_admin"},
 		UnitKinds:         []string{formsport.UnitCommune, formsport.UnitFacility, formsport.UnitHousehold},
 		Departments:       []string{partyport.DeptChanNuoiThuySan},
 		RequireLateReason: true,
@@ -53,13 +55,13 @@ func FormProfiles() []formsport.Profile {
 		Name:      "kn_khtc",
 		Hierarchy: []string{"TINH", "PHONG"},
 		Roles: map[string]string{
-			authz.KNTinh + "@" + partyport.DeptKeHoachTaiChinh: "TINH",
-			authz.KNTinh: "PHONG",
+			extport.SessionRoleProvince + "@" + partyport.DeptKeHoachTaiChinh: "TINH",
+			extport.SessionRoleProvince:                                       "PHONG",
 		},
 		PublishBy:      "TINH",
 		CloseBy:        "TINH",
 		ReviewBy:       "TINH",
-		DefineBy:       []string{authz.KNAdmin, "reports_admin"},
+		DefineBy:       []string{extport.SessionRoleAdmin, "reports_admin"},
 		UnitKinds:      []string{formsport.UnitDepartment},
 		MaxSubmissions: 3,
 	}
@@ -71,12 +73,17 @@ func FormProfiles() []formsport.Profile {
 	return profiles
 }
 
-func resolveFormActor(_ context.Context, p authz.Principal, profile formsport.Profile) (formsport.ResolvedActor, bool, error) {
-	if p.KN == nil {
+func resolveFormActor(ctx context.Context, p authz.Principal, profile formsport.Profile) (formsport.ResolvedActor, bool, error) {
+	// The legacy marker only distinguishes an unbound selected request from a native realm request.
+	// Permissions are always decoded from the registered owner payload.
+	if p.SelectedSession == nil && p.KN == nil {
 		return formsport.ResolvedActor{}, false, nil
 	}
-	k := *p.KN
-	if len(profile.Departments) > 0 && k.Role != authz.KNAdmin && !slices.Contains(profile.Departments, k.Department) {
+	_, k, err := extport.RequireSession(authz.WithPrincipal(ctx, p))
+	if err != nil {
+		return formsport.ResolvedActor{}, true, err
+	}
+	if len(profile.Departments) > 0 && k.Role != extport.SessionRoleAdmin && !slices.Contains(profile.Departments, k.Department) {
 		return formsport.ResolvedActor{}, true, problem.Forbidden.WithDetail("cấu hình biểu " + profile.Name + " không dành cho phòng ban của phiên")
 	}
 	return formsport.ResolvedActor{

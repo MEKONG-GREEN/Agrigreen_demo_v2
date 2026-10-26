@@ -23,6 +23,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port/farmerid"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
@@ -38,6 +39,7 @@ import (
 	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
@@ -99,6 +101,7 @@ type Modules struct {
 	Price         *price.Module     // W11.71 cap/price: khung giá — danh mục nền, /v1/price/* (ADR-0049)
 	HRM           *hrm.Module       // W11.21 dom/hrm: danh mục nhân sự HCTH (FN-19), /v1/hrm/* (ADR-0050)
 	Contact       *contact.Module   // W11.23 cap/directory: Contact dùng chung (FN-13), /v1/contacts/*
+	Export        *export.Module    // W10.17 cap/export: mẫu văn bản có phiên bản, .docx có băm, /v1/exports/*
 }
 
 // Named trả module kèm tên repo (module.yaml) theo thứ tự gắn route.
@@ -110,6 +113,7 @@ func (m Modules) Named() []NamedModule {
 		{"pf/simulation", m.Simulation}, {"pf/cropcycle", m.CropCycle}, {"pf/cooperative", m.Cooperative}, {"pf/metrics", m.Metrics},
 		{"pf/extdata", m.ExtData}, {"pf/metering", m.Metering}, {"pf/apiclient", m.APIClient}, {"pf/forms", m.Forms},
 		{"pf/price", m.Price}, {"pf/hrm", m.HRM}, {"pf/contact", m.Contact},
+		{"pf/export", m.Export},
 	}
 }
 
@@ -160,7 +164,11 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 
 	md := masterdata.New(unit, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 
-	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
+	navigationPolicy, err := extension.NavigationPolicy()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault, NavigationPolicy: navigationPolicy})
 	wf := wireWorkflow(unit, clk, md, pty) // W6.1: cap/workflow cho duyệt tham số, cấp quyền (r_workflow, W2.6: cùng pool đơn vị)
 
 	g := geo.New(unit, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits()})
@@ -184,13 +192,17 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 
 	cnt := content.New(unit, clk, content.Deps{Scope: pty.ScopeResolver(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Store: store})
 
-	kn := extension.New(unit, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
-		Plots: coop.Plots(), Coops: coop.Cooperatives()})
+	knHTXData := extension.NewPublishedHTXData(unit)
+	knUnits := extension.NewPublishedAdminUnits(unit)
+	knOrgs := extension.NewPublishedOrganizations(unit)
+	kn := extension.New(unit, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: knOrgs, Units: knUnits, Params: md.Params(), Catalogs: md.Catalogs(),
+		Plots: knHTXData, Coops: knHTXData})
 	md.UseStaffDirectory(kn.StaffNames()) // G-07: tên người đặt/duyệt tham số
 	pty.UseActorNames(kn.StaffNames())    // KN v7.7 P2: tên người thao tác trong Log phòng ban/khu vực
 
 	// PFPUB/D2 (ADR-0053 §8): nhãn "Chưa xác nhận" của dòng HTX trong số đã chốt cho KHTC.
-	kn.UseHTXConfirmations(coop.HTXConfirmations())
+	kn.UseHTXConfirmations(knHTXData)
+	kn.UseDeptLibrary(store) // W11.54: tệp kho văn bản phòng ở kho đối tượng
 
 	mech := mechanization.New(unit, clk, mechanization.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Vault: ext.Vault,
@@ -216,7 +228,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	// dùng cổng thiết bị độc lập (syncmod.NewDevices) để không vòng phụ thuộc. API chỉ
 	// xếp lần gửi đẩy; gửi thật ở consumer pf.notify.push của worker.
 	nt := notify.New(unit, clk, notify.Deps{
-		Consumers: NotificationConsumers(), Renderers: NotificationRenderers(), Kinds: NotificationKinds(), Digests: NotificationDigests(), Builders: NotificationBuilders(nil, kn.Staff(), md.AdminUnits()),
+		Consumers: NotificationConsumers(), Renderers: NotificationRenderers(), Kinds: NotificationKinds(), Digests: NotificationDigests(), Builders: NotificationBuilders(nil, kn.Staff(), knUnits),
 		Scope: pty.ScopeResolver(), Devices: syncmod.NewDevices(unit), Staff: kn.Staff(), Units: md.AdminUnits(),
 	})
 
@@ -252,7 +264,11 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 			return Modules{}, pools, err
 		}
 	}
-	acc := accounts.New(unit, clk, accounts.Deps{Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
+	sessionRegistry, err := authz.NewSessionRegistry(extension.SessionProjection())
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	acc := accounts.New(unit, clk, accounts.Deps{Sessions: sessionRegistry, Navigation: pty.ContextNavigation(), Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
 		Households: coop.PartyHouseholds(), Vault: ext.Vault, Params: md.Params(),
 		Departments: pty.Departments(), Units: md.AdminUnits(), Names: kn.StaffNames(), // KN v7.7 P1
 		Modules: pty.ModuleEnablement()}) // W1.4: vai của module đã tắt không cấp được
@@ -275,13 +291,18 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	nt.UseAreaFarmers(AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}) // HTX US-NEWS-03
 
 	// pf/reports: API tạo việc xuất và cấp URL tải; worker dựng tệp (cmd/worker). Địa chỉ email tra qua pf/accounts (MailDirectory).
-	rep := reports.New(unit, clk, reports.Deps{FormSeeds: []reportsport.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: kn.ReportData(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Catalogs: md.Catalogs(), Clock: clk}), Catalog: []reportsport.CatalogRegistration{extension.ReportCatalog()}, Policies: []reportsport.Policy{extension.ReportPolicy()},
-		ResolveSession: extension.ReportSessionResolver(pty.Orgs()),
+	lease, err := reports.SendLeaseFromEnv(os.Getenv) // P0-WORKER-REPORTS: hạn "Đang gửi" trước khi cho "Gửi lại" tiếp tục lượt
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	rep := reports.New(unit, clk, reports.Deps{FormSeeds: []reportsport.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: kn.ReportData(), Orgs: knOrgs, Units: knUnits, Catalogs: md.Catalogs(), Clock: clk}), Catalog: []reportsport.CatalogRegistration{extension.ReportCatalog()}, Policies: []reportsport.Policy{extension.ReportPolicy()},
+		ResolveSession: extension.ReportSessionResolver(knOrgs),
 		Scope:          pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
 		Mechanization: mech.ReportData(), CropCycle: coop.ReportData(), Directory: acc.MailDirectory(),
 		Recipients:     acc.ReportRecipients(),                 // HTX US-DASH-03: người nhận = tài khoản của HTX
 		Consolidations: kn.Consolidations(), Getenv: os.Getenv, // KN v7.7 P4: báo cáo Chi cục; cờ Google Sheet (tắt mặc định)
 		LinkDownloadBase: os.Getenv("AG_REPORT_LINK_BASE"), // A4: liên kết tải Chi cục (route công khai /v1/public/report-links)
+		DispatchLease:    lease,
 	})
 	// KN v7.7 P4: vòng đời báo cáo — engine mẫu (P3), khu vực (P2), cán bộ phụ trách (P1), lịch sử gửi Chi cục; nối ngược
 	// cho P2: bảng Ảnh hưởng (kỳ chưa chốt), dữ liệu theo phòng ban, menu "Báo cáo đột xuất", cột "biểu đang dùng".
@@ -295,6 +316,9 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	// W11.76: khóa tuần (lịch kỳ hệ thống W11.03) lưu lúc duyệt bảng giá.
 	pr.UseWeeks(PriceWeeks{Calendar: kn})
+	// W11.78: điều tra giá thành — họ tên, SĐT nông hộ / cán bộ điều tra qua kho định danh; mặc định TẮT ở production
+	// (AG_PRICE_SURVEY_PII, chờ DPIA — Q-005).
+	pr.UseSurvey(ext.Vault, price.SurveyEnabled(os.Getenv, residency.Production(os.Getenv)))
 	hr, err := hrm.New(unit, clk, KNHRMAccess) // W11.21: dom/hrm (/v1/hrm/*), danh mục nhân sự — ADR-0050
 	if err != nil {
 		return Modules{}, pools, err
@@ -302,14 +326,21 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	// W11.22: hồ sơ nhân sự — PII qua kho định danh (ngăn hồ sơ vault 000004), đơn vị nội bộ của pf/accounts (W11.07);
 	// mặc định TẮT ở production (AG_HRM_RECORDS, chờ DPIA — Q-005).
 	hr.UseRecords(ext.Vault, KNHRMUnits{Units: acc.InternalUnits()}, hrm.RecordsEnabled(os.Getenv, residency.Production(os.Getenv)))
+	// W11.27: kế hoạch nhân lực năm (FN-11) — kỳ native cap/forms profile hrm_plan.
+	hr.UsePlans(fm.Publisher(), fm.Control(), fm.Entry())
 	// W11.23: cap/directory — Contact dùng chung (FN-13). Cán bộ thuộc tỉnh chiếu từ hồ sơ nhân sự (cùng cổng AG_HRM_RECORDS),
 	// PII qua thẻ danh bạ của kho định danh; tên cán bộ của danh bạ trực pf/extension đọc từ Contact trước (Q-072).
 	ct, err := contact.New(unit, clk, KNContactAccess, ext.Vault)
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	ct.UseStaff(KNContactStaff{Dir: hr.Directory()}, KNContactLabels{Units: acc.InternalUnits(), AdminUnits: md.AdminUnits()})
+	ct.UseStaff(KNContactStaff{Dir: hr.Directory()}, KNContactLabels{Units: acc.InternalUnits(), AdminUnits: knUnits})
 	kn.UseContactNames(ct.Names())
+	// W10.17: cap/export — Word KHTC Mẫu 1–5 (mẫu có phiên bản, lần xuất có băm, số văn bản {n}/BC-TTKN).
+	exp, err := wireExport(unit, clk, kn)
+	if err != nil {
+		return Modules{}, pools, err
+	}
 	wireHRMDocs(hr, ev) // W11.24: kho tài liệu nhân sự — tệp qua pf/evidence (hr_records)
 	pty.UseOrgImpact(kn.OpenPeriodsImpact())
 	pty.UseDepartmentUsage(kn.ReportUsage())
@@ -327,8 +358,11 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	// W11.43: cảnh báo CNTS — bài nộp cap/forms (SubmissionFeed), người nhận theo sổ gán vai trò (cán bộ xã, Lãnh đạo phòng,
 	// người phụ trách biểu).
 	kn.UseCNTSAlerts(extension.CNTSAlertDeps{Feed: fm.SubmissionFeed(), Directory: acc.ExtensionKNDirectory(), Holders: acc.RoleHolders()})
-	kn.UseRoleHolders(acc.RoleHolders()) // W11.46: người theo dõi lịch công tác
-	kn.UseXaScopes(acc.XaScopes())       // W11.46: viên chức Cấp Xã CNTS của lịch trực KSGM BM-03
+	kn.UseRoleHolders(acc.RoleHolders())     // W11.46: người theo dõi lịch công tác
+	kn.UseXaScopes(acc.XaScopes())           // W11.46: viên chức Cấp Xã CNTS của lịch trực KSGM BM-03
+	kn.UseCNTSModelVault(ext.Vault)          // W11.47: chủ hộ mô hình CNTS ở kho định danh
+	wireCNTSDiary(kn, ev, ext.Vault)         // W11.48: ảnh nhật ký nuôi CNTS qua pf/evidence
+	kn.UseCNTSMapGeometry(g.AdminGeometry()) // W11.52: cảnh báo vùng vẽ ngoài địa giới xã (bản đồ CNTS)
 
 	// pf/waterway (G2): API ghi sổ đoạn/công trình, tạo job dựng và phát hành; worker dựng đồ thị (cmd/worker).
 	ww := waterway.New(unit, clk, waterway.Deps{Params: md.Params(), Catalogs: md.Catalogs()})
@@ -423,7 +457,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
 		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Cooperative: coop, Metrics: met, ExtData: ed, Metering: meter, APIClient: apic,
-		Forms: fm, Price: pr, HRM: hr, Contact: ct}, pools, nil
+		Forms: fm, Price: pr, HRM: hr, Contact: ct, Export: exp}, pools, nil
 }
 
 // EgressModeFromEnv đọc AG_EGRESS_MODE (ADR-0024 mục 2): rỗng → observe; giá trị lạ → lỗi khởi động.

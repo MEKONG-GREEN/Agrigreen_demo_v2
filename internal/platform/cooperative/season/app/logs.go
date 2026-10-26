@@ -116,6 +116,43 @@ func (s *Service) logSeason(ctx context.Context, tid uuid.UUID, seasonRef, plotR
 	return cur, err
 }
 
+// Missing and RLS-hidden seasons are indistinguishable. A manager/farmer may
+// report "not open" only after an ordinary, scoped Plot port lookup proves
+// write ownership. Hidden/unknown plots have the same denial. This runs only
+// AFTER logSeason has closed its transaction; never bypass RLS or read an
+// unscoped season just to choose a response message.
+func (s *Service) missingLogSeason(ctx context.Context, a access, seasonRef, plotRef uuid.UUID) error {
+	if a.kind == accCoop || a.kind == accFarmer {
+		// An unseen season_ref cannot be linked to a client-supplied plot.
+		if seasonRef != uuid.Nil || plotRef == uuid.Nil {
+			return ErrOutOfScope
+		}
+		if s.dependencyTxOpen(ctx) {
+			return ErrDependency.WithDetail("quyền ghi thửa phải được giải ngoài giao dịch đang mở")
+		}
+		if s.Plots == nil {
+			return ErrDependency.WithDetail("chưa nối pf/cooperative (thửa)")
+		}
+		pl, err := s.Plots.Get(ctx, plotRef)
+		if errors.Is(err, port.ErrPlotNotFound) {
+			return ErrOutOfScope
+		}
+		if err != nil {
+			return ErrDependency.WithDetail("không tra được thửa").WithCause(err)
+		}
+		if pl.Ref != plotRef || pl.CooperativeRef == uuid.Nil || (pl.OwnerTenant != uuid.Nil && pl.OwnerTenant != a.p.TenantID) {
+			return ErrOutOfScope
+		}
+		if err := a.canWrite(pl.CooperativeRef, pl.HouseholdRef); err != nil {
+			return err
+		}
+	}
+	if seasonRef != uuid.Nil {
+		return ErrSeasonNotFound
+	}
+	return ErrSeasonNotOpen
+}
+
 // seasonAcceptsLog: vụ đang mở; bản ghi ngoại tuyến tới muộn được nhận nếu xảy
 // ra trước lúc vụ hoàn thành (HTX US-LOG-02 AC-2, US-LOG-04).
 func seasonAcceptsLog(season store.Season, at time.Time, channel string) bool {
@@ -165,10 +202,7 @@ func (s *Service) recordLog(ctx context.Context, a access, in LogInput) (LogResu
 		return LogResult{}, err
 	}
 	if season == nil {
-		if in.SeasonRef != uuid.Nil {
-			return LogResult{}, ErrSeasonNotFound
-		}
-		return LogResult{}, ErrSeasonNotOpen
+		return LogResult{}, s.missingLogSeason(ctx, a, in.SeasonRef, in.PlotRef)
 	}
 	// Ghi: báo "không thuộc phạm vi quản lý" (HTX US-SEASON-02 AC-2) thay vì ẩn.
 	if err := a.canWrite(season.CooperativeRef, season.HouseholdRef); err != nil {
@@ -493,7 +527,14 @@ func (s *Service) recordBatch(ctx context.Context, a access, in BatchInput) (Bat
 		}
 		switch {
 		case season == nil:
-			skipped = append(skipped, store.Skipped{PlotRef: plot, Code: ErrSeasonNotOpen.Code, Reason: SkipNotOpen})
+			missing := s.missingLogSeason(ctx, a, uuid.Nil, plot)
+			if errors.Is(missing, ErrOutOfScope) {
+				skipped = append(skipped, store.Skipped{PlotRef: plot, Code: ErrOutOfScope.Code, Reason: SkipOutOfScope})
+			} else if errors.Is(missing, ErrSeasonNotOpen) {
+				skipped = append(skipped, store.Skipped{PlotRef: plot, Code: ErrSeasonNotOpen.Code, Reason: SkipNotOpen})
+			} else {
+				return BatchResult{}, missing
+			}
 			continue
 		case a.canWrite(season.CooperativeRef, season.HouseholdRef) != nil:
 			skipped = append(skipped, store.Skipped{PlotRef: plot, Code: ErrOutOfScope.Code, Reason: SkipOutOfScope})

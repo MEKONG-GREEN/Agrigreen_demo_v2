@@ -1,0 +1,11 @@
+{
+  "id": "kn-hrm-plans",
+  "source": "./kn-hrm-plans",
+  "app": [
+    {
+      "export": "hrmPlanRoutes",
+      "order": 60
+    }
+  ],
+  "admin": []
+}

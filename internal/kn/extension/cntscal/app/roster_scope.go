@@ -3,11 +3,11 @@ package app
 import (
 	"context"
 	"errors"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"strings"
 	"time"
 
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -57,7 +57,7 @@ func (s *Service) rosterScope(ctx context.Context, c caller, requested string, w
 	if err != nil {
 		return c, err
 	}
-	if !c.admin() && (!provinces[requested] || (c.k.Role != authz.KNXa && !c.k.Scope.Allows(requested))) {
+	if !c.admin() && (!provinces[requested] || (c.k.Role != port.SessionRoleCommune && !c.k.Scope.Allows(requested))) {
 		return c, ErrOutOfScope
 	}
 	c.province = requested

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"slices"
 	"sort"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -113,7 +113,7 @@ type Dashboard struct {
 // KNDashboard dựng dashboard từ bảng chỉ số dựng sẵn khi "Cập nhật" (consolidation_metric) + trạng thái nộp —
 // 6–8 truy vấn theo chỉ mục, không quét bài nộp (mục tiêu < 5 s, xem docs/runbooks/kn-report-cycle-load.md).
 func (s *Service) KNDashboard(ctx context.Context, q DashboardQuery) (Dashboard, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return Dashboard{}, err
 	}
@@ -504,13 +504,14 @@ func (s *Service) CommuneStatsOf(ctx context.Context, commune string, batchID *u
 	if err != nil {
 		return CommuneStats{}, err
 	}
-	if a.k.Role == authz.KNXa && !slices.Contains(a.k.Communes, commune) {
+	if a.k.Role == port.SessionRoleCommune && !slices.Contains(a.k.Communes, commune) {
 		return CommuneStats{}, ErrOutOfScope
 	}
-	out := CommuneStats{Commune: commune}
+	var out CommuneStats
 	now := s.now()
-	fc := s.forms(a.p.TenantID)
-	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+	dp := s.newDeps(a.p.TenantID) // P0-POOL-KN: phiên bản mẫu đọc ngoài giao dịch
+	err = s.txDeps(ctx, a.p.TenantID, dp, func(tx pgx.Tx) error {
+		out = CommuneStats{Commune: commune}
 		f := store.TaskFilter{Department: a.dept(), Province: a.province, Communes: []string{commune}, BatchID: batchID, OrderByDue: true}
 		tasks, err := store.ListTasks(ctx, tx, f)
 		if err != nil {
@@ -548,12 +549,19 @@ func (s *Service) CommuneStatsOf(ctx context.Context, commune string, batchID *u
 				}
 			}
 		}
+		versions := make([]uuid.UUID, 0, len(latestBy))
+		for _, t := range latestBy {
+			versions = append(versions, t.VersionID)
+		}
+		if err := dp.want(ctx, versions, ""); err != nil {
+			return err
+		}
 		for code, t := range latestBy {
 			sub, err := store.SubmissionByID(ctx, tx, *t.SubmittedSubmissionID)
 			if err != nil || sub == nil {
 				return err
 			}
-			fi, err := fc.get(ctx, t.VersionID)
+			fi, err := dp.form(ctx, t.VersionID)
 			if err != nil {
 				return err
 			}

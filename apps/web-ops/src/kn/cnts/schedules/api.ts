@@ -3,6 +3,7 @@
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
 import { newIdempotencyKey } from "@/api/idempotency";
+import { parseNumberInput, type NumberRule } from "@/components/form";
 
 type S = components["schemas"];
 export type DutyRoster = S["CNTSDutyRoster"];
@@ -95,12 +96,22 @@ export const BATCH_STATUS_LABEL: Record<BatchStatus, string> = { open: "Đang th
 export const BATCH_STATUS_TONE: Record<BatchStatus, "neutral" | "ok" | "warn" | "bad" | "info"> = { open: "info", overdue: "bad", done: "ok", cancelled: "neutral" };
 
 /** Lỗi phía máy khách của biểu lập lịch tiêm (máy chủ kiểm lại). */
+/** Tuổi lúc nhận giống: số nguyên 0–3650 ngày; số con: số nguyên > 0 (R-A1, như máy chủ). */
+export const AGE_RULE: NumberRule = { required: true, integer: true, max: 3650 };
+export const HEAD_RULE: NumberRule = { integer: true, positive: true, max: 100_000_000 };
+
+/** Ô số nguyên người gõ → số (rỗng → null) hoặc lỗi theo trường. */
+export function intValue(raw: string, rule: NumberRule): { ok: true; value: number | null } | { ok: false; error: string } {
+  const p = parseNumberInput(raw, rule);
+  return p.ok ? { ok: true, value: p.value === "" ? null : Number(p.value) } : p;
+}
+
 export function batchErrors(b: Partial<BatchCreate>): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!b.commune_code) e.commune_code = "Chọn xã";
-  if (!b.model_type_code) e.model_type_code = "Chọn loại mô hình";
-  if (!b.household_ref && !b.locality?.trim()) e.locality = "Chọn hộ mô hình hoặc ghi địa bàn (không ghi họ tên, số điện thoại)";
-  if (!b.received_date) e.received_date = "Bắt buộc";
+  if (!b.commune_code) e.commune_code = "Bắt buộc nhập.";
+  if (!b.model_type_code) e.model_type_code = "Bắt buộc nhập.";
+  if (!b.household_ref && !b.locality?.trim()) e.locality = "Chọn hộ mô hình hoặc ghi địa bàn (không ghi họ tên, số điện thoại).";
+  if (!b.received_date) e.received_date = "Bắt buộc nhập.";
   if (b.age_at_receipt === undefined || !Number.isInteger(b.age_at_receipt) || b.age_at_receipt < 0 || b.age_at_receipt > 3650) e.age_at_receipt = "0–3650 ngày";
   if (b.head_count !== undefined && b.head_count !== null && (!Number.isInteger(b.head_count) || b.head_count < 1)) e.head_count = "Số con ≥ 1";
   return e;

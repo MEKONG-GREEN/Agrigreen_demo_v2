@@ -1,12 +1,14 @@
 // Package app: use case Phòng Kế hoạch – Tài chính (W11.61, D4 KH1, BRD KHTC v2.2): Danh mục KHTC (FN-AD-04.01), danh
 // sách CT/DA chủ (quyết định D20 — KHTC là chủ, module khác tham chiếu qua extension/port.KHTCPrograms), Kế hoạch năm
 // 6 tab có phiên bản theo quyết định + ngày hiệu lực (FN-TI-02.02, BR-DL-13, BR-DL-21), sao chép từ năm trước, xuất /
-// nhập Excel. Quyền theo ngữ cảnh phiên KN (authz.RequireKN), không theo vai realm.
+// nhập Excel. Quyền theo ngữ cảnh phiên KN (port.RequireSession), không theo vai realm.
 package app
 
 import (
 	"context"
 	"errors"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -30,6 +32,7 @@ import (
 
 // Mã lỗi (docs/errors.md, mục pf/extension — KHTC W11.61).
 var (
+	ErrDependency      = problem.New(http.StatusServiceUnavailable, "extension.dependency_unavailable", "Dịch vụ phụ thuộc chưa sẵn sàng")
 	ErrCatalogExists   = problem.New(http.StatusConflict, "extension.khtc_catalog_exists", "Mã đã có trong danh mục (kể cả mục đã ngừng dùng)")
 	ErrCatalogNotFound = problem.New(http.StatusNotFound, "extension.khtc_catalog_not_found", "Không có mục danh mục KHTC")
 	ErrDefaultConflict = problem.New(http.StatusConflict, "extension.khtc_default_conflict", "Mẫu đã có người ký mặc định đang dùng")
@@ -74,24 +77,30 @@ func (s *Service) today() time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }
 
+// tx chạy fn trong giao dịch tenant. P0-POOL-KN-2 (#139): ctx mang txdeps (lưu Kế hoạch năm) → cổng của Kỳ KHTC / phiếu KHTC
+// (ClosedCutoff, EntryUsage — giao dịch riêng trên cùng pool) chỉ đọc NGOÀI giao dịch; thiếu thì hủy, nạp, chạy lại fn.
 func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {
-	return tenant.WithTenantTx(ctx, s.DB, tid, fn)
+	err := txdeps.Run(ctx, func(body func(pgx.Tx) error) error { return tenant.WithTenantTx(ctx, s.DB, tid, body) }, fn)
+	if errors.Is(err, txdeps.ErrExhausted) {
+		return ErrDependency.WithDetail("kỳ KHTC hoặc phiếu KHTC thay đổi liên tục — thử lại").WithCause(err)
+	}
+	return err
 }
 
 type caller struct {
 	p authz.Principal
-	k authz.KNContext
+	k port.SessionContext
 }
 
 // reader: Admin; Cấp Tỉnh mọi phòng ban (phòng chuyên môn xem kế hoạch của phòng — FN-PN-03.03; lãnh đạo chỉ xem).
 // Cấp Quốc gia, Cấp Xã không có chức năng KHTC (ma trận BRD KHTC §VI).
 func (s *Service) reader(ctx context.Context) (caller, error) {
-	p, k, err := authz.RequireKN(ctx)
+	p, k, err := port.RequireSession(ctx)
 	if err != nil {
 		return caller{}, err
 	}
 	c := caller{p: p, k: k}
-	if k.Role != authz.KNAdmin && k.Role != authz.KNTinh {
+	if k.Role != port.SessionRoleAdmin && k.Role != port.SessionRoleProvince {
 		return c, problem.Forbidden.WithDetail("chỉ Admin và Cấp Tỉnh xem dữ liệu KHTC")
 	}
 	return c, nil
@@ -113,7 +122,7 @@ func (s *Service) planWriter(ctx context.Context) (caller, error) {
 	if err != nil {
 		return c, err
 	}
-	if c.k.Role != authz.KNAdmin && c.k.Department != DeptKHTC {
+	if c.k.Role != port.SessionRoleAdmin && c.k.Department != DeptKHTC {
 		return c, problem.Forbidden.WithDetail("chỉ Phòng Kế hoạch – Tài chính lập, điều chỉnh kế hoạch năm và danh sách CT/DA")
 	}
 	return c, c.checkWrite()
@@ -125,7 +134,7 @@ func (s *Service) catalogWriter(ctx context.Context) (caller, error) {
 	if err != nil {
 		return c, err
 	}
-	if c.k.Role != authz.KNAdmin {
+	if c.k.Role != port.SessionRoleAdmin {
 		return c, problem.Forbidden.WithDetail("chỉ Admin quản lý Danh mục KHTC")
 	}
 	return c, c.checkWrite()

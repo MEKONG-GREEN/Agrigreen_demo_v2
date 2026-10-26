@@ -9,11 +9,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"time"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -29,7 +29,7 @@ func (s *Service) cntsReady(ctx context.Context) error {
 	if s.FormsNative == nil {
 		return ErrDependency.WithDetail("chưa nối cap/forms (kỳ native)")
 	}
-	if _, _, err := authz.RequireKN(ctx); err != nil {
+	if _, _, err := port.RequireSession(ctx); err != nil {
 		return err
 	}
 	return nil

@@ -5,7 +5,7 @@
 // (FN-AD-04.07: mọi thao tác ghi bắt buộc lý do ≥ 10 ký tự, mã hóa phần trăm).
 import type { components as AppC } from "@/api/generated/application";
 import type { components as AdmC } from "@/api/generated/admin";
-import { uuidv7 } from "@/api/idempotency";
+import { beginAttempt, currentIdempotentRun, requestFingerprint, type IdempotencyAttempt } from "@/api/idempotency";
 import { ApiProblem, networkProblem, toProblem } from "@/api/problem";
 import { CONTEXT_HEADER, REASON_HEADER } from "../contract";
 
@@ -202,26 +202,48 @@ export class RawFile {
   ) {}
 }
 
+/** Dấu vân tay thân yêu cầu (đồng bộ): JSON/chuỗi nguyên văn; tệp nhị phân theo độ dài + băm FNV-1a; Blob theo loại + cỡ. */
+function bodyFingerprint(b: unknown): string {
+  if (b === undefined) return "";
+  if (typeof b === "string") return b;
+  const bytes = b instanceof Uint8Array ? b : b instanceof ArrayBuffer ? new Uint8Array(b) : null;
+  if (bytes) {
+    let h = 2166136261;
+    for (let i = 0; i < bytes.length; i++) h = Math.imul(h ^ (bytes[i] ?? 0), 16777619) >>> 0;
+    return `bin:${bytes.length}:${h.toString(16)}`;
+  }
+  if (typeof Blob !== "undefined" && b instanceof Blob) return `blob:${b.type}:${b.size}`;
+  return String(b);
+}
+
 export function knHttp(opts: KnHttpOptions) {
   const base = opts.baseUrl.replace(/\/+$/, "");
   const doFetch = opts.fetch ?? ((r: Request) => fetch(r));
+  // idem: khóa tường minh của nơi gọi. Không truyền → khóa của phiên thao tác hiện hành (useAction/useIdempotentAction,
+  // P0-WEB-IDEMKEY #129: bấm lại cùng dữ liệu sau lỗi mạng/5xx dùng lại khóa) → ngoài phiên mới sinh khóa mới.
   return async function call<T>(method: "GET" | "POST" | "PUT" | "PATCH", path: string, body?: unknown, query?: Q, idem?: string): Promise<T> {
+    const op = currentIdempotentRun(); // đọc đồng bộ, trước mọi await
     const headers = new Headers({ Accept: "application/json, application/problem+json" });
     const token = opts.getAccessToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
     const ctx = opts.getContextId();
     if (ctx) headers.set(CONTEXT_HEADER, ctx);
+    const url = `${base}${path}${qs(query)}`;
+    const payload = method === "GET" ? undefined : body instanceof RawFile ? body.data : JSON.stringify(body ?? {});
+    let attempt: IdempotencyAttempt | null = null;
     if (method !== "GET") {
       headers.set("Content-Type", body instanceof RawFile ? body.contentType : "application/json");
-      headers.set("Idempotency-Key", idem ?? uuidv7());
+      attempt = beginAttempt(op, requestFingerprint(method, url, ctx, bodyFingerprint(payload)), idem);
+      headers.set("Idempotency-Key", attempt.key);
       const r = supportReason?.trim();
       if (r) headers.set(REASON_HEADER, encodeURIComponent(r));
     }
-    const req = new Request(`${base}${path}${qs(query)}`, { method, headers, body: method === "GET" ? undefined : body instanceof RawFile ? (body.data as BodyInit) : JSON.stringify(body ?? {}) });
+    const req = new Request(url, { method, headers, body: payload as BodyInit | undefined });
     let res: Response;
     try {
       res = await doFetch(req);
     } catch {
+      attempt?.settle("network");
       throw networkProblem();
     }
     const text = await res.text();
@@ -231,6 +253,7 @@ export function knHttp(opts: KnHttpOptions) {
     } catch {
       data = undefined;
     }
+    attempt?.settle({ status: res.status, code: (data as { code?: string } | undefined)?.code ?? null });
     if (!res.ok) throw new ApiProblem(toProblem(data, res));
     return data as T;
   };
@@ -263,7 +286,8 @@ export function createCycleApi(opts: KnHttpOptions) {
     communeReports: (q: { commune?: string; period_type?: string; status?: string; form_code?: string; batch_id?: string } = {}) => call<RcTaskList>("GET", `${X}/commune-reports`, undefined, q),
     communeStats: (commune: string, batch_id?: string) => call<RcCommuneStats>("GET", `${X}/commune-reports/stats`, undefined, { commune, batch_id }),
     task: (id: string) => call<RcTaskDetail>("GET", `${X}/report-tasks/${id}`),
-    submit: (id: string, body: { id?: string; kind: "draft" | "submitted"; rows: { indicator?: string; input: Record<string, string> }[] }) => call<RcSubmissionResult>("POST", `${X}/report-tasks/${id}/submissions`, body),
+    submit: (id: string, body: { id?: string; kind: "draft" | "submitted"; rows: { indicator?: string; input: Record<string, string> }[] }, idem?: string) =>
+      call<RcSubmissionResult>("POST", `${X}/report-tasks/${id}/submissions`, body, undefined, idem),
     history: (id: string) => call<{ items: RcSubmission[] }>("GET", `${X}/report-tasks/${id}/history`),
     taskLog: (id: string) => call<{ items: RcLogEntry[] }>("GET", `${X}/report-tasks/${id}/log`),
     requestAdjustment: (id: string, reason: string) => call<{ task: RcTask }>("POST", `${X}/report-tasks/${id}/adjustment-request`, { reason }),
@@ -398,17 +422,20 @@ export function createCollectApi(opts: KnHttpOptions) {
   const call = knHttp(opts);
   return {
     cooperatives: (q: { commune?: string; status?: "active" | "inactive" | "all"; q?: string } = {}) => call<A["KNCooperativeList"]>("GET", "/v1/kn/cooperatives", undefined, { ...q, limit: 200 }),
-    createCooperative: (b: A["KNCooperativeCreate"]) => call<KnCooperative>("POST", "/v1/kn/cooperatives", b),
+    createCooperative: (b: A["KNCooperativeCreate"], idem?: string) => call<KnCooperative>("POST", "/v1/kn/cooperatives", b, undefined, idem),
     cooperative: (ref: string) => call<KnCooperative>("GET", `/v1/kn/cooperatives/${ref}`),
     deactivate: (ref: string, reason: string) => call<A["KNCooperativeDeactivated"]>("POST", `/v1/kn/cooperatives/${ref}/deactivate`, { reason }),
     households: (ref: string) => call<A["KNHouseholdList"]>("GET", `/v1/kn/cooperatives/${ref}/households`),
-    addHousehold: (ref: string, b: { holder: { full_name: string; phone: string }; cultivated_area_ha?: string }) => call<KnHousehold>("POST", `/v1/kn/cooperatives/${ref}/households`, b),
+    addHousehold: (ref: string, b: { holder: { full_name: string; phone: string }; cultivated_area_ha?: string }, idem?: string) =>
+      call<KnHousehold>("POST", `/v1/kn/cooperatives/${ref}/households`, b, undefined, idem),
     machines: (commune?: string) => call<KnMachineOverview>("GET", "/v1/kn/machine-counts", undefined, { commune }),
     coopMachines: (ref: string) => call<KnCoopMachines>("GET", `/v1/kn/machine-counts/${ref}`),
-    putMachines: (ref: string, lines: { machine_type: string; quantity: number; note?: string | null }[]) => call<KnCoopMachines>("PUT", `/v1/kn/machine-counts/${ref}`, { lines }),
+    putMachines: (ref: string, lines: { machine_type: string; quantity: number; note?: string | null }[], idem?: string) =>
+      call<KnCoopMachines>("PUT", `/v1/kn/machine-counts/${ref}`, { lines }, undefined, idem),
     plots: (q: { commune?: string; cooperative_ref?: string } = {}) => call<{ items: KnPlot[]; next_cursor: string | null }>("GET", "/v1/kn/plots", undefined, q),
     materials: (commune?: string) => call<{ items: MaterialRecord[]; next_cursor: string | null }>("GET", "/v1/kn/materials", undefined, { commune }),
-    recordMaterials: (b: { commune_code: string; recorded_on: string; lines: { material_code: string; quantity: string; note?: string }[] }) => call<{ items: MaterialRecord[] }>("POST", "/v1/kn/materials", b),
+    recordMaterials: (b: { commune_code: string; recorded_on: string; lines: { material_code: string; quantity: string; note?: string }[] }, idem?: string) =>
+      call<{ items: MaterialRecord[] }>("POST", "/v1/kn/materials", b, undefined, idem),
     materialSummary: (commune?: string) =>
       call<{ items: { commune_code: string; material_code: string; material_name: string; unit: string; quantity: string; records: number }[] }>("GET", "/v1/kn/materials/summary", undefined, { commune }),
   };

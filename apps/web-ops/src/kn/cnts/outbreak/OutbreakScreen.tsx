@@ -5,15 +5,21 @@
 //   thành ổ dịch hoặc bác bỏ.
 // - Cấp Tỉnh: theo dõi ổ dịch toàn phạm vi (lọc trạng thái/bệnh/ngày, thống kê), xem diễn biến, xác nhận kết thúc / mở lại.
 // Tọa độ lưu sẵn cho lớp bản đồ (GET /v1/extension/cnts/outbreak-points) — bản đồ vùng dịch là W11.52 (GĐ2).
+// BF-SWEEP-CNTS (#101): ô số dùng NumberField (quy mô đàn nguyên > 0, số con nguyên ≥ 0, kg/lít ≥ 0), bảng có STT, lý do
+// kết thúc / mở lại / bác bỏ nhập trong pop-up ngắn. Biểu "Bản đồ vùng dịch" (CN-15: Tên vùng, Loại, Xã/phường bắt buộc,
+// diện tích > 0) chưa có trên web — TODO(#111). Biểu nhập BM-10 vẫn mở ngay trên trang này — đổi sang trang riêng ở #111.
 import { useMemo, useState } from "react";
 import { unwrap } from "@/api/client";
 import { ApiProblem } from "@/api/problem";
 import type { CatalogItem } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
-import { PageHeader, StatusPill } from "@/components/patterns/list";
+import { NumberField, SelectField, TextField, parseNumberInput, type NumberRule } from "@/components/form";
+import { DataTable, PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
+import { ReasonDialog } from "../ReasonDialog";
 import {
   EVENT_LABEL,
+  OUTBREAK_RULES,
   SOURCE_LABEL,
   STATUS_LABEL,
   STATUS_TONE,
@@ -30,6 +36,9 @@ import {
   type OutbreakStatus,
   type Suspect,
 } from "./api";
+
+/** Số con của tin báo: số nguyên ≥ 0, không bắt buộc. */
+const SUSPECT_COUNT: NumberRule = { integer: true, max: 999_999_999 };
 
 type Mode = { kind: "new" } | { kind: "progress"; o: Outbreak } | { kind: "confirm"; s: Suspect };
 
@@ -167,50 +176,39 @@ export function OutbreakScreen() {
               {d.by_disease.length ? (
                 <p className="mute small">Theo bệnh: {d.by_disease.map((c) => `${c.label} ${c.count}`).join(" · ")}</p>
               ) : null}
-              <table className="dt" aria-label="Danh sách ổ dịch">
-                <thead>
-                  <tr>
-                    <th>Bệnh</th>
-                    <th>Vật nuôi</th>
-                    <th>Xã</th>
-                    <th>Tiếp nhận</th>
-                    <th>Diễn biến đến</th>
-                    <th>Chết / quy mô</th>
-                    <th>Trạng thái</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {d.items.map((o) => (
-                    <tr key={o.ref}>
-                      <td>{o.disease_name}</td>
-                      <td>{o.species_name}</td>
-                      <td>{communeName(o.commune_code)}</td>
-                      <td>{dt(o.received_at)}</td>
-                      <td>{ymd(o.as_of)}</td>
-                      <td>
-                        {o.dead} / {o.herd_size}
-                      </td>
-                      <td>
+              <DataTable
+                caption="Danh sách ổ dịch"
+                rows={d.items}
+                rowKey={(o) => o.ref}
+                empty="Không có ổ dịch."
+                columns={[
+                  { key: "disease", header: "Bệnh", cell: (o) => o.disease_name },
+                  { key: "species", header: "Vật nuôi", cell: (o) => o.species_name },
+                  { key: "commune", header: "Xã", cell: (o) => communeName(o.commune_code) },
+                  { key: "recv", header: "Tiếp nhận", cell: (o) => dt(o.received_at) },
+                  { key: "asof", header: "Diễn biến đến", cell: (o) => ymd(o.as_of) },
+                  { key: "dead", header: "Chết / quy mô", cell: (o) => `${o.dead} / ${o.herd_size}` },
+                  {
+                    key: "st",
+                    header: "Trạng thái",
+                    cell: (o) => (
+                      <>
                         <StatusPill tone={STATUS_TONE[o.status]}>{STATUS_LABEL[o.status]}</StatusPill>
                         <span className="mute"> · v{o.version}</span>
-                      </td>
-                      <td>
-                        <button className="btn btn-sm" onClick={() => setOpen(o.ref)}>
-                          Xem
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {d.items.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="mute">
-                        Không có ổ dịch.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
+                      </>
+                    ),
+                  },
+                  {
+                    key: "act",
+                    header: "",
+                    cell: (o) => (
+                      <button className="btn btn-sm" onClick={() => setOpen(o.ref)}>
+                        Xem
+                      </button>
+                    ),
+                  },
+                ]}
+              />
             </>
           )}
         </LoadState>
@@ -272,21 +270,17 @@ function OutbreakDetailView({
 }) {
   const detail = useLoad(() => oapi.get(oref), [oapi, oref]);
   const act = useAction();
-  const [reason, setReason] = useState("");
+  const [asking, setAsking] = useState(false);
   return (
     <section className="card sec" aria-label="Chi tiết ổ dịch">
       <LoadState s={detail}>
         {(d) => {
           const o = d.current;
-          const setStatus = async (kind: "close" | "reopen") => {
-            if (!reason.trim()) {
-              act.setNote(null);
-              return;
-            }
+          const setStatus = async (kind: "close" | "reopen", reason: string) => {
             const r = await act.run(() => (kind === "close" ? oapi.close(o.ref, o.version, reason) : oapi.reopen(o.ref, o.version, reason)),
               kind === "close" ? "Đã xác nhận kết thúc ổ dịch." : "Đã mở lại ổ dịch.");
             if (r) {
-              setReason("");
+              setAsking(false);
               detail.reload();
               onChanged();
             }
@@ -331,34 +325,20 @@ function OutbreakDetailView({
                 <dd>{o.prevention_note ?? "—"}</dd>
               </dl>
               <h3>Diễn biến ({d.versions.length} phiên bản)</h3>
-              <table className="dt" aria-label="Diễn biến">
-                <thead>
-                  <tr>
-                    <th>Phiên bản</th>
-                    <th>Sự việc</th>
-                    <th>Ngày</th>
-                    <th>Chết</th>
-                    <th>Tiêu hủy</th>
-                    <th>Ghi chú</th>
-                    <th>Người, lúc</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {d.versions.map((v) => (
-                    <tr key={v.version_id}>
-                      <td>v{v.version}</td>
-                      <td>{EVENT_LABEL[v.event]}</td>
-                      <td>{ymd(v.as_of)}</td>
-                      <td>{v.dead}</td>
-                      <td>{v.culled_head ?? "—"}</td>
-                      <td>{v.status_reason ?? v.progress_note ?? "—"}</td>
-                      <td>
-                        {v.actor.display ?? v.actor.ref.slice(0, 8)} · {dt(v.recorded_at)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                caption="Diễn biến"
+                rows={d.versions}
+                rowKey={(v) => v.version_id}
+                columns={[
+                  { key: "ver", header: "Phiên bản", cell: (v) => `v${v.version}` },
+                  { key: "ev", header: "Sự việc", cell: (v) => EVENT_LABEL[v.event] },
+                  { key: "asof", header: "Ngày", cell: (v) => ymd(v.as_of) },
+                  { key: "dead", header: "Chết", cell: (v) => v.dead },
+                  { key: "culled", header: "Tiêu hủy", cell: (v) => v.culled_head ?? "—" },
+                  { key: "note", header: "Ghi chú", cell: (v) => v.status_reason ?? v.progress_note ?? "—" },
+                  { key: "who", header: "Người, lúc", cell: (v) => `${v.actor.display ?? v.actor.ref.slice(0, 8)} · ${dt(v.recorded_at)}` },
+                ]}
+              />
               <div className="row">
                 {canUpdate && o.status !== "closed" ? (
                   <button className="btn btn-primary" onClick={() => onUpdate(o)}>
@@ -366,25 +346,21 @@ function OutbreakDetailView({
                   </button>
                 ) : null}
                 {canClose ? (
-                  <>
-                    <input
-                      className="input"
-                      aria-label="Lý do"
-                      placeholder={o.status === "closed" ? "Lý do mở lại" : "Lý do kết thúc (vd hết 21 ngày không phát sinh)"}
-                      maxLength={1000}
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                    />
-                    {o.status === "closed" ? (
-                      <button className="btn" disabled={act.busy || !reason.trim()} onClick={() => setStatus("reopen")}>
-                        Mở lại
-                      </button>
-                    ) : (
-                      <button className="btn btn-primary" disabled={act.busy || !reason.trim()} onClick={() => setStatus("close")}>
-                        Xác nhận kết thúc
-                      </button>
-                    )}
-                  </>
+                  <button className={o.status === "closed" ? "btn" : "btn btn-primary"} disabled={act.busy} onClick={() => setAsking(true)}>
+                    {o.status === "closed" ? "Mở lại" : "Xác nhận kết thúc"}
+                  </button>
+                ) : null}
+                {asking ? (
+                  <ReasonDialog
+                    title={o.status === "closed" ? "Mở lại ổ dịch" : "Xác nhận kết thúc ổ dịch"}
+                    label={o.status === "closed" ? "Lý do mở lại" : "Lý do kết thúc (vd hết 21 ngày không phát sinh)"}
+                    confirmLabel={o.status === "closed" ? "Mở lại" : "Xác nhận kết thúc"}
+                    min={1}
+                    max={1000}
+                    busy={act.busy}
+                    onClose={() => setAsking(false)}
+                    onConfirm={(r) => void setStatus(o.status === "closed" ? "reopen" : "close", r)}
+                  />
                 ) : null}
                 <button className="btn" onClick={onClose}>
                   Đóng
@@ -418,87 +394,73 @@ function SuspectTable({
   onChanged: () => void;
 }) {
   const act = useAction();
-  const [dismissing, setDismissing] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
+  const [dismissing, setDismissing] = useState<Suspect | null>(null);
   return (
     <>
       {act.view}
-      <table className="dt" aria-label="Danh sách tin báo nghi dịch">
-        <thead>
-          <tr>
-            <th>Phát hiện</th>
-            <th>Xã, địa bàn</th>
-            <th>Vật nuôi</th>
-            <th>Mô tả</th>
-            <th>Vị trí</th>
-            <th>Trạng thái</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((s) => (
-            <tr key={s.ref}>
-              <td>
-                {dt(s.observed_at)} · {SOURCE_LABEL[s.reporter_kind]}
-              </td>
-              <td>
-                {communeName(s.commune_code)}
-                {s.locality ? ` · ${s.locality}` : ""}
-              </td>
-              <td>{s.species_code ? speciesName(s.species_code) : "—"}</td>
-              <td>{s.description}</td>
-              <td>{s.location ? "Có" : "Chưa có"}</td>
-              <td>
+      <DataTable
+        caption="Danh sách tin báo nghi dịch"
+        rows={items}
+        rowKey={(s) => s.ref}
+        empty="Không có tin báo."
+        columns={[
+          { key: "at", header: "Phát hiện", cell: (s) => `${dt(s.observed_at)} · ${SOURCE_LABEL[s.reporter_kind]}` },
+          { key: "where", header: "Xã, địa bàn", cell: (s) => `${communeName(s.commune_code)}${s.locality ? ` · ${s.locality}` : ""}` },
+          { key: "species", header: "Vật nuôi", cell: (s) => (s.species_code ? speciesName(s.species_code) : "—") },
+          { key: "desc", header: "Mô tả", cell: (s) => s.description },
+          { key: "loc", header: "Vị trí", cell: (s) => (s.location ? "Có" : "Chưa có") },
+          {
+            key: "st",
+            header: "Trạng thái",
+            cell: (s) => (
+              <>
                 {SUSPECT_LABEL[s.status]}
                 {s.status_reason ? <span className="mute"> · {s.status_reason}</span> : null}
-              </td>
-              <td>
+              </>
+            ),
+          },
+          {
+            key: "act",
+            header: "",
+            cell: (s) => (
+              <>
                 {s.status === "confirmed" && s.outbreak_ref ? (
                   <button className="btn btn-sm" onClick={() => onOpenOutbreak(s.outbreak_ref!)}>
                     Xem ổ dịch
                   </button>
                 ) : null}
                 {canAct && s.status === "reported" ? (
-                  dismissing === s.ref ? (
-                    <span className="row">
-                      <input className="input" aria-label="Lý do bác bỏ" maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} />
-                      <button
-                        className="btn btn-sm"
-                        disabled={act.busy || !reason.trim()}
-                        onClick={async () => {
-                          if (await act.run(() => oapi.dismiss(s.ref, s.version, reason), "Đã bác bỏ tin báo.")) {
-                            setDismissing(null);
-                            setReason("");
-                            onChanged();
-                          }
-                        }}
-                      >
-                        Bác bỏ
-                      </button>
-                    </span>
-                  ) : (
-                    <span className="row">
-                      <button className="btn btn-sm btn-primary" onClick={() => onConfirm(s)}>
-                        Xác nhận → lập BM-10
-                      </button>
-                      <button className="btn btn-sm" onClick={() => setDismissing(s.ref)}>
-                        Bác bỏ…
-                      </button>
-                    </span>
-                  )
+                  <span className="row">
+                    <button className="btn btn-sm btn-primary" onClick={() => onConfirm(s)}>
+                      Xác nhận → lập BM-10
+                    </button>
+                    <button className="btn btn-sm" onClick={() => setDismissing(s)}>
+                      Bác bỏ…
+                    </button>
+                  </span>
                 ) : null}
-              </td>
-            </tr>
-          ))}
-          {items.length === 0 ? (
-            <tr>
-              <td colSpan={7} className="mute">
-                Không có tin báo.
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+              </>
+            ),
+          },
+        ]}
+      />
+      {dismissing ? (
+        <ReasonDialog
+          title="Bác bỏ tin báo nghi dịch"
+          label="Lý do bác bỏ"
+          confirmLabel="Bác bỏ"
+          min={1}
+          max={1000}
+          busy={act.busy}
+          onClose={() => setDismissing(null)}
+          onConfirm={async (reason) => {
+            if (await act.run(() => oapi.dismiss(dismissing.ref, dismissing.version, reason), "Đã bác bỏ tin báo.")) {
+              setDismissing(null);
+              onChanged();
+            }
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -568,12 +530,14 @@ function OutbreakEditor({
     setErrs(fe);
     if (Object.keys(fe).length) return;
     try {
-      const o =
+      // P0-WEB-IDEMKEY: trong phiên thao tác của act — gửi lại sau lỗi mạng dùng lại khóa cũ.
+      const o = await act.idem(() =>
         mode.kind === "new"
-          ? await oapi.report(payload(f))
+          ? oapi.report(payload(f))
           : mode.kind === "progress"
-            ? await oapi.progress(mode.o.ref, payload(f, mode.o.version))
-            : await oapi.confirm(mode.s.ref, payload(f, mode.s.version));
+            ? oapi.progress(mode.o.ref, payload(f, mode.o.version))
+            : oapi.confirm(mode.s.ref, payload(f, mode.s.version)),
+      );
       onDone(o.ref);
     } catch (e) {
       if (e instanceof ApiProblem && (e.problem.code === "extension.cnts_outbreak_version_conflict" || e.problem.code === "extension.cnts_suspect_version_conflict")) {
@@ -585,27 +549,38 @@ function OutbreakEditor({
     }
   };
 
-  const field = (key: keyof OutbreakForm, label: string, opts: { req?: boolean; type?: string; area?: boolean; ph?: string; err?: string } = {}) => (
-    <label className="field">
-      <span>
-        {label}
-        {opts.req ? <span className="req"> *</span> : null}
-      </span>
-      {opts.area ? (
-        <textarea className="input" aria-label={label} maxLength={2000} value={f[key]} onChange={(e) => up({ [key]: e.target.value } as Partial<OutbreakForm>)} />
-      ) : (
-        <input
-          className="input"
-          aria-label={label}
-          type={opts.type ?? "text"}
-          placeholder={opts.ph}
+  const field = (key: keyof OutbreakForm, label: string, opts: { req?: boolean; type?: string; area?: boolean; ph?: string; err?: string } = {}) => {
+    const error = errs[opts.err ?? key];
+    const onChange = (v: string) => up({ [key]: v } as Partial<OutbreakForm>);
+    if (key in OUTBREAK_RULES) {
+      const rule = OUTBREAK_RULES[key as keyof typeof OUTBREAK_RULES] as NumberRule;
+      return (
+        <NumberField
+          label={label}
+          rule={rule}
           value={f[key]}
-          onChange={(e) => up({ [key]: e.target.value } as Partial<OutbreakForm>)}
+          onChange={onChange}
+          error={error}
+          onBlurError={(m) => setErrs((x) => ({ ...x, [key]: m ?? "" }))}
         />
-      )}
-      {errs[opts.err ?? key] ? <span className="err">{errs[opts.err ?? key]}</span> : null}
-    </label>
-  );
+      );
+    }
+    if (!opts.type) return <TextField label={label} required={opts.req} multiline={opts.area} maxLength={opts.area ? 2000 : undefined} placeholder={opts.ph} value={f[key]} onChange={onChange} error={error} />;
+    return (
+      <label className="field">
+        <span>
+          {label}
+          {opts.req ? <span className="req"> *</span> : null}
+        </span>
+        <input className="input" aria-label={label} type={opts.type} value={f[key]} onChange={(e) => onChange(e.target.value)} />
+        {error ? (
+          <span className="err" role="alert">
+            {error}
+          </span>
+        ) : null}
+      </label>
+    );
+  };
 
   return (
     <section className="card sec" aria-label="Nhập báo cáo dịch bệnh">
@@ -698,9 +673,9 @@ function OutbreakEditor({
         </label>
       </fieldset>
       <div className="ws-two">
-        {field("herd_size", "DB-06 Quy mô đàn (con)", { req: true })}
+        {field("herd_size", "DB-06 Quy mô đàn (con)")}
         {field("herd_age_days", "Ngày tuổi")}
-        {field("dead", "DB-07 Số con chết (lũy kế)", { req: true })}
+        {field("dead", "DB-07 Số con chết (lũy kế)")}
         {field("symptoms", "DB-08 Triệu chứng", { req: true, area: true })}
         {field("sample_date", "DB-09 Ngày lấy mẫu", { type: "date" })}
         {field("lab_name", "Nơi xét nghiệm")}
@@ -758,12 +733,19 @@ function SuspectEditor({
   const gps = useGps((lat, lon, accuracy_m) => up({ lat, lon, accuracy_m }));
   const submit = async () => {
     const e: Record<string, string> = {};
-    if (!s.commune_code) e.commune_code = "Chọn xã";
-    if (!s.locality.trim()) e.locality = "Ghi địa bàn";
-    if (!s.description.trim()) e.description = "Bắt buộc";
+    if (!s.commune_code) e.commune_code = "Bắt buộc nhập.";
+    if (!s.locality.trim()) e.locality = "Bắt buộc nhập.";
+    if (!s.description.trim()) e.description = "Bắt buộc nhập.";
+    for (const k of ["affected", "dead"] as const) {
+      const p = parseNumberInput(s[k], SUSPECT_COUNT);
+      if (!p.ok) e[k] = p.error;
+    }
     setErrs(e);
     if (Object.keys(e).length) return;
-    const n = (v: string) => (v.trim() === "" ? null : Number(v));
+    const n = (v: string) => {
+      const p = parseNumberInput(v, SUSPECT_COUNT);
+      return p.ok && p.value !== "" ? Number(p.value) : null;
+    };
     const r = await act.run(() =>
       oapi.reportSuspect({
         commune_code: s.commune_code, reporter_kind: s.reporter_kind, observed_at: new Date(s.observed_at).toISOString(), species_code: s.species_code || undefined,
@@ -779,18 +761,7 @@ function SuspectEditor({
       <h2>Ghi nhận tin báo nghi dịch</h2>
       {act.view}
       <div className="ws-two">
-        <label className="field">
-          <span>Xã *</span>
-          <select className="select" aria-label="Xã tin báo" value={s.commune_code} onChange={(e) => up({ commune_code: e.target.value })}>
-            <option value="">—</option>
-            {communes.map((c) => (
-              <option key={c} value={c}>
-                {communeName(c)}
-              </option>
-            ))}
-          </select>
-          {errs.commune_code ? <span className="err">{errs.commune_code}</span> : null}
-        </label>
+        <SelectField label="Xã tin báo" required value={s.commune_code} onChange={(v) => up({ commune_code: v })} error={errs.commune_code} placeholder="—" options={communes.map((c) => ({ value: c, label: communeName(c) }))} />
         <label className="field">
           <span>Người báo</span>
           <select className="select" aria-label="Người báo" value={s.reporter_kind} onChange={(e) => up({ reporter_kind: e.target.value as Suspect["reporter_kind"] })}>
@@ -816,24 +787,11 @@ function SuspectEditor({
             ))}
           </select>
         </label>
-        <label className="field">
-          <span>Địa bàn (ấp, khu vực) *</span>
-          <input className="input" aria-label="Địa bàn tin báo" placeholder="Không ghi họ tên, số điện thoại" value={s.locality} onChange={(e) => up({ locality: e.target.value })} />
-          {errs.locality ? <span className="err">{errs.locality}</span> : null}
-        </label>
-        <label className="field">
-          <span>Số con có biểu hiện / chết</span>
-          <span className="row">
-            <input className="input" aria-label="Số con có biểu hiện" value={s.affected} onChange={(e) => up({ affected: e.target.value })} />
-            <input className="input" aria-label="Số con chết tin báo" value={s.dead} onChange={(e) => up({ dead: e.target.value })} />
-          </span>
-        </label>
+        <TextField label="Địa bàn tin báo (ấp, khu vực)" required placeholder="Không ghi họ tên, số điện thoại" value={s.locality} onChange={(v) => up({ locality: v })} error={errs.locality} maxLength={300} />
+        <NumberField label="Số con có biểu hiện" rule={SUSPECT_COUNT} value={s.affected} onChange={(v) => up({ affected: v })} error={errs.affected} />
+        <NumberField label="Số con chết tin báo" rule={SUSPECT_COUNT} value={s.dead} onChange={(v) => up({ dead: v })} error={errs.dead} />
       </div>
-      <label className="field">
-        <span>Mô tả *</span>
-        <textarea className="input" aria-label="Mô tả tin báo" maxLength={2000} value={s.description} onChange={(e) => up({ description: e.target.value })} />
-        {errs.description ? <span className="err">{errs.description}</span> : null}
-      </label>
+      <TextField label="Mô tả tin báo" required multiline maxLength={2000} value={s.description} onChange={(v) => up({ description: v })} error={errs.description} />
       <div className="row">
         <input className="input" aria-label="Vĩ độ tin báo" placeholder="Vĩ độ" value={s.lat} onChange={(e) => up({ lat: e.target.value })} />
         <input className="input" aria-label="Kinh độ tin báo" placeholder="Kinh độ" value={s.lon} onChange={(e) => up({ lon: e.target.value })} />

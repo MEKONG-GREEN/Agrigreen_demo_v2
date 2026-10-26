@@ -179,3 +179,8 @@ function handle(ctx: Ctx): Response {
     d.draft_id = uuidv7();
     return json((load(ctx, s)).detail, 201);
 }
+/** W10.17: bản xuất Excel đã lưu cùng bản soạn hiện tại — nguồn của Word giả lập (kn-khtc-words). */
+export function khtcReportExport(periodId: string, exportId: string) {
+    const value = STORE.get(periodId), x = value?.exports.find(e => e.meta.id === exportId);
+    return value && x ? { detail: value.detail, meta: x.meta } : undefined;
+}

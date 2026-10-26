@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-CONTEXT-A: tích hợp d96f24b1; frozen268/PG1072giao dịch+W24FD/HTX14, static và helper11migration440.508s/context119.685s đạt, main giữ.

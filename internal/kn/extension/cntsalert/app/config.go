@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -217,6 +219,10 @@ const (
 	remindAhead = 8 * 24 * time.Hour
 )
 
+// isCampaignKey: khóa kỳ native của đợt điều tra ("DT-<yyyymmdd>-<6 hex>", W11.50) — đợt có nhắc riêng, không vào chuỗi
+// trễ liên tiếp của biểu định kỳ.
+func isCampaignKey(key string) bool { return strings.HasPrefix(key, "DT-") }
+
 func accepting(status string) bool { return status == "open" || status == "reopened" }
 
 // Remind gửi nhắc nộp đến hạn và sinh cảnh báo trễ liên tiếp cho tenant tại now. Idempotent (cnts_reminder_sent, khóa
@@ -231,7 +237,9 @@ func (s *Service) Remind(ctx context.Context, tid uuid.UUID, now time.Time) (int
 	}
 	loc := clock.Zone()
 	sent, streaks := 0, 0
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: tỉnh của xã, cán bộ nhận nhắc đọc ngoài giao dịch (service.go tx)
 	err = s.tx(ctx, tid, func(tx pgx.Tx) error {
+		sent, streaks = 0, 0 // thân giao dịch có thể chạy lại (txdeps)
 		cs, err := s.configs(ctx, tx)
 		if err != nil {
 			return err
@@ -248,7 +256,7 @@ func (s *Service) Remind(ctx context.Context, tid uuid.UUID, now time.Time) (int
 		}
 		// 1. Nhắc nộp.
 		for _, p := range ps {
-			if !accepting(p.Status) || !domain.IsForm(p.TemplateCode) {
+			if !accepting(p.Status) || !domain.IsForm(p.TemplateCode) || isCampaignKey(p.PeriodKey) {
 				continue
 			}
 			cfg, _ := reminderOf(cs, p.TemplateCode)
@@ -331,7 +339,7 @@ func (s *Service) lateStreaks(ctx context.Context, tx pgx.Tx, tid uuid.UUID, ps 
 	now time.Time) (int, error) {
 	series := map[string][]unitPeriod{} // biểu|đơn vị → kỳ đã quá hạn
 	for _, p := range ps {
-		if !domain.IsForm(p.TemplateCode) || now.Before(p.DueAt) {
+		if !domain.IsForm(p.TemplateCode) || now.Before(p.DueAt) || isCampaignKey(p.PeriodKey) {
 			continue
 		}
 		for _, u := range p.Units {

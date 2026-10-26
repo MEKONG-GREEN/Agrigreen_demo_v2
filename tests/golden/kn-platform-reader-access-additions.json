@@ -1,0 +1,15 @@
+{
+  "Roles": [],
+  "Access": [
+    {
+      "Reader": "r_extension",
+      "View": "pf_masterdata_pub.v1_admin_units"
+    }
+  ],
+  "Memberships": [
+    {
+      "Reader": "r_extension",
+      "Granted": "r_masterdata_pub"
+    }
+  ]
+}

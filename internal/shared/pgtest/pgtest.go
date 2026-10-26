@@ -214,6 +214,26 @@ func (e *Env) Pool(t testing.TB, c migrations.Cluster, role string) *pgxpool.Poo
 	return p
 }
 
+// SizedPool mở pool RIÊNG (không dùng chung, đóng khi test xong) của một vai với cỡ maxConns — cho kiểm thử cạn
+// pool (P0-POOL-SHARED: thao tác không giữ kết nối khi gọi dịch vụ ngoài). Như Pool: vai ứng dụng qua PgBouncer nếu có.
+func (e *Env) SizedPool(t testing.TB, c migrations.Cluster, role string, maxConns int32) *pgxpool.Pool {
+	t.Helper()
+	base, bouncer := e.PoolURL, true
+	if role == dbadmin.Migrator {
+		base, bouncer = e.DirectURL, false
+	}
+	dsn, err := dbadmin.RoleURL(base, c, e.Suffix, role)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := db.Open(context.Background(), dsn, db.Options{ViaPgBouncer: bouncer, MaxConns: maxConns, AppName: "pgtest-sized"})
+	if err != nil {
+		t.Fatalf("pgtest: mở pool %s/%s cỡ %d: %v", c, role, maxConns, err)
+	}
+	t.Cleanup(p.Close)
+	return p
+}
+
 // DirectPool mở pool của một vai nối THẲNG PostgreSQL, không qua PgBouncer —
 // cho mã cần tính năng mức phiên (khóa tư vấn của leader, LISTEN), vốn không
 // dùng được qua PgBouncer transaction mode.

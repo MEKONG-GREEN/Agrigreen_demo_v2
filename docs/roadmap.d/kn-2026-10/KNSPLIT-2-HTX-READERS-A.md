@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-HTX-READERS-A: bộ đọc KN qua view; dev945ec7b1, helper19007 đủ11migration/ACL58-23 và HTX8/platform4 PG đạt.

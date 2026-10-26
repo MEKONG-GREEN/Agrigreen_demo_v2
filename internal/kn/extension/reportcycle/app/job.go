@@ -77,7 +77,9 @@ func (s *Service) JobTenant(ctx context.Context, tid uuid.UUID, now time.Time) (
 	}
 	for _, p := range due {
 		var cons consolidateOut
-		err := s.tx(ctx, tid, func(tx pgx.Tx) error {
+		dp := s.newDeps(tid)
+		err := s.txDeps(ctx, tid, dp, func(tx pgx.Tx) error {
+			cons = consolidateOut{}
 			lp, err := store.PeriodByID(ctx, tx, p.ID, true)
 			if err != nil || lp == nil || lp.Status != "open" {
 				return err
@@ -86,7 +88,10 @@ func (s *Service) JobTenant(ctx context.Context, tid uuid.UUID, now time.Time) (
 			if err != nil {
 				return err
 			}
-			cons, err = s.closeTx(ctx, tx, tid, *lp, *b, port.SystemActor, nil, "auto", "auto-close:"+lp.ID.String(), now)
+			if err := s.wantPeriod(ctx, tx, dp, *lp, *b, nil); err != nil {
+				return err
+			}
+			cons, err = s.closeTx(ctx, tx, dp, tid, *lp, *b, port.SystemActor, nil, "auto", "auto-close:"+lp.ID.String(), now)
 			return err
 		})
 		if err != nil {
@@ -113,7 +118,9 @@ func (s *Service) JobTenant(ctx context.Context, tid uuid.UUID, now time.Time) (
 	}
 	for _, pid := range order {
 		var cons consolidateOut
-		err := s.tx(ctx, tid, func(tx pgx.Tx) error {
+		dp := s.newDeps(tid)
+		err := s.txDeps(ctx, tid, dp, func(tx pgx.Tx) error {
+			cons = consolidateOut{}
 			p, err := store.PeriodByID(ctx, tx, pid, true)
 			if err != nil || p == nil {
 				return err
@@ -122,11 +129,14 @@ func (s *Service) JobTenant(ctx context.Context, tid uuid.UUID, now time.Time) (
 			if err != nil {
 				return err
 			}
+			if err := s.wantPeriod(ctx, tx, dp, *p, *b, nil); err != nil {
+				return err // P0-POOL-KN: hủy trước khi ghi; nạp ngoài giao dịch rồi chạy lại
+			}
 			tasks, err := store.TasksOfPeriod(ctx, tx, pid, nil, true)
 			if err != nil {
 				return err
 			}
-			cons, err = s.reclose(ctx, tx, tid, *p, *b, tasks, byPeriod[pid], port.SystemActor, nil, "auto-reclose:"+pid.String()+":"+ts(now), now)
+			cons, err = s.reclose(ctx, tx, dp, tid, *p, *b, tasks, byPeriod[pid], port.SystemActor, nil, "auto-reclose:"+pid.String()+":"+ts(now), now)
 			return err
 		})
 		if err != nil {

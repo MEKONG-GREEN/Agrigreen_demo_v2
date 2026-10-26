@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -98,7 +99,18 @@ const (
 	deptBVTV = "bao_ve_thuc_vat"    // Đang áp dụng — cho kiểm "hai Cán bộ xã khác phòng ban cùng xã"
 )
 
-func newKNFixture(t *testing.T) *knFix {
+func newKNFixture(t *testing.T, registries ...*authz.SessionRegistry) *knFix {
+	return newKNFixtureWithCatalog(t, nil, registries...)
+}
+
+func newKNFixtureWithCatalog(t *testing.T, catalog *port.AttributeCatalog, registries ...*authz.SessionRegistry) *knFix {
+	sessions := fixtureSessionRegistry(t)
+	if len(registries) > 1 {
+		t.Fatal("one registry override expected")
+	}
+	if len(registries) == 1 {
+		sessions = registries[0]
+	}
 	base := newFixture(t)
 	f := &knFix{fixture: base, depts: &fakeDepartments{unit: map[uuid.UUID]uuid.UUID{}, depts: map[uuid.UUID][]partyport.Department{}}}
 	f.depts.unit[f.p91], f.depts.unit[f.team30292], f.depts.unit[f.national] = f.p91, f.p91, f.national
@@ -111,7 +123,7 @@ func newKNFixture(t *testing.T) *knFix {
 	f.depts.depts[f.national] = []partyport.Department{mk(f.national, deptTT, "Phòng Trồng trọt", partyport.DeptActive)}
 
 	ops := f.env.Pool(t, migrations.PF, "platform_api")
-	f.kmod = accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Departments: f.depts})
+	f.kmod = accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Departments: f.depts, Sessions: sessions, SessionPolicies: fixtureSessionPolicies(), Attributes: catalog})
 	log := telemetry.NewLogger("test", io.Discard)
 	app := httpx.NewEngine(log, 1<<20)
 	ag := app.Group("/v1", httpx.Authenticate(f.iss.Verifier()), f.kmod.Middleware(), idempotency.Middleware(ops))
@@ -332,6 +344,9 @@ func TestFN_CH_00_01_ContextHeaderSpoofingRejected(t *testing.T) {
 		t.Fatalf("ngữ cảnh hợp lệ: %d %v", r.status, r.body)
 	}
 	p := f.lastProbe()
+	if p.SelectedSession == nil || p.SelectedSession.Profile() != "fixture" || p.SelectedSession.ID().String() != anCtx {
+		t.Fatal("selected server context was not bound")
+	}
 	if p.ActorRef != an.actor || p.KN == nil || p.KN.Role != port.KNXa || p.Has("kn_officer") || !p.Has(port.RoleKNUser) {
 		t.Fatalf("Principal: %+v", p)
 	}
@@ -783,5 +798,116 @@ func TestIdempotencyContextBinding_W1146(t *testing.T) {
 	}
 	if len(f.probe) != 1 {
 		t.Fatalf("đã chạy handler ngoài lần đầu: %d", len(f.probe))
+	}
+}
+
+func fixtureSessionRegistry(t *testing.T) *authz.SessionRegistry {
+	t.Helper()
+	r, err := authz.NewSessionRegistry(authz.SessionRegistration{Profile: "fixture", Project: func(_ context.Context, p authz.Principal) (authz.Session, bool, error) {
+		if p.KN == nil {
+			return authz.Session{}, false, nil
+		}
+		scope := authz.SessionScope{NodeID: p.KN.OrgRef, Department: p.KN.Department, UnitCodes: p.KN.Communes, RequiresNode: p.KN.Role == authz.KNXa}
+		if p.KN.Support != nil {
+			scope.OnBehalfOfRef = p.KN.Support.OnBehalfOf
+		}
+		binding, err := authz.NewSession("fixture", p.KN.ID, scope)
+		if err != nil {
+			return binding, true, err
+		}
+		data := fixturePolicyPayload{UnitRef: p.KN.UnitRef}
+		if p.KN.Support != nil {
+			data.Audit = &port.SupportAuditContext{ContextID: p.KN.ID, SessionID: p.KN.Support.SessionID, OnBehalfOf: p.KN.Support.OnBehalfOf,
+				Audience: p.KN.Role, Department: p.KN.Department, Reason: p.KN.Support.Reason}
+		}
+		raw, err := json.Marshal(data)
+		return binding.WithPayload(raw), true, err
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func TestSelectedMiddlewareRequiresRegisteredProjection(t *testing.T) {
+	provider := func(profile string) authz.SessionProjector {
+		return func(_ context.Context, p authz.Principal) (authz.Session, bool, error) {
+			s, err := authz.NewSession(profile, p.KN.ID, authz.SessionScope{})
+			return s, true, err
+		}
+	}
+	cases := []struct {
+		name        string
+		entries     []authz.SessionRegistration
+		nilRegistry bool
+	}{
+		{name: "nil", nilRegistry: true},
+		{name: "empty"},
+		{name: "provider error", entries: []authz.SessionRegistration{{Profile: "fixture", Project: func(context.Context, authz.Principal) (authz.Session, bool, error) {
+			return authz.Session{}, true, errors.New("synthetic projection failure")
+		}}}},
+		{name: "mismatch", entries: []authz.SessionRegistration{{Profile: "fixture", Project: provider("other")}}},
+		{name: "ambiguous", entries: []authz.SessionRegistration{{Profile: "one", Project: provider("one")}, {Profile: "two", Project: provider("two")}}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var registry *authz.SessionRegistry
+			if !c.nilRegistry {
+				var err error
+				registry, err = authz.NewSessionRegistry(c.entries...)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			f := newKNFixture(t, registry)
+			_, actor, created := f.createKN("Cán bộ thử registry", asg(port.KNXa, f.p91, []string{deptTT}, "30292"))
+			selected := f.ctxID(actor, asgIDs(created)[port.KNXa], deptTT)
+			denied := f.withCtx(actor, http.MethodGet, "/v1/probe", selected, nil)
+			wantCode(t, denied, http.StatusForbidden, "accounts.context_invalid", "unregistered projection must not use token permissions")
+			if len(f.probe) != 0 {
+				t.Fatal("rejected selected request reached handler")
+			}
+			if normal := f.req(f.app, actor, http.MethodGet, "/v1/probe", nil, nil); normal.status != http.StatusOK || f.lastProbe().SelectedSession != nil {
+				t.Fatal("unselected native request changed")
+			}
+		})
+	}
+}
+
+// The kernel fixture owns this generic payload; it does not import KN code.
+type fixturePolicyPayload struct {
+	UnitRef uuid.UUID
+	Audit   *port.SupportAuditContext
+}
+
+func fixtureSessionPolicies() port.SessionPolicies {
+	read := func(ctx context.Context) (fixturePolicyPayload, error) {
+		p, ok := authz.FromContext(ctx)
+		if !ok || p.SelectedSession == nil || !p.SelectedSession.Valid() || p.SelectedSession.Profile() != "fixture" {
+			return fixturePolicyPayload{}, errors.New("missing fixture session")
+		}
+		var data fixturePolicyPayload
+		err := json.Unmarshal(p.SelectedSession.Payload(), &data)
+		return data, err
+	}
+	return port.SessionPolicies{
+		SupportAudit: func(ctx context.Context) (port.SupportAuditContext, error) {
+			data, err := read(ctx)
+			if err != nil {
+				return port.SupportAuditContext{}, err
+			}
+			if data.Audit == nil {
+				return port.SupportAuditContext{}, errors.New("missing fixture support")
+			}
+			return *data.Audit, nil
+		},
+		DefaultUnit: func(ctx context.Context) (uuid.UUID, bool, error) {
+			p, ok := authz.FromContext(ctx)
+			if ok && p.SelectedSession == nil && p.KN == nil {
+				return uuid.Nil, false, nil
+			}
+			data, err := read(ctx)
+			return data.UnitRef, true, err
+		},
 	}
 }

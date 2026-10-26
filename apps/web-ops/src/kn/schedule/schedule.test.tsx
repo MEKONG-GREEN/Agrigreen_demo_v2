@@ -134,7 +134,7 @@ describe("<RegisterSchedule> Cấp Xã (Hình 21)", { timeout: 30_000 }, () => {
   it("mặc định tuần sau, chưa đăng ký; thêm mục → Lưu nháp → Gửi duyệt; Log ghi sự kiện", async () => {
     const user = userEvent.setup();
     const { api, ws } = await clientFor("kn-an", "asg-an-xa");
-    render(<RegisterSchedule ws={ws} api={api} communes={AN_COMMUNES} level="commune" />);
+    render(<RegisterSchedule ws={ws} api={api} communes={AN_COMMUNES} />);
     expect(screen.getByRole("heading", { level: 1, name: "Lịch làm việc hằng tuần" })).toBeInTheDocument();
     const next = nextWeekStart();
     expect(await screen.findByText(/Hạn đăng ký:/)).toBeInTheDocument();
@@ -145,7 +145,13 @@ describe("<RegisterSchedule> Cấp Xã (Hình 21)", { timeout: 30_000 }, () => {
     await user.click(screen.getByRole("button", { name: `Thêm mục ${dayColumnLabel(addDays(next, 1))} Sáng` }));
     const form = screen.getByRole("region", { name: "Mục công tác" });
     await user.type(within(form).getByLabelText("Nội dung công việc"), "Kiểm tra rầy nâu");
+    // Log bug TT-05/CN-04: Xã/phường và Địa điểm bắt buộc.
+    await user.click(within(form).getByRole("button", { name: /Lưu mục/ }));
+    expect(within(form).getByRole("alert")).toHaveTextContent("Xã/phường bắt buộc.");
     await user.selectOptions(within(form).getByLabelText("Địa điểm: xã/phường"), "91302");
+    await user.click(within(form).getByRole("button", { name: /Lưu mục/ }));
+    expect(within(form).getByRole("alert")).toHaveTextContent("Địa điểm bắt buộc");
+    await user.type(within(form).getByLabelText("Địa điểm cụ thể"), "Cánh đồng ấp 2");
     await within(form).findByRole("option", { name: "HTX Bình Đức" });
     await user.selectOptions(within(form).getByLabelText("Địa điểm: HTX"), "HTX Bình Đức");
     await user.type(within(form).getByLabelText("Thành phần phối hợp"), "0912345678");
@@ -175,7 +181,7 @@ describe("<RegisterSchedule> Cấp Xã (Hình 21)", { timeout: 30_000 }, () => {
   it("Sao chép tuần trước; lịch đã duyệt tuần này: báo điều chỉnh phải duyệt lại; tuần đã kết thúc: chỉ xem", async () => {
     const user = userEvent.setup();
     const { api, ws } = await clientFor("kn-an", "asg-an-xa");
-    render(<RegisterSchedule ws={ws} api={api} communes={AN_COMMUNES} level="commune" />);
+    render(<RegisterSchedule ws={ws} api={api} communes={AN_COMMUNES} />);
     await screen.findByText(/Hạn đăng ký:/);
     await user.click(screen.getByRole("button", { name: /Sao chép tuần trước/ }));
     expect(await screen.findByText(/Đã sao chép 5 mục từ tuần trước/)).toBeInTheDocument();
@@ -247,6 +253,28 @@ describe("<ApproveSchedules> Cấp Tỉnh (Hình 12)", { timeout: 30_000 }, () =
     await user.click(screen.getByRole("tab", { name: "Lịch của tôi" }));
     expect(await screen.findByRole("button", { name: /Sao chép tuần trước/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Duyệt hàng loạt/ })).toBeNull();
+  });
+
+  it("BF-SCHED R-B1 (PO 25/10/2026): Lịch của tôi Cấp Tỉnh bắt buộc Xã/phường, chọn trong mọi xã của tỉnh (tuần mới)", async () => {
+    const user = userEvent.setup();
+    const { api, ws } = await clientFor("kn-binh", "asg-binh-tinh");
+    render(<RegisterSchedule ws={ws} api={api} communes={[]} embedded />);
+    await screen.findByText(/Hạn đăng ký:/);
+    const next = nextWeekStart();
+    await user.click(screen.getByRole("button", { name: `Thêm mục ${dayColumnLabel(addDays(next, 2))} Chiều` }));
+    const form = screen.getByRole("region", { name: "Mục công tác" });
+    const select = within(form).getByLabelText("Địa điểm: xã/phường");
+    expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(["— Chọn xã/phường —", "Mỹ Hòa Hưng", "Bình Đức", "Long Xuyên", "Vĩnh Tế", "An Cư", "Núi Sam", "Châu Phong"]);
+    await user.type(within(form).getByLabelText("Nội dung công việc"), "Kiểm tra mô hình lúa");
+    await user.type(within(form).getByLabelText("Địa điểm cụ thể"), "Cánh đồng lớn");
+    await user.click(within(form).getByRole("button", { name: /Lưu mục/ }));
+    expect(within(form).getByRole("alert")).toHaveTextContent("Xã/phường bắt buộc.");
+    await user.selectOptions(select, "91306");
+    await user.click(within(form).getByRole("button", { name: /Lưu mục/ }));
+    const card = await screen.findByText("Kiểm tra mô hình lúa");
+    expect(card.closest("[data-testid=ws-item]")).toHaveTextContent("Núi Sam");
+    await user.click(screen.getByRole("button", { name: "Lưu nháp" }));
+    expect(await screen.findByText("Đã lưu nháp.")).toBeInTheDocument();
   });
 
   it("Admin chỉ xem: không có nút duyệt, không có tab Lịch của tôi", async () => {

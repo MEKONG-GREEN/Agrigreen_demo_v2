@@ -1,0 +1,11 @@
+{
+  "id": "kn-cnts-model",
+  "source": "./kn-cnts-model",
+  "app": [
+    {
+      "export": "cntsModelRoutes",
+      "order": 1047
+    }
+  ],
+  "admin": []
+}

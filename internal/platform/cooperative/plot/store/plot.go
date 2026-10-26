@@ -583,3 +583,44 @@ func DistanceM(ctx context.Context, tx pgx.Tx, ref uuid.UUID, lon, lat string) (
 	}
 	return parseDec(s)
 }
+
+// ManagerChangesAfter merges current rows and ID-only ownership losses in one
+// statement snapshot. Two Read Committed statements can otherwise see a later
+// loss cursor while missing an earlier, concurrently-created owned plot forever.
+// The small page is selected before fetching geometry; both branches retain RLS.
+func ManagerChangesAfter(ctx context.Context, tx pgx.Tx, all bool, communes []string, owner uuid.UUID, after int64, limit int) ([]Plot, error) {
+	rows, err := tx.Query(ctx, `WITH feed AS (
+   SELECT p.tenant_id, p.ref, p.revision, p.sync_seq, false AS tombstone
+   FROM pf_coop.plot p
+   WHERE ($2::boolean OR p.commune_code = ANY($3::text[])) AND p.sync_seq > $4::bigint
+   UNION ALL
+   SELECT t.tenant_id, t.plot_ref, t.revision, t.sync_seq, true
+   FROM pf_coop.plot_scope_tombstone t
+   WHERE t.previous_cooperative_ref = $1::uuid
+     AND ($2::boolean OR t.commune_code = ANY($3::text[]))
+     AND t.sync_seq > $4::bigint
+     AND NOT EXISTS (SELECT 1 FROM pf_coop.plot p
+       WHERE p.tenant_id = t.tenant_id AND p.ref = t.plot_ref AND p.sync_seq >= t.sync_seq
+         AND ($2::boolean OR p.commune_code = ANY($3::text[]))
+         AND (p.cooperative_ref = $1::uuid OR p.cooperative_ref IS NULL))
+ ), page AS MATERIALIZED (
+   SELECT * FROM feed ORDER BY sync_seq LIMIT $5::int
+ )
+ SELECT `+plotCols+`, ST_AsGeoJSON(p.geom, 7)
+   FROM page c JOIN pf_coop.plot p ON NOT c.tombstone AND p.tenant_id = c.tenant_id AND p.ref = c.ref
+ UNION ALL
+ -- Match plotCols for the existing scanner, using constants for every field
+ -- other than the loss ID/version/cursor/tenant. Never join a tombstone to the
+ -- new owner's row. Retired status makes plotChanges emit Data=nil.
+ SELECT t.ref, ''::text, ''::text, ''::text, NULL::uuid, NULL::uuid, 'retired'::text, ''::text,
+   0::bigint, '00000000-0000-0000-0000-000000000000'::uuid, '0'::text, ''::text, false,
+   t.revision, t.sync_seq, '00000000-0000-0000-0000-000000000000'::uuid,
+   'epoch'::timestamptz, 'epoch'::timestamptz, NULL::uuid, ''::text, ''::text, NULL::text,
+   ''::text, ''::text, t.tenant_id, ''::text
+   FROM page t WHERE t.tombstone
+ ORDER BY sync_seq`, owner, all, units(communes), after, limit)
+	if err != nil {
+		return nil, err
+	}
+	return collectPlots(rows)
+}

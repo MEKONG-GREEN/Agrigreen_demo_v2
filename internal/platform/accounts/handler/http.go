@@ -28,10 +28,14 @@ import (
 const MaxImportBytes = app.MaxImportBytes
 
 // Handler gói app.Service cho HTTP.
-type Handler struct{ Svc *app.Service }
+type Handler struct {
+	Svc      *app.Service
+	Sessions *authz.SessionRegistry
+}
 
 // RegisterAdmin gắn route Admin API.
 func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
+	rg.GET("/accounts/audit", h.audit)
 	rg.GET("/accounts/grants", h.grants)
 	rg.GET("/accounts/users", h.list)
 	rg.POST("/accounts/users", h.create)
@@ -68,6 +72,10 @@ type userDTO struct {
 	Tracked         bool     `json:"tracked"`
 	// MFA chỉ có ở GET /v1/accounts/users/{id} (D24).
 	MFA *mfaDTO `json:"mfa,omitempty"`
+	// LoginLocked is present only on account detail; false is a verified unlocked state.
+	LoginLocked *bool `json:"login_locked,omitempty"`
+	// LoginLockedUntil: mốc khóa tạm tự hết (RFC 3339, chỉ khi login_locked=true và suy được).
+	LoginLockedUntil *string `json:"login_locked_until,omitempty"`
 }
 
 type mfaDTO struct {
@@ -97,6 +105,7 @@ func toUserDTO(v app.UserView) userDTO {
 		ID: u.ID.String(), Username: u.Username, Email: u.Email, FirstName: u.FirstName, LastName: u.LastName,
 		Phone: strPtr(u.Phone), Enabled: u.Enabled, EmailVerified: u.EmailVerified, OrgRef: refPtr(u.OrgRef),
 		Roles: v.Roles, LockCause: strPtr(string(v.LockCause)), RequiredActions: u.RequiredActions, Tracked: v.Tracked,
+		LoginLocked: v.LoginLocked,
 	}
 	if d.RequiredActions == nil {
 		d.RequiredActions = []string{}
@@ -104,6 +113,10 @@ func toUserDTO(v app.UserView) userDTO {
 	if !u.CreatedAt.IsZero() {
 		s := u.CreatedAt.UTC().Format(time.RFC3339)
 		d.CreatedAt = &s
+	}
+	if v.LoginLockedUntil != nil {
+		s := v.LoginLockedUntil.UTC().Format(time.RFC3339)
+		d.LoginLockedUntil = &s
 	}
 	if v.MFA != nil {
 		d.MFA = &mfaDTO{Required: v.MFA.Required, Configured: v.MFA.Configured, EnrollmentPending: v.MFA.EnrollmentPending}
@@ -186,11 +199,16 @@ func (h Handler) grants(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	g := port.Grantable(p.Roles)
+	catalog := h.Svc.RoleCatalog()
+	if !catalog.Valid() {
+		httpx.Fail(c, app.ErrDependency)
+		return
+	}
+	g := catalog.Grantable(p.Roles)
 	if g == nil {
 		g = []string{}
 	}
-	c.JSON(http.StatusOK, gin.H{"grantable": g, "mfa_roles": port.MFARoles, "role_org_kinds": port.RoleOrgKinds})
+	c.JSON(http.StatusOK, gin.H{"grantable": g, "mfa_roles": catalog.MFARoles(), "role_org_kinds": catalog.RoleOrgKinds()})
 }
 
 type createReq struct {

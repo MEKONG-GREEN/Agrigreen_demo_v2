@@ -18,23 +18,26 @@ export function legacyMenu(groups: readonly NavGroup[]): MenuTree {
 
 export interface MenuLink {
   node: MenuNode;
+  /** Mục cha gần nhất (null nếu là mục cấp 1). */
   parent: MenuNode | null;
+  /** Chuỗi mục cha từ cấp 1 xuống (menu TT tỉnh có 3 cấp: Báo cáo tổng hợp › Báo cáo tuần › T01). */
+  ancestors: MenuNode[];
   group: MenuGroup;
 }
 
 /** Lá bấm được: có href, không "Chưa mở" / "Sắp có" (kn.menu/v3). */
 const usable = (n: MenuNode): boolean => !!n.href && n.status !== "not_open" && n.status !== "coming_soon";
 
-/** Mọi liên kết (lá có href) theo thứ tự hiển thị. */
+/** Mọi liên kết (lá có href) theo thứ tự hiển thị, mọi cấp. */
 export function menuLinks(tree: MenuTree): MenuLink[] {
   const out: MenuLink[] = [];
-  for (const group of tree.groups) {
-    for (const item of group.items) {
-      if (item.children?.length) {
-        for (const c of item.children) if (usable(c)) out.push({ node: c, parent: item, group });
-      } else if (usable(item)) out.push({ node: item, parent: null, group });
+  const walk = (items: readonly MenuNode[], ancestors: MenuNode[], group: MenuGroup) => {
+    for (const item of items) {
+      if (item.children?.length) walk(item.children, [...ancestors, item], group);
+      else if (usable(item)) out.push({ node: item, parent: ancestors[ancestors.length - 1] ?? null, ancestors, group });
     }
-  }
+  };
+  for (const group of tree.groups) walk(group.items, [], group);
   return out;
 }
 
@@ -56,11 +59,12 @@ export function menuAllows(tree: MenuTree, pathname: string): boolean {
   return !!findActive(tree, pathname);
 }
 
-/** Breadcrumb: [mục cha hoặc nhóm, mục] — "Điều hành / Dashboard", "Nhiệm vụ / Công việc cần làm". */
+/** Breadcrumb: [các mục cha hoặc nhóm, mục] — "Điều hành / Dashboard", "Nhiệm vụ / Công việc cần làm",
+ *  "Báo cáo tổng hợp các xã / Báo cáo tuần / T01 · Tiến độ XG". */
 export function crumbsFor(tree: MenuTree, pathname: string): string[] {
   const a = findActive(tree, pathname);
   if (!a) return [];
-  return [a.parent?.label ?? a.group.label, a.node.label];
+  return a.ancestors.length ? [...a.ancestors.map((n) => n.label), a.node.label] : [a.group.label, a.node.label];
 }
 
 /** Số đếm của mục (ẩn khi 0 hoặc không có nguồn). Mục cha không tự cộng — chỉ việc cần xử lý mới có số. */

@@ -1,0 +1,35 @@
+{
+  "Roles": [],
+  "Access": [
+    {
+      "Reader": "r_extension",
+      "View": "pf_cooperative_pub.v1_confirmations"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_cooperative_pub.v1_cooperatives"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_cooperative_pub.v1_plots"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_cooperative_pub.v1_seasons"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_party_pub.v1_org_tree"
+    }
+  ],
+  "Memberships": [
+    {
+      "Reader": "r_extension",
+      "Granted": "r_cooperative_pub"
+    },
+    {
+      "Reader": "r_extension",
+      "Granted": "r_party_pub"
+    }
+  ]
+}

@@ -35,6 +35,9 @@ const cols = `department_code, province_code, calendar_id, calendar_version, per
   closed_at, snapshot_id, snapshot_no, data_at, provisional, units_total, units_with_data, missing_units, rows, totals,
   confirmation_status, figures_hash, status_hash`
 
+// Nhánh kỳ native bỏ kỳ `adhoc` (W11.50 — đợt điều tra CNTS, FN-21 BR-02): số liệu đợt không vào tổng/lũy kế quy đổi
+// của KHTC; kỳ định kỳ có loại day/week/ksgm_week/month/… (lịch D8).
+//
 // filter chỉ trên cột chia cửa sổ key_closed của view (phòng, tỉnh, loại kỳ, khóa kỳ) → cờ của từng nguồn vẫn tính trên
 // đủ khóa; lọc biểu làm ở Go sau khi tính KeyClosedAll.
 const filter = `tenant_id = $1 AND ($2 = '' OR department_code = $2) AND ($3 = '' OR province_code = $3)
@@ -43,7 +46,7 @@ const filter = `tenant_id = $1 AND ($2 = '' OR department_code = $2) AND ($3 = '
 const query = `WITH u AS (
     SELECT ` + cols + ` FROM pf_extension_pub.v1_closed_figures WHERE ` + filter + `
     UNION ALL
-    SELECT ` + cols + ` FROM pf_forms_pub.v1_closed_figures WHERE ` + filter + `)
+    SELECT ` + cols + ` FROM pf_forms_pub.v1_closed_figures WHERE ` + filter + ` AND period_type <> 'adhoc')
   SELECT ` + cols + `,
          bool_and(key_closed) OVER (PARTITION BY department_code, province_code, period_type, period_key) AS key_closed_all
     FROM u

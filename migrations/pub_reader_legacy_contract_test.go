@@ -146,6 +146,32 @@ func TestLegacyPublishedReaderAccessContract(t *testing.T) {
 	}
 	additions.Access = append(additions.Access, platform.Access...)
 	additions.Memberships = append(additions.Memberships, platform.Memberships...)
+	knRaw, err := os.ReadFile("../tests/golden/kn-htx-reader-access-additions.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kn snapshot
+	if err := json.Unmarshal(knRaw, &kn); err != nil {
+		t.Fatal(err)
+	}
+	if len(kn.Roles) != 0 {
+		t.Fatal("KN role flag changes are not approved")
+	}
+	additions.Access = append(additions.Access, kn.Access...)
+	additions.Memberships = append(additions.Memberships, kn.Memberships...)
+	platformKNRaw, err := os.ReadFile("../tests/golden/kn-platform-reader-access-additions.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var platformKN snapshot
+	if err := json.Unmarshal(platformKNRaw, &platformKN); err != nil {
+		t.Fatal(err)
+	}
+	if len(platformKN.Roles) != 0 {
+		t.Fatal("KN platform reader role flag changes are not approved")
+	}
+	additions.Access = append(additions.Access, platformKN.Access...)
+	additions.Memberships = append(additions.Memberships, platformKN.Memberships...)
 	want.Access = append(want.Access, additions.Access...)
 	want.Memberships = append(want.Memberships, additions.Memberships...)
 	slices.SortFunc(want.Access, func(a, b access) int {

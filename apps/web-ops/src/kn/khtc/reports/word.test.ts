@@ -1,0 +1,56 @@
+import { describe, expect, it } from "vitest";
+import { createApiClient } from "@/api/client";
+import { mockFetchNoDelay } from "@/api/mock/handler";
+import { mockExportRun, placeDateLine } from "@/api/mock/export";
+import { ApiProblem } from "@/api/problem";
+import { createExportApi } from "@/components/exports/api";
+import { createKhtcPeriodApi } from "../periods/api";
+import { createKhtcFormApi, emptyContent } from "../forms/api";
+import { createReportApi } from "./api";
+const client = (token = "mock.tinh") => createApiClient({ baseUrl: "http://mock", getAccessToken: () => token, getContextId: () => null, fetch: mockFetchNoDelay });
+const code = (p: Promise<unknown>) => p.then(() => "ok", (e: unknown) => e instanceof ApiProblem ? e.problem.code : String(e));
+describe("W10.17 Word KHTC qua cap/export (giả lập)", () => {
+    it("xuất Word từ bản Excel, tự cấp {n}/BC-TTKN một lần mỗi báo cáo, không cấp cho bản Tạm tính, lịch sử và tải lại", async () => {
+        const api = client(), periods = createKhtcPeriodApi(api), forms = createKhtcFormApi(api), reports = createReportApi(api);
+        const year = new Date().getFullYear() + 9;
+        const open = (no: number) => periods.open({ report_type: "week", year, no, departments: ["trong_trot"] });
+        const draft = await open(5);
+        let dv = await reports.save(draft.id, { base_version: 0, admin: { report_date: "" } });
+        const xv = await reports.export(draft.id, dv.version, true, {});
+        const wv = await reports.word(draft.id, xv.id);
+        expect(wv.doc_number_auto).toBe(false);
+        expect(wv.doc_number).toBe("…/BC-TTKN");
+        const p = await open(6);
+        const f = await forms.get(p.id, "trong_trot"), row = f.tabs.flatMap(t => t.rows).find(r => !r.module_sourced)!;
+        const input = emptyContent();
+        input.cells[row.entry_ref] = { done: "12" };
+        input.texts.cong_tac_khac = "Mô hình minh họa";
+        await forms.submit(p.id, "trong_trot", input, 0);
+        dv = await reports.refresh(p.id, 0);
+        const x = await reports.export(p.id, dv.version, !!dv.content.data.provisional.length, {});
+        const w1 = await reports.word(p.id, x.id), w2 = await reports.word(p.id, x.id);
+        expect(x.provisional).toBe(true); // nguồn giả lập luôn còn Tạm tính → không cấp số
+        expect(w2.doc_number).toBe(w1.doc_number);
+        expect([w1.seq, w2.seq]).toEqual([1, 2]);
+        expect((await reports.words(p.id)).map(w => w.seq)).toEqual([2, 1]);
+        const file = await reports.downloadWord(p.id, w1.id);
+        expect(await file.blob.text()).toContain(`Số: ${w1.doc_number}`);
+        expect(await code(reports.downloadWord(p.id, "khong-co"))).toMatch(/not_found$/);
+        const p2 = await open(7);
+        const d2 = await reports.save(p2.id, { base_version: 0, admin: { document_no: "88" } });
+        const x2 = await reports.export(p2.id, d2.version, true, {});
+        expect((await reports.word(p2.id, x2.id)).doc_number).toBe("88/BC-TTKN");
+        const runs = await createExportApi(api).runs({ subject: `khtc_report:${p.id}` });
+        expect(runs.map(r => r.id)).toEqual([w2.id, w1.id]);
+        const templates = await createExportApi(api).templates();
+        expect(templates.map(t => t.key)).toContain("khtc.mau_1");
+        expect(templates.find(t => t.key === "khtc.mau_1")?.versions[0]?.recorded_at).toBeTruthy();
+    });
+    it("sổ giả lập cấp số tuần tự theo năm, một số mỗi đối tượng", () => {
+        const run = (subject: string) => mockExportRun({ template: "khtc.mau_1", subject, fileName: "x.docx", docNumber: "", series: "TEST-W1017", actor: "a", lines: [] });
+        const a = run("khtc_report:a"), again = run("khtc_report:a"), b = run("khtc_report:b");
+        expect([a.doc_number, again.doc_number, b.doc_number]).toEqual(["1/TEST-W1017", "1/TEST-W1017", "2/TEST-W1017"]);
+        expect(a.doc_number_auto && b.doc_number_auto).toBe(true);
+        expect(placeDateLine("An Giang", new Date("2026-12-31T17:30:00Z"))).toBe("An Giang, ngày 01 tháng 01 năm 2027");
+    });
+});

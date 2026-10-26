@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"slices"
 
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 )
@@ -11,6 +12,10 @@ type nameBook struct {
 	regions   map[string]partyport.Region
 	byCommune map[string]partyport.CommuneRegion
 	communes  map[string]string
+	// P0-POOL-KN: sổ của extDeps — trong giao dịch không gọi pf/party; tên xã chưa nạp ghi vào missing (txDeps nạp
+	// ngoài giao dịch rồi chạy lại).
+	deps    *extDeps
+	missing []string
 }
 
 func (s *Service) regionNames(ctx context.Context, province string) (*nameBook, error) {
@@ -47,6 +52,17 @@ func (n *nameBook) commune(ctx context.Context, s *Service, code string) string 
 	if v, ok := n.communes[code]; ok {
 		return v
 	}
+	if n.deps != nil && n.deps.sealed {
+		if !slices.Contains(n.missing, code) {
+			n.missing = append(n.missing, code)
+		}
+		return code
+	}
+	return n.load(ctx, s, code)
+}
+
+// load tra tên xã qua pf/party (ngoài giao dịch) và ghi vào sổ.
+func (n *nameBook) load(ctx context.Context, s *Service, code string) string {
 	name := code
 	if s.Units != nil {
 		if u, err := s.Units.Get(ctx, code, s.now()); err == nil && u.Name != "" {

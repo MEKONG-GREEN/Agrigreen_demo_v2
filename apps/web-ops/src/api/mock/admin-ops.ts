@@ -146,6 +146,38 @@ export const ACCOUNTS: MockAccount[] = accountOrgs.map((org, i) => {
   return a;
 });
 
+// ADMIN-UNLOCK (#42): khóa đăng nhập do sai mật khẩu (Keycloak attack-detection) — tách khỏi enabled. Từ P0-VPS-OPS
+// (#131) là khóa TẠM 15 phút rồi tự mở; Admin mở sớm qua /unlock. Giá trị = mốc tự mở (ms). Máy chủ chỉ trả
+// login_locked (+ login_locked_until) ở GET chi tiết; danh sách/tạo bỏ field.
+export const LOGIN_LOCK_MS = 15 * 60_000;
+const LOGIN_LOCKS = new Map<string, number>();
+
+/** Giả lập Keycloak khóa tạm sau 5 lần sai; `until` mặc định = bây giờ + 15 phút (truyền mốc đã qua = khóa đã tự hết). */
+export function lockAccountByBruteForce(id: string, until = Date.now() + LOGIN_LOCK_MS): void {
+  LOGIN_LOCKS.set(id, until);
+}
+
+/** Cho kiểm thử: bỏ mọi khóa đăng nhập sai (kể cả tài khoản mẫu). */
+export function resetAccountLoginLocks(): void {
+  LOGIN_LOCKS.clear();
+}
+
+function loginLockedUntil(id: string): number | null {
+  const until = LOGIN_LOCKS.get(id);
+  return until !== undefined && until > Date.now() ? until : null;
+}
+
+// Dữ liệu mẫu cho demo: một cán bộ tổ khuyến nông đang hoạt động nhưng vừa bị khóa tạm do nhập sai mật khẩu 5 lần.
+{
+  const sample = ACCOUNTS.filter((a) => a.user.enabled && a.user.required_actions.length === 0)[3];
+  if (sample) lockAccountByBruteForce(sample.user.id);
+}
+
+function accountDetail(u: AccountsUser): AccountsUser {
+  const until = loginLockedUntil(u.id);
+  return { ...u, mfa: mfaOf(u), login_locked: until !== null, ...(until !== null ? { login_locked_until: new Date(until).toISOString() } : {}) };
+}
+
 function accountVisible(p: MockPersona, a: MockAccount): boolean {
   return orgInScope(p, ORGS.find((o) => o.ref === a.user.org_ref));
 }
@@ -274,11 +306,15 @@ function lockUnlock(p: MockPersona, id: string | undefined, body: unknown, lock:
   if (found.user.id === p.me.actor_ref) return problem(403, "accounts.self_action", "Self action");
   const bad = (found.user.roles ?? []).find((r) => !grantable(p).includes(r));
   if (bad) return problem(403, "accounts.role_not_grantable", "Role not grantable");
-  if (lock ? !found.user.enabled : found.user.enabled) return problem(409, "accounts.state_conflict", "State conflict");
+  // Như máy chủ: mở khóa khi bị Admin khóa HOẶC đang khóa do đăng nhập sai (enabled vẫn true); không còn gì → 409.
+  const bruteForce = loginLockedUntil(found.user.id) !== null;
+  if (lock ? !found.user.enabled : found.user.enabled && !bruteForce) return problem(409, "accounts.state_conflict", "State conflict");
   if (!lock && !ORGS.find((o) => o.ref === found.user.org_ref)?.active) return problem(409, "accounts.org_inactive", "Org inactive");
+  const prevCause = found.user.lock_cause ?? (!lock && bruteForce ? "brute_force" : null);
+  if (!lock) LOGIN_LOCKS.delete(found.user.id);
   found.user.enabled = !lock;
   found.user.lock_cause = lock ? "manual" : null;
-  const seq = pushEvent(found, lock ? "locked" : "unlocked", p.me.actor_ref, reason);
+  const seq = pushEvent(found, lock ? "locked" : "unlocked", p.me.actor_ref, reason, lock ? undefined : { prev_cause: prevCause });
   return json({ account: accountSnapshot(found.user), seq, replayed: false });
 }
 
@@ -564,7 +600,7 @@ export const adminOpsRoutes: Route[] = [
     pattern: /^\/v1\/accounts\/users\/([\w-]+)$/,
     handler: ({ persona, params }) => {
       const a = findAccount(persona, params[0]);
-      return a instanceof Response ? a : json({ ...a.user, mfa: mfaOf(a.user) });
+      return a instanceof Response ? a : json(accountDetail(a.user));
     },
   },
   {

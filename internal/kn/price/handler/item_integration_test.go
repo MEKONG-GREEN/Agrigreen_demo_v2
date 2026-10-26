@@ -33,7 +33,7 @@ import (
 func TestPriceItemsHTTP_W1173(t *testing.T) {
 	env := pgtest.Get(t)
 	now := time.Date(2026, 10, 12, 3, 0, 0, 0, time.UTC) // 10:00 giờ VN, thứ Hai 12/10/2026
-	prof := port.Profile{Name: "kn", Department: "thong_tin_truyen_thong", Roles: map[string]string{"kn_tinh": "TINH", "kn_xa": "XA", "kn_tw": "TW"},
+	prof := port.Profile{Session: testOwnerSession, Name: "kn", Department: "thong_tin_truyen_thong", Roles: map[string]string{"kn_tinh": "TINH", "kn_xa": "XA", "kn_tw": "TW"},
 		ManageBy: []string{"admin"}, StewardDuty: authz.DutyPriceAdmin}
 	svc, err := app.NewService(db.ForModule(env.Pool(t, migrations.PF, dbadmin.AppPlatform), app.DBModule), clock.NewFixed(now),
 		[]port.Profile{prof})
@@ -58,7 +58,7 @@ func TestPriceItemsHTTP_W1173(t *testing.T) {
 	}
 	r.Use(func(c *gin.Context) {
 		if p, ok := who[c.GetHeader("X-Test-As")]; ok {
-			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
+			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindTestSession(t, p)))
 		}
 	})
 	Handler{Svc: svc}.RegisterApp(r.Group("/v1"))

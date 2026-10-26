@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"io"
 	"net/http"
 	"slices"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
 )
@@ -70,7 +70,7 @@ var provincialCommuneAliases = map[string]string{
 // "<Mã biểu> <Chữ cột>" (vd "T01 E" hoặc "T01_E Diện tích giao"); khi chỉ chọn một biểu, tiêu đề "E"/"Cột E" cũng nhận.
 // Ô công thức → cả tệp bị từ chối (tabular). Số phải là decimal không âm; dòng lỗi bị loại kèm lý do, dòng khác vẫn nhận.
 func (s *Service) ImportProvincial(ctx context.Context, reportType, from string, templateIDs []uuid.UUID, src io.Reader) (ProvincialImport, error) {
-	a, err := s.writer(ctx, authz.KNTinh)
+	a, err := s.writer(ctx, port.SessionRoleProvince)
 	if err != nil {
 		return ProvincialImport{}, err
 	}

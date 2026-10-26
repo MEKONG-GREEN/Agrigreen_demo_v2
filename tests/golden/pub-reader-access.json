@@ -49,6 +49,12 @@
       "Login": false
     },
     {
+      "Role": "r_export",
+      "Inherit": true,
+      "BypassRLS": false,
+      "Login": false
+    },
+    {
       "Role": "r_extension",
       "Inherit": true,
       "BypassRLS": false,

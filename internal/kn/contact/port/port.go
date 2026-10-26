@@ -17,6 +17,8 @@ import (
 // tiết, không xuất); Cấp Tỉnh, Admin thấy thêm chức danh, đơn vị, cấp, email; Cấp Tỉnh – HCTH cập nhật liên hệ ngoài tỉnh;
 // Admin quản lý toàn bộ.
 type Access struct {
+	// Session is the configured owner policy. Nil selects native realm roles only.
+	Session SessionResolver `json:"-"`
 	// FullBy, BasicBy: vai trong ngữ cảnh phiên KN (authz.KNContext.Role) xem đủ trường / chỉ ba trường.
 	FullBy  []string
 	BasicBy []string

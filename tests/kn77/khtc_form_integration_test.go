@@ -88,7 +88,7 @@ func newKHTCFormFx(t *testing.T) *kfFx {
 		actor, _ := uuid.Parse(c.GetHeader("X-Test-Actor"))
 		// Như httpx.Authenticate: người gọi + tenant ở ctx (cổng Kế hoạch năm đọc tenant từ ctx).
 		ctx := tenant.WithID(c.Request.Context(), base.tid)
-		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, authz.Principal{ActorRef: actor, TenantID: base.tid, KN: &k}))
+		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: base.tid, KN: &k})))
 		scope, _ := json.Marshal(k)
 		c.Request = c.Request.WithContext(idempotency.WithAuthorizationScope(c.Request.Context(), scope))
 	}, idempotency.Middleware(ops))

@@ -86,7 +86,7 @@ func (s *Service) SetAssignmentAttrs(ctx context.Context, user, id uuid.UUID, in
 	if !asg.Active {
 		return AttrsResult{}, ErrAssignmentState
 	}
-	if in, err = domain.NormalizeAttrs(asg.Role, in); err != nil {
+	if in, err = domain.NormalizeAttrsWithCatalog(asg.Role, in, s.AttributeCatalog()); err != nil {
 		return AttrsResult{}, fieldProblem(err)
 	}
 	if s.Facilities != nil && len(in.Facilities) > 0 {
@@ -372,12 +372,16 @@ func (s *Service) PeopleInScope(ctx context.Context) (port.KNPeopleScope, error)
 	if err != nil {
 		return port.KNPeopleScope{}, err
 	}
+	caps, err := s.attributeCapabilities(port.Assignment{Role: k.Role, MgmtLevel: k.MgmtLevel}, port.AssignmentAttrs{ProvinceGroup: k.ProvinceGroup, Duties: k.Duties})
+	if err != nil {
+		return port.KNPeopleScope{}, err
+	}
 	self := port.KNPeopleScope{InternalUnit: k.InternalUnit, Members: []uuid.UUID{p.ActorRef}, CommuneOfficers: []uuid.UUID{}}
 	switch {
-	case k.Role == port.KNAdmin, k.Role == port.KNTinh && k.Department == partyport.DeptHanhChinhTongHop && !k.ViewOnly,
-		k.Role == port.KNTinh && readsAll(k):
+	case k.Role == port.KNAdmin, k.Role == port.KNTinh && k.Department == partyport.DeptHanhChinhTongHop && !k.ReadOnly() && !caps.ForceReadOnly,
+		caps.ReadsAllDepartments:
 		return port.KNPeopleScope{All: true, InternalUnit: k.InternalUnit, Members: []uuid.UUID{}, CommuneOfficers: []uuid.UUID{}}, nil
-	case k.Role != port.KNTinh || !k.Manager || k.InternalUnit == "":
+	case k.Role != port.KNTinh || !caps.Manager || k.InternalUnit == "":
 		return self, nil
 	}
 	now := s.now()
@@ -397,10 +401,4 @@ func (s *Service) PeopleInScope(ctx context.Context) (port.KNPeopleScope, error)
 		out.Members = append(out.Members, p.ActorRef)
 	}
 	return out, nil
-}
-
-// readsAll: Lãnh đạo đơn vị hoặc nhóm Ban Giám đốc (đọc mọi phòng ban, mọi người của đơn vị).
-func readsAll(k authz.KNContext) bool {
-	l, _ := port.MgmtLevelOf(k.MgmtLevel)
-	return l.ReadsAllDepartments || k.ProvinceGroup == port.GroupBanGiamDoc
 }

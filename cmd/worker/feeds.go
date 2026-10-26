@@ -5,7 +5,9 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
@@ -65,5 +67,19 @@ func apiclientFeedJobs(ctx context.Context, direct string, closeFn *func(), log 
 	}, gl)
 	// W5.6 (ADR-0034): feed của cặp song phương — chép bản ghi mới của sổ song phương pf_coop (pf/cooperative) theo seq.
 	mod.UseBilateral(coop.BilateralLedger())
+	// W11.81 (BRD Báo giá FN-TI-02.07): bảng giá ngày ĐÃ DUYỆT (pf/price, r_price) cho feed price_board_daily — chỉ khi
+	// có đơn vị công bố (AG_INTEGRATION_PRICE_PUBLISHERS); thay API công khai của prototype.
+	pubs, err := apiclient.PricePublishersFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	if len(pubs) > 0 {
+		pm, err := price.New(pool, clk, assembly.PriceProfiles())
+		if err != nil {
+			return nil, err
+		}
+		mod.UsePublishedFeedSources(map[string]apiclientport.PublishedSource{apiclientport.FeedPriceBoardDaily: pm.PublicBoardFeed("")},
+			map[string][]apiclientport.Publisher{apiclientport.FeedPriceBoardDaily: pubs})
+	}
 	return mod.FeedJobs(interval, log), nil
 }

@@ -15,7 +15,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -60,13 +59,18 @@ func (s *Service) afterConsolidate(c consolidateOut) {
 // consolidateTx dựng lần tổng hợp cho các biểu của kỳ (templates nil = mọi biểu): lấy bản "Đã gửi" mới nhất từng
 // xã, tính lại công thức và dòng Khu vực/Toàn tỉnh (FormEngine.Totals), so khác ô với lần trước, ghi lần chạy
 // bất biến + ảnh chụp + chỉ số dashboard. Không có thay đổi → "Dữ liệu đã mới nhất" (không ghi).
-func (s *Service) consolidateTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p store.Period, b store.Batch, templates []uuid.UUID, trigger string,
+//
+// P0-POOL-KN: phiên bản mẫu, khu vực + tên xã lấy từ d (nạp ngoài giao dịch — wantPeriod, txDeps).
+func (s *Service) consolidateTx(ctx context.Context, tx pgx.Tx, d *extDeps, tid uuid.UUID, p store.Period, b store.Batch, templates []uuid.UUID, trigger string,
 	actor uuid.UUID, obo *uuid.UUID, idem string, now time.Time) (consolidateOut, error) {
 	var out consolidateOut
 	if s.Forms == nil {
 		return out, ErrDependency.WithDetail("chưa nối engine mẫu báo cáo (pf/reports)")
 	}
-	nb, err := s.regionNames(ctx, p.ProvinceCode)
+	if err := s.wantPeriod(ctx, tx, d, p, b, templates); err != nil {
+		return out, err
+	}
+	nb, err := d.book(ctx, p.ProvinceCode)
 	if err != nil {
 		return out, err
 	}
@@ -74,14 +78,13 @@ func (s *Service) consolidateTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p
 	if err != nil {
 		return out, err
 	}
-	fc := s.forms(tid)
 	var codes []string
 	cells := 0
 	for _, f := range b.Forms {
 		if templates != nil && !slices.Contains(templates, f.TemplateID) {
 			continue
 		}
-		fi, err := fc.get(ctx, f.VersionID)
+		fi, err := d.form(ctx, f.VersionID)
 		if err != nil {
 			return out, err
 		}
@@ -365,13 +368,15 @@ type ConsolidateResult struct {
 
 // Consolidate là nút "Cập nhật" của Cấp Tỉnh (FN-TI-02.05 B3).
 func (s *Service) Consolidate(ctx context.Context, periodID uuid.UUID, templateIDs []uuid.UUID, idem string) (ConsolidateResult, error) {
-	a, err := s.writer(ctx, authz.KNTinh)
+	a, err := s.writer(ctx, port.SessionRoleProvince)
 	if err != nil {
 		return ConsolidateResult{}, err
 	}
 	now := s.now()
 	var c consolidateOut
-	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+	dp := s.newDeps(a.p.TenantID)
+	err = s.txDeps(ctx, a.p.TenantID, dp, func(tx pgx.Tx) error {
+		c = consolidateOut{}
 		p, b, err := s.periodInScope(ctx, tx, a, periodID, true)
 		if err != nil {
 			return err
@@ -380,7 +385,7 @@ func (s *Service) Consolidate(ctx context.Context, periodID uuid.UUID, templateI
 		if len(templateIDs) > 0 {
 			tpls = templateIDs
 		}
-		c, err = s.consolidateTx(ctx, tx, a.p.TenantID, *p, *b, tpls, domain.TriggerManual, a.p.ActorRef, a.onBehalf(), idemOr(idem, "cons"), now)
+		c, err = s.consolidateTx(ctx, tx, dp, a.p.TenantID, *p, *b, tpls, domain.TriggerManual, a.p.ActorRef, a.onBehalf(), idemOr(idem, "cons"), now)
 		return err
 	})
 	if err != nil {
@@ -428,7 +433,7 @@ type ConsolidationView struct {
 
 // GetConsolidation trả bảng tổng hợp theo mẫu (Cấp Tỉnh; Cấp Quốc gia chỉ xem — FN-TW-01.02).
 func (s *Service) GetConsolidation(ctx context.Context, q ConsolidationQuery, compare bool) (ConsolidationView, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return ConsolidationView{}, err
 	}
@@ -639,7 +644,7 @@ func pendingOf(ctx context.Context, tx pgx.Tx, p store.Period, tpl uuid.UUID, sn
 
 // PendingChanges trả "Thay đổi chờ cập nhật" của mọi biểu trong kỳ.
 func (s *Service) PendingChanges(ctx context.Context, periodID uuid.UUID) (PendingSummary, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return PendingSummary{}, err
 	}
@@ -678,7 +683,7 @@ func (s *Service) PendingChanges(ctx context.Context, periodID uuid.UUID) (Pendi
 
 // RunsOf trả "Nhật ký cập nhật" (mọi lần chạy, không xóa).
 func (s *Service) RunsOf(ctx context.Context, periodID uuid.UUID, templateID *uuid.UUID) ([]store.Run, map[uuid.UUID]string, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -703,7 +708,7 @@ func (s *Service) RunsOf(ctx context.Context, periodID uuid.UUID, templateID *uu
 
 // RunChanges trả chi tiết ô thay đổi của một lần chạy (cursor theo id).
 func (s *Service) RunChanges(ctx context.Context, runID uuid.UUID, after *uuid.UUID, limit int) (store.Run, []store.CellChange, map[uuid.UUID]string, error) {
-	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
+	a, err := s.knActor(ctx, port.SessionRoleProvince, port.SessionRoleNational, port.SessionRoleAdmin)
 	if err != nil {
 		return store.Run{}, nil, nil, err
 	}

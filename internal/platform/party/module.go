@@ -27,6 +27,10 @@ const DBRole = "party_app"
 
 // Deps là port của module khác mà party cần.
 type Deps struct {
+	// Transfers is optional; missing registrations keep the transfer facade closed.
+	Transfers        *port.TransferRegistry
+	NavigationPolicy port.NavigationPolicy
+	Menus            *port.Menus // instance-owned menu presentation; nil keeps compatibility
 	// AdminUnits: đơn vị hành chính có hiệu lực theo thời gian (pf/masterdata) —
 	// kiểm mã đơn vị khi tạo/di chuyển tổ chức và tính phạm vi TTKN tỉnh.
 	AdminUnits port.AdminUnits
@@ -36,12 +40,13 @@ type Deps struct {
 
 // Module là pf/party đã nối.
 type Module struct {
-	db    tenant.Beginner // nguồn k_ref (kref.go)
-	svc   *app.Service
-	reg   *app.Registry
-	share *app.Sharing
-	kn    *app.KN
-	mods  *app.Modules
+	db        tenant.Beginner // nguồn k_ref (kref.go)
+	svc       *app.Service
+	reg       *app.Registry
+	share     *app.Sharing
+	kn        *app.KN
+	mods      *app.Modules
+	transfers *app.Transfers
 }
 
 // New tạo module với pool của vai party_app. deps tùy chọn để giữ tương thích
@@ -54,16 +59,17 @@ func New(db tenant.Beginner, clk clock.Clock, deps ...Deps) *Module {
 		d = deps[0]
 	}
 	reg := &app.Registry{DB: db, Clock: clk, Units: d.AdminUnits, Vault: d.Vault}
-	kn := &app.KN{DB: db, Clock: clk, Reg: reg}
+	kn := &app.KN{DB: db, Clock: clk, Reg: reg, NavigationPolicy: d.NavigationPolicy, Menus: d.Menus}
 	mods := &app.Modules{DB: db, Clock: clk, Names: func() port.ActorNames { return kn.Names }}
 	kn.Modules = mods
 	return &Module{
-		db:    db,
-		svc:   &app.Service{DB: db, Clock: clk},
-		reg:   reg,
-		share: &app.Sharing{DB: db, Clock: clk},
-		kn:    kn,
-		mods:  mods,
+		db:        db,
+		svc:       &app.Service{DB: db, Clock: clk},
+		reg:       reg,
+		share:     &app.Sharing{DB: db, Clock: clk},
+		kn:        kn,
+		mods:      mods,
+		transfers: app.NewTransfers(db, clk, d.Transfers),
 	}
 }
 
@@ -171,6 +177,9 @@ func (m *Module) UseOrgImpact(s port.OrgImpactSource) { m.kn.Impact = append(m.k
 // UseFormAvailability nối P3 cho menu "Báo cáo đột xuất" (FN-AD-04.06).
 func (m *Module) UseFormAvailability(f port.FormAvailability) { m.kn.Forms = f }
 
+// ContextNavigation returns the validated server-context landing resolver.
+func (m *Module) ContextNavigation() port.Navigation { return m.kn.ContextNavigation }
+
 // UseSessionContext nối ngữ cảnh phiên của P1 (X-AG-Context) cho menu.
 func (m *Module) UseSessionContext(s port.SessionContext) { m.kn.Session = s }
 
@@ -183,3 +192,6 @@ func (m *Module) UseActorNames(n port.ActorNames) { m.kn.Names = n }
 
 // CooperativeRegistrar tạo Nút HTX qua cổng nội bộ có kiểm vai cho luồng Neo D2.
 func (m *Module) CooperativeRegistrar() port.CooperativeRegistrar { return m.reg }
+
+// Transfers exposes only the generic protocol. It creates no HTTP/CLI route.
+func (m *Module) Transfers() port.TenantTransfers { return m.transfers }

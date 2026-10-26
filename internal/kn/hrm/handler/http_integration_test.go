@@ -36,7 +36,7 @@ func TestHRMCatalogHTTP_W1121(t *testing.T) {
 	env := pgtest.Get(t)
 	now := time.Date(2026, 10, 12, 3, 0, 0, 0, time.UTC) // 10:00 giờ VN
 	svc, err := app.NewService(db.ForModule(env.Pool(t, migrations.PF, dbadmin.AppPlatform), app.DBModule), clock.NewFixed(now),
-		port.Access{Department: "hanh_chinh_tong_hop", ManageBy: []string{"admin"}, ReadBy: []string{"kn_tinh"}})
+		port.Access{Session: testOwnerSession, Department: "hanh_chinh_tong_hop", ManageBy: []string{"admin"}, ReadBy: []string{"kn_tinh"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestHRMCatalogHTTP_W1121(t *testing.T) {
 	}
 	r.Use(func(c *gin.Context) {
 		if p, ok := who[c.GetHeader("X-Test-As")]; ok {
-			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
+			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindTestSession(t, p)))
 		}
 	})
 	Handler{Svc: svc}.RegisterApp(r.Group("/v1"))
@@ -83,9 +83,10 @@ func TestHRMCatalogHTTP_W1121(t *testing.T) {
 
 	// Quyền.
 	call("", http.MethodGet, "/v1/hrm/status", nil, http.StatusUnauthorized)
-	for _, as := range []string{"tt", "xa", "realmxa"} {
+	for _, as := range []string{"tt", "xa"} {
 		call(as, http.MethodGet, "/v1/hrm/catalogs/grade", nil, http.StatusForbidden)
 	}
+	call("realmxa", http.MethodGet, "/v1/hrm/status", nil, http.StatusPreconditionRequired)
 	st := call("hcth", http.MethodGet, "/v1/hrm/status", nil, http.StatusOK)
 	if st["can_manage"] != false || st["day"] != "2026-10-12" || st["rule_version"] != "hrm.v1" || st["scales"] != json.Number("0") {
 		t.Fatalf("status: %v", st)

@@ -1,0 +1,1 @@
+- [ ] P0-WEB-IDEMKEY (#129): web giữ một Idempotency-Key cho mỗi thao tác (theo dấu vân tay yêu cầu, giữ khi lỗi mạng/5xx, đổi khi thành công/đổi dữ liệu) qua useAction/useIdempotentAction, knHttp và middleware openapi-fetch; mock chặn khóa đang xử lý. Chờ review chéo.

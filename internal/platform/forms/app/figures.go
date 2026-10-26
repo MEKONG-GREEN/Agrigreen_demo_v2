@@ -76,11 +76,18 @@ func (f Figures) Figures(ctx context.Context, q port.FiguresQuery) ([]port.Perio
 		// Lược đơn vị ngoài phạm vi (người gọi không phải Nút chủ/toàn quốc).
 		for _, p := range ps {
 			j, ok := byID[p.ID]
-			if !ok || a.scope.All || a.owns(p.Period) {
+			if !ok || (a.targetFilter == nil && (a.scope.All || a.owns(p.Period))) {
 				continue
 			}
 			pf := &out[j]
 			pf.Units = slices.DeleteFunc(pf.Units, func(u string) bool { return !a.allowsUnit(p.Spec, p.Units, u) })
+			if a.targetFilter != nil {
+				for u := range pf.Parents {
+					if !a.allowsUnit(p.Spec, p.Units, u) {
+						delete(pf.Parents, u)
+					}
+				}
+			}
 			for _, m := range []map[string]port.UnitFigures{pf.Submitted, pf.Closed} {
 				for u := range m {
 					if !a.allowsUnit(p.Spec, p.Units, u) {

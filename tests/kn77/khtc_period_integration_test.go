@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
@@ -107,9 +108,15 @@ type khtcFx struct {
 	node uuid.UUID
 }
 
-func newKHTCFx(t *testing.T) *khtcFx {
+func newKHTCFx(t *testing.T) *khtcFx { return newKHTCFxPool(t, nil) }
+
+// newKHTCFxPool như newKHTCFx; shared khác nil (P0-POOL-KN-2) → pf/extension + cap/forms dùng CHUNG pool đó (gốc lắp ráp thật).
+func newKHTCFxPool(t *testing.T, shared *pgxpool.Pool) *khtcFx {
 	env := pgtest.Get(t)
-	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
+	pool := shared
+	if pool == nil {
+		pool = env.Pool(t, migrations.PF, dbadmin.AppPlatform)
+	}
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	// 08:00 Thứ Tư 14/10/2026 giờ VN — tuần 41 (07/10–13/10) vừa kết thúc, hạn nộp 10:00 hôm nay.
 	clk := clock.NewFixed(time.Date(2026, 10, 14, 1, 0, 0, 0, time.UTC))
@@ -127,7 +134,7 @@ func newKHTCFx(t *testing.T) *khtcFx {
 		var k authz.KNContext
 		_ = json.Unmarshal([]byte(c.GetHeader("X-Test-KN")), &k)
 		actor, _ := uuid.Parse(c.GetHeader("X-Test-Actor"))
-		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), authz.Principal{ActorRef: actor, TenantID: f.tid, KN: &k}))
+		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: f.tid, KN: &k})))
 	}, idempotency.Middleware(ops))
 	fm.RegisterApp(g)
 	kn.RegisterApp(g)

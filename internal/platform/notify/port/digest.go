@@ -38,3 +38,8 @@ type DigestRegistration struct {
 	Job    DigestJobDefinition
 	Format DigestFormatter
 }
+
+// DigestRecipients resolves service mailboxes for the authenticated queue tenant.
+// A configured resolver is authoritative: errors or an empty result never fall
+// back to a process-wide recipient list. The caller may modify the returned slice.
+type DigestRecipients func(context.Context, uuid.UUID) ([]string, error)

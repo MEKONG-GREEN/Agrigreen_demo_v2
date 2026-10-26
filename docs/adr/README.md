@@ -43,6 +43,7 @@
 | 0041 | [MFA theo nhóm cho cán bộ KN, phiên giữ theo D9, realm quản trị riêng, vô hiệu tài khoản 45 ngày](0041-mfa-theo-nhom-d24.md) | Chấp nhận — quyết định CEO D24, D25 (13/10/2026), ứng với v4.3 ADR-23/P-1…P-5; hiện thực gói MFA (pf 20261013134254, 20261013142347); sửa ADR-0010 |
 | 0049 | [`cap/price` = module năng lực `pf/price`](0049-cap-price-pf-price.md) | Đề xuất — khung hiện thực ở W11.71 (pf 000138); số 0039–0048 dành cho ADR khác của đợt; bị thay thế một phần bởi ADR-0055 (Báo giá là của KN) |
 | 0050 | [`dom/hrm` = module nghiệp vụ `pf/hrm`; danh mục nhân sự ở module của chủ](0050-dom-hrm-pf-hrm.md) | Đề xuất — khung + danh mục nhân sự ở W11.21 (pf 000147); dữ liệu thật chờ Q-070 |
+| 0051 | [Tách `cap/export` thành module năng lực `pf/export` — mẫu văn bản có phiên bản, bộ ghi .docx tất định, sổ lần xuất có băm, số văn bản tự cấp](0051-cap-export-pf-export-docx.md) | Đề xuất — hiện thực ở W10.17 (pf 20261024090957); dùng thật chờ Q-062 |
 | 0052 | [Đồng sở hữu dữ liệu MKG + HTX, neo HTX theo mã số thuế, HTX tạm "Chưa xác nhận" và nhận quyền](0052-dong-so-huu-mkg-htx-neo-mst.md) | Chấp nhận — quyết định CEO D2 (13/10/2026), trả lời H-1/QĐ-2; hiện thực gói D2 (pf 20261013091454) |
 | 0053 | [Một hợp đồng `_pub` có phiên bản cho "số liệu đã chốt" — họ `closed_figures/v1`, port KHTC `KHTCSources`, bên đọc qua thành viên vai `_pub`](0053-hop-dong-so-lieu-da-chot-closed-figures.md) | Đề xuất — hiện thực ở PFPUB; D8, D17, D18, D2 đã chốt; Trồng trọt giữ vòng đời báo cáo |
 | 0054 | [`cap/directory` = module năng lực `pf/contact` — danh bạ dùng chung, một bản ghi/người ở kho định danh, lọc trường ở API](0054-cap-directory-pf-contact.md) | Đề xuất — hiện thực W11.23 (pf 20261013230912, vault 20261013165158); Q-071, Q-072 theo đề xuất của dev; bị thay thế một phần bởi ADR-0055 (Contact là của KN) |
@@ -67,4 +68,3 @@ Số của ADR **chưa viết** mà tài liệu khác đã nhắc tới. Viết 
 | 0046 | Phụ thuộc OR-Tools | như trên |
 | 0047 | Dữ liệu vị trí người lái/người đếm | như trên, W12.19 |
 | 0048 | Liên kết khách có OTP | như trên |
-| 0051 | Tách `cap/export` → `pf/export` + ghi .docx (W10.17). Trước giữ 0050; 0050 đã dùng cho `dom/hrm` (W11.21) nên lấy số trống kế tiếp | như trên |

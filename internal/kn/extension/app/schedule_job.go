@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	diarystore "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/store"
@@ -27,6 +28,8 @@ type ScheduleJobResult struct {
 	Locked    int // lịch của tuần đã kết thúc được ghi sự việc "locked"
 	Reminders int // lần nhắc đã phát (submit_due + review_overdue)
 	Purged    int // tọa độ check-in quá hạn lưu đã xóa (W11.46, QĐ-8)
+	// DiaryPurged: tọa độ lúc ghi nhật ký CNTS quá hạn lưu đã xóa (W11.48, QĐ-8, hằng số cntsdiary FixRetentionDays).
+	DiaryPurged int
 }
 
 const (
@@ -39,7 +42,7 @@ const (
 // chặn ghi không phụ thuộc job — app kiểm tuần theo đồng hồ);
 // (2) nhắc cán bộ chưa gửi lịch tuần kế tiếp khi còn ≤ remind_before giờ tới hạn đăng ký;
 // (3) nhắc người duyệt khi còn lịch chờ duyệt quá hạn duyệt (FN-TI-02.07 luồng phụ);
-// (0) xóa tọa độ check-in quá hạn lưu (W11.46).
+// (0) xóa tọa độ check-in quá hạn lưu (W11.46) và tọa độ lúc ghi nhật ký CNTS quá hạn lưu (W11.48).
 // Idempotent: mỗi (loại nhắc, tuần, phòng ban, tỉnh) chỉ một lần (bảng work_schedule_reminder), khóa idem
 // "lock:<lịch>" cho sự việc khóa.
 func (s *Service) RunScheduleJob(ctx context.Context, tenants TenantLister) (ScheduleJobResult, error) {
@@ -55,6 +58,7 @@ func (s *Service) RunScheduleJob(ctx context.Context, tenants TenantLister) (Sch
 		total.Locked += r.Locked
 		total.Reminders += r.Reminders
 		total.Purged += r.Purged
+		total.DiaryPurged += r.DiaryPurged
 		if err != nil {
 			errs = append(errs, fmt.Errorf("tenant %s: %w", tid, err))
 		}
@@ -81,6 +85,20 @@ func (s *Service) ScheduleJobTenant(ctx context.Context, tid uuid.UUID, now time
 			return res, err
 		}
 		res.Purged += n
+		if n < purgeBatch {
+			break
+		}
+	}
+	for {
+		var n int
+		if err := tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+			var e error
+			n, e = diarystore.PurgeFixes(ctx, tx, today, purgeBatch)
+			return e
+		}); err != nil {
+			return res, err
+		}
+		res.DiaryPurged += n
 		if n < purgeBatch {
 			break
 		}

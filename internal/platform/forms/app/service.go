@@ -78,14 +78,15 @@ func (s *Service) Profiles() []port.Profile {
 
 // actor là người gọi đối với MỘT profile.
 type actor struct {
-	ref, tenant  uuid.UUID
-	role, level  string
-	dept         string // phòng ban do ứng dụng cung cấp (rỗng: vai realm)
-	leaf         bool   // cấp của người gọi là cấp lá (cấp nộp bài)
-	scope        authz.Scope
-	node         uuid.UUID
-	define       bool
-	targetFilter func(string, uuid.UUID) bool
+	ref, tenant    uuid.UUID
+	role, level    string
+	dept           string // phòng ban do ứng dụng cung cấp (rỗng: vai realm)
+	leaf           bool   // cấp của người gọi là cấp lá (cấp nộp bài)
+	scope          authz.Scope
+	node           uuid.UUID
+	define         bool
+	targetFilter   func(string, uuid.UUID) bool
+	templateFilter func(string) bool
 }
 
 // resolve uses the registered application session, otherwise the configured realm roles.
@@ -110,6 +111,7 @@ func (s *Service) resolve(ctx context.Context, name string) (port.Profile, actor
 		if applies {
 			a.role, a.scope, a.node, a.dept = subject.Role, subject.Scope, subject.Node, subject.Department
 			a.targetFilter = subject.AllowsTarget
+			a.templateFilter = subject.AllowsTemplate
 			a.level = prof.LevelOf(a.role, a.dept)
 			a.define = slices.Contains(prof.DefineBy, a.role)
 		}
@@ -149,6 +151,10 @@ func (a actor) allowsUnit(spec domain.Spec, units []string, u string) bool {
 		return a.targetFilter(spec.UnitKind, ref)
 	}
 	return true
+}
+
+func (a actor) allowsTemplate(code string) bool {
+	return a.templateFilter == nil || a.templateFilter(code)
 }
 
 func (a actor) need(level, what string) error {

@@ -67,6 +67,19 @@ func (s *Service) BuildAll(ctx context.Context) ([]BuildResult, error) {
 			errs = append(errs, fmt.Errorf("%s: %w", f, err))
 		}
 	}
+	// W11.81: feed tham chiếu của dữ liệu đã công bố (price_board_daily) — chỉ khi gốc lắp ráp đã nối nguồn + đơn vị công bố.
+	for _, f := range PublishedFeeds {
+		if s.PublishedSources[f] == nil || len(s.Publishers[f]) == 0 {
+			continue
+		}
+		r, err := s.BuildPublished(ctx, f)
+		if err != nil {
+			s.log().ErrorContext(ctx, "feed: dựng tập dữ liệu lỗi", "event", "integration.dataset_build_failed", "dataset", f, "outcome", "error", "error", err.Error())
+			errs = append(errs, fmt.Errorf("%s: %w", f, err))
+			continue
+		}
+		out = append(out, r)
+	}
 	// W5.6: feed của cặp song phương — chép bản ghi mới của sổ song phương (chỉ khi gốc lắp ráp đã nối sổ).
 	if s.Bilateral != nil {
 		rs, err := s.BuildBilateral(ctx)

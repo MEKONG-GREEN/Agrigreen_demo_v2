@@ -41,21 +41,22 @@ func (ReportSync) Entities() []string {
 
 // syncActor: chỉ ngữ cảnh Cấp Xã nhận/gửi dữ liệu báo cáo qua đồng bộ. Không có ngữ cảnh hoặc vai khác → 403 để pf/sync
 // bỏ qua entity (thiết bị cũ không gửi X-AG-Context vẫn đồng bộ các entity khác).
-func syncActor(ctx context.Context, sc authz.Scope) (authz.Principal, authz.KNContext, []string, error) {
+func syncActor(ctx context.Context, sc authz.Scope) (authz.Principal, port.SessionContext, []string, error) {
 	p, ok := authz.FromContext(ctx)
 	if !ok {
-		return p, authz.KNContext{}, nil, problem.Unauthenticated
+		return p, port.SessionContext{}, nil, problem.Unauthenticated
 	}
-	if p.KN == nil || p.KN.Role != authz.KNXa {
-		return p, authz.KNContext{}, nil, problem.Forbidden.WithDetail("cần ngữ cảnh Cấp Xã (X-AG-Context)")
+	k, err := port.ReadSessionContext(p)
+	if err != nil || k.Role != port.SessionRoleCommune {
+		return p, port.SessionContext{}, nil, problem.Forbidden.WithDetail("cần ngữ cảnh Cấp Xã (X-AG-Context)")
 	}
 	communes := []string{}
-	for _, c := range p.KN.Communes {
+	for _, c := range k.Communes {
 		if sc.Allows(c) && !slices.Contains(communes, c) {
 			communes = append(communes, c)
 		}
 	}
-	return p, *p.KN, communes, nil
+	return p, k, communes, nil
 }
 
 func clampSync(limit int) int {
@@ -154,15 +155,28 @@ func (r ReportSync) Changes(ctx context.Context, sc authz.Scope, entity string, 
 	return nil, after, problem.Validation.WithField("entity", "không có entity "+entity)
 }
 
-func (s *Service) syncTasks(ctx context.Context, p authz.Principal, k authz.KNContext, communes []string, after int64, limit int) ([]syncport.Change, int64, error) {
+func (s *Service) syncTasks(ctx context.Context, p authz.Principal, k port.SessionContext, communes []string, after int64, limit int) ([]syncport.Change, int64, error) {
 	now := s.now()
 	var out []syncport.Change
 	last := after
-	books := map[string]*nameBook{}
-	err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+	dp := s.newDeps(p.TenantID) // P0-POOL-KN: khu vực + tên xã (pf/party) đọc ngoài giao dịch
+	err := s.txDeps(ctx, p.TenantID, dp, func(tx pgx.Tx) error {
+		out, last = nil, after
 		tasks, err := store.TasksChangedSince(ctx, tx, k.Department, communes, after, limit, false)
 		if err != nil {
 			return err
+		}
+		want := map[string][]string{}
+		for _, t := range tasks {
+			want[t.ProvinceCode] = append(want[t.ProvinceCode], t.CommuneCode)
+		}
+		for prov, cs := range want {
+			if err := dp.want(ctx, nil, prov, cs...); err != nil && !errors.Is(err, errNeedDeps) {
+				return err
+			}
+		}
+		if dp.pending() {
+			return errNeedDeps
 		}
 		pids, bids := []uuid.UUID{}, []uuid.UUID{}
 		for _, t := range tasks {
@@ -206,12 +220,9 @@ func (s *Service) syncTasks(ctx context.Context, p authz.Principal, k authz.KNCo
 				}
 				provincial[pk] = pv[t.TemplateID]
 			}
-			nb := books[t.ProvinceCode]
-			if nb == nil {
-				if nb, err = s.regionNames(ctx, t.ProvinceCode); err != nil {
-					return err
-				}
-				books[t.ProvinceCode] = nb
+			nb, err := dp.book(ctx, t.ProvinceCode)
+			if err != nil {
+				return err
 			}
 			per := periods[t.PeriodID]
 			v := viewOf(t.Task, per, &b, now)
@@ -249,7 +260,7 @@ func (s *Service) syncTasks(ctx context.Context, p authz.Principal, k authz.KNCo
 	return out, last, err
 }
 
-func (s *Service) syncSubmissions(ctx context.Context, p authz.Principal, k authz.KNContext, communes []string, after int64, limit int) ([]syncport.Change, int64, error) {
+func (s *Service) syncSubmissions(ctx context.Context, p authz.Principal, k port.SessionContext, communes []string, after int64, limit int) ([]syncport.Change, int64, error) {
 	var out []syncport.Change
 	last := after
 	err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
@@ -289,7 +300,7 @@ func (s *Service) syncSubmissions(ctx context.Context, p authz.Principal, k auth
 	return out, last, err
 }
 
-func (s *Service) syncLayouts(ctx context.Context, p authz.Principal, k authz.KNContext, communes []string, after int64, limit int) ([]syncport.Change, int64, error) {
+func (s *Service) syncLayouts(ctx context.Context, p authz.Principal, k port.SessionContext, communes []string, after int64, limit int) ([]syncport.Change, int64, error) {
 	if s.Forms == nil {
 		return nil, after, nil // chưa nối engine mẫu (pf/reports): không giao bố cục, entity khác vẫn đồng bộ
 	}

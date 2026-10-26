@@ -13,6 +13,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
 	source "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcsource/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
 	forms "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	party "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -44,18 +45,20 @@ type Service struct {
 	Sources    *source.Service
 	Egress     meter.Checkpoint
 	EgressMode meter.Mode
+	// Exporter: pf/export (`cap/export`, W10.17) — xuất Word từ bản Excel đã đóng băng; nil → 503.
+	Exporter exportport.Exporter
 }
 type caller struct {
 	principal authz.Principal
-	kn        authz.KNContext
+	kn        port.SessionContext
 }
 
 func (s *Service) reader(ctx context.Context) (caller, error) {
-	p, k, err := authz.RequireKN(ctx)
+	p, k, err := port.RequireSession(ctx)
 	if err != nil {
 		return caller{}, err
 	}
-	if k.Role != authz.KNAdmin && (k.Department != party.DeptKeHoachTaiChinh || k.Role != authz.KNTinh && k.Role != authz.KNTW) {
+	if k.Role != port.SessionRoleAdmin && (k.Department != party.DeptKeHoachTaiChinh || k.Role != port.SessionRoleProvince && k.Role != port.SessionRoleNational) {
 		return caller{}, problem.Forbidden
 	}
 	if s.DB == nil {
@@ -64,7 +67,7 @@ func (s *Service) reader(ctx context.Context) (caller, error) {
 	return caller{principal: p, kn: k}, nil
 }
 func writer(c caller, p pstore.Period) error {
-	if c.kn.Role != authz.KNTinh || c.kn.Department != party.DeptKeHoachTaiChinh || c.kn.ReadOnly() {
+	if c.kn.Role != port.SessionRoleProvince || c.kn.Department != party.DeptKeHoachTaiChinh || c.kn.ReadOnly() {
 		return problem.Forbidden
 	}
 	if c.principal.ActorRef != p.ActorRef {

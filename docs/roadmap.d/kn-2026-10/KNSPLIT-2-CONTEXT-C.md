@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-CONTEXT-C: đã tích hợp dev66d88069; source5/static/full5PG và helper9migration thật PASS,35goldens/boundary314 giữ.

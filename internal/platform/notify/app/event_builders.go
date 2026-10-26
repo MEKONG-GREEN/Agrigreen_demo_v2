@@ -62,5 +62,9 @@ func (r eventBuilderRegistry) build(ctx context.Context, tenantID uuid.UUID, eve
 	for i := range digests {
 		digests[i].AudienceUnits = slices.Clone(digests[i].AudienceUnits)
 	}
-	return notificationsFromDrafts(plan.Drafts), digests, true, nil
+	ns, err := notificationsFromDrafts(plan.Drafts)
+	if err != nil {
+		return nil, nil, true, err
+	}
+	return ns, digests, true, nil
 }

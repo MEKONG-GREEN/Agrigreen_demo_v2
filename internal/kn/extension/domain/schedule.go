@@ -64,6 +64,8 @@ var (
 	ErrTooManyItems      = errors.New("tối đa 100 mục một tuần")
 	ErrSubmitEmpty       = errors.New("lịch gửi duyệt phải có ít nhất một mục")
 	ErrItemCommune       = errors.New("xã không thuộc các xã phụ trách")
+	ErrItemCommuneReq    = errors.New("xã/phường bắt buộc")
+	ErrItemLocationReq   = errors.New("địa điểm bắt buộc (nhập địa điểm hoặc chọn vị trí)")
 	ErrScheduleReasonLen = errors.New("bắt buộc, 10–1000 ký tự")
 )
 
@@ -169,8 +171,8 @@ func ParseClock(s string) (string, int, error) {
 	return s, h*60 + m, nil
 }
 
-// NormalizeItems kiểm và chuẩn hóa mục của một phiên bản: ngày trong tuần, buổi, giờ, độ dài, xã thuộc
-// allowedCommunes (nil = không giới hạn), không SĐT/CCCD trong văn bản tự do (RB-3, gap §4.2). Mục thiếu
+// NormalizeItems kiểm và chuẩn hóa mục của một phiên bản: ngày trong tuần, buổi, giờ, độ dài, địa điểm bắt buộc (chữ hoặc vị trí), xã bắt buộc và thuộc
+// allowedCommunes (nil = không giới hạn phạm vi, vẫn bắt buộc có xã), không SĐT/CCCD trong văn bản tự do (RB-3, gap §4.2). Mục thiếu
 // ItemID được gán newID(). Thứ tự sau chuẩn hóa: ngày, buổi, giờ bắt đầu, vị trí gửi lên.
 func NormalizeItems(weekStart time.Time, items []ScheduleItem, allowedCommunes []string, newID func() uuid.UUID) ([]ScheduleItem, error) {
 	if len(items) > MaxScheduleItems {
@@ -210,10 +212,18 @@ func NormalizeItems(weekStart time.Time, items []ScheduleItem, allowedCommunes [
 			return nil, FieldError{Field: f("content"), Err: ErrItemContent}
 		}
 		it.CommuneCode = strings.TrimSpace(it.CommuneCode)
+		// Xã/phường bắt buộc với mọi người đăng ký (log bug TT-05/CN-04; quyết định PO 25/10/2026: cả cán bộ tỉnh).
+		if it.CommuneCode == "" {
+			return nil, FieldError{Field: f("commune_code"), Err: ErrItemCommuneReq}
+		}
 		if it.CommuneCode != "" && allowedCommunes != nil && !contains(allowedCommunes, it.CommuneCode) {
 			return nil, FieldError{Field: f("commune_code"), Err: ErrItemCommune}
 		}
 		it.Location, it.Participants, it.Note = strings.TrimSpace(it.Location), strings.TrimSpace(it.Participants), strings.TrimSpace(it.Note)
+		// Địa điểm bắt buộc: chữ (vd "UBND xã") hoặc vị trí trên bản đồ (dùng để check-in).
+		if it.Location == "" && it.Place == nil {
+			return nil, FieldError{Field: f("location"), Err: ErrItemLocationReq}
+		}
 		if it.Place != nil {
 			p, err := it.Place.Normalize()
 			if err != nil {

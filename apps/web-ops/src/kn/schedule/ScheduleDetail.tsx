@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ApiClient } from "@/api/client";
 import type { ApiProblem } from "@/api/problem";
+import { useIdempotentAction } from "@/api/useIdempotentAction";
 import { Icon } from "@/components/Icon";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Loading } from "@/components/ui";
@@ -54,12 +55,13 @@ export function ScheduleDetail({ ws, api, id, backHref, readOnly = false }: { ws
   const communeName = useCommuneNames(api, codes);
   const coopName = usePreloadCoops(api, codes);
 
+  const idem = useIdempotentAction(); // P0-WEB-IDEMKEY: duyệt/yêu cầu sửa bấm lại sau lỗi mạng → cùng khóa
   const act = async (fn: () => Promise<WsDetail>, done: string) => {
     setBusy(true);
     setProblem(null);
     setNotice(null);
     try {
-      const d = await fn();
+      const d = await idem.run(fn);
       setData({ key, detail: d });
       setNotice(done);
       setLogKey((k) => k + 1);

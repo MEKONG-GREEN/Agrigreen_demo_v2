@@ -56,24 +56,23 @@ var formAdmins = []string{port.RoleReportsAdmin, authz.RolePlatformAdmin}
 // formReader retains native realm roles; applications register their session
 // policy separately. A resolver error or explicit denial never falls back.
 func (s *Service) formReader(ctx context.Context, extra ...string) (authz.Principal, *port.SessionActor, error) {
-	p, err := authz.Require(ctx, append(append([]string{}, s.formReaderRoles()...), extra...)...)
-	if err == nil {
-		return p, nil, nil
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return authz.Principal{}, nil, problem.Unauthenticated
 	}
-	if q, ok := authz.FromContext(ctx); ok {
-		if s.ResolveSession != nil {
-			actor, handled, e := s.ResolveSession(ctx, q, port.SessionReadForms)
-			if e != nil {
-				return q, nil, e
+	if s.ResolveSession != nil {
+		actor, handled, err := s.ResolveSession(ctx, p, port.SessionReadForms)
+		if err != nil {
+			return p, nil, err
+		}
+		if handled {
+			if !actor.Allowed || actor.AllowsDepartment == nil {
+				return p, nil, problem.Forbidden
 			}
-			if handled {
-				if !actor.Allowed || actor.AllowsDepartment == nil {
-					return q, nil, problem.Forbidden
-				}
-				return q, &actor, nil
-			}
+			return p, &actor, nil
 		}
 	}
+	p, err := authz.Require(ctx, append(append([]string{}, s.formReaderRoles()...), extra...)...)
 	return p, nil, err
 }
 
@@ -959,6 +958,17 @@ func (s *Service) ImportForm(ctx context.Context, data []byte, in ImportInput, i
 	}
 	res := ImportResult{ImportID: ids.New()}
 	now := s.now()
+	// P0-POOL-SHARED (#126): ghi tệp vào kho đối tượng TRƯỚC giao dịch — không giữ kết nối DB khi gọi kho. Khóa có mã
+	// lần nạp (ghi một lần); lần nạp lỗi/hủy để lại đối tượng mồ côi vô hại, dòng form_import chỉ trỏ tới tệp khi nạp được.
+	var storedKey *string
+	if s.Store != nil {
+		key := fmt.Sprintf("reports/%s/form-imports/%s.xlsx", p.TenantID, res.ImportID)
+		if _, err := s.Store.Put(ctx, key, bytes.NewReader(data), int64(len(data)), hex.EncodeToString(sum[:]), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); err != nil {
+			s.log().Warn("không lưu được tệp nạp mẫu", "event", "reports.form_import.store_failed", "import_id", res.ImportID)
+		} else {
+			storedKey = &key
+		}
+	}
 	var failure error
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		var tpl *store.FormTemplate
@@ -1030,14 +1040,7 @@ func (s *Service) ImportForm(ctx context.Context, data []byte, in ImportInput, i
 				return err
 			}
 		}
-		if s.Store != nil {
-			key := fmt.Sprintf("reports/%s/form-imports/%s.xlsx", p.TenantID, res.ImportID)
-			if _, err := s.Store.Put(ctx, key, bytes.NewReader(data), int64(len(data)), imp.FileSHA256, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); err != nil {
-				s.log().Warn("không lưu được tệp nạp mẫu", "event", "reports.form_import.store_failed", "import_id", res.ImportID)
-			} else {
-				imp.ObjectKey = &key
-			}
-		}
+		imp.ObjectKey = storedKey
 		v := store.FormVersion{ID: ids.New(), TemplateID: tpl.ID, Status: port.FormDraft, Def: def, Origin: "import", ImportID: &res.ImportID,
 			CreatedBy: p.ActorRef, CreatedAt: now, UpdatedBy: p.ActorRef, UpdatedAt: now}
 		if err := store.InsertFormVersion(ctx, tx, p.TenantID, &v); err != nil {

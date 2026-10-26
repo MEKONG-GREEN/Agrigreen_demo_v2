@@ -231,6 +231,8 @@ export const knCollectRoutes: Route[] = [
       const b = (body ?? {}) as { holder?: { full_name?: string; phone?: string }; cultivated_area_ha?: string };
       const phone = String(b.holder?.phone ?? "").replace(/\D/g, "");
       if (!b.holder?.full_name || !/^0\d{9}$/.test(phone)) return fieldErr("holder", "họ tên và SĐT 10 chữ số bắt buộc");
+      // BF-SWEEP-TT: diện tích canh tác như area_ha của HTX — decimal ≥ 0, tối đa 4 chữ số lẻ (R-A1, máy chủ cũng chặn).
+      if (b.cultivated_area_ha !== undefined && b.cultivated_area_ha !== null && b.cultivated_area_ha !== "" && !/^\d+(\.\d{1,4})?$/.test(String(b.cultivated_area_ha))) return fieldErr("cultivated_area_ha", "decimal ≥ 0, tối đa 4 chữ số lẻ");
       const h: Household = { ref: uuidv7(), coop: x.ref, holder: { label: shortName(b.holder.full_name), masked_phone: mask(phone) }, cultivated_area_ha: b.cultivated_area_ha ?? null, active: true, since_date: now().slice(0, 10) };
       HH.push(h);
       return json(hhWire(h), 201);

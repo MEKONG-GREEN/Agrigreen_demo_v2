@@ -352,7 +352,7 @@ func TestPublishedHTXPrivileges(t *testing.T) {
 	for _, role := range []string{"pf/extension", "pf/price", "pf/hrm", "pf/contact", "pf/metrics"} {
 		dbi := db.ForModule(env.Pool(t, migrations.PF, dbadmin.AppPlatform), db.Module(role))
 		queries := []string{"SELECT count(*) FROM pf_coop.plot", "INSERT INTO pf_cooperative_pub.v1_plots DEFAULT VALUES"}
-		if role != "pf/metrics" {
+		if role != "pf/metrics" && role != "pf/extension" {
 			queries = append(queries, "SELECT count(*) FROM pf_cooperative_pub.v1_plots")
 		}
 		for _, q := range queries {

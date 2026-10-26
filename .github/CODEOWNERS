@@ -1,0 +1,10 @@
+# Chủ sở hữu mã — yêu cầu review tự động khi PR đụng các đường dẫn này (xem AGENTS.md §5, §10).
+# Hiện chỉ có một tài khoản GitHub cho cả hai công cụ AI, nên đây là người được thông báo, không phải cổng approval.
+# TODO: thêm chủ sở hữu của Ecombox và Tech Lead khi đã quyết (dòng sau ghi đè dòng trước cho cùng đường dẫn).
+
+/migrations/            @tunglm-MKG
+/internal/shared/       @tunglm-MKG
+/contracts/             @tunglm-MKG
+/.github/               @tunglm-MKG
+/scripts/workflow/      @tunglm-MKG
+/AGENTS.md              @tunglm-MKG

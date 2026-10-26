@@ -3,7 +3,6 @@
 # Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
 name: pf/apiclient
 aka: [k/access]
-hosts: [cap/export]
 kind: kernel
 zones: [pf]
 version: 1.0.0
@@ -21,6 +20,7 @@ provides:
     - PartnerGrantors
     - PartnerSource
     - Plans
+    - PublishedSource
     - TokenAuthenticator
   events: [pf.apiclient.export.requested/v1]
   internal_events: []

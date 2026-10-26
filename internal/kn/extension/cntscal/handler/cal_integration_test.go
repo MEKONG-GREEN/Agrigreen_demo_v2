@@ -131,6 +131,14 @@ func (x *xaScopes) XaScopes(context.Context, uuid.UUID, string) ([]accport.XaSco
 }
 
 // knResolver: ngữ cảnh KN của lịch công tác lấy từ Principal.KN (middleware giả).
+// provinceOrgs: cây tổ chức giả — mọi nút của phiên thuộc TTKN tỉnh "89" (cùng tỉnh knResolver trả).
+// Sau đổi phiên KN (owner session), lịch công tác tìm tỉnh từ nút của phiên qua Deps.Orgs; thiếu → 503.
+type provinceOrgs struct{}
+
+func (provinceOrgs) Get(_ context.Context, ref uuid.UUID) (partyport.Org, error) {
+	return partyport.Org{Ref: ref, Kind: partyport.OrgTTKNProvince, AdminUnitCode: "89", Active: true}, nil
+}
+
 type knResolver struct{}
 
 func (knResolver) KNContext(ctx context.Context) (accport.KNContext, bool, error) {
@@ -157,7 +165,7 @@ func newFix(t *testing.T, multi ...bool) *fix {
 	env := pgtest.Get(t)
 	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}}
 	f.pool = env.AdminPool(t, migrations.PF)
-	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), extension.Deps{Units: units{}})
+	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), extension.Deps{Units: units{}, Orgs: provinceOrgs{}})
 	mod.UseCNTSCatalogs(catalogs{multiProvince: len(multi) > 0 && multi[0]})
 	if len(multi) < 2 || multi[1] {
 		mod.UseXaScopes(f.xa)
@@ -172,6 +180,10 @@ func newFix(t *testing.T, multi ...bool) *fix {
 }
 
 func (f *fix) knMiddleware() gin.HandlerFunc {
+	registry, err := authz.NewSessionRegistry(extension.SessionProjection())
+	if err != nil {
+		f.t.Fatal(err)
+	}
 	return func(c *gin.Context) {
 		p, ok := authz.FromContext(c.Request.Context())
 		id, err := uuid.Parse(c.GetHeader(authz.ContextHeader))
@@ -184,6 +196,13 @@ func (f *fix) knMiddleware() gin.HandlerFunc {
 		}
 		cp := *kc
 		p.KN = &cp
+		selected, err := registry.ResolveSelected(c.Request.Context(), p)
+		if err != nil {
+			f.t.Errorf("owner session projection: %v", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		p.SelectedSession = &selected
 		scope, _ := json.Marshal(cp)
 		ctx := idempotency.WithAuthorizationScope(c.Request.Context(), scope)
 		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, p))
@@ -388,7 +407,7 @@ func TestWorkScheduleCheckin(t *testing.T) {
 	items := []map[string]any{
 		{"id": itemNear, "day": "2027-10-13", "session": "morning", "content": "Kiểm tra lò mổ", "commune_code": "30001", "place": place},
 		{"id": itemFar, "day": "2027-10-13", "session": "afternoon", "content": "Thăm hộ mô hình", "commune_code": "30001", "place": place},
-		{"id": itemOffice, "day": "2027-10-12", "session": "morning", "content": "Họp tại xã", "location": "Ấp 2"},
+		{"id": itemOffice, "day": "2027-10-12", "session": "morning", "content": "Họp tại xã", "commune_code": "30001", "location": "Ấp 2"},
 	}
 	sid := ids.New()
 	d := want(t, officer.post("/v1/extension/work-schedules", map[string]any{"id": sid, "week_start": "2027-10-11", "action": "draft", "items": items}), 201, "", "lưu nháp")
@@ -399,6 +418,14 @@ func TestWorkScheduleCheckin(t *testing.T) {
 	near := map[string]any{"lat": 10.001, "lon": 105.0, "accuracy_m": 12, "captured_at": "2027-10-13T09:55:00+07:00"}
 	want(t, officer.post(path, near), 409, "extension.checkin_not_registered", "lịch nháp chưa check-in")
 	want(t, officer.post("/v1/extension/work-schedules", map[string]any{"id": sid, "week_start": "2027-10-11", "action": "submit", "base_version": 1, "items": items}), 201, "", "gửi duyệt")
+	// Log bug TT-07/CN-06: lịch đã gửi nhưng chưa được duyệt → chưa check-in được.
+	want(t, officer.post(path, near), 409, "extension.checkin_not_approved", "chờ duyệt chưa check-in")
+	lead := tinh("lanh_dao_phong")
+	lead.Manager = true
+	lead.MgmtLevel = "truong_phong"
+	reviewer := f.user(lead)
+	approvePath := "/v1/extension/work-schedules/" + sid.String() + "/approve"
+	want(t, reviewer.post(approvePath, map[string]any{"version": 2}), 200, "", "duyệt bản 2")
 	k := key()
 	c := want(t, officer.postK(path, k, near), 201, "", "check-in gần")
 	ck := obj(c, "checkin")
@@ -425,18 +452,22 @@ func TestWorkScheduleCheckin(t *testing.T) {
 	if m["checkin_enabled"] != true || num(sc, "checkin_count") != "2" || num(sc, "missed_checkin_count") != "1" {
 		t.Fatalf("lịch của tôi: %s", m)
 	}
+	// Điều chỉnh sau khi duyệt: bản 2 vẫn hiệu lực trong lúc bản 3 chờ duyệt lại; mục chỉ có ở bản 3 chưa check-in được.
+	itemNew := ids.New()
+	amended := append(append([]map[string]any{}, items...),
+		map[string]any{"id": itemNew, "day": "2027-10-13", "session": "afternoon", "start_time": "15:00", "content": "Kiểm tra hộ nuôi", "commune_code": "30001", "place": place})
+	am := want(t, officer.post("/v1/extension/work-schedules", map[string]any{"id": sid, "week_start": "2027-10-11", "action": "submit", "base_version": 2, "items": amended}), 201, "", "gửi điều chỉnh")
+	if sc := obj(am, "schedule"); sc["status"] != "pending" || num(sc, "approved_version") != "2" {
+		t.Fatalf("điều chỉnh chờ duyệt, giữ bản đã duyệt: %s", am)
+	}
+	want(t, officer.post(fmt.Sprintf("/v1/extension/work-schedules/%s/items/%s/checkin", sid, itemNew), near), 404, "extension.schedule_item_not_found", "mục chưa được duyệt")
 	// Cả phản hồi duyệt lịch sau check-in cũng chỉ cache metadata.
-	lead := tinh("lanh_dao_phong")
-	lead.Manager = true
-	lead.MgmtLevel = "truong_phong"
-	reviewer := f.user(lead)
-	approvePath := "/v1/extension/work-schedules/" + sid.String() + "/approve"
 	approveKey := key()
-	approved := want(t, reviewer.postK(approvePath, approveKey, map[string]any{"version": 2}), 200, "", "duyệt sau check-in")
+	approved := want(t, reviewer.postK(approvePath, approveKey, map[string]any{"version": 3}), 200, "", "duyệt điều chỉnh sau check-in")
 	if len(list(approved, "checkins")) != 2 || obj(list(approved, "checkins")[0].(map[string]any), "location") == nil {
 		t.Fatal("phản hồi đầu của người có quyền phải còn vị trí")
 	}
-	approved = want(t, reviewer.postK(approvePath, approveKey, map[string]any{"version": 2}), 200, "", "gửi lại duyệt")
+	approved = want(t, reviewer.postK(approvePath, approveKey, map[string]any{"version": 3}), 200, "", "gửi lại duyệt")
 	for _, v := range list(approved, "checkins") {
 		if obj(v.(map[string]any), "location") != nil {
 			t.Fatal("cache duyệt giữ tọa độ cá nhân")

@@ -68,9 +68,14 @@ class _WsServer {
   final List<Map<String, Object?>> saves = [];
   final List<String?> mineCalls = [];
 
+  /// Phạm vi người gọi theo phiên KN (`owner_level`, `commune_codes` ở cấp
+  /// trên của `mine`) — null: bản máy chủ cũ chưa trả.
+  Map<String, Object?>? scope;
+
   Map<String, Object?> mine(String week) {
     final ws = parseYmd(week)!;
     return {
+      ...?scope,
       'week_start': week,
       'week_end': ymd(ws.add(const Duration(days: 6))),
       'submit_due_at': '2026-10-02T17:00:00+07:00',
@@ -168,6 +173,8 @@ WsItem _item(
   String content = 'Kiểm tra rầy nâu HTX Mỹ Hòa',
   String? participants,
   String? note,
+  String? commune = '30280',
+  String? location = 'Ấp 1',
 }) => WsItem(
   id: id,
   day: day,
@@ -175,6 +182,8 @@ WsItem _item(
   startTime: start,
   endTime: end,
   content: content,
+  communeCode: commune,
+  location: location,
   participants: participants,
   note: note,
 );
@@ -232,6 +241,22 @@ void main() {
       bad(_item('a', _week, end: '24:00'), 'end_time');
       bad(_item('a', _week, start: '10:00', end: '09:00'), 'end_time');
       bad(_item('a', _week, start: null, end: '09:00'), 'start_time');
+      // Log bug TT-05/CN-04: Địa điểm bắt buộc (chữ hoặc vị trí); Xã/phường bắt
+      // buộc với mọi người đăng ký, cả cán bộ tỉnh (quyết định PO 25/10/2026).
+      bad(_item('a', _week, location: ' '), 'location');
+      validateItem(
+        WsItem(
+          id: 'g',
+          day: _week,
+          session: WsSession.morning,
+          content: 'Thăm đồng',
+          communeCode: '30280',
+          place: const WsPlace(lat: 10, lon: 105),
+        ),
+        _week,
+      );
+      bad(_item('a', _week, commune: null), 'commune_code');
+      bad(_item('a', _week, commune: ' '), 'commune_code');
       validateItem(_item('a', _week, start: '09:00', end: '09:00'), _week);
     });
 
@@ -429,6 +454,84 @@ void main() {
       expect(v.offline, isTrue);
       expect(v.fetchedAt, isNotNull);
       expect(v.status, WsStatus.pending);
+    });
+
+    test('R-B1 (review #99): tuần mới (schedule null) — cán bộ xã vẫn có xã phụ trách, Xã/phường bắt buộc', () async {
+      srv.scope = {
+        'owner_level': 'commune',
+        'commune_codes': ['30280', '30281'],
+      };
+      var v = await svc.load(_week);
+      expect(v.scheduleId, isNull, reason: 'tuần chưa đăng ký');
+      expect(v.communeCodes, ['30280', '30281']);
+      await expectLater(
+        svc.upsertItem(_week, _item(svc.newItemId(), _week, commune: null)),
+        throwsA(
+          isA<WorkScheduleError>().having(
+            (e) => e.field,
+            'field',
+            'commune_code',
+          ),
+        ),
+      );
+      v = await svc.upsertItem(
+        _week,
+        _item(svc.newItemId(), _week, commune: '30281'),
+      );
+      expect(v.items.single.communeCode, '30281');
+      v = await svc.save(_week, submit: true);
+      expect(srv.saves.single['items'], [
+        isA<Map<String, Object?>>().having(
+          (m) => m['commune_code'],
+          'commune_code',
+          '30281',
+        ),
+      ]);
+
+      // Ngoại tuyến, mở tuần khác chưa từng tải: dùng phạm vi đã đệm.
+      srv.offline = true;
+      v = await svc.load(_week.add(const Duration(days: 7)));
+      expect(v.offline, isTrue);
+      expect(v.communeCodes, ['30280', '30281']);
+    });
+
+    test('R-B1 (PO 25/10/2026): cán bộ tỉnh cũng bắt buộc Xã/phường, chọn trong mọi xã của tỉnh (có tên, cả ngoại tuyến)', () async {
+      srv.scope = {
+        'owner_level': 'province',
+        'commune_codes': ['30280', '30281', '30282'],
+        'communes': [
+          {'code': '30280', 'name': 'Mỹ Hòa Hưng'},
+          {'code': '30281', 'name': 'Bình Đức'},
+          {'code': '30282', 'name': 'Núi Sam'},
+        ],
+      };
+      var v = await svc.load(_week);
+      expect(v.scheduleId, isNull, reason: 'tuần chưa đăng ký');
+      expect(v.ownerLevel, 'province');
+      expect(v.communeCodes, ['30280', '30281', '30282']);
+      expect(v.communeNames['30282'], 'Núi Sam');
+      await expectLater(
+        svc.upsertItem(_week, _item(svc.newItemId(), _week, commune: null)),
+        throwsA(
+          isA<WorkScheduleError>().having(
+            (e) => e.field,
+            'field',
+            'commune_code',
+          ),
+        ),
+      );
+      v = await svc.upsertItem(
+        _week,
+        _item(svc.newItemId(), _week, commune: '30282'),
+      );
+      expect(v.items.single.communeCode, '30282');
+
+      // Ngoại tuyến, mở tuần chưa từng tải: cùng danh sách xã (bản đệm `mine`).
+      srv.offline = true;
+      v = await svc.load(_week.add(const Duration(days: 7)));
+      expect(v.offline, isTrue);
+      expect(v.communeCodes, ['30280', '30281', '30282']);
+      expect(v.communeNames['30281'], 'Bình Đức');
     });
 
     test(

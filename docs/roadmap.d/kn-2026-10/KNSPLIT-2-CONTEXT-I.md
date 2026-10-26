@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-CONTEXT-I: Callback phiên chủ KN cho Báo giá/HCTH/Contact đã wired; source composite, 34 owner/native HTTP-PG, static/lint và full5 thực PASS; giữ35golden/boundary314; chờ root rebase/helper9 + full KN77/API và tích hợp dev.

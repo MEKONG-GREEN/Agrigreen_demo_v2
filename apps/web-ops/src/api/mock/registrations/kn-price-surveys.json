@@ -1,0 +1,11 @@
+{
+  "id": "kn-price-surveys",
+  "source": "./kn-price-surveys",
+  "app": [
+    {
+      "export": "priceSurveyRoutes",
+      "order": 78
+    }
+  ],
+  "admin": []
+}

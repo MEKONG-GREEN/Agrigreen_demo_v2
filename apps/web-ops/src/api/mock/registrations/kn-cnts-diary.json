@@ -1,0 +1,11 @@
+{
+  "id": "kn-cnts-diary",
+  "source": "./kn-cnts-diary",
+  "app": [
+    {
+      "export": "cntsDiaryRoutes",
+      "order": 1048
+    }
+  ],
+  "admin": []
+}

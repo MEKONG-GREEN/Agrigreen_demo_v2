@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-HTX-READERS-B: dev880ba924; helper99344 exit0/11migration509.204s/HTX10-137.047s/platform4-130.606s/handler151.165s, noSKIP/FAIL; full5PG/static đạt;33goldens/ACL giữ; baseline314/directHTXimports0.
