@@ -69,7 +69,7 @@ func newKHTCFormFxWith(t *testing.T, wrapControl func(formsport.PeriodControl) f
 		t.Fatal(err)
 	}
 	cw := &crosswalk{closed: true}
-	var control formsport.PeriodControl = fm.Control()
+	control := fm.Control()
 	if wrapControl != nil {
 		control = wrapControl(control)
 	}
