@@ -8,7 +8,7 @@ Offline ID chỉ được trả cached data sau khi kiểm profile, biểu và �
 
 Snapshot là byte bất biến có hash: không lọc JSON rồi giữ hash cũ. Với actor có filter tường minh, chỉ trả whole native snapshot khi mọi đơn vị trong snapshot đều được phép. Mirror không có metadata template/target có thể chứng minh, nên actor có filter tường minh không đọc được mirror qua cổng generic; luồng nil cũ giữ nguyên. Không thay bytes snapshot/golden hoặc actor lịch sử.
 
-Các port job dùng tenant tường minh (Feed/SystemProgress) vẫn là cổng máy chủ tin cậy; không dựng Principal. Sync feed không tự phát sự kiện khi grant thay đổi: owner #71 phải có hợp đồng refresh/resync để successor thấy task và thiết bị bỏ cache quyền đã thu hồi. #74 chỉ cung cấp enforcement hiện hành, chưa hoàn thành FN-14/handoff.
+Các port job dùng tenant tường minh (Feed/SystemProgress) vẫn là cổng máy chủ tin cậy; không dựng Principal. Sync feed không tự phát sự kiện khi grant thay đổi. Hợp đồng refresh/resync (#71/#49): chủ KN (`Module.SessionProjection`) chiếu quyền FN-14 hiện hành vào payload chủ mỗi request; dấu quyền phiên đổi → idempotency không trả phản hồi theo quyền cũ và con trỏ pf/sync `reset` (docs/dev/sync-contract.md), nên người nhận thấy task và thiết bị bỏ cache quyền đã thu hồi. KN adapter: `internal/kn/extension/module_forms_profiles.go` (profile `kn_cnts`).
 
 Gói không đổi HTTP/schema/DDL/ACL. Lỗi dùng mã hiện có. KN adapter/closure thuộc #71, cần cross-review trước tích hợp qua ticket.
 

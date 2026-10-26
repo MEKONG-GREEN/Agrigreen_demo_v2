@@ -264,7 +264,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 			return Modules{}, pools, err
 		}
 	}
-	sessionRegistry, err := authz.NewSessionRegistry(extension.SessionProjection())
+	// #49/#71: phiên chủ KN của module (kèm phạm vi quyền CNTS FN-14 hiện hành từ sổ cnts_grant) thay phép chiếu tĩnh.
+	sessionRegistry, err := authz.NewSessionRegistry(kn.SessionProjection())
 	if err != nil {
 		return Modules{}, pools, err
 	}

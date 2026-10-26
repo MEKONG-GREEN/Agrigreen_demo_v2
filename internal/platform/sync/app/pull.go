@@ -89,6 +89,15 @@ func (s *Service) PullEntitiesOnly(ctx context.Context, deviceHeader, cursor str
 		// Đổi vai trò/phòng ban/xã phụ trách của ngữ cảnh → con trỏ cũ reset (dữ liệu KN theo phòng ban).
 		fp = "kn:" + p.KN.Role + ":" + p.KN.Department + ":" + fp
 	}
+	if p.SelectedSession != nil {
+		// #49 (FN-14 AC-02): phiên chủ đã chọn — quyền trong payload chủ đổi (cấp, thu hồi, chuyển việc) thì dấu quyền
+		// đổi → con trỏ cũ reset, máy nạp lại toàn bộ theo quyền hiện hành. Không giải mã payload; phiên lỗi → chặn.
+		stamp, err := p.SelectedSession.AuthorizationStamp()
+		if err != nil {
+			return PullResult{}, problem.Forbidden.WithCause(err)
+		}
+		fp += ":s" + hex.EncodeToString(stamp[:8])
+	}
 	if scope.Empty() && p.Has(accport.RoleFarmer) {
 		// Nông dân: token không có org_ref → phạm vi pf/party rỗng. Đi đường riêng theo
 		// nông hộ liên kết (chỉ entity của FarmerSource), không suy phạm vi xã.
