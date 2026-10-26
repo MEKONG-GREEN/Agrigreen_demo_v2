@@ -29,6 +29,11 @@
 // W11.27 (pf 20261024091030) — KẾ HOẠCH NHÂN LỰC NĂM (FN-11, D3 H7): profile "hrm_plan" của cap/forms (đơn vị lá = đơn vị
 // nội bộ), số hiện có/dự kiến nghỉ hưu tự tính từ hồ sơ tại ngày chốt, nháp và điều chỉnh sau chốt ở sổ pf_hrm.
 //
+// NOTIFY-HCTH-KN #50 (pf 20261026125619) — THÔNG BÁO HCTH (module_notify.go): sự kiện outbox pf.hrm.promotion_due.detected
+// (job nâng bậc) và pf.hrm.plan.reminded ("Nhắc phòng chưa lập", sổ plan_reminder) ghi cùng giao dịch với sổ; loại thông
+// báo hrm_promotion_due/hrm_plan_reminder, consumer pf.notify.hrm và builder (người nhận qua port.NotifyDirectory) đăng ký
+// vào registry chung của pf/notify.
+//
 // Gói sau của cùng module: W11.26 đánh giá. Module khác chỉ import hrm/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
 package hrm
 

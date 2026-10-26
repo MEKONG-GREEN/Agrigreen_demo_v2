@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.hrm.plan.reminded/v1",
+  "title": "pf.hrm.plan.reminded — payload",
+  "description": "Phòng HCTH hoặc Admin (phiên có quyền ghi kế hoạch) bấm \"Nhắc phòng chưa lập\" (W11.27, BRD HCTH v3.0 FN-11). Ghi cùng giao dịch với sổ pf_hrm.plan_reminder (reminder_id). units là các đơn vị nội bộ chưa gửi kế hoạch lúc nhắc; node_ref là Nút sở hữu phòng ban của phiên người nhắc (Trung tâm). pf/notify (consumer pf.notify.hrm, builder do pf/hrm đăng ký) gửi thông báo hrm_plan_reminder tới lãnh đạo các đơn vị đó tại Nút node_ref — không gửi toàn tenant theo vai realm. Không dữ liệu cá nhân.",
+  "x-event-type": "pf.hrm.plan.reminded",
+  "x-schema-version": 1,
+  "x-producer": "pf/hrm",
+  "type": "object",
+  "required": [
+    "reminder_id",
+    "year",
+    "period_ref",
+    "node_ref",
+    "units",
+    "due_at",
+    "actor_ref"
+  ],
+  "properties": {
+    "reminder_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "year": {
+      "type": "integer",
+      "description": "Năm kế hoạch"
+    },
+    "period_ref": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Kỳ native cap/forms (profile hrm_plan)"
+    },
+    "node_ref": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Nút sở hữu phòng ban của phiên người nhắc"
+    },
+    "units": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "due_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Hạn các đơn vị gửi"
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Người nhắc (không tự nhận thông báo)"
+    }
+  }
+}
