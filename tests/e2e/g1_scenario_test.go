@@ -1064,7 +1064,6 @@ func TestRB3ErasureEvidenceUnreadable(t *testing.T) {
 const piiColumnQuery = `SELECT table_schema, table_name, column_name FROM information_schema.columns
 	  WHERE (table_schema LIKE 'pf\_%' OR table_schema = 'shared')
 	    AND column_name ~* '(full_?name|phone|national_?id|cccd|address|dia_chi|ho_ten)'
-	    AND data_type <> 'boolean' -- cờ có/không (vd pf_price.survey_form.has_phone) không chứa được dữ liệu cá nhân
       AND NOT (table_schema = 'pf_contact' AND column_name IN ('phone', 'address')
        AND table_name IN (SELECT c.relname FROM pg_partition_tree('pf_contact.unit'::regclass) p
         JOIN pg_class c ON c.oid = p.relid))
