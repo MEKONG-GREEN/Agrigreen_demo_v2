@@ -93,6 +93,11 @@ func SendLeaseFromEnv(getenv func(string) string) (time.Duration, error) {
 	return dispatch.SendLeaseFromEnv(getenv)
 }
 
+// SendMargin là biên an toàn giữa hạn lời gọi SMTP và hạn nhận việc (¼ hạn, tối đa 30 giây) — xem dispatch.SendMargin.
+func SendMargin(lease time.Duration) time.Duration {
+	return dispatch.SendMargin(lease)
+}
+
 // Module là pf/reports đã nối.
 type Module struct{ svc *app.Service }
 

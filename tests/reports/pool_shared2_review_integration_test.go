@@ -15,7 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -33,9 +33,9 @@ func TestP0PoolShared2_DeliverySMTPDeadlineFromClaimStart(t *testing.T) {
 	modPool := pgtest.Get(t).SizedPool(t, migrations.PF, dbadmin.AppPlatform, 1)
 	f := newFixtureWith(t, true, modPool)
 	ev, _ := scheduledCompleted(t, f)
-	const lease = 4 * time.Second // biên dispatch.SendMargin = 1 s → hạn gửi = mốc trước giao dịch nhận + 3 s
+	const lease = 4 * time.Second // biên reports.SendMargin = 1 s → hạn gửi = mốc trước giao dịch nhận + 3 s
 	const hold = 2 * time.Second  // giữ kết nối: giao dịch nhận chờ
-	sendWindow := lease - dispatch.SendMargin(lease)
+	sendWindow := lease - reports.SendMargin(lease)
 	f.mod.UseDeliveryLease(lease)
 	var mu sync.Mutex
 	var (
