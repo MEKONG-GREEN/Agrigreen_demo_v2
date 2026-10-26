@@ -49,7 +49,8 @@ func (m *Module) SessionProjection() authz.SessionRegistration {
 //   - chỉ phiên Cấp Xã của phòng Chăn nuôi – Thủy sản (quyền FN-14 là quyền trong module CNTS); vai/phòng khác → nil;
 //   - người được cấp = người gọi; chế độ hỗ trợ có tài khoản được hỗ trợ → tài khoản đó; hỗ trợ không gắn tài khoản
 //     (Admin chỉ chọn vai + xã) → nil (không có người được cấp; giữ phạm vi Admin đã chọn — câu hỏi mở #71);
-//   - xã của quyền giao với Scope của lần gán đã chọn (cùng người nhiều lần gán: mỗi phiên chỉ thấy xã của mình);
+//   - xã của quyền giao với Scope của lần gán đã chọn (cùng người nhiều lần gán: mỗi phiên chỉ thấy xã của mình; người
+//     đã từng có quyền CNTS thì phiên ở xã chưa được cấp là phạm vi rỗng, không quay về W11.07);
 //   - tenant = tenant đã xác thực (RLS). Ngữ cảnh chỉ xem vẫn được chiếu (chỉ thu hẹp; ghi đã bị chặn tập trung).
 func (m *Module) cntsGrantScope(ctx context.Context, p authz.Principal, k port.SessionContext) (*port.CNTSGrantScope, error) {
 	if k.Role != port.SessionRoleCommune || k.Department != partyport.DeptChanNuoiThuySan || m == nil || m.model == nil {

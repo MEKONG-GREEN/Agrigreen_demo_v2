@@ -103,8 +103,9 @@ func TestCNTSGrantOwnerSession_71(t *testing.T) {
 	rows := f.count(`SELECT count(*) FROM pf_extension.cnts_grant WHERE tenant_id = $1`, f.tenant)
 
 	// Cùng người nhiều lần gán: phiên xã khác không nhận quyền của xã 30001; phòng khác, tenant khác không có phạm vi.
-	if o2 := f.project(officer.ref, f.tenant, xa("30002")); o2.k.CNTSGrant != nil {
-		t.Fatalf("lần gán khác nhận quyền: %+v", o2.k.CNTSGrant)
+	if o2 := f.project(officer.ref, f.tenant, xa("30002")); o2.k.CNTSGrant == nil || len(o2.k.CNTSGrant.Grants) != 0 ||
+		allowsTemplate(o2.forms(t), "CNTS-BM01") {
+		t.Fatalf("lần gán khác không nhận quyền của xã 30001 và không quay về W11.07: %+v", o2.k.CNTSGrant)
 	}
 	both := f.project(officer.ref, f.tenant, xa("30001", "30002"))
 	if both.k.CNTSGrant == nil || both.forms(t).Scope.Allows("30002") {
@@ -219,5 +220,32 @@ func TestCNTSGrantOwnerSession_71(t *testing.T) {
 	if n := f.count(`SELECT count(*) FROM pf_extension.cnts_grant WHERE tenant_id = $1 AND grant_ref = $2 AND grantee_ref <> $3`, f.tenant,
 		uuid.MustParse(g1ref), officer.ref); n != 0 {
 		t.Fatal("thu hồi đổi người được cấp của quyền cũ")
+	}
+}
+
+// Review #71 (fail-open): thu hẹp quyền bằng UpdateGrant (X+Y → X) không được trả xã đã bỏ về W11.07. Người đã từng có quyền
+// CNTS (bất kỳ phiên bản nào, kể cả đã sửa/thu hồi/hết hạn) luôn là phạm vi tường minh: phiên xã Y = rỗng = chặn.
+func TestCNTSGrantNarrowingStaysExplicit_71(t *testing.T) {
+	f := newFix(t)
+	tongHop := f.user(tinh("tong_hop"))
+	officer := f.user(xa("30001", "30002"))
+	f.xa.list = []accport.XaScope{{ActorRef: officer.ref, Communes: []string{"30001", "30002"}}}
+	g := want(t, tongHop.post(base+"grants", map[string]any{"grantee_ref": officer.ref.String(), "role": "tang_cuong",
+		"commune_codes": []string{"30001", "30002"}, "forms": []string{"BM-04"}}), 201, "", "cấp X+Y")
+	if o := f.project(officer.ref, f.tenant, xa("30002")); o.k.CNTSGrant == nil || len(o.k.CNTSGrant.Grants) != 1 ||
+		!allowsTemplate(o.forms(t), "CNTS-BM04") {
+		t.Fatalf("trước khi thu hẹp, xã Y có quyền: %+v", o.k.CNTSGrant)
+	}
+	want(t, tongHop.post(base+"grants/"+str(g, "ref"), map[string]any{"base_version": 1, "commune_codes": []string{"30001"},
+		"forms": []string{"BM-04"}}), 200, "", "thu hẹp còn X")
+	o := f.project(officer.ref, f.tenant, xa("30002"))
+	if o.k.CNTSGrant == nil || len(o.k.CNTSGrant.Grants) != 0 {
+		t.Fatalf("thu hẹp quyền làm xã Y quay về W11.07: %+v", o.k.CNTSGrant)
+	}
+	if a := o.forms(t); a.AllowsTemplate == nil || a.AllowsTemplate("CNTS-BM04") || !a.Scope.Empty() || a.AllowsTarget(formsport.UnitFacility, fac1) {
+		t.Fatal("xã đã bỏ khỏi quyền vẫn mở biểu/cơ sở")
+	}
+	if x := f.project(officer.ref, f.tenant, xa("30001")); x.k.CNTSGrant == nil || len(x.k.CNTSGrant.Grants) != 1 || !allowsTemplate(x.forms(t), "CNTS-BM04") {
+		t.Fatal("xã còn trong quyền phải giữ quyền")
 	}
 }

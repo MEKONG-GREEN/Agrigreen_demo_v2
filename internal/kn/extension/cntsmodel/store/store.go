@@ -457,6 +457,15 @@ func GrantVersions(ctx context.Context, tx pgx.Tx, ref uuid.UUID) ([]Grant, erro
 	return collect(rows, err, scanGrant)
 }
 
+// GranteeEverGranted cho biết grantee đã TỪNG có quyền CNTS (vai khác nông hộ) ở BẤT KỲ phiên bản nào trong tenant — kể
+// cả quyền đã sửa thu hẹp, thu hồi, hết hạn (#71: quyết định phạm vi tường minh của phiên, chỉ đọc).
+func GranteeEverGranted(ctx context.Context, tx pgx.Tx, grantee uuid.UUID) (bool, error) {
+	var ok bool
+	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pf_extension.cnts_grant WHERE grantee_ref = $1 AND role <> $2)`,
+		grantee, domain.RoleFarmer).Scan(&ok)
+	return ok, err
+}
+
 // ListGrants trả bản hiện hành của mọi quyền; grantee khác nil → chỉ của người đó.
 func ListGrants(ctx context.Context, tx pgx.Tx, grantee *uuid.UUID) ([]Grant, error) {
 	rows, err := tx.Query(ctx, "SELECT "+grantCols+` FROM (

@@ -24,9 +24,12 @@ import (
 // SessionGrants trả phạm vi quyền FN-14 hiện hành của grantee trong tenant, giới hạn trong các xã mà phiên được phép
 // (inScope — Scope của lần gán đã chọn).
 //
-//   - nil: grantee chưa từng có quyền (mọi trạng thái) chạm xã của phiên → người gọi giữ hành vi W11.07;
+//   - nil: grantee CHƯA TỪNG có quyền CNTS nào (mọi phiên bản, mọi xã, vai khác nông hộ) trong tenant → giữ W11.07;
 //   - khác nil: tường minh — chỉ quyền đang hiệu lực hôm nay (giờ Việt Nam, tính cả ngày đầu/cuối; thu hồi, chờ hiệu
-//     lực, hết hạn bị bỏ). Không còn quyền nào → phạm vi rỗng (chặn), không quay về W11.07.
+//     lực, hết hạn bị bỏ) có xã thuộc phiên. Không còn quyền nào → phạm vi rỗng (chặn), không quay về W11.07.
+//
+// Tường minh xét trên MỌI phiên bản sổ, không chỉ bản hiện hành, và không theo xã: sửa thu hẹp xã (X+Y → X), đổi mã xã
+// do sáp nhập hay lần gán ở xã khác không bao giờ mở lại W11.07 cho người đã được quản lý bằng FN-14 (review #71).
 //
 // Vai nông hộ thuộc phiên nông hộ (GĐ2) nên không chiếu vào phiên Cấp Xã.
 func (s *Service) SessionGrants(ctx context.Context, tenantID, grantee uuid.UUID, inScope func(string) bool) (*knport.CNTSGrantScope, error) {
@@ -42,7 +45,6 @@ func (s *Service) SessionGrants(ctx context.Context, tenantID, grantee uuid.UUID
 			return err
 		}
 		scope := &knport.CNTSGrantScope{Grants: []knport.CNTSGrant{}, Households: []uuid.UUID{}}
-		touched := false
 		var hhRefs, siteRefs []uuid.UUID
 		for _, g := range gs {
 			if g.GranteeRef != grantee || g.Role == domain.RoleFarmer {
@@ -52,7 +54,6 @@ func (s *Service) SessionGrants(ctx context.Context, tenantID, grantee uuid.UUID
 			if len(communes) == 0 {
 				continue
 			}
-			touched = true
 			if domain.GrantStatus(g.Event, g.ValidFrom, g.ValidTo, today) != domain.StatusActive {
 				continue
 			}
@@ -67,8 +68,12 @@ func (s *Service) SessionGrants(ctx context.Context, tenantID, grantee uuid.UUID
 			hhRefs = append(hhRefs, e.Households...)
 			siteRefs = append(siteRefs, e.Sites...)
 		}
-		if !touched {
+		if len(gs) == 0 {
 			return nil
+		}
+		ever, err := store.GranteeEverGranted(ctx, tx, grantee)
+		if err != nil || !ever {
+			return err
 		}
 		slices.SortFunc(scope.Grants, func(a, b knport.CNTSGrant) int { return strings.Compare(a.Ref.String(), b.Ref.String()) })
 		if len(hhRefs) > 0 || len(siteRefs) > 0 {
