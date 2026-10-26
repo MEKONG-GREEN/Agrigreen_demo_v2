@@ -1,15 +1,15 @@
 package app
 
-// TẠM (KNSPLIT-2-MENU-KN): ghi ảnh chụp đầu ra cây menu compatibility cho kiểm parity của builder KN.
-// Không commit trong làn KN — đề xuất làn shared giữ lại (child issue). Chạy:
-//   AG_KN_MENU_SNAPSHOT=<đường dẫn> go test ./internal/platform/party/app -run TestKNMenuCompatSnapshot
-
+// KNSPLIT-2-MENU-PARITY (#122): bộ sinh ảnh chụp compatibility của #76 (trước là testdata/compat_snapshot_gen.go.txt,
+// chép tạm vào gói này) giữ thành kiểm thử thật. Ảnh chụp ghi ở internal/kn/extension/menu/testdata/compat-menus.json.
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/uuid"
@@ -20,7 +20,9 @@ import (
 
 type snapForms bool
 
-func (f snapForms) HasForms(context.Context, string, string, string) (bool, error) { return bool(f), nil }
+func (f snapForms) HasForms(context.Context, string, string, string) (bool, error) {
+	return bool(f), nil
+}
 
 type snapDept struct {
 	Code        string `json:"code"`
@@ -78,11 +80,9 @@ func snapItems(items []MenuItemView) []snapItem {
 	return out
 }
 
-func TestKNMenuCompatSnapshot(t *testing.T) {
-	path := os.Getenv("AG_KN_MENU_SNAPSHOT")
-	if path == "" {
-		t.Skip("AG_KN_MENU_SNAPSHOT unset")
-	}
+// compatMenuSnapshot sinh ảnh chụp đầu ra compatibility (JSON đã thụt lề, có dòng cuối).
+func compatMenuSnapshot(t *testing.T) []byte {
+	t.Helper()
 	nav, err := domain.RegisteredNavigation()
 	if err != nil {
 		t.Fatal(err)
@@ -214,8 +214,28 @@ func TestKNMenuCompatSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, append(out, '\n'), 0o644); err != nil {
+	t.Logf("cases=%d results=%d bytes=%d", len(cases), len(results), len(out))
+	return append(out, '\n')
+}
+
+// TestCompatMenuSnapshotCurrent giữ ảnh chụp compatibility mà builder của ứng dụng (internal/kn/extension/menu,
+// TestBuilderMatchesCompatibilitySnapshot) so từng byte luôn khớp bảng hiện hành của pf/party: đổi menu mà quên sinh
+// lại thì hỏng ở đây. Sinh lại: AG_UPDATE_MENU_SNAPSHOT=1 go test -count=1 -run TestCompatMenuSnapshotCurrent
+// ./internal/platform/party/app, rồi go test ./internal/kn/extension/menu.
+func TestCompatMenuSnapshotCurrent(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "kn", "extension", "menu", "testdata", "compat-menus.json")
+	got := compatMenuSnapshot(t)
+	if os.Getenv("AG_UPDATE_MENU_SNAPSHOT") == "1" {
+		if err := os.WriteFile(path, got, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("cases=%d results=%d bytes=%d", len(cases), len(results), len(out))
+	if !bytes.Equal(bytes.ReplaceAll(want, []byte("\r\n"), []byte("\n")), got) {
+		t.Fatalf("%s lệch đầu ra compatibility hiện hành (%d/%d byte): sinh lại bằng AG_UPDATE_MENU_SNAPSHOT=1", path, len(want), len(got))
+	}
 }

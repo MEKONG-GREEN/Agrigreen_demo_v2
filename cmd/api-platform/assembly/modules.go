@@ -164,11 +164,18 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 
 	md := masterdata.New(unit, clk, masterdata.Deps{Params: masterdataParamRegistrations(), Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 
-	navigationPolicy, err := extension.NavigationPolicy()
+	// KNSPLIT-2-MENU-PARITY (#122): cây menu KN do ứng dụng sở hữu (#76) thay bảng compatibility của pf/party.
+	// Mỗi module thành viên giữ nguồn của mình; NavigationPolicy của catalog giải alias bộ menu nên thay
+	// extension.NavigationPolicy() (chỉ dành cho đường compatibility). Parity: tests/kn77/menu_parity_integration_test.go.
+	menuCatalog, err := extension.MenuCatalog(hrm.MenuSource(), price.MenuSource(), contact.MenuSource())
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault, NavigationPolicy: navigationPolicy})
+	menus, err := menuCatalog.Registry()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault, Menus: menus, NavigationPolicy: menuCatalog.NavigationPolicy()})
 	wf := wireWorkflow(unit, clk, md, pty) // W6.1: cap/workflow cho duyệt tham số, cấp quyền (r_workflow, W2.6: cùng pool đơn vị)
 
 	g := geo.New(unit, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits()})
@@ -351,6 +358,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	pty.UseDepartmentUsage(mech.DepartmentUsage())
 	pty.UseDepartmentUsage(coop.DepartmentUsage())
 	pty.UseFormAvailability(rep.FormAvailability())
+	menuCatalog.UseFormAvailability(rep.FormAvailability()) // #122: cùng nguồn P3 cho mục "Báo cáo đột xuất" của cây KN
 	md.UseFormUsage(rep.FormUsage())
 	kn.UseTablePDF(rep.TablePDF()) // KN v7.7 P5: "Xuất PDF" lịch công tác
 	pr.UseTablePDF(rep.TablePDF()) // W11.75: "Tải PDF" phiếu báo giá (FN-XA-03.02)
