@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
@@ -78,36 +79,85 @@ const (
 	  VALUES ($1, $2::uuid, gen_random_uuid(), now() + interval '1 minute')`
 )
 
+// intentUntil đọc claim_until của ý định hủy ĐANG GIỮ của kỳ (giờ DB) — hạn thật mà Bản cuối/đóng kỳ phải chờ.
+func intentUntil(f *reportFx, adm *pgxpool.Pool, pid string) (time.Time, error) {
+	var until time.Time
+	err := tenant.WithTenantTx(context.Background(), adm, f.tid, func(tx pgx.Tx) error {
+		return tx.QueryRow(context.Background(), `SELECT claim_until FROM pf_extension.khtc_cancel_intent
+		  WHERE tenant_id = $1 AND period_id = $2::uuid AND claim_id IS NOT NULL`, f.tid, pid).Scan(&until)
+	})
+	return until, err
+}
+
 // C1: cap/forms CancelPeriod chậm bị cắt TRƯỚC hạn ý định hủy (hạn 4 s, biên 1 s), trả 503; ý định được trả ngay.
+//
+// TEST-143-DEFLAKE (#153): không đo đồng hồ từ một mốc phía test (máy tải → độ trễ trước giao dịch nhận và độ trễ fake
+// nhận ra ctx hủy cộng vào số đo, đỏ giả). Kiểm trực tiếp bất biến: hạn ctx mà CancelPeriod nhận phải sớm hơn claim_until
+// THẬT của ý định (đọc từ DB trong lúc ý định còn giữ) ít nhất cancelDeadlineSlack, và lời gọi dừng vì chính hạn đó —
+// kể cả khi giao dịch nhận phải chờ khóa lâu (hạn neo trước giao dịch nhận, không phải lúc commit).
 func TestP0PoolShared2_KHTCCancelFormsDeadlineBeforeLease(t *testing.T) {
 	f, h := newHookedReportFx(t)
 	const lease = 4 * time.Second
+	// Biên sản phẩm = min(lease/4, 15 s) = 1 s cộng thời gian giao dịch nhận; một nửa biên đủ phân biệt với hạn không biên
+	// (hạn = mốc + lease ≈ claim_until) mà không phụ thuộc tải máy.
+	const cancelDeadlineSlack = 500 * time.Millisecond
 	f.ext.UseKHTCCancelLease(lease)
 	p := f.open(41, dTT, dTTTT)
+	adm := pgtest.Get(t).AdminPool(t, migrations.PF) // mở trên goroutine test (hook chạy ở goroutine máy chủ)
 	var mu sync.Mutex
-	var stopped time.Duration
-	hadDeadline := false
-	start := time.Now()
+	var (
+		deadline   time.Time
+		hasDL      bool
+		claimUntil time.Time
+		untilErr   error
+		stopErr    error
+	)
 	h.set(func(ctx context.Context, _ func(context.Context) error) error {
-		_, dl := ctx.Deadline()
+		dl, ok := ctx.Deadline()
+		until, uerr := intentUntil(f, adm, p.ID) // ý định đã commit trước lời gọi cap/forms
 		select {
 		case <-ctx.Done():
 		case <-time.After(3 * lease): // không có hạn → treo tới đây (đỏ)
 		}
 		mu.Lock()
-		stopped, hadDeadline = time.Since(start), dl
+		deadline, hasDL, claimUntil, untilErr, stopErr = dl, ok, until, uerr, ctx.Err()
 		mu.Unlock()
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 		return errors.New("fixture: cap/forms treo")
 	})
+	// Giữ khóa khtc_snapshot của kỳ 2 s: giao dịch nhận ý định (BeginCancel) mở giao dịch — claim_until = now() (đầu giao
+	// dịch) + hạn — rồi phải chờ khóa. Hạn neo TRƯỚC giao dịch nhận (đúng) vẫn sớm hơn claim_until một biên; hạn neo SAU khi
+	// giao dịch nhận commit thì muộn hơn ~1 s → đỏ.
+	hold, err := adm.Begin(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := hold.Exec(context.Background(), `SELECT pg_advisory_xact_lock(hashtextextended('khtc_snapshot:' || $1::uuid::text || ':' || $2::uuid::text, 0))`, f.tid, p.ID); err != nil {
+		_ = hold.Rollback(context.Background())
+		t.Fatal(err)
+	}
+	held := make(chan struct{})
+	go func() {
+		defer close(held)
+		time.Sleep(2 * time.Second)
+		_ = hold.Rollback(context.Background())
+	}()
 	c, b := f.khtc(http.MethodPost, "/periods/"+p.ID+"/cancel", f.khtcUser, "", map[string]any{"reason": "Hủy kỳ khi cap/forms đang chậm"})
+	<-held
 	mu.Lock()
-	got, dl := stopped, hadDeadline
+	dl, ok, until, uerr, serr := deadline, hasDL, claimUntil, untilErr, stopErr
 	mu.Unlock()
-	if !dl || got >= lease {
-		t.Fatalf("P0-POOL-SHARED-2 C1: CancelPeriod dừng sau %s (có hạn=%v), muốn trước hạn ý định %s", got, dl, lease)
+	if uerr != nil {
+		t.Fatalf("đọc claim_until của ý định hủy: %v", uerr)
+	}
+	if !ok || !dl.Before(until.Add(-cancelDeadlineSlack)) {
+		t.Fatalf("P0-POOL-SHARED-2 C1: hạn CancelPeriod %s (có hạn=%v) phải sớm hơn hạn ý định claim_until %s ít nhất %s (còn %s)",
+			dl.Format(time.RFC3339Nano), ok, until.Format(time.RFC3339Nano), cancelDeadlineSlack, until.Sub(dl))
+	}
+	if !errors.Is(serr, context.DeadlineExceeded) {
+		t.Fatalf("P0-POOL-SHARED-2 C1: CancelPeriod phải dừng vì hạn của chính nó, ctx.Err()=%v", serr)
 	}
 	f.fail(c, b, "extension.dependency_unavailable")
 	if n := intentSQL(t, f, p.ID, sqlLiveIntents); n != 0 {
