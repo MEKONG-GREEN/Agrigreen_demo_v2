@@ -80,4 +80,10 @@ regexes = [
 
   # Biến môi trường được escape trong tệp compose: $$TEN_BIEN
   '''\$\$[A-Z0-9_]+''',
+
+  # 25/10/2026 — khóa mục menu KN (vd "tinh.bao_cao.tong_hop.tuan.t01", "xa.bao_cao.hang_vu.v01") trong
+  # internal/kn/extension/menu(s)/ và fixture menu của web-ops: generic-api-key trúng vì trường tên "key"
+  # mang chuỗi dài. Neo cả chuỗi: cấp (tw/tinh/xa) + các đoạn chữ thường/số/gạch dưới nối bằng dấu chấm —
+  # khoá API thật (agk_<12>_<43>, ADR-0022) có chữ hoa và không có dấu chấm nên không lọt qua.
+  '''^(tw|tinh|xa)(\.[a-z0-9_]+)+$''',
 ]

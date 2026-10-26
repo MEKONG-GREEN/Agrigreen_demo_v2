@@ -134,7 +134,7 @@ Quy ước đăng ký menu/mock/OpenAPI theo module: [docs/dev/module-registrati
 
 ### Toolchain Go: đặt trước mọi lệnh `go`
 
-Trước **mọi** lệnh `go` (test, cổng, sinh lại, gộp), đặt `GOTOOLCHAIN` bằng dòng `toolchain` trong `go.mod` (hiện `go1.26.9`; sẽ đổi khi [#132](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/132) gộp — luôn đọc lại `go.mod`, đừng chép số cố định), rồi kiểm `go version` và ghi dòng đó vào bằng chứng:
+Trước **mọi** lệnh `go` (test, cổng, sinh lại, gộp), đặt `GOTOOLCHAIN` bằng dòng `toolchain` trong `go.mod` (hiện `go1.26.10`; sẽ đổi khi [#132](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/132) gộp — luôn đọc lại `go.mod`, đừng chép số cố định), rồi kiểm `go version` và ghi dòng đó vào bằng chứng:
 
 ```powershell
 $env:GOTOOLCHAIN = (Select-String -Path go.mod -Pattern '^toolchain\s+(\S+)').Matches[0].Groups[1].Value
