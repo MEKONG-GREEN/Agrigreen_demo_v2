@@ -162,7 +162,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		store = s
 	}
 
-	md := masterdata.New(unit, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
+	md := masterdata.New(unit, clk, masterdata.Deps{Params: masterdataParamRegistrations(), Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 
 	navigationPolicy, err := extension.NavigationPolicy()
 	if err != nil {
