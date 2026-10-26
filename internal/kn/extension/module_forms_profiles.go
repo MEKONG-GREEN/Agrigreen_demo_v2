@@ -86,6 +86,26 @@ func resolveFormActor(ctx context.Context, p authz.Principal, profile formsport.
 	if len(profile.Departments) > 0 && k.Role != extport.SessionRoleAdmin && !slices.Contains(profile.Departments, k.Department) {
 		return formsport.ResolvedActor{}, true, problem.Forbidden.WithDetail("cấu hình biểu " + profile.Name + " không dành cho phòng ban của phiên")
 	}
+	if slices.Contains(profile.Departments, partyport.DeptChanNuoiThuySan) {
+		// #71 (FN-14 AC-01…AC-03, BR-02): biểu kỳ CNTS dùng phạm vi quyền FN-14 trong payload chủ. Chưa từng được cấp →
+		// AllowsTemplate nil + giới hạn W11.07 như cũ; tường minh → biểu, xã, cơ sở, hộ chỉ theo quyền đang hiệu lực
+		// (rỗng = chặn). Closure đọc bản sao bất biến của payload request này.
+		a := formsport.ResolvedActor{Role: k.Role, Department: k.Department, Scope: k.CNTSScope(), Node: k.OrgRef,
+			AllowsTarget: func(kind string, ref uuid.UUID) bool {
+				switch kind {
+				case formsport.UnitFacility:
+					return k.AllowsCNTSFacility(ref)
+				case formsport.UnitHousehold:
+					return k.AllowsCNTSHousehold(ref)
+				default:
+					return true
+				}
+			}}
+		if k.Role == extport.SessionRoleCommune && k.CNTSGrant != nil {
+			a.AllowsTemplate = k.AllowsCNTSForm
+		}
+		return a, true, nil
+	}
 	return formsport.ResolvedActor{
 		Role: k.Role, Department: k.Department, Scope: k.Scope, Node: k.OrgRef,
 		AllowsTarget: func(kind string, ref uuid.UUID) bool {

@@ -371,6 +371,22 @@ func ListHouseholds(ctx context.Context, tx pgx.Tx, f HouseholdFilter) ([]Househ
 	return collect(rows, err, scanHousehold)
 }
 
+// CoveredHouseholds trả bản hiện hành của các hộ có mã trong refs HOẶC thuộc điểm trong sites (phạm vi quyền theo dõi
+// mô hình của phiên — #71). Hai danh sách rỗng → không truy vấn.
+func CoveredHouseholds(ctx context.Context, tx pgx.Tx, refs, sites []uuid.UUID) ([]Household, error) {
+	if len(refs) == 0 && len(sites) == 0 {
+		return nil, nil
+	}
+	rows, err := tx.Query(ctx, "SELECT "+householdCols+` FROM (
+	    SELECT DISTINCT ON (household_ref) * FROM pf_extension.cnts_model_household
+	    WHERE household_ref IN (SELECT household_ref FROM pf_extension.cnts_model_household
+	      WHERE household_ref = ANY ($1::text[]::uuid[]) OR site_ref = ANY ($2::text[]::uuid[]))
+	    ORDER BY household_ref, seq DESC) h
+	  WHERE h.household_ref = ANY ($1::text[]::uuid[]) OR h.site_ref = ANY ($2::text[]::uuid[])
+	  ORDER BY household_ref`, refStrings(refs), refStrings(sites))
+	return collect(rows, err, scanHousehold)
+}
+
 // ---------------------------------------------------------------------------
 // Cấp quyền
 // ---------------------------------------------------------------------------

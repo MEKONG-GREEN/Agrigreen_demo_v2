@@ -113,13 +113,22 @@ type fix struct {
 	ctxs   map[uuid.UUID]*authz.KNContext
 	xa     *xaScopes
 	vault  *clienttest.Fake
+	clk    *clock.Fixed
+	// sessions là phép chiếu phiên chủ của module (#71: kèm phạm vi quyền FN-14), như assembly API.
+	sessions *authz.SessionRegistry
 }
 
 func newFix(t *testing.T) *fix {
 	env := pgtest.Get(t)
 	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}, vault: clienttest.New()}
 	f.pool = env.AdminPool(t, migrations.PF)
-	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), extension.Deps{Units: units{}})
+	f.clk = clock.NewFixed(t0)
+	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, extension.Deps{Units: units{}})
+	registry, err := authz.NewSessionRegistry(mod.SessionProjection())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.sessions = registry
 	mod.UseCNTSCatalogs(catalogs{})
 	mod.UseXaScopes(f.xa)
 	mod.UseCNTSModelVault(f.vault)
@@ -132,10 +141,7 @@ func newFix(t *testing.T) *fix {
 }
 
 func (f *fix) knMiddleware() gin.HandlerFunc {
-	registry, err := authz.NewSessionRegistry(extension.SessionProjection())
-	if err != nil {
-		f.t.Fatal(err)
-	}
+	registry := f.sessions
 	return func(c *gin.Context) {
 		p, ok := authz.FromContext(c.Request.Context())
 		id, err := uuid.Parse(c.GetHeader(authz.ContextHeader))
