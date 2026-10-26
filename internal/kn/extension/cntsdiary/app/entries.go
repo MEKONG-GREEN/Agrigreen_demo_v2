@@ -1,7 +1,7 @@
 package app
 
 // Lần ghi nhật ký (UR-XA-11, UR-XA-12) và rà soát, xác thực (UR-TINH-12, FN-13). Vòng đời Mục III.5: Lưu nháp → Đã gửi →
-// Đã xác thực; Đã gửi → Yêu cầu bổ sung (lý do) → Đã gửi. Chưa xác thực: sửa trong 7 ngày (EditDays) kể từ
+// Đã xác thực; Đã gửi → Yêu cầu bổ sung (lý do) → Đã gửi. Chưa xác thực: sửa trong n ngày (tham số có phiên bản, mặc định 7 — params.go) kể từ
 // ngày ghi; đã xác thực không sửa — điều chỉnh tạo phiên bản 'corrected' có lý do, chờ xác thực lại (AC-04).
 //
 // Vị trí (NT-15, NC-16): tọa độ thiết bị gửi kèm LẦN TẠO, không đổi ở phiên bản sau. Tọa độ vào bảng thường
@@ -330,7 +330,18 @@ func (s *Service) CreateEntry(ctx context.Context, in EntryInput) (EntryView, er
 	}
 	var out store.Entry
 	replayed := false
+	// Hạn lưu GPS: phiên bản có hiệu lực ở ngày thiết bị ghi, đọc NGOÀI giao dịch (#85). Chốt thời điểm ghi mặc định trước
+	// giao dịch để ngày tra tham số trùng ngày tính purge_after.
+	if in.CapturedAt == nil {
+		now := s.now()
+		in.CapturedAt = &now
+	}
 	retention := FixRetentionDays
+	if in.Fix != nil {
+		if retention, err = s.fixRetentionDays(ctx, *in.CapturedAt); err != nil {
+			return EntryView{}, err
+		}
+	}
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.EntryByIdem(ctx, tx, idemEntry(in.IdemKey)); err != nil || prev != nil {
 			if prev != nil {
@@ -443,7 +454,10 @@ func (s *Service) change(ctx context.Context, ref uuid.UUID, act string, in Entr
 	if (act == domain.ActReturn || act == domain.ActCorrect) && !domain.ValidReason(in.Reason) {
 		return EntryView{}, problem.Validation.WithField("reason", "5–1000 ký tự")
 	}
-	editDays := s.editDays(ctx)
+	editDays, err := s.editDays(ctx, s.now())
+	if err != nil {
+		return EntryView{}, err
+	}
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.EntryByIdem(ctx, tx, idemEntry(in.IdemKey)); err != nil || prev != nil {
 			return err
@@ -605,7 +619,10 @@ func (s *Service) ListEntries(ctx context.Context, q EntryQuery) (EntryList, err
 	if q.Review {
 		f.Statuses = []string{domain.StatusSubmitted}
 	}
-	editDays := s.editDays(ctx)
+	editDays, err := s.editDays(ctx, s.now())
+	if err != nil {
+		return EntryList{}, err
+	}
 	out := EntryList{Items: []EntryView{}}
 	refs := []uuid.UUID{}
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
@@ -656,7 +673,10 @@ func (s *Service) GetEntry(ctx context.Context, ref uuid.UUID) (EntryView, error
 	if err != nil {
 		return EntryView{}, err
 	}
-	editDays := s.editDays(ctx)
+	editDays, err := s.editDays(ctx, s.now())
+	if err != nil {
+		return EntryView{}, err
+	}
 	var v EntryView
 	var person uuid.UUID
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {

@@ -140,16 +140,6 @@ func (s *Service) thresholds(ctx context.Context, modelType string) domain.Thres
 	return domain.Thresholds{PHMin: &phMin, PHMax: &phMax, DOMin: &doMin, MortalityMaxPct: s.optParam(ctx, ParamMortality+":"+modelType)}
 }
 
-// EditDays: lần ghi đã gửi chưa xác thực sửa được trong 7 ngày kể từ ngày ghi (Mục III.5). FixRetentionDays: hạn lưu tọa độ
-// GPS lúc ghi (tạm 365 ngày, chờ DPIA Q-005). Hằng số trong mã — kho tham số KN đang đóng băng danh mục (pf/masterdata
-// TestParametersRequireRegistration); tham số hóa cần ticket làn shared (gia-dinh/W11.48).
-const (
-	EditDays         = 7
-	FixRetentionDays = 365
-)
-
-func (s *Service) editDays(context.Context) int { return EditDays }
-
 // caller là người gọi đã giải ngữ cảnh phiên KN.
 type caller struct {
 	p authz.Principal

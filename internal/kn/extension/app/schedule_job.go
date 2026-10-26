@@ -28,7 +28,7 @@ type ScheduleJobResult struct {
 	Locked    int // lịch của tuần đã kết thúc được ghi sự việc "locked"
 	Reminders int // lần nhắc đã phát (submit_due + review_overdue)
 	Purged    int // tọa độ check-in quá hạn lưu đã xóa (W11.46, QĐ-8)
-	// DiaryPurged: tọa độ lúc ghi nhật ký CNTS quá hạn lưu đã xóa (W11.48, QĐ-8, hằng số cntsdiary FixRetentionDays).
+	// DiaryPurged: tọa độ lúc ghi nhật ký CNTS quá hạn lưu đã xóa (W11.48, QĐ-8; hạn lưu chốt lúc ghi theo tham số cnts.diary.gps_retention_days — #85).
 	DiaryPurged int
 }
 
