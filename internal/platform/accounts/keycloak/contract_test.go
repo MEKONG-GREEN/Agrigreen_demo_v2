@@ -127,7 +127,7 @@ func runContract(t *testing.T, d port.Directory, mem *Memory) {
 	if err := d.Logout(ctx, idA); err != nil || mem.Logouts(idA) != 1 {
 		t.Fatalf("logout: %v %d", err, mem.Logouts(idA))
 	}
-	// GIS US-LOG-01 AC-3: khóa vĩnh viễn do đăng nhập sai — đọc và xóa qua attack-detection.
+	// GIS US-LOG-01 AC-3: khóa do đăng nhập sai — đọc và xóa qua attack-detection.
 	if locked, err := d.BruteForceLocked(ctx, idA); err != nil || locked {
 		t.Fatalf("chưa bị khóa chống dò: %v %v", locked, err)
 	}
@@ -141,6 +141,27 @@ func runContract(t *testing.T, d port.Directory, mem *Memory) {
 	if locked, _ := d.BruteForceLocked(ctx, idA); locked {
 		t.Fatal("sau khi mở khóa")
 	}
+	// P0-VPS-OPS (#131): khóa tạm 15 phút — trạng thái kèm mốc tự hết, và tự hết khi qua mốc.
+	if st, err := d.LoginLockStatus(ctx, idA); err != nil || st.Locked || st.Until != nil {
+		t.Fatalf("chưa khóa: %+v %v", st, err)
+	}
+	before := time.Now()
+	mem.LockByBruteForce(idA)
+	st, err := d.LoginLockStatus(ctx, idA)
+	if err != nil || !st.Locked || st.Until == nil {
+		t.Fatalf("khóa tạm: %+v %v", st, err)
+	}
+	if want := before.Add(DefaultLockoutWait); st.Until.Before(want.Add(-time.Second)) || st.Until.After(want.Add(5*time.Second)) {
+		t.Fatalf("mốc tự hết %v, muốn ~%v", st.Until, want)
+	}
+	mem.SetNow(func() time.Time { return time.Now().Add(DefaultLockoutWait + time.Minute) })
+	if st, err := d.LoginLockStatus(ctx, idA); err != nil || st.Locked || st.Until != nil {
+		t.Fatalf("khóa tạm phải tự hết: %+v %v", st, err)
+	}
+	if locked, _ := d.BruteForceLocked(ctx, idA); locked {
+		t.Fatal("khóa tạm phải tự hết (BruteForceLocked)")
+	}
+	mem.SetNow(time.Now)
 
 	if _, err := d.GetUser(ctx, uuid.New()); !errors.Is(err, port.ErrUserNotFound) {
 		t.Fatalf("không có người dùng: %v", err)

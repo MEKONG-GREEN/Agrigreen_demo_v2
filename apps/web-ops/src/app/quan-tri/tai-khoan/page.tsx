@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
-import { ACCOUNT_STATE, accountState, canResetTotp, fullName, importAccounts, lockReasonError, MFA_STATE, mfaState, rolesForOrgKind } from "@/admin/accounts";
+import { ACCOUNT_STATE, accountState, canResetTotp, fullName, importAccounts, lockOperation, lockReasonError, loginLockText, MFA_STATE, mfaState, rolesForOrgKind } from "@/admin/accounts";
 import { unwrap } from "@/api/client";
 import { newIdempotencyKey } from "@/api/idempotency";
 import { collectPages, usePagedList } from "@/api/pagination";
@@ -150,10 +150,13 @@ function CreateForm({ grants, orgs, onDone }: { grants: AccountsGrants | undefin
   );
 }
 
-/** Khóa / mở khóa với lý do ≥ 20 ký tự — POST /v1/accounts/users/{id}/lock | unlock. */
+/**
+ * Khóa / mở khóa với lý do ≥ 20 ký tự — POST /v1/accounts/users/{id}/lock | unlock. ADMIN-UNLOCK (#61): tài khoản
+ * enabled=true nhưng đang khóa do đăng nhập sai (login_locked) → thao tác là MỞ khóa (máy chủ xóa khóa Keycloak).
+ */
 function LockForm({ user, onDone }: { user: AccountsUser; onDone: () => void }) {
   const { adminApi } = useAuth();
-  const lock = user.enabled;
+  const lock = lockOperation(user) === "lock";
   const [reason, setReason] = useState("");
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -185,6 +188,9 @@ function LockForm({ user, onDone }: { user: AccountsUser; onDone: () => void }) 
       <label htmlFor="lk-reason" style={{ fontWeight: 600 }}>
         {lock ? "Lý do khóa tài khoản" : "Lý do mở khóa"} (tối thiểu 20 ký tự, không ghi thông tin cá nhân)
       </label>
+      {user.login_locked === true ? (
+        <span className="small mute">Đang khóa tạm do đăng nhập sai (tự mở sau 15 phút). Mở khóa ngay để cán bộ đăng nhập lại được.</span>
+      ) : null}
       <textarea
         id="lk-reason"
         className="input textarea"
@@ -393,6 +399,11 @@ function UserPanel({ id, grants, orgs, onChanged }: { id: string; grants: Accoun
           <div>
             <h2 style={{ fontSize: 17 }}>{fullName(u) || u.username}</h2>
             <span className={`chip ${ACCOUNT_STATE[accountState(u)].cls}`}>{ACCOUNT_STATE[accountState(u)].text}</span>
+            {loginLockText(u) ? (
+              <span className="chip c-bad" data-testid="login-lock" style={{ marginLeft: 6 }}>
+                {loginLockText(u)}
+              </span>
+            ) : null}
           </div>
           <dl className="kv small">
             <dt>Tên đăng nhập</dt>
@@ -409,7 +420,7 @@ function UserPanel({ id, grants, orgs, onChanged }: { id: string; grants: Accoun
             <dd>{u.required_actions.join(", ") || "—"}</dd>
           </dl>
           <MfaPanel key={`mfa-${u.id}`} user={u} onDone={changed} />
-          <LockForm key={`${u.id}-${u.enabled}`} user={u} onDone={changed} />
+          <LockForm key={`${u.id}-${u.enabled}-${String(u.login_locked)}`} user={u} onDone={changed} />
           <div className="panel stack" style={{ gap: 6 }}>
             <b>Liên kết kích hoạt / đặt lại mật khẩu</b>
             <span className="small mute">Gửi lại liên kết một lần tới email công vụ (không gửi mật khẩu tạm).</span>

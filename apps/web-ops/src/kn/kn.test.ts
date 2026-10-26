@@ -3,6 +3,7 @@ import { mockFetchNoDelay } from "@/api/mock/handler";
 import { MAX_ATTEMPTS, mockKnLogin, resetMockLoginAttempts } from "@/api/mock/kn";
 import { KN_ACCOUNTS, MOCK_KN_PASSWORD } from "@/api/mock/kn-accounts";
 import { mockToken } from "@/api/mock/personas";
+import { resetReportCycle } from "@/api/mock/kn-reports/store";
 import { createApiClient, unwrap } from "@/api/client";
 import { createKnApi } from "./client";
 import type { components } from "@/api/generated/application";
@@ -57,6 +58,8 @@ describe("đăng nhập mật khẩu giả lập", () => {
 
 describe("client P1/P2 (GET /v1/menu theo ngữ cảnh) + header X-AG-Context", () => {
   it("chọn ngữ cảnh → menu theo vai trò; mọi lời gọi sau mang X-AG-Context; /v1/me theo ngữ cảnh", async () => {
+    // Đồng hồ cố định cho sổ giả lập vòng đời báo cáo: số đếm không phụ thuộc ngày/giờ chạy CI.
+    resetReportCycle(() => Date.parse("2026-10-26T03:00:00Z")); // Thứ Hai 26/10/2026 10:00 giờ VN
     let ctxId: string | null = null;
     const seen: (string | null)[] = [];
     const spy = (r: Request) => {
@@ -77,7 +80,7 @@ describe("client P1/P2 (GET /v1/menu theo ngữ cảnh) + header X-AG-Context", 
     const menu = await kn.menu();
     expect(menu.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dữ liệu", "Dùng chung"]);
     // Số đếm tính từ sổ giả lập vòng đời báo cáo (P4): công việc còn phải gửi của 2 xã phụ trách.
-    expect((await kn.badges()).counts["extension.report_tasks.todo"]).toBeGreaterThan(0);
+    expect((await kn.badges()).counts["extension.report_tasks.todo"]).toBe(2);
     const me = await unwrap(api.GET("/v1/me"));
     expect(me.roles).toContain("kn_officer");
     expect(me.scope.units).toEqual(["91301", "91302"]);

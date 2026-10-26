@@ -15,7 +15,7 @@ import type { DepartmentRef, KnRole, RoleAssignment, SessionContext } from "@/kn
 import { NATIONAL_REF, provinceOrgRef } from "./data";
 import { hasRole, json, problem, problemOf, type Ctx, type Route } from "./http";
 import { findKnAccount, KN_ACCOUNTS, KN_DEPARTMENTS, KN_MENU_PROFILE, type MockKnAccount } from "./kn-accounts";
-import { dropSupportContexts, knStoredContext, registerKnContext, knMenu } from "./kn";
+import { clearMockKnLoginLock, dropSupportContexts, knStoredContext, mockKnLoginLockedUntil, registerKnContext, knMenu } from "./kn";
 import { stableUuid } from "./kn-schedules";
 import { AG_COMMUNES, AG_PROVINCE, AG_REGIONS, communeName, regionName } from "./kn-reports/store";
 
@@ -229,6 +229,15 @@ function userWire(a: MockKnAccount) {
     // D24: mọi cán bộ KN bắt TOTP khi đăng nhập.
     mfa: { required: true, configured: !totpPending, enrollment_pending: totpPending },
   };
+}
+
+/**
+ * ADMIN-UNLOCK (#42/#61): GET chi tiết thêm login_locked (+ login_locked_until) đọc từ bộ đếm đăng nhập giả lập
+ * (mockKnLogin: sai 5 lần → khóa tạm 15 phút). Danh sách/tạo dùng userWire — bỏ field như máy chủ (không N+1).
+ */
+function userDetailWire(a: MockKnAccount) {
+  const until = mockKnLoginLockedUntil(a.identifiers);
+  return { ...userWire(a), login_locked: until !== null, ...(until ? { login_locked_until: until } : {}) };
 }
 
 function assignmentWire(a: MockKnAccount, x: RoleAssignment) {
@@ -644,7 +653,7 @@ export const knAdminRoutes: Route[] = [
     match: knAdminContext,
     handler: (ctx) => (isKnAdmin(ctx) ? json({ items: KN_ACCOUNTS.map(userWire), next_cursor: null }) : deny()),
   },
-  { method: "GET", pattern: re("/v1/accounts/users/{id}"), match: knAdminContext, handler: (ctx) => withAccount(ctx, (a) => json(userWire(a))) },
+  { method: "GET", pattern: re("/v1/accounts/users/{id}"), match: knAdminContext, handler: (ctx) => withAccount(ctx, (a) => json(userDetailWire(a))) },
   {
     method: "POST",
     pattern: re("/v1/accounts/kn-users"),
@@ -806,9 +815,13 @@ export const knAdminRoutes: Route[] = [
           const r = reasonOk(ctx.body, 20);
           if (!r) return errField("reason", "bắt buộc, ít nhất 20 ký tự");
           const p = profileOf(a);
-          if (p.enabled === (op === "unlock")) return problem(409, "accounts.state_conflict", "Trạng thái tài khoản không đổi");
+          // Như máy chủ: mở khóa cả khi enabled=true mà đang khóa do đăng nhập sai; không còn gì để mở → 409.
+          const bruteForce = op === "unlock" && mockKnLoginLockedUntil(a.identifiers) !== null;
+          if (p.enabled === (op === "unlock") && !bruteForce) return problem(409, "accounts.state_conflict", "Trạng thái tài khoản không đổi");
+          if (op === "unlock") clearMockKnLoginLock(a.identifiers);
+          const was = op === "lock" ? "Hoạt động" : p.enabled ? "Khóa do đăng nhập sai" : "Đang khóa";
           p.enabled = op === "unlock";
-          log(a, { event: op === "lock" ? "account.locked" : "account.unlocked", entity_ref: null, actor_ref: ADMIN_REF, changes: [{ field: "Trạng thái", old: op === "lock" ? "Hoạt động" : "Đang khóa", new: op === "lock" ? "Đang khóa" : "Hoạt động" }], reason: r });
+          log(a, { event: op === "lock" ? "account.locked" : "account.unlocked", entity_ref: null, actor_ref: ADMIN_REF, changes: [{ field: "Trạng thái", old: was, new: op === "lock" ? "Đang khóa" : "Hoạt động" }], reason: r });
           return json({ user_ref: userId(a), org_ref: userWire(a).org_ref, roles: ["kn_user"], enabled: p.enabled, lock_cause: p.enabled ? null : "manual" });
         }),
     }),

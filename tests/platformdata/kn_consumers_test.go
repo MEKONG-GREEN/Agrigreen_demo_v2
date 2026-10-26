@@ -2,6 +2,7 @@ package platformdata_test
 
 import (
 	"context"
+	"errors"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	kn "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
@@ -104,6 +105,18 @@ func TestKNReportSessionWithPublishedOrganizations(t *testing.T) {
 		for _, role := range []string{authz.KNAdmin, authz.KNTW, authz.KNTinh, authz.KNXa, "invalid"} {
 			for _, org := range []uuid.UUID{ref(101), ref(102), ref(106), ref(999)} {
 				p := authz.Principal{TenantID: tid, ActorRef: ref(900), KN: &authz.KNContext{Role: role, OrgRef: org, Department: "trong_trot", Scope: authz.Scope{All: true}}}
+				// REPORTS-OWNER-FIXTURE (#81): resolver chủ chỉ đọc phiên đã chọn, không đọc Principal.KN — gắn phiên KN
+				// thật cho vai hợp lệ; vai sai dùng phiên không hợp lệ rõ ràng để cả hai resolver cùng phải từ chối.
+				selected, err := kn.NewSessionContext(kn.SessionContext{ID: ids.New(), Role: role, OrgRef: org, Department: "trong_trot", Scope: authz.Scope{All: true}})
+				if role == "invalid" {
+					if !errors.Is(err, authz.ErrInvalidSession) {
+						t.Fatalf("invalid role must not build a session: %v", err)
+					}
+					selected = authz.Session{}
+				} else if err != nil {
+					t.Fatal(err)
+				}
+				p.SelectedSession = &selected
 				ctx := authz.WithPrincipal(tenant.WithID(context.Background(), tid), p)
 				for _, op := range []string{rp.SessionReadForms, rp.SessionReadDispatch, rp.SessionWriteDispatch} {
 					na, nh, ne := native(ctx, p, op)

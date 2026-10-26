@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { accountState, canResetTotp, lockReasonError, mfaState, rolesForOrgKind } from "./accounts";
+import { formatDateTime } from "@/lib/format";
+import { accountState, canResetTotp, lockOperation, lockReasonError, loginLockState, loginLockText, mfaState, rolesForOrgKind } from "./accounts";
 
 describe("pf/accounts — kiểm sơ bộ phía client", () => {
   it("lý do khóa/mở khóa tối thiểu 20 ký tự (đếm sau khi bỏ khoảng trắng)", () => {
@@ -36,5 +37,27 @@ describe("pf/accounts — kiểm sơ bộ phía client", () => {
     expect(rolesForOrgKind(grants, "cooperative")).toEqual(["coop_manager", "reports_admin"]);
     expect(rolesForOrgKind(grants, "extension_team")).toEqual(["kn_officer", "reports_admin"]);
     expect(rolesForOrgKind(undefined, "cooperative")).toEqual([]);
+  });
+
+  it("ADMIN-UNLOCK (#61): khóa đăng nhập sai tách khỏi enabled; thiếu field = chưa biết, không coi là mở", () => {
+    expect(loginLockState({})).toBe("unknown");
+    expect(loginLockState({ login_locked: false })).toBe("clear");
+    expect(loginLockState({ login_locked: true })).toBe("locked");
+    // enabled=true nhưng Keycloak đang khóa do sai mật khẩu → thao tác là MỞ khóa.
+    expect(lockOperation({ enabled: true, login_locked: true })).toBe("unlock");
+    expect(lockOperation({ enabled: true, login_locked: false })).toBe("lock");
+    expect(lockOperation({ enabled: true })).toBe("lock");
+    expect(lockOperation({ enabled: false, login_locked: false })).toBe("unlock");
+  });
+
+  it("ADMIN-UNLOCK (#61): khóa tạm 15 phút (P0-VPS-OPS) — báo giờ tự mở khi máy chủ trả mốc", () => {
+    const until = "2026-10-26T03:15:00Z";
+    const t = loginLockText({ login_locked: true, login_locked_until: until })!;
+    expect(t).toContain("Khóa do đăng nhập sai");
+    expect(t).toContain(`tự mở lúc ${formatDateTime(until)}`);
+    expect(t).toContain("10:15");
+    expect(loginLockText({ login_locked: true })).toBe("Khóa do đăng nhập sai — tự mở sau 15 phút kể từ lần sai cuối");
+    expect(loginLockText({ login_locked: false })).toBeNull();
+    expect(loginLockText({})).toBeNull();
   });
 });

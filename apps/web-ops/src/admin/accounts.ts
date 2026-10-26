@@ -4,6 +4,7 @@ import type { AdminApiClient } from "@/api/client";
 import { unwrap } from "@/api/client";
 import type { AccountsGrants, AccountsImportResult, AccountsUser, OrgKind } from "@/api/types";
 import type { UploadFile } from "@/lib/files";
+import { formatDateTime } from "@/lib/format";
 
 /** Lý do khóa/mở khóa tối thiểu 20 ký tự (HTX US-HTXSTATUS-01 AC-3). */
 export const LOCK_REASON_MIN = 20;
@@ -34,6 +35,30 @@ export const ACCOUNT_STATE: Record<AccountState, { text: string; cls: string }> 
   // D24: job accounts_dormant khóa sau 45 ngày không hoạt động — Admin mở khóa (có lý do).
   locked_dormant: { text: "Khóa do không hoạt động", cls: "c-bad" },
 };
+
+/**
+ * ADMIN-UNLOCK (#42/#61): khóa đăng nhập do sai mật khẩu nhiều lần (Keycloak attack-detection) — KHÁC `enabled`.
+ * `login_locked` chỉ có ở GET chi tiết; thiếu field (danh sách, bản tạo) = chưa biết, không coi là đã mở.
+ */
+export type LoginLockState = "locked" | "clear" | "unknown";
+
+export function loginLockState(u: Pick<AccountsUser, "login_locked">): LoginLockState {
+  if (u.login_locked === true) return "locked";
+  return u.login_locked === false ? "clear" : "unknown";
+}
+
+/** Thao tác của form khóa/mở khóa: mở khi bị Admin khóa HOẶC đang khóa do đăng nhập sai dù enabled=true. */
+export function lockOperation(u: Pick<AccountsUser, "enabled" | "login_locked">): "lock" | "unlock" {
+  return !u.enabled || u.login_locked === true ? "unlock" : "lock";
+}
+
+/** P0-VPS-OPS (#131): khóa tạm 15 phút rồi tự mở; Admin mở sớm được. Có mốc từ máy chủ thì báo giờ tự mở. */
+export function loginLockText(u: Pick<AccountsUser, "login_locked" | "login_locked_until">): string | null {
+  if (u.login_locked !== true) return null;
+  return u.login_locked_until
+    ? `Khóa do đăng nhập sai — tự mở lúc ${formatDateTime(u.login_locked_until)}`
+    : "Khóa do đăng nhập sai — tự mở sau 15 phút kể từ lần sai cuối";
+}
 
 /** D24 — trạng thái TOTP của tài khoản (chỉ có ở GET /v1/accounts/users/{id}). */
 export type MfaState = "configured" | "pending" | "missing" | "optional";

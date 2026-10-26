@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { canResetTotp, MFA_STATE, mfaState } from "@/admin/accounts";
+import { canResetTotp, lockOperation, loginLockText, MFA_STATE, mfaState } from "@/admin/accounts";
 import { unwrap } from "@/api/client";
 import { fieldErrorMap } from "@/api/problem";
 import { useAuth } from "@/auth/AuthProvider";
@@ -718,8 +718,9 @@ export function UserDetailScreen() {
                     <Icon name="lock" size={15} /> Đặt lại TOTP
                   </button>
                 ) : null}
-                <button type="button" className="btn btn-d btn-sm" onClick={() => (setReason(""), setReasonErr(undefined), setReasonDlg({ kind: user.enabled ? "lock" : "unlock" }))}>
-                  <Icon name={user.enabled ? "lock" : "unlock"} size={15} /> {user.enabled ? "Khóa tài khoản" : "Mở khóa"}
+                {/* ADMIN-UNLOCK (#61): enabled=true nhưng khóa do đăng nhập sai → thao tác là Mở khóa. */}
+                <button type="button" className="btn btn-d btn-sm" onClick={() => (setReason(""), setReasonErr(undefined), setReasonDlg({ kind: lockOperation(user) }))}>
+                  <Icon name={lockOperation(user)} size={15} /> {lockOperation(user) === "lock" ? "Khóa tài khoản" : "Mở khóa"}
                 </button>
               </ActionBar>
               {act.view}
@@ -733,6 +734,11 @@ export function UserDetailScreen() {
                         <div className="field">
                           <span>Trạng thái</span>
                           <StatusPill tone={user.enabled ? "ok" : "bad"}>{user.enabled ? "Hoạt động" : "Đang khóa"}</StatusPill>
+                          {loginLockText(user) ? (
+                            <span data-testid="login-lock">
+                              <StatusPill tone="bad">{loginLockText(user)}</StatusPill>
+                            </span>
+                          ) : null}
                         </div>
                         <TextField label="Email" required value={f.email} onChange={(v) => setEdit({ ...f, email: v })} error={editErr.email ?? server.email} maxLength={254} />
                         <TextField label="Số điện thoại" value={f.phone} onChange={(v) => setEdit({ ...f, phone: v })} error={editErr.phone ?? server.phone} maxLength={20} />
@@ -809,6 +815,9 @@ export function UserDetailScreen() {
                     </button>
                   }
                 >
+                  {reasonDlg.kind === "unlock" && user.login_locked === true ? (
+                    <p className="small">Tài khoản đang khóa tạm do đăng nhập sai (tự mở sau 15 phút). Mở khóa ngay để cán bộ đăng nhập lại được.</p>
+                  ) : null}
                   {reasonDlg.kind === "totp" ? <p className="small">Mã TOTP cũ bị xóa, mọi phiên bị thu hồi, cán bộ đăng ký lại ở lần đăng nhập tới.</p> : null}
                   <TextField label={`Lý do (${reasonDlg.kind === "revoke" || reasonDlg.kind === "deleg" ? "≥ 10" : "≥ 20"} ký tự)`} required multiline value={reason} onChange={setReason} error={reasonErr} />
                 </Dialog>

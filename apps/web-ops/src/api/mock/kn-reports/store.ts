@@ -11,6 +11,7 @@ import { problem } from "../http";
 import { KN_ACCOUNTS, findKnAccount } from "../kn-accounts";
 import { stableUuid, WS_ROSTER } from "../kn-schedules";
 import { knStoredContext, type StoredContext } from "../kn";
+import { vnDate } from "@/kn/schedule/week";
 import { evaluateGrid } from "../forms/evaluate";
 import { exportXlsx } from "../forms/xlsx";
 import { layout } from "../forms/layout";
@@ -479,6 +480,8 @@ function emptyState(now: () => number): State {
 }
 
 export const nowMs = () => S.now();
+/** Kỳ đã bắt đầu tại `now`: from_date là ngày lịch Việt Nam (UTC+7), không phải 00:00 UTC. */
+const periodStarted = (p: Pick<Period, "from_date">, now: number) => p.from_date <= vnDate(now);
 
 // ---------------------------------------------------------------------------
 // Mẫu (engine giả lập)
@@ -1174,7 +1177,7 @@ export function confirmTask(c: Caller, t: Task, body: unknown, at = nowMs()): Re
 // ---------------------------------------------------------------------------
 export function defaultPeriod(batchId: string, now = nowMs()): Period | undefined {
   const ps = periodsOf(batchId);
-  return [...ps].reverse().find((p) => Date.parse(p.from_date) <= now) ?? ps[0];
+  return [...ps].reverse().find((p) => periodStarted(p, now)) ?? ps[0];
 }
 
 export function statusBoard(b: Batch, p: Period, q: { template_id?: string | null; status?: string | null }, now = nowMs()) {
@@ -1574,7 +1577,7 @@ export function dashboard(c: Caller, q: { province?: string | null; region?: str
     period = periods.find((p) => p.id === q.period_id);
     if (!period) return problem(404, "extension.report_period_not_found", "Không tìm thấy kỳ báo cáo");
   } else {
-    const started = periods.filter((p) => Date.parse(p.from_date) <= now);
+    const started = periods.filter((p) => periodStarted(p, now));
     period = started.find((p) => S.runs.some((r) => r.period_id === p.id)) ?? started[0];
   }
   const regionNames = Object.fromEntries(AG_REGIONS.map((r) => [r.code, r.name]));
@@ -1688,9 +1691,9 @@ export function badgesFor(c: Caller, now = nowMs()): Record<string, number> {
     const p = periodOf(t.period_id)!;
     const adhoc = b.report_type === "adhoc";
     if (c.role === "kn_xa") {
-      if (taskPending({ status: t.stored }) && Date.parse(p.from_date) <= now) counts[adhoc ? "extension.report_tasks.ad_hoc_todo" : "extension.report_tasks.todo"]!++;
+      if (taskPending({ status: t.stored }) && periodStarted(p, now)) counts[adhoc ? "extension.report_tasks.ad_hoc_todo" : "extension.report_tasks.todo"]!++;
     } else {
-      if (taskPending({ status: t.stored }) && Date.parse(p.from_date) <= now) counts[adhoc ? "extension.report_status.ad_hoc_pending" : "extension.report_status.not_submitted"]!++;
+      if (taskPending({ status: t.stored }) && periodStarted(p, now)) counts[adhoc ? "extension.report_status.ad_hoc_pending" : "extension.report_status.not_submitted"]!++;
       if (t.stored === "submitted") counts["extension.submissions.pending_review"]!++;
     }
   }

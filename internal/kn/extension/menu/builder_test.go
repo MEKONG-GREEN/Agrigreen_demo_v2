@@ -334,3 +334,38 @@ func TestAdminWithoutUnitAcceptsSameCodeAcrossUnits(t *testing.T) {
 		t.Fatalf("khóa mục Phòng ban %v, muốn %v", keys, want)
 	}
 }
+
+// BF-ACC-KN-MENU (#120, TT-13): menu Admin KN không còn liên kết màn tài khoản native cũ /quan-tri/tai-khoan
+// (Công cụ nền tảng (tạm) › Tài khoản cán bộ (G1)); quản lý người dùng của Admin KN đi qua /kn/quan-tri/nguoi-dung.
+// Màn/API native giữ nguyên, chỉ mở theo vai realm (platform_admin/account_admin), không theo menu KN.
+func TestAdminMenuDropsNativeAccountLink(t *testing.T) {
+	c := catalog(t)
+	reg, err := c.Registry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	unit := uuid.New()
+	request := partyport.MenuBuildRequest{NavigationRequest: partyport.NavigationRequest{Audience: partyport.AudienceAdmin, UnitRef: unit}, Mode: partyport.MenuAdmin,
+		Departments: []partyport.Department{department(unit, "trong_trot", partyport.MenuProfileTrongTrot)}}
+	def, err := reg.Build(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := leaves(def.Groups)
+	if _, ok := items["admin.qt.cong_cu.tai_khoan"]; ok {
+		t.Fatal("menu Admin KN còn mục admin.qt.cong_cu.tai_khoan")
+	}
+	for key, it := range items {
+		if it.Route == "/quan-tri/tai-khoan" || strings.HasPrefix(it.Route, "/quan-tri/tai-khoan/") {
+			t.Fatalf("menu Admin KN còn liên kết native %s: %+v", key, it)
+		}
+	}
+	if it := items["admin.qt.nguoi_dung"]; it.Route != "/kn/quan-tri/nguoi-dung" || !it.Enabled || it.Status == "coming_soon" {
+		t.Fatalf("Admin KN mất màn Người dùng mới: %+v", it)
+	}
+	for _, key := range []string{"admin.qt.cong_cu.tham_so", "admin.qt.cong_cu.to_chuc"} {
+		if _, ok := items[key]; !ok {
+			t.Fatalf("gỡ nhầm mục công cụ nền tảng khác %s", key)
+		}
+	}
+}

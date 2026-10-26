@@ -100,17 +100,6 @@
               "Children": null
             },
             {
-              "Key": "admin.qt.cong_cu.tai_khoan",
-              "Label": "Tài khoản cán bộ (G1)",
-              "Route": "/quan-tri/tai-khoan",
-              "Icon": "user",
-              "BadgeSource": "",
-              "Requires": null,
-              "ComingSoon": false,
-              "Needs": "",
-              "Children": null
-            },
-            {
               "Key": "admin.qt.cong_cu.to_chuc",
               "Label": "Cây tổ chức (G1)",
               "Route": "/quan-tri/to-chuc",

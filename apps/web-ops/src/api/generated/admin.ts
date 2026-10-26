@@ -5504,6 +5504,13 @@ export interface components {
             /** @description Có trong pf_accounts (tạo hoặc thao tác qua nền tảng) */
             tracked: boolean;
             mfa?: components["schemas"]["AccountsMFA"];
+            /** @description ADMIN-UNLOCK — chỉ có ở GET /v1/accounts/users/{id} (danh sách/tạo bỏ, không coi là false). true = Keycloak đang khóa đăng nhập do sai mật khẩu nhiều lần (khóa tạm 15 phút, P0-VPS-OPS); enabled giữ nguyên nghĩa. Admin mở sớm bằng POST /v1/accounts/users/{id}/unlock. Không đọc được trạng thái → 503 accounts.dependency_unavailable, không trả false. */
+            login_locked?: boolean;
+            /**
+             * Format: date-time
+             * @description Chỉ khi login_locked = true và máy chủ suy được: thời điểm khóa tạm dự kiến tự hết (lần sai cuối + thời gian chờ của realm)
+             */
+            login_locked_until?: string;
         };
         /** @description D24 — trạng thái TOTP; chỉ có ở GET /v1/accounts/users/{id} */
         AccountsMFA: {
