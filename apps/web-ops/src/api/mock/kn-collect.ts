@@ -2,7 +2,8 @@
 // BACKEND GIẢ LẬP thu thập dữ liệu Cấp Xã KN v7.7 (P7, application.yaml /v1/kn/*): HTX + nông hộ (FN-XA-03.03),
 // máy móc theo HTX (FN-XA-03.04), thửa (FN-XA-03.05, danh sách), vật tư (FN-XA-03.06). Quy tắc như Go P7 ở mức màn web
 // cần: phạm vi theo ngữ cảnh (Cấp Xã: xã phụ trách; Cấp Tỉnh/TW: chỉ xem), SĐT che, vô hiệu hóa thay xóa (lý do ≥ 20),
-// số máy nguyên 0–1.000.000, trùng loại bị chặn, vật tư sửa = bản ghi bù có lý do.
+// số máy nguyên 1–1.000.000 (#113), năm SX ở hồ sơ KN riêng 1900–năm hiện tại VN (#119), trùng loại bị chặn,
+// vật tư sửa = bản ghi bù có lý do.
 // ============================================================================
 import { uuidv7 } from "../idempotency";
 import { json, problem, type Ctx, type Route } from "./http";
@@ -86,6 +87,8 @@ const shortName = (full: string) => {
 let COOPS: Coop[] = [];
 let HH: Household[] = [];
 let MACH = new Map<string, Line[]>();
+/** Hồ sơ KN riêng #119: năm sản xuất theo loại máy của HTX (cooperative_ref → loại → năm). */
+let YEARS = new Map<string, Map<string, { year_made: number; updated_at: string; actor_ref: string }>>();
 let MATS: Material[] = [];
 let seeded = false;
 
@@ -109,6 +112,7 @@ function seed(): void {
     Array.from({ length: 2 + (i % 2) }, (_, k) => ({ ref: uuidv7(), coop: c.ref, holder: { label: `Hộ ${k + 1} ${c.name.replace(/^HTX /, "")}`, masked_phone: `0987•••${String(10 * i + k).padStart(3, "0")}` }, cultivated_area_ha: String(1.5 + k), active: true, since_date: "2025-03-01" })),
   );
   MACH = new Map(COOPS.slice(0, 3).map((c, i) => [c.ref, [{ machine_type: "may_gat", machine_type_name: MACHINE_TYPES.may_gat!, quantity: 2 + i, note: null, updated_at: "2026-08-25T02:00:00Z", updated_by: "00000000-0000-7000-8000-00000000c004" }]]));
+  YEARS = new Map(COOPS.slice(0, 2).map((c, i) => [c.ref, new Map([["may_gat", { year_made: 2018 + i, updated_at: "2026-08-25T02:00:00Z", actor_ref: "00000000-0000-7000-8000-00000000c004" }]])]));
   MATS = [];
 }
 
@@ -145,6 +149,12 @@ const notFound = () => problem(404, "party.org_not_found", "Không tìm thấy H
 const fieldErr = (field: string, reason: string) => problem(422, "validation_failed", "Dữ liệu không hợp lệ", { errors: [{ field, reason }] });
 const UUID = "([0-9a-f-]{36})";
 const re = (s: string) => new RegExp(`^${s.replaceAll("{id}", UUID)}$`);
+const profileWire = (x: Coop, c: Caller) => ({
+  cooperative_ref: x.ref,
+  commune_code: x.commune_code,
+  department_code: c.dept ?? "trong_trot",
+  items: [...(YEARS.get(x.ref) ?? new Map()).entries()].map(([t, v]) => ({ machine_type: t, machine_type_name: MACHINE_TYPES[t] ?? t, ...v })),
+});
 const coopLines = (x: Coop) => {
   const lines = MACH.get(x.ref) ?? [];
   return { cooperative_ref: x.ref, name: x.name, commune_code: x.commune_code, lines, total: lines.reduce((s, l) => s + l.quantity, 0) };
@@ -245,6 +255,44 @@ export const knCollectRoutes: Route[] = [
   },
   {
     method: "GET",
+    pattern: re("/v1/kn/machine-profiles/{id}"),
+    handler: wrap(({ params }, c) => {
+      const x = findCoop(c, params[0]);
+      return x ? json(profileWire(x, c)) : problem(404, "extension.kn_attrs_cooperative_not_found", "Không tìm thấy HTX");
+    }),
+  },
+  {
+    method: "PUT",
+    pattern: re("/v1/kn/machine-profiles/{id}"),
+    handler: wrap(({ params, body }, c) => {
+      const deny = canWrite(c, "extension.read_only");
+      if (deny) return deny;
+      const x = findCoop(c, params[0]);
+      if (!x) return problem(404, "extension.kn_attrs_cooperative_not_found", "Không tìm thấy HTX");
+      if (!x.active) return fieldErr("cooperative_ref", "HTX đã ngừng hoạt động");
+      const lines = ((body as { lines?: unknown[] } | undefined)?.lines ?? []) as { machine_type?: string; year_made?: unknown }[];
+      const maxYear = Number(todayVN().slice(0, 4));
+      const seen = new Set<string>();
+      for (const l of lines) {
+        const t = String(l.machine_type ?? "");
+        if (!MACHINE_TYPES[t]) return problem(422, "extension.kn_attrs_machine_type_unknown", "Loại máy không có trong danh mục", { errors: [{ field: `lines.${t}.machine_type`, reason: "không có hoặc đã ngừng dùng trong danh mục" }] });
+        if (seen.has(t)) return fieldErr(`lines.${t}.machine_type`, "loại máy trùng trong hồ sơ");
+        seen.add(t);
+        if (l.year_made === undefined || l.year_made === null) return fieldErr(`lines.${t}.year_made`, "bắt buộc");
+        const y = l.year_made;
+        if (typeof y !== "number" || !Number.isInteger(y) || y < 1900 || y > maxYear)
+          return problem(422, "extension.kn_attrs_year_invalid", "Năm sản xuất không hợp lệ", { errors: [{ field: `lines.${t}.year_made`, reason: `năm sản xuất phải là số nguyên từ 1900 đến ${maxYear}` }] });
+      }
+      const prev = YEARS.get(x.ref) ?? new Map();
+      YEARS.set(x.ref, new Map(lines.map((l) => {
+        const old = prev.get(l.machine_type!);
+        return [l.machine_type!, old && old.year_made === l.year_made ? old : { year_made: l.year_made as number, updated_at: now(), actor_ref: c.actor }];
+      })));
+      return json(profileWire(x, c));
+    }),
+  },
+  {
+    method: "GET",
     pattern: re("/v1/kn/machine-counts"),
     handler: wrap(({ url }, c) => {
       const commune = url.searchParams.get("commune");
@@ -280,9 +328,11 @@ export const knCollectRoutes: Route[] = [
       if (!x.active) return problem(422, "mechanization.cooperative_invalid", "HTX ngừng hoạt động");
       const lines = ((body as { lines?: unknown[] } | undefined)?.lines ?? []) as { machine_type: string; quantity: unknown; note?: string | null }[];
       const seen = new Set<string>();
-      for (const l of lines) {
+      for (const [i, l] of lines.entries()) {
         if (!MACHINE_TYPES[l.machine_type]) return problem(422, "mechanization.machine_type_unknown", "Loại máy không có trong danh mục");
-        if (typeof l.quantity !== "number" || !Number.isInteger(l.quantity) || l.quantity < 0 || l.quantity > 1_000_000) return problem(422, "mechanization.machine_quantity_invalid", "Số lượng phải là số nguyên 0–1.000.000");
+        // #113 BF-SRV-GUARD: số 0 không còn là khai báo hợp lệ — bỏ loại thì bỏ dòng.
+        if (typeof l.quantity !== "number" || !Number.isInteger(l.quantity) || l.quantity < 1 || l.quantity > 1_000_000)
+          return problem(422, "mechanization.machine_quantity_invalid", "Số lượng phải là số nguyên 1–1.000.000", { errors: [{ field: `lines[${i}].quantity`, reason: "số nguyên 1–1.000.000" }] });
         if (seen.has(l.machine_type)) return problem(422, "mechanization.machine_type_duplicate", "Trùng loại máy — cập nhật dòng đã có");
         seen.add(l.machine_type);
       }

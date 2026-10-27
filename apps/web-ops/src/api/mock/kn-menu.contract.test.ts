@@ -87,6 +87,20 @@ describe("fromKnMenu — trình bày Hình 3c", () => {
     const odd: KnMenu = { ...admin, groups: [{ key: "x", label: "X", items: [{ ...admin.groups[0]!.items[0]!, icon: "khong-co" }] }] };
     expect(fromKnMenu(odd).groups[0]!.items[0]!.icon).toBe("file");
   });
+
+  it("Admin: khóa phòng ban có hậu tố .<org_ref> (trùng mã giữa hai đơn vị, #122) vẫn ra tên ngắn", () => {
+    const admin = cases.find((c) => c.name === "admin")!.menu;
+    const suffixed: KnMenu = {
+      ...admin,
+      groups: admin.groups.map((g) =>
+        g.key === "phong_ban"
+          ? { ...g, items: g.items.map((it) => (it.enabled ? it : { ...it, key: `${it.key}.0b7a5c1e-1f2d-4c3b-9a8e-7d6c5b4a3f21` })) }
+          : g,
+      ),
+    };
+    const pb = fromKnMenu(suffixed).groups.find((g) => g.key === "phong_ban")!;
+    expect(pb.items.slice(1, 3).map((i) => i.label)).toEqual(["Chăn nuôi - TS", "Kế hoạch - TC"]);
+  });
 });
 
 describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): menu theo Update prototype và hình khách gửi", () => {

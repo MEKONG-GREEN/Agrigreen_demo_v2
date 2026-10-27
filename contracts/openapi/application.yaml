@@ -12746,6 +12746,24 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: hrm.plan_not_found, $ref: "#/components/responses/Problem"}
         "409": {description: hrm.plan_closed, $ref: "#/components/responses/Problem"}
+  /v1/hrm/plans/{year}/remind:
+    parameters:
+      - $ref: "#/components/parameters/HrmPlanYear"
+    post:
+      summary: Nhắc các đơn vị CHƯA gửi kế hoạch (Phòng HCTH, Admin — phiên có quyền ghi) — sổ nhắc + sự kiện pf.hrm.plan.reminded cùng giao dịch; pf/notify gửi lãnh đạo các đơn vị đó tại Nút của phiên
+      operationId: hrmPlanRemind
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Đã nhắc
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPlanReminder"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.plan_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "hrm.plan_closed | hrm.plan_all_submitted", $ref: "#/components/responses/Problem"}
   /v1/hrm/plans/{year}/units/{unit}:
     parameters:
       - $ref: "#/components/parameters/HrmPlanYear"
@@ -24099,6 +24117,24 @@ components:
         units: {type: array, items: {type: string}}
         submitted: {type: integer}
         opened_at: {type: string, format: date-time}
+    HrmPlanReminder:
+      type: object
+      required: [id, year, period_ref, units, due_at, reminded_at]
+      properties:
+        id: {type: string, format: uuid}
+        year: {type: integer}
+        period_ref: {type: string, format: uuid}
+        units:
+          type: array
+          description: Đơn vị nội bộ chưa gửi kế hoạch lúc nhắc
+          items:
+            type: object
+            required: [unit, unit_name]
+            properties:
+              unit: {type: string}
+              unit_name: {type: string}
+        due_at: {type: string, format: date-time}
+        reminded_at: {type: string, format: date-time}
     HrmPlanStatus:
       type: string
       description: "not_started Chưa lập · draft Đang lập · submitted Đã gửi · returned Yêu cầu điều chỉnh · accepted Đã xác nhận · closed Đã chốt · missed Không gửi"

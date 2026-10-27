@@ -162,13 +162,20 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		store = s
 	}
 
-	md := masterdata.New(unit, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
+	md := masterdata.New(unit, clk, masterdata.Deps{Params: masterdataParamRegistrations(), Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 
-	navigationPolicy, err := extension.NavigationPolicy()
+	// KNSPLIT-2-MENU-PARITY (#122): cây menu KN do ứng dụng sở hữu (#76) thay bảng compatibility của pf/party.
+	// Mỗi module thành viên giữ nguồn của mình; NavigationPolicy của catalog giải alias bộ menu nên thay
+	// extension.NavigationPolicy() (chỉ dành cho đường compatibility). Parity: tests/kn77/menu_parity_integration_test.go.
+	menuCatalog, err := extension.MenuCatalog(hrm.MenuSource(), price.MenuSource(), contact.MenuSource())
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault, NavigationPolicy: navigationPolicy})
+	menus, err := menuCatalog.Registry()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault, Menus: menus, NavigationPolicy: menuCatalog.NavigationPolicy()})
 	wf := wireWorkflow(unit, clk, md, pty) // W6.1: cap/workflow cho duyệt tham số, cấp quyền (r_workflow, W2.6: cùng pool đơn vị)
 
 	g := geo.New(unit, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits()})
@@ -228,7 +235,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	// dùng cổng thiết bị độc lập (syncmod.NewDevices) để không vòng phụ thuộc. API chỉ
 	// xếp lần gửi đẩy; gửi thật ở consumer pf.notify.push của worker.
 	nt := notify.New(unit, clk, notify.Deps{
-		Consumers: NotificationConsumers(), Renderers: NotificationRenderers(), Kinds: NotificationKinds(), Digests: NotificationDigests(), Builders: NotificationBuilders(nil, kn.Staff(), knUnits),
+		Consumers: NotificationConsumers(), Renderers: NotificationRenderers(), Kinds: NotificationKinds(), Digests: NotificationDigests(), Builders: NotificationBuilders(nil, kn.Staff(), knUnits, nil),
 		Scope: pty.ScopeResolver(), Devices: syncmod.NewDevices(unit), Staff: kn.Staff(), Units: md.AdminUnits(),
 	})
 
@@ -264,7 +271,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 			return Modules{}, pools, err
 		}
 	}
-	sessionRegistry, err := authz.NewSessionRegistry(extension.SessionProjection())
+	// #49/#71: phiên chủ KN của module (kèm phạm vi quyền CNTS FN-14 hiện hành từ sổ cnts_grant) thay phép chiếu tĩnh.
+	sessionRegistry, err := authz.NewSessionRegistry(kn.SessionProjection())
 	if err != nil {
 		return Modules{}, pools, err
 	}
@@ -350,6 +358,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	pty.UseDepartmentUsage(mech.DepartmentUsage())
 	pty.UseDepartmentUsage(coop.DepartmentUsage())
 	pty.UseFormAvailability(rep.FormAvailability())
+	menuCatalog.UseFormAvailability(rep.FormAvailability()) // #122: cùng nguồn P3 cho mục "Báo cáo đột xuất" của cây KN
 	md.UseFormUsage(rep.FormUsage())
 	kn.UseTablePDF(rep.TablePDF()) // KN v7.7 P5: "Xuất PDF" lịch công tác
 	pr.UseTablePDF(rep.TablePDF()) // W11.75: "Tải PDF" phiếu báo giá (FN-XA-03.02)

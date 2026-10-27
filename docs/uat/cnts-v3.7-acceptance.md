@@ -56,11 +56,12 @@ Nguồn và giới hạn: [giả định W11.47](../kn/gia-dinh/W11.47.md) (Q-02
 | ★ Điểm trình diễn (xã, quy mô, tọa độ, cán bộ theo dõi, mẫu nhật ký): xã ngoài tỉnh bị chặn, loại mô hình theo danh mục, cán bộ phải phụ trách xã, HTX chỉ là mã có trong công bố HTX; Cấp Xã chỉ thấy điểm của xã mình | `TestCNTSModel_W1147` | G1 |
 | ★ UR-XA-04: cán bộ theo dõi điểm (hoặc được cấp quyền theo dõi mô hình) thêm, sửa, rút hộ; chủ hộ ở kho định danh (sổ chỉ giữ `person_ref`), nhãn và SĐT che một phần (BR-02); SĐT trong ghi chú bị chặn; rút hộ xóa tọa độ (QĐ-8) | `TestCNTSModel_W1147`, `TestHouseholdKeeper`; Vitest giả lập | G1 |
 | ★ UR-TINH-09, FN-14: cấp quyền theo vai, địa bàn (xã/cơ sở/điểm/hộ), biểu mẫu, hiệu lực; chỉ 4 vai Xã/Nông hộ (BR-01); địa bàn ngoài tỉnh bị chặn; chủ nhiệm chỉ cấp trong dự án mình (BR-03); người được cấp phải là tài khoản Cấp Xã có sẵn; mọi thay đổi có nhật ký | `TestCNTSModel_W1147`, `TestGrantRoles`, `TestGrantStatusAndCovers` | G1 |
-| ★ FN-14 AC-02: thu hồi quyền của A chuyển phạm vi cho người nhận (quyền mới cùng phạm vi); A mất quyền sửa hộ ngay, người nhận sửa được | `TestCNTSModel_W1147` | G1 (chuyển việc biểu chưa nộp trong `cap/forms`: chưa) |
+| ★ FN-14 AC-02: thu hồi quyền của A chuyển phạm vi cho người nhận (quyền mới cùng phạm vi); A mất quyền sửa hộ ngay, người nhận sửa được | `TestCNTSModel_W1147` | G1 (#71: chuyển điều kiện công việc biểu qua phiên chủ — `TestCNTSGrantOwnerSession_71`; #49: con trỏ đồng bộ reset) |
 | ADR-0055 / Q-KNS-04: KN không tạo dữ liệu HTX | `TestCNTSModel_W1147` (đếm qua `pf_cooperative_pub`), `go run ./tools/knboundary` | G1 |
 | Menu Tỉnh (Chương trình, dự án; Hộ mô hình; Cấp quyền xã, nông hộ), Xã (Điểm trình diễn, hộ mô hình; Quyền của tôi), TW (Dự án KNQG) | `TestWebMenuFixture`; `kn-menu.contract.test.ts` | G1 |
+| ★ FN-14 AC-01/AC-03, BR-02 (#71): quyền FN-14 vào phiên chủ KN ở request kế tiếp; BM-01 chỉ cơ sở được cấp; biểu được giao giới hạn biểu kỳ CNTS; tường minh rỗng/hết hạn/thu hồi/sửa thu hẹp xã = chặn (người đã từng có quyền không quay về W11.07); biên ngày tính cả ngày cuối; cùng người nhiều lần gán, phòng/tenant khác không nhận | `TestCNTSGrantOwnerSession_71`, `TestCNTSGrantNarrowingStaysExplicit_71`, `TestCNTSFormActorUsesOwnerGrantScope`, `TestCNTSGrant*` (port) | G1 |
 
-Chưa nghiệm thu: FN-14 AC-01/AC-03 (quyền KN vào phạm vi phiên `pf/accounts`, phạm vi KSGM BM-01 — ticket làn shared),
+Chưa nghiệm thu: chuyển nháp nhật ký khi thu hồi, Cấp Xã chưa từng được cấp quyền vẫn theo thuộc tính W11.07 (câu hỏi mở #71),
 mẫu biểu dự án BM-12…BM-16 (W11.53), nạp Excel điểm/hộ, chọn tọa độ trên bản đồ (W11.52), nông hộ tự nhập (GĐ2).
 
 ## Nhật ký nuôi BM-08/09/19 W11.48

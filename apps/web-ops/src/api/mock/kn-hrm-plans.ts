@@ -405,6 +405,32 @@ export const hrmPlanRoutes: Route[] = [
     },
   },
   {
+    // NOTIFY-HCTH-KN (#50): "Nhắc phòng chưa lập" — đơn vị chưa gửi (chưa có lần gửi nào); máy chủ ghi sổ nhắc + sự kiện
+    // pf.hrm.plan.reminded, pf/notify gửi lãnh đạo các đơn vị đó (giả lập không mô phỏng hộp thư).
+    method: "POST",
+    pattern: /^\/v1\/hrm\/plans\/(\d{4})\/remind$/,
+    handler: (ctx) => {
+      const l = load(ctx);
+      if (l instanceof Response) return l;
+      if (!l.c.center || l.c.readOnly) return CENTER_ONLY();
+      if (closed(l.p))
+        return problem(409, "hrm.plan_closed", "Kế hoạch đã chốt — chỉ điều chỉnh có lý do");
+      const names = new Map(H.units().map((u) => [u.code, u.name]));
+      const units = l.p.period.units.filter((u) => !(l.p.subs[u]?.length));
+      if (!units.length)
+        return problem(409, "hrm.plan_all_submitted", "Mọi đơn vị đã gửi kế hoạch — không còn đơn vị cần nhắc");
+      const body: S["HrmPlanReminder"] = {
+        id: uuid(),
+        year: l.p.period.year,
+        period_ref: l.p.period.period_ref,
+        units: units.map((u) => ({ unit: u, unit_name: names.get(u) ?? u })),
+        due_at: l.p.period.due_at,
+        reminded_at: now(),
+      };
+      return json(body, 201);
+    },
+  },
+  {
     method: "GET",
     pattern: /^\/v1\/hrm\/plans\/(\d{4})\/units\/([a-z][a-z0-9_]*)$/,
     handler: (ctx) => {

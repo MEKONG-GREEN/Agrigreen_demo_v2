@@ -9100,6 +9100,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/hrm/plans/{year}/remind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nhắc các đơn vị CHƯA gửi kế hoạch (Phòng HCTH, Admin — phiên có quyền ghi) — sổ nhắc + sự kiện pf.hrm.plan.reminded cùng giao dịch; pf/notify gửi lãnh đạo các đơn vị đó tại Nút của phiên */
+        post: operations["hrmPlanRemind"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/hrm/plans/{year}/units/{unit}": {
         parameters: {
             query?: never;
@@ -20595,6 +20615,22 @@ export interface components {
             submitted: number;
             /** Format: date-time */
             opened_at: string;
+        };
+        HrmPlanReminder: {
+            /** Format: uuid */
+            id: string;
+            year: number;
+            /** Format: uuid */
+            period_ref: string;
+            /** @description Đơn vị nội bộ chưa gửi kế hoạch lúc nhắc */
+            units: {
+                unit: string;
+                unit_name: string;
+            }[];
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            reminded_at: string;
         };
         /**
          * @description not_started Chưa lập · draft Đang lập · submitted Đã gửi · returned Yêu cầu điều chỉnh · accepted Đã xác nhận · closed Đã chốt · missed Không gửi
@@ -42013,6 +42049,37 @@ export interface operations {
             /** @description hrm.plan_not_found */
             404: components["responses"]["Problem"];
             /** @description hrm.plan_closed */
+            409: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanRemind: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã nhắc */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPlanReminder"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.plan_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.plan_closed | hrm.plan_all_submitted */
             409: components["responses"]["Problem"];
         };
     };
