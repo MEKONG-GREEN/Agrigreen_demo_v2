@@ -3,7 +3,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { IDEMPOTENCY_HEADER } from "@/api/idempotency";
+import { mockFetchNoDelay } from "@/api/mock/handler";
+import { resetKnCollect } from "@/api/mock/kn-collect";
 import { ApiProblem } from "@/api/problem";
+import { createCollectApi } from "@/kn/cycle/api";
 import type * as GisEditor from "@/gis/editor";
 import type { LngLat } from "@/gis/geometry";
 import { PlotCreateScreen, PlotEditScreen, PlotsScreen, drawnAreaHa, outerRing, plotDraftError, plotUpdateBody } from "./PlotScreens";
@@ -247,5 +251,79 @@ describe("Sửa thửa", () => {
     expect(screen.getByLabelText(/Tên thửa/)).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Lưu" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Sửa ranh giới" })).toBeNull();
+  });
+});
+
+// #129 (như review Codex #103 P2): bước ghi đứng sau await phải dùng idem của CÙNG lượt — mất phản hồi ở bước cuối
+// rồi bấm Lưu lại thì mọi bước dùng lại khóa cũ, không báo thành công khi bước cuối lỗi.
+describe("Thửa — bấm Lưu lại sau mất phản hồi giữ khóa của mọi bước", () => {
+  async function realClient(losePath: RegExp) {
+    resetKnCollect();
+    const r = await mockFetchNoDelay(
+      new Request("http://mock/v1/me/context", {
+        method: "POST",
+        headers: { Authorization: "Bearer mock.kn-an", "Content-Type": "application/json", "Idempotency-Key": `ctx-${Math.random()}` },
+        body: JSON.stringify({ assignment_id: "asg-an-xa", department_code: "trong_trot" }),
+      }),
+    );
+    const ctx = ((await r.json()) as { context_id: string }).context_id;
+    const writes: { path: string; key: string }[] = [];
+    let lose = true;
+    const fetch = async (req: Request): Promise<Response> => {
+      const path = new URL(req.url).pathname;
+      if (req.method !== "GET") writes.push({ path, key: req.headers.get(IDEMPOTENCY_HEADER) ?? "" });
+      const res = await mockFetchNoDelay(req);
+      if (req.method !== "GET" && losePath.test(path) && lose) {
+        lose = false; // máy chủ đã xử lý, phản hồi mất
+        throw new TypeError("Failed to fetch");
+      }
+      return res;
+    };
+    const api = createCollectApi({ baseUrl: "http://mock", getAccessToken: () => "mock.kn-an", getContextId: () => ctx, fetch });
+    auth.collectApi = api as unknown as typeof auth.collectApi;
+    return { api, writes };
+  }
+  const kind = (w: { path: string }) => (w.path.startsWith("/v1/kn/plot-profiles/") ? "crop" : w.path.endsWith("/boundary") ? "boundary" : "plot");
+
+  it("Thêm thửa: đặt cây trồng mất phản hồi → Lưu lại dùng lại khóa của tạo thửa và cây trồng", async () => {
+    const { writes } = await realClient(/^\/v1\/kn\/plot-profiles\//);
+    const u = userEvent.setup();
+    render(<PlotCreateScreen />);
+    const crop = screen.getByLabelText(/Cây trồng/);
+    await waitFor(() => expect(within(crop).getAllByRole("option").length).toBeGreaterThan(1));
+    await u.type(screen.getByLabelText(/Tên thửa/), "Lô thử lại");
+    await u.type(screen.getByLabelText(/Chủ hộ/), "Trần Văn B");
+    await u.selectOptions(crop, within(crop).getAllByRole("option")[1]!);
+    await draw(u, SQUARE.map(([x, y]) => [x + 0.8, y + 0.2] as LngLat));
+    await u.click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(writes).toHaveLength(2));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Lưu" })).toBeEnabled());
+    expect(push).not.toHaveBeenCalled();
+    await u.click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+    expect(writes.map(kind)).toEqual(["plot", "crop", "plot", "crop"]);
+    expect(writes[2]!.key).toBe(writes[0]!.key);
+    expect(writes[3]!.key).toBe(writes[1]!.key);
+  });
+
+  it("Sửa thửa: vẽ lại ranh giới rồi sửa tên (mất phản hồi) → Lưu lại dùng lại khóa của cả hai bước", async () => {
+    const { api, writes } = await realClient(/^\/v1\/kn\/plots\/[^/]+$/);
+    const [first] = (await api.plots({ commune: "91301" })).items;
+    params.id = first!.ref;
+    const u = userEvent.setup();
+    render(<PlotEditScreen />);
+    const name = await screen.findByLabelText(/Tên thửa/);
+    await u.type(name, " sửa");
+    await u.click(screen.getByRole("button", { name: "Sửa ranh giới" }));
+    await u.type(screen.getByLabelText(/Lý do sửa ranh giới/), "Đo lại bằng GPS ngoài đồng");
+    await u.click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(writes).toHaveLength(2));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Lưu" })).toBeEnabled());
+    expect(push).not.toHaveBeenCalled();
+    await u.click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/kn/du-lieu/ve-thua"));
+    expect(writes.map(kind)).toEqual(["boundary", "plot", "boundary", "plot"]);
+    expect(writes[2]!.key).toBe(writes[0]!.key);
+    expect(writes[3]!.key).toBe(writes[1]!.key);
   });
 });

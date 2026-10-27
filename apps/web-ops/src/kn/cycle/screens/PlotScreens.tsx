@@ -184,7 +184,7 @@ export function PlotCreateScreen() {
     setErrors({ ...v.errors, ...(g ? { geometry: g } : {}) });
     if (!v.valid || g) return;
     const b = v.values;
-    const r = await act.run(async () => {
+    const r = await act.run(async (idem) => {
       const p = await collectApi.createPlot({
         commune_code: b.commune_code,
         lot_name: b.lot_name.trim(),
@@ -194,7 +194,8 @@ export function PlotCreateScreen() {
         shape: "polygon",
         geometry: draftGeometry("polygon", coords) as KnPlotDetail["geometry"],
       });
-      await collectApi.putPlotCrop(p.ref, b.crop_code);
+      // Sau await: bọc bằng idem của CÙNG lượt để bấm lại sau mất phản hồi giữ khóa của mọi bước (#129).
+      await idem(() => collectApi.putPlotCrop(p.ref, b.crop_code));
       return p;
     });
     if (r) router.push(`/kn/du-lieu/ve-thua/${r.ref}`);
@@ -280,11 +281,12 @@ export function PlotEditScreen() {
           setErrors({ ...v.errors, ...(g ? { geometry: g } : {}), ...(reasonShort ? { reason: reasonShort } : {}) });
           if (!v.valid || g || reasonShort) return;
           const body = plotUpdateBody(plot, f);
-          const ok = await act.run(async () => {
-            // Ranh giới trước: chồng lấn (409) thì dừng, không ghi thuộc tính hay cây trồng.
-            if (redraw) await collectApi.correctPlotBoundary(id, { supersedes_boundary_id: plot.boundary_id, geometry: draftGeometry("polygon", coords) as KnPlotDetail["geometry"], shape: "polygon", reason: f.reason.trim() });
-            if (body) await collectApi.updatePlot(id, body);
-            if (f.crop_code !== profile.crop_code) await collectApi.putPlotCrop(id, f.crop_code);
+          const ok = await act.run(async (idem) => {
+            // Ranh giới trước: chồng lấn (409) thì dừng, không ghi thuộc tính hay cây trồng. Mọi bước bọc idem của cùng
+            // lượt (bước sau await) để bấm lại sau mất phản hồi dùng lại khóa cũ (#129).
+            if (redraw) await idem(() => collectApi.correctPlotBoundary(id, { supersedes_boundary_id: plot.boundary_id, geometry: draftGeometry("polygon", coords) as KnPlotDetail["geometry"], shape: "polygon", reason: f.reason.trim() }));
+            if (body) await idem(() => collectApi.updatePlot(id, body));
+            if (f.crop_code !== profile.crop_code) await idem(() => collectApi.putPlotCrop(id, f.crop_code));
             return true;
           });
           if (ok) router.push(back);

@@ -7,7 +7,7 @@
   - `/kn/du-lieu/ve-thua/[id]`: sửa Tên thửa, Chủ hộ, Cây trồng, HTX, Ghi chú. Bấm "Sửa ranh giới" để vẽ lại (nạp sẵn các đỉnh cũ), khi đó **Lý do sửa ranh giới** bắt buộc, tối thiểu 10 ký tự như máy chủ. Có khung Log từ `/v1/kn/plots/{ref}/log`. Thửa đã ngừng dùng chỉ xem.
 - **Diện tích tự tính:** ô chỉ đọc, tính diện tích trắc địa của hình đang vẽ để xem trước. Máy chủ tính lại trên hình khi lưu. Web không gửi `declared_area_ha`. Hình phải có ít nhất 3 điểm phân biệt, không thẳng hàng, diện tích 0,001 – 1.000 ha (như `geo.area_out_of_range`).
 - **Chồng lấn:** máy chủ quyết định và chặn (409 `geo.plot_overlap`). Web hiện thông báo "Thửa chồng lấn … không được lưu" kèm lỗi máy chủ và giữ nguyên trang để vẽ lại. Web không tự tính giao cắt, vì máy chủ có ngưỡng dung sai `geo.overlap_tolerance_pct` và các thửa liền bờ chung cạnh không phải chồng lấn.
-- **Thứ tự ghi trong một lượt thao tác** (`useAction`, khóa chống gửi trùng #129):
+- **Thứ tự ghi trong một lượt thao tác** (`useAction`, khóa chống gửi trùng #129; mọi bước bọc `idem` của chính lượt, nên bấm Lưu lại sau mất phản hồi dùng lại khóa cũ cho từng bước và không báo thành công khi bước sau lỗi):
   - Thêm: `POST /v1/kn/plots` → `PUT /v1/kn/plot-profiles/{ref}` (cây trồng). Chồng lấn thì dừng ở bước đầu, không ghi gì.
   - Sửa: `POST /v1/kn/plots/{ref}/boundary` (nếu vẽ lại) → `PUT /v1/kn/plots/{ref}` (chỉ trường đã đổi) → `PUT /v1/kn/plot-profiles/{ref}` (nếu đổi cây trồng). Ranh giới làm trước nên chồng lấn sẽ chặn cả lần lưu.
 - **Chủ hộ khi sửa:** tên thật nằm ở kho định danh, web chỉ thấy nhãn che (vd "Nguyễn V. A."). Ô Chủ hộ để trống nghĩa là giữ nguyên chủ hộ hiện tại. Nhập họ tên thì đổi chủ hộ. Ô này chỉ bắt buộc khi thửa chưa có chủ hộ.
