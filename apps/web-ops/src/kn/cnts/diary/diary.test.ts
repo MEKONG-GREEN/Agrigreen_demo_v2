@@ -13,6 +13,7 @@ import {
   kgPerHead,
   kindsOf,
   lineAmount,
+  MAX_GROWTH_WEEK,
   metricErrors,
   money,
   soldOn,
@@ -248,5 +249,36 @@ describe("BF-CN-DIARY #109 — đủ trường sổ gốc BM-08/BM-09 2026", () 
     ]);
     // Quá tuần 12 thêm dòng mỗi 2 tuần.
     expect(growthTable(c, [e("2027-03-30", "90", "0", "1")]).rows.map((r) => r.week).slice(-2)).toEqual([12, 14]);
+  });
+
+  it("#109 (Codex P2): bảng sinh trưởng giới hạn tài nguyên với tuần tuổi bất thường", () => {
+    const c = { received_date: "2027-01-01", age_days: 1, initial_count: 100, initial_weight_g: "40" };
+    const e = (d: string, week: string, alive = "99", feed = "1") => ({ entry_date: d, status: "submitted" as const, metrics: { alive, dead: "0", feed_kg: feed, age_week: week } });
+    for (const huge of ["10000", "100000000", "9".repeat(400)]) {
+      const g = growthTable(c, [e("2027-01-02", "1"), e("2027-01-03", huge)]);
+      expect(g.rows.map((r) => r.week)).toEqual([1, 2, 3, 4, 6, 8, 10, 12]);
+      expect(g.outOfRange).toEqual([{ entry_date: "2027-01-03", week: Number(huge) }]);
+      expect(g.total.feedKg).toBe(1); // lần ghi bất thường không cộng vào bảng
+    }
+    // Nhiều lần ghi bất thường vẫn không vượt trần dòng.
+    const many = Array.from({ length: 500 }, (_, i) => e("2027-02-01", String(105 + i * 1000)));
+    expect(growthTable(c, many).rows.length).toBe(8);
+    // Ngày tuổi lúc nhận quá lớn (tuần tính ra > MAX_GROWTH_WEEK) cũng báo bất thường.
+    expect(growthTable({ ...c, age_days: 3650 }, [{ entry_date: "2027-01-02", status: "submitted", metrics: { alive: "1", dead: "0", feed_kg: "1" } }]).outOfRange).toHaveLength(1);
+    // Bình thường và quá tuần 12 vẫn đúng; trần là MAX_GROWTH_WEEK (8 + 46 = 54 dòng).
+    const g = growthTable(c, [e("2027-01-02", "3", "98", "2"), e("2027-03-20", "13", "95", "5"), e("2027-04-01", "16", "94", "4")]);
+    expect(g.outOfRange).toEqual([]);
+    expect(g.rows.map((r) => r.week)).toEqual([1, 2, 3, 4, 6, 8, 10, 12, 14, 16]);
+    expect(g.rows.find((r) => r.week === 3)).toMatchObject({ alive: 98, feedKg: 2 });
+    expect(g.rows.find((r) => r.week === 14)).toMatchObject({ alive: 95, feedKg: 5 });
+    expect(g.rows.find((r) => r.week === 16)).toMatchObject({ alive: 94, feedKg: 4 });
+    const top = growthTable(c, [e("2027-01-02", String(MAX_GROWTH_WEEK))]);
+    expect(top.rows).toHaveLength(54);
+    expect(top.rows.at(-1)!.week).toBe(MAX_GROWTH_WEEK);
+    expect(top.outOfRange).toEqual([]);
+    // Biểu ghi báo lỗi sớm như server (MaxAgeWeek).
+    const m = { alive: "1", dead: "0", feed_kg: "1" };
+    expect(metricErrors("BM-08", "daily", { ...m, age_week: "13" }).age_week).toBeUndefined();
+    expect(metricErrors("BM-08", "daily", { ...m, age_week: "10000" }).age_week).toBe("Tuần tuổi 0–104");
   });
 });

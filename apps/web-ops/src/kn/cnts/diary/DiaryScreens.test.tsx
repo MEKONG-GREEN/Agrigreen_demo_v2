@@ -8,6 +8,8 @@ import { resetCntsModel } from "@/api/mock/kn-cnts-model";
 import type * as Common from "@/kn/cycle/common";
 import { DiaryScreen } from "./DiaryScreen";
 import { ReviewScreen } from "./ReviewScreen";
+import { GrowthSection } from "./parts";
+import type { Cycle } from "./api";
 
 const auth: { api: ApiClient | null } = { api: null };
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ api: auth.api, kn: { context: { role: "admin" } } }) }));
@@ -76,4 +78,14 @@ it("BF-CN-DIARY #109: đầu sổ, vật tư mục 1, mục 4 nguyên liệu th�
   await user.click(screen.getByRole("button", { name: "Ghi nhật ký" }));
   const form = await screen.findByLabelText("Ghi nhật ký", { selector: "div" });
   expect(within(form).getByText("Mua nguyên liệu thức ăn chăn nuôi (NC-09)")).toBeInTheDocument();
+});
+
+it("BF-CN-DIARY #109 (Codex P2): tuần tuổi bất thường không sinh dòng, hiện ghi chú", () => {
+  const c = { form: "BM-08", received_date: "2027-01-01", age_days: 1, initial_count: 100, initial_weight_g: "40" } as unknown as Cycle;
+  const e = (d: string, week: string) => ({ entry_date: d, status: "submitted" as const, metrics: { alive: "99", dead: "0", feed_kg: "1", age_week: week } });
+  render(<GrowthSection c={c} entries={[e("2027-01-02", "1"), e("2027-01-03", "100000000")]} />);
+  const growth = screen.getByRole("table", { name: "Chỉ tiêu sinh trưởng theo tuần tuổi" });
+  expect(within(growth).getAllByText(/^Tuần \d+$/)).toHaveLength(8);
+  expect(screen.getByRole("note")).toHaveTextContent("Dữ liệu tuần tuổi bất thường: 1 lần ghi");
+  expect(screen.getByRole("note")).toHaveTextContent("ngày 03/01/2027 — tuần 100000000");
 });

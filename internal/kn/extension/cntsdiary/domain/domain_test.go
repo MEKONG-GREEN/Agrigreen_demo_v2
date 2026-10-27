@@ -172,3 +172,33 @@ func TestPaperFormFields(t *testing.T) {
 		t.Fatalf("BM-19 không có mục nguyên liệu thức ăn: %v", es)
 	}
 }
+
+// #109 (Codex P2): "Tuần tuổi (khi cân)" phi thực tế bị chặn ở server; tuần bình thường và quá tuần 12 vẫn nhận.
+func TestEntryAgeWeekBound(t *testing.T) {
+	entry := func(w string) *Entry {
+		return &Entry{Kind: KindDaily, Metrics: map[string]string{"alive": "100", "feed_kg": "1", "age_week": w}}
+	}
+	for _, form := range []string{FormBM08, FormBM09} {
+		for _, w := range []string{"0", "1", "6", "12", "13", "14", "20", "52", "104"} {
+			e := entry(w)
+			if es := e.Normalize(form); len(es) > 0 || e.Metrics["age_week"] != w {
+				t.Fatalf("%s age_week=%s: %v", form, w, es)
+			}
+		}
+		for _, w := range []string{"105", "10000", "100000000"} {
+			es := entry(w).Normalize(form)
+			if len(es) != 1 || es[0].Field != "metrics.age_week" {
+				t.Fatalf("%s age_week=%s phải bị chặn: %v", form, w, es)
+			}
+		}
+	}
+	// Vượt cả giới hạn số nguyên chung: một lỗi, không trùng.
+	if es := entry("100000001").Normalize(FormBM08); len(es) != 1 || es[0].Field != "metrics.age_week" {
+		t.Fatalf("age_week quá lớn: %v", es)
+	}
+	// BM-19 không có chỉ số tuần tuổi.
+	fish := &Entry{Kind: KindGrowthEnv, Metrics: map[string]string{"age_week": "5"}}
+	if es := fish.Normalize(FormBM19); !slices.ContainsFunc(es, func(x FieldErr) bool { return x.Field == "metrics.age_week" }) {
+		t.Fatalf("BM-19 phải từ chối age_week: %v", es)
+	}
+}

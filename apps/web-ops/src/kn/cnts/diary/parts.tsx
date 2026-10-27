@@ -9,6 +9,7 @@ import {
   dmy,
   growthTable,
   lineAmount,
+  MAX_GROWTH_WEEK,
   metricsOf,
   money,
   PHOTO_KIND_LABEL,
@@ -367,6 +368,16 @@ export function GrowthSection({ c, entries }: { c: Cycle; entries: Pick<Entry, "
           </tr>
         </tbody>
       </table>
+      {g.outOfRange.length ? (
+        <p role="note" className="mute">
+          Dữ liệu tuần tuổi bất thường: {g.outOfRange.length} lần ghi có tuần tuổi ngoài 1–{MAX_GROWTH_WEEK} không đưa vào bảng (
+          {g.outOfRange
+            .slice(0, 5)
+            .map((x) => `ngày ${dmy(x.entry_date)} — ${Number.isFinite(x.week) ? `tuần ${x.week}` : "không xác định"}`)
+            .join("; ")}
+          {g.outOfRange.length > 5 ? `; và ${g.outOfRange.length - 5} lần khác` : ""}). Nhờ người ghi điều chỉnh lần ghi.
+        </p>
+      ) : null}
     </section>
   );
 }

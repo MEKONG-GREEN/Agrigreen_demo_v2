@@ -315,6 +315,7 @@ export function metricErrors(form: Form, kind: EntryKind, m: Record<string, stri
     }
   }
   if (form === "BM-19" && m.ph && Number(m.ph) > 14) e.ph = "pH 0–14";
+  if (!e.age_week && m.age_week?.trim() && Number(m.age_week) > MAX_GROWTH_WEEK) e.age_week = `Tuần tuổi 0–${MAX_GROWTH_WEEK}`;
   return e;
 }
 
@@ -564,6 +565,13 @@ export function kgPerHead(outputKg: string | null | undefined, heads: number | n
 /** Tuần tuổi sổ ghi ở phần 2 mục 2 (tuần 1, 2, 3, 4, 6, 8, 10, 12). */
 export const GROWTH_WEEKS = [1, 2, 3, 4, 6, 8, 10, 12] as const;
 
+/**
+ * Tuần tuổi tối đa của bảng sinh trưởng — trùng `MaxAgeWeek` ở server (#109). Lần ghi quá ngưỡng (dữ liệu cũ nhập nhầm,
+ * hoặc ngày tuổi lúc nhận quá lớn) không sinh dòng mà được báo "dữ liệu tuần tuổi bất thường"; bảng tối đa
+ * 8 + (104 − 12) / 2 = 54 dòng.
+ */
+export const MAX_GROWTH_WEEK = 104;
+
 /** Tuần tuổi của lần ghi: lấy "Tuần tuổi (khi cân)" nếu có, không thì tính từ ngày tuổi lúc nhận + số ngày từ ngày nhận. */
 export function ageWeek(c: Pick<Cycle, "received_date" | "age_days">, e: Pick<Entry, "entry_date" | "metrics">): number {
   const w = e.metrics.age_week;
@@ -593,21 +601,32 @@ export interface Growth {
   rows: GrowthRow[];
   total: { dead: number; feedKg: number; alive: number | null; survival: number | null; fcr: number | null };
   avg: { weightKg: number | null; feedPerHead: number | null };
+  /** Lần ghi có tuần tuổi ngoài 1–MAX_GROWTH_WEEK: không đưa vào bảng (ngày ghi, tuần tuổi). */
+  outOfRange: { entry_date: string; week: number }[];
 }
 
 /**
  * Chỉ tiêu sinh trưởng theo tuần tuổi (phần 2 mục 2 của sổ, NC-12) tính từ các lần ghi hằng ngày đã gửi (bỏ nháp). Dòng tuần
- * W gộp các tuần sau dòng trước tới W (dòng "Tuần 6" gồm tuần 5–6…); quá tuần 12 thêm dòng mỗi 2 tuần. Số sống, tỉ lệ sống,
+ * W gộp các tuần sau dòng trước tới W (dòng "Tuần 6" gồm tuần 5–6…); quá tuần 12 thêm dòng mỗi 2 tuần, tới tối đa
+ * MAX_GROWTH_WEEK. Lần ghi có tuần tuổi ngoài ngưỡng không sinh dòng, trả ở `outOfRange` (#109). Số sống, tỉ lệ sống,
  * tiêu tốn tự tính; trọng lượng lấy theo lần cân (NC-12 nhập).
  */
 export function growthTable(
   c: Pick<Cycle, "received_date" | "age_days" | "initial_count" | "initial_weight_g">,
   entries: Pick<Entry, "entry_date" | "metrics" | "status">[],
 ): Growth {
-  const es = entries.filter((e) => e.status !== "draft").sort((a, b) => a.entry_date.localeCompare(b.entry_date));
-  const weekOf = es.map((e) => ageWeek(c, e));
+  const outOfRange: Growth["outOfRange"] = [];
+  const es: Pick<Entry, "entry_date" | "metrics" | "status">[] = [];
+  const weekOf: number[] = [];
+  for (const e of entries.filter((x) => x.status !== "draft").sort((a, b) => a.entry_date.localeCompare(b.entry_date))) {
+    const w = ageWeek(c, e);
+    if (Number.isFinite(w) && w >= 1 && w <= MAX_GROWTH_WEEK) {
+      es.push(e);
+      weekOf.push(w);
+    } else outOfRange.push({ entry_date: e.entry_date, week: w });
+  }
   const weeks: number[] = [...GROWTH_WEEKS];
-  const maxWeek = Math.max(0, ...weekOf);
+  const maxWeek = weekOf.reduce((m, w) => Math.max(m, w), 0);
   while (weeks.at(-1)! < maxWeek) weeks.push(weeks.at(-1)! + 2);
   const startKg = (num(c.initial_weight_g) ?? 0) / 1000;
   const causeLabel = (v: string) => DEATH_CAUSES.find((x) => x[0] === v)?.[1] ?? v;
@@ -660,6 +679,7 @@ export function growthTable(
       weightKg: weighed.length ? round(weighed.reduce((a, b) => a + b, 0) / weighed.length, 3) : null,
       feedPerHead: c.initial_count ? round(cumFeed / c.initial_count, 2) : null,
     },
+    outOfRange,
   };
 }
 

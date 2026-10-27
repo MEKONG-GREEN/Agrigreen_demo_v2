@@ -97,6 +97,10 @@ const (
 	MaxBackfillDay = 7         // ngày ghi lùi tối đa so thời điểm thiết bị (bù ngày quên ghi)
 	MaxOfflineDays = 30        // bản ngoại tuyến gửi muộn tối đa
 	FutureSkew     = 5 * time.Minute
+	// MaxAgeWeek là tuần tuổi tối đa của "Tuần tuổi (khi cân)" (NC-12, BM-08/BM-09). Sổ gà TP / vịt xiêm 2026 ghi sinh
+	// trưởng tới tuần 12 (vịt xuất 70 ngày); 104 tuần (2 năm) đủ rộng cho đàn nuôi kéo dài hay gà/vịt đẻ, mà vẫn chặn số
+	// nhập nhầm (vd. 10000) — bảng sinh trưởng trên web dựng dòng theo tuần tuổi (#109).
+	MaxAgeWeek = 104
 )
 
 // FieldErr là lỗi một trường.
@@ -520,6 +524,11 @@ func (en *Entry) Normalize(form string) Errors {
 				continue
 			}
 			out[d.Code] = v
+		}
+	}
+	if v, ok := out["age_week"]; ok {
+		if n, _ := strconv.ParseInt(v, 10, 64); n > MaxAgeWeek {
+			e.add("metrics.age_week", "tuần tuổi 0–"+strconv.Itoa(MaxAgeWeek)+" (NC-12 Tuần tuổi khi cân)")
 		}
 	}
 	if form == FormBM19 {
