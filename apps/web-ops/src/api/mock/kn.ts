@@ -1027,7 +1027,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
           {
             "key": "xa.cnts.cong_viec_tuan",
             "label": "Báo cáo công việc tuần",
-            "route": "/kn/cnts/bao-cao-ky",
+            "route": "/kn/cnts/cong-viec-tuan",
             "icon": "check"
           },
           {

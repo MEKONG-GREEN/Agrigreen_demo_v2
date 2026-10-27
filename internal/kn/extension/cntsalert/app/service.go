@@ -86,6 +86,8 @@ type Service struct {
 	Feed formsport.SubmissionFeed
 	// Dir: người nhận (nil → thông báo theo chủ đề vai × đơn vị, không email).
 	Dir Directory
+	// Control (BF-CN-PUBLISH): tiến độ kỳ native trong phạm vi người gọi — nút Nhắc của màn theo dõi biểu kỳ. nil → 503.
+	Control formsport.PeriodControl
 	// Names (tùy chọn): tên cán bộ cho lịch sử, người xử lý.
 	Names func() partyport.ActorNames
 }

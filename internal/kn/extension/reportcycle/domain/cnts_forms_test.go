@@ -29,10 +29,10 @@ func TestSplitCNTS_W1142(t *testing.T) {
 		!ps[0].From.Equal(Date(2026, 10, 7)) || !ps[0].DueAt.Equal(time.Date(2026, 10, 14, 12, 0, 0, 0, loc)) {
 		t.Fatalf("BM-04: %+v %v", ps, err)
 	}
-	// BM-05: tuần làm việc; Phần I hạn Thứ Hai sau, Phần II hạn Thứ Sáu trước.
+	// BM-05: tuần Thứ Hai–Chủ Nhật (bảng T2–CN, UP-06); Phần I hạn 08:00 Thứ Hai sau, Phần II hạn 17:00 Thứ Sáu trước.
 	ps, err = SplitCNTS(CNTSSeriesInput{Form: bm(CNTSBM05I), From: Date(2026, 10, 12), To: Date(2026, 10, 18), Rule: DefaultRule, Loc: loc})
-	if err != nil || len(ps) != 1 || ps[0].Key != "2026-LV42" || !ps[0].To.Equal(Date(2026, 10, 16)) ||
-		!ps[0].DueAt.Equal(time.Date(2026, 10, 19, 17, 0, 0, 0, loc)) {
+	if err != nil || len(ps) != 1 || ps[0].Key != "2026-LV42" || !ps[0].To.Equal(Date(2026, 10, 18)) ||
+		!ps[0].DueAt.Equal(time.Date(2026, 10, 19, 8, 0, 0, 0, loc)) {
 		t.Fatalf("BM-05 I: %+v %v", ps, err)
 	}
 	ps, err = SplitCNTS(CNTSSeriesInput{Form: bm(CNTSBM05II), From: Date(2026, 10, 12), To: Date(2026, 10, 16), Rule: DefaultRule, Loc: loc})
@@ -66,5 +66,43 @@ func TestValidateCNTS_W1142(t *testing.T) {
 			}
 			seen[x.Key] = true
 		}
+	}
+}
+
+// BF-CN-WEEKLY (UP-06): bảng T2–CN — Thứ Bảy, Chủ Nhật không bắt buộc nhưng đã chọn loại thì phải ghi nội dung; Phần II
+// đi công tác ("Công tác khác") bắt buộc Địa điểm; mỗi ô ≤ 500 ký tự.
+func TestValidateCNTS_BM05Weekly(t *testing.T) {
+	for _, code := range []string{CNTSBM05I, CNTSBM05II} {
+		f, _ := CNTSFormByCode(code)
+		req := map[string]bool{}
+		for _, x := range f.Fields {
+			req[x.Key] = x.Required
+		}
+		if !req["t2_loai"] || !req["t6_loai"] || req["t7_loai"] || req["cn_loai"] {
+			t.Fatalf("%s: Thứ Hai–Thứ Sáu bắt buộc, Thứ Bảy/Chủ Nhật không: %v", code, req)
+		}
+	}
+	plan := map[string]string{"t2_loai": WorkTypes[0], "t2_ke_hoach": "Kiểm tra đàn", "t2_ket_qua_du_kien": "Xong",
+		"t3_loai": WorkTypeOther, "t3_cong_tac_khac": "Họp tại tỉnh", "t3_ke_hoach": "Họp", "t3_ket_qua_du_kien": "Nắm chỉ đạo",
+		"t7_loai": WorkTypes[0]}
+	got := map[string]bool{}
+	for _, is := range ValidateCNTS(CNTSBM05II, plan) {
+		got[is.Field] = true
+	}
+	if len(got) != 3 || !got["t3_dia_diem"] || !got["t7_ke_hoach"] || !got["t7_ket_qua_du_kien"] {
+		t.Fatalf("Phần II: %v", got)
+	}
+	plan["t3_dia_diem"], plan["t7_ke_hoach"], plan["t7_ket_qua_du_kien"] = "Sở NN&MT", "Trực", "Đủ"
+	if is := ValidateCNTS(CNTSBM05II, plan); len(is) != 0 {
+		t.Fatalf("Phần II hợp lệ: %+v", is)
+	}
+	// Phần I: không đòi Địa điểm; Chủ Nhật đã chọn loại phải ghi kết quả.
+	res := map[string]string{"t3_loai": WorkTypeOther, "t3_cong_tac_khac": "Họp", "cn_loai": WorkTypes[0]}
+	if is := ValidateCNTS(CNTSBM05I, res); len(is) != 1 || is[0].Field != "cn_ket_qua" {
+		t.Fatalf("Phần I: %+v", is)
+	}
+	days := PlanDays(plan)
+	if len(days) != 3 || days[0].Offset != 0 || days[1].Place != "Sở NN&MT" || days[2].Offset != 5 || days[2].Label != "Thứ Bảy" {
+		t.Fatalf("PlanDays: %+v", days)
 	}
 }

@@ -45,6 +45,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/report-tasks", h.listTasks)
 	g.GET("/report-tasks/:id", h.getTask)
 	g.POST("/report-tasks/:id/submissions", h.submit)
+	httpx.AllowBody(g, http.MethodPost, "/report-tasks/:id/grid-import", app.MaxGridImportBytes+1024)
+	g.POST("/report-tasks/:id/grid-import", h.gridImport)
 	g.GET("/report-tasks/:id/history", h.history)
 	g.GET("/report-tasks/:id/log", h.taskLog)
 	g.POST("/report-tasks/:id/adjustment-request", h.adjust)
@@ -702,6 +704,28 @@ func (h Handler) history(c *gin.Context) {
 		items = append(items, toSubmission(s, names))
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+// gridImport: BF-TT-FORMS "Nhập từ Excel" — đọc tệp thành dòng chữ cái cột → giá trị, không ghi.
+func (h Handler) gridImport(c *gin.Context) {
+	id, ok := pathID(c, app.ErrTaskNotFound)
+	if !ok {
+		return
+	}
+	res, err := h.Svc.ImportGrid(c.Request.Context(), id, io.LimitReader(c.Request.Body, app.MaxGridImportBytes+1))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	rows := make([]gin.H, 0, len(res.Rows))
+	for _, r := range res.Rows {
+		numeric := r.Numeric
+		if numeric == nil {
+			numeric = []string{}
+		}
+		rows = append(rows, gin.H{"line": r.Line, "cells": r.Cells, "numeric": numeric})
+	}
+	c.JSON(http.StatusOK, gin.H{"sheet": res.Sheet, "rows": rows})
 }
 
 func (h Handler) taskLog(c *gin.Context) {

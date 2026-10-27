@@ -543,7 +543,14 @@ export const CATALOGS: Record<CatalogName, CatalogItem[]> = {
     ["RAU_MAU", "Rau màu", { is_group: "true" }],
     ["RAU_MUONG", "Rau muống", { parent_code: "RAU_MAU", is_group: "false", unit: "tấn" }],
   ]),
-  material: cat("material", [["PHAN_URE", "Phân Urê", { unit: "kg", group: "Phân bón" }]]),
+  // Mã khớp sổ vật tư giả lập (kn-collect.ts MATERIALS đọc từ đây — BF-TT-MAT #105).
+  material: cat("material", [
+    ["phan_ure", "Phân urê", { unit: "tấn", group: "Phân bón" }],
+    ["phan_npk", "Phân NPK", { unit: "tấn", group: "Phân bón" }],
+    ["thuoc_bvtv", "Thuốc BVTV", { unit: "lít", group: "Thuốc BVTV" }],
+    ["bay_den", "Bẫy đèn", { unit: "cái", group: "Thiết bị" }],
+    ["giong_lua_cu", "Giống lúa (ngừng dùng)", { unit: "kg", group: "Giống" }, true],
+  ]),
   production_model: cat("production_model", [["1P5G", "1 phải 5 giảm", {}]]),
   report_type: cat("report_type", [
     ["tuan", "Báo cáo tuần", { period: "week", level: "commune" }],

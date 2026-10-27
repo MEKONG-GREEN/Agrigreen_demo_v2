@@ -640,3 +640,72 @@ func TestCNTSDiary_W1148(t *testing.T) {
 }
 
 func r(m map[string]any) []byte { b, _ := json.Marshal(m); return b }
+
+// BF-CN-DIARY (#109, CN-08/CN-12): nhật ký BM-08/BM-09 đủ trường sổ gốc 2026 — đầu sổ (mô hình, thời gian thực hiện, cán bộ
+// theo dõi), mục 1 vật tư (vật tư + chủng loại), mục 4 mua nguyên liệu thức ăn (cộng vào gợi ý chi thức ăn NC-15), mục 5 ghi chú
+// tiêm phòng, phần 3 họ tên cán bộ; sổ vịt xiêm vẫn không có phòng/trị bệnh, xuất bán.
+func TestCNTSDiary_BFCNDiaryPaperFields(t *testing.T) {
+	f := newFix(t)
+	chu := f.user(tinh("chu_nhiem"))
+	officer := f.user(xa("30001"))
+	f.xa.list = []accport.XaScope{{ActorRef: officer.ref, Communes: []string{"30001"}}}
+	p := want(t, chu.post(base+"projects", map[string]any{"code": "da-vit-2027", "name": "Mô hình vịt xiêm ATSH 2027", "kind": "tinh",
+		"start_date": "2027-03-01", "end_date": "2027-12-31"}), 201, "", "dự án")
+	s := want(t, chu.post(base+"demo-sites", map[string]any{"project_ref": str(p, "ref"), "commune_code": "30001", "name": "Điểm vịt Bình Hòa",
+		"model_type_code": "GA_TP", "officer_ref": officer.ref.String(), "diary_form": "BM-09",
+		"location": map[string]any{"lat": 10.38, "lng": 105.43, "source": "map"}}), 201, "", "điểm BM-09")
+	h := str(want(t, officer.post(base+"model-households", map[string]any{"site_ref": str(s, "ref"), "owner_name": "Lê Văn Vịt",
+		"owner_phone": "0912333444", "keeper_kind": "officer", "keeper_ref": officer.ref.String(), "location": map[string]any{"lat": 10.381,
+			"lng": 105.431, "source": "gps"}}), 201, "", "hộ"), "ref")
+
+	cyc := map[string]any{"household_ref": h, "breed": "Vịt xiêm Pháp", "received_date": "2027-10-01", "initial_count": 300, "age_days": 1,
+		"supplies": []map[string]any{
+			{"item": "Con giống", "date": "2027-10-01", "kind": "Vịt xiêm Pháp 1 ngày tuổi", "quantity": "300", "unit": "con"},
+			{"item": "Thức ăn vịt con", "date": "2027-10-01", "kind": "", "quantity": "200", "unit": "kg"},
+			{"date": "2027-10-01", "kind": "Vaccine viêm gan vịt", "quantity": "3", "unit": "lọ"}}}
+	want(t, officer.post(base+"diary-cycles", merge(cyc, map[string]any{"supplies": []map[string]any{{"date": "2027-10-01", "kind": "",
+		"quantity": "1", "unit": ""}}})), 422, "extension.cnts_diary_cycle_invalid", "mục 1: thiếu cả vật tư và chủng loại")
+	cy := want(t, officer.post(base+"diary-cycles", cyc), 201, "", "mở lứa vịt")
+	cref := str(cy, "ref")
+	d := want(t, officer.get(base+"diary-cycles/"+cref), 200, "", "chi tiết lứa")
+	sup := list(d, "supplies")
+	if len(sup) != 3 || str(sup[0].(map[string]any), "item") != "Con giống" || str(sup[1].(map[string]any), "item") != "Thức ăn vịt con" {
+		t.Fatalf("mục 1 vật tư: %v", sup)
+	}
+	if str(d, "project_name") != "Mô hình vịt xiêm ATSH 2027" || str(d, "project_start") != "2027-03-01" || str(d, "project_end") != "2027-12-31" ||
+		str(d, "officer_ref") != officer.ref.String() {
+		t.Fatalf("đầu sổ NC-01 (mô hình, thời gian thực hiện, cán bộ theo dõi): %v", d)
+	}
+
+	day := map[string]any{"cycle_ref": cref, "entry_kind": "daily", "metrics": map[string]any{"alive": "298", "dead": "2", "death_cause": "yeu",
+		"feed_kg": "6"}, "location": map[string]any{"lat": 10.3811, "lng": 105.4311, "accuracy_m": "8"}, "submit": true,
+		"tables": map[string]any{
+			"feed_purchases": []map[string]any{{"date": "2027-10-12", "name": "Cám vịt con", "quantity_kg": "25", "unit_price": "12000", "note": "đại lý"}},
+			"feed_materials": []map[string]any{{"date": "2027-10-12", "name": "Lúa", "quantity_kg": "10.5", "unit_price": "8000", "note": "tự trộn"}},
+			"vaccinations": []map[string]any{{"vaccine": "Dịch tả vịt", "shot": 0, "date": "2027-10-12", "dosage": "1 liều/con",
+				"method": "tiêm dưới da", "mfg_date": "2027-09-01", "note": "lô 0927"}},
+			"officer_notes": []map[string]any{{"date": "2027-10-12", "officer": "Nguyễn Văn Cán", "content": "Rửa máng uống hằng ngày",
+				"farmer_opinion": "Đồng ý"}}}}
+	want(t, officer.post(base+"diary-entries", merge(day, map[string]any{"tables": map[string]any{"treatments": []map[string]any{{"date": "2027-10-12",
+		"drug": "X", "withdrawal_days": 1}}}})), 422, "extension.cnts_diary_entry_invalid", "sổ vịt xiêm 2026 không có phòng và trị bệnh")
+	e := want(t, officer.post(base+"diary-entries", day), 201, "", "lần ghi đủ trường sổ gốc")
+	tb := obj(e, "tables")
+	fm := list(tb, "feed_materials")
+	if len(fm) != 1 || str(fm[0].(map[string]any), "name") != "Lúa" || str(fm[0].(map[string]any), "quantity_kg") != "10.5" {
+		t.Fatalf("mục 4 nguyên liệu thức ăn: %v", tb)
+	}
+	if v := list(tb, "vaccinations")[0].(map[string]any); str(v, "note") != "lô 0927" || str(v, "method") != "tiêm dưới da" {
+		t.Fatalf("mục 5 tiêm phòng: %v", v)
+	}
+	if o := list(tb, "officer_notes")[0].(map[string]any); str(o, "officer") != "Nguyễn Văn Cán" {
+		t.Fatalf("phần 3 họ tên cán bộ: %v", o)
+	}
+	if n := f.count(`SELECT count(*) FROM pf_extension.cnts_diary_entry WHERE tenant_id = $1 AND entry_ref = $2
+	    AND tables -> 'feed_materials' -> 0 ->> 'name' = 'Lúa'`, f.tenant, str(e, "ref")); n != 1 {
+		t.Fatalf("sổ lần ghi lưu mục 4: %d", n)
+	}
+	d = want(t, officer.get(base+"diary-cycles/"+cref), 200, "", "gợi ý hạch toán")
+	if fc := str(obj(d, "suggest"), "feed_cost"); fc != "384000" { // 25×12.000 + 10,5×8.000
+		t.Fatalf("NC-09 mục 3 + mục 4 cộng vào gợi ý chi thức ăn: %s", fc)
+	}
+}

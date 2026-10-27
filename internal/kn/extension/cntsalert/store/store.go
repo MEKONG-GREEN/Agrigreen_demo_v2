@@ -333,3 +333,15 @@ func RemindersSince(ctx context.Context, tx pgx.Tx, since time.Time) (map[string
 
 // ErrNotFound: không có bản ghi.
 var ErrNotFound = errors.New("không có")
+
+// PublicationOwner trả cán bộ tỉnh phụ trách biểu của lần phát hành mới nhất chứa kỳ native period (BF-CN-PUBLISH, sổ
+// pf_extension.cnts_publication của extension/reportcycle) — nil nếu kỳ không ghi người phụ trách.
+func PublicationOwner(ctx context.Context, tx pgx.Tx, period uuid.UUID) (*uuid.UUID, error) {
+	var owner *uuid.UUID
+	err := tx.QueryRow(ctx, `SELECT owner_ref FROM pf_extension.cnts_publication WHERE period_refs @> ARRAY[$1::uuid]
+	  ORDER BY event_time DESC LIMIT 1`, period).Scan(&owner)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return owner, err
+}

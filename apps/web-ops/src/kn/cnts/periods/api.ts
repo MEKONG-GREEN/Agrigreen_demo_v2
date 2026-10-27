@@ -17,6 +17,19 @@ export type FormsSubmission = S["FormsSubmission"];
 export type FormsPeriodView = S["FormsPeriodView"];
 export type FormsPrevious = S["FormsPrevious"];
 export type TaskStatus = FormsTask["status"];
+export type CntsTracking = S["CNTSTracking"];
+export type CntsDraft = S["CNTSPeriodDraft"];
+export type CntsTarget = NonNullable<CntsSeriesInput["target"]>;
+
+/** Đối tượng phát hành (CN-07). */
+export const TARGET_LABEL: Record<CntsTarget, string> = {
+  province: "Tất cả xã của tỉnh",
+  regions: "Theo khu vực",
+  aquaculture: "Xã có nuôi thủy sản",
+  model: "Xã có mô hình",
+  communes: "Chọn từng xã",
+  facilities: "Cơ sở giết mổ",
+};
 
 export const PROFILE = "kn_cnts";
 
@@ -126,6 +139,9 @@ export function createCntsPeriodApi(api: ApiClient) {
     period: (id: string): Promise<FormsPeriodView> => unwrap(api.GET("/v1/forms/periods/{id}", { params: { path: { id }, query } })),
     previous: async (periodId: string, unit: string): Promise<FormsPrevious | null> =>
       (await unwrap(api.GET("/v1/forms/periods/{id}/previous", { params: { path: { id: periodId }, query: { ...query, unit } } }))).previous,
+    /** Lịch sử phiên bản bài nộp của đơn vị (mới trước) — khung Log (BF-CN-WEEKLY). */
+    submissions: async (periodId: string, unit: string): Promise<FormsSubmission[]> =>
+      (await unwrap(api.GET("/v1/forms/periods/{id}/submissions", { params: { path: { id: periodId }, query: { ...query, unit } } }))).items,
     submit: (periodId: string, body: SubmitBody): Promise<FormsSubmission> =>
       unwrap(api.POST("/v1/forms/periods/{id}/submissions", { params: { path: { id: periodId }, query, ...idem() }, body })),
     close: (periodId: string): Promise<FormsPeriodView> =>
@@ -134,10 +150,61 @@ export function createCntsPeriodApi(api: ApiClient) {
       unwrap(api.POST("/v1/forms/periods/{id}/reopen", { params: { path: { id: periodId }, query, ...idem() }, body: { reason, units } })),
     cancel: (periodId: string, reason: string): Promise<FormsPeriodView> =>
       unwrap(api.POST("/v1/forms/periods/{id}/cancel", { params: { path: { id: periodId }, query, ...idem() }, body: { reason } })),
+    // BF-CN-PUBLISH (CN-07): người phụ trách, giờ chốt, dấu nháp; nháp của xã; nút Nhắc.
+    tracking: (code?: string, periodIds: string[] = []): Promise<CntsTracking> =>
+      unwrap(api.GET("/v1/extension/cnts/period-tracking", {
+        params: { query: { ...(code ? { code } : {}), ...(periodIds.length ? { period_ids: periodIds.slice(0, 400).join(",") } : {}) } },
+      })),
+    draft: async (periodId: string, unit: string): Promise<CntsDraft | null> =>
+      (await unwrap(api.GET("/v1/extension/cnts/period-drafts/{id}", { params: { path: { id: periodId }, query: { unit } } }))).draft ?? null,
+    saveDraft: (periodId: string, body: { unit: string; values: Record<string, string>; nil_report: boolean; note?: string }): Promise<CntsDraft> =>
+      unwrap(api.PUT("/v1/extension/cnts/period-drafts/{id}", { params: { path: { id: periodId } }, body })),
+    remind: (periodId: string, units: string[] = []): Promise<{ reminded: number; skipped: string[] }> =>
+      unwrap(api.POST("/v1/extension/cnts/period-reminders", { params: idem(), body: { period_id: periodId, ...(units.length ? { units } : {}) } })),
   };
 }
 
 export type CntsPeriodApi = ReturnType<typeof createCntsPeriodApi>;
+
+/** Trạng thái theo dõi của một đơn vị (CN-07): đã nộp / nháp / chưa nhập / trễ / trả lại / không nộp. */
+export type TrackState = "submitted" | "draft" | "not_entered" | "overdue" | "returned" | "missed";
+
+export const TRACK_LABEL: Record<TrackState, string> = {
+  submitted: "Đã nộp",
+  draft: "Nháp",
+  not_entered: "Chưa nhập",
+  overdue: "Trễ hạn",
+  returned: "Trả lại",
+  missed: "Không nộp",
+};
+
+export const TRACK_TONE: Record<TrackState, "neutral" | "ok" | "warn" | "bad" | "info"> = {
+  submitted: "ok",
+  draft: "info",
+  not_entered: "neutral",
+  overdue: "bad",
+  returned: "warn",
+  missed: "bad",
+};
+
+/** Khóa dấu nháp (kỳ|đơn vị) → thời điểm lưu. */
+export function draftIndex(t: Pick<CntsTracking, "drafts"> | null | undefined): Map<string, string> {
+  return new Map((t?.drafts ?? []).map((d) => [`${d.period_id}|${d.unit}`, d.saved_at]));
+}
+
+/**
+ * Trạng thái theo dõi của một công việc. Trả lại (yêu cầu điều chỉnh) ưu tiên; chưa gửi lần nào: Trễ hạn khi quá hạn
+ * (kể cả đã có nháp — trễ là việc cần xử lý), Nháp khi có nháp, còn lại Chưa nhập. Nháp cũ hơn lần gửi cuối bị bỏ qua.
+ */
+export function trackState(t: Pick<FormsTask, "status" | "version" | "submitted_at" | "period_id" | "unit">, drafts: Map<string, string>): TrackState {
+  if (t.status === "returned") return "returned";
+  if (t.status === "missed") return "missed";
+  if (t.version > 0) return "submitted";
+  if (t.status === "overdue") return "overdue";
+  const saved = drafts.get(`${t.period_id}|${t.unit}`);
+  if (saved && (!t.submitted_at || Date.parse(saved) > Date.parse(t.submitted_at))) return "draft";
+  return "not_entered";
+}
 
 /** Gom công việc theo kỳ (màn theo dõi Cấp Tỉnh). */
 export interface PeriodRow {
@@ -149,23 +216,43 @@ export interface PeriodRow {
   periodStatus: FormsTask["period_status"];
   total: number;
   submitted: number;
+  draft: number;
+  notEntered: number;
   overdue: number;
+  returned: number;
   missing: number;
+  /** Số đơn vị cần nhắc: chưa gửi (chưa nhập, nháp, trễ) hoặc bị trả lại. */
+  pending: number;
+  units: { unit: string; parent: string; state: TrackState; returnNote: string | null; submittedAt: string | null }[];
+  ownerName: string | null;
+  /** Giờ chốt (ISO) = hạn + số giờ đã đặt khi phát hành; null = không đặt. */
+  closeAt: string | null;
 }
 
-export function periodRows(tasks: FormsTask[]): PeriodRow[] {
+export function periodRows(tasks: FormsTask[], tracking?: CntsTracking | null): PeriodRow[] {
+  const drafts = draftIndex(tracking);
+  const meta = new Map((tracking?.periods ?? []).map((p) => [p.period_id, p]));
   const by = new Map<string, PeriodRow>();
   for (const t of tasks) {
     let r = by.get(t.period_id);
     if (!r) {
+      const m = meta.get(t.period_id);
+      const closeAt = m && m.close_after_hours != null ? new Date(Date.parse(t.due_at) + m.close_after_hours * 3_600_000).toISOString() : null;
       r = { periodId: t.period_id, code: t.template_code, title: t.template_title, label: t.label, dueAt: t.due_at, periodStatus: t.period_status,
-        total: 0, submitted: 0, overdue: 0, missing: 0 };
+        total: 0, submitted: 0, draft: 0, notEntered: 0, overdue: 0, returned: 0, missing: 0, pending: 0, units: [],
+        ownerName: m?.owner_name ?? (m?.owner_ref ? m.owner_ref : null), closeAt };
       by.set(t.period_id, r);
     }
+    const st = trackState(t, drafts);
     r.total++;
-    if (t.version > 0) r.submitted++;
-    if (t.status === "overdue") r.overdue++;
-    if (t.status === "missed") r.missing++;
+    if (st === "submitted") r.submitted++;
+    if (st === "draft") r.draft++;
+    if (st === "not_entered") r.notEntered++;
+    if (st === "overdue") r.overdue++;
+    if (st === "returned") r.returned++;
+    if (st === "missed") r.missing++;
+    if (st === "draft" || st === "not_entered" || st === "overdue" || st === "returned") r.pending++;
+    r.units.push({ unit: t.unit, parent: t.parent, state: st, returnNote: t.return_note, submittedAt: t.submitted_at });
   }
   return [...by.values()];
 }

@@ -52,11 +52,13 @@ describe("Biểu kỳ CNTS — phát hành", () => {
     render(<CntsPublishScreen />);
     const table = await screen.findByRole("table", { name: "Biểu mẫu" });
     expect(within(table).getByRole("columnheader", { name: "STT" })).toBeInTheDocument();
+    await u.click(await screen.findByRole("radio", { name: /Chọn từng xã/ }));
     await u.clear(screen.getByLabelText(/Từ ngày/));
     await u.type(screen.getByLabelText(/Giờ hạn nộp/), "25:00");
-    await u.click(screen.getByRole("button", { name: "Xem trước" }));
-    expect(alerts()).toEqual(expect.arrayContaining(["Bắt buộc nhập.", "Chọn ít nhất một đơn vị nhận.", "Giờ dạng HH:MM, vd 16:00."]));
-    expect(writes("/preview")).toHaveLength(0);
+    const before = writes("/preview").length; // màn nạp danh sách xã bằng một lần xem trước "Tất cả xã"
+    await u.click(screen.getByRole("button", { name: /Xem trước/ }));
+    expect(alerts()).toEqual(expect.arrayContaining(["Bắt buộc nhập.", "Chọn ít nhất một đơn vị nhận.", "Giờ dạng HH:MM, vd 16:00.", "Chọn cán bộ tỉnh phụ trách biểu."]));
+    expect(writes("/preview")).toHaveLength(before);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
