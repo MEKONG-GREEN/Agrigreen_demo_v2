@@ -417,6 +417,8 @@ export type KnPlot = A["KNPlot"];
 export type MaterialRecord = A["MaterialRecord"];
 export type MaterialQuery = { commune?: string; from?: string; to?: string; material_code?: string };
 export type MaterialImport = AppPaths["/v1/kn/materials/import"]["post"]["responses"]["200"]["content"]["application/json"];
+/** Hồ sơ KN riêng (#119 BF-SRV-KN-ATTRS): năm sản xuất theo loại máy của HTX (TT-10). */
+export type KnMachineProfile = A["KNMachineProfile"];
 
 export type CollectApi = ReturnType<typeof createCollectApi>;
 
@@ -434,6 +436,10 @@ export function createCollectApi(opts: KnHttpOptions) {
     coopMachines: (ref: string) => call<KnCoopMachines>("GET", `/v1/kn/machine-counts/${ref}`),
     putMachines: (ref: string, lines: { machine_type: string; quantity: number; note?: string | null }[], idem?: string) =>
       call<KnCoopMachines>("PUT", `/v1/kn/machine-counts/${ref}`, { lines }, undefined, idem),
+    machineProfile: (ref: string) => call<KnMachineProfile>("GET", `/v1/kn/machine-profiles/${ref}`),
+    /** Thay toàn bộ năm sản xuất theo loại máy (loại vắng = bỏ khỏi hồ sơ). */
+    putMachineProfile: (ref: string, lines: { machine_type: string; year_made: number }[], idem?: string) =>
+      call<KnMachineProfile>("PUT", `/v1/kn/machine-profiles/${ref}`, { lines }, undefined, idem),
     plots: (q: { commune?: string; cooperative_ref?: string } = {}) => call<{ items: KnPlot[]; next_cursor: string | null }>("GET", "/v1/kn/plots", undefined, q),
     materials: (q: MaterialQuery = {}) => call<{ items: MaterialRecord[]; next_cursor: string | null }>("GET", "/v1/kn/materials", undefined, { ...q, limit: 500 }),
     recordMaterials: (b: { commune_code: string; recorded_on: string; lines: { material_code: string; quantity: string; note?: string }[] }, idem?: string) =>

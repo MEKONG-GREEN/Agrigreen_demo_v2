@@ -367,15 +367,62 @@ func TestHRMPromotionHTTP_W1125(t *testing.T) {
 	f.call("hcth", http.MethodPost, "/v1/hrm/promotion/decisions/"+oldID+"/cancel", map[string]any{"reason": "Quyết định nhập nhầm người"}, http.StatusOK)
 
 	// Job tính mốc hằng ngày: một dòng mỗi ngày; chạy lại cùng ngày không ghi thêm.
-	r1, err := f.svc.PromotionScan(t.Context(), f.tid, time.Date(2026, 10, 12, 1, 0, 0, 0, time.UTC), nil)
-	if err != nil || !r1.Fresh || r1.Counts["due_3"] != 2 || r1.Counts["fail"] != 1 {
+	r1, err := f.svc.PromotionScan(t.Context(), f.tid, time.Date(2026, 10, 12, 1, 0, 0, 0, time.UTC))
+	if err != nil || !r1.Fresh || r1.Counts["due_3"] != 2 || r1.Counts["fail"] != 1 || !r1.Notified {
 		t.Fatalf("job: %+v %v", r1, err)
 	}
-	if r2, err := f.svc.PromotionScan(t.Context(), f.tid, time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC), nil); err != nil || r2.Fresh {
+	if r2, err := f.svc.PromotionScan(t.Context(), f.tid, time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)); err != nil || r2.Fresh || r2.Notified {
 		t.Fatalf("job lặp: %+v %v", r2, err)
 	}
 	if l := f.call("hcth", http.MethodGet, "/v1/hrm/promotion", nil, http.StatusOK); l["last_scan"].(map[string]any)["day"] != "2026-10-12" {
 		t.Fatalf("lần tính gần nhất: %v", l["last_scan"])
+	}
+	// NOTIFY-HCTH-KN (#50): sự kiện pf.hrm.promotion_due.detected ghi CÙNG giao dịch với dòng sổ promotion_scan — đúng một
+	// sự kiện cho ngày (chạy lại không phát thêm), scan_id là dòng sổ, chỉ số đếm (không mã nhân sự, không PII). Ngày sau
+	// số đếm y hệt → không phát (không làm tràn hộp thư); số đếm đổi → phát.
+	admin := f.env.AdminPool(t, migrations.PF)
+	promoEvents := func() []map[string]any {
+		t.Helper()
+		rows, err := admin.Query(context.Background(), `SELECT payload::text FROM shared.outbox WHERE tenant_id = $1 AND event_type = $2
+		    AND producer = 'pf/hrm' ORDER BY id`, f.tid, "pf.hrm.promotion_due.detected")
+		if err != nil {
+			t.Fatal(err)
+		}
+		raws, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []map[string]any
+		for _, raw := range raws {
+			for _, pii := range []string{"Trần Văn An", "Lê Thị Bé", "0913000001", "staff_id", a} {
+				if strings.Contains(raw, pii) {
+					t.Fatalf("sự kiện chứa %q: %s", pii, raw)
+				}
+			}
+			var m map[string]any
+			dec := json.NewDecoder(strings.NewReader(raw))
+			dec.UseNumber()
+			_ = dec.Decode(&m)
+			out = append(out, m)
+		}
+		return out
+	}
+	evs := promoEvents()
+	if len(evs) != 1 || evs[0]["day"] != "2026-10-12" || evs[0]["fail"] != json.Number("1") {
+		t.Fatalf("sự kiện nâng bậc: %v", evs)
+	}
+	var scanID string
+	if err := admin.QueryRow(context.Background(), `SELECT id::text FROM pf_hrm.promotion_scan WHERE tenant_id = $1 AND scan_day = '2026-10-12'`,
+		f.tid).Scan(&scanID); err != nil || evs[0]["scan_id"] != scanID {
+		t.Fatalf("scan_id %v ≠ dòng sổ %s (%v)", evs[0]["scan_id"], scanID, err)
+	}
+	if w := evs[0]["windows"].([]any); len(w) != 3 || w[1].(map[string]any)["months"] != json.Number("3") || w[1].(map[string]any)["count"] != json.Number("2") {
+		t.Fatalf("mốc nhắc: %v", w)
+	}
+	if r3, err := f.svc.PromotionScan(t.Context(), f.tid, time.Date(2026, 10, 13, 1, 0, 0, 0, time.UTC)); err != nil || !r3.Fresh {
+		t.Fatalf("job ngày sau: %+v %v", r3, err)
+	} else if n := len(promoEvents()); (r3.Notified && n != 2) || (!r3.Notified && n != 1) {
+		t.Fatalf("phát theo thay đổi: notified=%v, %d sự kiện", r3.Notified, n)
 	}
 
 	// Sổ chỉ ghi thêm; không PII trong sổ nâng bậc (RB-3); tenant khác không thấy.

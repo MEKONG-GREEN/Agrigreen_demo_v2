@@ -1,0 +1,1 @@
+- [x] BF-TT-MACH-WEB (#103, 27/10/2026, không có migration): màn Máy móc HTX thêm cột Năm SX (bắt buộc, 1900 – năm hiện tại giờ VN, lưu ở hồ sơ KN riêng `/v1/kn/machine-profiles`), số lượng nguyên 1 – 1.000.000, không trùng loại máy; lỗi theo trường của máy chủ gắn vào ô của dòng. Mock có route hồ sơ năm máy. [Giả định](../../kn/gia-dinh/BF-TT-MACH-WEB.md).

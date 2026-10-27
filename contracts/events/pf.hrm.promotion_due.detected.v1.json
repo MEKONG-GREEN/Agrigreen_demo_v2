@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.hrm.promotion_due.detected/v1",
+  "title": "pf.hrm.promotion_due.detected — payload",
+  "description": "Job hrm_promotion_scan (W11.25, BRD HCTH v3.0 FN-09 bước 1) thấy trường hợp nâng bậc cần Phòng HCTH xử lý và số đếm khác lần tính trước. Ghi cùng giao dịch với dòng sổ pf_hrm.promotion_scan (scan_id) — tối đa một sự kiện mỗi tenant mỗi ngày. Chỉ số đếm và ngày, không mã nhân sự, không dữ liệu cá nhân. pf/notify (consumer pf.notify.hrm, builder do pf/hrm đăng ký) gửi thông báo hrm_promotion_due tới Phòng HCTH và Admin.",
+  "x-event-type": "pf.hrm.promotion_due.detected",
+  "x-schema-version": 1,
+  "x-producer": "pf/hrm",
+  "type": "object",
+  "required": [
+    "scan_id",
+    "day",
+    "windows",
+    "overdue",
+    "fail",
+    "review",
+    "missing"
+  ],
+  "properties": {
+    "scan_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Dòng sổ promotion_scan (tham chiếu đợt tính)"
+    },
+    "day": {
+      "type": "string",
+      "format": "date",
+      "description": "Ngày tính (giờ Việt Nam)"
+    },
+    "windows": {
+      "type": "array",
+      "description": "Số kỳ NLTX/TNVK đến hạn, chưa có quyết định, theo từng mốc nhắc (tháng)",
+      "items": {
+        "type": "object",
+        "required": [
+          "months",
+          "count"
+        ],
+        "properties": {
+          "months": {
+            "type": "integer"
+          },
+          "count": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "overdue": {
+      "type": "integer",
+      "description": "Kỳ đã quá hạn, chưa xử lý"
+    },
+    "fail": {
+      "type": "integer",
+      "description": "Kỳ \"Chưa đủ\" điều kiện"
+    },
+    "review": {
+      "type": "integer",
+      "description": "Kỳ \"Cần xem xét\""
+    },
+    "missing": {
+      "type": "integer",
+      "description": "Viên chức thiếu mốc xếp bậc (chưa tính được)"
+    }
+  }
+}
