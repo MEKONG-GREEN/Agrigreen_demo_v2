@@ -4,7 +4,7 @@
 // nhập BM-01 (theo cơ sở, theo ngày), BM-04, BM-17 (theo xã, theo tuần), BM-05 (kết quả / kế hoạch tuần làm việc).
 // Hỗ trợ: sao chép kỳ trước, báo không phát sinh, ghi chú (H08), lý do trễ (H09), lưu nháp trên máy, khóa lạc quan —
 // người lưu sau được báo "Đã có người cập nhật lúc …" và phải tải bản mới (không ghi đè).
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { unwrap } from "@/api/client";
 import { ApiProblem } from "@/api/problem";
 import type { CatalogItem } from "@/api/types";
@@ -12,7 +12,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { NumberField, SelectField, TextField } from "@/components/form";
 import { DataTable, PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
-import { STATUS_LABEL, STATUS_TONE, createCntsPeriodApi, fieldErrors, groupFields, isLate, numberRule, payloadValues, type FormsTask } from "./api";
+import { STATUS_LABEL, STATUS_TONE, createCntsPeriodApi, fieldErrors, groupFields, isLate, numberRule, payloadValues, type CntsDraft, type FormsTask } from "./api";
 
 interface Draft {
   values: Record<string, string>;
@@ -159,13 +159,22 @@ function Entry({
   const local = loadDraft(task);
   const init: Draft = local ?? { values: task.values, nil: task.nil_report, note: task.note, explanation: task.explanation };
   const [d, setD] = useState<Draft>(init);
+  // Người dùng đã sửa biểu (số liệu, không phát sinh, ghi chú, giải trình, sao chép kỳ trước) kể từ khi mở.
+  const edited = useRef(false);
+  // Nháp máy chủ về sau khi người dùng đã sửa: không ghi đè, chỉ báo và để người dùng chủ động nạp.
+  const [serverDraft, setServerDraft] = useState<CntsDraft | null>(null);
   // BF-CN-PUBLISH (UR-XA-13): nháp đã lưu lên máy chủ (máy khác / phiên trước) khi trên máy này chưa có nháp.
+  // Nháp trên máy này luôn mới hơn (lưu sau mỗi thao tác) nên không hỏi máy chủ. Nháp máy chủ không mới hơn lần gửi
+  // gần nhất thì bỏ qua. Phản hồi đến sau khi người dùng đã nhập thì không ghi đè (#108 [P2] Codex).
   useEffect(() => {
     if (local || !task.open) return;
     let alive = true;
     capi.draft(task.period_id, task.unit).then(
       (s) => {
-        if (alive && s) setD((x) => ({ ...x, values: { ...s.values }, nil: s.nil_report, note: s.note }));
+        if (!alive || !s) return;
+        if (task.submitted_at && !(Date.parse(s.saved_at) > Date.parse(task.submitted_at))) return;
+        if (edited.current) setServerDraft(s);
+        else setD((x) => ({ ...x, values: { ...s.values }, nil: s.nil_report, note: s.note }));
       },
       () => undefined,
     );
@@ -178,12 +187,14 @@ function Entry({
   const [conflict, setConflict] = useState<string | null>(null);
   const act = useAction();
   const late = isLate(task);
-  const update = (patch: Partial<Draft>) =>
+  const update = (patch: Partial<Draft>) => {
+    edited.current = true;
     setD((x) => {
       const n = { ...x, ...patch };
       saveDraft(task, n);
       return n;
     });
+  };
   const readOnly = !task.open;
 
   const submit = async () => {
@@ -242,6 +253,20 @@ function Entry({
             }}
           >
             Tải bản mới
+          </button>
+        </div>
+      ) : null}
+      {serverDraft && !readOnly ? (
+        <div className="alert alert-info" role="status">
+          <span>Có bản nháp đã lưu trên máy chủ lúc {dt(serverDraft.saved_at)}. Chưa nạp vì bạn đã sửa biểu; nạp sẽ thay số liệu, mục không phát sinh và ghi chú đang nhập.</span>
+          <button
+            className="btn btn-sm"
+            onClick={() => {
+              update({ values: { ...serverDraft.values }, nil: serverDraft.nil_report, note: serverDraft.note });
+              setServerDraft(null);
+            }}
+          >
+            Nạp nháp máy chủ
           </button>
         </div>
       ) : null}
@@ -350,3 +375,6 @@ function Entry({
     </section>
   );
 }
+
+// Cho kiểm thử hồi quy nạp nháp máy chủ (publish.test.tsx).
+export { Entry as CntsTaskEntry };

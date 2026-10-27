@@ -1,7 +1,7 @@
 // BF-CN-PUBLISH (#108, CN-07): cấu hình phát hành biểu kỳ CNTS (đối tượng nhóm xã, người phụ trách, giờ chốt, xem trước
 // số nhiệm vụ) và màn theo dõi (Đã nộp / Nháp / Chưa nhập / Trễ / Trả lại / Không nộp, nút Nhắc) — hàm thuần, backend giả
 // lập và màn thật.
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient, type ApiClient } from "@/api/client";
@@ -10,7 +10,8 @@ import { resetKnAdmin } from "@/api/mock/kn-admin";
 import { resetCntsPeriods } from "@/api/mock/kn-cnts-periods";
 import { ApiProblem } from "@/api/problem";
 import { createKnAdminApi } from "@/kn/cycle/api";
-import { createCntsPeriodApi, draftIndex, periodRows, trackState, type FormsTask } from "./api";
+import { createCntsPeriodApi, draftIndex, periodRows, trackState, type CntsDraft, type FormsTask } from "./api";
+import { CntsTaskEntry } from "./CntsEntryScreen";
 import { CntsPublishScreen, publishErrors, seriesBody, type PublishDraft } from "./CntsPublishScreen";
 
 vi.mock("next/navigation", () => ({
@@ -177,5 +178,88 @@ describe("CN-07 — màn phát hành và theo dõi", () => {
     expect(within(units).getAllByText("Chưa nhập")).toHaveLength(2);
     await u.click(within(table).getByRole("button", { name: "Nhắc (2)" }));
     expect(await screen.findByText(/Đã nhắc 2 đơn vị/)).toBeInTheDocument();
+  });
+});
+
+// #108 [P2] Codex: phản hồi nháp máy chủ đến chậm không được ghi đè nội dung người dùng vừa nhập.
+describe("CN-07 — nạp nháp máy chủ khi mở công việc", () => {
+  const task = (x: Partial<FormsTask> = {}) =>
+    ({
+      id: "race", period_id: "p", unit: "91301", open: true, version: 0, values: {}, nil_report: false, note: "", explanation: "",
+      fields: [{ key: "ghi_nhan", label: "Ghi nhận", type: "text" }], status: "not_submitted", due_at: "2099-01-01T00:00:00Z",
+      submitted_at: null, template_title: "BM-04", label: "Tuần 1", ...x,
+    }) as unknown as FormsTask;
+  const server: CntsDraft = { period_id: "p", unit: "91301", values: { ghi_nhan: "số cũ" }, nil_report: true, note: "nhập cũ", saved_at: "2099-01-01T08:00:00Z" };
+
+  function open(t: FormsTask) {
+    let resolve!: (d: CntsDraft | null) => void;
+    const pending = new Promise<CntsDraft | null>((r) => (resolve = r));
+    const draft = vi.fn(() => pending);
+    const capi = { draft } as unknown as Parameters<typeof CntsTaskEntry>[0]["capi"];
+    render(<CntsTaskEntry task={t} unitLabel="Mỹ Hòa Hưng" nilLabel="Không phát sinh" capi={capi} onDone={() => undefined} />);
+    return {
+      draft,
+      settle: async (d: CntsDraft | null) => {
+        await act(async () => {
+          resolve(d);
+          await pending;
+        });
+      },
+    };
+  }
+  const value = () => screen.getByLabelText(/Ghi nhận/);
+  const note = () => screen.getByLabelText("H08 Ghi chú chung");
+  const nil = () => screen.getByRole("checkbox", { name: /Không phát sinh/ });
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    auth.api = null;
+  });
+
+  it.each([
+    ["số liệu", () => fireEvent.change(value(), { target: { value: "số mới" } }), { v: "số mới", n: "", nil: false }],
+    ["ghi chú", () => fireEvent.change(note(), { target: { value: "nội dung mới" } }), { v: "", n: "nội dung mới", nil: false }],
+    ["không phát sinh", () => fireEvent.click(nil()), { v: "", n: "", nil: true }],
+  ])("người dùng sửa %s trước khi nháp máy chủ về → giữ nội dung đã nhập, báo có nháp máy chủ, bấm nạp mới thay", async (_, edit, want) => {
+    const { settle } = open(task());
+    edit();
+    await settle(server);
+    expect(value()).toHaveValue(want.v);
+    expect(note()).toHaveValue(want.n);
+    expect(nil()).toHaveProperty("checked", want.nil);
+    const notice = screen.getByText(/Có bản nháp đã lưu trên máy chủ/);
+    fireEvent.click(within(notice.parentElement!).getByRole("button", { name: "Nạp nháp máy chủ" }));
+    expect(value()).toHaveValue("số cũ");
+    expect(note()).toHaveValue("nhập cũ");
+    expect(nil()).toHaveProperty("checked", true);
+    expect(screen.queryByText(/Có bản nháp đã lưu trên máy chủ/)).toBeNull();
+  });
+
+  it("chưa sửa gì → nháp máy chủ về được nạp (số liệu, ghi chú, không phát sinh), không hiện thông báo", async () => {
+    const { settle } = open(task());
+    await settle(server);
+    expect(value()).toHaveValue("số cũ");
+    expect(note()).toHaveValue("nhập cũ");
+    expect(nil()).toHaveProperty("checked", true);
+    expect(screen.queryByText(/Có bản nháp đã lưu trên máy chủ/)).toBeNull();
+  });
+
+  it("nháp máy chủ không mới hơn lần gửi gần nhất → bỏ qua", async () => {
+    const sent = task({ version: 1, submitted_at: "2099-01-01T09:00:00Z", values: { ghi_nhan: "đã gửi" }, note: "bản gửi" });
+    const { settle } = open(sent);
+    await settle(server);
+    expect(value()).toHaveValue("đã gửi");
+    expect(note()).toHaveValue("bản gửi");
+    expect(nil()).toHaveProperty("checked", false);
+    expect(screen.queryByText(/Có bản nháp đã lưu trên máy chủ/)).toBeNull();
+  });
+
+  it("có nháp trên máy (lưu sau mỗi thao tác, mới hơn nháp máy chủ) → dùng nháp trên máy, không hỏi máy chủ", async () => {
+    window.localStorage.setItem("cnts-draft:race:v0", JSON.stringify({ values: { ghi_nhan: "trên máy" }, nil: false, note: "ghi chú máy", explanation: "" }));
+    const { draft, settle } = open(task());
+    await settle(server);
+    expect(draft).not.toHaveBeenCalled();
+    expect(value()).toHaveValue("trên máy");
+    expect(note()).toHaveValue("ghi chú máy");
   });
 });
