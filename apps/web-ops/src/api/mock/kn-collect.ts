@@ -5,6 +5,7 @@
 // số máy nguyên 0–1.000.000, trùng loại bị chặn, vật tư sửa = bản ghi bù có lý do.
 // ============================================================================
 import { uuidv7 } from "../idempotency";
+import { CATALOGS } from "./data";
 import { json, problem, type Ctx, type Route } from "./http";
 import { KN_COOPS } from "./kn-schedules";
 import { callerOf, isErr, type Caller } from "./kn-reports/store";
@@ -66,12 +67,12 @@ export const MACHINE_TYPES: Record<string, string> = {
   may_gat: "Máy gặt đập liên hợp",
   may_say: "Máy sấy",
 };
-export const MATERIALS: Record<string, { name: string; unit: string; countable: boolean }> = {
-  phan_ure: { name: "Phân urê", unit: "tấn", countable: false },
-  phan_npk: { name: "Phân NPK", unit: "tấn", countable: false },
-  thuoc_bvtv: { name: "Thuốc BVTV", unit: "lít", countable: false },
-  bay_den: { name: "Bẫy đèn", unit: "cái", countable: true },
-};
+/** ĐVT đếm được → số lượng nguyên (như Go material/domain.CountableUnits). */
+const COUNTABLE_UNITS = ["bao", "cái", "chai", "gói", "con", "chiếc", "cây", "hộp"];
+/** Vật tư đang dùng của danh mục giả lập `material` (data.ts) — cùng nguồn với màn chọn vật tư. */
+export const MATERIALS: Record<string, { name: string; unit: string; countable: boolean }> = Object.fromEntries(
+  CATALOGS.material.filter((m) => m.active && m.attrs.unit).map((m) => [m.code, { name: m.name, unit: m.attrs.unit!, countable: COUNTABLE_UNITS.includes(m.attrs.unit!.toLowerCase()) }]),
+);
 
 const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 /** Hôm nay theo lịch VN (now() là chuỗi UTC "Z") — KN-VN-DATE #149. */
@@ -137,6 +138,11 @@ function matWire(m: Material) {
   delete out.current;
   return out;
 }
+/** Lọc sổ vật tư như Go: commune, from/to (ngày ghi nhận), material_code. */
+const matchMat = (m: Material, url: URL) => {
+  const p = (k: string) => url.searchParams.get(k);
+  return (!p("commune") || m.commune_code === p("commune")) && (!p("from") || m.recorded_on >= p("from")!) && (!p("to") || m.recorded_on <= p("to")!) && (!p("material_code") || m.material_code === p("material_code"));
+};
 const coopWire = (x: Coop) => ({ ...x, household_count: HH.filter((h) => h.coop === x.ref && h.active).length });
 const findCoop = (c: Caller, ref: string | undefined) => COOPS.find((x) => x.ref === ref && inScope(c, x.commune_code));
 const notFound = () => problem(404, "party.org_not_found", "Không tìm thấy HTX");
@@ -323,7 +329,7 @@ export const knCollectRoutes: Route[] = [
     handler: wrap(({ url }, c) => {
       const commune = url.searchParams.get("commune");
       if (commune && !inScope(c, commune)) return problem(403, "extension.out_of_scope", "Ngoài phạm vi phụ trách");
-      return json({ items: MATS.filter((m) => m.current && inScope(c, m.commune_code) && (!commune || m.commune_code === commune)).map(matWire).reverse(), next_cursor: null });
+      return json({ items: MATS.filter((m) => m.current && inScope(c, m.commune_code) && matchMat(m, url)).map(matWire).reverse(), next_cursor: null });
     }),
   },
   {
@@ -353,8 +359,9 @@ export const knCollectRoutes: Route[] = [
     pattern: re("/v1/kn/materials/summary"),
     handler: wrap(({ url }, c) => {
       const commune = url.searchParams.get("commune");
+      if (commune && !inScope(c, commune)) return problem(403, "extension.out_of_scope", "Ngoài phạm vi phụ trách");
       const agg = new Map<string, { commune_code: string; material_code: string; material_name: string; unit: string; quantity: number; records: number }>();
-      for (const m of MATS.filter((x) => x.current && inScope(c, x.commune_code) && (!commune || x.commune_code === commune))) {
+      for (const m of MATS.filter((x) => x.current && inScope(c, x.commune_code) && matchMat(x, url))) {
         const k = `${m.commune_code}|${m.material_code}`;
         const a = agg.get(k) ?? { commune_code: m.commune_code, material_code: m.material_code, material_name: m.material_name, unit: m.unit, quantity: 0, records: 0 };
         a.quantity += Number(m.quantity);
@@ -364,4 +371,83 @@ export const knCollectRoutes: Route[] = [
       return json({ items: [...agg.values()].map((a) => ({ ...a, quantity: String(Math.round(a.quantity * 10000) / 10000) })) });
     }),
   },
+  {
+    method: "GET",
+    pattern: re("/v1/kn/materials/{id}/log"),
+    handler: wrap(({ params }, c) => {
+      const m = MATS.find((x) => x.id === params[0] && inScope(c, x.commune_code));
+      if (!m) return problem(404, "extension.material_record_not_found", "Không tìm thấy bản ghi vật tư");
+      const chain: Material[] = [];
+      for (let x: Material | undefined = m; x; x = MATS.find((y) => y.id === x!.supersedes_id)) chain.push(x);
+      const items = chain.map((x) => {
+        const prev = MATS.find((y) => y.id === x.supersedes_id);
+        return {
+          id: x.id,
+          event: prev ? "corrected" : "recorded",
+          actor_ref: x.actor_ref,
+          actor_display: x.actor_display,
+          at: x.recorded_at,
+          changes: prev ? [{ field: "quantity", old: prev.quantity, new: x.quantity }] : [{ field: "quantity", old: null, new: x.quantity }, { field: "note", old: null, new: x.note }],
+          reason: x.correction_reason,
+        };
+      });
+      return json({ items, next_cursor: null });
+    }),
+  },
+  {
+    method: "POST",
+    pattern: re("/v1/kn/materials/import"),
+    handler: wrap(({ body }, c) => canWrite(c, "extension.read_only") ?? materialImport(body)),
+  },
 ];
+
+/** Giả lập POST /v1/kn/materials/import (BF-TT-MAT #105): chỉ đọc CSV UTF-8 — máy chủ thật đọc cả .xlsx. */
+function materialImport(body: unknown): Response {
+  const invalid = (d: string) => problem(422, "extension.material_import_invalid", "Tệp vật tư không đúng mẫu", { detail: d });
+  if (typeof body !== "string") return invalid("Giả lập chỉ đọc CSV UTF-8 — máy chủ thật đọc cả .xlsx");
+  const norm = (h: string) =>
+    h
+      .replace(/^﻿/, "")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/đ/gi, "d")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  const rows = body.split(/\r?\n/).filter((l) => l.trim()).map((l) => l.split(",").map((x) => x.trim()));
+  const keys = (rows[0] ?? []).map(norm);
+  const col = (...names: string[]) => keys.findIndex((k) => names.includes(k));
+  const ci = { m: col("vat_tu", "ma_vat_tu", "loai_vat_tu", "ten_vat_tu"), q: col("so_luong"), d: col("thoi_diem", "ngay", "ngay_ghi_nhan"), n: col("ghi_chu") };
+  if (ci.m < 0 || ci.q < 0) return invalid("Tệp thiếu cột bắt buộc: Vật tư, Số lượng");
+  let accepted = 0;
+  const lines = rows.slice(1).map((r, i) => {
+    const raw = r[ci.m] ?? "";
+    const code = Object.keys(MATERIALS).find((k) => k === raw.toLowerCase() || norm(MATERIALS[k]!.name) === norm(raw)) ?? null;
+    const m = code ? MATERIALS[code]! : null;
+    const reasons: string[] = [];
+    if (!m) reasons.push(raw ? "vật tư không có trong danh mục đang dùng" : "thiếu vật tư");
+    const q = (r[ci.q] ?? "").replace(/\s/g, "");
+    const okQ = m ? (m.countable ? /^\d+$/ : /^\d+(\.\d{1,4})?$/).test(q) : /^\d+(\.\d+)?$/.test(q);
+    if (!q) reasons.push("thiếu số lượng");
+    else if (!okQ) reasons.push(m?.countable ? "ĐVT đếm được: số lượng phải là số nguyên" : "số lượng không hợp lệ");
+    const ds = ci.d >= 0 ? (r[ci.d] ?? "") : "";
+    const dm = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(ds);
+    const day = dm ? `${dm[3]}-${dm[2]!.padStart(2, "0")}-${dm[1]!.padStart(2, "0")}` : /^\d{4}-\d{2}-\d{2}$/.test(ds) ? ds : null;
+    if (ds && !day) reasons.push("thời điểm phải là ngày dd/mm/yyyy");
+    else if (day && day > todayVN()) reasons.push("thời điểm không được ở tương lai");
+    const ok = reasons.length === 0;
+    if (ok) accepted++;
+    return {
+      row: i + 2,
+      material_code: code,
+      material_name: m?.name ?? null,
+      unit: m?.unit ?? null,
+      quantity: q && okQ ? q : null,
+      recorded_on: day && day <= todayVN() ? day : null,
+      note: (ci.n >= 0 ? r[ci.n] : "") || null,
+      status: ok ? "accepted" : "rejected",
+      reason: ok ? null : reasons.join("; "),
+    };
+  });
+  return json({ lines, accepted, rejected: lines.length - accepted });
+}

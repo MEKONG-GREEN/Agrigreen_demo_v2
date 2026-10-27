@@ -4,7 +4,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AssignmentEditScreen, UserCreateScreen } from "./AdminScreens";
-import { CoopCreateScreen, CoopsScreen, HouseholdCreateScreen, MachinesScreen, MaterialsScreen } from "./DataScreens";
+import { CoopCreateScreen, CoopsScreen, HouseholdCreateScreen, MachinesScreen } from "./DataScreens";
 import { BatchesScreen, PublishScreen } from "./TinhScreens";
 
 const push = vi.fn();
@@ -131,27 +131,7 @@ describe("Dữ liệu xã — Thêm HTX, nông hộ trên trang riêng (R-A2, R-
     await u.click(screen.getByRole("button", { name: "Lưu" }));
     await waitFor(() => expect(auth.collectApi.putMachines).toHaveBeenCalledWith("htx-1", [{ machine_type: "may_gat", quantity: 3, note: null }]));
   });
-
-  it("Vật tư: số lượng bắt buộc, không âm; bẫy đèn chỉ nhận số nguyên", async () => {
-    const u = userEvent.setup();
-    render(<MaterialsScreen />);
-    const form = screen.getByRole("region", { name: "Ghi nhận vật tư" });
-    await u.click(within(form).getByRole("button", { name: "Lưu" }));
-    expect(within(form).getByRole("alert")).toHaveTextContent("Bắt buộc nhập.");
-    await u.type(within(form).getByLabelText(/Số lượng/), "-3");
-    await u.click(within(form).getByRole("button", { name: "Lưu" }));
-    expect(within(form).getByRole("alert")).toHaveTextContent("Không được nhập số âm.");
-    await u.selectOptions(within(form).getByLabelText(/Loại vật tư/), "bay_den");
-    await u.clear(within(form).getByLabelText(/Số lượng/));
-    await u.type(within(form).getByLabelText(/Số lượng/), "2,5");
-    await u.click(within(form).getByRole("button", { name: "Lưu" }));
-    expect(within(form).getByRole("alert")).toHaveTextContent("Chỉ nhập số nguyên.");
-    expect(auth.collectApi.recordMaterials).not.toHaveBeenCalled();
-    await u.selectOptions(within(form).getByLabelText(/Loại vật tư/), "phan_ure");
-    await u.click(within(form).getByRole("button", { name: "Lưu" }));
-    await waitFor(() => expect(auth.collectApi.recordMaterials).toHaveBeenCalled());
-    expect(auth.collectApi.recordMaterials!.mock.calls[0]![0].lines[0].quantity).toBe("2.5");
-  });
+  // Vật tư (bảng nhập nhiều dòng, BF-TT-MAT #105): MaterialsScreen.test.tsx.
 });
 
 describe("Quản trị người dùng — trang riêng thay pop-up", () => {

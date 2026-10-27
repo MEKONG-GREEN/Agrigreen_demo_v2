@@ -14,8 +14,8 @@ import { NumberField, SelectField, TextField, parseNumberInput, validateForm } f
 import { ActionBar, BackLink, DetailLayout, DetailPage, LabelValueBlock, LogPanel, RelatedTabs } from "@/components/patterns/detail";
 import { DataTable, FilterBar, FilterChip, PageHeader, RowActions, SearchBox, StatusPill, type Column } from "@/components/patterns/list";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
-import type { KnCooperative, KnPlot, MaterialRecord } from "../api";
-import { LoadState, dt, num, useAction, useCommuneNames, useCycleReadOnly, useLoad, ymdLocal } from "../common";
+import type { KnCooperative, KnPlot } from "../api";
+import { LoadState, num, useAction, useCommuneNames, useCycleReadOnly, useLoad } from "../common";
 import { PiiHint } from "@/kn/pii";
 
 /** Ghi chú phần còn ở nơi khác (nạp Excel, vẽ bản đồ ngoại tuyến…). */
@@ -474,93 +474,5 @@ export function PlotsScreen() {
   );
 }
 
-const MATERIAL_OPTIONS: [string, string][] = [
-  ["phan_ure", "Phân urê (tấn)"],
-  ["phan_npk", "Phân NPK (tấn)"],
-  ["thuoc_bvtv", "Thuốc BVTV (lít)"],
-  ["bay_den", "Bẫy đèn (cái)"],
-];
-
-/** FN-XA-03.06 Vật tư: ghi nhận theo xã + thời điểm; lịch sử; tổng hợp theo xã (Cấp Tỉnh xem). */
-export function MaterialsScreen() {
-  const { collectApi } = useAuth();
-  const readOnly = useCycleReadOnly();
-  const f = useCommuneFilter();
-  const act = useAction();
-  const [page, setPage] = useState(1);
-  const [line, setLine] = useState({ material_code: "phan_ure", quantity: "", note: "" });
-  const [day, setDay] = useState(() => ymdLocal(new Date()));
-  const list = useLoad(() => collectApi.materials(f.commune || undefined), [f.commune, act.note]);
-  const sum = useLoad(() => collectApi.materialSummary(f.commune || undefined), [f.commune, act.note]);
-  const name = useCommuneNames([...(list.data?.items.map((m) => m.commune_code) ?? []), ...(sum.data?.items.map((m) => m.commune_code) ?? [])]);
-  const commune = f.commune || f.communes[0]?.code || "";
-  // R-A1: số lượng ≥ 0, tối đa 4 chữ số lẻ; vật tư đếm được (bẫy đèn – cái) chỉ nhận số nguyên như máy chủ.
-  // TODO(#105): làm lại dạng bảng nhập nhiều dòng (lọc Xã + Thời điểm, ĐVT tự điền, Nạp Excel, Lịch sử) theo TT-12.
-  const qtyRule = { maxDecimals: 4, integer: line.material_code === "bay_den" };
-  const [errors, setErrors] = useState<Partial<Record<"day" | "material_code" | "quantity", string>>>({});
-  const dayErr = errors.day ?? (act.problem ? fieldErrorMap(act.problem).recorded_on : undefined);
-  const saveMaterial = async () => {
-    const v = validateForm(
-      { day, material_code: line.material_code, quantity: line.quantity },
-      { day: { kind: "text", required: true }, material_code: { kind: "text", required: true }, quantity: { kind: "number", required: true, ...qtyRule } },
-    );
-    setErrors(v.errors);
-    if (!v.valid) return;
-    const ok = await act.run(
-      () => collectApi.recordMaterials({ commune_code: commune, recorded_on: day, lines: [{ material_code: line.material_code, quantity: v.values.quantity, ...(line.note.trim() ? { note: line.note.trim() } : {}) }] }),
-      `Đã ghi nhận vật tư cho ${name(commune)}.`,
-    );
-    if (ok) setLine({ ...line, quantity: "", note: "" });
-  };
-  const columns: Column<MaterialRecord>[] = [
-    { key: "on", header: "Ngày ghi nhận", cell: (m) => m.recorded_on },
-    { key: "commune", header: "Xã", cell: (m) => name(m.commune_code) },
-    { key: "mat", header: "Vật tư", cell: (m) => m.material_name },
-    { key: "q", header: "Số lượng", cell: (m) => `${num(m.quantity, 4)} ${m.unit}` },
-    { key: "note", header: "Ghi chú", cell: (m) => m.note ?? "—" },
-    { key: "by", header: "Người ghi", cell: (m) => `${m.actor_display ?? "—"} · ${dt(m.recorded_at)}` },
-  ];
-  return (
-    <>
-      <PageHeader title="Vật tư" />
-      <FilterBar>{f.chip}</FilterBar>
-      {act.view}
-      {readOnly ? null : (
-        <section className="card sec row" style={{ gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "flex-start" }} aria-label="Ghi nhận vật tư">
-          <div className="field">
-            <label htmlFor="mat-day">
-              Thời điểm ghi nhận
-              <span className="req" aria-hidden="true">
-                {" "}*
-              </span>
-            </label>
-            <input id="mat-day" className="input" type="date" aria-required value={day} onChange={(e) => setDay(e.target.value)} aria-invalid={dayErr ? true : undefined} />
-            {dayErr ? (
-              <span className="err" role="alert">
-                {dayErr}
-              </span>
-            ) : null}
-          </div>
-          <SelectField label="Loại vật tư" required value={line.material_code} onChange={(v) => setLine({ ...line, material_code: v })} error={errors.material_code} options={MATERIAL_OPTIONS.map(([value, label]) => ({ value, label }))} />
-          <NumberField label="Số lượng" required value={line.quantity} onChange={(v) => setLine({ ...line, quantity: v })} rule={qtyRule} error={errors.quantity} onBlurError={(e) => setErrors((x) => ({ ...x, quantity: e }))} />
-          <TextField label="Ghi chú" value={line.note} onChange={(v) => setLine({ ...line, note: v })} maxLength={500} hint={<PiiHint text={line.note} />} />
-          <button type="button" className="btn btn-p btn-sm" style={{ alignSelf: "flex-end" }} disabled={!commune || act.busy} onClick={() => void saveMaterial()}>
-            Lưu
-          </button>
-        </section>
-      )}
-      <section className="card sec" aria-label="Tổng hợp vật tư theo xã" style={{ marginBottom: 12 }}>
-        <h2>Tổng hợp theo xã</h2>
-        <ul className="list-plain">
-          {(sum.data?.items ?? []).map((x) => (
-            <li key={`${x.commune_code}-${x.material_code}`}>
-              {name(x.commune_code)} · {x.material_name}: <b>{num(x.quantity, 4)}</b> {x.unit} ({x.records} lần)
-            </li>
-          ))}
-          {!sum.data?.items.length ? <li className="mute">Chưa có ghi nhận.</li> : null}
-        </ul>
-      </section>
-      <LoadState s={list}>{(d) => <DataTable caption="Lịch sử ghi nhận" columns={columns} rows={d.items.slice((page - 1) * 20, page * 20)} rowKey={(m) => m.id} page={page} pageSize={20} total={d.items.length} onPage={setPage} empty="Chưa có ghi nhận vật tư." />}</LoadState>
-    </>
-  );
-}
+/** FN-XA-03.06 Vật tư — bảng nhập nhiều dòng (BF-TT-MAT #105) ở MaterialsScreen.tsx. */
+export { MaterialsScreen } from "./MaterialsScreen";

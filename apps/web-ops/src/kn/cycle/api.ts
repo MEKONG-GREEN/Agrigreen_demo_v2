@@ -3,7 +3,7 @@
 // assignments, log, support-sessions, /v1/departments, /v1/regions, /v1/orgs/tree). Kiểu = kiểu sinh từ OpenAPI.
 // fetch(Request) thuần (như src/kn/client.ts): Bearer, X-AG-Context, Idempotency-Key, và X-AG-Reason ở chế độ hỗ trợ
 // (FN-AD-04.07: mọi thao tác ghi bắt buộc lý do ≥ 10 ký tự, mã hóa phần trăm).
-import type { components as AppC } from "@/api/generated/application";
+import type { components as AppC, paths as AppPaths } from "@/api/generated/application";
 import type { components as AdmC } from "@/api/generated/admin";
 import { beginAttempt, currentIdempotentRun, requestFingerprint, type IdempotencyAttempt } from "@/api/idempotency";
 import { ApiProblem, networkProblem, toProblem } from "@/api/problem";
@@ -415,6 +415,8 @@ export type KnCoopMachines = A["KNCoopMachines"];
 export type KnMachineOverview = A["KNMachineOverview"];
 export type KnPlot = A["KNPlot"];
 export type MaterialRecord = A["MaterialRecord"];
+export type MaterialQuery = { commune?: string; from?: string; to?: string; material_code?: string };
+export type MaterialImport = AppPaths["/v1/kn/materials/import"]["post"]["responses"]["200"]["content"]["application/json"];
 
 export type CollectApi = ReturnType<typeof createCollectApi>;
 
@@ -433,10 +435,15 @@ export function createCollectApi(opts: KnHttpOptions) {
     putMachines: (ref: string, lines: { machine_type: string; quantity: number; note?: string | null }[], idem?: string) =>
       call<KnCoopMachines>("PUT", `/v1/kn/machine-counts/${ref}`, { lines }, undefined, idem),
     plots: (q: { commune?: string; cooperative_ref?: string } = {}) => call<{ items: KnPlot[]; next_cursor: string | null }>("GET", "/v1/kn/plots", undefined, q),
-    materials: (commune?: string) => call<{ items: MaterialRecord[]; next_cursor: string | null }>("GET", "/v1/kn/materials", undefined, { commune }),
+    materials: (q: MaterialQuery = {}) => call<{ items: MaterialRecord[]; next_cursor: string | null }>("GET", "/v1/kn/materials", undefined, { ...q, limit: 500 }),
     recordMaterials: (b: { commune_code: string; recorded_on: string; lines: { material_code: string; quantity: string; note?: string }[] }, idem?: string) =>
       call<{ items: MaterialRecord[] }>("POST", "/v1/kn/materials", b, undefined, idem),
-    materialSummary: (commune?: string) =>
-      call<{ items: { commune_code: string; material_code: string; material_name: string; unit: string; quantity: string; records: number }[] }>("GET", "/v1/kn/materials/summary", undefined, { commune }),
+    materialSummary: (q: Omit<MaterialQuery, "material_code"> = {}) =>
+      call<{ items: { commune_code: string; material_code: string; material_name: string; unit: string; quantity: string; records: number }[] }>("GET", "/v1/kn/materials/summary", undefined, q),
+    /** Danh mục vật tư đang dùng (masterdata `material`, ĐVT = attrs.unit) cho cột "Loại vật tư". */
+    materialCatalog: () => call<{ items: A["CatalogItem"][]; next_cursor: string | null }>("GET", "/v1/masterdata/catalogs/material", undefined, { limit: 200 }),
+    materialLog: (id: string) => call<A["KNRecordLogPage"]>("GET", `/v1/kn/materials/${id}/log`),
+    /** BF-TT-MAT "Nạp Excel": máy chủ đọc tệp CSV/.xlsx thành dòng của bảng nhập — không ghi sổ. */
+    importMaterials: (file: RawFile) => call<MaterialImport>("POST", "/v1/kn/materials/import", file),
   };
 }
