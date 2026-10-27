@@ -22349,8 +22349,11 @@ export interface components {
             items: components["schemas"]["CNTSGrantCandidate"][];
         };
         CNTSDiarySupply: {
+            /** @description Vật tư (mục 1 sổ: con giống, thức ăn con/lớn, vaccine, chế phẩm…); dòng cũ chỉ có chủng loại */
+            item?: string;
             /** Format: date */
             date: string;
+            /** @description Chủng loại vật tư */
             kind: string;
             quantity: string;
             unit: string;
@@ -22508,6 +22511,22 @@ export interface components {
             project_code: string;
             owner_label: string | null;
             can_edit: boolean;
+            /** @description Đầu sổ NC-01: mô hình */
+            project_name: string;
+            /**
+             * Format: date
+             * @description Thời gian thực hiện — từ
+             */
+            project_start: string;
+            /**
+             * Format: date
+             * @description Thời gian thực hiện — đến
+             */
+            project_end: string | null;
+            /** Format: uuid */
+            officer_ref: string | null;
+            /** @description Cán bộ theo dõi điểm */
+            officer_display: string | null;
             accounting: components["schemas"]["CNTSDiaryAccounting"];
             suggest: components["schemas"]["CNTSDiarySuggest"];
             version: number;
@@ -22586,6 +22605,22 @@ export interface components {
             project_code: string;
             owner_label: string | null;
             can_edit: boolean;
+            /** @description Đầu sổ NC-01: mô hình */
+            project_name: string;
+            /**
+             * Format: date
+             * @description Thời gian thực hiện — từ
+             */
+            project_start: string;
+            /**
+             * Format: date
+             * @description Thời gian thực hiện — đến
+             */
+            project_end: string | null;
+            /** Format: uuid */
+            officer_ref: string | null;
+            /** @description Cán bộ theo dõi điểm */
+            officer_display: string | null;
             accounting: components["schemas"]["CNTSDiaryAccounting"];
             suggest: components["schemas"]["CNTSDiarySuggest"];
             version: number;
@@ -22771,12 +22806,14 @@ export interface components {
         };
         CNTSDiaryVaccination: {
             vaccine: string;
+            /** @description Lần tiêm; 0 = không ghi (sổ giấy 2026 không có cột lần) */
             shot: number;
             /** Format: date */
             date: string;
             dosage?: string;
             method?: string;
             mfg_date?: string;
+            note?: string;
         };
         CNTSMapLayers: {
             /** Format: date */
@@ -22809,11 +22846,16 @@ export interface components {
         CNTSDiaryOfficerNote: {
             /** Format: date */
             date: string;
+            /** @description Họ và tên cán bộ (phần 3 của sổ) */
+            officer?: string;
             content: string;
             farmer_opinion?: string;
         };
         CNTSDiaryTables: {
+            /** @description NC-09 mục 3 — mua thức ăn chăn nuôi */
             feed_purchases?: components["schemas"]["CNTSDiaryFeedPurchase"][];
+            /** @description NC-09 mục 4 — mua nguyên liệu thức ăn chăn nuôi (BM-08, BM-09) */
+            feed_materials?: components["schemas"]["CNTSDiaryFeedPurchase"][];
             treatments?: components["schemas"]["CNTSDiaryTreatment"][];
             vaccinations?: components["schemas"]["CNTSDiaryVaccination"][];
             sales?: components["schemas"]["CNTSDiarySale"][];

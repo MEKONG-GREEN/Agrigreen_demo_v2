@@ -141,8 +141,10 @@ func Day(t time.Time, zone *time.Location) time.Time {
 // Lứa nuôi (NC-02, NC-03, NC-15)
 // ---------------------------------------------------------------------------
 
-// Supply là một dòng vật tư nhận (NC-03): ngày nhận, chủng loại, số lượng.
+// Supply là một dòng vật tư nhận (NC-03, mục 1 "Thông tin chung" của sổ): vật tư (con giống, thức ăn gà/vịt con, gà/vịt
+// lớn, vaccine, chế phẩm…), ngày nhận, số lượng, chủng loại vật tư. Dòng cũ (trước BF-CN-DIARY) chỉ có chủng loại.
 type Supply struct {
+	Item     string `json:"item,omitempty"`
 	Date     string `json:"date"`
 	Kind     string `json:"kind"`
 	Quantity string `json:"quantity"`
@@ -196,9 +198,10 @@ func (c *Cycle) Normalize(today time.Time) Errors {
 		if _, err := time.Parse(time.DateOnly, s.Date); err != nil {
 			e.add(f+".date", "dạng YYYY-MM-DD")
 		}
+		e.text(f+".item", &s.Item, MaxShort)
 		e.text(f+".kind", &s.Kind, MaxShort)
-		if s.Kind == "" {
-			e.add(f+".kind", "bắt buộc")
+		if s.Item == "" && s.Kind == "" {
+			e.add(f+".item", "nhập vật tư hoặc chủng loại")
 		}
 		if d, err := decimal.NewFromString(strings.TrimSpace(s.Quantity)); err != nil || d.IsNegative() {
 			e.add(f+".quantity", "số không âm")
@@ -355,7 +358,8 @@ func MetricsOf(form string) []MetricDef {
 
 // Bảng phụ của sổ gà/vịt (UR-XA-11).
 const (
-	TableFeedPurchases = "feed_purchases" // NC-09
+	TableFeedPurchases = "feed_purchases" // NC-09, mục 3 của sổ: mua thức ăn chăn nuôi
+	TableFeedMaterials = "feed_materials" // NC-09, mục 4 của sổ: mua nguyên liệu thức ăn chăn nuôi (BF-CN-DIARY)
 	TableTreatments    = "treatments"     // NC-10 (không có ở sổ vịt xiêm 2026)
 	TableVaccinations  = "vaccinations"   // NC-11
 	TableSales         = "sales"          // NC-13 (không có ở sổ vịt xiêm 2026)
@@ -367,14 +371,15 @@ const (
 func TablesOf(form string) []string {
 	switch form {
 	case FormBM08:
-		return []string{TableFeedPurchases, TableTreatments, TableVaccinations, TableSales, TableOfficerNotes}
+		return []string{TableFeedPurchases, TableFeedMaterials, TableTreatments, TableVaccinations, TableSales, TableOfficerNotes}
 	case FormBM09:
-		return []string{TableFeedPurchases, TableVaccinations, TableOfficerNotes}
+		return []string{TableFeedPurchases, TableFeedMaterials, TableVaccinations, TableOfficerNotes}
 	}
 	return nil
 }
 
-// FeedPurchase NC-09.
+// FeedPurchase NC-09 (mục 3 mua thức ăn, mục 4 mua nguyên liệu thức ăn — cùng cột: ngày, tên, số lượng kg, đơn giá,
+// thành tiền tự tính, ghi chú).
 type FeedPurchase struct {
 	Date      string `json:"date"`
 	Name      string `json:"name"`
@@ -395,7 +400,8 @@ type Treatment struct {
 	Result         string `json:"result,omitempty"`
 }
 
-// Vaccination NC-11.
+// Vaccination NC-11 (mục 5 của sổ: ngày tiêm, tên vaccine, liều lượng, cách dùng, ngày sản xuất vaccine, ghi chú). Lần
+// tiêm (BRD) không có trên sổ giấy — 0 là chưa ghi.
 type Vaccination struct {
 	Vaccine string `json:"vaccine"`
 	Shot    int    `json:"shot"`
@@ -403,6 +409,7 @@ type Vaccination struct {
 	Dosage  string `json:"dosage,omitempty"`
 	Method  string `json:"method,omitempty"`
 	MfgDate string `json:"mfg_date,omitempty"`
+	Note    string `json:"note,omitempty"`
 }
 
 // Sale NC-13.
@@ -414,9 +421,10 @@ type Sale struct {
 	UnitPrice string `json:"unit_price"`
 }
 
-// OfficerNote NC-14.
+// OfficerNote NC-14 (phần 3 của sổ: ngày, họ và tên cán bộ, nội dung yêu cầu, ý kiến nông dân).
 type OfficerNote struct {
 	Date          string `json:"date"`
+	Officer       string `json:"officer,omitempty"`
 	Content       string `json:"content"`
 	FarmerOpinion string `json:"farmer_opinion,omitempty"`
 }
@@ -424,6 +432,7 @@ type OfficerNote struct {
 // Tables là bảng phụ của một lần ghi.
 type Tables struct {
 	FeedPurchases []FeedPurchase `json:"feed_purchases,omitempty"`
+	FeedMaterials []FeedPurchase `json:"feed_materials,omitempty"`
 	Treatments    []Treatment    `json:"treatments,omitempty"`
 	Vaccinations  []Vaccination  `json:"vaccinations,omitempty"`
 	Sales         []Sale         `json:"sales,omitempty"`
@@ -537,10 +546,13 @@ func (en *Entry) Normalize(form string) Errors {
 		}
 		return true
 	}
-	if check(TableFeedPurchases, len(t.FeedPurchases)) {
-		for i := range t.FeedPurchases {
-			r := &t.FeedPurchases[i]
-			f := "tables.feed_purchases[" + strconv.Itoa(i) + "]"
+	purchases := func(name string, rows []FeedPurchase) {
+		if !check(name, len(rows)) {
+			return
+		}
+		for i := range rows {
+			r := &rows[i]
+			f := "tables." + name + "[" + strconv.Itoa(i) + "]"
 			date(&e, f+".date", r.Date)
 			e.text(f+".name", &r.Name, MaxShort)
 			if r.Name == "" {
@@ -551,6 +563,8 @@ func (en *Entry) Normalize(form string) Errors {
 			e.text(f+".note", &r.Note, MaxShort)
 		}
 	}
+	purchases(TableFeedPurchases, t.FeedPurchases)
+	purchases(TableFeedMaterials, t.FeedMaterials)
 	if check(TableTreatments, len(t.Treatments)) {
 		for i := range t.Treatments {
 			r := &t.Treatments[i]
@@ -577,11 +591,12 @@ func (en *Entry) Normalize(form string) Errors {
 			if r.Vaccine == "" {
 				e.add(f+".vaccine", "bắt buộc")
 			}
-			if r.Shot < 1 || r.Shot > 20 {
-				e.add(f+".shot", "1–20")
+			if r.Shot < 0 || r.Shot > 20 {
+				e.add(f+".shot", "0–20 (0 = không ghi lần)")
 			}
 			e.text(f+".dosage", &r.Dosage, MaxShort)
 			e.text(f+".method", &r.Method, MaxShort)
+			e.text(f+".note", &r.Note, MaxShort)
 			if strings.TrimSpace(r.MfgDate) != "" {
 				date(&e, f+".mfg_date", r.MfgDate)
 			}
@@ -605,6 +620,7 @@ func (en *Entry) Normalize(form string) Errors {
 			r := &t.OfficerNotes[i]
 			f := "tables.officer_notes[" + strconv.Itoa(i) + "]"
 			date(&e, f+".date", r.Date)
+			e.text(f+".officer", &r.Officer, MaxShort)
 			e.text(f+".content", &r.Content, MaxText)
 			if r.Content == "" {
 				e.add(f+".content", "bắt buộc")
@@ -649,10 +665,10 @@ func (t Tables) SoldHeads(day time.Time) int64 {
 	return n
 }
 
-// FeedCost là tổng tiền mua thức ăn (NC-09 → gợi ý chi thức ăn NC-15).
+// FeedCost là tổng tiền mua thức ăn và nguyên liệu thức ăn (NC-09, mục 3 + 4 của sổ → gợi ý chi thức ăn NC-15).
 func (t Tables) FeedCost() decimal.Decimal {
 	sum := decimal.Zero
-	for _, r := range t.FeedPurchases {
+	for _, r := range slices.Concat(t.FeedPurchases, t.FeedMaterials) {
 		q, e1 := decimal.NewFromString(r.QtyKg)
 		p, e2 := decimal.NewFromString(r.UnitPrice)
 		if e1 == nil && e2 == nil {

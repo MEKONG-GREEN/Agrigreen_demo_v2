@@ -7,6 +7,7 @@ package app
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -36,14 +37,19 @@ type CycleView struct {
 	SiteName    string
 	ProjectCode string
 	OwnerLabel  string
-	CanEdit     bool
-	TotalCost   decimal.Decimal
-	Profit      *decimal.Decimal
-	UnitCost    *decimal.Decimal
-	Suggest     Suggest
-	Versions    []store.Cycle // chỉ chi tiết
-	Names       map[uuid.UUID]string
-	Replayed    bool
+	// Đầu sổ (NC-01): mô hình, thời gian thực hiện (ngày bắt đầu, kết thúc của chương trình/dự án), cán bộ theo dõi điểm.
+	ProjectName  string
+	ProjectStart time.Time
+	ProjectEnd   *time.Time
+	OfficerRef   *uuid.UUID
+	CanEdit      bool
+	TotalCost    decimal.Decimal
+	Profit       *decimal.Decimal
+	UnitCost     *decimal.Decimal
+	Suggest      Suggest
+	Versions     []store.Cycle // chỉ chi tiết
+	Names        map[uuid.UUID]string
+	Replayed     bool
 }
 
 func cycleStatus(event string) string {
@@ -89,7 +95,8 @@ func suggest(es []store.Entry) Suggest {
 
 func (s *Service) cycleView(c caller, hc *hctx, cy store.Cycle, es []store.Entry) CycleView {
 	v := CycleView{Cycle: cy, Status: cycleStatus(cy.Event), SiteName: hc.x.Name, ProjectCode: hc.p.Code, TotalCost: cy.TotalCost(),
-		Profit: cy.Profit(), UnitCost: cy.UnitCost(), Suggest: suggest(es)}
+		Profit: cy.Profit(), UnitCost: cy.UnitCost(), Suggest: suggest(es), ProjectName: hc.p.Name, ProjectStart: hc.p.Start,
+		ProjectEnd: hc.p.End, OfficerRef: hc.x.OfficerRef}
 	v.CanEdit = hc.open() && (c.keeper(hc) || (cy.Event == domain.EventClosed && c.reviewer(hc.p)))
 	return v
 }
@@ -418,6 +425,9 @@ func (s *Service) ListCycles(ctx context.Context, q CycleQuery) (CycleList, erro
 			}
 			out.Items = append(out.Items, v)
 			refs = append(refs, cy.ActorRef)
+			if v.OfficerRef != nil {
+				refs = append(refs, *v.OfficerRef)
+			}
 		}
 		return nil
 	})
@@ -471,6 +481,9 @@ func (s *Service) GetCycle(ctx context.Context, ref uuid.UUID) (CycleView, error
 	refs := []uuid.UUID{}
 	for _, x := range v.Versions {
 		refs = append(refs, x.ActorRef)
+	}
+	if v.OfficerRef != nil {
+		refs = append(refs, *v.OfficerRef)
 	}
 	v.Names = s.names(ctx, refs)
 	return v, nil

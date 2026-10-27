@@ -2,9 +2,31 @@
 
 // Phần dùng chung của màn nhật ký nuôi (W11.48): kết quả kiểm tra tự động, bảng chỉ số so lần trước, vị trí lúc ghi so với
 // điểm, biểu đồ tăng trọng theo lần cân, ảnh (mở qua máy chủ — bản rõ chỉ trong bộ nhớ trình duyệt).
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { StatusPill } from "@/components/patterns/list";
-import { metricsOf, type CntsDiaryApi, type Check, type Entry, type EntryDetail, type Form, PHOTO_KIND_LABEL, STATUS_LABEL, STATUS_TONE } from "./api";
+import {
+  AMOUNT_OF,
+  dmy,
+  growthTable,
+  lineAmount,
+  metricsOf,
+  money,
+  PHOTO_KIND_LABEL,
+  STATUS_LABEL,
+  STATUS_TONE,
+  TABLE_FIELDS,
+  TABLE_LABEL,
+  tablesOf,
+  TECH_TARGETS,
+  vn,
+  type CntsDiaryApi,
+  type Check,
+  type Cycle,
+  type Entry,
+  type EntryDetail,
+  type Form,
+  type Tables,
+} from "./api";
 
 export function StatusBadge({ status }: { status: Entry["status"] }) {
   return <StatusPill tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</StatusPill>;
@@ -161,5 +183,190 @@ export function Photos({ dapi, photos }: { dapi: CntsDiaryApi; photos: EntryDeta
         </figure>
       ))}
     </div>
+  );
+}
+
+/** Đầu sổ (NC-01): mô hình, thời gian thực hiện, cán bộ theo dõi điểm, chủ hộ, địa điểm, thông tin nhận giống (NC-02). */
+export function CycleHeader({ c }: { c: Cycle }) {
+  const rows: [string, string][] = [
+    ["Mô hình", `${c.project_name} (${c.project_code})`],
+    ["Thời gian thực hiện", `từ ${dmy(c.project_start)}${c.project_end ? ` đến ${dmy(c.project_end)}` : ""}`],
+    ["Cán bộ theo dõi điểm", c.officer_display ?? (c.officer_ref ? "—" : "Chưa phân công")],
+    ["Chủ hộ", c.owner_label ?? "—"],
+    ["Địa điểm thực hiện mô hình", c.site_name],
+    ["Ngày nhận giống; giống", `${dmy(c.received_date)}; ${c.breed}`],
+    ["Số lượng thả nuôi đầu kỳ", `${c.initial_count} con`],
+    ["Trọng lượng nhận; ngày tuổi", `${c.initial_weight_g ? `${vn(Number(c.initial_weight_g))} g/con` : "—"}; ${c.age_days ?? "—"}`],
+  ];
+  return (
+    <dl className="kv" aria-label="Đầu sổ">
+      {rows.map(([k, v]) => (
+        <Fragment key={k}>
+          <dt>{k}</dt>
+          <dd>{v}</dd>
+        </Fragment>
+      ))}
+    </dl>
+  );
+}
+
+/** Mục 1 "Thông tin chung" của sổ: vật tư nhận (NC-03). */
+export function SuppliesView({ supplies }: { supplies: Cycle["supplies"] }) {
+  if (!supplies.length) return null;
+  return (
+    <table className="table" aria-label="Vật tư nhận">
+      <thead>
+        <tr>
+          <th>Stt</th>
+          <th>Vật tư</th>
+          <th>Ngày nhận</th>
+          <th>Số lượng</th>
+          <th>Chủng loại vật tư</th>
+        </tr>
+      </thead>
+      <tbody>
+        {supplies.map((s, i) => (
+          <tr key={i}>
+            <td>{i + 1}</td>
+            <td>{s.item || "—"}</td>
+            <td>{dmy(s.date)}</td>
+            <td>
+              {s.quantity} {s.unit}
+            </td>
+            <td>{s.kind || "—"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** Bảng phụ của lần ghi (mục 3–7, phần 3 của sổ) — thành tiền tự tính. */
+export function TablesView({ form, tables }: { form: Form; tables: Tables }) {
+  const names = tablesOf(form).filter((n) => (tables[n] ?? []).length > 0);
+  if (!names.length) return null;
+  return (
+    <>
+      {names.map((n) => {
+        const fields = TABLE_FIELDS[n];
+        const amount = AMOUNT_OF[n];
+        const rows = (tables[n] ?? []) as unknown as Record<string, string | number | undefined>[];
+        return (
+          <table className="table" key={n} aria-label={TABLE_LABEL[n]}>
+            <caption>{TABLE_LABEL[n]}</caption>
+            <thead>
+              <tr>
+                {fields.map((f) => (
+                  <th key={f.key}>{f.label}</th>
+                ))}
+                {amount ? <th>Thành tiền</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  {fields.map((f) => {
+                    const v = r[f.key];
+                    return <td key={f.key}>{v === undefined || v === "" || (f.key === "shot" && !v) ? "—" : f.type === "date" ? dmy(String(v)) : String(v)}</td>;
+                  })}
+                  {amount ? <td>{money(lineAmount(r[amount[0]], r[amount[1]]))}</td> : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        );
+      })}
+    </>
+  );
+}
+
+/** Phần 2 của sổ (cán bộ theo dõi điểm): yêu cầu kỹ thuật cần đạt và chỉ tiêu sinh trưởng theo tuần tuổi (NC-12). */
+export function GrowthSection({ c, entries }: { c: Cycle; entries: Pick<Entry, "entry_date" | "metrics" | "status">[] }) {
+  const g = growthTable(c, entries);
+  const targets = TECH_TARGETS[c.form] ?? [];
+  const animal = c.form === "BM-09" ? "vịt" : "gà";
+  return (
+    <section aria-label="Chỉ tiêu sinh trưởng">
+      <h4>Phần 2 — Cán bộ theo dõi điểm</h4>
+      {targets.length ? (
+        <table className="table" aria-label="Yêu cầu kỹ thuật cần đạt">
+          <caption>1. Các yêu cầu kỹ thuật cần đạt</caption>
+          <thead>
+            <tr>
+              <th>Tên chỉ tiêu</th>
+              <th>ĐVT</th>
+              <th>Chỉ tiêu cần đạt</th>
+              <th>Thực tế</th>
+              <th>Đánh giá</th>
+            </tr>
+          </thead>
+          <tbody>
+            {targets.map((t) => {
+              const v = t.actual(g);
+              return (
+                <tr key={t.label}>
+                  <td>{t.label}</td>
+                  <td>{t.unit}</td>
+                  <td>{t.target}</td>
+                  <td>{vn(v)}</td>
+                  <td>{v === null ? "Chưa có số liệu" : t.ok(v) ? "Đạt" : "Chưa đạt"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : null}
+      <table className="table" aria-label="Chỉ tiêu sinh trưởng theo tuần tuổi">
+        <caption>2. Chỉ tiêu sinh trưởng của {animal} (tự tính từ lần ghi đã gửi)</caption>
+        <thead>
+          <tr>
+            <th>Stt</th>
+            <th>Tuần tuổi</th>
+            <th>Số lượng {animal} sống (con)</th>
+            <th>Tỉ lệ sống (%)</th>
+            <th>Nguyên nhân</th>
+            <th>Thức ăn trong kỳ (kg)</th>
+            <th>Tiêu tốn thức ăn (kg TA/kg tăng trọng)</th>
+            <th>Trọng lượng trung bình (kg/con)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {g.rows.map((r, i) => (
+            <tr key={r.week}>
+              <td>{i + 1}</td>
+              <td>Tuần {r.week}</td>
+              <td>{r.alive ?? "—"}</td>
+              <td>{vn(r.survival)}</td>
+              <td>{r.dead ? `${r.dead} con${r.causes ? ` — ${r.causes}` : ""}` : "—"}</td>
+              <td>{r.feedKg ? vn(r.feedKg) : "—"}</td>
+              <td>{vn(r.fcr)}</td>
+              <td>{vn(r.weightKg)}</td>
+            </tr>
+          ))}
+          <tr>
+            <td colSpan={2}>
+              <b>Cộng</b>
+            </td>
+            <td>{g.total.alive ?? "—"}</td>
+            <td>{vn(g.total.survival)}</td>
+            <td>{g.total.dead ? `${g.total.dead} con` : "—"}</td>
+            <td>{vn(g.total.feedKg)}</td>
+            <td>{vn(g.total.fcr)}</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td colSpan={2}>
+              <b>Bình quân</b>
+            </td>
+            <td colSpan={3} className="mute">
+              Thức ăn/con đầu kỳ: {vn(g.avg.feedPerHead)} kg
+            </td>
+            <td>—</td>
+            <td>—</td>
+            <td>{vn(g.avg.weightKg)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
   );
 }
