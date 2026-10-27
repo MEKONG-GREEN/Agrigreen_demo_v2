@@ -49,6 +49,8 @@ beforeEach(() => {
     machines: vi.fn().mockResolvedValue({ commune_totals: [] }),
     coopMachines: vi.fn().mockResolvedValue({ cooperative_ref: "htx-1", name: "HTX Mỹ Hòa", lines: [{ machine_type: "may_gat", machine_type_name: "Máy gặt", quantity: 2, note: null }], total: 2 }),
     putMachines: vi.fn().mockResolvedValue({ total: 3 }),
+    machineProfile: vi.fn().mockResolvedValue({ items: [{ machine_type: "may_gat", year_made: 2019 }] }),
+    putMachineProfile: vi.fn().mockResolvedValue({ items: [] }),
     materials: vi.fn().mockResolvedValue({ items: [] }),
     materialSummary: vi.fn().mockResolvedValue({ items: [] }),
     recordMaterials: vi.fn().mockResolvedValue({ items: [] }),
