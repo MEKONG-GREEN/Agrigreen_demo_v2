@@ -100,11 +100,17 @@ func TestParseGridImport_NumericCellsGolden(t *testing.T) {
 	}
 	set("A4", 1)
 	set("B4", "Mỹ Hòa Hưng")
-	set("C4", 1.234)
-	set("D4", 12.345)
-	set("E4", 0.001)
+	// Ô số ghi giá trị thô (không có t = kiểu số), không qua float (R-10). E4 "1E-3" giống Excel lưu số rất nhỏ.
+	num := func(cell, raw string) {
+		if err := f.SetCellDefault(sh, cell, raw); err != nil {
+			t.Fatal(err)
+		}
+	}
+	num("C4", "1.234")
+	num("D4", "12.345")
+	num("E4", "1E-3")
 	set("F4", "1.234,5")
-	set("G4", 1234.5)
+	num("G4", "1234.5")
 	style, err := f.NewStyle(&excelize.Style{NumFmt: 4}) // #,##0.00
 	if err != nil {
 		t.Fatal(err)
@@ -137,5 +143,24 @@ func TestParseGridImport_NumericCellsGolden(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("API nhập lưới:\n nhận %s\n muốn %s", gotRaw, wantRaw)
+	}
+}
+
+// canonicalNumber dùng decimal (R-10): giữ đúng chữ số thập phân, làm tròn 15 chữ số có nghĩa như Excel, bỏ nhiễu nhị phân.
+func TestCanonicalNumber(t *testing.T) {
+	for raw, want := range map[string]string{
+		"1.234": "1.234", "12.345": "12.345", "0.001": "0.001", "1E-3": "0.001", "1e-3": "0.001",
+		"1234.5": "1234.5", "1234.50": "1234.5", "7": "7", "-12.5": "-12.5", "0": "0", "0.000": "0", " 42 ": "42",
+		"1E+20": "100000000000000000000", "0.30000000000000004": "0.3", "1.2340000000000001": "1.234",
+		"123456789012345678": "123456789012346000",
+	} {
+		if got, ok := canonicalNumber(raw); !ok || got != want {
+			t.Errorf("%q: %q %v, muốn %q", raw, got, ok, want)
+		}
+	}
+	for _, raw := range []string{"", "NaN", "INF", "-Inf", "1,234", "1.234,5", "abc", "#DIV/0!"} {
+		if got, ok := canonicalNumber(raw); ok {
+			t.Errorf("%q: muốn không phải số, nhận %q", raw, got)
+		}
 	}
 }

@@ -12,7 +12,6 @@ import (
 	"encoding/csv"
 	"errors"
 	"io"
-	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/shopspring/decimal"
 	"github.com/xuri/excelize/v2"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
@@ -184,7 +184,7 @@ func gridRows(rows [][]string) (GridImport, bool) {
 
 // markNumericCells (Codex P1 #107): GetRows trả giá trị ĐÃ ĐỊNH DẠNG theo máy chủ ("1.234", "1,234.50"…), không phân
 // biệt ô số với ô chữ. Với mỗi ô của dòng dữ liệu, ô kiểu số (không có t / t="n", kể cả công thức ra số) được thay bằng
-// giá trị thô chuẩn hóa dạng thập phân dấu chấm, ngắn nhất mà vẫn đúng float64 (1.234 → "1.234", 1E-3 → "0.001",
+// giá trị thô chuẩn hóa dạng thập phân dấu chấm bằng decimal (canonicalNumber; 1.234 → "1.234", 1E-3 → "0.001",
 // 1234.5 định dạng "#,##0.00" → "1234.5") và ghi chữ cái cột vào Numeric. Ô chữ / chuỗi công thức / logic giữ nguyên.
 func markNumericCells(f *excelize.File, sh string, rows []GridImportRow) {
 	for i := range rows {
@@ -199,14 +199,34 @@ func markNumericCells(f *excelize.File, sh string, rows []GridImportRow) {
 			if err != nil {
 				continue
 			}
-			v, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
-			if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
+			v, ok := canonicalNumber(raw)
+			if !ok {
 				continue
 			}
-			r.Cells[l] = strconv.FormatFloat(v, 'f', -1, 64)
+			r.Cells[l] = v
 			r.Numeric = append(r.Numeric, l)
 		}
 	}
+}
+
+// excelSignificantDigits: Excel chỉ giữ 15 chữ số có nghĩa; phần đuôi kiểu "0.30000000000000004" là nhiễu nhị phân.
+const excelSignificantDigits = 15
+
+// canonicalNumber chuẩn hóa giá trị thô của ô số .xlsx bằng decimal (R-10: không float trong reportcycle): đọc chuỗi
+// ("1.234", "1E-3", "1.2340000000000001"), làm tròn còn 15 chữ số có nghĩa như Excel, in dạng thập phân dấu chấm, bỏ số 0
+// thừa ("1.234", "0.001", "1234.5"). Chuỗi không phải số (rỗng, NaN, INF…) → false.
+func canonicalNumber(raw string) (string, bool) {
+	d, err := decimal.NewFromString(strings.TrimSpace(raw))
+	if err != nil {
+		return "", false
+	}
+	if d.IsZero() {
+		return "0", true
+	}
+	// Vị trí chữ số có nghĩa đầu tiên: 10^msd ≤ |d| < 10^(msd+1).
+	coef := d.Coefficient() // bản sao
+	msd := int32(len(coef.Abs(coef).String())) - 1 + d.Exponent()
+	return d.Round(excelSignificantDigits - 1 - msd).String(), true
 }
 
 // sortedLetters: chữ cái cột theo thứ tự cột (A, B, …, Z, AA, …).
