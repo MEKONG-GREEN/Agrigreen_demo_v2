@@ -5,8 +5,8 @@
 //   → B3 loại kỳ, khoảng ngày, vụ/đợt, hạn nộp, số ngày chốt, ghi chú (máy chủ tự chia kỳ) → B4 chỉ tiêu "Tỉnh giao"
 //   theo xã (nhập tay / Excel / sao từ đợt trước) → B5 xem trước rồi Phát hành.
 // "Sao từ đợt trước": web điền sẵn giá trị của đợt đã phát hành gần nhất có cùng biểu (GET provincial-values) để xem và
-// sửa; xã KHÔNG sửa được gửi qua copy_provincial_from_previous (máy chủ chép lại, nguồn "previous"), xã đã sửa gửi trực
-// tiếp trong provincial_values. Không đổi engine pf/forms.
+// sửa; biểu mà mọi xã đã sao còn nguyên được gửi qua copy_provincial_from_previous (máy chủ chép lại, nguồn "previous");
+// đã sửa/xóa xã đã sao thì cả biểu gửi trực tiếp trong provincial_values (xem splitProvincial). Không đổi engine pf/forms.
 import Link from "next/link";
 import { useId, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
@@ -91,30 +91,38 @@ function StepError({ text }: { text?: string }) {
 }
 
 /**
- * Tách Tỉnh giao để gửi: xã đã "sao từ đợt trước" mà người dùng không sửa → để máy chủ chép (copy_provincial_from_previous,
- * nguồn previous); xã khác → provincial_values. `copied` = giá trị đã điền sẵn từ đợt trước theo biểu → xã.
+ * Tách Tỉnh giao để gửi. Máy chủ (reportcycle Issue) với copy_provincial_from_previous chép giá trị đợt trước cho MỌI xã
+ * của đợt chưa có dòng trong provincial_values — API không biểu đạt được "ô đã xóa". Vì vậy chỉ nhờ máy chủ chép một biểu
+ * (nguồn previous) khi mọi xã đã sao của biểu còn NGUYÊN và không xã nào có giá trị ở đợt trước đang trống trên màn hình;
+ * khi đó xã sao nguyên không gửi, xã khác gửi trực tiếp. Ngược lại (đã sửa/xóa một xã đã sao, hoặc xóa trắng một xã mà
+ * đợt trước có giá trị) → KHÔNG gửi cờ chép cho biểu đó, gửi toàn bộ ảnh màn hình qua provincial_values (Codex #106).
+ * `copied` = giá trị đã điền sẵn theo biểu → xã; `prev` = toàn bộ giá trị đợt trước đã lấy (mặc định = copied);
+ * `scope` = các xã nhận đợt này (không truyền = mọi xã).
  */
-export function splitProvincial(pv: PV, copied: PV, picked: string[]): { provincial: PV; copyFrom: string[]; copiedRows: number } {
+export function splitProvincial(pv: PV, copied: PV, picked: string[], prev: PV = copied, scope?: readonly string[]): { provincial: PV; copyFrom: string[]; copiedRows: number } {
   const provincial: PV = {};
-  const copyFrom = new Set<string>();
+  const copyFrom: string[] = [];
   let copiedRows = 0;
-  const same = (a: Record<string, string> = {}, b: Record<string, string> = {}) => {
-    const keys = new Set([...Object.keys(a), ...Object.keys(b)].filter((k) => (a[k] ?? "") !== "" || (b[k] ?? "") !== ""));
-    return [...keys].every((k) => (a[k] ?? "") === (b[k] ?? ""));
-  };
+  const filled = (cells: Record<string, string> = {}) => Object.fromEntries(Object.entries(cells).filter(([, v]) => v !== ""));
+  const same = (a: Record<string, string>, b: Record<string, string>) => Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((k) => a[k] === b[k]);
+  const inScope = (cm: string) => !scope || scope.includes(cm);
   for (const tpl of picked) {
+    const rows: Record<string, Record<string, string>> = {};
     for (const [cm, cells] of Object.entries(pv[tpl] ?? {})) {
-      const src = copied[tpl]?.[cm];
-      if (src && same(cells, src)) {
-        copyFrom.add(tpl);
-        copiedRows++;
-        continue;
-      }
-      const kept = Object.fromEntries(Object.entries(cells).filter(([, v]) => v !== ""));
-      if (Object.keys(kept).length) (provincial[tpl] ??= {})[cm] = kept;
+      const kept = filled(cells);
+      if (Object.keys(kept).length) rows[cm] = kept;
     }
+    const cp = Object.entries(copied[tpl] ?? {}).filter(([cm]) => inScope(cm));
+    const untouched = cp.length > 0 && cp.every(([cm, src]) => rows[cm] !== undefined && same(rows[cm]!, filled(src)));
+    const noResurrect = Object.entries(prev[tpl] ?? {}).every(([cm, src]) => !inScope(cm) || rows[cm] !== undefined || !Object.keys(filled(src)).length);
+    if (untouched && noResurrect) {
+      copyFrom.push(tpl);
+      copiedRows += cp.length;
+      for (const [cm] of cp) delete rows[cm];
+    }
+    if (Object.keys(rows).length) provincial[tpl] = rows;
   }
-  return { provincial, copyFrom: [...copyFrom], copiedRows };
+  return { provincial, copyFrom, copiedRows };
 }
 
 /** FN-TI-02.02 Phát hành biểu mẫu báo cáo (Hình 7) — wizard 5 bước (TT-14). */
@@ -140,6 +148,7 @@ export function PublishScreen() {
   const [note, setNote] = useState("");
   const [pv, setPv] = useState<PV>({});
   const [copied, setCopied] = useState<PV>({});
+  const [prevPv, setPrevPv] = useState<PV>({}); // toàn bộ giá trị đợt trước đã lấy khi "Sao từ đợt trước" (kể cả xã không điền)
   const [copyNote, setCopyNote] = useState<string | null>(null);
   const [pvSource, setPvSource] = useState<"manual" | "excel">("manual");
   const [pvImport, setPvImport] = useState<RcProvincialImport | null>(null);
@@ -170,6 +179,7 @@ export function PublishScreen() {
     const gone = (tpl: string) => !tpls || tpls.includes(tpl);
     setPv((x) => Object.fromEntries(Object.entries(x).filter(([tpl]) => !gone(tpl))));
     setCopied((x) => Object.fromEntries(Object.entries(x).filter(([tpl]) => !gone(tpl))));
+    setPrevPv((x) => Object.fromEntries(Object.entries(x).filter(([tpl]) => !gone(tpl))));
     setPvErr((x) => Object.fromEntries(Object.entries(x).filter(([k]) => !gone(k.split("|")[0]!))));
   };
 
@@ -202,7 +212,7 @@ export function PublishScreen() {
   };
   const body = (closeAfterDays: number, values: PV): RcBatchInput => {
     const [offset, time] = deadline.split("|");
-    const { provincial, copyFrom } = splitProvincial(values, copied, picked);
+    const { provincial, copyFrom } = splitProvincial(values, copied, picked, prevPv, preview ? previewCommunes.map((c) => c.commune_code) : undefined);
     return {
       report_type: rt,
       template_ids: picked,
@@ -309,8 +319,10 @@ export function PublishScreen() {
     const inScope = new Set(previewCommunes.map((c) => c.commune_code));
     const nextPv: PV = { ...pv };
     const nextCopied: PV = { ...copied };
+    const nextPrev: PV = { ...prevPv };
     let n = 0;
     for (const { tpl, values } of r) {
+      nextPrev[tpl] = values;
       for (const [cm, cells] of Object.entries(values)) {
         const cur = nextPv[tpl]?.[cm] ?? {};
         if (!inScope.has(cm) || Object.values(cur).some((v) => v !== "")) continue; // chỉ điền xã nhận đợt này, còn trống
@@ -321,6 +333,7 @@ export function PublishScreen() {
     }
     setPv(nextPv);
     setCopied(nextCopied);
+    setPrevPv(nextPrev);
     const seasons = [...new Set(r.map((x) => x.season))];
     setCopyNote(r.length ? `Đã sao ${n} dòng xã × biểu từ đợt ${seasons.map((s) => `“${s}”`).join(", ")}; xã đã có giá trị giữ nguyên.` : "Chưa có đợt trước nào có biểu đã chọn.");
   };
@@ -392,7 +405,7 @@ export function PublishScreen() {
   const inPreview = new Set(previewCommunes.map((c) => c.commune_code));
   const outsideImport = pvImport ? pvImport.rows.filter((x) => x.status === "accepted" && previewCommunes.length > 0 && !inPreview.has(x.commune_code)) : [];
   const shownCommunes = allCommunes.filter((c) => !communeQ || `${c.commune_code} ${name(c.commune_code)} ${c.region_name}`.toLowerCase().includes(communeQ.toLowerCase()));
-  const pvSummary = splitProvincial(pv, copied, picked);
+  const pvSummary = splitProvincial(pv, copied, picked, prevPv, preview ? previewCommunes.map((c) => c.commune_code) : undefined);
   const pvCount = Object.values(pvSummary.provincial).reduce((s, m) => s + Object.keys(m).length, 0);
 
   return (

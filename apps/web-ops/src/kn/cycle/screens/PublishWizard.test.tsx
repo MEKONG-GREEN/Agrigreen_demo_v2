@@ -191,6 +191,40 @@ describe("Phát hành biểu — wizard 5 bước (TT-14)", () => {
     expect(auth.cycleApi.preview!.mock.lastCall![0]).not.toHaveProperty("copy_provincial_from_previous");
   });
 
+  it("Codex #106: sao nhiều xã, xóa trắng một xã → phát hành không chép lại giá trị đã xóa", async () => {
+    auth.cycleApi.provincialValues = vi.fn().mockResolvedValue({
+      items: [
+        { template_id: "tpl-T01", commune_code: "91301", cells: { H: "120.5" } },
+        { template_id: "tpl-T01", commune_code: "91302", cells: { H: "80" } },
+      ],
+    });
+    const u = userEvent.setup();
+    render(<PublishScreen />);
+    await u.click(await screen.findByRole("checkbox", { name: "Chọn T01" }));
+    await next(u);
+    await screen.findByText("Toàn tỉnh: 3 xã/phường.");
+    await next(u);
+    await next(u);
+    await screen.findByLabelText("T01 H 91301");
+    await u.click(screen.getByRole("button", { name: /Sao từ đợt trước/ }));
+    await waitFor(() => expect(screen.getByLabelText("T01 H 91302")).toHaveValue("80"));
+    expect(screen.getByLabelText("T01 H 91301")).toHaveValue("120.5");
+    await u.clear(screen.getByLabelText("T01 H 91302"));
+    await next(u);
+    expect(currentStep()).toHaveTextContent("Bước 5");
+    await u.click(screen.getByRole("button", { name: /Phát hành$/ }));
+    await waitFor(() => expect(auth.cycleApi.issue).toHaveBeenCalledTimes(1));
+    const sent = auth.cycleApi.issue!.mock.calls[0]![0] as { provincial_values: Record<string, Record<string, Record<string, string>>>; copy_provincial_from_previous?: string[] };
+    expect(sent).not.toHaveProperty("copy_provincial_from_previous");
+    expect(sent.provincial_values).toEqual({ "tpl-T01": { "91301": { H: "120.5" } } });
+    // Áp đúng quy tắc máy chủ (reportcycle/app/batch.go Issue): với biểu có cờ chép, xã của đợt chưa có dòng explicit nhận giá trị đợt trước.
+    const published: Record<string, Record<string, string>> = { ...sent.provincial_values["tpl-T01"] };
+    if (sent.copy_provincial_from_previous?.includes("tpl-T01")) {
+      for (const [cm, cells] of Object.entries({ "91301": { H: "120.5" }, "91302": { H: "80" } })) if (COMMUNES.some((c) => c.commune_code === cm) && !published[cm]) published[cm] = cells;
+    }
+    expect(published).toEqual({ "91301": { H: "120.5" } }); // 91302 đã xóa trên màn hình → không được sống lại H=80
+  });
+
   it("Codex review #100: bỏ chọn biểu ở B1 thì ô Tỉnh giao lỗi của biểu đó không chặn và không bị gửi", async () => {
     const u = userEvent.setup();
     render(<PublishScreen />);
@@ -236,7 +270,31 @@ describe("splitProvincial", () => {
       { a: { x1: { H: "1" }, x2: { H: "8" } } },
       ["a"],
     );
-    expect(r).toEqual({ provincial: { a: { x2: { H: "9" } } }, copyFrom: ["a"], copiedRows: 1 });
+    // Đã sửa một xã đã sao (x2) → không nhờ máy chủ chép biểu "a" nữa, gửi toàn bộ ảnh màn hình.
+    expect(r).toEqual({ provincial: { a: { x1: { H: "1" }, x2: { H: "9" } } }, copyFrom: [], copiedRows: 0 });
+  });
+
+  it("mọi xã sao còn nguyên → copyFrom, xã nhập thêm gửi trực tiếp", () => {
+    const r = splitProvincial({ a: { x1: { H: "1" }, x2: { H: "8" }, x3: { H: "5" } } }, { a: { x1: { H: "1" }, x2: { H: "8" } } }, ["a"]);
+    expect(r).toEqual({ provincial: { a: { x3: { H: "5" } } }, copyFrom: ["a"], copiedRows: 2 });
+  });
+
+  it("Codex #106: xóa trắng một xã đã sao → không gửi cờ chép, xã đó không có dòng", () => {
+    const copied = { a: { x1: { H: "120.5" }, x2: { H: "80" } } };
+    const r = splitProvincial({ a: { x1: { H: "120.5" }, x2: { H: "" } } }, copied, ["a"]);
+    expect(r).toEqual({ provincial: { a: { x1: { H: "120.5" } } }, copyFrom: [], copiedRows: 0 });
+  });
+
+  it("xóa trắng xã nhập tay mà đợt trước có giá trị → không gửi cờ chép (máy chủ sẽ chép lại xã trống)", () => {
+    // x2 đã nhập tay trước khi sao nên không được điền (copied không có x2), nhưng đợt trước có x2.
+    const r = splitProvincial({ a: { x1: { H: "1" }, x2: { H: "" } } }, { a: { x1: { H: "1" } } }, ["a"], { a: { x1: { H: "1" }, x2: { H: "80" } } });
+    expect(r.copyFrom).toEqual([]);
+    expect(r.provincial).toEqual({ a: { x1: { H: "1" } } });
+  });
+
+  it("xã của đợt trước nằm ngoài phạm vi đợt này không chặn việc chép", () => {
+    const r = splitProvincial({ a: { x1: { H: "1" } } }, { a: { x1: { H: "1" } } }, ["a"], { a: { x1: { H: "1" }, x9: { H: "7" } } }, ["x1", "x2"]);
+    expect(r).toEqual({ provincial: {}, copyFrom: ["a"], copiedRows: 1 });
   });
 });
 
