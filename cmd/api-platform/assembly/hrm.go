@@ -2,6 +2,7 @@ package assembly
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 
@@ -41,4 +42,32 @@ func (u KNHRMUnits) InternalUnits(ctx context.Context, unitRef uuid.UUID) ([]hrm
 		out = append(out, hrmport.Unit{Code: x.Code, Name: x.Name, Kind: x.Kind, Active: x.Active})
 	}
 	return out, nil
+}
+
+// KNHRMNotifyDirectory nối người nhận thông báo HCTH của pf/hrm (NOTIFY-HCTH #48/#50) vào pf/accounts — CHỈ ĐỌC, tenant tường
+// minh (consumer worker không có Principal): vai trên lần gán còn hiệu lực theo phòng ban (RoleHolders) và lãnh đạo đơn vị
+// nội bộ tại một Nút (UnitManagers). Thiếu cổng → lỗi (consumer NACK, không đoán người nhận).
+type KNHRMNotifyDirectory struct {
+	Holders  accountsport.RoleHolders
+	Managers accountsport.UnitManagers
+}
+
+var _ hrmport.NotifyDirectory = KNHRMNotifyDirectory{}
+
+var errHRMNotifyDirectory = errors.New("assembly: chưa nối người nhận thông báo HCTH (pf/accounts)")
+
+// RoleHolders thực hiện hrmport.NotifyDirectory.
+func (d KNHRMNotifyDirectory) RoleHolders(ctx context.Context, tid uuid.UUID, role, dept string) ([]uuid.UUID, error) {
+	if d.Holders == nil {
+		return nil, errHRMNotifyDirectory
+	}
+	return d.Holders.RoleHolders(ctx, tid, role, dept)
+}
+
+// UnitManagers thực hiện hrmport.NotifyDirectory.
+func (d KNHRMNotifyDirectory) UnitManagers(ctx context.Context, tid, node uuid.UUID, units []string) (map[string][]uuid.UUID, error) {
+	if d.Managers == nil {
+		return nil, errHRMNotifyDirectory
+	}
+	return d.Managers.UnitManagers(ctx, tid, node, units)
 }

@@ -29,8 +29,7 @@ import (
 
 // PromotionConfig là phần cấu hình nâng bậc của Service.
 type PromotionConfig struct {
-	Notifier port.PromotionNotifier
-	Writer   port.PromotionWriter // W10.17 — Word; nil → chỉ Excel
+	Writer port.PromotionWriter // W10.17 — Word; nil → chỉ Excel
 }
 
 // promoCaller: xem/xuất cần export = all (FN-09 "Cấp Tỉnh – HCTH, Admin"); ghi cần thêm profile.edit = all.
